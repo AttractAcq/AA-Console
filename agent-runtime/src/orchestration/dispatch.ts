@@ -10,6 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
 import type { AgentRow } from "./registry.js";
 import type { AgentJobRow } from "../queue.js";
+import { runCompetitorJob } from "../agents/competitor/index.js";
 
 export interface JobResult {
   ok: boolean;
@@ -25,9 +26,10 @@ export type JobRunner = (
   job: AgentJobRow,
 ) => Promise<JobResult>;
 
-// Phase B ships deliberately empty. Agents land one at a time, each with
-// its own gate, starting with competitor.
-const RUNNERS: Record<string, JobRunner> = {};
+// Agents land one at a time, each with its own gate.
+const RUNNERS: Record<string, JobRunner> = {
+  competitor: runCompetitorJob,
+};
 
 export function hasRunner(agentKey: string): boolean {
   return agentKey in RUNNERS;
