@@ -11,6 +11,12 @@ import type { RuntimeConfig } from "../config.js";
 import type { AgentRow } from "./registry.js";
 import type { AgentJobRow } from "../queue.js";
 import { runCompetitorJob } from "../agents/competitor/index.js";
+import { runIcpJob } from "../agents/icp/index.js";
+import { runAssociationJob } from "../agents/association/index.js";
+import { runCampaignIntelJob } from "../agents/campaign_intel/index.js";
+import { runBrandStrategyJob } from "../agents/brand_strategy/index.js";
+import { runOfferStrategyJob } from "../agents/offer_strategy/index.js";
+import { runMoneyModelJob } from "../agents/money_model/index.js";
 
 export interface JobResult {
   ok: boolean;
@@ -28,7 +34,18 @@ export type JobRunner = (
 
 // Agents land one at a time, each with its own gate.
 const RUNNERS: Record<string, JobRunner> = {
+  icp: runIcpJob,
   competitor: runCompetitorJob,
+  association: runAssociationJob,
+  campaign_intel: runCampaignIntelJob,
+  brand_strategy: runBrandStrategyJob,
+  offer_strategy: runOfferStrategyJob,
+  money_model: runMoneyModelJob,
+  // `market` is registered in the agents table but deliberately absent
+  // here: it has no record_templates rows and no tab in the client nav,
+  // so it has nothing to produce and nowhere to show it. A job queued for
+  // it fails loudly as NO_RUNTIME_IMPLEMENTATION, which is the honest
+  // outcome until that product decision is made.
 };
 
 export function hasRunner(agentKey: string): boolean {

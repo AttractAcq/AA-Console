@@ -76,6 +76,52 @@ export async function loadDomainContext(
   return { templates, context: (contextRes.data as BusinessContext) ?? null, input };
 }
 
+export interface UpstreamRecord {
+  domain: string;
+  item_key: string;
+  title: string;
+  body: string | null;
+}
+
+/**
+ * Loads the records a synthesis agent depends on. Brand Strategy reads
+ * ICP, Competitor and Association; Money Model reads Offer Strategy. The
+ * database gate (can_run_agent) already refuses to queue these before
+ * their upstream has completed, so anything missing here is a real fault.
+ */
+export async function loadUpstreamRecords(
+  sb: SupabaseClient,
+  clientId: string,
+  domains: string[],
+): Promise<UpstreamRecord[]> {
+  if (domains.length === 0) return [];
+  const { data, error } = await sb
+    .from("client_agent_records")
+    .select("domain, item_key, title, body")
+    .eq("client_id", clientId)
+    .in("domain", domains)
+    .order("domain")
+    .order("display_order");
+  if (error) throw new Error(`Failed to load upstream records: ${error.message}`);
+  return ((data ?? []) as UpstreamRecord[]).filter((r) => (r.body ?? "").trim().length > 0);
+}
+
+/** Renders upstream records as prompt text, grouped by domain. */
+export function renderUpstream(records: UpstreamRecord[]): string {
+  if (records.length === 0) return "(no upstream records found)";
+  const byDomain = new Map<string, UpstreamRecord[]>();
+  for (const record of records) {
+    const list = byDomain.get(record.domain) ?? [];
+    list.push(record);
+    byDomain.set(record.domain, list);
+  }
+  return [...byDomain.entries()]
+    .map(([domain, items]) =>
+      `### ${domain}\n` + items.map((i) => `**${i.title}**\n${i.body}`).join("\n\n"),
+    )
+    .join("\n\n");
+}
+
 /** Renders the business context as prompt text, omitting anything blank. */
 export function renderContext(context: BusinessContext | null): string {
   if (!context) return "(no business context has been captured for this client yet)";
