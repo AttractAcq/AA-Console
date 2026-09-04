@@ -1,0 +1,102 @@
+// Process entry point: a small health/status HTTP surface plus
+// config.concurrency worker loops in the same process. One process, not a
+// server/worker pair — there is no cross-process coordination this runtime
+// needs, and one process is simpler to deploy and health-check.
+//
+// AGENT_RUNTIME_ENABLED=false is the rollback switch: the health server
+// still starts, so the platform health check keeps passing, but no worker
+// loops run and the process is inert.
+
+import http from "node:http";
+import { loadConfig } from "./config.js";
+import { serviceClient } from "./db.js";
+import { startWorker, type WorkerHandle } from "./worker.js";
+import { startHeartbeat } from "./heartbeat.js";
+import { registeredAgentKeys } from "./orchestration/dispatch.js";
+import { logger } from "./logging/logger.js";
+
+const config = loadConfig();
+const sb = serviceClient(config);
+
+logger.info("agent_runtime_starting", {
+  enabled: config.enabled,
+  concurrency: config.concurrency,
+  model: config.model,
+  leaseSeconds: config.leaseSeconds,
+  agents: registeredAgentKeys(),
+  pid: process.pid,
+});
+
+const workers: WorkerHandle[] = [];
+if (config.enabled) {
+  for (let i = 0; i < config.concurrency; i += 1) {
+    workers.push(startWorker(sb, config, i));
+  }
+} else {
+  logger.warn("agent_runtime_disabled", {
+    reason: "AGENT_RUNTIME_ENABLED is not true; no worker loops started.",
+  });
+}
+
+const heartbeat = startHeartbeat(sb, config, workers.length);
+
+const server = http.createServer((req, res) => {
+  const json = (status: number, body: unknown): void => {
+    res.writeHead(status, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(body));
+  };
+
+  if (req.url === "/health") {
+    // Deliberately unauthenticated and free of secrets — the platform
+    // health check hits this.
+    json(200, {
+      ok: true,
+      enabled: config.enabled,
+      workers: workers.length,
+      pid: process.pid,
+    });
+    return;
+  }
+
+  if (req.url === "/status") {
+    if (config.sharedSecret && req.headers["x-runtime-secret"] !== config.sharedSecret) {
+      json(401, { ok: false, error: "unauthorized" });
+      return;
+    }
+    json(200, {
+      ok: true,
+      enabled: config.enabled,
+      concurrency: config.concurrency,
+      leaseSeconds: config.leaseSeconds,
+      model: config.model,
+      agents: registeredAgentKeys(),
+    });
+    return;
+  }
+
+  json(404, { ok: false, error: "not found" });
+});
+
+server.listen(config.healthPort, () => {
+  logger.info("health_server_listening", { port: config.healthPort });
+});
+
+let shuttingDown = false;
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info("agent_runtime_stopping", { signal });
+
+  heartbeat.stop();
+  server.close();
+  // Let in-flight jobs finish their current iteration rather than killing
+  // them; anything still running will have its lease expire and be
+  // reclaimed by the next worker.
+  await Promise.all(workers.map((worker) => worker.stop()));
+
+  logger.info("agent_runtime_stopped", {});
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

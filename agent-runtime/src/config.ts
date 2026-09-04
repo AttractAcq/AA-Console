@@ -1,0 +1,94 @@
+// Environment configuration. Fails closed: a missing required variable
+// throws at startup rather than surfacing as undefined behaviour later.
+// Never logs a secret value, only whether one is present.
+
+export interface RuntimeConfig {
+  supabaseUrl: string;
+  supabaseServiceRoleKey: string;
+  anthropicApiKey: string;
+  /** Per-agent override, e.g. ANTHROPIC_API_KEY_COMPETITOR. Falls back to the shared key. */
+  anthropicApiKeyByAgent: Record<string, string>;
+  model: string;
+  enabled: boolean;
+  concurrency: number;
+  leaseSeconds: number;
+  emptyQueueBackoffMs: number;
+  healthPort: number;
+  /** Required in an X-Runtime-Secret header on /status when set. */
+  sharedSecret: string | null;
+}
+
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value || value.trim().length === 0) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value.trim();
+}
+
+function optionalEnv(name: string): string | undefined {
+  const value = process.env[name];
+  return value && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function intEnv(name: string, fallback: number): number {
+  const raw = optionalEnv(name);
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer, got: ${raw}`);
+  }
+  return parsed;
+}
+
+// Deliberately a literal list rather than a query against the agents table:
+// a misconfigured registry row must never change which environment
+// variables this process is willing to read at startup.
+const AGENT_KEY_ENV_SUFFIX: Record<string, string> = {
+  icp: "ICP",
+  competitor: "COMPETITOR",
+  association: "ASSOCIATION",
+  market: "MARKET",
+  campaign_intel: "CAMPAIGN_INTEL",
+  brand_strategy: "BRAND_STRATEGY",
+  offer_strategy: "OFFER_STRATEGY",
+  money_model: "MONEY_MODEL",
+  ideation: "IDEATION",
+  brief: "BRIEF",
+  landing_page: "LANDING_PAGE",
+};
+
+export function loadConfig(): RuntimeConfig {
+  const anthropicApiKey = requireEnv("ANTHROPIC_API_KEY");
+  const anthropicApiKeyByAgent: Record<string, string> = {};
+  for (const [agentKey, suffix] of Object.entries(AGENT_KEY_ENV_SUFFIX)) {
+    const override = optionalEnv(`ANTHROPIC_API_KEY_${suffix}`);
+    if (override) anthropicApiKeyByAgent[agentKey] = override;
+  }
+
+  const leaseSeconds = intEnv("AGENT_RUNTIME_LEASE_SECONDS", 900);
+  if (leaseSeconds < 30 || leaseSeconds > 3600) {
+    // claim_agent_job rejects anything outside this range, so fail here
+    // rather than on every claim attempt.
+    throw new Error(`AGENT_RUNTIME_LEASE_SECONDS must be between 30 and 3600, got: ${leaseSeconds}`);
+  }
+
+  return {
+    supabaseUrl: requireEnv("SUPABASE_URL"),
+    supabaseServiceRoleKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    anthropicApiKey,
+    anthropicApiKeyByAgent,
+    model: optionalEnv("AGENT_RUNTIME_MODEL") ?? "claude-opus-5",
+    enabled: (optionalEnv("AGENT_RUNTIME_ENABLED") ?? "true").toLowerCase() === "true",
+    concurrency: intEnv("AGENT_RUNTIME_CONCURRENCY", 2),
+    leaseSeconds,
+    emptyQueueBackoffMs: intEnv("AGENT_RUNTIME_EMPTY_QUEUE_BACKOFF_MS", 5000),
+    healthPort: intEnv("PORT", 8787),
+    sharedSecret: optionalEnv("AGENT_RUNTIME_SHARED_SECRET") ?? null,
+  };
+}
+
+/** Never pass the result of this to a log line or an HTTP response. */
+export function anthropicKeyForAgent(config: RuntimeConfig, agentKey: string): string {
+  return config.anthropicApiKeyByAgent[agentKey] ?? config.anthropicApiKey;
+}

@@ -1,0 +1,2253 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
+  public: {
+    Tables: {
+      agent_job_events: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          job_id: string
+          level: string
+          payload: Json | null
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          job_id: string
+          level?: string
+          payload?: Json | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          job_id?: string
+          level?: string
+          payload?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_job_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_jobs: {
+        Row: {
+          agent_key: string
+          attempts: number
+          client_id: string | null
+          completed_at: string | null
+          cost_usd: number
+          created_at: string
+          created_by: string | null
+          error: string | null
+          id: string
+          input_id: string | null
+          input_table: string | null
+          input_tokens: number
+          lease_until: string | null
+          max_attempts: number
+          output_tokens: number
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_status"]
+        }
+        Insert: {
+          agent_key: string
+          attempts?: number
+          client_id?: string | null
+          completed_at?: string | null
+          cost_usd?: number
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          input_id?: string | null
+          input_table?: string | null
+          input_tokens?: number
+          lease_until?: string | null
+          max_attempts?: number
+          output_tokens?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+        }
+        Update: {
+          agent_key?: string
+          attempts?: number
+          client_id?: string | null
+          completed_at?: string | null
+          cost_usd?: number
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          input_id?: string | null
+          input_table?: string | null
+          input_tokens?: number
+          lease_until?: string | null
+          max_attempts?: number
+          output_tokens?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_jobs_agent_key_fkey"
+            columns: ["agent_key"]
+            isOneToOne: false
+            referencedRelation: "agent_stats"
+            referencedColumns: ["agent_key"]
+          },
+          {
+            foreignKeyName: "agent_jobs_agent_key_fkey"
+            columns: ["agent_key"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["agent_key"]
+          },
+          {
+            foreignKeyName: "agent_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_jobs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agents: {
+        Row: {
+          agent_key: string
+          config: Json
+          created_at: string
+          description: string | null
+          domain: string | null
+          id: string
+          initials: string
+          name: string
+          paused: boolean
+          requires_upstream: string[]
+          updated_at: string
+        }
+        Insert: {
+          agent_key: string
+          config?: Json
+          created_at?: string
+          description?: string | null
+          domain?: string | null
+          id?: string
+          initials: string
+          name: string
+          paused?: boolean
+          requires_upstream?: string[]
+          updated_at?: string
+        }
+        Update: {
+          agent_key?: string
+          config?: Json
+          created_at?: string
+          description?: string | null
+          domain?: string | null
+          id?: string
+          initials?: string
+          name?: string
+          paused?: boolean
+          requires_upstream?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      campaigns: {
+        Row: {
+          campaign_ref: string
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          daily_spend: number
+          ended_on: string | null
+          id: string
+          objective_achieved: string | null
+          started_on: string
+          status: Database["public"]["Enums"]["campaign_status"]
+          target_role: string
+          total_spend: number
+          updated_at: string
+        }
+        Insert: {
+          campaign_ref: string
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_spend?: number
+          ended_on?: string | null
+          id?: string
+          objective_achieved?: string | null
+          started_on?: string
+          status?: Database["public"]["Enums"]["campaign_status"]
+          target_role: string
+          total_spend?: number
+          updated_at?: string
+        }
+        Update: {
+          campaign_ref?: string
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_spend?: number
+          ended_on?: string | null
+          id?: string
+          objective_achieved?: string | null
+          started_on?: string
+          status?: Database["public"]["Enums"]["campaign_status"]
+          target_role?: string
+          total_spend?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channel_members: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          channel_id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          channel_id: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          channel_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_members_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_members_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "team_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_agent_inputs: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          domain: Database["public"]["Enums"]["record_domain"]
+          id: string
+          notes: string | null
+          payload: Json
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          domain: Database["public"]["Enums"]["record_domain"]
+          id?: string
+          notes?: string | null
+          payload?: Json
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          domain?: Database["public"]["Enums"]["record_domain"]
+          id?: string
+          notes?: string | null
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_agent_inputs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_agent_inputs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_agent_records: {
+        Row: {
+          body: string | null
+          client_id: string
+          created_at: string
+          display_order: number
+          domain: Database["public"]["Enums"]["record_domain"]
+          edited_at: string | null
+          edited_by: string | null
+          id: string
+          item_key: string
+          item_type: string
+          job_id: string | null
+          period: string | null
+          status: Database["public"]["Enums"]["record_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          client_id: string
+          created_at?: string
+          display_order?: number
+          domain: Database["public"]["Enums"]["record_domain"]
+          edited_at?: string | null
+          edited_by?: string | null
+          id?: string
+          item_key: string
+          item_type?: string
+          job_id?: string | null
+          period?: string | null
+          status?: Database["public"]["Enums"]["record_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          client_id?: string
+          created_at?: string
+          display_order?: number
+          domain?: Database["public"]["Enums"]["record_domain"]
+          edited_at?: string | null
+          edited_by?: string | null
+          id?: string
+          item_key?: string
+          item_type?: string
+          job_id?: string | null
+          period?: string | null
+          status?: Database["public"]["Enums"]["record_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_edited_by_fkey"
+            columns: ["edited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_asset_reviews: {
+        Row: {
+          asset_id: string
+          created_at: string
+          decision: Database["public"]["Enums"]["review_status"]
+          id: string
+          reason: string | null
+          reviewed_by: string | null
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          decision: Database["public"]["Enums"]["review_status"]
+          id?: string
+          reason?: string | null
+          reviewed_by?: string | null
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          decision?: Database["public"]["Enums"]["review_status"]
+          id?: string
+          reason?: string | null
+          reviewed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_assignments: {
+        Row: {
+          client_id: string
+          compensation: number | null
+          created_at: string
+          due_date: string | null
+          ended_at: string | null
+          id: string
+          member_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          compensation?: number | null
+          created_at?: string
+          due_date?: string | null
+          ended_at?: string | null
+          id?: string
+          member_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          compensation?: number | null
+          created_at?: string
+          due_date?: string | null
+          ended_at?: string | null
+          id?: string
+          member_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_assignments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_assignments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_audit_notes: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          member_id: string | null
+          note: string
+          noted_on: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          member_id?: string | null
+          note: string
+          noted_on?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          member_id?: string | null
+          note?: string
+          noted_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_audit_notes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_audit_notes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_audit_notes_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_billing: {
+        Row: {
+          client_id: string
+          current_plan: string | null
+          monthly_amount: number | null
+          started_on: string | null
+          updated_at: string
+          upsell_opportunity: string | null
+        }
+        Insert: {
+          client_id: string
+          current_plan?: string | null
+          monthly_amount?: number | null
+          started_on?: string | null
+          updated_at?: string
+          upsell_opportunity?: string | null
+        }
+        Update: {
+          client_id?: string
+          current_plan?: string | null
+          monthly_amount?: number | null
+          started_on?: string | null
+          updated_at?: string
+          upsell_opportunity?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_billing_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_briefs: {
+        Row: {
+          body: string | null
+          brief_ref: string | null
+          client_id: string
+          created_at: string
+          id: string
+          job_id: string | null
+          media_type: Database["public"]["Enums"]["media_type"]
+          source_idea_id: string | null
+          status: Database["public"]["Enums"]["brief_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          brief_ref?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          media_type?: Database["public"]["Enums"]["media_type"]
+          source_idea_id?: string | null
+          status?: Database["public"]["Enums"]["brief_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          brief_ref?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          media_type?: Database["public"]["Enums"]["media_type"]
+          source_idea_id?: string | null
+          status?: Database["public"]["Enums"]["brief_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_briefs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_briefs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_briefs_source_idea_id_fkey"
+            columns: ["source_idea_id"]
+            isOneToOne: false
+            referencedRelation: "client_ideas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_business_context: {
+        Row: {
+          brand_voice: string | null
+          business_overview: string | null
+          client_id: string
+          competitors: string | null
+          created_at: string
+          current_marketing: string | null
+          current_revenue: string | null
+          ideal_customer: string | null
+          main_offer: string | null
+          proof_testimonials: string | null
+          sales_process: string | null
+          target_revenue: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          brand_voice?: string | null
+          business_overview?: string | null
+          client_id: string
+          competitors?: string | null
+          created_at?: string
+          current_marketing?: string | null
+          current_revenue?: string | null
+          ideal_customer?: string | null
+          main_offer?: string | null
+          proof_testimonials?: string | null
+          sales_process?: string | null
+          target_revenue?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          brand_voice?: string | null
+          business_overview?: string | null
+          client_id?: string
+          competitors?: string | null
+          created_at?: string
+          current_marketing?: string | null
+          current_revenue?: string | null
+          ideal_customer?: string | null
+          main_offer?: string | null
+          proof_testimonials?: string | null
+          sales_process?: string | null
+          target_revenue?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_business_context_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_business_context_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_contracts: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          signed_at: string | null
+          storage_path: string
+          title: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          signed_at?: string | null
+          storage_path: string
+          title: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          signed_at?: string | null
+          storage_path?: string
+          title?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_contracts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_contracts_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_ideas: {
+        Row: {
+          body: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          job_id: string | null
+          media_type: Database["public"]["Enums"]["media_type"]
+          proof_id: string | null
+          source: Database["public"]["Enums"]["idea_source"]
+          status: Database["public"]["Enums"]["idea_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          job_id?: string | null
+          media_type?: Database["public"]["Enums"]["media_type"]
+          proof_id?: string | null
+          source: Database["public"]["Enums"]["idea_source"]
+          status?: Database["public"]["Enums"]["idea_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          job_id?: string | null
+          media_type?: Database["public"]["Enums"]["media_type"]
+          proof_id?: string | null
+          source?: Database["public"]["Enums"]["idea_source"]
+          status?: Database["public"]["Enums"]["idea_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_ideas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_ideas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_ideas_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_ideas_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_integrations: {
+        Row: {
+          access_level: string | null
+          client_id: string
+          created_at: string
+          credential_label: string | null
+          credential_secret_id: string | null
+          id: string
+          last_checked_at: string | null
+          provider: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          access_level?: string | null
+          client_id: string
+          created_at?: string
+          credential_label?: string | null
+          credential_secret_id?: string | null
+          id?: string
+          last_checked_at?: string | null
+          provider: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          access_level?: string | null
+          client_id?: string
+          created_at?: string
+          credential_label?: string | null
+          credential_secret_id?: string | null
+          id?: string
+          last_checked_at?: string | null
+          provider?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_integrations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_leads: {
+        Row: {
+          client_id: string
+          contact: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string | null
+          notes: string | null
+          pipeline_stage: Database["public"]["Enums"]["pipeline_stage"]
+          source: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          contact?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string | null
+          notes?: string | null
+          pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
+          source?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          contact?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string | null
+          notes?: string | null
+          pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
+          source?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_leads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_media_assets: {
+        Row: {
+          brief_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          media_type: Database["public"]["Enums"]["media_type"]
+          member_id: string | null
+          ref_number: string | null
+          review_status: Database["public"]["Enums"]["review_status"]
+          storage_path: string
+          title: string | null
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          brief_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          media_type: Database["public"]["Enums"]["media_type"]
+          member_id?: string | null
+          ref_number?: string | null
+          review_status?: Database["public"]["Enums"]["review_status"]
+          storage_path: string
+          title?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          brief_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          media_type?: Database["public"]["Enums"]["media_type"]
+          member_id?: string | null
+          ref_number?: string | null
+          review_status?: Database["public"]["Enums"]["review_status"]
+          storage_path?: string
+          title?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_onboarding_steps: {
+        Row: {
+          client_id: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          display_order: number
+          id: string
+          status: Database["public"]["Enums"]["step_status"]
+          step_key: string
+          title: string
+        }
+        Insert: {
+          client_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          status?: Database["public"]["Enums"]["step_status"]
+          step_key: string
+          title: string
+        }
+        Update: {
+          client_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          status?: Database["public"]["Enums"]["step_status"]
+          step_key?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_onboarding_steps_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_onboarding_steps_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_pages: {
+        Row: {
+          body: string | null
+          brief: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          job_id: string | null
+          page_type: Database["public"]["Enums"]["page_type"]
+          published_url: string | null
+          status: Database["public"]["Enums"]["record_status"]
+          thumbnail_path: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          brief?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          job_id?: string | null
+          page_type: Database["public"]["Enums"]["page_type"]
+          published_url?: string | null
+          status?: Database["public"]["Enums"]["record_status"]
+          thumbnail_path?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          brief?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          job_id?: string | null
+          page_type?: Database["public"]["Enums"]["page_type"]
+          published_url?: string | null
+          status?: Database["public"]["Enums"]["record_status"]
+          thumbnail_path?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_pages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_pages_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_pages_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_proof_assets: {
+        Row: {
+          body: string | null
+          client_id: string
+          created_at: string
+          id: string
+          media_type: Database["public"]["Enums"]["media_type"]
+          source: string | null
+          storage_path: string | null
+          title: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          body?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          media_type: Database["public"]["Enums"]["media_type"]
+          source?: string | null
+          storage_path?: string | null
+          title?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          body?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          media_type?: Database["public"]["Enums"]["media_type"]
+          source?: string | null
+          storage_path?: string | null
+          title?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_proof_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_proof_assets_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_users: {
+        Row: {
+          client_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_users_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          created_at: string
+          id: string
+          initials: string
+          is_internal: boolean
+          location: string | null
+          name: string
+          sector: string | null
+          tier: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          initials: string
+          is_internal?: boolean
+          location?: string | null
+          name: string
+          sector?: string | null
+          tier?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          initials?: string
+          is_internal?: boolean
+          location?: string | null
+          name?: string
+          sector?: string | null
+          tier?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      contract_payments: {
+        Row: {
+          compensation: number
+          created_at: string
+          due_date: string | null
+          id: string
+          member_id: string
+          payment_date: string | null
+          service_rendered: string
+          updated_at: string
+        }
+        Insert: {
+          compensation: number
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          member_id: string
+          payment_date?: string | null
+          service_rendered: string
+          updated_at?: string
+        }
+        Update: {
+          compensation?: number
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          member_id?: string
+          payment_date?: string | null
+          service_rendered?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_payments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_entries: {
+        Row: {
+          amount: number
+          category: string | null
+          client_id: string | null
+          created_at: string
+          id: string
+          line_item: string
+          period: string
+          statement: string
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          line_item: string
+          period: string
+          statement: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          line_item?: string
+          period?: string
+          statement?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_entries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_periods: {
+        Row: {
+          cac: number | null
+          created_at: string
+          id: string
+          ltv: number | null
+          mrr: number | null
+          notes: string | null
+          period: string
+          updated_at: string
+        }
+        Insert: {
+          cac?: number | null
+          created_at?: string
+          id?: string
+          ltv?: number | null
+          mrr?: number | null
+          notes?: string | null
+          period: string
+          updated_at?: string
+        }
+        Update: {
+          cac?: number | null
+          created_at?: string
+          id?: string
+          ltv?: number | null
+          mrr?: number | null
+          notes?: string | null
+          period?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      job_assignments: {
+        Row: {
+          brief_id: string | null
+          client_id: string | null
+          compensation: number | null
+          completed_at: string | null
+          created_at: string
+          due_date: string | null
+          id: string
+          member_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          brief_id?: string | null
+          client_id?: string | null
+          compensation?: number | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          member_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          brief_id?: string | null
+          client_id?: string | null
+          compensation?: number | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          member_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_assignments_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          employee_category: Database["public"]["Enums"]["team_category"] | null
+          full_name: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          employee_category?:
+            | Database["public"]["Enums"]["team_category"]
+            | null
+          full_name?: string | null
+          id: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          employee_category?:
+            | Database["public"]["Enums"]["team_category"]
+            | null
+          full_name?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      record_templates: {
+        Row: {
+          description: string | null
+          display_order: number
+          domain: Database["public"]["Enums"]["record_domain"]
+          item_key: string
+          item_type: string
+          title: string
+        }
+        Insert: {
+          description?: string | null
+          display_order?: number
+          domain: Database["public"]["Enums"]["record_domain"]
+          item_key: string
+          item_type?: string
+          title: string
+        }
+        Update: {
+          description?: string | null
+          display_order?: number
+          domain?: Database["public"]["Enums"]["record_domain"]
+          item_key?: string
+          item_type?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      ref_counters: {
+        Row: {
+          client_id: string
+          last_value: number
+        }
+        Insert: {
+          client_id: string
+          last_value?: number
+        }
+        Update: {
+          client_id?: string
+          last_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ref_counters_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_posts: {
+        Row: {
+          asset_id: string | null
+          channel: Database["public"]["Enums"]["post_channel"]
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          media_type: Database["public"]["Enums"]["media_type"]
+          notes: string | null
+          published_at: string | null
+          ref_number: string | null
+          scheduled_for: string
+          updated_at: string
+        }
+        Insert: {
+          asset_id?: string | null
+          channel?: Database["public"]["Enums"]["post_channel"]
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          media_type?: Database["public"]["Enums"]["media_type"]
+          notes?: string | null
+          published_at?: string | null
+          ref_number?: string | null
+          scheduled_for: string
+          updated_at?: string
+        }
+        Update: {
+          asset_id?: string | null
+          channel?: Database["public"]["Enums"]["post_channel"]
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          media_type?: Database["public"]["Enums"]["media_type"]
+          notes?: string | null
+          published_at?: string | null
+          ref_number?: string | null
+          scheduled_for?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sops: {
+        Row: {
+          created_at: string
+          id: string
+          owner_id: string | null
+          storage_path: string
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_id?: string | null
+          storage_path: string
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_id?: string | null
+          storage_path?: string
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sops_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sops_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_channels: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_channels_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          active: boolean
+          category: Database["public"]["Enums"]["team_category"]
+          contact_info: string | null
+          created_at: string
+          engagement: Database["public"]["Enums"]["engagement_type"]
+          id: string
+          initials: string
+          name: string
+          personal_info: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          category: Database["public"]["Enums"]["team_category"]
+          contact_info?: string | null
+          created_at?: string
+          engagement?: Database["public"]["Enums"]["engagement_type"]
+          id?: string
+          initials: string
+          name: string
+          personal_info?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          category?: Database["public"]["Enums"]["team_category"]
+          contact_info?: string | null
+          created_at?: string
+          engagement?: Database["public"]["Enums"]["engagement_type"]
+          id?: string
+          initials?: string
+          name?: string
+          personal_info?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_messages: {
+        Row: {
+          author_id: string | null
+          body: string
+          channel_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          channel_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          channel_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_messages_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "team_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_logs: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          id: string
+          logged_on: string
+          member_id: string
+          minutes: number | null
+          work_done: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          logged_on?: string
+          member_id: string
+          minutes?: number | null
+          work_done: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          logged_on?: string
+          member_id?: string
+          minutes?: number | null
+          work_done?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_logs_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      agent_stats: {
+        Row: {
+          agent_key: string | null
+          avg_monthly_cost: number | null
+          failed_runs: number | null
+          failure_rate: number | null
+          name: string | null
+          runs: number | null
+          total_cost: number | null
+        }
+        Relationships: []
+      }
+      approvals_queue: {
+        Row: {
+          brief_id: string | null
+          brief_title: string | null
+          client_id: string | null
+          client_name: string | null
+          created_at: string | null
+          id: string | null
+          media_type: Database["public"]["Enums"]["media_type"] | null
+          member_id: string | null
+          ref_number: string | null
+          review_status: Database["public"]["Enums"]["review_status"] | null
+          storage_path: string | null
+          title: string | null
+          updated_at: string | null
+          uploaded_by: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_totals: {
+        Row: {
+          active_campaigns: number | null
+          current_daily_spend: number | null
+          lifetime_spend: number | null
+        }
+        Relationships: []
+      }
+      client_billing_view: {
+        Row: {
+          client_id: string | null
+          current_plan: string | null
+          duration_days: number | null
+          duration_from: string | null
+          monthly_amount: number | null
+          started_on: string | null
+          updated_at: string | null
+          upsell_opportunity: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_billing_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_pipeline_counts: {
+        Row: {
+          client_id: string | null
+          lead_count: number | null
+          pipeline_stage: Database["public"]["Enums"]["pipeline_stage"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mrr_from_billing: {
+        Row: {
+          mrr: number | null
+          paying_clients: number | null
+        }
+        Relationships: []
+      }
+      work_submissions: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          media_type: Database["public"]["Enums"]["media_type"] | null
+          member_id: string | null
+          ref_number: string | null
+          review_status: Database["public"]["Enums"]["review_status"] | null
+          storage_path: string | null
+          title: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          media_type?: Database["public"]["Enums"]["media_type"] | null
+          member_id?: string | null
+          ref_number?: string | null
+          review_status?: Database["public"]["Enums"]["review_status"] | null
+          storage_path?: string | null
+          title?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          media_type?: Database["public"]["Enums"]["media_type"] | null
+          member_id?: string | null
+          ref_number?: string | null
+          review_status?: Database["public"]["Enums"]["review_status"] | null
+          storage_path?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Functions: {
+      accessible_client_ids: { Args: never; Returns: string[] }
+      admin_create_team_member: {
+        Args: {
+          p_category: Database["public"]["Enums"]["team_category"]
+          p_engagement?: Database["public"]["Enums"]["engagement_type"]
+          p_initials: string
+          p_name: string
+          p_password?: string
+          p_username?: string
+        }
+        Returns: string
+      }
+      admin_store_integration_credential: {
+        Args: {
+          p_access_level?: string
+          p_client_id: string
+          p_label: string
+          p_provider: string
+          p_secret: string
+        }
+        Returns: string
+      }
+      approve_idea_and_generate_brief: {
+        Args: { p_idea_id: string }
+        Returns: string
+      }
+      can_access_client: { Args: { target: string }; Returns: boolean }
+      can_run_agent: {
+        Args: { p_agent_key: string; p_client_id: string }
+        Returns: boolean
+      }
+      create_console_user: {
+        Args: {
+          p_category?: Database["public"]["Enums"]["team_category"]
+          p_email: string
+          p_full_name: string
+          p_password: string
+          p_role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: string
+      }
+      current_member_id: { Args: never; Returns: string }
+      current_role_of: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      enqueue_agent_job: {
+        Args: {
+          p_agent_key: string
+          p_client_id?: string
+          p_input_id?: string
+          p_input_table?: string
+        }
+        Returns: string
+      }
+      is_admin: { Args: never; Returns: boolean }
+      is_channel_member: { Args: { target: string }; Returns: boolean }
+      is_member: { Args: { target: string }; Returns: boolean }
+      next_ref_number: { Args: { p_client_id: string }; Returns: string }
+      review_media_asset: {
+        Args: {
+          p_asset_id: string
+          p_decision: Database["public"]["Enums"]["review_status"]
+          p_reason?: string
+        }
+        Returns: undefined
+      }
+      schedule_asset: {
+        Args: {
+          p_asset_id: string
+          p_channel?: Database["public"]["Enums"]["post_channel"]
+          p_date: string
+        }
+        Returns: string
+      }
+      start_onboarding: { Args: { p_client_id: string }; Returns: undefined }
+      try_uuid: { Args: { t: string }; Returns: string }
+    }
+    Enums: {
+      app_role: "admin" | "employee" | "client"
+      brief_status:
+        | "draft"
+        | "approved"
+        | "rejected"
+        | "in_production"
+        | "complete"
+      campaign_status: "active" | "past"
+      engagement_type: "employee" | "contractor"
+      idea_source: "manual" | "auto" | "proof"
+      idea_status: "draft" | "approved" | "rejected" | "briefed"
+      job_status: "queued" | "running" | "completed" | "failed" | "cancelled"
+      media_type: "image" | "text" | "video"
+      page_type: "landing" | "offer"
+      pipeline_stage: "first_touch" | "second_touch" | "call_booked"
+      post_channel: "organic" | "paid"
+      record_domain:
+        | "icp"
+        | "competitor"
+        | "association"
+        | "market"
+        | "campaign_intel"
+        | "brand_strategy"
+        | "offer_strategy"
+        | "money_model"
+      record_status: "draft" | "approved" | "superseded"
+      review_status: "pending" | "approved" | "rejected"
+      step_status: "pending" | "in_progress" | "complete"
+      team_category: "avatars" | "editors" | "smm"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      app_role: ["admin", "employee", "client"],
+      brief_status: [
+        "draft",
+        "approved",
+        "rejected",
+        "in_production",
+        "complete",
+      ],
+      campaign_status: ["active", "past"],
+      engagement_type: ["employee", "contractor"],
+      idea_source: ["manual", "auto", "proof"],
+      idea_status: ["draft", "approved", "rejected", "briefed"],
+      job_status: ["queued", "running", "completed", "failed", "cancelled"],
+      media_type: ["image", "text", "video"],
+      page_type: ["landing", "offer"],
+      pipeline_stage: ["first_touch", "second_touch", "call_booked"],
+      post_channel: ["organic", "paid"],
+      record_domain: [
+        "icp",
+        "competitor",
+        "association",
+        "market",
+        "campaign_intel",
+        "brand_strategy",
+        "offer_strategy",
+        "money_model",
+      ],
+      record_status: ["draft", "approved", "superseded"],
+      review_status: ["pending", "approved", "rejected"],
+      step_status: ["pending", "in_progress", "complete"],
+      team_category: ["avatars", "editors", "smm"],
+    },
+  },
+} as const
