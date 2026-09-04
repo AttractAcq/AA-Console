@@ -18,6 +18,7 @@ import {
   findPlaceholders,
   loadDomainContext,
   loadUpstreamRecords,
+  parseSections,
   persistRecords,
   renderContext,
   renderUpstream,
@@ -131,12 +132,23 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
       throw error;
     }
 
-    const sections = result.submitted as Record<string, string>;
+    const { sections, missing, unknown } = parseSections(result.submitted, templates);
     const usage = {
       inputTokens: result.usage.inputTokens,
       outputTokens: result.usage.outputTokens,
       costUsd: result.usage.costUsd,
     };
+
+    // A missing section is a failure, not a partial success — a half-written
+    // domain is worse than an obviously failed one, because it looks done.
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        retryable: true,
+        failureMessage: `Model omitted section(s): ${missing.join(", ")}.${unknown.length ? ` It also returned unknown key(s): ${unknown.join(", ")}.` : ""}`,
+        usage,
+      };
+    }
 
     // Degraded output is a failure, not a success with bad data — writing
     // it would poison every downstream agent that reads these records.

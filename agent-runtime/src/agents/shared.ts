@@ -145,29 +145,78 @@ export function renderContext(context: BusinessContext | null): string {
 }
 
 /**
- * A submit tool whose schema is exactly the domain's templates: one
- * required string per item_key, additionalProperties false. With
- * strict: true this guarantees the payload has every section and nothing
- * else, so persistence never has to defend against a malformed shape.
+ * A submit tool whose schema is CONSTANT SIZE regardless of how many
+ * templates a domain has.
+ *
+ * The obvious shape — one required property per item_key — is what the
+ * competitor agent shipped with, and it works at 6 sections but returns
+ * `400 Schema is too complex` at 15 (ICP). Strict-mode schemas are
+ * compiled, and complexity grows with property count. An array of
+ * {item_key, body} keeps the schema the same size whether the domain has
+ * 3 sections or 30, so no future template addition can break it.
+ *
+ * The valid keys go in the prompt rather than an enum, and parseSections
+ * checks them — that keeps the schema simple and gives a better error
+ * than a schema violation would.
  */
 export function buildSubmitTool(domain: string, templates: Template[]): SubmitToolSpec {
-  const properties: Record<string, unknown> = {};
-  for (const template of templates) {
-    properties[template.item_key] = {
-      type: "string",
-      description: [template.title, template.description].filter(Boolean).join(" — "),
-    };
-  }
   return {
     name: "submit_analysis",
-    description: `Submit the finished ${domain} analysis. Call this exactly once, when you have finished researching. Every section is required and must contain real findings.`,
+    description: `Submit the finished ${domain} analysis. Call this exactly once, when you are done. Return one entry per required section, using the exact item_key given for each.`,
     inputSchema: {
       type: "object",
-      properties,
-      required: templates.map((t) => t.item_key),
+      properties: {
+        sections: {
+          type: "array",
+          description: `One entry per section. Exactly ${templates.length} entries are required.`,
+          items: {
+            type: "object",
+            properties: {
+              item_key: { type: "string", description: "The exact item_key of the section." },
+              body: { type: "string", description: "The section content." },
+            },
+            required: ["item_key", "body"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["sections"],
       additionalProperties: false,
     },
   };
+}
+
+export interface ParsedSections {
+  sections: Record<string, string>;
+  missing: string[];
+  unknown: string[];
+}
+
+/** Turns the submitted array back into a key/body map and reports what is off. */
+export function parseSections(
+  submitted: Record<string, unknown>,
+  templates: Template[],
+): ParsedSections {
+  const raw = Array.isArray(submitted.sections) ? submitted.sections : [];
+  const sections: Record<string, string> = {};
+  const valid = new Set(templates.map((t) => t.item_key));
+  const unknown: string[] = [];
+
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const record = entry as Record<string, unknown>;
+    const key = typeof record.item_key === "string" ? record.item_key.trim() : "";
+    const body = typeof record.body === "string" ? record.body : "";
+    if (!key) continue;
+    if (!valid.has(key)) {
+      unknown.push(key);
+      continue;
+    }
+    sections[key] = body;
+  }
+
+  const missing = templates.map((t) => t.item_key).filter((k) => !(k in sections));
+  return { sections, missing, unknown };
 }
 
 // Anything matching this is a refusal to actually answer. v5 shipped a
