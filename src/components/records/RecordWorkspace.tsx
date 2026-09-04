@@ -41,6 +41,7 @@ type Job = {
 
 const JOB_TONE: Record<JobStatus, string> = {
   queued: "bg-secondary text-secondary-foreground",
+  claimed: "bg-secondary text-secondary-foreground",
   running: "bg-primary/10 text-brand-strong",
   completed: "bg-primary/10 text-brand-strong",
   failed: "bg-destructive/10 text-destructive",
@@ -49,6 +50,7 @@ const JOB_TONE: Record<JobStatus, string> = {
 
 const JOB_LABEL: Record<JobStatus, string> = {
   queued: "Queued — waiting for a worker",
+  claimed: "Claimed — starting",
   running: "Running",
   completed: "Completed",
   failed: "Failed",

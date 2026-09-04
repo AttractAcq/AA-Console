@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { AgentCard } from "../../components/AgentCard";
 import { EmptyState } from "../../components/EmptyState";
+import { RuntimeHealthPanel } from "../../components/RuntimeHealthPanel";
 import { FormModal } from "../../components/forms/FormModal";
 import { initialsFrom, slugFrom } from "../../components/forms/fields";
 import type { FieldDef } from "../../components/forms/fields";
@@ -58,6 +59,8 @@ export function AgentsPanel() {
 
   return (
     <div>
+      <RuntimeHealthPanel />
+
       <div className="mb-4 flex justify-end">
         <Button icon={Plus} onClick={() => setAddOpen(true)}>
           Add Agent

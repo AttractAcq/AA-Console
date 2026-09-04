@@ -1,36 +1,221 @@
-import { useState } from "react";
-import { Play, Pause, Settings } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { Play, Pause, PlayCircle, Settings } from "lucide-react";
 import { ActionCard } from "../../../components/ActionCard";
-import { Modal } from "../../../components/Modal";
+import { Panel } from "../../../components/Panel";
+import { FormModal, ConfirmModal } from "../../../components/forms/FormModal";
+import type { FieldDef, FormValues } from "../../../components/forms/fields";
+import { loadClients, useOptions } from "../../../lib/options";
+import { supabase } from "../../../lib/supabase";
+import type { Database } from "../../../types/database";
+import { cn } from "../../../lib/cn";
 
-const actions = [
-  { id: "run", label: "Run Agent", icon: Play },
-  { id: "pause", label: "Pause Agent", icon: Pause },
-  { id: "configure", label: "Edit Configuration", icon: Settings },
-];
+type AgentRow = {
+  agent_key: string;
+  name: string;
+  paused: boolean;
+  domain: string | null;
+  description: string | null;
+  requires_upstream: string[];
+  config: Record<string, unknown>;
+};
 
 export function AgentActionsSection() {
-  const [openActionId, setOpenActionId] = useState<string | null>(null);
-  const openAction = actions.find((action) => action.id === openActionId);
+  const { agentId } = useParams<{ agentId: string }>();
+  const [agent, setAgent] = useState<AgentRow | null>(null);
+  const [openAction, setOpenAction] = useState<"run" | "pause" | "configure" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  const clientOptions = useOptions(loadClients, openAction === "run");
+
+  const refresh = useCallback(async () => {
+    if (!agentId) return;
+    const { data } = await supabase
+      .from("agents")
+      .select("agent_key, name, paused, domain, description, requires_upstream, config")
+      .eq("agent_key", agentId)
+      .maybeSingle();
+    setAgent((data as AgentRow) ?? null);
+  }, [agentId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function togglePause() {
+    if (!agent) return;
+    setBusy(true);
+    const next = !agent.paused;
+    const { error } = await supabase
+      .from("agents")
+      .update({ paused: next })
+      .eq("agent_key", agent.agent_key);
+    setBusy(false);
+    if (error) {
+      setNotice({ kind: "error", text: error.message });
+      return;
+    }
+    // claim_agent_job skips paused agents, so this genuinely stops work
+    // rather than only changing a label.
+    setNotice({
+      kind: "ok",
+      text: next
+        ? "Paused. Queued jobs stay queued and no worker will claim them."
+        : "Resumed. Any queued jobs will be claimed on the next poll.",
+    });
+    void refresh();
+  }
+
+  if (!agent) return <p className="text-sm text-muted-foreground">Loading agent…</p>;
+
+  const runFields: FieldDef[] = [
+    {
+      name: "client_id",
+      label: "Client",
+      kind: "select",
+      required: true,
+      options: clientOptions,
+      hint:
+        agent.requires_upstream.length > 0
+          ? `This agent needs ${agent.requires_upstream.join(", ")} to have completed for the client first. It will refuse otherwise.`
+          : undefined,
+    },
+  ];
+
+  const configFields: FieldDef[] = [
+    {
+      name: "config",
+      label: "Configuration (JSON)",
+      kind: "textarea",
+      rows: 10,
+      required: true,
+      hint: "Stored on the agent and passed to the worker. Must be a valid JSON object.",
+    },
+  ];
 
   return (
-    <div>
+    <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-3">
-        {actions.map((action) => (
-          <ActionCard
-            key={action.id}
-            title={action.label}
-            icon={action.icon}
-            onClick={() => setOpenActionId(action.id)}
-          />
-        ))}
+        <ActionCard title="Run Agent" icon={Play} onClick={() => setOpenAction("run")} />
+        <ActionCard
+          title={agent.paused ? "Resume Agent" : "Pause Agent"}
+          icon={agent.paused ? PlayCircle : Pause}
+          onClick={() => setOpenAction("pause")}
+        />
+        <ActionCard title="Edit Configuration" icon={Settings} onClick={() => setOpenAction("configure")} />
       </div>
 
-      <Modal
-        open={openAction !== undefined}
-        onClose={() => setOpenActionId(null)}
-        title={openAction?.label ?? ""}
+      {notice && (
+        <p
+          role="status"
+          className={cn(
+            "text-sm",
+            notice.kind === "ok" ? "text-brand-strong" : "text-destructive",
+          )}
+        >
+          {notice.text}
+        </p>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Panel title="State">
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-1 text-xs font-medium",
+              agent.paused
+                ? "bg-secondary text-secondary-foreground"
+                : "bg-primary/10 text-brand-strong",
+            )}
+          >
+            {agent.paused ? "Paused" : "Active"}
+          </span>
+          {agent.description && (
+            <p className="mt-3 text-sm text-muted-foreground">{agent.description}</p>
+          )}
+        </Panel>
+
+        <Panel title="Requires upstream">
+          {agent.requires_upstream.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nothing — this agent can run against business context alone.
+            </p>
+          ) : (
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {agent.requires_upstream.map((key) => (
+                <li key={key}>
+                  <code className="rounded bg-secondary px-1.5 py-0.5 text-xs">{key}</code> must
+                  have completed for the client
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </div>
+
+      <FormModal
+        open={openAction === "run"}
+        onClose={() => setOpenAction(null)}
+        title={`Run ${agent.name}`}
+        intro="Queues a job. The worker claims it within a few seconds; watch progress on the Logs tab."
+        fields={runFields}
+        submitLabel="Queue run"
+        onSubmit={async (v) => {
+          const { error } = await supabase.rpc("enqueue_agent_job", {
+            p_agent_key: agent.agent_key,
+            p_client_id: v.client_id as string,
+          });
+          // The RPC enforces the upstream gate, so a refusal here is the
+          // real reason rather than a guess made in the browser.
+          if (error) throw new Error(error.message);
+          setNotice({ kind: "ok", text: "Queued. The worker will pick it up shortly." });
+        }}
       />
+
+      <ConfirmModal
+        open={openAction === "pause"}
+        onClose={() => setOpenAction(null)}
+        title={agent.paused ? `Resume ${agent.name}` : `Pause ${agent.name}`}
+        body={
+          agent.paused
+            ? "Workers will start claiming this agent's queued jobs again."
+            : "No worker will claim this agent's jobs while it is paused. Anything already running finishes; anything queued waits."
+        }
+        confirmLabel={agent.paused ? "Resume" : "Pause"}
+        onConfirm={togglePause}
+        onDone={refresh}
+      />
+
+      <FormModal
+        open={openAction === "configure"}
+        onClose={() => setOpenAction(null)}
+        title={`Configure ${agent.name}`}
+        fields={configFields}
+        initialValues={{ config: JSON.stringify(agent.config ?? {}, null, 2) } as FormValues}
+        submitLabel="Save configuration"
+        onSubmit={async (v) => {
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(v.config as string);
+          } catch {
+            throw new Error("That is not valid JSON.");
+          }
+          if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+            throw new Error("Configuration must be a JSON object, not an array or a bare value.");
+          }
+          const { error } = await supabase
+            .from("agents")
+            .update({ config: parsed as Database["public"]["Tables"]["agents"]["Update"]["config"] })
+            .eq("agent_key", agent.agent_key);
+          if (error) throw error;
+          setNotice({ kind: "ok", text: "Configuration saved." });
+        }}
+        onSaved={refresh}
+      />
+
+      <p className="text-xs text-muted-foreground">
+        {busy ? "Working…" : ""}
+      </p>
     </div>
   );
 }

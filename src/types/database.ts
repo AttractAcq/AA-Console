@@ -63,6 +63,7 @@ export type Database = {
           input_id: string | null
           input_table: string | null
           input_tokens: number
+          lease_owner: string | null
           lease_until: string | null
           max_attempts: number
           output_tokens: number
@@ -82,6 +83,7 @@ export type Database = {
           input_id?: string | null
           input_table?: string | null
           input_tokens?: number
+          lease_owner?: string | null
           lease_until?: string | null
           max_attempts?: number
           output_tokens?: number
@@ -101,6 +103,7 @@ export type Database = {
           input_id?: string | null
           input_table?: string | null
           input_tokens?: number
+          lease_owner?: string | null
           lease_until?: string | null
           max_attempts?: number
           output_tokens?: number
@@ -134,6 +137,99 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_runtime_heartbeats: {
+        Row: {
+          active_jobs: number | null
+          id: string
+          metadata: Json
+          queue_depth: number | null
+          reported_at: string
+          status: string
+          version: string | null
+          worker_id: string
+        }
+        Insert: {
+          active_jobs?: number | null
+          id?: string
+          metadata?: Json
+          queue_depth?: number | null
+          reported_at?: string
+          status?: string
+          version?: string | null
+          worker_id: string
+        }
+        Update: {
+          active_jobs?: number | null
+          id?: string
+          metadata?: Json
+          queue_depth?: number | null
+          reported_at?: string
+          status?: string
+          version?: string | null
+          worker_id?: string
+        }
+        Relationships: []
+      }
+      agent_tool_calls: {
+        Row: {
+          client_id: string | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          input_summary: string | null
+          job_id: string
+          output_summary: string | null
+          permission_class: string
+          started_at: string | null
+          status: string
+          tool_name: string
+        }
+        Insert: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          input_summary?: string | null
+          job_id: string
+          output_summary?: string | null
+          permission_class?: string
+          started_at?: string | null
+          status?: string
+          tool_name: string
+        }
+        Update: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          input_summary?: string | null
+          job_id?: string
+          output_summary?: string | null
+          permission_class?: string
+          started_at?: string | null
+          status?: string
+          tool_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_tool_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_tool_calls_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
             referencedColumns: ["id"]
           },
         ]
@@ -1817,6 +1913,42 @@ export type Database = {
       }
     }
     Views: {
+      agent_runtime_status: {
+        Row: {
+          active_jobs: number | null
+          age: string | null
+          is_live: boolean | null
+          metadata: Json | null
+          queue_depth: number | null
+          reported_at: string | null
+          status: string | null
+          version: string | null
+          worker_id: string | null
+        }
+        Insert: {
+          active_jobs?: number | null
+          age?: never
+          is_live?: never
+          metadata?: Json | null
+          queue_depth?: number | null
+          reported_at?: string | null
+          status?: string | null
+          version?: string | null
+          worker_id?: string | null
+        }
+        Update: {
+          active_jobs?: number | null
+          age?: never
+          is_live?: never
+          metadata?: Json | null
+          queue_depth?: number | null
+          reported_at?: string | null
+          status?: string | null
+          version?: string | null
+          worker_id?: string | null
+        }
+        Relationships: []
+      }
       agent_stats: {
         Row: {
           agent_key: string | null
@@ -2013,6 +2145,39 @@ export type Database = {
         Args: { p_agent_key: string; p_client_id: string }
         Returns: boolean
       }
+      claim_agent_job: {
+        Args: {
+          p_agent_keys?: string[]
+          p_lease_owner: string
+          p_lease_seconds?: number
+        }
+        Returns: {
+          agent_key: string
+          attempts: number
+          client_id: string | null
+          completed_at: string | null
+          cost_usd: number
+          created_at: string
+          created_by: string | null
+          error: string | null
+          id: string
+          input_id: string | null
+          input_table: string | null
+          input_tokens: number
+          lease_owner: string | null
+          lease_until: string | null
+          max_attempts: number
+          output_tokens: number
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agent_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_console_user: {
         Args: {
           p_category?: Database["public"]["Enums"]["team_category"]
@@ -2039,8 +2204,17 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_channel_member: { Args: { target: string }; Returns: boolean }
+      is_client_user: { Args: { target: string }; Returns: boolean }
       is_member: { Args: { target: string }; Returns: boolean }
       next_ref_number: { Args: { p_client_id: string }; Returns: string }
+      renew_agent_job_lease: {
+        Args: {
+          p_job_id: string
+          p_lease_owner: string
+          p_lease_seconds?: number
+        }
+        Returns: boolean
+      }
       review_media_asset: {
         Args: {
           p_asset_id: string
@@ -2072,7 +2246,13 @@ export type Database = {
       engagement_type: "employee" | "contractor"
       idea_source: "manual" | "auto" | "proof"
       idea_status: "draft" | "approved" | "rejected" | "briefed"
-      job_status: "queued" | "running" | "completed" | "failed" | "cancelled"
+      job_status:
+        | "queued"
+        | "claimed"
+        | "running"
+        | "completed"
+        | "failed"
+        | "cancelled"
       media_type: "image" | "text" | "video"
       page_type: "landing" | "offer"
       pipeline_stage: "first_touch" | "second_touch" | "call_booked"
@@ -2229,7 +2409,14 @@ export const Constants = {
       engagement_type: ["employee", "contractor"],
       idea_source: ["manual", "auto", "proof"],
       idea_status: ["draft", "approved", "rejected", "briefed"],
-      job_status: ["queued", "running", "completed", "failed", "cancelled"],
+      job_status: [
+        "queued",
+        "claimed",
+        "running",
+        "completed",
+        "failed",
+        "cancelled",
+      ],
       media_type: ["image", "text", "video"],
       page_type: ["landing", "offer"],
       pipeline_stage: ["first_touch", "second_touch", "call_booked"],
