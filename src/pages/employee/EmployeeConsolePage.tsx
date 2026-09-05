@@ -8,6 +8,7 @@ import type { EmployeeCategory } from "../../lib/identity";
 import { SmmWorkspace } from "./sections/SmmWorkspace";
 import { ProductionWorkspace } from "./sections/ProductionWorkspace";
 import { JobsTable } from "./sections/JobsTable";
+import { ClientsTable } from "./sections/ClientsTable";
 import { ChatView } from "../../components/chat/ChatView";
 
 /** Avatars work jobs; editors work projects. Same table, different word. */
@@ -62,6 +63,14 @@ export function EmployeeConsolePage() {
 
     if (noun && (page.id === "past-jobs" || page.id === "past-projects")) {
       return <JobsTable memberId={memberId!} scope="past" noun={noun} />;
+    }
+
+    if (page.id === "current-clients") {
+      return <ClientsTable memberId={memberId!} scope="current" />;
+    }
+
+    if (page.id === "past-clients") {
+      return <ClientsTable memberId={memberId!} scope="past" />;
     }
 
     return <EmptyState label={`${page.label} — coming soon`} />;

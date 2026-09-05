@@ -8,6 +8,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { DataTable } from "../../components/DataTable";
 import { ChatView } from "../../components/chat/ChatView";
 import { AddProofModal } from "../../components/proof/AddProofModal";
+import { ActiveCampaignsView, ActiveOrganicView, ActiveConversionView } from "./ClientViews";
 import { findConsolePage } from "../../config/consoleNav";
 import { useAuth } from "../../context/auth";
 import { fetchClientAssets, shortDate } from "../../lib/media";
@@ -181,6 +182,12 @@ export function ClientConsolePage() {
         <ChatView />
       ) : page.id === "dashboard" ? (
         dashboard()
+      ) : page.id === "active-campaigns" ? (
+        <ActiveCampaignsView clientId={clientId} />
+      ) : page.id === "active-organic" ? (
+        <ActiveOrganicView clientId={clientId} />
+      ) : page.id === "active-conversion" ? (
+        <ActiveConversionView clientId={clientId} />
       ) : (
         <EmptyState label={`${page.label} — coming soon`} />
       )}
