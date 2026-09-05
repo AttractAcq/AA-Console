@@ -26,7 +26,7 @@ import { OpenAiError, runStructuredCompletion } from "../../tools/openai.js";
 import { estimateCostUsd } from "../../usage/cost.js";
 import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js";
 import type { BusinessContext } from "../shared.js";
-import { RenderError, renderImage, type ReferenceImage } from "./render.js";
+import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 
 const BUCKET = "client-media";
 
@@ -125,11 +125,22 @@ export async function runCreativeBuildJob(
     return { ok: false, retryable: false, failureMessage: "A creative build needs a client." };
   }
   const params = (job.params ?? {}) as Record<string, unknown>;
-  const generationId = typeof params.generation_id === "string" ? params.generation_id : null;
-  if (!generationId) {
-    return { ok: false, retryable: false, failureMessage: "No generation to build." };
+  const renderId = typeof params.render_id === "string" ? params.render_id : null;
+  if (!renderId) {
+    return { ok: false, retryable: false, failureMessage: "No render to produce." };
   }
 
+  const { data: render, error: renderError } = await sb
+    .from("creative_renders")
+    .select("id, generation_id, quality, size, reference_path")
+    .eq("id", renderId)
+    .maybeSingle();
+  if (renderError) throw new Error(`Could not load the render: ${renderError.message}`);
+  if (!render) {
+    return { ok: false, retryable: false, failureMessage: "That render no longer exists." };
+  }
+
+  const generationId = render.generation_id as string;
   const { data: generation, error: genError } = await sb
     .from("creative_generations")
     .select("id, brief_id, media_type, quality, size, concept, stage, reference_path")
@@ -139,6 +150,16 @@ export async function runCreativeBuildJob(
   if (!generation) {
     return { ok: false, retryable: false, failureMessage: "That build no longer exists." };
   }
+
+  // The render carries its own settings, so a re-render at a different
+  // quality does not rewrite the generation the earlier ones used.
+  const renderQuality = String(render.quality);
+  const renderSize = String(render.size);
+  const renderReference = render.reference_path as string | null;
+
+  // The one difference between a first build and a re-render.
+  const existingConcept = generation.concept as Record<string, unknown> | null;
+  const needsConcept = !existingConcept || Object.keys(existingConcept).length === 0;
 
   const { data: brief, error: briefError } = await sb
     .from("client_briefs")
@@ -184,13 +205,24 @@ export async function runCreativeBuildJob(
   }
   const fail = async (message: string) => {
     await sb
+      .from("creative_renders")
+      .update({ status: "failed", error: message, updated_at: new Date().toISOString() })
+      .eq("id", renderId);
+    await sb
       .from("creative_generations")
       .update({ stage: "failed", error: message, updated_at: new Date().toISOString() })
       .eq("id", generationId);
-    // Hand the brief back. It was moved to in_production when the build was
-    // queued, and the Build button hides at that status — so leaving it there
-    // after a failure strands the brief with no way to try again.
-    await sb.from("client_briefs").update({ status: "approved" }).eq("id", typed.id);
+    // Hand the brief back only if nothing has ever come out of it. A
+    // re-render failing must not undo a build that already produced an
+    // asset and moved the brief on.
+    const { count } = await sb
+      .from("creative_renders")
+      .select("id", { count: "exact", head: true })
+      .eq("generation_id", generationId)
+      .eq("status", "done");
+    if (!count) {
+      await sb.from("client_briefs").update({ status: "approved" }).eq("id", typed.id);
+    }
   };
 
   // ---- stage one: the concept -------------------------------------------
@@ -214,7 +246,7 @@ export async function runCreativeBuildJob(
     .map((p) => `- ${p.title ?? "Untitled"}${p.source ? ` (${p.source})` : ""}: ${p.body ?? "[file]"}`)
     .join("\n");
 
-  const hasReference = Boolean(generation.reference_path);
+  const hasReference = Boolean(renderReference);
   const submitTool = isImage ? IMAGE_CONCEPT_TOOL : TEXT_CONCEPT_TOOL;
   const prompt = `Turn this approved brief into ${isImage ? "a creative concept for a single image" : "finished copy"}.
 ${
@@ -240,11 +272,24 @@ ${proof || "None. Make no proof claim."}
 Call ${submitTool.name} once when you are done.`;
 
   let concept: Record<string, unknown>;
-  let usage: { inputTokens: number; outputTokens: number; costUsd: number };
+  let usage: { inputTokens: number; outputTokens: number; costUsd: number } = {
+    inputTokens: 0,
+    outputTokens: 0,
+    costUsd: 0,
+  };
   const conceptModel =
     config.conceptProvider === "openai" ? config.conceptModel : config.model;
 
-  try {
+  if (!needsConcept) {
+    // The whole reason renders are separate rows: this is the expensive
+    // half, and iterating on the same direction must not pay for it again.
+    concept = existingConcept as Record<string, unknown>;
+    await appendEvent(
+      sb,
+      job.id,
+      "Reusing the existing concept — no reasoning cost for this render.",
+    );
+  } else try {
     if (config.conceptProvider === "openai") {
       const out = await runStructuredCompletion({
         apiKey: config.openaiApiKey as string,
@@ -286,6 +331,11 @@ Call ${submitTool.name} once when you are done.`;
     throw error;
   }
 
+  await sb
+    .from("creative_renders")
+    .update({ status: "rendering", updated_at: new Date().toISOString() })
+    .eq("id", renderId);
+
   // ---- text stops here: the concept is the deliverable -------------------
   if (!isImage) {
     const body = String(concept.body ?? "").trim();
@@ -295,7 +345,7 @@ Call ${submitTool.name} once when you are done.`;
       return { ok: false, retryable: true, failureMessage: message, usage };
     }
 
-    const path = `${job.client_id}/generated/${generationId}.md`;
+    const path = `${job.client_id}/generated/${renderId}.md`;
     const document = [`# ${String(concept.headline ?? typed.title)}`, "", body, "", `**Call to action:** ${String(concept.call_to_action ?? "")}`].join("\n");
     const { error: uploadError } = await sb.storage
       .from(BUCKET)
@@ -303,6 +353,17 @@ Call ${submitTool.name} once when you are done.`;
     if (uploadError) throw new Error(`Could not store the copy: ${uploadError.message}`);
 
     const assetId = await insertAsset(sb, job, typed, path, "text");
+    await sb
+      .from("creative_renders")
+      .update({
+        status: "done",
+        asset_id: assetId,
+        model: conceptModel,
+        cost_usd: usage.costUsd,
+        error: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", renderId);
     await sb
       .from("creative_generations")
       .update({
@@ -336,19 +397,19 @@ Call ${submitTool.name} once when you are done.`;
     })
     .eq("id", generationId);
 
-  await appendEvent(sb, job.id, `Concept written. Rendering at ${generation.quality} quality, ${generation.size}.`);
+  await appendEvent(sb, job.id, `Rendering at ${renderQuality} quality, ${renderSize}.`);
 
   let reference: ReferenceImage | null = null;
-  if (generation.reference_path) {
+  if (renderReference) {
     const { data: file, error: downloadError } = await sb.storage
       .from(BUCKET)
-      .download(String(generation.reference_path));
+      .download(renderReference);
     if (downloadError || !file) {
       const message = `Could not read the reference image: ${downloadError?.message ?? "not found"}`;
       await fail(message);
       return { ok: false, retryable: false, failureMessage: message, usage };
     }
-    const name = String(generation.reference_path).split("/").pop() ?? "reference.png";
+    const name = renderReference.split("/").pop() ?? "reference.png";
     reference = {
       bytes: Buffer.from(await file.arrayBuffer()),
       contentType: file.type || "image/png",
@@ -360,8 +421,8 @@ Call ${submitTool.name} once when you are done.`;
   let image;
   try {
     image = await renderImage(config, imagePrompt, {
-      size: String(generation.size),
-      quality: String(generation.quality),
+      size: renderSize,
+      quality: renderQuality,
       reference,
     });
   } catch (error) {
@@ -374,7 +435,7 @@ Call ${submitTool.name} once when you are done.`;
     throw error;
   }
 
-  const path = `${job.client_id}/generated/${generationId}.${image.extension}`;
+  const path = `${job.client_id}/generated/${renderId}.${image.extension}`;
   const { error: uploadError } = await sb.storage
     .from(BUCKET)
     .upload(path, image.bytes, { contentType: image.contentType, upsert: true });
@@ -382,12 +443,32 @@ Call ${submitTool.name} once when you are done.`;
 
   const assetId = await insertAsset(sb, job, typed, path, "image");
   await sb
+    .from("creative_renders")
+    .update({
+      status: "done",
+      asset_id: assetId,
+      model: config.imageModel,
+      // Concept cost lands on the render that paid for it; every render also
+      // carries its own image cost. A re-render therefore reads as the few
+      // cents it actually cost, not as free.
+      cost_usd: usage.costUsd + estimateImageCostUsd(renderQuality),
+      error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", renderId);
+  await sb
     .from("creative_generations")
     .update({ stage: "done", asset_id: assetId, error: null, updated_at: new Date().toISOString() })
     .eq("id", generationId);
 
   await markBriefComplete(sb, typed.id);
-  await appendEvent(sb, job.id, "Image rendered and filed under the client's assets, awaiting review.");
+  await appendEvent(
+    sb,
+    job.id,
+    needsConcept
+      ? "Image rendered and filed under the client's assets, awaiting review."
+      : "Re-render complete, filed alongside the earlier ones.",
+  );
   return { ok: true, retryable: false, usage };
 }
 

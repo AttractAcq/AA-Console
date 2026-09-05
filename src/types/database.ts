@@ -1511,6 +1511,7 @@ export type Database = {
           brief_id: string
           client_id: string
           concept: Json | null
+          concept_edited_at: string | null
           concept_model: string | null
           cost_usd: number | null
           created_at: string
@@ -1522,6 +1523,7 @@ export type Database = {
           job_id: string | null
           media_type: Database["public"]["Enums"]["media_type"]
           quality: string
+          reference_path: string | null
           size: string
           stage: Database["public"]["Enums"]["creative_stage"]
           updated_at: string
@@ -1531,6 +1533,7 @@ export type Database = {
           brief_id: string
           client_id: string
           concept?: Json | null
+          concept_edited_at?: string | null
           concept_model?: string | null
           cost_usd?: number | null
           created_at?: string
@@ -1542,6 +1545,7 @@ export type Database = {
           job_id?: string | null
           media_type: Database["public"]["Enums"]["media_type"]
           quality?: string
+          reference_path?: string | null
           size?: string
           stage?: Database["public"]["Enums"]["creative_stage"]
           updated_at?: string
@@ -1551,6 +1555,7 @@ export type Database = {
           brief_id?: string
           client_id?: string
           concept?: Json | null
+          concept_edited_at?: string | null
           concept_model?: string | null
           cost_usd?: number | null
           created_at?: string
@@ -1562,6 +1567,7 @@ export type Database = {
           job_id?: string | null
           media_type?: Database["public"]["Enums"]["media_type"]
           quality?: string
+          reference_path?: string | null
           size?: string
           stage?: Database["public"]["Enums"]["creative_stage"]
           updated_at?: string
@@ -1604,6 +1610,106 @@ export type Database = {
           },
           {
             foreignKeyName: "creative_generations_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creative_renders: {
+        Row: {
+          asset_id: string | null
+          client_id: string
+          cost_usd: number | null
+          created_at: string
+          created_by: string | null
+          error: string | null
+          generation_id: string
+          id: string
+          job_id: string | null
+          model: string | null
+          quality: string
+          reference_path: string | null
+          selected: boolean
+          size: string
+          status: Database["public"]["Enums"]["render_status"]
+          updated_at: string
+        }
+        Insert: {
+          asset_id?: string | null
+          client_id: string
+          cost_usd?: number | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          generation_id: string
+          id?: string
+          job_id?: string | null
+          model?: string | null
+          quality?: string
+          reference_path?: string | null
+          selected?: boolean
+          size?: string
+          status?: Database["public"]["Enums"]["render_status"]
+          updated_at?: string
+        }
+        Update: {
+          asset_id?: string | null
+          client_id?: string
+          cost_usd?: number | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          generation_id?: string
+          id?: string
+          job_id?: string | null
+          model?: string | null
+          quality?: string
+          reference_path?: string | null
+          selected?: boolean
+          size?: string
+          status?: Database["public"]["Enums"]["render_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_renders_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_renders_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_renders_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_renders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_renders_generation_id_fkey"
+            columns: ["generation_id"]
+            isOneToOne: false
+            referencedRelation: "creative_generations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_renders_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "agent_jobs"
@@ -2519,7 +2625,12 @@ export type Database = {
         Returns: string
       }
       build_brief_with_ai: {
-        Args: { p_brief_id: string; p_quality?: string; p_size?: string }
+        Args: {
+          p_brief_id: string
+          p_quality?: string
+          p_reference_path?: string
+          p_size?: string
+        }
         Returns: string
       }
       can_access_client: { Args: { target: string }; Returns: boolean }
@@ -2650,6 +2761,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      rerender_generation: {
+        Args: { p_generation_id: string; p_quality?: string; p_size?: string }
+        Returns: string
+      }
       review_media_asset: {
         Args: {
           p_asset_id: string
@@ -2666,6 +2781,7 @@ export type Database = {
         }
         Returns: string
       }
+      select_render: { Args: { p_render_id: string }; Returns: undefined }
       start_master_run: { Args: { p_client_id: string }; Returns: string }
       start_master_run_as: {
         Args: { p_actor: string; p_client_id: string }
@@ -2673,6 +2789,10 @@ export type Database = {
       }
       start_onboarding: { Args: { p_client_id: string }; Returns: undefined }
       try_uuid: { Args: { t: string }; Returns: string }
+      update_generation_concept: {
+        Args: { p_concept: Json; p_generation_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "employee" | "client"
@@ -2715,6 +2835,7 @@ export type Database = {
         | "money_model"
         | "reporting"
       record_status: "draft" | "approved" | "superseded"
+      render_status: "queued" | "rendering" | "done" | "failed"
       review_status: "pending" | "approved" | "rejected"
       step_status: "pending" | "in_progress" | "complete"
       team_category: "avatars" | "editors" | "smm"
@@ -2888,6 +3009,7 @@ export const Constants = {
         "reporting",
       ],
       record_status: ["draft", "approved", "superseded"],
+      render_status: ["queued", "rendering", "done", "failed"],
       review_status: ["pending", "approved", "rejected"],
       step_status: ["pending", "in_progress", "complete"],
       team_category: ["avatars", "editors", "smm"],

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { RichText } from "../markdown/RichText";
+import { ConceptWorkspace } from "./ConceptWorkspace";
 import { supabase } from "../../lib/supabase";
-import { signPaths } from "../../lib/media";
 import { cn } from "../../lib/cn";
 
 type Brief = {
@@ -25,21 +25,7 @@ type Idea = {
   source: string | null;
 };
 
-type Generation = {
-  id: string;
-  stage: string;
-  concept: Record<string, unknown> | null;
-  image_prompt: string | null;
-  quality: string;
-  size: string;
-  reference_path: string | null;
-  concept_model: string | null;
-  image_model: string | null;
-  cost_usd: number | null;
-  error: string | null;
-  created_at: string;
-  asset_id: string | null;
-};
+import type { Generation } from "./ConceptWorkspace";
 
 type Dispatch = {
   id: string;
@@ -64,24 +50,6 @@ const EMAIL_TONE: Record<string, string> = {
   pending: "bg-secondary text-secondary-foreground",
 };
 
-/** Turns concept keys into the labels a person would use. */
-const CONCEPT_LABEL: Record<string, string> = {
-  headline: "Headline",
-  subhead: "Subhead",
-  call_to_action: "Call to action",
-  subject: "What's in frame",
-  composition: "Composition",
-  art_direction: "Art direction",
-  avoid: "Do not include",
-  rationale: "Why this",
-  body: "Copy",
-};
-
-const CONCEPT_ORDER = [
-  "headline", "subhead", "body", "call_to_action",
-  "subject", "composition", "art_direction", "avoid", "rationale",
-];
-
 /**
  * Everything known about one brief, in one place.
  *
@@ -103,7 +71,6 @@ export function BriefDetailModal({
   const [idea, setIdea] = useState<Idea | null>(null);
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [dispatches, setDispatches] = useState<Dispatch[]>([]);
-  const [assetUrls, setAssetUrls] = useState<Map<string, string>>(new Map());
   const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -120,7 +87,7 @@ export function BriefDetailModal({
         : Promise.resolve({ data: null }),
       supabase
         .from("creative_generations")
-        .select("id, stage, concept, image_prompt, quality, size, reference_path, concept_model, image_model, cost_usd, error, created_at, asset_id")
+        .select("id, stage, concept, quality, size, reference_path, concept_model, image_model, concept_edited_at, cost_usd, error, created_at, media_type")
         .eq("brief_id", brief.id)
         .order("created_at", { ascending: false }),
       supabase
@@ -135,24 +102,6 @@ export function BriefDetailModal({
     setGenerations(gens);
     setDispatches((dispRes.data ?? []) as unknown as Dispatch[]);
 
-    // Show the finished asset next to the concept that produced it.
-    const assetIds = gens.map((g) => g.asset_id).filter((id): id is string => Boolean(id));
-    if (assetIds.length) {
-      const { data: assets } = await supabase
-        .from("client_media_assets")
-        .select("id, storage_path")
-        .in("id", assetIds);
-      const signed = await signPaths("client-media", (assets ?? []).map((a) => a.storage_path));
-      setAssetUrls(
-        new Map(
-          (assets ?? [])
-            .map((a) => [a.id, signed.get(a.storage_path) ?? ""] as [string, string])
-            .filter(([, url]) => url),
-        ),
-      );
-    } else {
-      setAssetUrls(new Map());
-    }
     setLoading(false);
   }, [brief]);
 
@@ -244,9 +193,6 @@ export function BriefDetailModal({
                           onClick={() => setExpanded(expanded === g.id ? null : g.id)}
                           className="flex w-full items-center gap-3 p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                          {g.asset_id && assetUrls.get(g.asset_id) && (
-                            <img src={assetUrls.get(g.asset_id)} alt="" className="h-12 w-12 shrink-0 rounded object-cover" />
-                          )}
                           <span className="min-w-0 flex-1">
                             <span
                               className={cn(
@@ -265,35 +211,12 @@ export function BriefDetailModal({
                             )}
                           </span>
                           <span className="shrink-0 text-xs text-muted-foreground">
-                            {expanded === g.id ? "Hide" : "Concept"}
+                            {expanded === g.id ? "Hide" : "Open"}
                           </span>
                         </button>
 
                         {expanded === g.id && (
-                          <div className="space-y-3 border-t border-border px-3 py-3">
-                            {g.concept ? (
-                              CONCEPT_ORDER.filter((k) => g.concept?.[k]).map((k) => (
-                                <div key={k}>
-                                  <p className="text-xs font-semibold text-muted-foreground">
-                                    {CONCEPT_LABEL[k] ?? k}
-                                  </p>
-                                  <p className="whitespace-pre-wrap text-sm text-foreground">
-                                    {String(g.concept?.[k])}
-                                  </p>
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-sm text-muted-foreground">
-                                No concept was written — this build failed before that stage.
-                              </p>
-                            )}
-                            {g.concept_model && (
-                              <p className="text-xs text-muted-foreground">
-                                Concept by {g.concept_model}
-                                {g.image_model ? `, rendered by ${g.image_model}` : ""}
-                              </p>
-                            )}
-                          </div>
+                          <ConceptWorkspace generation={g} onChanged={() => void load()} />
                         )}
                       </li>
                     ))}

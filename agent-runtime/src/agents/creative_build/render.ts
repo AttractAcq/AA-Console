@@ -35,6 +35,24 @@ export interface RenderedImage {
 export const SIZES = ["1024x1536", "1024x1024", "1536x1024"] as const;
 export const QUALITIES = ["low", "medium", "high"] as const;
 
+/**
+ * The image API returns no cost, so it is estimated from quality. Without
+ * this a re-render reads as $0.00, which is wrong in the direction that
+ * matters — it makes iteration look free.
+ *
+ * Figures are the planning estimates for a portrait creative; adjust here if
+ * provider pricing moves. Nothing else reads them.
+ */
+const IMAGE_COST_USD: Record<string, number> = {
+  low: 0.005,
+  medium: 0.045,
+  high: 0.165,
+};
+
+export function estimateImageCostUsd(quality: string): number {
+  return IMAGE_COST_USD[quality] ?? IMAGE_COST_USD.medium!;
+}
+
 export interface ReferenceImage {
   bytes: Buffer;
   contentType: string;
