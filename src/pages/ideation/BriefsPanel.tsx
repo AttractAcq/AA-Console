@@ -7,12 +7,24 @@ import { mediaFilters } from "../../data/mediaFilters";
 import type { MediaFilterId } from "../../data/mediaFilters";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
+import { ApproveAndBuildModal } from "../../components/briefs/ApproveAndBuildModal";
+import { cn } from "../../lib/cn";
 
 type Brief = {
   id: string;
   title: string;
-  media_type: string;
+  body: string | null;
+  media_type: "image" | "text" | "video";
+  brief_ref: string | null;
   status: string;
+};
+
+const STATUS_TONE: Record<string, string> = {
+  draft: "bg-secondary text-secondary-foreground",
+  approved: "bg-secondary text-secondary-foreground",
+  in_production: "bg-primary/10 text-brand-strong",
+  complete: "bg-primary/10 text-brand-strong",
+  rejected: "bg-destructive/10 text-destructive",
 };
 
 export function BriefsPanel() {
@@ -20,6 +32,8 @@ export function BriefsPanel() {
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [loading, setLoading] = useState(true);
+  const [building, setBuilding] = useState<Brief | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -28,7 +42,7 @@ export function BriefsPanel() {
     }
     const { data } = await supabase
       .from("client_briefs")
-      .select("id, title, media_type, status")
+      .select("id, title, body, media_type, brief_ref, status")
       .eq("client_id", clientId)
       .order("created_at", { ascending: false });
     setBriefs((data ?? []) as Brief[]);
@@ -55,8 +69,14 @@ export function BriefsPanel() {
       <div className="mb-4">
         <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
       </div>
+      {notice && (
+        <p role="status" className="mb-4 text-sm text-brand-strong">
+          {notice}
+        </p>
+      )}
+
       <DataTable
-        columns={["Brief", "Type", "Status"]}
+        columns={["Brief", "Type", "Status", ""]}
         emptyLabel={
           loading
             ? "Loading briefs…"
@@ -66,7 +86,52 @@ export function BriefsPanel() {
               ? `No ${activeLabel.toLowerCase()} briefs — ${elsewhere} brief${elsewhere === 1 ? "" : "s"} under another type`
               : "No briefs yet — approve an idea on the Generation tab"
         }
-        rows={shown.map((b) => [b.title, b.media_type, b.status])}
+        rows={shown.map((b) => [
+          b.brief_ref ? (
+            <span key="t">
+              {b.title}
+              <span className="block text-xs text-muted-foreground">{b.brief_ref}</span>
+            </span>
+          ) : (
+            b.title
+          ),
+          <span key="m" className="capitalize">{b.media_type}</span>,
+          <span
+            key="s"
+            className={cn(
+              "inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+              STATUS_TONE[b.status] ?? "bg-muted text-muted-foreground",
+            )}
+          >
+            {b.status.replace(/_/g, " ")}
+          </span>,
+          // A brief already in production or finished has been actioned;
+          // offering Build again would quietly queue a second one.
+          b.status === "in_production" || b.status === "complete" ? (
+            <span key="a" className="text-xs text-muted-foreground">Actioned</span>
+          ) : (
+            <button
+              key="a"
+              type="button"
+              onClick={() => setBuilding(b)}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Approve &amp; Build
+            </button>
+          ),
+        ])}
+      />
+
+      <ApproveAndBuildModal
+        brief={building}
+        open={building !== null}
+        onClose={() => setBuilding(null)}
+        onDone={() => {
+          setNotice(
+            "Queued. Generated assets appear under Media; anything sent to a person is on their dashboard now.",
+          );
+          void refresh();
+        }}
       />
     </div>
   );

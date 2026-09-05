@@ -288,6 +288,84 @@ export type Database = {
         }
         Relationships: []
       }
+      brief_dispatches: {
+        Row: {
+          assignment_id: string | null
+          brief_id: string
+          client_id: string
+          created_at: string
+          email_error: string | null
+          email_status: string
+          emailed_at: string | null
+          id: string
+          job_id: string | null
+          member_id: string
+          sent_by: string | null
+        }
+        Insert: {
+          assignment_id?: string | null
+          brief_id: string
+          client_id: string
+          created_at?: string
+          email_error?: string | null
+          email_status?: string
+          emailed_at?: string | null
+          id?: string
+          job_id?: string | null
+          member_id: string
+          sent_by?: string | null
+        }
+        Update: {
+          assignment_id?: string | null
+          brief_id?: string
+          client_id?: string
+          created_at?: string
+          email_error?: string | null
+          email_status?: string
+          emailed_at?: string | null
+          id?: string
+          job_id?: string | null
+          member_id?: string
+          sent_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brief_dispatches_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "job_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           campaign_ref: string
@@ -1427,6 +1505,112 @@ export type Database = {
           },
         ]
       }
+      creative_generations: {
+        Row: {
+          asset_id: string | null
+          brief_id: string
+          client_id: string
+          concept: Json | null
+          concept_model: string | null
+          cost_usd: number | null
+          created_at: string
+          created_by: string | null
+          error: string | null
+          id: string
+          image_model: string | null
+          image_prompt: string | null
+          job_id: string | null
+          media_type: Database["public"]["Enums"]["media_type"]
+          quality: string
+          size: string
+          stage: Database["public"]["Enums"]["creative_stage"]
+          updated_at: string
+        }
+        Insert: {
+          asset_id?: string | null
+          brief_id: string
+          client_id: string
+          concept?: Json | null
+          concept_model?: string | null
+          cost_usd?: number | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          image_model?: string | null
+          image_prompt?: string | null
+          job_id?: string | null
+          media_type: Database["public"]["Enums"]["media_type"]
+          quality?: string
+          size?: string
+          stage?: Database["public"]["Enums"]["creative_stage"]
+          updated_at?: string
+        }
+        Update: {
+          asset_id?: string | null
+          brief_id?: string
+          client_id?: string
+          concept?: Json | null
+          concept_model?: string | null
+          cost_usd?: number | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          image_model?: string | null
+          image_prompt?: string | null
+          job_id?: string | null
+          media_type?: Database["public"]["Enums"]["media_type"]
+          quality?: string
+          size?: string
+          stage?: Database["public"]["Enums"]["creative_stage"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_generations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_generations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_generations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_generations_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_generations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_generations_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_entries: {
         Row: {
           amount: number
@@ -2334,6 +2518,10 @@ export type Database = {
         Args: { p_idea_id: string }
         Returns: string
       }
+      build_brief_with_ai: {
+        Args: { p_brief_id: string; p_quality?: string; p_size?: string }
+        Returns: string
+      }
       can_access_client: { Args: { target: string }; Returns: boolean }
       can_run_agent: {
         Args: { p_agent_key: string; p_client_id: string }
@@ -2388,6 +2576,15 @@ export type Database = {
       current_role_of: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      dispatch_brief_to_members: {
+        Args: {
+          p_brief_id: string
+          p_compensation?: number
+          p_due_date?: string
+          p_member_ids: string[]
+        }
+        Returns: number
       }
       enqueue_agent_job: {
         Args: {
@@ -2485,7 +2682,9 @@ export type Database = {
         | "rejected"
         | "in_production"
         | "complete"
+      build_route: "ai" | "human"
       campaign_status: "active" | "past"
+      creative_stage: "concept" | "render" | "done" | "failed"
       engagement_type: "employee" | "contractor"
       idea_source: "manual" | "auto" | "proof"
       idea_status: "draft" | "approved" | "rejected" | "briefed"
@@ -2654,7 +2853,9 @@ export const Constants = {
         "in_production",
         "complete",
       ],
+      build_route: ["ai", "human"],
       campaign_status: ["active", "past"],
+      creative_stage: ["concept", "render", "done", "failed"],
       engagement_type: ["employee", "contractor"],
       idea_source: ["manual", "auto", "proof"],
       idea_status: ["draft", "approved", "rejected", "briefed"],

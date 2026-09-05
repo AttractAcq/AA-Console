@@ -24,6 +24,8 @@ import { runBriefJob } from "../agents/brief/index.js";
 import { runLandingPageJob } from "../agents/landing_page/index.js";
 import { runMetricsIngestJob } from "../agents/metrics_ingest/index.js";
 import { runReportingJob } from "../agents/reporting/index.js";
+import { runCreativeBuildJob } from "../agents/creative_build/index.js";
+import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 
 export interface JobResult {
   ok: boolean;
@@ -57,6 +59,9 @@ const RUNNERS: Record<string, JobRunner> = {
   metrics_ingest: runMetricsIngestJob,
   // Reads what the ingest wrote and says what it means.
   reporting: runReportingJob,
+  // A brief becomes an asset, or a brief reaches a person.
+  creative_build: runCreativeBuildJob,
+  brief_dispatch: runBriefDispatchJob,
   // outcome until that product decision is made.
 };
 

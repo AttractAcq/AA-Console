@@ -18,6 +18,15 @@ export interface RuntimeConfig {
   sharedSecret: string | null;
   /** Origins allowed to call /master/chat from a browser. */
   allowedOrigins: string[];
+
+  /** Image rendering. Absent means the AI build route reports itself unavailable. */
+  openaiApiKey: string | null;
+  imageModel: string;
+  /** Transactional email. Absent means a brief is still assigned, just not emailed. */
+  resendApiKey: string | null;
+  resendFrom: string;
+  /** Where an emailed brief links back to. */
+  consoleUrl: string;
 }
 
 function requireEnv(name: string): string {
@@ -95,6 +104,18 @@ export function loadConfig(): RuntimeConfig {
       .split(",")
       .map((origin) => origin.trim())
       .filter(Boolean),
+
+    // Both providers are optional at startup. A missing key is a feature
+    // that reports itself unavailable, not a process that refuses to boot —
+    // the rest of the runtime has no business failing because nobody has
+    // connected an image renderer yet.
+    openaiApiKey: optionalEnv("OPENAI_API_KEY") ?? null,
+    // Not pinned in code: the correct id is a provider fact that changes
+    // faster than this repo does, so a wrong one is a config edit.
+    imageModel: optionalEnv("OPENAI_IMAGE_MODEL") ?? "gpt-image-2",
+    resendApiKey: optionalEnv("RESEND_API_KEY") ?? null,
+    resendFrom: optionalEnv("RESEND_FROM") ?? "AA Console <briefs@attractacq.com>",
+    consoleUrl: (optionalEnv("CONSOLE_URL") ?? "http://localhost:5173").replace(/\/+$/, ""),
   };
 }
 
