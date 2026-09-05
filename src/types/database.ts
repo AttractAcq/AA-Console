@@ -2440,6 +2440,10 @@ export type Database = {
           total: number
         }[]
       }
+      metrics_period_summary: {
+        Args: { p_client_id: string; p_since: string; p_until: string }
+        Returns: Json
+      }
       next_ref_number: { Args: { p_client_id: string }; Returns: string }
       renew_agent_job_lease: {
         Args: {
@@ -2510,6 +2514,7 @@ export type Database = {
         | "brand_strategy"
         | "offer_strategy"
         | "money_model"
+        | "reporting"
       record_status: "draft" | "approved" | "superseded"
       review_status: "pending" | "approved" | "rejected"
       step_status: "pending" | "in_progress" | "complete"
@@ -2679,6 +2684,7 @@ export const Constants = {
         "brand_strategy",
         "offer_strategy",
         "money_model",
+        "reporting",
       ],
       record_status: ["draft", "approved", "superseded"],
       review_status: ["pending", "approved", "rejected"],

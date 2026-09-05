@@ -33,6 +33,27 @@ function parseCompetitors(raw: string) {
 }
 
 export const AGENT_FORMS: Record<RecordDomain, AgentFormConfig> = {
+  reporting: {
+    title: "Reporting Commentary",
+    agentKey: "reporting",
+    intro:
+      "Reads the metrics already ingested for this client and writes the client-facing narrative. It never invents a figure — if nothing has been ingested yet, it will say so rather than guess.",
+    fields: [
+      {
+        name: "period_days",
+        label: "Period",
+        kind: "select",
+        options: [
+          { value: "7", label: "Last 7 days" },
+          { value: "30", label: "Last 30 days" },
+          { value: "90", label: "Last 90 days" },
+        ],
+        hint: "A short window shows what just changed; a long one shows whether it holds.",
+      },
+    ],
+    toPayload: (values) => ({ period_days: Number(values.period_days ?? 30) }),
+  },
+
   icp: {
     title: "ICP Inputs",
     agentKey: "icp",

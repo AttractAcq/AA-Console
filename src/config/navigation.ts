@@ -193,6 +193,7 @@ export const clientNavGroups: NavNode[] = [
           { id: "paid", label: "Paid" },
           { id: "landing-pages", label: "Landing Pages" },
           { id: "offer-pages", label: "Offer Pages" },
+          { id: "commentary", label: "Commentary" },
         ],
       },
     ],

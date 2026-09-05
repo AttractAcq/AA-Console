@@ -35,6 +35,8 @@ export interface PromptArgs {
   /** The sections the model must return, already formatted for a prompt. */
   sectionBrief: string;
   submitToolName: string;
+  /** Whatever loadExtra returned, ready to drop into the prompt. */
+  extra: string;
 }
 
 export interface RecordAgentConfig {
@@ -51,6 +53,16 @@ export interface RecordAgentConfig {
   resolvePeriod?: (input: Record<string, unknown>) => string | null;
   /** Opening line for the job event log. */
   describeStart?: (input: Record<string, unknown>) => string;
+  /**
+   * Domain-specific context that is not business context, a form input or
+   * an upstream record — reporting reads aggregates out of metrics_daily,
+   * for instance. Returning `block` fails the job before any provider call,
+   * which is how a domain says "there is nothing here to work from".
+   */
+  loadExtra?: (
+    sb: SupabaseClient,
+    job: AgentJobRow,
+  ) => Promise<{ text: string; block?: string }>;
 }
 
 export function createRecordAgent(config: RecordAgentConfig): JobRunner {
@@ -84,6 +96,16 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
       };
     }
 
+    let extra = "";
+    if (config.loadExtra) {
+      const loaded = await config.loadExtra(sb, job);
+      // Cheapest possible failure, again: before a token is spent.
+      if (loaded.block) {
+        return { ok: false, retryable: false, failureMessage: loaded.block };
+      }
+      extra = loaded.text;
+    }
+
     const submitTool = buildSubmitTool(config.domain, templates);
     const sectionBrief = templates
       .map((t) => `- ${t.item_key}: ${t.title}${t.description ? ` — ${t.description}` : ""}`)
@@ -96,6 +118,7 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
       upstream,
       sectionBrief,
       submitToolName: submitTool.name,
+      extra,
     });
 
     if (config.describeStart) {

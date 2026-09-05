@@ -28,6 +28,10 @@ import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { ProspectsLeadsPanel } from "./prospects-leads/ProspectsLeadsPanel";
 import { OnboardingPanel } from "./account/OnboardingPanel";
 import { IntegrationsPanel } from "./account/IntegrationsPanel";
+import { PaidReportingPanel } from "./reporting/PaidReportingPanel";
+import { OrganicReportingPanel } from "./reporting/OrganicReportingPanel";
+import { PagesReportingPanel } from "./reporting/PagesReportingPanel";
+import { CommentaryPanel } from "./reporting/CommentaryPanel";
 import { ContractsLegalPanel } from "./account/ContractsLegalPanel";
 import { BillingSubscriptionPanel } from "./account/BillingSubscriptionPanel";
 import { AuditLogPanel } from "./account/AuditLogPanel";
@@ -84,6 +88,13 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   conversion: {
     "primary-landing-pages": () => <PageBuilderPanel pageType="landing" />,
     "secondary-offer-pages": () => <PageBuilderPanel pageType="offer" />,
+  },
+  reporting: {
+    organic: () => <OrganicReportingPanel />,
+    paid: () => <PaidReportingPanel />,
+    "landing-pages": () => <PagesReportingPanel pageType="landing" />,
+    "offer-pages": () => <PagesReportingPanel pageType="offer" />,
+    commentary: () => <CommentaryPanel />,
   },
 };
 
