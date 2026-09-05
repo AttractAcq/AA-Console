@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Bot, ChevronDown, MessageSquare, PenLine, Plus, SendHorizontal, Wrench } from "lucide-react";
+import { Bot, ChevronDown, MessageSquare, PenLine, Plus, SendHorizontal, Trash2, Wrench } from "lucide-react";
 import { EmptyState } from "../EmptyState";
+import { ConfirmModal } from "../forms/FormModal";
 import { RichText } from "./RichText";
 import { useAuth } from "../../context/auth";
 import { supabase } from "../../lib/supabase";
@@ -45,6 +46,7 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [threadsOpen, setThreadsOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Thread | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -211,7 +213,13 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
               />
               <ul className="absolute right-0 top-full z-20 mt-1 max-h-72 w-72 overflow-y-auto rounded-lg border border-border bg-card py-1 shadow-lg">
                 {threads.map((thread) => (
-                  <li key={thread.id}>
+                  <li
+                    key={thread.id}
+                    className={cn(
+                      "group flex items-stretch gap-1 pr-1 hover:bg-accent",
+                      thread.id === conversationId && "bg-accent",
+                    )}
+                  >
                     <button
                       type="button"
                       onClick={() => {
@@ -220,10 +228,7 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
                         setThreadsOpen(false);
                         void loadMessages(thread.id);
                       }}
-                      className={cn(
-                        "flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        thread.id === conversationId && "bg-accent",
-                      )}
+                      className="flex min-w-0 flex-1 flex-col items-start gap-0.5 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <span className="line-clamp-2 text-xs text-foreground">
                         {thread.title?.trim() || "Untitled thread"}
@@ -231,6 +236,17 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
                       <span className="text-[0.7rem] text-muted-foreground">
                         {new Date(thread.updated_at).toLocaleString()}
                       </span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Delete thread: ${thread.title?.trim() || "Untitled thread"}`}
+                      onClick={() => {
+                        setPendingDelete(thread);
+                        setThreadsOpen(false);
+                      }}
+                      className="my-1 shrink-0 self-center rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                   </li>
                 ))}
@@ -326,6 +342,38 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
         )}
         <div ref={endRef} />
       </div>
+
+      <ConfirmModal
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        title="Delete this thread?"
+        body={
+          pendingDelete
+            ? `"${pendingDelete.title?.trim() || "Untitled thread"}" and every message in it will be removed. This cannot be undone. Nothing the Master AI did — jobs it queued, rows it wrote — is affected.`
+            : ""
+        }
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (!pendingDelete) return;
+          const { error: deleteError } = await supabase
+            .from("master_ai_conversations")
+            .delete()
+            .eq("id", pendingDelete.id);
+          if (deleteError) throw new Error(deleteError.message);
+
+          const remaining = await loadThreads();
+          // Deleting the thread you are reading leaves the view showing a
+          // conversation that no longer exists, so fall back to the next
+          // most recent rather than stranding it.
+          if (pendingDelete.id === conversationId) {
+            const next = remaining[0]?.id ?? null;
+            setConversationId(next);
+            if (next) await loadMessages(next);
+            else setTurns([]);
+          }
+          setPendingDelete(null);
+        }}
+      />
 
       <form onSubmit={onSubmit} className="flex shrink-0 items-center gap-2 border-t border-border px-5 py-3">
         <input
