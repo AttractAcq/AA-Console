@@ -13,6 +13,7 @@ import { serviceClient } from "./db.js";
 import { startWorker, type WorkerHandle } from "./worker.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { registeredAgentKeys } from "./orchestration/dispatch.js";
+import { handleMasterChat } from "./master/route.js";
 import { logger } from "./logging/logger.js";
 
 const config = loadConfig();
@@ -45,6 +46,32 @@ const server = http.createServer((req, res) => {
     res.writeHead(status, { "Content-Type": "application/json" });
     res.end(JSON.stringify(body));
   };
+
+  // The Master AI is browser-called, so it needs CORS. Only listed origins
+  // get the header at all — an unlisted origin is refused by the browser
+  // before the request is even attempted.
+  const origin = req.headers.origin;
+  if (origin && config.allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Max-Age", "86400");
+  }
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  if (req.url === "/master/chat") {
+    if (req.method !== "POST") {
+      json(405, { ok: false, error: "POST only" });
+      return;
+    }
+    void handleMasterChat(req, res, sb, config);
+    return;
+  }
 
   if (req.url === "/health") {
     // Deliberately unauthenticated and free of secrets — the platform

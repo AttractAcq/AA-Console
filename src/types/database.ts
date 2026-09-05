@@ -1550,6 +1550,85 @@ export type Database = {
           },
         ]
       }
+      master_ai_conversations: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          created_by: string
+          id: string
+          pending_confirmation: Json | null
+          scope: Database["public"]["Enums"]["master_ai_scope"]
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          pending_confirmation?: Json | null
+          scope: Database["public"]["Enums"]["master_ai_scope"]
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          pending_confirmation?: Json | null
+          scope?: Database["public"]["Enums"]["master_ai_scope"]
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_ai_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      master_ai_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          cost_usd: number | null
+          created_at: string
+          id: string
+          role: string
+          tool_calls: Json
+        }
+        Insert: {
+          content?: string
+          conversation_id: string
+          cost_usd?: number | null
+          created_at?: string
+          id?: string
+          role: string
+          tool_calls?: Json
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          cost_usd?: number | null
+          created_at?: string
+          id?: string
+          role?: string
+          tool_calls?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_ai_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "master_ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -2222,6 +2301,15 @@ export type Database = {
       is_channel_member: { Args: { target: string }; Returns: boolean }
       is_client_user: { Args: { target: string }; Returns: boolean }
       is_member: { Args: { target: string }; Returns: boolean }
+      master_ai_describe_table: {
+        Args: { p_table: string }
+        Returns: {
+          column_default: string
+          column_name: string
+          data_type: string
+          is_nullable: string
+        }[]
+      }
       master_run_progress: {
         Args: { p_run_id: string }
         Returns: {
@@ -2281,6 +2369,7 @@ export type Database = {
         | "completed"
         | "failed"
         | "cancelled"
+      master_ai_scope: "client" | "company"
       media_type: "image" | "text" | "video"
       page_type: "landing" | "offer"
       pipeline_stage: "first_touch" | "second_touch" | "call_booked"
@@ -2446,6 +2535,7 @@ export const Constants = {
         "failed",
         "cancelled",
       ],
+      master_ai_scope: ["client", "company"],
       media_type: ["image", "text", "video"],
       page_type: ["landing", "offer"],
       pipeline_stage: ["first_touch", "second_touch", "call_booked"],

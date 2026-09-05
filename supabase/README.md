@@ -37,6 +37,25 @@ keeps an existing account's password in step with what it is given. The
 live project is already migrated, so this only matters for new
 environments.
 
+## Careful: `migration fetch` overwrites migration 11
+
+`supabase migration fetch` re-pulls **every** migration from the database and
+overwrites the local files. The database still holds the original migration 11
+with the five passwords as literals, so a fetch silently reverts the
+parameterisation above and re-stages the plaintext admin password for commit.
+
+After any `migration fetch`, restore it before committing:
+
+```bash
+git checkout HEAD -- supabase/migrations/20260903105742_11_auth_users_and_role_metadata.sql
+```
+
+Then confirm nothing slipped through:
+
+```bash
+git diff --cached | grep -E "^\+.*('Alex@Acq'|'AA123')"
+```
+
 ## Local state
 
 `.temp/` is machine-specific CLI state (project ref, service versions,

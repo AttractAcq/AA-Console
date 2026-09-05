@@ -7,6 +7,7 @@ import { DataTable } from "../../components/DataTable";
 import { ConfirmModal } from "../../components/forms/FormModal";
 import { RunAgentModal } from "../../components/agents/RunAgentModal";
 import { supabase } from "../../lib/supabase";
+import { MasterAIChat } from "../../components/masterai/MasterAIChat";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { cn } from "../../lib/cn";
@@ -125,6 +126,8 @@ export function ClientDashboardPanel() {
   return (
     <div className="space-y-6">
       <AgentActivityBar inFlight={active} failures={recentFailures} />
+
+      {clientId && <MasterAIChat scope={{ kind: "client", clientId }} />}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button icon={Play} onClick={() => setRunOpen(true)}>

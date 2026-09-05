@@ -18,8 +18,8 @@ describe("dispatch registry", () => {
     }
   });
 
-  it("has no runner for market, by design, until it has somewhere to show its output", () => {
-    expect(hasRunner("market")).toBe(false);
+  it("has a runner for market, which now has an Intelligence tab to show it", () => {
+    expect(hasRunner("market")).toBe(true);
   });
 
   it("has no runner for an unregistered agent key", () => {
@@ -32,6 +32,5 @@ describe("dispatch registry", () => {
     for (const key of keys) {
       expect(hasRunner(key)).toBe(true);
     }
-    expect(keys).not.toContain("market");
   });
 });

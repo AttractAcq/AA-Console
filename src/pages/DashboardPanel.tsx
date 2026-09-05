@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Users, Settings2, UsersRound, ShieldCheck, ChevronRight } from "lucide-react";
 import { Panel } from "../components/Panel";
 import { ClientCard } from "../components/ClientCard";
+import { MasterAIChat } from "../components/masterai/MasterAIChat";
 import { EmptyState } from "../components/EmptyState";
 import { getRecentClientIds } from "../lib/routeEntities";
 import { supabase } from "../lib/supabase";
@@ -110,6 +111,8 @@ export function DashboardPanel() {
           </Panel>
         ))}
       </div>
+
+      <MasterAIChat scope={{ kind: "company" }} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">

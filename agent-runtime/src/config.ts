@@ -16,6 +16,8 @@ export interface RuntimeConfig {
   healthPort: number;
   /** Required in an X-Runtime-Secret header on /status when set. */
   sharedSecret: string | null;
+  /** Origins allowed to call /master/chat from a browser. */
+  allowedOrigins: string[];
 }
 
 function requireEnv(name: string): string {
@@ -85,6 +87,14 @@ export function loadConfig(): RuntimeConfig {
     emptyQueueBackoffMs: intEnv("AGENT_RUNTIME_EMPTY_QUEUE_BACKOFF_MS", 5000),
     healthPort: intEnv("PORT", 8787),
     sharedSecret: optionalEnv("AGENT_RUNTIME_SHARED_SECRET") ?? null,
+    // The Master AI is called from the browser, so the origin list is a
+    // real control rather than a formality. Defaults to local dev only:
+    // a deployment that forgets to set this cannot be reached from a
+    // hosted front end, which is the failure we want.
+    allowedOrigins: (optionalEnv("MASTER_AI_ALLOWED_ORIGINS") ?? "http://localhost:5173")
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean),
   };
 }
 
