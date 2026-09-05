@@ -64,6 +64,16 @@ export const TABLES: Record<string, TableRule> = {
   client_onboarding_steps: { scope: CLIENT_COLUMN, clientRead: true, clientWrite: true },
   client_pages: { scope: CLIENT_COLUMN, clientRead: true, clientWrite: true },
   client_proof_assets: { scope: CLIENT_COLUMN, clientRead: true, clientWrite: true },
+  // Read-only on purpose. These rows are pulled from an ad platform and
+  // are what a client is shown as fact; a human or a model editing them
+  // would be falsifying reporting rather than correcting it. Fix the
+  // mapping and re-run the ingest instead.
+  metrics_daily: {
+    scope: CLIENT_COLUMN,
+    clientRead: true,
+    clientWrite: false,
+    note: "Reporting numbers are written by the ingest job. Re-run metrics_ingest rather than editing them.",
+  },
   finance_entries: { scope: CLIENT_COLUMN, clientRead: true, clientWrite: true },
   job_assignments: { scope: CLIENT_COLUMN, clientRead: true, clientWrite: true },
   scheduled_posts: { scope: CLIENT_COLUMN, clientRead: true, clientWrite: true },

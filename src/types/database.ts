@@ -67,6 +67,7 @@ export type Database = {
           lease_until: string | null
           max_attempts: number
           output_tokens: number
+          params: Json
           run_id: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["job_status"]
@@ -88,6 +89,7 @@ export type Database = {
           lease_until?: string | null
           max_attempts?: number
           output_tokens?: number
+          params?: Json
           run_id?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["job_status"]
@@ -109,6 +111,7 @@ export type Database = {
           lease_until?: string | null
           max_attempts?: number
           output_tokens?: number
+          params?: Json
           run_id?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["job_status"]
@@ -250,6 +253,7 @@ export type Database = {
           name: string
           paused: boolean
           requires_upstream: string[]
+          scheduled_only: boolean
           updated_at: string
         }
         Insert: {
@@ -264,6 +268,7 @@ export type Database = {
           name: string
           paused?: boolean
           requires_upstream?: string[]
+          scheduled_only?: boolean
           updated_at?: string
         }
         Update: {
@@ -278,6 +283,7 @@ export type Database = {
           name?: string
           paused?: boolean
           requires_upstream?: string[]
+          scheduled_only?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -290,6 +296,7 @@ export type Database = {
           created_by: string | null
           daily_spend: number
           ended_on: string | null
+          external_id: string | null
           id: string
           objective_achieved: string | null
           started_on: string
@@ -305,6 +312,7 @@ export type Database = {
           created_by?: string | null
           daily_spend?: number
           ended_on?: string | null
+          external_id?: string | null
           id?: string
           objective_achieved?: string | null
           started_on?: string
@@ -320,6 +328,7 @@ export type Database = {
           created_by?: string | null
           daily_spend?: number
           ended_on?: string | null
+          external_id?: string | null
           id?: string
           objective_achieved?: string | null
           started_on?: string
@@ -1629,6 +1638,91 @@ export type Database = {
           },
         ]
       }
+      metrics_daily: {
+        Row: {
+          basis: Database["public"]["Enums"]["metric_basis"]
+          campaign_id: string | null
+          clicks: number | null
+          client_id: string
+          conversions: number | null
+          currency: string | null
+          engagements: number | null
+          entity_type: Database["public"]["Enums"]["metric_entity"]
+          external_id: string
+          fetched_at: string
+          id: string
+          impressions: number | null
+          metric_date: string
+          post_id: string | null
+          raw: Json | null
+          reach: number | null
+          spend: number | null
+          surface: Database["public"]["Enums"]["metric_surface"]
+        }
+        Insert: {
+          basis?: Database["public"]["Enums"]["metric_basis"]
+          campaign_id?: string | null
+          clicks?: number | null
+          client_id: string
+          conversions?: number | null
+          currency?: string | null
+          engagements?: number | null
+          entity_type: Database["public"]["Enums"]["metric_entity"]
+          external_id: string
+          fetched_at?: string
+          id?: string
+          impressions?: number | null
+          metric_date: string
+          post_id?: string | null
+          raw?: Json | null
+          reach?: number | null
+          spend?: number | null
+          surface: Database["public"]["Enums"]["metric_surface"]
+        }
+        Update: {
+          basis?: Database["public"]["Enums"]["metric_basis"]
+          campaign_id?: string | null
+          clicks?: number | null
+          client_id?: string
+          conversions?: number | null
+          currency?: string | null
+          engagements?: number | null
+          entity_type?: Database["public"]["Enums"]["metric_entity"]
+          external_id?: string
+          fetched_at?: string
+          id?: string
+          impressions?: number | null
+          metric_date?: string
+          post_id?: string | null
+          raw?: Json | null
+          reach?: number | null
+          spend?: number | null
+          surface?: Database["public"]["Enums"]["metric_surface"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metrics_daily_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_daily_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_daily_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1720,6 +1814,7 @@ export type Database = {
           client_id: string | null
           created_at: string
           created_by: string | null
+          external_id: string | null
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
           notes: string | null
@@ -1734,6 +1829,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           created_by?: string | null
+          external_id?: string | null
           id?: string
           media_type?: Database["public"]["Enums"]["media_type"]
           notes?: string | null
@@ -1748,6 +1844,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           created_by?: string | null
+          external_id?: string | null
           id?: string
           media_type?: Database["public"]["Enums"]["media_type"]
           notes?: string | null
@@ -2262,6 +2359,7 @@ export type Database = {
           lease_until: string | null
           max_attempts: number
           output_tokens: number
+          params: Json
           run_id: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["job_status"]
@@ -2295,6 +2393,24 @@ export type Database = {
           p_input_id?: string
           p_input_table?: string
         }
+        Returns: string
+      }
+      enqueue_agent_job_as: {
+        Args: {
+          p_actor: string
+          p_agent_key: string
+          p_client_id?: string
+          p_input_id?: string
+          p_input_table?: string
+        }
+        Returns: string
+      }
+      enqueue_metrics_ingest_jobs: {
+        Args: { p_days?: number }
+        Returns: number
+      }
+      integration_secret: {
+        Args: { p_client_id: string; p_provider: string }
         Returns: string
       }
       is_admin: { Args: never; Returns: boolean }
@@ -2347,6 +2463,10 @@ export type Database = {
         Returns: string
       }
       start_master_run: { Args: { p_client_id: string }; Returns: string }
+      start_master_run_as: {
+        Args: { p_actor: string; p_client_id: string }
+        Returns: string
+      }
       start_onboarding: { Args: { p_client_id: string }; Returns: undefined }
       try_uuid: { Args: { t: string }; Returns: string }
     }
@@ -2371,6 +2491,9 @@ export type Database = {
         | "cancelled"
       master_ai_scope: "client" | "company"
       media_type: "image" | "text" | "video"
+      metric_basis: "daily" | "cumulative"
+      metric_entity: "account" | "campaign" | "post" | "page"
+      metric_surface: "paid" | "organic" | "landing" | "offer"
       page_type: "landing" | "offer"
       pipeline_stage: "first_touch" | "second_touch" | "call_booked"
       post_channel: "organic" | "paid"
@@ -2537,6 +2660,9 @@ export const Constants = {
       ],
       master_ai_scope: ["client", "company"],
       media_type: ["image", "text", "video"],
+      metric_basis: ["daily", "cumulative"],
+      metric_entity: ["account", "campaign", "post", "page"],
+      metric_surface: ["paid", "organic", "landing", "offer"],
       page_type: ["landing", "offer"],
       pipeline_stage: ["first_touch", "second_touch", "call_booked"],
       post_channel: ["organic", "paid"],

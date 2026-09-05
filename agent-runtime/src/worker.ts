@@ -17,7 +17,7 @@ import {
   type AgentJobRow,
 } from "./queue.js";
 import { getAgent } from "./orchestration/registry.js";
-import { dispatchJob, hasRunner } from "./orchestration/dispatch.js";
+import { dispatchJob, hasRunner, registeredAgentKeys } from "./orchestration/dispatch.js";
 import { logger } from "./logging/logger.js";
 
 export interface WorkerHandle {
@@ -35,7 +35,14 @@ export function startWorker(
   async function loop(): Promise<void> {
     while (!stopped) {
       try {
-        const job = await claimNextJob(sb, leaseOwner, config.leaseSeconds);
+        // Only claim what this build can actually run. claim_agent_job has
+        // always accepted this filter; not passing it meant a worker would
+        // claim an agent it had no runner for and burn the job's attempts
+        // on NO_RUNTIME_IMPLEMENTATION. That makes registering an agent row
+        // before its runner ships a destructive act, and during a rolling
+        // deploy the old container would eat the new agent's jobs. Now such
+        // a job simply waits for a build that knows how to run it.
+        const job = await claimNextJob(sb, leaseOwner, config.leaseSeconds, registeredAgentKeys());
         if (!job) {
           await sleep(config.emptyQueueBackoffMs);
           continue;

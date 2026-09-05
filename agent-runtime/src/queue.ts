@@ -9,6 +9,8 @@ export interface AgentJobRow {
   client_id: string | null;
   input_table: string | null;
   input_id: string | null;
+  /** Runner arguments not addressed by input_table/input_id, e.g. a surface and date window. */
+  params: Record<string, unknown> | null;
   status: string;
   attempts: number;
   max_attempts: number;
