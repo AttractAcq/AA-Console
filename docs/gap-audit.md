@@ -1,5 +1,7 @@
 # Gap audit — 5 September 2026
 
+*Updated the same day: gap 2 closed and re-verified; gap 2a added.*
+
 The current reference for what is built, what is not, and what is built but
 unproven. Every claim below was checked against the running system rather
 than recalled; how each was checked is stated so it can be re-run.
@@ -17,7 +19,7 @@ been true for some time.
 | Admin console pages | **Complete.** Every leaf page resolves to a real panel; nothing falls through to a bare `EmptyState`. | Parsed `navigation.ts` against the registries in `Page.tsx`. The only unmatched ids are `delivery` and `account`, which are parent groups, not pages. |
 | Agent runtime | **14 agents registered, 14 runners.** No agent can be queued that the runtime cannot execute. | `agents` table vs `RUNNERS` in `dispatch.ts`. |
 | Deployment | **Current.** Railway reports `version: 8e0f5ce`, the latest commit. | `agent_runtime_status`. |
-| RLS | **Every table has RLS enabled and at least one policy.** | `pg_class.relrowsecurity` and `pg_policy` across `public`. |
+| RLS | **Every table has RLS enabled and at least one policy, and cross-client isolation is now tested.** | `pg_class.relrowsecurity`, `pg_policy`, and `scripts/rls-isolation-test.mjs` run against two live client logins. |
 | Schema in git | **38 migrations, all exported.** | `supabase/migrations/`. |
 | Reporting pipeline | **Built end to end**, steps 1–6. | See "Unproven" below — built is not the same as working. |
 
@@ -42,20 +44,60 @@ back correctly classified as non-retryable and flipped the integration to
 (organic), then turn on Daily Sync. No further code is expected — but that
 expectation is exactly what is untested.
 
-### 2. Cross-client RLS isolation has never been tested with two client logins
+### 2. ~~Cross-client RLS isolation~~ — TESTED AND HOLDING (5 Sep 2026)
 
-Only **one** client account exists. `client_users` has a single row, and
-**Harbour Dental has no login at all**. Every guarantee that one client
-cannot see another's data rests on `can_access_client()` and has only ever
-been exercised from the admin account and one client account.
+**Closed.** A second client login was created for Harbour Dental, and both
+accounts were used to attack each other's data. `scripts/rls-isolation-test.mjs`
+re-runs the whole thing.
 
-This is the highest-severity item on the list, because the failure is silent
-and the blast radius is every client's data.
+What was attempted, in both directions, across all 26 client-scoped tables:
 
-**To close:** create a second client login, sign in as it, and attempt to
-read the first client's campaigns, media, briefs, ideas, leads and metrics.
-The Master AI's client-scope fence was tested this way and held; the RLS
-layer beneath it has not been.
+| Attack | Result |
+|---|---|
+| Unfiltered read of every table | No foreign rows returned |
+| Read filtered explicitly to the other client's id | 0 rows |
+| `clients` table | Each account sees only itself |
+| `agent_job_events` (no `client_id` of its own) | Attract Acquisition, which has no jobs, saw 0 |
+| Cross-client `UPDATE` of business context | 0 rows changed; overview verified intact afterwards |
+| Cross-client `INSERT` of an audit note | 403 |
+| Cross-client `DELETE` of campaigns | 0 rows; all campaigns verified still present afterwards |
+| `can_access_client(other)` | `false` |
+
+The write attempts returned HTTP 200 with an empty body rather than 403,
+because RLS filters them to zero rows rather than rejecting the statement.
+That is a refusal, and the follow-up query confirmed nothing changed — but it
+means a caller cannot tell "forbidden" from "no match", so any future test
+must verify the data, not the status code.
+
+A static audit ran alongside it, because the live test can only prove tables
+that hold data on both sides — nine were empty and would have passed
+vacuously. Every policy on every client-scoped table was read directly: all
+are admin-only, scoped through `can_access_client()` / `is_client_user()`, or
+an equivalent inline `client_users` lookup. None lacks a predicate.
+
+### 2a. Clients can read the profile of anyone sharing a chat channel (NEW)
+
+Found while investigating an oddity in the test above: the Attract Acquisition
+account could read all five `profiles` rows, while Harbour Dental could read
+one. The cause is `profiles_channel_peer_read`, which grants read access to
+the profile of anyone you share a channel with. AA is in `general` alongside
+the admin and all three employees; HD is in no channel.
+
+This is deliberate — chat has to render author names — but it has two edges:
+
+- It exposes staff **email addresses and roles** to a client, which is more
+  than rendering a name requires.
+- **If an admin ever adds two clients to the same channel, they can read each
+  other's profile.** Nothing prevents it; the Add Members UI lists every user.
+  Today only one client is in a channel, so it has not happened.
+
+This is not cross-client *data* leakage — no client row, campaign, brief or
+metric crosses over — but it is the one path by which two clients could see
+anything of each other's.
+
+**To close:** expose a narrow view (`id`, `full_name` only) for the chat
+author lookup and drop the peer policy on `profiles`. Column privileges are
+not an option here, as they are role-wide and would blind admins too.
 
 ### 3. `account` is unimplemented in both non-admin consoles
 
@@ -129,12 +171,15 @@ Both are the kind of record that only matters the day someone asks "who
 approved this, and when" — which is the day it is too late to start
 collecting it. The collecting is already done; the reading is not.
 
-### 9. Frontend test coverage is thin, and there are no RLS tests
+### 9. Frontend test coverage is thin
 
 29 frontend tests across three files (`fields`, `markdown`, `media`) against
-54 in the runtime. No panel renders under test, and — more importantly —
-nothing tests a policy. Gap 2 exists partly because there is no harness that
-would have caught it.
+54 in the runtime. No panel renders under test.
+
+The RLS half of this is now addressed: `scripts/rls-isolation-test.mjs` is a
+real harness and is meant to be re-run whenever a policy changes or a table
+is added. It is not wired into CI, because it needs two live client
+credentials.
 
 ### 10. Everything is tested against production
 
@@ -193,6 +238,12 @@ recorded here because the next person will hit them too.
   `agent-runtime/src/orchestration/dispatch.ts`.
 - **Deployed version:** `select version from agent_runtime_status where is_live`.
 - **RLS coverage:** `pg_class.relrowsecurity` and `pg_policy` over `public`.
+- **Cross-client isolation:** `node scripts/rls-isolation-test.mjs`, with
+  `.env.local` sourced and `RLS_TEST_CLIENT_A_PASSWORD` /
+  `RLS_TEST_CLIENT_B_PASSWORD` set (the script holds no credentials).
+  Add any new client-scoped table to the `TABLES` list in that file, and
+  remember it only proves tables holding data on both sides — pair it with the
+  static policy read for the rest.
 - **Security warnings:** Supabase advisors — then check each
   `SECURITY DEFINER` function for an internal `is_admin()` or
   `can_access_client()` guard before treating it as a finding.
