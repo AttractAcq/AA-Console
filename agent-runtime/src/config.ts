@@ -22,6 +22,9 @@ export interface RuntimeConfig {
   /** Image rendering. Absent means the AI build route reports itself unavailable. */
   openaiApiKey: string | null;
   imageModel: string;
+  /** Which provider writes the creative concept. */
+  conceptProvider: "openai" | "anthropic";
+  conceptModel: string;
   /** Transactional email. Absent means a brief is still assigned, just not emailed. */
   resendApiKey: string | null;
   resendFrom: string;
@@ -113,6 +116,14 @@ export function loadConfig(): RuntimeConfig {
     // Not pinned in code: the correct id is a provider fact that changes
     // faster than this repo does, so a wrong one is a config edit.
     imageModel: optionalEnv("OPENAI_IMAGE_MODEL") ?? "gpt-image-2",
+    // Explicit rather than inferred from the model name: reading the
+    // provider out of a string is the kind of cleverness that breaks
+    // silently the first time a model is named differently.
+    conceptProvider:
+      (optionalEnv("CREATIVE_CONCEPT_PROVIDER") ?? "openai").toLowerCase() === "anthropic"
+        ? "anthropic"
+        : "openai",
+    conceptModel: optionalEnv("CREATIVE_CONCEPT_MODEL") ?? "gpt-5.6-sol",
     resendApiKey: optionalEnv("RESEND_API_KEY") ?? null,
     resendFrom: optionalEnv("RESEND_FROM") ?? "AA Console <briefs@attractacq.com>",
     consoleUrl: (optionalEnv("CONSOLE_URL") ?? "http://localhost:5173").replace(/\/+$/, ""),

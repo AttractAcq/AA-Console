@@ -149,6 +149,7 @@ export const clientNavGroups: NavNode[] = [
         tabs: [
           { id: "image-library", label: "Image Library" },
           { id: "video-library", label: "Video Library" },
+          { id: "copy-library", label: "Copy Library" },
         ],
       },
       {

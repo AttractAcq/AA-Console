@@ -26,6 +26,10 @@ const RATES: Record<string, Rates> = {
   sonnet: { input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 },
   haiku: { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 },
   fable: { input: 10, output: 50, cacheWrite: 12.5, cacheRead: 1 },
+  // OpenAI, for the creative-director stage. Same units: USD per million.
+  sol: { input: 4, output: 20, cacheWrite: 5, cacheRead: 0.4 },
+  terra: { input: 2, output: 12, cacheWrite: 2.5, cacheRead: 0.2 },
+  luna: { input: 0.2, output: 1.2, cacheWrite: 0.25, cacheRead: 0.02 },
 };
 
 function ratesFor(model: string): Rates {
@@ -33,6 +37,9 @@ function ratesFor(model: string): Rates {
   if (value.includes("haiku")) return RATES.haiku!;
   if (value.includes("sonnet")) return RATES.sonnet!;
   if (value.includes("fable") || value.includes("mythos")) return RATES.fable!;
+  if (value.includes("sol")) return RATES.sol!;
+  if (value.includes("terra")) return RATES.terra!;
+  if (value.includes("luna")) return RATES.luna!;
   // Unknown models price as opus — the expensive assumption, so a
   // mispriced run over-reports rather than hiding spend.
   return RATES.opus!;

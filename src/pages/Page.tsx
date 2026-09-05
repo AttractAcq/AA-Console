@@ -28,6 +28,7 @@ import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { ProspectsLeadsPanel } from "./prospects-leads/ProspectsLeadsPanel";
 import { OnboardingPanel } from "./account/OnboardingPanel";
 import { IntegrationsPanel } from "./account/IntegrationsPanel";
+import { CopyLibraryPanel } from "./media/CopyLibraryPanel";
 import { PaidReportingPanel } from "./reporting/PaidReportingPanel";
 import { OrganicReportingPanel } from "./reporting/OrganicReportingPanel";
 import { PagesReportingPanel } from "./reporting/PagesReportingPanel";
@@ -80,6 +81,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   media: {
     "image-library": () => <ImageLibraryPanel />,
     "video-library": () => <VideoLibraryPanel />,
+    "copy-library": () => <CopyLibraryPanel />,
   },
   distribution: {
     organic: () => <OrganicPanel />,

@@ -22,6 +22,8 @@ import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
+import { OpenAiError, runStructuredCompletion } from "../../tools/openai.js";
+import { estimateCostUsd } from "../../usage/cost.js";
 import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, renderImage } from "./render.js";
@@ -156,6 +158,30 @@ export async function runCreativeBuildJob(
   }
 
   const isImage = typed.media_type === "image";
+
+  // Check the renderer before writing a concept. An image build that cannot
+  // render is worth failing for free rather than after paying for the
+  // expensive half — which is exactly what it used to do.
+  if (isImage && !config.openaiApiKey) {
+    const message =
+      "No image renderer is configured. Set OPENAI_API_KEY on the runtime to enable AI image builds.";
+    await sb
+      .from("creative_generations")
+      .update({ stage: "failed", error: message, updated_at: new Date().toISOString() })
+      .eq("id", generationId);
+    await sb.from("client_briefs").update({ status: "approved" }).eq("id", typed.id);
+    return { ok: false, retryable: false, failureMessage: message };
+  }
+  if (config.conceptProvider === "openai" && !config.openaiApiKey) {
+    const message =
+      "The creative concept is set to run on OpenAI but no OPENAI_API_KEY is configured. Set the key, or set CREATIVE_CONCEPT_PROVIDER=anthropic.";
+    await sb
+      .from("creative_generations")
+      .update({ stage: "failed", error: message, updated_at: new Date().toISOString() })
+      .eq("id", generationId);
+    await sb.from("client_briefs").update({ status: "approved" }).eq("id", typed.id);
+    return { ok: false, retryable: false, failureMessage: message };
+  }
   const fail = async (message: string) => {
     await sb
       .from("creative_generations")
@@ -207,31 +233,52 @@ ${proof || "None. Make no proof claim."}
 
 Call ${submitTool.name} once when you are done.`;
 
-  let result;
+  let concept: Record<string, unknown>;
+  let usage: { inputTokens: number; outputTokens: number; costUsd: number };
+  const conceptModel =
+    config.conceptProvider === "openai" ? config.conceptModel : config.model;
+
   try {
-    result = await runAgentLoop({
-      apiKey: anthropicKeyForAgent(config, agent.agent_key),
-      model: config.model,
-      system: SYSTEM,
-      prompt,
-      submitTool,
-      enableWebSearch: false,
-      onProgress: (note) => void appendEvent(sb, job.id, note),
-    });
+    if (config.conceptProvider === "openai") {
+      const out = await runStructuredCompletion({
+        apiKey: config.openaiApiKey as string,
+        model: config.conceptModel,
+        system: SYSTEM,
+        prompt,
+        schemaName: submitTool.name,
+        schema: submitTool.inputSchema,
+        reasoningEffort: "medium",
+      });
+      concept = out.parsed;
+      usage = {
+        inputTokens: out.usage.inputTokens,
+        outputTokens: out.usage.outputTokens,
+        costUsd: estimateCostUsd(config.conceptModel, out.usage),
+      };
+    } else {
+      const out = await runAgentLoop({
+        apiKey: anthropicKeyForAgent(config, agent.agent_key),
+        model: config.model,
+        system: SYSTEM,
+        prompt,
+        submitTool,
+        enableWebSearch: false,
+        onProgress: (note) => void appendEvent(sb, job.id, note),
+      });
+      concept = out.submitted;
+      usage = {
+        inputTokens: out.usage.inputTokens,
+        outputTokens: out.usage.outputTokens,
+        costUsd: out.usage.costUsd,
+      };
+    }
   } catch (error) {
-    if (error instanceof ProviderError) {
+    if (error instanceof ProviderError || error instanceof OpenAiError) {
       await fail(error.message);
       return { ok: false, retryable: error.retryable, failureMessage: error.message };
     }
     throw error;
   }
-
-  const concept = result.submitted;
-  const usage = {
-    inputTokens: result.usage.inputTokens,
-    outputTokens: result.usage.outputTokens,
-    costUsd: result.usage.costUsd,
-  };
 
   // ---- text stops here: the concept is the deliverable -------------------
   if (!isImage) {
@@ -255,7 +302,7 @@ Call ${submitTool.name} once when you are done.`;
       .update({
         stage: "done",
         concept,
-        concept_model: config.model,
+        concept_model: conceptModel,
         asset_id: assetId,
         cost_usd: usage.costUsd,
         error: null,
@@ -276,7 +323,7 @@ Call ${submitTool.name} once when you are done.`;
       stage: "render",
       concept,
       image_prompt: imagePrompt,
-      concept_model: config.model,
+      concept_model: conceptModel,
       image_model: config.imageModel,
       cost_usd: usage.costUsd,
       updated_at: new Date().toISOString(),
