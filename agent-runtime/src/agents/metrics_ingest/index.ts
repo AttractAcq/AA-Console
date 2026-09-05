@@ -44,13 +44,26 @@ function readParams(job: AgentJobRow): { surface: Surface; window: Window } {
   };
 }
 
+/**
+ * Same API and same token model, different account: Ads Insights is
+ * addressed by act_<id> and Instagram insights by the IG user id, and
+ * credential_label holds one id. So each surface reads its own row.
+ */
+const PROVIDER_FOR_SURFACE: Record<string, string> = {
+  paid: "meta",
+  organic: "instagram",
+};
+
 /** The credential label carries the account id; the Vault secret is the token. */
-async function loadCredentials(sb: SupabaseClient, clientId: string) {
+async function loadCredentials(sb: SupabaseClient, clientId: string, surface: Surface) {
+  const provider = PROVIDER_FOR_SURFACE[surface];
+  if (!provider) return null;
+
   const { data: integration, error } = await sb
     .from("client_integrations")
     .select("credential_label, status")
     .eq("client_id", clientId)
-    .eq("provider", "meta")
+    .eq("provider", provider)
     .eq("status", "active")
     .maybeSingle();
   if (error) throw new Error(`Could not read the integration: ${error.message}`);
@@ -58,12 +71,16 @@ async function loadCredentials(sb: SupabaseClient, clientId: string) {
 
   const { data: token, error: secretError } = await sb.rpc("integration_secret", {
     p_client_id: clientId,
-    p_provider: "meta",
+    p_provider: provider,
   });
   if (secretError) throw new Error(`Could not read the credential: ${secretError.message}`);
   if (!token || !integration.credential_label) return null;
 
-  return { accessToken: String(token), accountId: String(integration.credential_label) };
+  return {
+    provider,
+    accessToken: String(token),
+    accountId: String(integration.credential_label),
+  };
 }
 
 /** Attaches our own campaign/post ids where the external id is one we know. */
@@ -134,13 +151,14 @@ export async function runMetricsIngestJob(
 
   const { surface, window } = readParams(job);
 
-  const credentials = await loadCredentials(sb, job.client_id);
+  const credentials = await loadCredentials(sb, job.client_id, surface);
   if (!credentials) {
     return {
       ok: false,
       retryable: false,
       failureMessage:
-        "This client has no active Meta integration. Connect one in Account → Integrations, then re-run.",
+        `This client has no active ${PROVIDER_FOR_SURFACE[surface] ?? surface} integration. ` +
+        "Connect one in Account → Integrations, then re-run.",
     };
   }
 
@@ -162,7 +180,7 @@ export async function runMetricsIngestJob(
           .from("client_integrations")
           .update({ status: "error", last_checked_at: new Date().toISOString() })
           .eq("client_id", job.client_id)
-          .eq("provider", "meta");
+          .eq("provider", credentials.provider);
       }
       return { ok: false, retryable: error.retryable, failureMessage: error.message };
     }
@@ -179,7 +197,7 @@ export async function runMetricsIngestJob(
       .from("client_integrations")
       .update({ status: "active", last_checked_at: new Date().toISOString() })
       .eq("client_id", job.client_id)
-      .eq("provider", "meta");
+      .eq("provider", credentials.provider);
     return { ok: true, retryable: false };
   }
 
@@ -200,7 +218,7 @@ export async function runMetricsIngestJob(
     .from("client_integrations")
     .update({ status: "active", last_checked_at: new Date().toISOString() })
     .eq("client_id", job.client_id)
-    .eq("provider", "meta");
+    .eq("provider", credentials.provider);
 
   await appendEvent(
     sb,

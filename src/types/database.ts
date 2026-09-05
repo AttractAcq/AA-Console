@@ -975,6 +975,7 @@ export type Database = {
           credential_label: string | null
           credential_secret_id: string | null
           id: string
+          ingest_enabled: boolean
           last_checked_at: string | null
           provider: string
           status: string
@@ -987,6 +988,7 @@ export type Database = {
           credential_label?: string | null
           credential_secret_id?: string | null
           id?: string
+          ingest_enabled?: boolean
           last_checked_at?: string | null
           provider: string
           status?: string
@@ -999,6 +1001,7 @@ export type Database = {
           credential_label?: string | null
           credential_secret_id?: string | null
           id?: string
+          ingest_enabled?: boolean
           last_checked_at?: string | null
           provider?: string
           status?: string
