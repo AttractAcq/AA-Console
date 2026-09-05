@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Bot, ChevronDown, PenLine, SendHorizontal, Wrench } from "lucide-react";
+import { Bot, ChevronDown, MessageSquare, PenLine, Plus, SendHorizontal, Wrench } from "lucide-react";
 import { EmptyState } from "../EmptyState";
 import { RichText } from "./RichText";
 import { useAuth } from "../../context/auth";
@@ -8,6 +8,8 @@ import { supabase } from "../../lib/supabase";
 import { masterAIConfigured, sendMasterMessage } from "../../lib/masterAI";
 import type { MasterScope, ToolCall } from "../../lib/masterAI";
 import { cn } from "../../lib/cn";
+
+type Thread = { id: string; title: string | null; updated_at: string };
 
 type Turn = {
   id: string;
@@ -41,6 +43,8 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
   const { profile } = useAuth();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [threadsOpen, setThreadsOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,30 +53,12 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
 
   const clientId = scope.kind === "client" ? scope.clientId : null;
 
-  // Reload the most recent thread for this scope so the chat survives a
-  // reload rather than starting blank every time.
-  const loadRecent = useCallback(async () => {
-    let query = supabase
-      .from("master_ai_conversations")
-      .select("id")
-      .eq("scope", scope.kind)
-      .order("updated_at", { ascending: false })
-      .limit(1);
-    query = clientId ? query.eq("client_id", clientId) : query.is("client_id", null);
-
-    const { data: convos } = await query;
-    const id = convos?.[0]?.id ?? null;
-    if (!id) {
-      setConversationId(null);
-      setTurns([]);
-      return;
-    }
+  const loadMessages = useCallback(async (id: string) => {
     const { data: rows } = await supabase
       .from("master_ai_messages")
       .select("id, role, content, tool_calls, cost_usd")
       .eq("conversation_id", id)
       .order("created_at");
-    setConversationId(id);
     setTurns(
       (rows ?? []).map((r) => ({
         id: r.id as string,
@@ -82,7 +68,34 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
         costUsd: r.cost_usd as number | null,
       })),
     );
+  }, []);
+
+  /**
+   * Threads are per scope: a client's threads never appear on the company
+   * dashboard and vice versa, so switching cannot silently move you into a
+   * conversation with a different blast radius.
+   */
+  const loadThreads = useCallback(async () => {
+    let query = supabase
+      .from("master_ai_conversations")
+      .select("id, title, updated_at")
+      .eq("scope", scope.kind)
+      .order("updated_at", { ascending: false })
+      .limit(25);
+    query = clientId ? query.eq("client_id", clientId) : query.is("client_id", null);
+    const { data } = await query;
+    const list = (data ?? []) as Thread[];
+    setThreads(list);
+    return list;
   }, [scope.kind, clientId]);
+
+  const loadRecent = useCallback(async () => {
+    const list = await loadThreads();
+    const id = list[0]?.id ?? null;
+    setConversationId(id);
+    if (id) await loadMessages(id);
+    else setTurns([]);
+  }, [loadThreads, loadMessages]);
 
   useEffect(() => {
     void loadRecent();
@@ -108,6 +121,7 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
     try {
       const reply = await sendMasterMessage({ scope, conversationId, message });
       setConversationId(reply.conversationId);
+      void loadThreads();
       setTurns((prev) => [
         ...prev,
         {
@@ -157,19 +171,73 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
             <p className="mt-0.5 text-xs text-muted-foreground">{scopeNote}</p>
           </div>
         </div>
-        {turns.length > 0 && (
+        <div className="relative flex shrink-0 items-center gap-1">
+          {threads.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setThreadsOpen((v) => !v)}
+              aria-expanded={threadsOpen}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
+              {threads.length} thread{threads.length === 1 ? "" : "s"}
+              <ChevronDown
+                className={cn("h-3 w-3 transition-transform", threadsOpen && "rotate-180")}
+                aria-hidden="true"
+              />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
               setConversationId(null);
               setTurns([]);
               setError(null);
+              setThreadsOpen(false);
             }}
-            className="shrink-0 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            New thread
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            New
           </button>
-        )}
+
+          {threadsOpen && (
+            <>
+              <button
+                type="button"
+                aria-label="Close thread list"
+                className="fixed inset-0 z-10 cursor-default"
+                onClick={() => setThreadsOpen(false)}
+              />
+              <ul className="absolute right-0 top-full z-20 mt-1 max-h-72 w-72 overflow-y-auto rounded-lg border border-border bg-card py-1 shadow-lg">
+                {threads.map((thread) => (
+                  <li key={thread.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConversationId(thread.id);
+                        setError(null);
+                        setThreadsOpen(false);
+                        void loadMessages(thread.id);
+                      }}
+                      className={cn(
+                        "flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        thread.id === conversationId && "bg-accent",
+                      )}
+                    >
+                      <span className="line-clamp-2 text-xs text-foreground">
+                        {thread.title?.trim() || "Untitled thread"}
+                      </span>
+                      <span className="text-[0.7rem] text-muted-foreground">
+                        {new Date(thread.updated_at).toLocaleString()}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
       </header>
 
       <div className="max-h-[26rem] min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">

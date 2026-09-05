@@ -110,14 +110,31 @@ export async function handleMasterChat(
 
     const { data: rows, error: historyError } = await sb
       .from("master_ai_messages")
-      .select("role, content")
+      .select("role, content, tool_calls")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT);
     if (historyError) throw new Error(historyError.message);
+
+    // Tool results are not replayed into history — they would dominate the
+    // context, and a cached row read three turns ago is worse than a fresh
+    // one. What the model does need is the memory that it acted at all, so
+    // each assistant turn carries a compact note of what it did. Without
+    // this it re-runs work it already did and cannot follow up on its own
+    // actions across turns.
     const history = (rows ?? [])
       .reverse()
-      .map((r) => ({ role: r.role as "user" | "assistant", content: r.content as string }))
+      .map((r) => {
+        const calls = (r.tool_calls ?? []) as Array<{ tool: string; summary: string }>;
+        const note =
+          r.role === "assistant" && calls.length > 0
+            ? `\n\n[actions taken: ${calls.map((c) => `${c.tool} — ${c.summary}`).join("; ")}]`
+            : "";
+        return {
+          role: r.role as "user" | "assistant",
+          content: `${r.content as string}${note}`,
+        };
+      })
       .filter((r) => r.content.trim().length > 0);
 
     const started = Date.now();

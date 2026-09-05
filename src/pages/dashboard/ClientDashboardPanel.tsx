@@ -127,8 +127,6 @@ export function ClientDashboardPanel() {
     <div className="space-y-6">
       <AgentActivityBar inFlight={active} failures={recentFailures} />
 
-      {clientId && <MasterAIChat scope={{ kind: "client", clientId }} />}
-
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button icon={Play} onClick={() => setRunOpen(true)}>
           Run Agent
@@ -199,6 +197,8 @@ export function ClientDashboardPanel() {
           </ul>
         </Panel>
       )}
+
+      {clientId && <MasterAIChat scope={{ kind: "client", clientId }} />}
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-foreground">Recent runs</h2>

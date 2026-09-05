@@ -5,7 +5,7 @@ import { cn } from "../lib/cn";
 export function ClientCard({ client }: { client: Client }) {
   return (
     <Link
-      to={`/clients/${client.id}/delivery/intelligence`}
+      to={`/clients/${client.id}/delivery/dashboard`}
       className={cn(
         "flex flex-col gap-4 rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
       )}
