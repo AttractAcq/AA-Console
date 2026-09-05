@@ -94,16 +94,24 @@ export const clientNavGroups: NavNode[] = [
     path: "delivery",
     children: [
       {
+        id: "delivery-dashboard",
+        label: "Dashboard",
+        path: "dashboard",
+        icon: LayoutDashboard,
+      },
+      {
         id: "intelligence",
         label: "Intelligence",
         path: "intelligence",
         icon: Brain,
         tabs: [
           { id: "business-context", label: "Business Context" },
+          { id: "market", label: "Market" },
           { id: "icp", label: "ICP" },
           { id: "competitors", label: "Competitors" },
           { id: "branding-associations", label: "Branding & Associations" },
           { id: "campaign-intelligence", label: "Campaign Intelligence" },
+          { id: "proof-intelligence", label: "Proof Intelligence" },
         ],
       },
       {

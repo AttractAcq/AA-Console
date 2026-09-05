@@ -67,6 +67,7 @@ export type Database = {
           lease_until: string | null
           max_attempts: number
           output_tokens: number
+          run_id: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["job_status"]
         }
@@ -87,6 +88,7 @@ export type Database = {
           lease_until?: string | null
           max_attempts?: number
           output_tokens?: number
+          run_id?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["job_status"]
         }
@@ -107,6 +109,7 @@ export type Database = {
           lease_until?: string | null
           max_attempts?: number
           output_tokens?: number
+          run_id?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["job_status"]
         }
@@ -237,6 +240,7 @@ export type Database = {
       agents: {
         Row: {
           agent_key: string
+          archived_at: string | null
           config: Json
           created_at: string
           description: string | null
@@ -250,6 +254,7 @@ export type Database = {
         }
         Insert: {
           agent_key: string
+          archived_at?: string | null
           config?: Json
           created_at?: string
           description?: string | null
@@ -263,6 +268,7 @@ export type Database = {
         }
         Update: {
           agent_key?: string
+          archived_at?: string | null
           config?: Json
           created_at?: string
           description?: string | null
@@ -873,6 +879,7 @@ export type Database = {
         Row: {
           body: string | null
           client_id: string
+          content_territory: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -880,13 +887,16 @@ export type Database = {
           media_type: Database["public"]["Enums"]["media_type"]
           proof_id: string | null
           source: Database["public"]["Enums"]["idea_source"]
+          source_question: string | null
           status: Database["public"]["Enums"]["idea_status"]
+          strategic_reason: string | null
           title: string
           updated_at: string
         }
         Insert: {
           body?: string | null
           client_id: string
+          content_territory?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -894,13 +904,16 @@ export type Database = {
           media_type?: Database["public"]["Enums"]["media_type"]
           proof_id?: string | null
           source: Database["public"]["Enums"]["idea_source"]
+          source_question?: string | null
           status?: Database["public"]["Enums"]["idea_status"]
+          strategic_reason?: string | null
           title: string
           updated_at?: string
         }
         Update: {
           body?: string | null
           client_id?: string
+          content_territory?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -908,7 +921,9 @@ export type Database = {
           media_type?: Database["public"]["Enums"]["media_type"]
           proof_id?: string | null
           source?: Database["public"]["Enums"]["idea_source"]
+          source_question?: string | null
           status?: Database["public"]["Enums"]["idea_status"]
+          strategic_reason?: string | null
           title?: string
           updated_at?: string
         }
@@ -2168,6 +2183,7 @@ export type Database = {
           lease_until: string | null
           max_attempts: number
           output_tokens: number
+          run_id: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["job_status"]
         }
@@ -2206,6 +2222,17 @@ export type Database = {
       is_channel_member: { Args: { target: string }; Returns: boolean }
       is_client_user: { Args: { target: string }; Returns: boolean }
       is_member: { Args: { target: string }; Returns: boolean }
+      master_run_progress: {
+        Args: { p_run_id: string }
+        Returns: {
+          completed: number
+          cost_usd: number
+          failed: number
+          queued: number
+          running: number
+          total: number
+        }[]
+      }
       next_ref_number: { Args: { p_client_id: string }; Returns: string }
       renew_agent_job_lease: {
         Args: {
@@ -2231,6 +2258,7 @@ export type Database = {
         }
         Returns: string
       }
+      start_master_run: { Args: { p_client_id: string }; Returns: string }
       start_onboarding: { Args: { p_client_id: string }; Returns: undefined }
       try_uuid: { Args: { t: string }; Returns: string }
     }
@@ -2262,6 +2290,7 @@ export type Database = {
         | "competitor"
         | "association"
         | "market"
+        | "proof"
         | "campaign_intel"
         | "brand_strategy"
         | "offer_strategy"
@@ -2426,6 +2455,7 @@ export const Constants = {
         "competitor",
         "association",
         "market",
+        "proof",
         "campaign_intel",
         "brand_strategy",
         "offer_strategy",

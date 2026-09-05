@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { FilterPills } from "../../components/FilterPills";
 import { DataTable } from "../../components/DataTable";
+import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { mediaFilters } from "../../data/mediaFilters";
 import type { MediaFilterId } from "../../data/mediaFilters";
+import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
 
 type Brief = {
@@ -37,17 +39,33 @@ export function BriefsPanel() {
     void refresh();
   }, [refresh]);
 
+  // A brief appears minutes after the click that asked for it, so the page
+  // has to reload itself when the job finishes rather than waiting to be
+  // reloaded by hand.
+  const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
+
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
   const shown = briefs.filter((b) => b.media_type === activeFilter);
+  const elsewhere = briefs.length - shown.length;
 
   return (
     <div>
+      <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
+
       <div className="mb-4">
         <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
       </div>
       <DataTable
         columns={["Brief", "Type", "Status"]}
-        emptyLabel={loading ? "Loading briefs…" : `No ${activeLabel.toLowerCase()} briefs yet`}
+        emptyLabel={
+          loading
+            ? "Loading briefs…"
+            : elsewhere > 0
+              // "No image briefs" while three video briefs sit one pill away
+              // reads as "nothing worked". Say where they actually are.
+              ? `No ${activeLabel.toLowerCase()} briefs — ${elsewhere} brief${elsewhere === 1 ? "" : "s"} under another type`
+              : "No briefs yet — approve an idea on the Generation tab"
+        }
         rows={shown.map((b) => [b.title, b.media_type, b.status])}
       />
     </div>

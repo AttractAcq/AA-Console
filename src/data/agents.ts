@@ -1,4 +1,4 @@
-export type AgentStatus = "Active" | "Idle";
+export type AgentStatus = "Active" | "Idle" | "Archived";
 
 export type Agent = {
   id: string;

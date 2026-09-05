@@ -17,6 +17,8 @@ import { runCampaignIntelJob } from "../agents/campaign_intel/index.js";
 import { runBrandStrategyJob } from "../agents/brand_strategy/index.js";
 import { runOfferStrategyJob } from "../agents/offer_strategy/index.js";
 import { runMoneyModelJob } from "../agents/money_model/index.js";
+import { runMarketJob } from "../agents/market/index.js";
+import { runProofJob } from "../agents/proof/index.js";
 import { runIdeationJob } from "../agents/ideation/index.js";
 import { runBriefJob } from "../agents/brief/index.js";
 
@@ -37,6 +39,8 @@ export type JobRunner = (
 // Agents land one at a time, each with its own gate.
 const RUNNERS: Record<string, JobRunner> = {
   icp: runIcpJob,
+  market: runMarketJob,
+  proof: runProofJob,
   competitor: runCompetitorJob,
   association: runAssociationJob,
   campaign_intel: runCampaignIntelJob,
@@ -45,10 +49,6 @@ const RUNNERS: Record<string, JobRunner> = {
   money_model: runMoneyModelJob,
   ideation: runIdeationJob,
   brief: runBriefJob,
-  // `market` is registered in the agents table but deliberately absent
-  // here: it has no record_templates rows and no tab in the client nav,
-  // so it has nothing to produce and nowhere to show it. A job queued for
-  // it fails loudly as NO_RUNTIME_IMPLEMENTATION, which is the honest
   // outcome until that product decision is made.
 };
 

@@ -17,7 +17,9 @@ export function AgentCard({ agent }: { agent: Agent }) {
           "w-fit rounded-full px-2.5 py-1 text-xs font-medium",
           agent.status === "Active"
             ? "bg-primary/10 text-brand-strong"
-            : "bg-secondary text-secondary-foreground",
+            : agent.status === "Archived"
+              ? "bg-muted text-muted-foreground"
+              : "bg-secondary text-secondary-foreground",
         )}
       >
         {agent.status}

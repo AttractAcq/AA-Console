@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Play, Pause, PlayCircle, Settings } from "lucide-react";
+import { Play, Pause, PlayCircle, Settings, Archive, ArchiveRestore } from "lucide-react";
 import { ActionCard } from "../../../components/ActionCard";
 import { Panel } from "../../../components/Panel";
 import { FormModal, ConfirmModal } from "../../../components/forms/FormModal";
@@ -14,6 +14,7 @@ type AgentRow = {
   agent_key: string;
   name: string;
   paused: boolean;
+  archived_at: string | null;
   domain: string | null;
   description: string | null;
   requires_upstream: string[];
@@ -23,7 +24,9 @@ type AgentRow = {
 export function AgentActionsSection() {
   const { agentId } = useParams<{ agentId: string }>();
   const [agent, setAgent] = useState<AgentRow | null>(null);
-  const [openAction, setOpenAction] = useState<"run" | "pause" | "configure" | null>(null);
+  const [openAction, setOpenAction] = useState<"run" | "pause" | "configure" | "archive" | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
@@ -33,7 +36,7 @@ export function AgentActionsSection() {
     if (!agentId) return;
     const { data } = await supabase
       .from("agents")
-      .select("agent_key, name, paused, domain, description, requires_upstream, config")
+      .select("agent_key, name, paused, archived_at, domain, description, requires_upstream, config")
       .eq("agent_key", agentId)
       .maybeSingle();
     setAgent((data as AgentRow) ?? null);
@@ -67,7 +70,31 @@ export function AgentActionsSection() {
     void refresh();
   }
 
+  async function toggleArchive() {
+    if (!agent) return;
+    const archiving = !agent.archived_at;
+    setBusy(true);
+    const { error } = await supabase
+      .from("agents")
+      .update(archiving ? { archived_at: new Date().toISOString(), paused: true } : { archived_at: null })
+      .eq("agent_key", agent.agent_key);
+    setBusy(false);
+    if (error) {
+      setNotice({ kind: "error", text: error.message });
+      return;
+    }
+    setNotice({
+      kind: "ok",
+      text: archiving
+        ? "Archived and paused. It's hidden from the default agent list; nothing new will be claimed for it."
+        : "Unarchived. It's back in the default agent list, still paused — resume it when ready.",
+    });
+    void refresh();
+  }
+
   if (!agent) return <p className="text-sm text-muted-foreground">Loading agent…</p>;
+
+  const archived = Boolean(agent.archived_at);
 
   const runFields: FieldDef[] = [
     {
@@ -97,13 +124,24 @@ export function AgentActionsSection() {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-3">
-        <ActionCard title="Run Agent" icon={Play} onClick={() => setOpenAction("run")} />
-        <ActionCard
-          title={agent.paused ? "Resume Agent" : "Pause Agent"}
-          icon={agent.paused ? PlayCircle : Pause}
-          onClick={() => setOpenAction("pause")}
-        />
-        <ActionCard title="Edit Configuration" icon={Settings} onClick={() => setOpenAction("configure")} />
+        {archived ? (
+          <ActionCard
+            title="Unarchive Agent"
+            icon={ArchiveRestore}
+            onClick={() => setOpenAction("archive")}
+          />
+        ) : (
+          <>
+            <ActionCard title="Run Agent" icon={Play} onClick={() => setOpenAction("run")} />
+            <ActionCard
+              title={agent.paused ? "Resume Agent" : "Pause Agent"}
+              icon={agent.paused ? PlayCircle : Pause}
+              onClick={() => setOpenAction("pause")}
+            />
+            <ActionCard title="Edit Configuration" icon={Settings} onClick={() => setOpenAction("configure")} />
+            <ActionCard title="Archive Agent" icon={Archive} onClick={() => setOpenAction("archive")} />
+          </>
+        )}
       </div>
 
       {notice && (
@@ -123,12 +161,14 @@ export function AgentActionsSection() {
           <span
             className={cn(
               "rounded-full px-2.5 py-1 text-xs font-medium",
-              agent.paused
-                ? "bg-secondary text-secondary-foreground"
-                : "bg-primary/10 text-brand-strong",
+              archived
+                ? "bg-muted text-muted-foreground"
+                : agent.paused
+                  ? "bg-secondary text-secondary-foreground"
+                  : "bg-primary/10 text-brand-strong",
             )}
           >
-            {agent.paused ? "Paused" : "Active"}
+            {archived ? "Archived" : agent.paused ? "Paused" : "Active"}
           </span>
           {agent.description && (
             <p className="mt-3 text-sm text-muted-foreground">{agent.description}</p>
@@ -211,6 +251,20 @@ export function AgentActionsSection() {
           setNotice({ kind: "ok", text: "Configuration saved." });
         }}
         onSaved={refresh}
+      />
+
+      <ConfirmModal
+        open={openAction === "archive"}
+        onClose={() => setOpenAction(null)}
+        title={archived ? `Unarchive ${agent.name}` : `Archive ${agent.name}`}
+        body={
+          archived
+            ? "It reappears in the default agent list, still paused. Resume it separately when it's ready for work again."
+            : "Hides it from the default agent list and pauses it. Job history is untouched — this doesn't delete anything, and it can be unarchived later."
+        }
+        confirmLabel={archived ? "Unarchive" : "Archive"}
+        onConfirm={toggleArchive}
+        onDone={refresh}
       />
 
       <p className="text-xs text-muted-foreground">

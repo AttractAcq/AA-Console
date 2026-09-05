@@ -1,4 +1,5 @@
 import { useSearchParams } from "react-router-dom";
+import { ClientDashboardPanel } from "./dashboard/ClientDashboardPanel";
 import type { ReactNode } from "react";
 import type { NavNode, NavTab } from "../config/navigation";
 import { PageHeader } from "../components/PageHeader";
@@ -7,6 +8,8 @@ import { EmptyState } from "../components/EmptyState";
 import { DashboardPanel } from "./DashboardPanel";
 import { BusinessContextPanel } from "./intelligence/BusinessContextPanel";
 import { IcpPanel } from "./intelligence/IcpPanel";
+import { MarketPanel } from "./intelligence/MarketPanel";
+import { ProofIntelligencePanel } from "./intelligence/ProofIntelligencePanel";
 import { CompetitorsPanel } from "./intelligence/CompetitorsPanel";
 import { BrandingAssociationsPanel } from "./intelligence/BrandingAssociationsPanel";
 import { CampaignIntelligencePanel } from "./intelligence/CampaignIntelligencePanel";
@@ -54,10 +57,12 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   },
   intelligence: {
     "business-context": () => <BusinessContextPanel />,
+    market: () => <MarketPanel />,
     icp: () => <IcpPanel />,
     competitors: () => <CompetitorsPanel />,
     "branding-associations": () => <BrandingAssociationsPanel />,
     "campaign-intelligence": () => <CampaignIntelligencePanel />,
+    "proof-intelligence": () => <ProofIntelligencePanel />,
   },
   strategy: {
     "branding-strategy": () => <BrandingStrategyPanel />,
@@ -84,6 +89,9 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
 
 const nodePanels: Record<string, () => ReactNode> = {
   dashboard: () => <DashboardPanel />,
+  // distinct id from the agency dashboard; both live at a path segment
+  // called "dashboard" but they are different pages
+  "delivery-dashboard": () => <ClientDashboardPanel />,
   "proof-bank": () => <ProofBankPanel />,
   approvals: () => <ApprovalsPanel />,
   "prospects-leads": () => <ProspectsLeadsPanel />,

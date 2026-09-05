@@ -12,19 +12,20 @@ import type { Agent } from "../../data/agents";
 
 export function AgentsPanel() {
   const [addOpen, setAddOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [agents, setAgents] = useState<Agent[]>([]);
 
   const refresh = useCallback(async () => {
     const { data } = await supabase
       .from("agents")
-      .select("agent_key, name, initials, paused")
+      .select("agent_key, name, initials, paused, archived_at")
       .order("name");
     setAgents(
       (data ?? []).map((a) => ({
         id: a.agent_key,
         name: a.name,
         initials: a.initials,
-        status: a.paused ? "Idle" : "Active",
+        status: a.archived_at ? "Archived" : a.paused ? "Idle" : "Active",
       })),
     );
   }, []);
@@ -32,6 +33,9 @@ export function AgentsPanel() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const archivedCount = agents.filter((a) => a.status === "Archived").length;
+  const shown = showArchived ? agents : agents.filter((a) => a.status !== "Archived");
 
   const fields: FieldDef[] = [
     { name: "name", label: "Name", kind: "text", required: true },
@@ -61,17 +65,32 @@ export function AgentsPanel() {
     <div>
       <RuntimeHealthPanel />
 
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex items-center justify-end gap-4">
+        {archivedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowArchived((v) => !v)}
+            className="text-sm text-muted-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {showArchived ? "Hide archived" : `Show archived (${archivedCount})`}
+          </button>
+        )}
         <Button icon={Plus} onClick={() => setAddOpen(true)}>
           Add Agent
         </Button>
       </div>
 
-      {agents.length === 0 ? (
-        <EmptyState label="No agents registered" />
+      {shown.length === 0 ? (
+        <EmptyState
+          label={
+            agents.length === 0
+              ? "No agents registered"
+              : "No active agents — try Show archived"
+          }
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-3">
-          {agents.map((agent) => (
+          {shown.map((agent) => (
             <AgentCard key={agent.id} agent={agent} />
           ))}
         </div>

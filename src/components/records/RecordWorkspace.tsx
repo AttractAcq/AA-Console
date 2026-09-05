@@ -9,6 +9,8 @@ import { AgentSteerForm, AGENT_FORMS } from "../forms/AgentSteerForm";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 import { cn } from "../../lib/cn";
+import { AgentActivityBar } from "../agents/AgentActivityBar";
+import { useAgentJobs } from "../../lib/useAgentJobs";
 
 type RecordDomain = Database["public"]["Enums"]["record_domain"];
 type JobStatus = Database["public"]["Enums"]["job_status"];
@@ -153,6 +155,11 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
 
   const filled = templates.filter((t) => byKey.get(t.item_key)?.body).length;
 
+  const { inFlight: liveJobs, recentFailures: liveFailures } = useAgentJobs(clientId, () => {
+    void loadRecords();
+    void loadJob();
+  });
+
   const editFields: FieldDef[] = [
     { name: "body", label: editing?.title ?? "Content", kind: "textarea", rows: 12, required: true },
   ];
@@ -161,6 +168,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
 
   return (
     <div>
+      <AgentActivityBar inFlight={liveJobs} failures={liveFailures} />
       <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
         {job && (
           <span

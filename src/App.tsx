@@ -98,7 +98,7 @@ export default function App() {
               <Route path="clients/:clientId">
                 <Route
                   index
-                  element={<Navigate to="delivery/intelligence" replace />}
+                  element={<Navigate to="delivery/dashboard" replace />}
                 />
                 {clientNavGroups.flatMap((group) =>
                   (group.children ?? []).map((child) => (

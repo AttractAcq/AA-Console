@@ -10,6 +10,8 @@ import { MEDIA_TYPE_OPTIONS, loadProofAssets, useOptions } from "../../lib/optio
 import { mediaFilters } from "../../data/mediaFilters";
 import type { MediaFilterId } from "../../data/mediaFilters";
 import { supabase } from "../../lib/supabase";
+import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
+import { useAgentJobs } from "../../lib/useAgentJobs";
 import type { Database } from "../../types/database";
 
 type MediaType = Database["public"]["Enums"]["media_type"];
@@ -33,6 +35,8 @@ export function GenerationPanel() {
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [busyIdeaId, setBusyIdeaId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const proofOptions = useOptions(
     () => loadProofAssets(clientId ?? ""),
     openCardId === "proof-idea" && Boolean(clientId),
@@ -53,12 +57,27 @@ export function GenerationPanel() {
     void refresh();
   }, [refresh]);
 
+  const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
+
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
   const shown = ideas.filter((i) => i.media_type === activeFilter);
 
   async function approveAndBrief(ideaId: string) {
+    setBusyIdeaId(ideaId);
+    setNotice(null);
     const { error } = await supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: ideaId });
-    if (!error) void refresh();
+    setBusyIdeaId(null);
+    // Previously this swallowed the error: a failed approve did nothing at
+    // all and looked identical to a successful one.
+    if (error) {
+      setNotice({ kind: "error", text: error.message });
+      return;
+    }
+    setNotice({
+      kind: "ok",
+      text: "Approved. The brief agent is writing it now — this takes a couple of minutes and the Briefs tab will fill in on its own.",
+    });
+    void refresh();
   }
 
   const proofFields: FieldDef[] = [
@@ -74,6 +93,17 @@ export function GenerationPanel() {
 
   return (
     <div>
+      <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
+
+      {notice && (
+        <p
+          role="status"
+          className={`mb-4 text-sm ${notice.kind === "ok" ? "text-brand-strong" : "text-destructive"}`}
+        >
+          {notice.text}
+        </p>
+      )}
+
       <div className="mb-6 grid gap-4 md:grid-cols-3">
         <ActionCard title="Manual Idea" icon={PenLine} onClick={() => setOpenCardId("manual-idea")} />
         <ActionCard title="Auto Idea" icon={Sparkles} onClick={() => setOpenCardId("auto-idea")} />
@@ -94,10 +124,11 @@ export function GenerationPanel() {
             <button
               key={i.id}
               type="button"
+              disabled={busyIdeaId === i.id}
               onClick={() => void approveAndBrief(i.id)}
               className="text-sm text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Approve &amp; brief
+              {busyIdeaId === i.id ? "Queueing…" : "Approve & brief"}
             </button>
           ) : (
             "—"

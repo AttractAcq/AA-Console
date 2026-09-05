@@ -123,6 +123,23 @@ export const AGENT_FORMS: Record<RecordDomain, AgentFormConfig> = {
     ],
   },
 
+  proof: {
+    title: "Proof Inputs",
+    agentKey: "proof",
+    intro:
+      "Proof Intelligence reads your business context and ICP. Anything you add here is proof the agent would otherwise never know about.",
+    fields: [
+      {
+        name: "known_proof",
+        label: "Proof you already have",
+        kind: "textarea",
+        rows: 5,
+        placeholder: "Results, credentials, case outcomes, awards, named clients, anything demonstrable",
+        hint: "Only things that genuinely exist. This agent will not invent proof, and it should not have to guess either.",
+      },
+    ],
+  },
+
   brand_strategy: {
     title: "Branding Input",
     agentKey: "brand_strategy",
