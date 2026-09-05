@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, Pencil, RefreshCw } from "lucide-react";
+import { CalendarPlus, Check, Pencil, RefreshCw, ThumbsUp } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { signPaths } from "../../lib/media";
 import { cn } from "../../lib/cn";
@@ -30,6 +30,14 @@ type Render = {
   error: string | null;
   selected: boolean;
   created_at: string;
+};
+
+/** What has happened to the file a render produced. */
+type AssetState = {
+  review_status: "pending" | "approved" | "rejected";
+  ref_number: string | null;
+  scheduled_for: string | null;
+  channel: string | null;
 };
 
 const CONCEPT_LABEL: Record<string, string> = {
@@ -81,6 +89,9 @@ export function ConceptWorkspace({
 }) {
   const [renders, setRenders] = useState<Render[]>([]);
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const [assets, setAssets] = useState<Map<string, AssetState>>(new Map());
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [channel, setChannel] = useState<"organic" | "paid">("organic");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [quality, setQuality] = useState("medium");
@@ -101,16 +112,39 @@ export function ConceptWorkspace({
       setUrls(new Map());
       return;
     }
-    const { data: assets } = await supabase
+    const { data: assetRows } = await supabase
       .from("client_media_assets")
-      .select("id, storage_path")
+      .select("id, storage_path, review_status, ref_number")
       .in("id", ids);
-    const signed = await signPaths("client-media", (assets ?? []).map((a) => a.storage_path));
+    const signed = await signPaths("client-media", (assetRows ?? []).map((a) => a.storage_path));
     setUrls(
       new Map(
-        (assets ?? [])
+        (assetRows ?? [])
           .map((a) => [a.id, signed.get(a.storage_path) ?? ""] as [string, string])
           .filter(([, u]) => u),
+      ),
+    );
+
+    // Whether each asset has already been booked in, so the action bar
+    // offers the next step rather than one that has been taken.
+    const { data: posts } = await supabase
+      .from("scheduled_posts")
+      .select("asset_id, scheduled_for, channel")
+      .in("asset_id", ids);
+    const booked = new Map(
+      (posts ?? []).map((p) => [p.asset_id as string, p] as [string, typeof p]),
+    );
+    setAssets(
+      new Map(
+        (assetRows ?? []).map((a) => [
+          a.id,
+          {
+            review_status: a.review_status as AssetState["review_status"],
+            ref_number: a.ref_number,
+            scheduled_for: booked.get(a.id)?.scheduled_for ?? null,
+            channel: booked.get(a.id)?.channel ?? null,
+          },
+        ]),
       ),
     );
   }, [generation.id]);
@@ -154,6 +188,39 @@ export function ConceptWorkspace({
     });
     if (rpcError) setError(rpcError.message);
     else {
+      await load();
+      onChanged();
+    }
+    setBusy(null);
+  };
+
+  const approve = async (assetId: string) => {
+    setBusy("approve");
+    setError(null);
+    const { error: rpcError } = await supabase.rpc("review_media_asset", {
+      p_asset_id: assetId,
+      p_decision: "approved",
+    });
+    if (rpcError) setError(rpcError.message);
+    else await load();
+    setBusy(null);
+  };
+
+  const schedule = async (assetId: string) => {
+    if (!scheduleDate) {
+      setError("Pick a date first.");
+      return;
+    }
+    setBusy("schedule");
+    setError(null);
+    const { error: rpcError } = await supabase.rpc("schedule_asset", {
+      p_asset_id: assetId,
+      p_date: scheduleDate,
+      p_channel: channel,
+    });
+    if (rpcError) setError(rpcError.message);
+    else {
+      setScheduleDate("");
       await load();
       onChanged();
     }
@@ -329,6 +396,9 @@ export function ConceptWorkspace({
                       <span className="text-[0.65rem] capitalize text-muted-foreground">
                         {r.quality}
                       </span>
+                      {r.asset_id && assets.get(r.asset_id)?.review_status === "approved" && (
+                        <span className="text-[0.65rem] text-brand-strong">approved</span>
+                      )}
                       <span className="ml-auto text-[0.65rem] text-muted-foreground">
                         {r.cost_usd ? `$${Number(r.cost_usd).toFixed(3)}` : "—"}
                       </span>
@@ -361,6 +431,82 @@ export function ConceptWorkspace({
           )}
         </div>
       )}
+
+      {/* ---- what happens to the one you picked ---- */}
+      {isImage && (() => {
+        const chosen = renders.find((r) => r.selected && r.status === "done");
+        if (!chosen?.asset_id) {
+          return renders.some((r) => r.status === "done") ? (
+            <p className="rounded-md bg-muted/60 px-2.5 py-2 text-xs text-muted-foreground">
+              Select a render to approve and schedule it.
+            </p>
+          ) : null;
+        }
+        const state = assets.get(chosen.asset_id);
+        if (!state) return null;
+
+        return (
+          <div className="rounded-md border border-border p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Selected render{state.ref_number ? ` · ${state.ref_number}` : ""}
+            </p>
+
+            {state.scheduled_for ? (
+              <p className="text-sm text-foreground">
+                Scheduled for <strong>{state.scheduled_for}</strong> on{" "}
+                <span className="capitalize">{state.channel}</span>. It appears on the client's
+                calendar and under Distribution.
+              </p>
+            ) : state.review_status === "pending" ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Awaiting review — approve it to make it schedulable.
+                </span>
+                <button
+                  type="button"
+                  disabled={busy === "approve"}
+                  onClick={() => void approve(chosen.asset_id as string)}
+                  className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                >
+                  <ThumbsUp className="h-3 w-3" aria-hidden="true" />
+                  {busy === "approve" ? "Approving…" : "Approve"}
+                </button>
+              </div>
+            ) : state.review_status === "rejected" ? (
+              <p className="text-sm text-destructive">
+                This render was rejected. Edit the concept and render again.
+              </p>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted-foreground">Approved. Book it in:</span>
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <select
+                  value={channel}
+                  onChange={(e) => setChannel(e.target.value as "organic" | "paid")}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="organic">Organic</option>
+                  <option value="paid">Paid</option>
+                </select>
+                <button
+                  type="button"
+                  disabled={busy === "schedule"}
+                  onClick={() => void schedule(chosen.asset_id as string)}
+                  className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                >
+                  <CalendarPlus className="h-3 w-3" aria-hidden="true" />
+                  {busy === "schedule" ? "Scheduling…" : "Schedule"}
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {error && (
         <p role="alert" className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">

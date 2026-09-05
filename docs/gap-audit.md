@@ -116,19 +116,22 @@ category, compensation.
 
 ---
 
-## 4. `is_channel_member` is still callable by `anon`
+## 4. ~~`is_channel_member` callable by `anon`~~ — CLOSED
 
-Re-checked: **still granted**. It is the only `SECURITY DEFINER` function
-reachable without signing in, and has no caller check of its own. Practical
-exposure is small — `anon` has no `auth.uid()` — but it is inconsistent with
-migration 10, which revoked exactly this everywhere else.
+**Closed.** No `SECURITY DEFINER` function in `public` is now reachable
+without signing in.
+
+Worth recording how: the first attempt, `revoke execute ... from anon`,
+changed nothing. Functions grant `EXECUTE` to `PUBLIC` by default and `anon`
+inherits it, so revoking from a role that never held its own grant is a
+no-op — and `has_function_privilege('anon', ...)` still returned true
+afterwards. The working form is to drop the `PUBLIC` grant and grant back
+explicitly, which is what migration 10 did originally.
 
 The other advisor warnings were checked individually and are not findings:
 `admin_create_team_member` and `admin_store_integration_credential` both
 verify `is_admin()` internally, and every client-scoped RPC verifies
 `can_access_client()`.
-
-**To close:** `revoke execute on function is_channel_member(uuid) from anon;`
 
 ---
 
@@ -159,8 +162,14 @@ Image cost is estimated from quality because the API returns none — without
 that a re-render would read as $0.00, wrong in the direction that makes
 iteration look free.
 
-Still open on this surface: nothing links a finished render to the scheduling
-step, so a selected image must still be found again under Media.
+**The loop is now closed too.** Selecting a render used to set a flag with
+no consequence. The selected render now carries the next action inline:
+approve it, then book it in with a date and channel, without leaving the
+brief. Verified end to end — a render approved and scheduled from inside the
+brief produced a `scheduled_posts` row on the client's calendar, with
+`client_id` filled by the existing trigger, the review logged to
+`client_asset_reviews`, and the whole thing traceable back to the brief it
+came from.
 
 ---
 
