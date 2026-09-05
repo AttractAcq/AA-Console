@@ -141,22 +141,26 @@ the same pattern.
 
 ---
 
-## 6. A build cannot be re-run, compared, or corrected
+## 6. ~~A build cannot be re-run, edited, or compared~~ — BUILT
 
-New, and the most valuable thing to build next.
+**Closed.** The concept and its renders are now separate rows: a generation
+owns the concept, `creative_renders` holds every image made from it.
 
-`creative_generations` keeps every attempt with its concept, prompt, cost and
-result, and the brief detail modal now shows them. But there is no way to:
+- **Re-render** an existing concept at any quality. The runner reuses the
+  stored concept and logs that it cost nothing, so iteration pays for the
+  render only — cents against $0.28.
+- **Edit the concept** in place. Saving does not render; the prompt is
+  recomposed from the edited text on the next render, so an edit is free
+  until an image is asked for. Edits are stamped, like human-edited records.
+- **Compare and select.** Renders show side by side with quality, cost and
+  status; one can be selected per concept.
 
-- re-run a build after a failure without going back through Approve & Build,
-- edit a concept and render from the edited version,
-- generate several concepts and compare them side by side.
+Image cost is estimated from quality because the API returns none — without
+that a re-render would read as $0.00, wrong in the direction that makes
+iteration look free.
 
-That last one is the workflow the attached design doc actually recommends —
-*"generate 4 medium concepts, select 1, refine, generate 1 high-quality
-final"* — and it is currently unreachable. The concept is the expensive half
-of a build and the part worth iterating; right now every iteration pays for
-it again from scratch.
+Still open on this surface: nothing links a finished render to the scheduling
+step, so a selected image must still be found again under Media.
 
 ---
 
@@ -277,6 +281,14 @@ Each of these has been hit more than once.
    accepted the filter; not passing it meant a container claimed agents it had
    no runner for and burned their attempts. Registering an agent before its
    runner ships was destructive until this was fixed.
+5. **Changing a job's `params` shape is a deploy-ordering problem, and the
+   claim filter does not cover it.** That filter matches on `agent_key`, so the
+   live runner happily claims a job for a key it knows and then cannot read the
+   arguments. This was hit when `creative_build` moved from `generation_id` to
+   `render_id`: the RPC was migrated first, the runtime was still one commit
+   behind, and the job burned all three attempts on "No generation to build."
+   **Deploy the runtime before migrating the RPC that changes what it is sent**,
+   or make the runner accept both shapes across the transition.
 
 ---
 

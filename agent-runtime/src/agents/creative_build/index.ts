@@ -226,7 +226,13 @@ export async function runCreativeBuildJob(
   };
 
   // ---- stage one: the concept -------------------------------------------
-  await appendEvent(sb, job.id, `Writing the creative concept for "${typed.title}".`);
+  await appendEvent(
+    sb,
+    job.id,
+    needsConcept
+      ? `Writing the creative concept for "${typed.title}".`
+      : `Re-rendering "${typed.title}".`,
+  );
 
   const [{ data: context }, upstream] = await Promise.all([
     sb
