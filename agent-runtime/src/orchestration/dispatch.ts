@@ -21,6 +21,7 @@ import { runMarketJob } from "../agents/market/index.js";
 import { runProofJob } from "../agents/proof/index.js";
 import { runIdeationJob } from "../agents/ideation/index.js";
 import { runBriefJob } from "../agents/brief/index.js";
+import { runLandingPageJob } from "../agents/landing_page/index.js";
 
 export interface JobResult {
   ok: boolean;
@@ -49,6 +50,7 @@ const RUNNERS: Record<string, JobRunner> = {
   money_model: runMoneyModelJob,
   ideation: runIdeationJob,
   brief: runBriefJob,
+  landing_page: runLandingPageJob,
   // outcome until that product decision is made.
 };
 
