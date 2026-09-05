@@ -26,7 +26,7 @@ import { OpenAiError, runStructuredCompletion } from "../../tools/openai.js";
 import { estimateCostUsd } from "../../usage/cost.js";
 import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js";
 import type { BusinessContext } from "../shared.js";
-import { RenderError, renderImage } from "./render.js";
+import { RenderError, renderImage, type ReferenceImage } from "./render.js";
 
 const BUCKET = "client-media";
 
@@ -132,7 +132,7 @@ export async function runCreativeBuildJob(
 
   const { data: generation, error: genError } = await sb
     .from("creative_generations")
-    .select("id, brief_id, media_type, quality, size, concept, stage")
+    .select("id, brief_id, media_type, quality, size, concept, stage, reference_path")
     .eq("id", generationId)
     .maybeSingle();
   if (genError) throw new Error(`Could not load the generation: ${genError.message}`);
@@ -214,8 +214,14 @@ export async function runCreativeBuildJob(
     .map((p) => `- ${p.title ?? "Untitled"}${p.source ? ` (${p.source})` : ""}: ${p.body ?? "[file]"}`)
     .join("\n");
 
+  const hasReference = Boolean(generation.reference_path);
   const submitTool = isImage ? IMAGE_CONCEPT_TOOL : TEXT_CONCEPT_TOOL;
   const prompt = `Turn this approved brief into ${isImage ? "a creative concept for a single image" : "finished copy"}.
+${
+  hasReference
+    ? `\nA REFERENCE IMAGE HAS BEEN SUPPLIED and the render will start from it. Write the concept as DIRECTION ON THAT IMAGE — what to keep, what to change, what to add, how to treat it — not as a description of a picture to build from nothing. Do not describe a subject that would replace it.\n`
+    : ""
+}
 
 THE BRIEF
 ${typed.title}
@@ -332,11 +338,31 @@ Call ${submitTool.name} once when you are done.`;
 
   await appendEvent(sb, job.id, `Concept written. Rendering at ${generation.quality} quality, ${generation.size}.`);
 
+  let reference: ReferenceImage | null = null;
+  if (generation.reference_path) {
+    const { data: file, error: downloadError } = await sb.storage
+      .from(BUCKET)
+      .download(String(generation.reference_path));
+    if (downloadError || !file) {
+      const message = `Could not read the reference image: ${downloadError?.message ?? "not found"}`;
+      await fail(message);
+      return { ok: false, retryable: false, failureMessage: message, usage };
+    }
+    const name = String(generation.reference_path).split("/").pop() ?? "reference.png";
+    reference = {
+      bytes: Buffer.from(await file.arrayBuffer()),
+      contentType: file.type || "image/png",
+      filename: name,
+    };
+    await appendEvent(sb, job.id, `Working from the supplied reference image (${name}).`);
+  }
+
   let image;
   try {
     image = await renderImage(config, imagePrompt, {
       size: String(generation.size),
       quality: String(generation.quality),
+      reference,
     });
   } catch (error) {
     if (error instanceof RenderError) {

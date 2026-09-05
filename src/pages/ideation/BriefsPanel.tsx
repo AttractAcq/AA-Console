@@ -8,6 +8,7 @@ import type { MediaFilterId } from "../../data/mediaFilters";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
 import { ApproveAndBuildModal } from "../../components/briefs/ApproveAndBuildModal";
+import { BriefDetailModal } from "../../components/briefs/BriefDetailModal";
 import { cn } from "../../lib/cn";
 
 type Brief = {
@@ -17,6 +18,8 @@ type Brief = {
   media_type: "image" | "text" | "video";
   brief_ref: string | null;
   status: string;
+  source_idea_id: string | null;
+  created_at: string;
 };
 
 const STATUS_TONE: Record<string, string> = {
@@ -33,6 +36,7 @@ export function BriefsPanel() {
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [loading, setLoading] = useState(true);
   const [building, setBuilding] = useState<Brief | null>(null);
+  const [viewing, setViewing] = useState<Brief | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -42,7 +46,7 @@ export function BriefsPanel() {
     }
     const { data } = await supabase
       .from("client_briefs")
-      .select("id, title, body, media_type, brief_ref, status")
+      .select("id, title, body, media_type, brief_ref, status, source_idea_id, created_at")
       .eq("client_id", clientId)
       .order("created_at", { ascending: false });
     setBriefs((data ?? []) as Brief[]);
@@ -87,14 +91,15 @@ export function BriefsPanel() {
               : "No briefs yet — approve an idea on the Generation tab"
         }
         rows={shown.map((b) => [
-          b.brief_ref ? (
-            <span key="t">
-              {b.title}
-              <span className="block text-xs text-muted-foreground">{b.brief_ref}</span>
-            </span>
-          ) : (
-            b.title
-          ),
+          <button
+            key="t"
+            type="button"
+            onClick={() => setViewing(b)}
+            className="rounded text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {b.title}
+            {b.brief_ref && <span className="block text-xs text-muted-foreground">{b.brief_ref}</span>}
+          </button>,
           <span key="m" className="capitalize">{b.media_type}</span>,
           <span
             key="s"
@@ -121,6 +126,8 @@ export function BriefsPanel() {
           ),
         ])}
       />
+
+      <BriefDetailModal brief={viewing} open={viewing !== null} onClose={() => setViewing(null)} />
 
       <ApproveAndBuildModal
         brief={building}

@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Bot, ChevronDown, MessageSquare, PenLine, Plus, SendHorizontal, Trash2, Wrench } from "lucide-react";
 import { EmptyState } from "../EmptyState";
 import { ConfirmModal } from "../forms/FormModal";
-import { RichText } from "./RichText";
+import { RichText } from "../markdown/RichText";
 import { useAuth } from "../../context/auth";
 import { supabase } from "../../lib/supabase";
 import { masterAIConfigured, sendMasterMessage } from "../../lib/masterAI";

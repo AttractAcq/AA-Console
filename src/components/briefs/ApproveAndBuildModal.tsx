@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Bot, Users } from "lucide-react";
+import { useParams } from "react-router-dom";
+import { Bot, ImagePlus, Users, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
 
@@ -45,6 +46,7 @@ export function ApproveAndBuildModal({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { clientId } = useParams<{ clientId: string }>();
   const [route, setRoute] = useState<"ai" | "human" | null>(null);
   const [quality, setQuality] = useState("medium");
   const [size, setSize] = useState("1024x1536");
@@ -55,6 +57,8 @@ export function ApproveAndBuildModal({
   const [compensation, setCompensation] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reference, setReference] = useState<{ path: string; name: string; preview: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const isVideo = brief?.media_type === "video";
 
@@ -69,6 +73,7 @@ export function ApproveAndBuildModal({
     setKinds(new Set());
     setDueDate("");
     setCompensation("");
+    setReference(null);
     setError(null);
   }, [open, brief?.id, isVideo]);
 
@@ -85,6 +90,26 @@ export function ApproveAndBuildModal({
   useEffect(() => {
     if (open) void loadMembers();
   }, [open, loadMembers]);
+
+  const uploadReference = async (file: File, clientId: string) => {
+    setUploading(true);
+    setError(null);
+    // Storage RLS is written against the path prefix, so the client id has
+    // to be the first segment — the same rule every other upload follows.
+    const ext = file.name.split(".").pop() ?? "png";
+    const path = `${clientId}/references/${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("client-media")
+      .upload(path, file, { upsert: false });
+    if (uploadError) {
+      setError(uploadError.message);
+      setUploading(false);
+      return;
+    }
+    const { data: signed } = await supabase.storage.from("client-media").createSignedUrl(path, 3600);
+    setReference({ path, name: file.name, preview: signed?.signedUrl ?? "" });
+    setUploading(false);
+  };
 
   if (!open || !brief) return null;
 
@@ -124,6 +149,7 @@ export function ApproveAndBuildModal({
           p_brief_id: brief.id,
           p_quality: quality,
           p_size: brief.media_type === "image" ? size : "1024x1536",
+          p_reference_path: reference?.path ?? undefined,
         });
         if (rpcError) throw new Error(rpcError.message);
       } else {
@@ -264,6 +290,61 @@ export function ApproveAndBuildModal({
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {brief.media_type === "image" && (
+                <div>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Start from an image <span className="font-normal normal-case">(optional)</span>
+                  </h3>
+                  {reference ? (
+                    <div className="flex items-center gap-3 rounded-md border border-border p-2">
+                      {reference.preview && (
+                        <img
+                          src={reference.preview}
+                          alt=""
+                          className="h-16 w-16 shrink-0 rounded object-cover"
+                        />
+                      )}
+                      <span className="min-w-0 flex-1 truncate text-sm text-foreground">{reference.name}</span>
+                      <button
+                        type="button"
+                        aria-label="Remove reference image"
+                        onClick={() => setReference(null)}
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <X className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 py-3 text-sm text-muted-foreground",
+                        "hover:border-primary/50 focus-within:ring-2 focus-within:ring-ring",
+                        uploading && "opacity-60",
+                      )}
+                    >
+                      <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                      {uploading ? "Uploading…" : "Upload a product shot, layout or photo to build from"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        disabled={uploading}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file && clientId) void uploadReference(file, clientId);
+                        }}
+                      />
+                    </label>
+                  )}
+                  {reference && (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      The concept will be written as direction on this image — what to keep, change and
+                      add — rather than describing a picture to build from nothing.
+                    </p>
+                  )}
                 </div>
               )}
 

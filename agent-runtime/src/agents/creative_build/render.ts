@@ -10,7 +10,10 @@
 
 import type { RuntimeConfig } from "../../config.js";
 
-const ENDPOINT = "https://api.openai.com/v1/images/generations";
+const GENERATE_ENDPOINT = "https://api.openai.com/v1/images/generations";
+// Working from a supplied image is a different endpoint and a multipart
+// body, not a flag on the same call.
+const EDIT_ENDPOINT = "https://api.openai.com/v1/images/edits";
 const TIMEOUT_MS = 180_000;
 
 export class RenderError extends Error {
@@ -32,10 +35,16 @@ export interface RenderedImage {
 export const SIZES = ["1024x1536", "1024x1024", "1536x1024"] as const;
 export const QUALITIES = ["low", "medium", "high"] as const;
 
+export interface ReferenceImage {
+  bytes: Buffer;
+  contentType: string;
+  filename: string;
+}
+
 export async function renderImage(
   config: RuntimeConfig,
   prompt: string,
-  opts: { size: string; quality: string },
+  opts: { size: string; quality: string; reference?: ReferenceImage | null },
 ): Promise<RenderedImage> {
   if (!config.openaiApiKey) {
     throw new RenderError(
@@ -48,21 +57,44 @@ export async function renderImage(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const response = await fetch(ENDPOINT, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${config.openaiApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: config.imageModel,
-        prompt,
-        size: opts.size,
-        quality: opts.quality,
-        n: 1,
-      }),
-    });
+    let response: Response;
+    if (opts.reference) {
+      // multipart: the file goes as a part, and Content-Type must be left
+      // for fetch to set so the boundary is correct.
+      const form = new FormData();
+      form.append("model", config.imageModel);
+      form.append("prompt", prompt);
+      form.append("size", opts.size);
+      form.append("quality", opts.quality);
+      form.append("n", "1");
+      form.append(
+        "image",
+        new Blob([new Uint8Array(opts.reference.bytes)], { type: opts.reference.contentType }),
+        opts.reference.filename,
+      );
+      response = await fetch(EDIT_ENDPOINT, {
+        method: "POST",
+        signal: controller.signal,
+        headers: { Authorization: `Bearer ${config.openaiApiKey}` },
+        body: form,
+      });
+    } else {
+      response = await fetch(GENERATE_ENDPOINT, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${config.openaiApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: config.imageModel,
+          prompt,
+          size: opts.size,
+          quality: opts.quality,
+          n: 1,
+        }),
+      });
+    }
 
     const body = (await response.json().catch(() => null)) as {
       data?: Array<{ b64_json?: string; url?: string }>;
