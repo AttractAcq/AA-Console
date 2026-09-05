@@ -1,5 +1,11 @@
 # UI → Data Entry Mapping
 
+> **Status note (5 September 2026):** the paragraph below describing this as
+> "a wireframe/mockup app with no backend yet" is out of date. The schema,
+> forms, agent runtime and reporting pipeline are built. This document is
+> still accurate as a *mapping* of buttons to fields; for current build
+> status and outstanding work see [gap-audit.md](./gap-audit.md).
+
 This document maps every input **button** in the AA Console UI to the **dependencies** —
 the data fields/cards currently rendered as placeholders on that same page. Each button
 opens a form-shaped `Modal` that is empty today (this is a wireframe/mockup app with no
