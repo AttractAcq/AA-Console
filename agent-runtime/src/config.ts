@@ -13,6 +13,10 @@ export interface RuntimeConfig {
   concurrency: number;
   leaseSeconds: number;
   emptyQueueBackoffMs: number;
+  /** Per-request timeout for a model call. Without one, a stalled stream hangs forever. */
+  providerTimeoutMs: number;
+  /** How long a job may hold its lease before renewal stops and it becomes reclaimable. */
+  maxJobSeconds: number;
   healthPort: number;
   /** Required in an X-Runtime-Secret header on /status when set. */
   sharedSecret: string | null;
@@ -97,6 +101,10 @@ export function loadConfig(): RuntimeConfig {
     concurrency: intEnv("AGENT_RUNTIME_CONCURRENCY", 2),
     leaseSeconds,
     emptyQueueBackoffMs: intEnv("AGENT_RUNTIME_EMPTY_QUEUE_BACKOFF_MS", 5000),
+    // Generous against the slowest legitimate run — a web-search agent can
+    // take minutes — but finite, which is the whole point.
+    providerTimeoutMs: intEnv("AGENT_RUNTIME_PROVIDER_TIMEOUT_MS", 600_000),
+    maxJobSeconds: intEnv("AGENT_RUNTIME_MAX_JOB_SECONDS", 1800),
     healthPort: intEnv("PORT", 8787),
     sharedSecret: optionalEnv("AGENT_RUNTIME_SHARED_SECRET") ?? null,
     // The Master AI is called from the browser, so the origin list is a

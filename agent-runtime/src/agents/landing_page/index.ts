@@ -155,6 +155,7 @@ Call ${submitTool.name} once when you are done.`;
     result = await runAgentLoop({
       apiKey: anthropicKeyForAgent(runtime, agent.agent_key),
       model: runtime.model,
+      timeoutMs: runtime.providerTimeoutMs,
       system,
       prompt,
       submitTool,

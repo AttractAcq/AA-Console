@@ -155,8 +155,28 @@ function startLeaseRenewal(
 ): { stop: () => void } {
   // A third of the lease gives two chances to renew before it lapses.
   const intervalMs = Math.max(10_000, Math.floor((config.leaseSeconds * 1000) / 3));
+  const startedAt = Date.now();
 
   async function renew(): Promise<void> {
+    // The lease is the recovery mechanism for a dead worker — but renewal by
+    // a LIVE worker holding a stalled call defeats it, because the lease
+    // never lapses and the job can never be reclaimed. So renewal is capped:
+    // past this age the lease is allowed to expire and another worker takes
+    // the job. The stale run cannot corrupt anything when it finally returns,
+    // because every write asserts it still owns the lease.
+    const ageSeconds = Math.round((Date.now() - startedAt) / 1000);
+    if (ageSeconds > config.maxJobSeconds) {
+      logger.error("job_lease_renewal_capped", {
+        jobId,
+        leaseOwner,
+        ageSeconds,
+        maxJobSeconds: config.maxJobSeconds,
+        reason: "job exceeded its maximum age; letting the lease lapse so it can be reclaimed",
+      });
+      clearInterval(interval);
+      return;
+    }
+
     try {
       const renewed = await renewJobLease(sb, jobId, leaseOwner, config.leaseSeconds);
       if (!renewed) {

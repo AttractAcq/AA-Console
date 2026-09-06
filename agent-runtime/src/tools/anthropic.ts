@@ -22,6 +22,8 @@ export interface SubmitToolSpec {
 
 export interface AgentLoopOptions {
   apiKey: string;
+  /** Per-request timeout. Defaults to ten minutes if a caller omits it. */
+  timeoutMs?: number;
   model: string;
   system: string;
   prompt: string;
@@ -107,7 +109,12 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     onProgress,
   } = options;
 
-  const client = new Anthropic({ apiKey, maxRetries: 2 });
+  // Without a timeout the SDK waits indefinitely, and a stalled stream then
+  // hangs the whole job: the lease keeps being renewed by a live process, so
+  // the expiry that is supposed to recover a wedged job never fires. This is
+  // the bound that makes the call eventually fail instead.
+  const timeoutMs = options.timeoutMs ?? 600_000;
+  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: timeoutMs });
 
   const tools: Anthropic.Messages.ToolUnion[] = [
     {

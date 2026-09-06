@@ -398,6 +398,7 @@ Call ${submitTool.name} once when you are done.`;
       const out = await runAgentLoop({
         apiKey: anthropicKeyForAgent(config, agent.agent_key),
         model: config.model,
+      timeoutMs: config.providerTimeoutMs,
         system: SYSTEM,
         prompt,
         submitTool,

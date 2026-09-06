@@ -130,6 +130,7 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
       result = await runAgentLoop({
         apiKey: anthropicKeyForAgent(runtime, agent.agent_key),
         model: runtime.model,
+      timeoutMs: runtime.providerTimeoutMs,
         system: config.system,
         prompt,
         submitTool,

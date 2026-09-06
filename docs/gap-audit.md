@@ -242,16 +242,24 @@ credential does not silently start billing API calls.
 4. **A worker must only claim agents it implements.** Not passing the filter to
    `claim_agent_job` meant a container claimed agents it had no runner for and
    burned their attempts.
-5. **Changing a job's `params` shape is a deploy-ordering problem**, and the
+5. **Lease renewal by a live worker defeats lease expiry.** The runtime
+   recovers a wedged job by letting its lease lapse — but a worker holding a
+   stalled call is alive, keeps renewing, and the lease never lapses. A brief
+   sat "running" for ten minutes with no output and no way to reclaim it. The
+   Anthropic client also had no timeout, so the call itself was unbounded.
+   Both are now capped: renewal stops past a maximum job age, and every model
+   call carries a per-request timeout. Every write already asserts lease
+   ownership, so a stale run cannot corrupt the job it lost.
+6. **Changing a job's `params` shape is a deploy-ordering problem**, and the
    claim filter does not cover it — it matches on `agent_key`. Deploy the
    runtime *before* migrating the RPC that changes what it is sent.
-6. **A renderer will invent an identity from a placeholder.** Given
+7. **A renderer will invent an identity from a placeholder.** Given
    "practice name as it appears on the door" it produced a plausible name, a
    logo and a phone number, on a real company's advertising. Rules that live
    only in the reasoning stage do not reach the stage that makes the pixels —
    put them in both, and give the renderer the real value so it never has to
    guess one.
-7. **Revoking a function grant from `anon` alone does nothing.** Functions grant
+8. **Revoking a function grant from `anon` alone does nothing.** Functions grant
    `EXECUTE` to `PUBLIC` by default and `anon` inherits it. Revoke from
    `PUBLIC`, then grant back explicitly — and check
    `has_function_privilege` afterwards, because the no-op is silent.
