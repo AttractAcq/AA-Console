@@ -85,20 +85,32 @@ A live test only proves tables holding data on both sides; nine were empty
 and would have passed vacuously. So every policy on every client-scoped table
 was also read directly. None lacks a predicate.
 
-### 2a. Clients can read the profile of anyone sharing a chat channel
+### 2a. ~~Clients can read the profile of anyone sharing a chat channel~~ — CLOSED
 
-`profiles_channel_peer_read` grants read access to the profile of anyone you
-share a channel with. Deliberate — chat renders author names — but it exposes
-staff **email addresses and roles** to a client, and **if an admin ever adds
-two clients to the same channel they can read each other's profile**. Nothing
-prevents it; the Add Members UI lists every user.
+**Closed.** `profiles_channel_peer_read` granted read of every column —
+email, role, timestamps — to anyone sharing a channel. A client could read
+staff email addresses, and two clients placed in one channel could have read
+each other's profile.
 
-No client data crosses over. This is the one path by which two clients could
-see anything of each other's.
+Column privileges could not fix it: they are role-wide, so revoking `email`
+from `authenticated` would have blinded admins too. So the row access is
+gone, and the one field chat actually needs comes from `chat_participants()`,
+which returns an id and a display name. The display name falls back to the
+local part of the address rather than the address — a name to show, not a way
+to contact someone.
 
-**To close:** a narrow view (`id`, `full_name`) for the chat author lookup,
-and drop the peer policy. Column privileges are role-wide and would blind
-admins too.
+Measured before and after, signed in as a real client:
+
+| | Before | After |
+|---|---|---|
+| Profiles readable by a client | 5 (incl. the admin's email and role) | **1 — their own** |
+| Names available to chat | 5 | 5 |
+
+Chat is unaffected: names and initials still render. The admin's member
+picker reads `profiles` directly and is covered by `profiles_admin_all`, so
+it still lists all six accounts.
+
+**With this, no client can see anything of another client's, by any path.**
 
 ---
 

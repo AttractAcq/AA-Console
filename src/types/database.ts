@@ -2638,6 +2638,13 @@ export type Database = {
         Args: { p_agent_key: string; p_client_id: string }
         Returns: boolean
       }
+      chat_participants: {
+        Args: never
+        Returns: {
+          display_name: string
+          id: string
+        }[]
+      }
       claim_agent_job: {
         Args: {
           p_agent_keys?: string[]

@@ -18,8 +18,8 @@ type Message = {
   created_at: string;
 };
 
-function initials(name: string | null, email: string | null): string {
-  const source = name?.trim() || email?.split("@")[0] || "?";
+function initials(name: string | null): string {
+  const source = name?.trim() || "?";
   return source
     .split(/[\s._-]+/)
     .filter(Boolean)
@@ -43,9 +43,11 @@ export function ChatView({ canManage = false }: { canManage?: boolean }) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [authors, setAuthors] = useState<Map<string, { name: string | null; email: string | null }>>(
-    new Map(),
-  );
+  // Names only. Chat used to read whole profile rows through an RLS policy
+  // that also handed over staff email addresses, and let two clients in one
+  // channel read each other. chat_participants() returns a name and nothing
+  // else.
+  const [authors, setAuthors] = useState<Map<string, string>>(new Map());
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,16 +82,13 @@ export function ChatView({ canManage = false }: { canManage?: boolean }) {
     const rows = (data ?? []) as Message[];
     setMessages(rows);
 
-    const ids = [...new Set(rows.map((m) => m.author_id).filter(Boolean))] as string[];
-    if (ids.length > 0) {
-      const { data: people } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .in("id", ids);
-      setAuthors(
-        new Map((people ?? []).map((p) => [p.id, { name: p.full_name, email: p.email }])),
-      );
-    }
+    const { data: people } = await supabase.rpc("chat_participants");
+    setAuthors(
+      new Map(((people ?? []) as Array<{ id: string; display_name: string | null }>).map((p) => [
+        p.id,
+        p.display_name ?? "",
+      ])),
+    );
   }, []);
 
   // Load the thread, then subscribe. Realtime gives the live half; the
@@ -262,12 +261,12 @@ export function ChatView({ canManage = false }: { canManage?: boolean }) {
                             : "bg-secondary text-secondary-foreground",
                         )}
                       >
-                        {initials(author?.name ?? null, author?.email ?? null)}
+                        {initials(author ?? null)}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline gap-2">
                           <span className="text-sm font-medium text-foreground">
-                            {mine ? "You" : (author?.name ?? author?.email ?? "Unknown")}
+                            {mine ? "You" : (author || "Unknown")}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {timeOf(m.created_at)}
