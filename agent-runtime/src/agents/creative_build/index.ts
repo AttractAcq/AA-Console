@@ -94,10 +94,44 @@ NEVER WRITE A PLACEHOLDER INTO TEXT THAT WILL BE RENDERED
 Anything you put in headline, subhead or call_to_action is set as literal type on the image. A renderer handed "[the practice's phone number]" or "practice name as it appears on the door" does not leave a gap — it invents a plausible name and a plausible number, and the result looks finished and is false.
 So: only write words you were actually given. If a phone number, address, price, URL or handle is not in the material above, do not refer to it at all — leave that element out. The business name you may use is the one named in the brief and nowhere else.`;
 
+export interface Identity {
+  phone: string | null;
+  website: string | null;
+  instagram: string | null;
+  address: string | null;
+  hasLogo: boolean;
+}
+
+/**
+ * Each detail is either given verbatim or explicitly forbidden. There is no
+ * third state: a renderer told nothing about a phone number will invent a
+ * plausible one, which is how the first live build put a fabricated WhatsApp
+ * number on a real practice's advertising.
+ */
+function identityLines(identity: Identity): string[] {
+  const rule = (label: string, value: string | null, ban: string) =>
+    value
+      ? `${label} is exactly "${value}". Render it verbatim, character for character, or leave it out. Never alter or substitute it.`
+      : ban;
+
+  return [
+    rule("The contact number", identity.phone, "No contact number is on file. Do NOT render a phone or WhatsApp number of any kind."),
+    rule("The website", identity.website, "No website is on file. Do NOT render a URL or domain."),
+    rule("The Instagram handle", identity.instagram, "No social handle is on file. Do NOT render one."),
+    rule("The address", identity.address, "No address is on file. Do NOT render a street, suburb or city."),
+    // A diffusion model approximates a wordmark, and an approximated logo is
+    // still the wrong mark, so the real file is placed afterwards.
+    identity.hasLogo
+      ? "A real logo will be placed into this image afterwards. Leave a clean empty area at the foot, roughly 15% of the height, with nothing in it — no lettering, no shape, no placeholder mark."
+      : "Do NOT draw a logo, wordmark, monogram, badge or emblem of any kind.",
+  ];
+}
+
 function composePrompt(
   concept: Record<string, unknown>,
   brief: BriefRow,
   clientName: string,
+  identity: Identity,
 ): string {
   const s = (k: string) => String(concept[k] ?? "").trim();
   const text = [s("headline"), s("subhead"), s("call_to_action")].filter(Boolean);
@@ -127,8 +161,9 @@ function composePrompt(
     // is repeated where the pixels are actually made.
     `IDENTITY — THIS IS A REAL BUSINESS, DO NOT INVENT ANY PART OF IT`,
     `The business is "${clientName}". That is the only name that may appear.`,
-    `Do NOT invent or render: any other business name, any logo or wordmark, a phone number, a WhatsApp number, an address, a website, an email, a social handle, a price, or a review score.`,
-    `If the layout seems to call for a logo or contact details, leave that area empty. Blank space is correct; an invented detail is a false claim on a real company's advertising.`,
+    ...identityLines(identity),
+    `Do NOT invent or render any detail not listed above — no other business name, no price, no review score, no email.`,
+    `Blank space is correct; an invented detail is a false claim on a real company's advertising.`,
     ``,
     `This is a paid marketing asset for ${clientName}. It must look deliberate, not generated.`,
   ].join("\n");
@@ -253,8 +288,13 @@ export async function runCreativeBuildJob(
       : `Re-rendering "${typed.title}".`,
   );
 
-  const [{ data: client }, { data: context }, upstream] = await Promise.all([
+  const [{ data: client }, { data: contact }, { data: context }, upstream] = await Promise.all([
     sb.from("clients").select("name").eq("id", job.client_id).maybeSingle(),
+    sb
+      .from("client_contact_details")
+      .select("phone, whatsapp, website, instagram, address, logo_path")
+      .eq("client_id", job.client_id)
+      .maybeSingle(),
     sb
       .from("client_business_context")
       .select("business_overview, ideal_customer, main_offer, competitors, brand_voice, proof_testimonials, current_marketing, sales_process, current_revenue, target_revenue")
@@ -264,8 +304,19 @@ export async function runCreativeBuildJob(
     loadConceptContext(sb, job.client_id),
   ]);
 
-  // The renderer is given the real name so it never has to guess one.
+  // The renderer is given the real values so it never has to guess one.
   const clientName = (client?.name as string | undefined) ?? "this business";
+  const c = (contact ?? {}) as Record<string, string | null>;
+  const identity = {
+    phone: c.whatsapp || c.phone || null,
+    website: c.website || null,
+    instagram: c.instagram || null,
+    address: c.address || null,
+    hasLogo: Boolean(c.logo_path),
+  };
+  // The select above is the only source of these; a silent typo there would
+  // read as "nothing on file" and quietly go back to blank corners.
+  const onFile = Object.entries(identity).filter(([, v]) => v).map(([k]) => k);
 
   const { data: proofRows } = await sb
     .from("client_proof_assets")
@@ -298,6 +349,12 @@ ${renderUpstream(upstream)}
 
 PROOF ON FILE — the only proof this asset may reference
 ${proof || "None. Make no proof claim."}
+
+IDENTITY ON FILE — the only identity details that exist
+Business name: ${clientName}
+${onFile.length === 0
+  ? "Nothing else. Do not refer to a phone number, website, handle, address or logo at all — none exist, and a placeholder becomes an invention when it is rendered."
+  : `On file and safe to use: ${onFile.join(", ")}. Anything not in that list does not exist — do not refer to it.`}
 
 Call ${submitTool.name} once when you are done.`;
 
@@ -413,7 +470,7 @@ Call ${submitTool.name} once when you are done.`;
   }
 
   // ---- stage two: render -------------------------------------------------
-  const imagePrompt = composePrompt(concept, typed, clientName);
+  const imagePrompt = composePrompt(concept, typed, clientName, identity);
   await sb
     .from("creative_generations")
     .update({

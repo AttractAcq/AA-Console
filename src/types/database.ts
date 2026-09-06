@@ -917,6 +917,62 @@ export type Database = {
           },
         ]
       }
+      client_contact_details: {
+        Row: {
+          address: string | null
+          client_id: string
+          email: string | null
+          facebook: string | null
+          instagram: string | null
+          logo_path: string | null
+          notes: string | null
+          phone: string | null
+          primary_contact: string | null
+          role_title: string | null
+          updated_at: string
+          website: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          address?: string | null
+          client_id: string
+          email?: string | null
+          facebook?: string | null
+          instagram?: string | null
+          logo_path?: string | null
+          notes?: string | null
+          phone?: string | null
+          primary_contact?: string | null
+          role_title?: string | null
+          updated_at?: string
+          website?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          address?: string | null
+          client_id?: string
+          email?: string | null
+          facebook?: string | null
+          instagram?: string | null
+          logo_path?: string | null
+          notes?: string | null
+          phone?: string | null
+          primary_contact?: string | null
+          role_title?: string | null
+          updated_at?: string
+          website?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_contact_details_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_contracts: {
         Row: {
           client_id: string

@@ -55,9 +55,18 @@ practice name, a fabricated logo and a fabricated WhatsApp number, on an ad
 for a real business. The concept had done the right thing and written a
 *placeholder*; the renderer, handed a placeholder, filled it in. Every
 evidence rule in this pipeline lived in the concept stage and none of it
-reached the renderer. Both stages now carry the ban, the renderer is given
-the real client name so it never has to guess, and a re-run produced the same
-asset with the footer correctly blank.
+reached the renderer. Both stages now carry the ban, and **Account → Contact & Identity** holds the
+real values — phone, WhatsApp, website, socials, address, logo — so the ban
+does not simply mean a blank corner forever. Each detail is either given
+verbatim or explicitly forbidden; there is no third state, because a renderer
+told nothing about a phone number invents a plausible one. A build with real
+details on file rendered "Harbour Dental" correctly and invented nothing.
+
+The logo is deliberately never drawn. A diffusion model approximates a
+wordmark, and an approximated logo is still the wrong mark, so the render is
+told to leave a clear area and the real file is composited afterwards —
+**which is not built yet.** Until it is, a client with a logo on file gets an
+asset with space reserved and nothing in it.
 
 See **Configuration required** below for exactly what goes where.
 

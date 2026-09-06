@@ -1,4 +1,5 @@
 import {
+  Contact,
   LayoutDashboard,
   Users,
   Settings2,
@@ -209,6 +210,12 @@ export const clientNavGroups: NavNode[] = [
         label: "Onboarding",
         path: "onboarding",
         icon: ClipboardList,
+      },
+      {
+        id: "contact",
+        label: "Contact & Identity",
+        path: "contact",
+        icon: Contact,
       },
       {
         id: "integrations",

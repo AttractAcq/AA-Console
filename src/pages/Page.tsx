@@ -27,6 +27,7 @@ import { PaidPanel } from "./distribution/PaidPanel";
 import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { ProspectsLeadsPanel } from "./prospects-leads/ProspectsLeadsPanel";
 import { OnboardingPanel } from "./account/OnboardingPanel";
+import { ContactPanel } from "./account/ContactPanel";
 import { IntegrationsPanel } from "./account/IntegrationsPanel";
 import { CopyLibraryPanel } from "./media/CopyLibraryPanel";
 import { PaidReportingPanel } from "./reporting/PaidReportingPanel";
@@ -109,6 +110,7 @@ const nodePanels: Record<string, () => ReactNode> = {
   approvals: () => <ApprovalsPanel />,
   "prospects-leads": () => <ProspectsLeadsPanel />,
   onboarding: () => <OnboardingPanel />,
+  contact: () => <ContactPanel />,
   integrations: () => <IntegrationsPanel />,
   contracts: () => <ContractsLegalPanel />,
   billing: () => <BillingSubscriptionPanel />,
