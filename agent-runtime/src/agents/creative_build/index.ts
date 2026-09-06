@@ -28,6 +28,7 @@ import { renderContext, renderUpstream } from "../shared.js";
 import { loadConceptContext } from "./context.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
+import { placeLogo } from "./logo.js";
 
 const BUCKET = "client-media";
 
@@ -522,10 +523,38 @@ Call ${submitTool.name} once when you are done.`;
     throw error;
   }
 
-  const path = `${job.client_id}/generated/${renderId}.${image.extension}`;
+  // The render left a clear band at the foot; the real logo goes into it
+  // here rather than being drawn by the model.
+  let final = { bytes: image.bytes, contentType: image.contentType, extension: image.extension };
+  if (c.logo_path) {
+    const { data: logoFile, error: logoError } = await sb.storage.from(BUCKET).download(c.logo_path);
+    if (logoError || !logoFile) {
+      // Not fatal: the render is paid for and still worth keeping.
+      await appendEvent(
+        sb,
+        job.id,
+        `Could not read the logo (${logoError?.message ?? "not found"}) — filed without it.`,
+        "warn",
+      );
+    } else {
+      const { result, placed, reason } = await placeLogo(
+        image.bytes,
+        Buffer.from(await logoFile.arrayBuffer()),
+      );
+      final = result;
+      await appendEvent(
+        sb,
+        job.id,
+        placed ? "Placed the client's logo onto the render." : `Logo not placed: ${reason}`,
+        placed ? "info" : "warn",
+      );
+    }
+  }
+
+  const path = `${job.client_id}/generated/${renderId}.${final.extension}`;
   const { error: uploadError } = await sb.storage
     .from(BUCKET)
-    .upload(path, image.bytes, { contentType: image.contentType, upsert: true });
+    .upload(path, final.bytes, { contentType: final.contentType, upsert: true });
   if (uploadError) throw new Error(`Could not store the image: ${uploadError.message}`);
 
   const assetId = await insertAsset(sb, job, typed, path, "image");

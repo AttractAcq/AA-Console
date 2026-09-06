@@ -17,6 +17,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
     "@supabase/supabase-js": "^2.107.0",
+    "sharp": "^0.35.4",
     "ws": "^8.18.0"
   },
   "devDependencies": {

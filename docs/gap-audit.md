@@ -63,10 +63,10 @@ told nothing about a phone number invents a plausible one. A build with real
 details on file rendered "Harbour Dental" correctly and invented nothing.
 
 The logo is deliberately never drawn. A diffusion model approximates a
-wordmark, and an approximated logo is still the wrong mark, so the render is
-told to leave a clear area and the real file is composited afterwards —
-**which is not built yet.** Until it is, a client with a logo on file gets an
-asset with space reserved and nothing in it.
+wordmark, and an approximated logo is still the wrong mark, so the render
+leaves a clear band and the real file is composited into it afterwards with
+sharp — pixel for pixel, the actual mark. A failed composite keeps the render
+rather than losing an image that has already been paid for.
 
 See **Configuration required** below for exactly what goes where.
 
