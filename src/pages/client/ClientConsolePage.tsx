@@ -5,6 +5,7 @@ import { ConsoleShell } from "../../components/ConsoleShell";
 import { Button } from "../../components/Button";
 import { Panel } from "../../components/Panel";
 import { EmptyState } from "../../components/EmptyState";
+import { ClientAccountView } from "./ClientAccountView";
 import { DataTable } from "../../components/DataTable";
 import { ChatView } from "../../components/chat/ChatView";
 import { AddProofModal } from "../../components/proof/AddProofModal";
@@ -188,6 +189,8 @@ export function ClientConsolePage() {
         <ActiveOrganicView clientId={clientId} />
       ) : page.id === "active-conversion" ? (
         <ActiveConversionView clientId={clientId} />
+      ) : page.id === "account" ? (
+        <ClientAccountView clientId={clientId} />
       ) : (
         <EmptyState label={`${page.label} — coming soon`} />
       )}

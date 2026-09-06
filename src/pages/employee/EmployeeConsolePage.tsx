@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { ConsoleShell } from "../../components/ConsoleShell";
 import { EmptyState } from "../../components/EmptyState";
+import { EmployeeAccountView } from "./sections/EmployeeAccountView";
 import { findConsolePage } from "../../config/consoleNav";
 import { useAuth } from "../../context/auth";
 import { EMPLOYEE_CATEGORY_LABEL } from "../../lib/identity";
@@ -71,6 +72,10 @@ export function EmployeeConsolePage() {
 
     if (page.id === "past-clients") {
       return <ClientsTable memberId={memberId!} scope="past" />;
+    }
+
+    if (page.id === "account") {
+      return <EmployeeAccountView memberId={memberId!} />;
     }
 
     return <EmptyState label={`${page.label} — coming soon`} />;

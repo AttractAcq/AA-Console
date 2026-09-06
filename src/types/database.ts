@@ -2752,6 +2752,13 @@ export type Database = {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: Json
       }
+      my_account_team: {
+        Args: never
+        Returns: {
+          category: string
+          name: string
+        }[]
+      }
       next_ref_number: { Args: { p_client_id: string }; Returns: string }
       renew_agent_job_lease: {
         Args: {

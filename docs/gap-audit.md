@@ -102,17 +102,33 @@ admins too.
 
 ---
 
-## 3. `account` is unimplemented in all four consoles
+## 3. ~~`account` unimplemented in all four consoles~~ — BUILT
 
-Confirmed still open. The client console handles `dashboard`,
-`active-campaigns`, `active-organic`, `active-conversion`, `chat`; the
-employee console handles `dashboard`, the current/past pages for all three
-roles, and `chat`. Neither handles `account`, so it renders "coming soon" in
-the client console and for editors, avatars and SMMs.
+**Closed.** Two panels, one per console shape.
 
-**To close:** one panel, reused. Client-side: contact details, billing
-status, who their account manager is. Employee-side: their own details,
-category, compensation.
+**Client:** their business details, their login, who works on their account,
+plan and monthly amount, onboarding progress, and agreements on file.
+
+**Employee (all three roles):** paid to date, awaiting payment, jobs
+completed, their own details and role, and a payments table.
+
+Both were built against what each role can genuinely read rather than what
+looks right as an admin — the trap here is a page that renders fine for an
+admin and blank for the person it is for. Every table used has a self- or
+client-scoped read policy.
+
+The one exception is the team. A client cannot read `team_members`, and
+should not: it carries contact details, engagement terms and personal notes.
+But knowing who does your work is the most basic thing an account page owes
+you, so `my_account_team()` returns a name and a role for the people
+currently assigned to the caller's own client, and nothing else.
+
+Contracts are listed but not downloadable — the bucket has no client read
+policy, so the page says to ask rather than offering a link that would fail.
+
+Verified as the real users, not as an admin: signed in as the Harbour Dental
+client and as EDITOR1. The negative test matters most — a payment raised
+against the avatar was invisible to the editor, with totals unchanged.
 
 ---
 
