@@ -88,9 +88,17 @@ RULES
 - Only reference proof or claims that appear in what you were given. Never invent a statistic, a testimonial, or a credential — this asset goes in front of the public.
 - Respect the brand voice. If it says never to say something, never say it.
 - Say what to avoid, including the visual cliche this sector is drowning in.
-- Write for the buyer described in the ICP, not for a marketing audience.`;
+- Write for the buyer described in the ICP, not for a marketing audience.
 
-function composePrompt(concept: Record<string, unknown>, brief: BriefRow): string {
+NEVER WRITE A PLACEHOLDER INTO TEXT THAT WILL BE RENDERED
+Anything you put in headline, subhead or call_to_action is set as literal type on the image. A renderer handed "[the practice's phone number]" or "practice name as it appears on the door" does not leave a gap — it invents a plausible name and a plausible number, and the result looks finished and is false.
+So: only write words you were actually given. If a phone number, address, price, URL or handle is not in the material above, do not refer to it at all — leave that element out. The business name you may use is the one named in the brief and nowhere else.`;
+
+function composePrompt(
+  concept: Record<string, unknown>,
+  brief: BriefRow,
+  clientName: string,
+): string {
   const s = (k: string) => String(concept[k] ?? "").trim();
   const text = [s("headline"), s("subhead"), s("call_to_action")].filter(Boolean);
 
@@ -112,7 +120,17 @@ function composePrompt(concept: Record<string, unknown>, brief: BriefRow): strin
     `DO NOT INCLUDE`,
     s("avoid") || "Stock-photo cliche, watermarks, distorted hands or faces, unreadable lettering.",
     ``,
-    `This is a paid marketing asset for a real business (${brief.title}). It must look deliberate, not generated.`,
+    // The concept stage is told not to emit placeholders, but a renderer
+    // will invent an identity from nothing if the composition implies one —
+    // it produced a fabricated practice name, logo and phone number before
+    // this block existed. The asset goes in front of the public, so the ban
+    // is repeated where the pixels are actually made.
+    `IDENTITY — THIS IS A REAL BUSINESS, DO NOT INVENT ANY PART OF IT`,
+    `The business is "${clientName}". That is the only name that may appear.`,
+    `Do NOT invent or render: any other business name, any logo or wordmark, a phone number, a WhatsApp number, an address, a website, an email, a social handle, a price, or a review score.`,
+    `If the layout seems to call for a logo or contact details, leave that area empty. Blank space is correct; an invented detail is a false claim on a real company's advertising.`,
+    ``,
+    `This is a paid marketing asset for ${clientName}. It must look deliberate, not generated.`,
   ].join("\n");
 }
 
@@ -235,7 +253,8 @@ export async function runCreativeBuildJob(
       : `Re-rendering "${typed.title}".`,
   );
 
-  const [{ data: context }, upstream] = await Promise.all([
+  const [{ data: client }, { data: context }, upstream] = await Promise.all([
+    sb.from("clients").select("name").eq("id", job.client_id).maybeSingle(),
     sb
       .from("client_business_context")
       .select("business_overview, ideal_customer, main_offer, competitors, brand_voice, proof_testimonials, current_marketing, sales_process, current_revenue, target_revenue")
@@ -244,6 +263,9 @@ export async function runCreativeBuildJob(
     // Selected sections, not whole domains — see context.ts.
     loadConceptContext(sb, job.client_id),
   ]);
+
+  // The renderer is given the real name so it never has to guess one.
+  const clientName = (client?.name as string | undefined) ?? "this business";
 
   const { data: proofRows } = await sb
     .from("client_proof_assets")
@@ -391,7 +413,7 @@ Call ${submitTool.name} once when you are done.`;
   }
 
   // ---- stage two: render -------------------------------------------------
-  const imagePrompt = composePrompt(concept, typed);
+  const imagePrompt = composePrompt(concept, typed, clientName);
   await sb
     .from("creative_generations")
     .update({

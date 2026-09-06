@@ -32,9 +32,9 @@ because no credential is configured.
 
 | Integration | Unlocks | State |
 |---|---|---|
-| **OpenAI** | The AI build route — creative concept *and* image render | `OPENAI_API_KEY` unset |
+| **OpenAI** | The AI build route — creative concept *and* image render | **Connected and proven end to end.** Both model ids resolve; a real build produced a publishable asset in 78s for $0.115 |
 | **Meta** (`meta` + `instagram`) | Metrics ingest, and everything downstream: Reporting panels, the commentary agent | 0 rows in `client_integrations`, 0 Vault secrets |
-| **Resend** | The email telling an editor a brief is waiting | `RESEND_API_KEY` unset |
+| **Resend** | The email telling an editor a brief is waiting | Key configured locally, **no email sent yet** — that reaches a real inbox, so it needs a deliberate decision |
 
 Everything around each boundary is verified. Meta's failure path was tested
 against the real API — an invalid token came back correctly classified as
@@ -46,10 +46,18 @@ refused to pay for a concept it could never render.
 
 What is unproven is the success path of all three.
 
-**Two model ids cannot be verified from here.** `gpt-image-2` and
-`gpt-5.6-sol` came from another conversation and are past what this codebase
-can check. Both are environment variables, so a wrong id is a config edit,
-and a 404 reports itself as *"check CREATIVE_CONCEPT_MODEL — not found"*.
+**The model ids are confirmed.** `gpt-image-2` and `gpt-5.6-sol` both resolve
+against the live API. That caveat is retired.
+
+**What the first real build found.** It produced a genuinely publishable
+asset — and invented the client's identity. The footer carried a fabricated
+practice name, a fabricated logo and a fabricated WhatsApp number, on an ad
+for a real business. The concept had done the right thing and written a
+*placeholder*; the renderer, handed a placeholder, filled it in. Every
+evidence rule in this pipeline lived in the concept stage and none of it
+reached the renderer. Both stages now carry the ban, the renderer is given
+the real client name so it never has to guess, and a re-run produced the same
+asset with the footer correctly blank.
 
 See **Configuration required** below for exactly what goes where.
 
@@ -167,17 +175,22 @@ CONSOLE_URL=http://localhost:5173
 
 ### Railway → the service → Variables — the deployed worker
 
-The same two keys, plus:
+The same two keys. Nothing else is needed while the console runs locally:
+`CONSOLE_URL` and `MASTER_AI_ALLOWED_ORIGINS` both default to
+`http://localhost:5173`.
+
+**Only when the console is deployed**, add both, pointing at it:
 
 ```
-CONSOLE_URL=<the deployed console URL>
-MASTER_AI_ALLOWED_ORIGINS=<the deployed console origin>
+CONSOLE_URL=https://console.attractacq.com
+MASTER_AI_ALLOWED_ORIGINS=https://console.attractacq.com
 ```
 
-`MASTER_AI_ALLOWED_ORIGINS` defaults to `http://localhost:5173` only. Until it
-names the hosted origin, **the Master AI will not work from a deployed front
-end** — the browser blocks it before the request is made. This has not bitten
-yet only because the console has been run locally.
+`CONSOLE_URL` is where the "Open it in the console" button in a brief email
+points. `MASTER_AI_ALLOWED_ORIGINS` is which origins a browser may call the
+Master AI from — until it names the deployed origin, **the Master AI will not
+work from the hosted front end**, because the browser blocks the request
+before it is sent.
 
 ### Meta, per client — in the app
 
@@ -223,7 +236,13 @@ credential does not silently start billing API calls.
 5. **Changing a job's `params` shape is a deploy-ordering problem**, and the
    claim filter does not cover it — it matches on `agent_key`. Deploy the
    runtime *before* migrating the RPC that changes what it is sent.
-6. **Revoking a function grant from `anon` alone does nothing.** Functions grant
+6. **A renderer will invent an identity from a placeholder.** Given
+   "practice name as it appears on the door" it produced a plausible name, a
+   logo and a phone number, on a real company's advertising. Rules that live
+   only in the reasoning stage do not reach the stage that makes the pixels —
+   put them in both, and give the renderer the real value so it never has to
+   guess one.
+7. **Revoking a function grant from `anon` alone does nothing.** Functions grant
    `EXECUTE` to `PUBLIC` by default and `anon` inherits it. Revoke from
    `PUBLIC`, then grant back explicitly — and check
    `has_function_privilege` afterwards, because the no-op is silent.
