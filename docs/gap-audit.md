@@ -135,15 +135,49 @@ evidence that tool calls are logged when they are not — so it is dropped.
 
 ---
 
-## 6. Frontend test coverage is thin
+## 6. ~~Frontend test coverage is thin~~ — CLOSED, and it was not thinness
 
-Four frontend test files against five in the runtime. No panel renders under
-test, and none of the build pipeline — the modal, the brief detail, the
-concept workspace, the reference upload — has one.
+The audit said "thin". It was **absent**, for a reason thinness does not
+describe: there was no DOM test environment at all. The three frontend suites
+were pure-logic — no jsdom, no testing-library — so "no panel renders under
+test" was not a coverage choice anyone had made. Nothing *could* render.
 
-The RLS half is addressed: `scripts/rls-isolation-test.mjs` is a real harness
-meant to be re-run whenever a policy changes or a table is added. It is not in
-CI because it needs two live client credentials.
+Now: jsdom and Testing Library are configured, and the four surfaces of the
+build pipeline have suites — **29 tests to 121**.
+
+| Suite | Covers |
+|---|---|
+| `AgentActivityBar` (12) | In-flight and failure states, and dismissal |
+| `ApproveAndBuildModal` (20) | AI/human routing, dispatch, reference upload |
+| `ConceptWorkspace` (21) | Concept editing, re-render, approve, schedule |
+| `BriefDetailModal` (19) | Provenance, build history, dispatch status |
+| `MediaDetailModal` (20) | Preview by type, provenance, decision history |
+
+They are written against the invariants that have actually broken or would be
+expensive to break, not against the markup:
+
+- **Video never reaches the AI route.** The rule the modal exists to enforce.
+- **A dismissed failure stays dismissed across an unmount** — the tab-change
+  regression, locked.
+- **Deselecting a category drops the people picked from it**, so a brief
+  cannot go to someone the operator believes they deselected.
+- **A generated asset is never attributed to a person**, and both models are
+  credited.
+- **Saving a concept edit spends nothing** — asserted by the absence of a
+  render call, which is the property that makes the split worth having.
+- **`attempts` is only reported when retries really happened.**
+- **A rejection shows its reason**, the gap-5 fix, now held in place.
+
+**The tests were checked for teeth rather than trusted.** Two mutations were
+introduced into `ApproveAndBuildModal` and reverted: forcing `isVideo` false
+failed 3 tests, and dropping the orphaned-selection cleanup failed 1. A suite
+that passes against broken source is worse than no suite.
+
+CI already runs `npm test`, so these gate every push with no workflow change.
+
+The RLS half remains as it was: `scripts/rls-isolation-test.mjs` is a real
+harness meant to be re-run whenever a policy changes or a table is added. It is
+not in CI because it needs two live client credentials.
 
 ---
 
@@ -199,6 +233,12 @@ present.
   is recorded in `master_ai_messages.cost_usd` and never totalled.
 - **Stale worker rows** in `agent_runtime_status` from local testing. Cosmetic —
   `is_live` reports them correctly.
+- **`react-router-dom` 6.30.6 carries two moderate advisories**, and the fix is
+  a semver-major move to 7.x. Checked rather than assumed: neither is reachable
+  here. The SSR hydration one needs SSR, and this is a Vite SPA with no server
+  entry. The open redirect needs an attacker-controlled navigation target, and
+  every `navigate()` and `to={}` in `src/` is a literal, a lookup in a constant
+  role map, or a database UUID. Worth doing as its own migration, not urgent.
 
 ---
 
@@ -267,6 +307,7 @@ credential does not silently start billing API calls.
 | `is_channel_member` callable by `anon` | Revoking from `PUBLIC`, not just `anon` | No `SECURITY DEFINER` function is now reachable by `anon` |
 | A build could not be re-run, edited or compared | Splitting the concept from its renders | A re-render spends 0 tokens on the concept, against 33,484 for the first build |
 | Concept context far larger than needed | An allow-list of the sections a creative uses | 33,484 → 13,023 input tokens, same output, on the same brief and model |
+| No panel could be rendered under test | jsdom, Testing Library, and five suites over the build pipeline | 29 tests → 121. Two deliberate mutations of the source failed 3 and 1 test respectively, so the suites are not vacuous |
 
 ---
 
@@ -312,6 +353,17 @@ credential does not silently start billing API calls.
    `EXECUTE` to `PUBLIC` by default and `anon` inherits it. Revoke from
    `PUBLIC`, then grant back explicitly — and check
    `has_function_privilege` afterwards, because the no-op is silent.
+9. **An audit line can name a symptom and hide its cause.** "Test coverage is
+   thin" reads as a backlog item — write more tests. The actual state was that
+   no test *could* render a component, because no DOM environment existed. The
+   count was a consequence, not the problem, and counting is what made it look
+   like one. When a gap is phrased as a quantity, check what the quantity is
+   made of before planning to increase it.
+10. **A suite that passes on first run has not been shown to work.** Every one
+    of these did. The check is to break the source deliberately and confirm the
+    right tests fail: `isVideo = false` must fail the video tests, and removing
+    the orphaned-selection cleanup must fail that one. Both did, and both were
+    reverted. Without that step a green run only proves the tests execute.
 
 ---
 
@@ -332,3 +384,6 @@ credential does not silently start billing API calls.
 - **Orphaned schema:** grep each table name across `src/`, excluding
   `types/database.ts`. Tables read through an RPC or a view look like false
   positives — `metrics_daily` and `agent_runtime_heartbeats` are.
+- **Whether the frontend suites still bite:** break one invariant in the source
+  on purpose, run `npm test`, confirm the expected tests fail, and revert. A
+  passing suite is evidence only if it can fail.
