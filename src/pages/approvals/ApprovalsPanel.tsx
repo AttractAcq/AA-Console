@@ -24,6 +24,10 @@ export function ApprovalsPanel() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<MediaAsset | null>(null);
+  // Rejecting without saying why sends the maker back with nothing to act on,
+  // so the reason is asked for rather than left optional.
+  const [rejecting, setRejecting] = useState<MediaAsset | null>(null);
+  const [reason, setReason] = useState("");
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -43,13 +47,17 @@ export function ApprovalsPanel() {
     void refresh();
   }, [refresh]);
 
-  async function review(asset: MediaAsset, decision: "approved" | "rejected") {
+  async function review(
+    asset: MediaAsset,
+    decision: "approved" | "rejected",
+    why?: string,
+  ) {
     setBusyId(asset.id);
     setError(null);
     const { error: rpcError } = await supabase.rpc("review_media_asset", {
       p_asset_id: asset.id,
       p_decision: decision,
-      p_reason: undefined,
+      p_reason: why?.trim() || undefined,
     });
     setBusyId(null);
     if (rpcError) {
@@ -113,7 +121,10 @@ export function ApprovalsPanel() {
                   <button
                     type="button"
                     disabled={busyId === asset.id}
-                    onClick={() => void review(asset, "rejected")}
+                    onClick={() => {
+                      setReason("");
+                      setRejecting(asset);
+                    }}
                     className="flex-1 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     Reject
@@ -122,6 +133,60 @@ export function ApprovalsPanel() {
               }
             />
           ))}
+        </div>
+      )}
+
+      {rejecting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close"
+            className="absolute inset-0 bg-foreground/40"
+            onClick={() => setRejecting(null)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="relative w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-lg"
+          >
+            <h2 className="text-base font-semibold text-card-foreground">
+              Why is this being rejected?
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {rejecting.ref_number ? `${rejecting.ref_number} — ` : ""}
+              {rejecting.title ?? "Untitled"}. Whoever made it sees this, so say what would make it
+              right.
+            </p>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={4}
+              autoFocus
+              placeholder="The shade guide is out of focus and the practice logo is cropped."
+              className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRejecting(null)}
+                className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!reason.trim() || busyId === rejecting.id}
+                onClick={() => {
+                  const asset = rejecting;
+                  setRejecting(null);
+                  void review(asset, "rejected", reason);
+                }}
+                className="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

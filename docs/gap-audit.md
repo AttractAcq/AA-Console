@@ -109,15 +109,29 @@ behind gap 1 — it delivers nothing until metrics exist.
 
 ---
 
-## 5. Two audit tables are written and never read
+## 5. ~~Two audit tables written and never read~~ — CLOSED, and one was worse
 
-Zero frontend references to either.
+They turned out to be different problems, and the audit had one of them wrong.
 
-- `agent_tool_calls` — every tool call an agent makes, with a permission class.
-- `client_asset_reviews` — approve/reject decisions with reasons.
+**`client_asset_reviews`** was genuinely written and never read — every
+approve and reject since the beginning. Worse, only admins and the client
+could read it, so the editor or avatar whose work was rejected, the one
+person who has to act on the reason, could not see it. And nothing ever
+captured a reason: both existing rows had `reason: null`, because the UI
+never asked.
 
-Both matter only on the day someone asks "who approved this, and when" —
-which is the day it is too late to start collecting. The collecting is done.
+Now: rejecting asks why and will not proceed without an answer, the decision
+history shows on the asset, and the maker can read the reviews of assets they
+made. Verified across four accounts — each maker sees exactly their own work
+and nothing else, and an AI-generated asset with no maker is visible to no
+employee at all.
+
+**`agent_tool_calls`** was not "written but never read". **Nothing ever wrote
+to it.** It was built for a tool-audit design the runtime did not adopt: the
+record agents call exactly one tool, and the only real tool user is the
+Master AI, which already writes a full audit to `master_ai_messages.tool_calls`.
+An empty table shaped like an audit trail is worse than no table — it reads as
+evidence that tool calls are logged when they are not — so it is dropped.
 
 ---
 

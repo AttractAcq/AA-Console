@@ -6,6 +6,14 @@ import { StatusBadge } from "./MediaCard";
 import { supabase } from "../lib/supabase";
 import { cn } from "../lib/cn";
 
+type Review = {
+  id: string;
+  decision: string;
+  reason: string | null;
+  created_at: string;
+  reviewer: string | null;
+};
+
 type Provenance = {
   briefTitle: string | null;
   briefRef: string | null;
@@ -38,6 +46,7 @@ export function MediaDetailModal({
   onClose: () => void;
 }) {
   const [provenance, setProvenance] = useState<Provenance | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
 
   const load = useCallback(async () => {
     if (!asset) return;
@@ -65,6 +74,32 @@ export function MediaDetailModal({
         .maybeSingle();
       conceptModel = (gen?.concept_model as string | null) ?? null;
     }
+
+    // The decision history. Written since the beginning and shown nowhere
+    // until now, which meant "rejected" arrived without the reason attached.
+    const { data: reviewRows } = await supabase
+      .from("client_asset_reviews")
+      .select("id, decision, reason, created_at, reviewed_by")
+      .eq("asset_id", asset.id)
+      .order("created_at", { ascending: false });
+
+    const reviewerIds = [
+      ...new Set((reviewRows ?? []).map((r) => r.reviewed_by).filter(Boolean) as string[]),
+    ];
+    const { data: reviewers } = reviewerIds.length
+      ? await supabase.from("profiles").select("id, full_name").in("id", reviewerIds)
+      : { data: [] as Array<{ id: string; full_name: string | null }> };
+    const nameById = new Map((reviewers ?? []).map((p) => [p.id, p.full_name]));
+
+    setReviews(
+      (reviewRows ?? []).map((r) => ({
+        id: r.id as string,
+        decision: r.decision as string,
+        reason: r.reason as string | null,
+        created_at: r.created_at as string,
+        reviewer: r.reviewed_by ? (nameById.get(r.reviewed_by) ?? null) : null,
+      })),
+    );
 
     setProvenance({
       briefTitle: (briefRes.data as { title?: string } | null)?.title ?? null,
@@ -169,6 +204,40 @@ export function MediaDetailModal({
               ) : null,
             )}
           </dl>
+
+          {reviews.length > 0 && (
+            <div className="border-t border-border px-5 py-4">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Decisions
+              </h3>
+              <ul className="space-y-2">
+                {reviews.map((review) => (
+                  <li key={review.id} className="text-sm">
+                    <span className="flex flex-wrap items-baseline gap-2">
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+                          review.decision === "approved"
+                            ? "bg-primary/10 text-brand-strong"
+                            : "bg-destructive/10 text-destructive",
+                        )}
+                      >
+                        {review.decision}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {review.reviewer ?? "Someone"} · {shortDate(review.created_at)}
+                      </span>
+                    </span>
+                    {review.reason && (
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">
+                        {review.reason}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {provenance?.generated && (
             <p className="px-5 pb-4 text-xs text-muted-foreground">

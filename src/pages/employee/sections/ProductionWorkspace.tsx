@@ -65,6 +65,7 @@ export function ProductionWorkspace({
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [rejectionReasons, setRejectionReasons] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +88,28 @@ export function ProductionWorkspace({
         .limit(20),
     ]);
     setJobs((assigned.data ?? []) as unknown as Job[]);
-    setSubmissions((delivered.data ?? []) as Submission[]);
+    const rows = (delivered.data ?? []) as Submission[];
+    setSubmissions(rows);
+
+    // Only the rejected ones need a reason, and RLS lets the maker read the
+    // reviews of assets they made.
+    const rejected = rows.filter((r) => r.review_status === "rejected").map((r) => r.id);
+    if (rejected.length > 0) {
+      const { data: reviews } = await supabase
+        .from("client_asset_reviews")
+        .select("asset_id, reason, created_at")
+        .in("asset_id", rejected)
+        .eq("decision", "rejected")
+        .order("created_at", { ascending: false });
+      const latest = new Map<string, string>();
+      for (const review of reviews ?? []) {
+        const assetId = review.asset_id as string;
+        if (!latest.has(assetId) && review.reason) latest.set(assetId, review.reason as string);
+      }
+      setRejectionReasons(latest);
+    } else {
+      setRejectionReasons(new Map());
+    }
     setLoading(false);
   }, [memberId]);
 
@@ -252,7 +274,22 @@ export function ProductionWorkspace({
             s.ref_number ?? "—",
             s.title ?? "—",
             s.media_type,
-            s.review_status,
+            // A rejection without its reason is a dead end for the person who
+            // has to fix it, so the reason travels with the status.
+            s.review_status === "rejected" ? (
+              <span key="s">
+                <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                  rejected
+                </span>
+                {rejectionReasons.get(s.id) && (
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {rejectionReasons.get(s.id)}
+                  </span>
+                )}
+              </span>
+            ) : (
+              s.review_status
+            ),
           ])}
         />
       </Panel>

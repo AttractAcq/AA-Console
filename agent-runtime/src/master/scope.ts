@@ -95,7 +95,6 @@ export const TABLES: Record<string, TableRule> = {
   client_users: { scope: CLIENT_COLUMN, clientRead: true, clientWrite: false },
   // Internal counter behind ref numbers. Editing it corrupts numbering.
   ref_counters: { scope: CLIENT_COLUMN, clientRead: true, clientWrite: false },
-  agent_tool_calls: { scope: CLIENT_COLUMN, clientRead: true, clientWrite: false },
 
   // ---- scoped through a parent row --------------------------------------
   agent_job_events: {
