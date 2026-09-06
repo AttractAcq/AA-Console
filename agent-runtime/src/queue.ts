@@ -124,15 +124,18 @@ export async function markJobFailed(
   failureMessage: string,
   usage: JobUsage = {},
 ): Promise<void> {
-  // Burning the attempt budget is what makes a non-retryable failure
-  // terminal — claim_agent_job only re-picks failed jobs under the cap.
+  // A non-retryable failure is finished now; a retryable one is finished
+  // only once the budget is spent. `terminal` carries that rather than the
+  // attempt count, which used to be inflated to max to stop a re-claim and
+  // in doing so reported three tries where there had been one.
   const terminal = !retryable || attempts >= maxAttempts;
   const { error, count } = await sb
     .from("agent_jobs")
     .update(
       {
         status: "failed",
-        attempts: terminal ? maxAttempts : attempts,
+        terminal,
+        attempts,
         error: failureMessage.slice(0, 2000),
         completed_at: terminal ? new Date().toISOString() : null,
         lease_owner: null,

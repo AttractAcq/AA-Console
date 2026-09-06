@@ -85,23 +85,28 @@ describe("lease-scoped state transitions", () => {
 });
 
 describe("markJobFailed", () => {
-  it("keeps a retryable failure under the attempt cap alive: no completed_at, attempts untouched", async () => {
+  it("keeps a retryable failure under the attempt cap alive: no completed_at, not terminal", async () => {
     const { sb, capture } = fakeUpdateClient({ error: null, count: 1 });
     await markJobFailed(sb, "job-1", "owner-1", 1, 3, true, "transient error");
     expect(capture.patch?.completed_at).toBeNull();
+    expect(capture.patch?.terminal).toBe(false);
     expect(capture.patch?.attempts).toBe(1);
   });
 
-  it("makes a non-retryable failure terminal regardless of attempts left", async () => {
+  it("makes a non-retryable failure terminal without inflating the attempt count", async () => {
     const { sb, capture } = fakeUpdateClient({ error: null, count: 1 });
     await markJobFailed(sb, "job-1", "owner-1", 1, 3, false, "fatal error");
-    expect(capture.patch?.attempts).toBe(3);
+    expect(capture.patch?.terminal).toBe(true);
     expect(capture.patch?.completed_at).not.toBeNull();
+    // The job tried once and gave up on purpose. Reporting 3 here is what
+    // made a missing API key read as a flaky, thrice-retried fault.
+    expect(capture.patch?.attempts).toBe(1);
   });
 
   it("makes a retryable failure terminal once the attempt cap is reached", async () => {
     const { sb, capture } = fakeUpdateClient({ error: null, count: 1 });
     await markJobFailed(sb, "job-1", "owner-1", 3, 3, true, "still failing");
+    expect(capture.patch?.terminal).toBe(true);
     expect(capture.patch?.attempts).toBe(3);
     expect(capture.patch?.completed_at).not.toBeNull();
   });
