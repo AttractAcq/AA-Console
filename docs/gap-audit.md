@@ -18,7 +18,7 @@ Supersedes the status framing in `ui-data-entry-mapping.md`.
 | Deployment | **Current.** Railway reports `c859fe6`, matching HEAD. | `agent_runtime_status`. |
 | RLS | **Every table enabled with policies. No client can see anything of another client's, by any path.** | `pg_class.relrowsecurity`, `pg_policy`, and `scripts/rls-isolation-test.mjs` against two live client logins. |
 | Exposed functions | **No `SECURITY DEFINER` function is reachable by `anon`.** | `has_function_privilege('anon', ...)` across `public`. |
-| Schema in git | **47 migrations, all exported.** | `supabase/migrations/`. |
+| Schema in git | **52 migrations, and the chain now provably replays** onto an empty database. | `supabase db push` onto a fresh staging project. |
 | Idea → brief → asset → scheduled | **Built end to end**, AI and human routes. | See gap 1: the AI half has never completed a render. |
 | Reporting ingest | **Built end to end**, steps 1–6, scheduled daily. | See gap 1: no live pull has ever succeeded. |
 
@@ -147,15 +147,43 @@ CI because it needs two live client credentials.
 
 ---
 
-## 7. Everything is still tested against production
+## 7. ~~Everything is tested against production~~ — STAGING EXISTS
 
-One Supabase project. Every migration was applied to it directly, and every
-verification run seeded and deleted rows in it. Safe so far because the data
-is demo data and each seed was removed — but not a practice that survives real
-client data.
+**Closed.** `AA-Console-Staging` (`vmmertwoboqiazcsougw`) was created and the
+whole migration chain replayed onto it from git. That required freeing a slot:
+the plan allows two active free projects, and `Cockpit` — v5, still
+heartbeating at the time — was paused for it.
 
-**To close:** a second project as staging, `supabase db push` from the
-migrations now in git, and a rule that migrations land there first.
+**The replay immediately failed, which is the entire point of having it.**
+
+Migration 10 revokes execute on `rls_auto_enable()`, a function **no migration
+creates**. It existed only in the live database, put there outside the
+migration history, so nothing in git described it.
+
+It is not a trivial object. An event trigger, `ensure_rls`, calls it on every
+DDL and turns row level security on for any new table in `public`. So part of
+the "every table has RLS" property this document keeps verifying is
+*automatic* — and a fresh environment built from git would not have had it. A
+new table there could have shipped without RLS and nothing would have
+complained.
+
+Both are now captured in `09b_rls_auto_enable.sql`, ordered to run before the
+revoke, written idempotently, and applied to production as well so the two
+share one lineage.
+
+A second difference surfaced on comparison: staging had the function callable
+by `anon` while production had it locked to `service_role`. Same cause as the
+`is_channel_member` trap — migration 10 revokes from `authenticated`, which
+does nothing, because functions grant EXECUTE to PUBLIC by default. The
+migration now reproduces production's grants exactly.
+
+Staging and production now agree on every count checked: 44 tables, 8 views,
+44 functions, 105 policies, no table without RLS, no `SECURITY DEFINER`
+function reachable by `anon`, 16 agents and 81 record templates seeded.
+
+**The rule from here:** migrations land on staging first. Production was
+verified unchanged after the catch-up push — 2 clients and 5 assets still
+present.
 
 ---
 
