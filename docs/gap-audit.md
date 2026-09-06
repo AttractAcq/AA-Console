@@ -250,6 +250,13 @@ credential does not silently start billing API calls.
    Both are now capped: renewal stops past a maximum job age, and every model
    call carries a per-request timeout. Every write already asserts lease
    ownership, so a stale run cannot corrupt the job it lost.
+
+   A second lesson from the same incident: `started_at` was set once and never
+   on retry, so `now() - started_at` reads as the age of the *job*, not of the
+   current attempt. A retry that had been running 30 seconds looked like 12
+   minutes — long enough to read as the stall it had just recovered from, and
+   it produced a wrong diagnosis before the numbers were checked. It is now
+   stamped per attempt.
 6. **Changing a job's `params` shape is a deploy-ordering problem**, and the
    claim filter does not cover it — it matches on `agent_key`. Deploy the
    runtime *before* migrating the RPC that changes what it is sent.

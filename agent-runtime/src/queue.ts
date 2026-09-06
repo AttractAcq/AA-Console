@@ -53,7 +53,12 @@ export async function markJobRunning(
 ): Promise<void> {
   const { error, count } = await sb
     .from("agent_jobs")
-    .update({ status: "running" }, { count: "exact" })
+    // started_at is stamped per attempt, not once. Left at the first
+    // attempt's value it makes "how long has this run been going"
+    // unanswerable — a retry that had been running 30 seconds read as 12
+    // minutes, which is long enough to look like the stall it had just
+    // recovered from. created_at still carries when the job was queued.
+    .update({ status: "running", started_at: new Date().toISOString() }, { count: "exact" })
     .eq("id", jobId)
     .eq("status", "claimed")
     .eq("lease_owner", leaseOwner);
