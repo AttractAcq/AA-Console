@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { FilterPills } from "./FilterPills";
 import { EmptyState } from "./EmptyState";
 import { MediaCard, StatusBadge } from "./MediaCard";
+import { MediaDetailModal } from "./MediaDetailModal";
 import { dateSortOptions } from "../data/sortOptions";
 import type { SortOptionId } from "../data/sortOptions";
 import { REVIEW_TONE, fetchClientAssets, shortDate, signPaths } from "../lib/media";
@@ -27,6 +28,7 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
   const [bodies, setBodies] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState<MediaAsset | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -81,8 +83,13 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {assets.map((asset) => (
-            <MediaCard
+            <button
               key={asset.id}
+              type="button"
+              onClick={() => setOpen(asset)}
+              className="rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+            <MediaCard
               mediaType={asset.media_type}
               url={urls.get(asset.storage_path)}
               body={bodies.get(asset.id)}
@@ -92,9 +99,18 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
                 <StatusBadge status={asset.review_status} tone={REVIEW_TONE[asset.review_status]} />
               }
             />
+            </button>
           ))}
         </div>
       )}
+
+      <MediaDetailModal
+        asset={open}
+        url={open ? urls.get(open.storage_path) : undefined}
+        body={open ? bodies.get(open.id) : undefined}
+        open={open !== null}
+        onClose={() => setOpen(null)}
+      />
     </div>
   );
 }

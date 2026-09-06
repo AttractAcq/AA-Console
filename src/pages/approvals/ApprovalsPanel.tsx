@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { Eye } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { FilterPills } from "../../components/FilterPills";
 import { EmptyState } from "../../components/EmptyState";
 import { MediaCard, StatusBadge } from "../../components/MediaCard";
+import { MediaDetailModal } from "../../components/MediaDetailModal";
 import { mediaFilters } from "../../data/mediaFilters";
 import type { MediaFilterId } from "../../data/mediaFilters";
 import { REVIEW_TONE, fetchClientAssets, shortDate, signPaths } from "../../lib/media";
@@ -21,6 +23,7 @@ export function ApprovalsPanel() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<MediaAsset | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -88,6 +91,17 @@ export function ApprovalsPanel() {
               }
               actions={
                 <>
+                  {/* An explicit control rather than a clickable tile: these
+                      cards already carry buttons, and a button cannot contain
+                      another one. */}
+                  <button
+                    type="button"
+                    onClick={() => setPreview(asset)}
+                    aria-label={`Preview ${asset.title ?? "this asset"}`}
+                    className="rounded-md border border-border px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  </button>
                   <button
                     type="button"
                     disabled={busyId === asset.id}
@@ -110,6 +124,13 @@ export function ApprovalsPanel() {
           ))}
         </div>
       )}
+
+      <MediaDetailModal
+        asset={preview}
+        url={preview ? urls.get(preview.storage_path) : undefined}
+        open={preview !== null}
+        onClose={() => setPreview(null)}
+      />
     </div>
   );
 }

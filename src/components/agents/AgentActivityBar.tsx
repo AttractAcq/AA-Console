@@ -3,6 +3,32 @@ import { AlertTriangle, Loader2, X } from "lucide-react";
 import { agentLabel, elapsedLabel, type LiveJob } from "../../lib/useAgentJobs";
 import { cn } from "../../lib/cn";
 
+const DISMISSED_KEY = "aa:dismissed-agent-failures";
+
+/**
+ * Dismissals outlive the component. This bar unmounts whenever the tab
+ * changes, so component state alone meant a dismissed error reappeared the
+ * moment you navigated — which is worse than not offering dismissal at all.
+ * sessionStorage keeps it for the session without hiding a failure forever.
+ */
+function readDismissed(): Set<string> {
+  try {
+    const raw = sessionStorage.getItem(DISMISSED_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistDismissed(ids: Set<string>): void {
+  try {
+    sessionStorage.setItem(DISMISSED_KEY, JSON.stringify([...ids]));
+  } catch {
+    // Private windows and blocked site data both throw. Dismissal then lasts
+    // only as long as the component, which is the old behaviour, not a crash.
+  }
+}
+
 /**
  * Tells you an agent is working, and that it finished or failed.
  *
@@ -22,7 +48,7 @@ export function AgentActivityBar({
 }) {
   // Dismissed by id, not by index: the list re-orders as jobs settle, and
   // dismissing "the second one" would then hide whatever moved into that slot.
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [dismissed, setDismissed] = useState<Set<string>>(readDismissed);
 
   // Re-render on a timer so the elapsed counter actually counts.
   const [, setTick] = useState(0);
@@ -33,7 +59,12 @@ export function AgentActivityBar({
   }, [inFlight.length]);
 
   const shown = failures.filter((job) => !dismissed.has(job.id));
-  const dismiss = (id: string) => setDismissed((prev) => new Set(prev).add(id));
+  const dismiss = (id: string) =>
+    setDismissed((prev) => {
+      const next = new Set(prev).add(id);
+      persistDismissed(next);
+      return next;
+    });
 
   if (inFlight.length === 0 && shown.length === 0) return null;
 
