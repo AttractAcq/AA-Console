@@ -189,21 +189,39 @@ came from.
 
 ---
 
-## 7. Concept generation sends far more context than it needs
+## 7. ~~Concept generation sends far more context than it needs~~ — CUT
 
-The one measured build cost **$0.28** for the concept alone, on 33,484 input
-tokens — the full client intelligence.
+**Closed, and measured.** The concept prompt sent every record from three
+domains — 36 records, 21,172 tokens of a 33,484-token prompt.
 
-The design doc this feature was built from warns against precisely this in
-its own section 15: *"Do not simply dump the full client brain into every
-generation request"*, suggesting 5–15k tokens via relevant retrieval. The
-implementation does the thing the doc warns about.
+The size was not the worst of it. The brief is *downstream* of those domains:
+the brief agent read the ICP and brand strategy to write it. Sending the brief
+and all of its source material asked the model to re-derive reasoning that had
+already happened, and paid for it.
 
-At 100 creatives a month that is roughly $28 in concepts before a single
-image is rendered.
+`creative_build/context.ts` is now an allow-list of the sections a single
+image or piece of copy actually uses — how the buyer talks, what they fear
+and want, how they see themselves, what is promised and what may not be
+claimed — with a 2,000-character cap for the few that run long. The three
+`brand_strategy` records are planning documents at ~9,000 characters each;
+only the one carrying the guardrails is passed, and only its opening.
 
-**To close:** select the context a creative concept actually needs — ICP,
-brand voice, offer, proof — rather than passing every upstream record.
+Measured on the same brief, same model:
+
+| | Before | After |
+|---|---|---|
+| Upstream records | 36 (21,172 tok) | 13 (5,907 tok) |
+| Prompt input | 33,484 tok | **13,023 tok** |
+| Output | 4,534 tok | 4,292 tok |
+| Cost (Opus) | $0.2808 | **$0.1724** |
+| Cost (Sol, projected) | $0.225 | ~$0.138 |
+
+**61% less input for the same output.** On this one comparison the concept
+was as good — it independently reached the same creative direction, and its
+"avoid" section was sharper, explaining why a generated image would be the
+exact stock picture the brief bans. One comparison is not proof that less
+context improves quality, but it is evidence the removed material was not
+carrying the result.
 
 ---
 

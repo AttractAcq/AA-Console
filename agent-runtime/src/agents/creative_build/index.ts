@@ -24,7 +24,8 @@ import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { OpenAiError, runStructuredCompletion } from "../../tools/openai.js";
 import { estimateCostUsd } from "../../usage/cost.js";
-import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js";
+import { renderContext, renderUpstream } from "../shared.js";
+import { loadConceptContext } from "./context.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 
@@ -240,7 +241,8 @@ export async function runCreativeBuildJob(
       .select("business_overview, ideal_customer, main_offer, competitors, brand_voice, proof_testimonials, current_marketing, sales_process, current_revenue, target_revenue")
       .eq("client_id", job.client_id)
       .maybeSingle(),
-    loadUpstreamRecords(sb, job.client_id, ["icp", "brand_strategy", "offer_strategy"]),
+    // Selected sections, not whole domains — see context.ts.
+    loadConceptContext(sb, job.client_id),
   ]);
 
   const { data: proofRows } = await sb
