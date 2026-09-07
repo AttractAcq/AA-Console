@@ -71,6 +71,7 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
     runtime: RuntimeConfig,
     agent: AgentRow,
     job: AgentJobRow,
+    deadlineAt: number,
   ): Promise<JobResult> {
     if (!job.client_id) {
       return { ok: false, retryable: false, failureMessage: `${config.domain} jobs require a client.` };
@@ -131,6 +132,7 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
         apiKey: anthropicKeyForAgent(runtime, agent.agent_key),
         model: runtime.model,
       timeoutMs: runtime.providerTimeoutMs,
+      deadlineAt,
         system: config.system,
         prompt,
         submitTool,

@@ -24,6 +24,12 @@ export interface AgentLoopOptions {
   apiKey: string;
   /** Per-request timeout. Defaults to ten minutes if a caller omits it. */
   timeoutMs?: number;
+  /**
+   * Wall-clock moment (epoch ms) this job must be finished by. Distinct from
+   * timeoutMs, which bounds one HTTP request: with retries and a multi-turn
+   * loop, a job could otherwise run for turns x retries x timeoutMs.
+   */
+  deadlineAt?: number;
   model: string;
   system: string;
   prompt: string;
@@ -64,8 +70,13 @@ function classify(error: unknown): { message: string; retryable: boolean } {
   if (error instanceof Anthropic.APIConnectionError) {
     return { message: `Connection error: ${error.message}`, retryable: true };
   }
+  // An abort here is this runtime's own deadline firing, not the provider
+  // failing. Saying so stops it reading as an Anthropic outage in the logs.
+  if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+    return { message: "The model call was cut off by the job's deadline.", retryable: true };
+  }
   const message = error instanceof Error ? error.message : String(error);
-  return { message, retryable: /timeout|timed out|econnreset|socket/i.test(message) };
+  return { message, retryable: /timeout|timed out|econnreset|socket|abort/i.test(message) };
 }
 
 type Blocks = Anthropic.Messages.ContentBlockParam[];
@@ -107,6 +118,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     maxTurns = 12,
     maxSearches = 12,
     onProgress,
+    deadlineAt,
   } = options;
 
   // Without a timeout the SDK waits indefinitely, and a stalled stream then
@@ -145,20 +157,43 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   };
 
   const usageWithCost = () => ({ ...totals, costUsd: estimateCostUsd(model, totals) });
+  const startedAt = Date.now();
 
   for (let turn = 1; turn <= maxTurns; turn += 1) {
+    // Checked before starting a turn, not after: the point is not to begin
+    // work that cannot finish inside the job's remaining life.
+    if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+      throw new ProviderError(
+        `The job ran past its ${Math.round((deadlineAt - startedAt) / 1000)}s deadline after ${turn - 1} ` +
+          `${turn - 1 === 1 ? "turn" : "turns"} without reaching an answer.`,
+        // Retryable: a deadline says this attempt took too long, not that the
+        // work is impossible. A genuinely stuck job exhausts its attempts.
+        true,
+        usageWithCost(),
+      );
+    }
+
     let response: Anthropic.Messages.Message;
     try {
-      const stream = client.messages.stream({
-        model,
-        max_tokens: 32000,
-        system,
-        messages,
-        tools,
-        // Adaptive is the only thinking mode on Opus 5; budget_tokens is
-        // rejected. Effort defaults to high.
-        thinking: { type: "adaptive" },
-      });
+      // A hard bound on this request, including the SDK's own retries: an
+      // abort is not retried, where a `timeout` option is. Without this the
+      // last request of a job can start just inside the deadline and then run
+      // for three more timeouts beyond it.
+      const remaining =
+        deadlineAt === undefined ? timeoutMs : Math.max(1_000, deadlineAt - Date.now());
+      const stream = client.messages.stream(
+        {
+          model,
+          max_tokens: 32000,
+          system,
+          messages,
+          tools,
+          // Adaptive is the only thinking mode on Opus 5; budget_tokens is
+          // rejected. Effort defaults to high.
+          thinking: { type: "adaptive" },
+        },
+        { signal: AbortSignal.timeout(Math.min(timeoutMs, remaining)) },
+      );
       response = await stream.finalMessage();
     } catch (error) {
       const { message, retryable } = classify(error);

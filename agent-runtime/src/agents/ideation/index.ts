@@ -80,6 +80,7 @@ export async function runIdeationJob(
   runtime: RuntimeConfig,
   agent: AgentRow,
   job: AgentJobRow,
+  deadlineAt: number,
 ): Promise<JobResult> {
   if (!job.client_id) {
     return { ok: false, retryable: false, failureMessage: "Ideation jobs require a client." };
@@ -213,6 +214,7 @@ Call ${submitTool.name} once when you are done.`;
       apiKey: anthropicKeyForAgent(runtime, agent.agent_key),
       model: runtime.model,
       timeoutMs: runtime.providerTimeoutMs,
+      deadlineAt,
       system,
       prompt,
       submitTool,

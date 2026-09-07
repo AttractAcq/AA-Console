@@ -26,6 +26,7 @@ import { runMetricsIngestJob } from "../agents/metrics_ingest/index.js";
 import { runReportingJob } from "../agents/reporting/index.js";
 import { runCreativeBuildJob } from "../agents/creative_build/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
+import { deadlineFromNow } from "./deadline.js";
 
 export interface JobResult {
   ok: boolean;
@@ -39,6 +40,12 @@ export type JobRunner = (
   config: RuntimeConfig,
   agent: AgentRow,
   job: AgentJobRow,
+  /**
+   * Epoch ms this attempt must be finished by. Runners that call a model take
+   * it; the rest may ignore it, which TypeScript allows — a function of four
+   * parameters satisfies a type of five.
+   */
+  deadlineAt: number,
 ) => Promise<JobResult>;
 
 // Agents land one at a time, each with its own gate.
@@ -83,5 +90,7 @@ export async function dispatchJob(
   if (!runner) {
     throw new Error(`No runtime implementation for agent_key "${job.agent_key}" (job ${job.id}).`);
   }
-  return runner(sb, config, agent, job);
+  // Computed here rather than inside each runner so every agent is bounded by
+  // construction, including any added later that forgets to ask.
+  return runner(sb, config, agent, job, deadlineFromNow(config));
 }

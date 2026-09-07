@@ -20,7 +20,7 @@ Supersedes the status framing in `ui-data-entry-mapping.md`.
 | RLS | **45 tables, all with RLS. 106 policies. No client can see another client's data by any path.** | `pg_class.relrowsecurity`, `pg_policy`, and `scripts/rls-isolation-test.mjs` against two live logins |
 | Exposed functions | **No `SECURITY DEFINER` function is reachable by `anon`.** | `has_function_privilege('anon', ...)` across `public` |
 | Schema in git | **54 migrations, replaying onto a fresh database.** Staging matches production: 45 tables, 0 without RLS, 106 policies, 16 agents. | `supabase db push` onto staging, then a count-for-count comparison |
-| Tests | **263** — 155 frontend, 108 runtime. | `npm test` in both packages |
+| Tests | **276** — 155 frontend, 121 runtime. | `npm test` in both packages |
 | Brand | **On file and enforced.** Palette, typography, imagery direction and per-brand bans reach both stages of a build. | `client_brand_profiles`, and the render block printed from a real row |
 | Idea → brief → asset → scheduled | **Built end to end**, AI and human routes, and the AI half has produced real assets. | 2 completed renders, 5 media assets, 7 scheduled posts |
 | Reporting ingest | **Built end to end**, scheduled daily. | See gap 1: no live pull has ever succeeded |
@@ -66,19 +66,35 @@ same pattern.
 **To close:** Supabase dashboard → Authentication → Policies. Not doable from
 this repo.
 
-### 4. A job has no true deadline
+### 4. ~~A job has no true deadline~~ — CLOSED
 
-The audit used to imply otherwise, so this is stated plainly. `providerTimeoutMs`
-(600s) is the Anthropic client's **per HTTP request** timeout, on a client built
-with `maxRetries: 2`, inside a loop of up to `maxTurns` turns. Worst case is
-turns × 3 × 600s, not 600s.
+`providerTimeoutMs` (600s) bounds one HTTP request, on a client built with
+`maxRetries: 2`, inside a loop of up to `maxTurns` turns — worst case was
+turns × 3 × 600s. And the worst of it was not the arithmetic: at
+`maxJobSeconds` the worker stopped **renewing** the lease but the job kept
+**executing**. A wedged attempt became a zombie holding a worker slot and
+still spending, while a second worker was free to claim the same row. Writes
+were safe — every one asserts lease ownership — but neither the work nor the
+cost was bounded.
 
-The only real outer bound is lease expiry and reclaim — which does work, and
-recovered a wedged ideation job unaided today. But nothing caps the wall-clock
-cost of a single job, and a wedged one holds a worker slot until its lease lapses.
+Now `dispatchJob` computes a deadline and hands it to every runner, so an
+agent added later is bounded whether or not it thinks to ask. It is
+deliberately the same `maxJobSeconds` the lease-renewal cap uses: a job stops
+working at the instant it stops being renewable, which is what removes the
+zombie rather than merely shortening it.
 
-**To close:** a deadline carried into `runAgentLoop` and checked between turns,
-so a job fails at a stated age rather than at whatever the retry maths produces.
+Inside the loop it does two things. It refuses to **start** a turn past the
+deadline — the property that actually saves money, since the alternative is
+paying for a call that cannot finish in time. And each request carries
+`AbortSignal.timeout` clamped to whatever time is left, because an abort is
+not retried where the SDK's own `timeout` option is; without it the last
+request of a job could start just inside the deadline and run three more
+timeouts beyond it. An abort is classified as this runtime's deadline rather
+than as a provider fault, so it stops reading as an Anthropic outage.
+
+The OpenAI paths were checked and left alone: both already abort hard, at
+300s for a concept and 180s for a render, so 480s worst case against a 1800s
+job bound. The unbounded multiplier really was the Anthropic loop.
 
 ### 5. Landing and offer page reporting has no data source
 
@@ -255,6 +271,7 @@ credential does not silently start billing API calls.
 | The console was not deployed anywhere | GitHub Pages, custom domain, HTTPS enforced | Live at `console.attractacq.com`; deep links serve the app via a 404.html fallback; icons and manifest serve |
 | A frontend commit restarted the agent worker | A Railway watch path of `/agent-runtime/**` | Railway's own log: the runtime commit deployed, the next docs commit shows SKIPPED — "No changes to watched files" |
 | OpenAI unproven end to end | A real two-stage build | A publishable asset in 78s for $0.115, with the client's real identity composited rather than invented |
+| A job could run past any stated bound | A deadline computed in `dispatchJob` and enforced between turns | Four mutations: never checking the deadline, dropping the per-request abort, an unbounded deadline, and forgetting to pass one. The third passed all 118 tests on the first attempt — the dispatch wiring had no test until it did |
 | Every build invented its own look | `client_brand_profiles`, fed to concept and render on the identity pattern | The render block printed from Harbour Dental's real row quotes `exactly #0F4C5C`; a client with no profile gets "No brand palette is on file" instead of silence. Four mutations — a hex as a suggestion, an empty row counting as a brand, dropping the hex guard, saving blanks as empty strings — each failed the tests that name them |
 
 ---

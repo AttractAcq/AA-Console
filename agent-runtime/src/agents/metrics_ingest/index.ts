@@ -143,6 +143,9 @@ export async function runMetricsIngestJob(
   _config: RuntimeConfig,
   _agent: AgentRow,
   job: AgentJobRow,
+  // This agent calls no model, so it has no loop to cut short — it is bounded
+  // by the lease alone. The parameter is here to satisfy JobRunner's shape.
+  _deadlineAt?: number,
   source: MetricsSource = metaGraphSource,
 ): Promise<JobResult> {
   if (!job.client_id) {

@@ -181,6 +181,7 @@ export async function runCreativeBuildJob(
   config: RuntimeConfig,
   agent: AgentRow,
   job: AgentJobRow,
+  deadlineAt: number,
 ): Promise<JobResult> {
   if (!job.client_id) {
     return { ok: false, retryable: false, failureMessage: "A creative build needs a client." };
@@ -407,7 +408,8 @@ Call ${submitTool.name} once when you are done.`;
       const out = await runAgentLoop({
         apiKey: anthropicKeyForAgent(config, agent.agent_key),
         model: config.model,
-      timeoutMs: config.providerTimeoutMs,
+        timeoutMs: config.providerTimeoutMs,
+        deadlineAt,
         system: SYSTEM,
         prompt,
         submitTool,
