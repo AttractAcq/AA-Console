@@ -11,6 +11,7 @@ import type { RuntimeConfig } from "../config.js";
 import { logger } from "../logging/logger.js";
 import { AuthError, requireAdmin } from "./auth.js";
 import { runChatTurn } from "./chat.js";
+import { checkBudget, readSpend } from "./budget.js";
 import type { MasterScope } from "./scope.js";
 
 const MAX_BODY_BYTES = 64 * 1024;
@@ -100,6 +101,30 @@ export async function handleMasterChat(
       clientName = client.name as string;
     }
 
+    // --- the spend ceiling, before anything is written or spent ---------
+    // Deliberately after the conversation is resolved (the per-conversation
+    // limit needs its id) and before the operator's message is recorded, so
+    // a refused turn leaves no half-turn in the thread.
+    const spend = await readSpend(sb, conversationId);
+    const budget = checkBudget(config, spend);
+    if (!budget.ok) {
+      logger.warn("master_ai_turn_refused_for_budget", {
+        conversationId,
+        userId: caller.userId,
+        dayUsd: spend.dayUsd,
+        conversationUsd: spend.conversationUsd,
+      });
+      return json(429, {
+        ok: false,
+        error: budget.reason,
+        spend: { day_usd: spend.dayUsd, conversation_usd: spend.conversationUsd },
+        limits: {
+          day_usd: config.masterAiDailyLimitUsd,
+          conversation_usd: config.masterAiConversationLimitUsd,
+        },
+      });
+    }
+
     // --- record the operator's message before doing anything with it ----
     const { data: userMessage, error: insertError } = await sb
       .from("master_ai_messages")
@@ -147,6 +172,7 @@ export async function handleMasterChat(
       history,
       lastUserMessageAt: userMessage.created_at as string,
       actorId: caller.userId,
+      budgetRemainingUsd: budget.remainingUsd,
     });
 
     await sb.from("master_ai_messages").insert({
@@ -170,6 +196,7 @@ export async function handleMasterChat(
       tools: result.toolCalls.length,
       mutations: result.toolCalls.filter((t) => t.mutating).length,
       costUsd: result.costUsd,
+      stoppedForBudget: result.stoppedForBudget ?? false,
       ms: Date.now() - started,
     });
 
@@ -179,6 +206,17 @@ export async function handleMasterChat(
       reply: result.reply,
       tool_calls: result.toolCalls,
       cost_usd: result.costUsd,
+      stopped_for_budget: result.stoppedForBudget ?? false,
+      // Post-turn totals, so the console can move its budget line without a
+      // second round trip.
+      spend: {
+        day_usd: spend.dayUsd + result.costUsd,
+        conversation_usd: spend.conversationUsd + result.costUsd,
+      },
+      limits: {
+        day_usd: config.masterAiDailyLimitUsd,
+        conversation_usd: config.masterAiConversationLimitUsd,
+      },
     });
   } catch (error) {
     if (error instanceof AuthError) {

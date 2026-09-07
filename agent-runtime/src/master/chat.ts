@@ -55,6 +55,8 @@ export interface ChatTurnResult {
   toolCalls: Array<{ tool: string; input: unknown; summary: string; mutating: boolean }>;
   costUsd: number;
   turns: number;
+  /** True when the loop was cut short by the spend ceiling rather than finishing. */
+  stoppedForBudget?: boolean;
 }
 
 export async function runChatTurn(opts: {
@@ -66,6 +68,12 @@ export async function runChatTurn(opts: {
   history: Array<{ role: "user" | "assistant"; content: string }>;
   lastUserMessageAt: string;
   actorId: string;
+  /**
+   * Dollars this turn may spend before a ceiling is reached. One turn is up
+   * to MAX_TURNS model calls, so checking only before the turn would let a
+   * single request run far past the limit it was cleared against.
+   */
+  budgetRemainingUsd: number;
 }): Promise<ChatTurnResult> {
   const { sb, config, scope, conversationId, clientName, history } = opts;
 
@@ -105,6 +113,9 @@ export async function runChatTurn(opts: {
     inputTokens += response.usage.input_tokens;
     outputTokens += response.usage.output_tokens;
 
+    const spentSoFar = estimateCostUsd(config.model, { inputTokens, outputTokens });
+    const overBudget = spentSoFar >= opts.budgetRemainingUsd;
+
     const toolUses = response.content.filter(
       (block): block is Anthropic.Messages.ToolUseBlock => block.type === "tool_use",
     );
@@ -120,6 +131,34 @@ export async function runChatTurn(opts: {
         toolCalls: auditTrail,
         costUsd: estimateCostUsd(config.model, { inputTokens, outputTokens }),
         turns,
+      };
+    }
+
+    // Stop before running the tools it just asked for, not after: a tool
+    // call is another model call to interpret its result, so continuing
+    // here is what actually spends the money.
+    if (overBudget) {
+      logger.warn("master_ai_turn_stopped_for_budget", {
+        conversationId,
+        turns,
+        spentSoFar,
+        allowed: opts.budgetRemainingUsd,
+      });
+      const text = response.content
+        .filter((b): b is Anthropic.Messages.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+        .trim();
+      return {
+        reply:
+          (text ? `${text}\n\n` : "") +
+          `I stopped here: this turn reached the spend ceiling after ${turns} ` +
+          `${turns === 1 ? "step" : "steps"} (about $${spentSoFar.toFixed(2)}). ` +
+          `Ask something narrower, or raise the limit on the runtime.`,
+        toolCalls: auditTrail,
+        costUsd: spentSoFar,
+        turns,
+        stoppedForBudget: true,
       };
     }
 

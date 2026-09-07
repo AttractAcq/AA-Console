@@ -20,6 +20,10 @@ export interface RuntimeConfig {
   healthPort: number;
   /** Required in an X-Runtime-Secret header on /status when set. */
   sharedSecret: string | null;
+  /** Ceiling on Master AI spend across every conversation in one UTC day. */
+  masterAiDailyLimitUsd: number;
+  /** Ceiling on Master AI spend within a single conversation, all time. */
+  masterAiConversationLimitUsd: number;
   /** Origins allowed to call /master/chat from a browser. */
   allowedOrigins: string[];
 
@@ -55,6 +59,19 @@ function intEnv(name: string, fallback: number): number {
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new Error(`${name} must be a positive integer, got: ${raw}`);
+  }
+  return parsed;
+}
+
+// Money, so not intEnv. Zero is allowed and means "stop the Master AI
+// entirely" — a deliberate off switch, not a misconfiguration, which is why
+// this rejects only negatives and nonsense.
+function moneyEnv(name: string, fallback: number): number {
+  const raw = optionalEnv(name);
+  if (!raw) return fallback;
+  const parsed = Number.parseFloat(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${name} must be a non-negative number of dollars, got: ${raw}`);
   }
   return parsed;
 }
@@ -107,6 +124,12 @@ export function loadConfig(): RuntimeConfig {
     maxJobSeconds: intEnv("AGENT_RUNTIME_MAX_JOB_SECONDS", 1800),
     healthPort: intEnv("PORT", 8787),
     sharedSecret: optionalEnv("AGENT_RUNTIME_SHARED_SECRET") ?? null,
+    // Calibrated against real use rather than guessed: 13 turns had cost
+    // $1.15 in total, the dearest single turn $0.16, and the busiest day
+    // $1.10. These sit far above that, so they never interrupt ordinary
+    // work — they exist to stop a runaway, not to budget.
+    masterAiDailyLimitUsd: moneyEnv("MASTER_AI_DAILY_LIMIT_USD", 20),
+    masterAiConversationLimitUsd: moneyEnv("MASTER_AI_CONVERSATION_LIMIT_USD", 5),
     // The Master AI is called from the browser, so the origin list is a
     // real control rather than a formality. Defaults to local dev only:
     // a deployment that forgets to set this cannot be reached from a

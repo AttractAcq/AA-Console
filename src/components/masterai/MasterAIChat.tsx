@@ -6,8 +6,8 @@ import { ConfirmModal } from "../forms/FormModal";
 import { RichText } from "../markdown/RichText";
 import { useAuth } from "../../context/auth";
 import { supabase } from "../../lib/supabase";
-import { masterAIConfigured, sendMasterMessage } from "../../lib/masterAI";
-import type { MasterScope, ToolCall } from "../../lib/masterAI";
+import { masterAIConfigured, readMasterSpend, sendMasterMessage } from "../../lib/masterAI";
+import type { MasterLimits, MasterScope, MasterSpend, ToolCall } from "../../lib/masterAI";
 import { cn } from "../../lib/cn";
 
 type Thread = { id: string; title: string | null; updated_at: string };
@@ -51,6 +51,11 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [spend, setSpend] = useState<MasterSpend | null>(null);
+  // The ceilings live in the runtime's environment, not the database, so
+  // they are learned from a reply rather than mirrored in this app's config
+  // where the two would drift apart without anyone noticing.
+  const [limits, setLimits] = useState<MasterLimits | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const clientId = scope.kind === "client" ? scope.clientId : null;
@@ -104,6 +109,10 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
   }, [loadRecent]);
 
   useEffect(() => {
+    void readMasterSpend(conversationId).then(setSpend);
+  }, [conversationId]);
+
+  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [turns.length, busy]);
 
@@ -123,6 +132,8 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
     try {
       const reply = await sendMasterMessage({ scope, conversationId, message });
       setConversationId(reply.conversationId);
+      if (reply.spend) setSpend(reply.spend);
+      if (reply.limits) setLimits(reply.limits);
       void loadThreads();
       setTurns((prev) => [
         ...prev,
@@ -136,6 +147,9 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
       ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
+      // A refusal is usually the ceiling, so re-read it: the line should
+      // agree with the message explaining why nothing happened.
+      void readMasterSpend(conversationId).then(setSpend);
     } finally {
       setBusy(false);
     }
@@ -171,6 +185,20 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
           <div>
             <h2 className="text-sm font-semibold text-card-foreground">{heading}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{scopeNote}</p>
+            {spend && (
+              <p
+                className={cn(
+                  "mt-0.5 text-xs",
+                  limits && spend.dayUsd >= limits.dayUsd * 0.8
+                    ? "font-medium text-destructive"
+                    : "text-muted-foreground",
+                )}
+              >
+                ${spend.dayUsd.toFixed(2)} today
+                {limits ? ` of $${limits.dayUsd.toFixed(2)}` : ""}
+                {spend.conversationUsd > 0 && ` · $${spend.conversationUsd.toFixed(2)} this thread`}
+              </p>
+            )}
           </div>
         </div>
         <div className="relative flex shrink-0 items-center gap-1">

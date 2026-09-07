@@ -229,8 +229,30 @@ present.
   nothing calls it with anything but the default.
 - **`brief` is excluded from master runs by matching its `agent_key` string.**
   `scheduled_only` now exists and is the cleaner mechanism.
-- **The Master AI has no spend ceiling.** Turns cost $0.06–$0.16; per-turn cost
-  is recorded in `master_ai_messages.cost_usd` and never totalled.
+- ~~**The Master AI has no spend ceiling.**~~ **Closed.** Two limits, because
+  they catch different failures: `MASTER_AI_DAILY_LIMIT_USD` (default $20)
+  bounds the bill, and `MASTER_AI_CONVERSATION_LIMIT_USD` (default $5) catches
+  one thread going in circles, which is the shape a runaway actually takes and
+  which a daily limit would only notice after it had eaten the day.
+
+  Defaults were calibrated against real use rather than guessed: 13 turns had
+  cost **$1.15 in total**, the dearest single turn $0.16, the busiest day
+  $1.10. Both ceilings sit far above that — they exist to stop a runaway, not
+  to budget. Zero is accepted and means stop entirely, a deliberate off switch;
+  a negative or non-numeric value refuses to boot, because a ceiling that
+  silently falls back to a default is worse than none.
+
+  Enforced in two places, because one turn is up to twelve model calls:
+  **before the turn** (refuses with 429 and writes nothing to the thread) and
+  **inside the loop** (stops before running the tools it just asked for — a
+  tool call implies another model call to read the result, so continuing is
+  what actually spends). It **fails closed**: if the total cannot be read, the
+  turn does not run.
+
+  `master_ai_spend()` is the single source of truth — the runtime enforces
+  against it and the console shows the same figure, so what is displayed and
+  what is enforced cannot drift. The chat header carries today's spend, turning
+  destructive past 80% of the limit.
 - **Stale worker rows** in `agent_runtime_status` from local testing. Cosmetic —
   `is_live` reports them correctly.
 - **`react-router-dom` 6.30.6 carries two moderate advisories**, and the fix is
@@ -257,6 +279,8 @@ RESEND_API_KEY=re_...
 Optional, with working defaults already in code:
 
 ```
+MASTER_AI_DAILY_LIMIT_USD=20
+MASTER_AI_CONVERSATION_LIMIT_USD=5
 OPENAI_IMAGE_MODEL=gpt-image-2
 CREATIVE_CONCEPT_PROVIDER=openai
 CREATIVE_CONCEPT_MODEL=gpt-5.6-sol
@@ -308,6 +332,7 @@ credential does not silently start billing API calls.
 | A build could not be re-run, edited or compared | Splitting the concept from its renders | A re-render spends 0 tokens on the concept, against 33,484 for the first build |
 | Concept context far larger than needed | An allow-list of the sections a creative uses | 33,484 → 13,023 input tokens, same output, on the same brief and model |
 | No panel could be rendered under test | jsdom, Testing Library, and five suites over the build pipeline | 29 tests → 121. Two deliberate mutations of the source failed 3 and 1 test respectively, so the suites are not vacuous |
+| Master AI spend was unbounded | Daily and per-conversation ceilings over `master_ai_spend()` | Day window proved against seeded rows on staging: $9.99 one second before UTC midnight is excluded from the day and still counted against the conversation. Five mutations — ignoring the conversation cap, an off-by-one at the limit, an unreadable total reading as zero, the ceiling computed but not enforced, unbounded headroom handed to the turn — each failed the tests that name them |
 
 ---
 
@@ -359,7 +384,12 @@ credential does not silently start billing API calls.
    count was a consequence, not the problem, and counting is what made it look
    like one. When a gap is phrased as a quantity, check what the quantity is
    made of before planning to increase it.
-10. **A suite that passes on first run has not been shown to work.** Every one
+10. **A limit read from the environment must refuse to boot on nonsense.**
+    `MASTER_AI_DAILY_LIMIT_USD=twenty` parsing to `NaN` and falling back to a
+    default gives a process that looks configured and is not. Zero is a
+    legitimate value here (stop entirely), so the check rejects negatives and
+    non-numbers specifically rather than anything falsy.
+11. **A suite that passes on first run has not been shown to work.** Every one
     of these did. The check is to break the source deliberately and confirm the
     right tests fail: `isVideo = false` must fail the video tests, and removing
     the orphaned-selection cleanup must fail that one. Both did, and both were

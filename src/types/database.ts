@@ -2800,6 +2800,13 @@ export type Database = {
           is_nullable: string
         }[]
       }
+      master_ai_spend: {
+        Args: { p_conversation_id?: string }
+        Returns: {
+          conversation_usd: number
+          day_usd: number
+        }[]
+      }
       master_run_progress: {
         Args: { p_run_id: string }
         Returns: {

@@ -12,7 +12,7 @@ let savedEnv: NodeJS.ProcessEnv;
 beforeEach(() => {
   savedEnv = { ...process.env };
   for (const key of Object.keys(process.env)) {
-    if (key.startsWith("AGENT_RUNTIME_") || key.startsWith("ANTHROPIC_API_KEY") || key === "SUPABASE_URL" || key === "SUPABASE_SERVICE_ROLE_KEY" || key === "PORT") {
+    if (key.startsWith("AGENT_RUNTIME_") || key.startsWith("MASTER_AI_") || key.startsWith("ANTHROPIC_API_KEY") || key === "SUPABASE_URL" || key === "SUPABASE_SERVICE_ROLE_KEY" || key === "PORT") {
       delete process.env[key];
     }
   }
@@ -66,5 +66,36 @@ describe("loadConfig", () => {
   it("falls back to the shared key when no override is set", () => {
     const config = loadConfig();
     expect(anthropicKeyForAgent(config, "brief")).toBe("shared-key");
+  });
+});
+
+describe("Master AI spend limits", () => {
+  it("defaults well above real usage rather than to no limit at all", () => {
+    const config = loadConfig();
+    expect(config.masterAiDailyLimitUsd).toBe(20);
+    expect(config.masterAiConversationLimitUsd).toBe(5);
+  });
+
+  it("takes dollars and cents, not whole dollars", () => {
+    process.env.MASTER_AI_DAILY_LIMIT_USD = "7.50";
+    expect(loadConfig().masterAiDailyLimitUsd).toBe(7.5);
+  });
+
+  // Zero is an off switch, not a mistake.
+  it("accepts zero as a deliberate stop", () => {
+    process.env.MASTER_AI_CONVERSATION_LIMIT_USD = "0";
+    expect(loadConfig().masterAiConversationLimitUsd).toBe(0);
+  });
+
+  // A ceiling that silently falls back to a default when misconfigured is
+  // worse than no ceiling, because it looks like it is holding.
+  it("refuses to boot on a negative limit", () => {
+    process.env.MASTER_AI_DAILY_LIMIT_USD = "-5";
+    expect(() => loadConfig()).toThrow(/non-negative/);
+  });
+
+  it("refuses to boot on a limit that is not a number", () => {
+    process.env.MASTER_AI_DAILY_LIMIT_USD = "twenty";
+    expect(() => loadConfig()).toThrow(/non-negative/);
   });
 });
