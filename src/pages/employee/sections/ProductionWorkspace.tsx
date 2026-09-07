@@ -12,7 +12,13 @@ type Job = {
   compensation: number | null;
   completed_at: string | null;
   client_id: string | null;
+  // The brief this job exists to satisfy. Carried onto the delivered asset —
+  // without it a human-made asset has no route back to its brief or its idea,
+  // and falls out of attribution entirely. That was the case for every asset
+  // an editor or avatar had ever delivered.
+  brief_id: string | null;
   clients: { name: string } | null;
+  client_briefs: { title: string; brief_ref: string | null; body: string | null } | null;
 };
 
 type Submission = {
@@ -77,7 +83,9 @@ export function ProductionWorkspace({
     const [assigned, delivered] = await Promise.all([
       supabase
         .from("job_assignments")
-        .select("id, title, due_date, compensation, completed_at, client_id, clients(name)")
+        .select(
+          "id, title, due_date, compensation, completed_at, client_id, brief_id, clients(name), client_briefs(title, brief_ref, body)",
+        )
         .eq("member_id", memberId)
         .order("due_date", { nullsFirst: false }),
       supabase
@@ -154,21 +162,44 @@ export function ProductionWorkspace({
       member_id: memberId,
       media_type: mediaTypeOf(file),
       storage_path: path,
-      title: file.name,
+      // The brief, not just the client. This is the link the whole chain hangs
+      // on: asset -> brief -> idea, and later performance -> idea.
+      brief_id: job.brief_id,
+      // Named after the work, not after whatever the camera called the file.
+      // "IMG_4032.mov" tells a reviewer nothing about what they are approving.
+      title: job.client_briefs?.title ?? job.title ?? file.name,
     });
-    setUploading(false);
     if (rowError) {
+      setUploading(false);
       setError(rowError.message);
       return;
     }
+
+    // Close the assignment. Without this a delivered job stays in the open
+    // queue forever, so neither the maker nor the agency can tell what is
+    // still outstanding.
+    const { error: closeError } = await supabase
+      .from("job_assignments")
+      .update({ completed_at: new Date().toISOString() })
+      .eq("id", job.id);
+
+    setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
-    setNotice("Delivered. It is now waiting for approval.");
+    setJobId("");
+    // The file is delivered either way; a failure to close the job is worth
+    // saying rather than swallowing, but it is not a failed delivery.
+    setNotice(
+      closeError
+        ? "Delivered and waiting for approval — but the job could not be marked done. Tell the agency."
+        : "Delivered. It is now waiting for approval.",
+    );
     void refresh();
   }
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading your work…</p>;
 
   const openJobs = jobs.filter((j) => !j.completed_at);
+  const selected = jobs.find((j) => j.id === jobId);
 
   return (
     <div className="space-y-6">
@@ -246,6 +277,28 @@ export function ProductionWorkspace({
               className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-2.5 file:py-1 file:text-xs file:text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
+
+          {/* The brief, on the page where the work is actually delivered.
+              It lived on a different page, so a maker had to hold it in their
+              head while uploading against it. */}
+          {selected?.client_briefs && (
+            <details className="rounded-md border border-border p-3">
+              <summary className="cursor-pointer text-sm font-medium text-foreground">
+                {selected.client_briefs.brief_ref
+                  ? `${selected.client_briefs.brief_ref} — `
+                  : ""}
+                {selected.client_briefs.title}
+              </summary>
+              <p className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground">
+                {selected.client_briefs.body ?? "This brief has no detail beyond its title."}
+              </p>
+            </details>
+          )}
+          {selected && !selected.brief_id && (
+            <p className="text-xs text-muted-foreground">
+              This job has no brief attached — deliver against its title.
+            </p>
+          )}
 
           {error && (
             <p role="alert" className="text-sm text-destructive">
