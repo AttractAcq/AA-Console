@@ -294,7 +294,9 @@ The same two keys. Nothing else is needed while the console runs locally:
 `CONSOLE_URL` and `MASTER_AI_ALLOWED_ORIGINS` both default to
 `http://localhost:5173`.
 
-**Only when the console is deployed**, add both, pointing at it:
+**The console is now deployed** to `console.attractacq.com` from
+`.github/workflows/deploy.yml` (GitHub Pages), so these are required, not
+optional:
 
 ```
 CONSOLE_URL=https://console.attractacq.com
@@ -306,6 +308,24 @@ points. `MASTER_AI_ALLOWED_ORIGINS` is which origins a browser may call the
 Master AI from — until it names the deployed origin, **the Master AI will not
 work from the hosted front end**, because the browser blocks the request
 before it is sent.
+
+### GitHub → the repo → Settings → Secrets and variables → Actions
+
+The browser app is built in CI, so its configuration is repository secrets
+rather than a local file. The deploy fails loudly if either of the first two
+is missing, rather than publishing a bundle that renders a login page it
+cannot authenticate against.
+
+| Secret | Required | Notes |
+|---|---|---|
+| `VITE_SUPABASE_URL` | Yes | |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Yes | Safe to ship — RLS decides what it can see |
+| `VITE_AGENT_RUNTIME_URL` | For the Master AI | Absent means the chat reports itself unconfigured rather than failing |
+
+Also needed once, outside the repo: **Settings → Pages → Source: GitHub
+Actions**, and a DNS `CNAME` for `console` pointing at `attractacq.github.io`.
+`public/CNAME` pins the domain into the build artifact so a deploy cannot
+quietly drop it.
 
 ### Meta, per client — in the app
 

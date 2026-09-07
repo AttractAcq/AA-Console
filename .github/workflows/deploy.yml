@@ -1,0 +1,93 @@
+name: Deploy to GitHub Pages
+
+# console.attractacq.com. The runtime (Railway) is deployed separately from
+# agent-runtime/ — this publishes only the browser app.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race to the same site. Queue instead of cancelling:
+# the losing run would otherwise leave the domain on an older build.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # A missing key does not fail the build — Vite substitutes undefined
+      # and the app ships, rendering a login page that cannot reach anything.
+      # Checking here turns a confusing runtime failure into an obvious
+      # red build.
+      - name: Check the build has its configuration
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          missing=""
+          [ -z "$VITE_SUPABASE_URL" ] && missing="$missing VITE_SUPABASE_URL"
+          [ -z "$VITE_SUPABASE_PUBLISHABLE_KEY" ] && missing="$missing VITE_SUPABASE_PUBLISHABLE_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            echo "Set them under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      # The deploy publishes to a real domain, so it does not ship a bundle
+      # whose own tests fail. CI runs these too; the duplication is one npm ci.
+      - run: npm run lint
+      - run: npm test
+
+      - name: Build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # Optional. Absent means the Master AI reports itself unconfigured
+          # rather than the app failing to build.
+          VITE_AGENT_RUNTIME_URL: ${{ secrets.VITE_AGENT_RUNTIME_URL }}
+        run: npm run build
+
+      # The app uses BrowserRouter, so /clients/<id>/delivery/dashboard is a
+      # real URL a person can reload or bookmark. Pages has no server to
+      # rewrite it, and serves 404.html — which is this same app, so the
+      # router resolves the path on the client.
+      - name: SPA fallback for deep links
+        run: cp dist/index.html dist/404.html
+
+      # public/CNAME is copied into dist by Vite and pins the custom domain
+      # to the artifact, so a deploy cannot quietly drop it.
+      - name: Verify the custom domain survived the build
+        run: |
+          test -f dist/CNAME || { echo "::error::dist/CNAME missing"; exit 1; }
+          echo "Serving $(cat dist/CNAME)"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
