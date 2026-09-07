@@ -14,7 +14,38 @@ type Brief = {
   status: string;
   source_idea_id?: string | null;
   created_at?: string;
+  // Structured brief. Null on the briefs written before Brief Studio existed,
+  // which still carry their prose in `body`.
+  hook?: string | null;
+  premise?: string | null;
+  argument?: string | null;
+  proof?: string | null;
+  script?: string | null;
+  visual_direction?: string | null;
+  shot_requirements?: string | null;
+  b_roll?: string | null;
+  call_to_action?: string | null;
+  channel_intent?: string | null;
+  production_method?: string | null;
 };
+
+/**
+ * The order a maker reads them in, which is not the order they are stored in.
+ * Video-only fields are simply absent on a still or a text piece — that is
+ * correct, not a gap, so unlike the brand profile nothing is shown as unset.
+ */
+const BRIEF_FIELDS: Array<[keyof Brief, string]> = [
+  ["hook", "Hook"],
+  ["premise", "Premise"],
+  ["argument", "Argument"],
+  ["proof", "Proof"],
+  ["script", "Script"],
+  ["visual_direction", "Visual direction"],
+  ["shot_requirements", "Shot requirements"],
+  ["b_roll", "B-roll"],
+  ["call_to_action", "Call to action"],
+  ["channel_intent", "Channel"],
+];
 
 type Idea = {
   title: string;
@@ -111,6 +142,11 @@ export function BriefDetailModal({
 
   if (!open || !brief) return null;
 
+  const structured = BRIEF_FIELDS.filter(([key]) => {
+    const value = brief[key];
+    return typeof value === "string" && value.trim().length > 0;
+  });
+
   const money = (v: number | null) => (v === null ? "—" : `$${Number(v).toFixed(3)}`);
 
   return (
@@ -164,16 +200,41 @@ export function BriefDetailModal({
           )}
 
           <section>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              The brief
-            </h3>
-            <div className="rounded-lg border border-border p-4 text-sm text-foreground">
-              {brief.body ? (
-                <RichText text={brief.body} />
-              ) : (
-                <p className="text-muted-foreground">This brief has no detail beyond its title.</p>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                The brief
+              </h3>
+              {brief.production_method && (
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium capitalize text-secondary-foreground">
+                  {brief.production_method}
+                </span>
               )}
             </div>
+
+            {structured.length > 0 ? (
+              <dl className="divide-y divide-border/60 rounded-lg border border-border">
+                {structured.map(([key, label]) => (
+                  <div key={key as string} className="px-4 py-3">
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {label}
+                    </dt>
+                    <dd className="mt-1 whitespace-pre-wrap text-sm text-foreground">
+                      {String(brief[key])}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              // Briefs written before Brief Studio have prose and no fields.
+              // Rendering the markdown keeps them readable rather than blank.
+              <div className="rounded-lg border border-border p-4 text-sm text-foreground">
+                {brief.body ? (
+                  <RichText text={brief.body} />
+                ) : (
+                  <p className="text-muted-foreground">This brief has no detail beyond its title.</p>
+                )}
+              </div>
+            )}
           </section>
 
           {loading ? (

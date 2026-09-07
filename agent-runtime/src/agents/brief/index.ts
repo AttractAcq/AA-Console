@@ -17,6 +17,7 @@ import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords } from "../shared.js";
+import { briefSubmitTool, composeBody, briefColumns, fieldsFor } from "./fields.js";
 
 export async function runBriefJob(
   sb: SupabaseClient,
@@ -68,30 +69,17 @@ export async function runBriefJob(
     .map((p) => `- ${p.title ?? "Untitled"}${p.source ? ` (${p.source})` : ""}: ${p.body ?? "[file]"}`)
     .join("\n");
 
-  const submitTool = {
-    name: "submit_brief",
-    description: "Submit the finished production brief. Call this exactly once.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        title: { type: "string", description: "Short production title for this piece." },
-        brief: { type: "string", description: "The full brief, in the structure requested." },
-      },
-      required: ["title", "brief"],
-      additionalProperties: false,
-    },
-  };
+  const submitTool = briefSubmitTool(idea.media_type);
 
   const system = `You work for Attract Acquisition, a marketing agency. You write production briefs.
 
 An editor or avatar who has never seen this client should be able to make the piece from your brief without asking a question.
 
 WHAT A BRIEF CONTAINS
-- The idea, restated in one line so the maker knows what they are actually saying.
-- The angle: how this specific piece expresses that idea.
-- Structure appropriate to the format — for video, what happens across the opening seconds, the body, and the close; for a carousel, what each frame carries; for a static or text piece, the single message and its supporting points.
-- What must be shown or said, and what must not.
-- Practical production notes: location, props, wardrobe, on-screen text, anything the maker has to arrange.
+You submit it as fields, not as an essay. Every field is required. Where one does
+not apply to this piece, say so in a few words rather than leaving it blank or
+inventing content to fill it — an empty proof is a decision the maker needs to
+know about, and a shot list on a still image is noise.
 
 ABSOLUTE RULES
 - Only reference proof you were actually given. If there is none on file, the piece must work without a claim — say so explicitly in the brief rather than leaving the maker to invent one.
@@ -117,6 +105,9 @@ ${voice || "(none on file)"}
 
 PROOF ON FILE — the only proof this piece may reference
 ${proof || "None. The piece must work without a proof claim; say so in the brief."}
+
+THE FIELDS
+${fieldsFor(idea.media_type).map(([name, description]) => `- ${name}: ${description}`).join("\n")}
 
 Call ${submitTool.name} once when you are done.`;
 
@@ -159,7 +150,10 @@ Call ${submitTool.name} once when you are done.`;
   };
 
   const title = String(result.submitted.title ?? "").trim() || idea.title;
-  const body = String(result.submitted.brief ?? "").trim();
+  // Composed from the fields rather than written separately: two outputs would
+  // be free to disagree, and the one an editor reads would be the unvalidated
+  // one. The markdown is a view of the structure.
+  const body = composeBody(idea.media_type, result.submitted);
   if (body.length < 200) {
     return {
       ok: false,
@@ -174,6 +168,7 @@ Call ${submitTool.name} once when you are done.`;
     source_idea_id: idea.id,
     title: title.slice(0, 300),
     body,
+    ...briefColumns(idea.media_type, result.submitted),
     media_type: idea.media_type,
     status: "draft",
     job_id: job.id,

@@ -854,43 +854,79 @@ export type Database = {
       }
       client_briefs: {
         Row: {
+          argument: string | null
+          b_roll: string | null
           body: string | null
           brief_ref: string | null
+          call_to_action: string | null
+          channel_intent: string | null
           client_id: string
           created_at: string
+          hook: string | null
           id: string
           job_id: string | null
           media_type: Database["public"]["Enums"]["media_type"]
+          premise: string | null
+          production_method: string | null
+          proof: string | null
+          proof_asset_id: string | null
+          script: string | null
+          shot_requirements: string | null
           source_idea_id: string | null
           status: Database["public"]["Enums"]["brief_status"]
           title: string
           updated_at: string
+          visual_direction: string | null
         }
         Insert: {
+          argument?: string | null
+          b_roll?: string | null
           body?: string | null
           brief_ref?: string | null
+          call_to_action?: string | null
+          channel_intent?: string | null
           client_id: string
           created_at?: string
+          hook?: string | null
           id?: string
           job_id?: string | null
           media_type?: Database["public"]["Enums"]["media_type"]
+          premise?: string | null
+          production_method?: string | null
+          proof?: string | null
+          proof_asset_id?: string | null
+          script?: string | null
+          shot_requirements?: string | null
           source_idea_id?: string | null
           status?: Database["public"]["Enums"]["brief_status"]
           title: string
           updated_at?: string
+          visual_direction?: string | null
         }
         Update: {
+          argument?: string | null
+          b_roll?: string | null
           body?: string | null
           brief_ref?: string | null
+          call_to_action?: string | null
+          channel_intent?: string | null
           client_id?: string
           created_at?: string
+          hook?: string | null
           id?: string
           job_id?: string | null
           media_type?: Database["public"]["Enums"]["media_type"]
+          premise?: string | null
+          production_method?: string | null
+          proof?: string | null
+          proof_asset_id?: string | null
+          script?: string | null
+          shot_requirements?: string | null
           source_idea_id?: string | null
           status?: Database["public"]["Enums"]["brief_status"]
           title?: string
           updated_at?: string
+          visual_direction?: string | null
         }
         Relationships: [
           {
@@ -905,6 +941,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_briefs_proof_asset_id_fkey"
+            columns: ["proof_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
             referencedColumns: ["id"]
           },
           {
