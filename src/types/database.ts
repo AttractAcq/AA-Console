@@ -1523,6 +1523,17 @@ export type Database = {
           media_type: Database["public"]["Enums"]["media_type"]
           source: string | null
           storage_path: string | null
+          ref_number: string | null
+          proof_type: string | null
+          claim: string | null
+          evidence: string | null
+          avatar_relevance: string | null
+          services: string | null
+          strength: string
+          usage_rights: string
+          captured_on: string | null
+          expires_on: string | null
+          updated_at: string
           title: string | null
           uploaded_by: string | null
         }
@@ -1534,6 +1545,17 @@ export type Database = {
           media_type: Database["public"]["Enums"]["media_type"]
           source?: string | null
           storage_path?: string | null
+          ref_number?: string | null
+          proof_type?: string | null
+          claim?: string | null
+          evidence?: string | null
+          avatar_relevance?: string | null
+          services?: string | null
+          strength?: string
+          usage_rights?: string
+          captured_on?: string | null
+          expires_on?: string | null
+          updated_at?: string
           title?: string | null
           uploaded_by?: string | null
         }
@@ -1545,6 +1567,17 @@ export type Database = {
           media_type?: Database["public"]["Enums"]["media_type"]
           source?: string | null
           storage_path?: string | null
+          ref_number?: string | null
+          proof_type?: string | null
+          claim?: string | null
+          evidence?: string | null
+          avatar_relevance?: string | null
+          services?: string | null
+          strength?: string
+          usage_rights?: string
+          captured_on?: string | null
+          expires_on?: string | null
+          updated_at?: string
           title?: string | null
           uploaded_by?: string | null
         }
@@ -2959,6 +2992,10 @@ export type Database = {
       repurpose_asset: {
         Args: { p_asset_id: string; p_formats: string[] }
         Returns: string
+      }
+      usable_proof: {
+        Args: { p_client_id: string; p_avatar?: string; p_limit?: number }
+        Returns: Database["public"]["Tables"]["client_proof_assets"]["Row"][]
       }
       review_media_asset: {
         Args: {

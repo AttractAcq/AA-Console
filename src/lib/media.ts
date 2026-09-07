@@ -66,6 +66,18 @@ export type ProofAsset = {
   storage_path: string | null;
   source: string | null;
   created_at: string;
+  // Proof & Asset OS. Null on records filed before it existed, which is why
+  // the panel shows what still needs structuring rather than assuming.
+  ref_number: string | null;
+  proof_type: string | null;
+  claim: string | null;
+  evidence: string | null;
+  avatar_relevance: string | null;
+  services: string | null;
+  strength: string;
+  usage_rights: string;
+  captured_on: string | null;
+  expires_on: string | null;
 };
 
 export async function fetchProofAssets(
@@ -74,7 +86,9 @@ export async function fetchProofAssets(
 ): Promise<ProofAsset[]> {
   let query = supabase
     .from("client_proof_assets")
-    .select("id, client_id, media_type, title, body, storage_path, source, created_at")
+    .select(
+      "id, client_id, media_type, title, body, storage_path, source, created_at, ref_number, proof_type, claim, evidence, avatar_relevance, services, strength, usage_rights, captured_on, expires_on",
+    )
     .eq("client_id", clientId);
   if (mediaType) query = query.eq("media_type", mediaType);
 

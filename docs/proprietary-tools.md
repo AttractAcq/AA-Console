@@ -95,19 +95,35 @@ milestones, dependencies, deliverables, health (results, communication,
 approvals, overdue, sentiment, scope), risks with owner and escalation, and
 **next best action** — the single highest-value thing in the description.
 
-## 6. Proof & Asset OS — *Partial*
+## 6. Proof & Asset OS — *Built, and now waiting on people rather than code*
 
-`client_proof_assets` (2 rows, 9 columns), a Proof Bank page and a `proof`
-agent.
+Proof is a structured record: type, claim, evidence, avatar relevance, service,
+strength, usage rights, captured and expiry dates, on the same per-client
+reference sequence as briefs and assets.
 
-Proof is currently title, body and source. The tool needs proof as a
-**structured record**: type, claim, evidence, avatar relevance, services,
-strength, usage rights, linked assets. Without that, the query the rest of the
-stack depends on — *"give me the strongest proof relevant to this avatar and
-claim"* — cannot be asked.
+`usable_proof(client, avatar, limit)` answers the question the rest of the
+stack depends on — **the strongest proof a client may actually use** — filtered
+to cleared and unexpired, strongest first. Proved on staging against six
+deliberately awkward records: a high-strength but uncleared one, a restricted
+one and an expired one were each excluded, and a different-avatar one dropped
+out under a filter.
 
-Given AA's thesis is that proof becomes attention and demand, this is a bigger
-gap than its size suggests.
+**Usage rights default to `not_cleared`, deliberately.** A customer result
+needs permission before it appears in advertising, so nothing is usable until a
+person says it is. That means the two existing records stopped being offered to
+agents the moment this shipped, which is correct rather than convenient, and
+the Proof Bank leads with the gap: *"1 of 3 cleared for use — the rest are not
+offered to any agent."*
+
+The brief agent now reads this instead of a flattened list, and can tell "none
+exists" from "some exists, nobody cleared it" — different problems needing
+different action, and only the second is a job someone can do.
+
+**What is left is data entry, not code.** Both live records need a claim, an
+avatar and a rights decision. Still deferred: several evidence files per proof
+(the table holds one `storage_path`), and `client_briefs.proof_asset_id` exists
+but nothing writes it yet, so a brief still names its proof in prose rather
+than linking to the record.
 
 ## 7. Attribution & Reporting OS — *Stub*
 
@@ -159,8 +175,8 @@ Worth stating, because the gaps above are long and the foundation is not thin:
 ## The shape of the remaining work
 
 Three tools are effectively unbuilt (3, 4, 9), three are stubs with a page and
-a table (2, 7, 8), and three are partial with real substance behind them
-(1, 5, 6).
+a table (2, 7, 8), one is partial with real substance (5), one is built bar its
+Iteration Engine (1), and one is built and waiting on data entry (6).
 
 The dependency worth noticing: **7 (Attribution) is what makes 9 (Economics)
 possible, and 1's Iteration Engine depends on both.** Revenue cannot be

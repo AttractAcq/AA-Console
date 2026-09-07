@@ -19,6 +19,7 @@ import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords } from "../shared.js";
 import { briefSubmitTool, composeBody, briefColumns, fieldsFor } from "./fields.js";
 import { loadIdentity, identityWriterBlock } from "../identity.js";
+import { loadUsableProof, renderProof } from "../proof.js";
 
 export async function runBriefJob(
   sb: SupabaseClient,
@@ -61,14 +62,18 @@ export async function runBriefJob(
     .map((r) => `**${r.title}**\n${r.body}`)
     .join("\n\n");
 
-  const { data: proofRows } = await sb
-    .from("client_proof_assets")
-    .select("title, body, source")
-    .eq("client_id", job.client_id)
-    .limit(15);
-  const proof = (proofRows ?? [])
-    .map((p) => `- ${p.title ?? "Untitled"}${p.source ? ` (${p.source})` : ""}: ${p.body ?? "[file]"}`)
-    .join("\n");
+  // Cleared, unexpired, strongest first — the filtering happens in the
+  // database so what arrives is already safe to cite. The held count lets the
+  // agent distinguish "no proof exists" from "proof exists, nobody cleared it".
+  const [usable, { count: held }] = await Promise.all([
+    loadUsableProof(sb, job.client_id),
+    sb
+      .from("client_proof_assets")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", job.client_id)
+      .neq("usage_rights", "approved"),
+  ]);
+  const proof = renderProof(usable, { held: held ?? 0 });
 
   // The real, checkable details. Without these the agent writes
   // "[NAMED PERSON]", which is harmless to a maker and becomes an invention
@@ -118,8 +123,8 @@ ${strategy || "(none on file)"}
 BUYER LANGUAGE, OBJECTIONS AND FEARS — speak to these, in their words
 ${voice || "(none on file)"}
 
-PROOF ON FILE — the only proof this piece may reference
-${proof || "None. The piece must work without a proof claim; say so in the brief."}
+PROOF CLEARED FOR USE — the only proof this piece may reference, cited by its reference
+${proof}
 
 ${identityWriterBlock(identity)}
 
