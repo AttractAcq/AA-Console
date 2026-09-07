@@ -253,6 +253,7 @@ export type Database = {
           name: string
           paused: boolean
           requires_upstream: string[]
+          requires_input: boolean
           scheduled_only: boolean
           updated_at: string
         }
@@ -268,6 +269,7 @@ export type Database = {
           name: string
           paused?: boolean
           requires_upstream?: string[]
+          requires_input?: boolean
           scheduled_only?: boolean
           updated_at?: string
         }
@@ -283,6 +285,7 @@ export type Database = {
           name?: string
           paused?: boolean
           requires_upstream?: string[]
+          requires_input?: boolean
           scheduled_only?: boolean
           updated_at?: string
         }

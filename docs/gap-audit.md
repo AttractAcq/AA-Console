@@ -119,12 +119,20 @@ it up, because they read the same one. Blocked behind gap 1.
 
 ### 7. Smaller things
 
-- **`brief` is excluded from master runs by a string match**, and it is
-  load-bearing rather than redundant. `start_master_run` carries both
-  `agent_key <> 'brief'` and the newer `scheduled_only = false` filter — but
-  `brief.scheduled_only` is **false**, so deleting the string would start
-  including `brief` in every master run. The fix is two steps in one migration:
-  set the flag, then drop the string.
+- ~~**`brief` is excluded from master runs by a string match.**~~ **Closed, and
+  it was hiding a live bug.** The string was load-bearing rather than
+  redundant — `brief.scheduled_only` is false, so it was the only thing
+  excluding it. It also only ever covered `brief`: `creative_build` and
+  `landing_page` have the same shape and *were* being queued by every master
+  run, failing on their first line ("No render to produce.", "it has no page to
+  work on"). So "Run All Agents" produced two guaranteed failures every time.
+
+  `scheduled_only` was the wrong flag to reuse — it means "driven by a schedule
+  rather than by a person", which is true of `metrics_ingest` and
+  `brief_dispatch` and false of all three of these. They now carry
+  `requires_input`, which says the actual reason: they act on a row a person
+  chose, and a master run has none to pass. Eleven agents are queued by a
+  master run now, down from thirteen.
 - **Brand CSS is stored and unused.** `client_brand_profiles.custom_css` exists
   and the page says so plainly, but nothing renders a generated page as HTML —
   `client_pages.body` is markdown shown as plain text in both the admin panel
@@ -271,6 +279,7 @@ credential does not silently start billing API calls.
 | The console was not deployed anywhere | GitHub Pages, custom domain, HTTPS enforced | Live at `console.attractacq.com`; deep links serve the app via a 404.html fallback; icons and manifest serve |
 | A frontend commit restarted the agent worker | A Railway watch path of `/agent-runtime/**` | Railway's own log: the runtime commit deployed, the next docs commit shows SKIPPED — "No changes to watched files" |
 | OpenAI unproven end to end | A real two-stage build | A publishable asset in 78s for $0.115, with the client's real identity composited rather than invented |
+| Master runs queued agents that could not succeed | A `requires_input` flag replacing a string match | `creative_build` and `landing_page` were queued by every master run and failed immediately; 13 agents queued became 11. The rewritten `start_master_run` was diffed against the live definition on staging — access check, paused, archived, dedupe, the empty guard, `SECURITY DEFINER` and `search_path` all confirmed intact |
 | A job could run past any stated bound | A deadline computed in `dispatchJob` and enforced between turns | Four mutations: never checking the deadline, dropping the per-request abort, an unbounded deadline, and forgetting to pass one. The third passed all 118 tests on the first attempt — the dispatch wiring had no test until it did |
 | Every build invented its own look | `client_brand_profiles`, fed to concept and render on the identity pattern | The render block printed from Harbour Dental's real row quotes `exactly #0F4C5C`; a client with no profile gets "No brand palette is on file" instead of silence. Four mutations — a hex as a suggestion, an empty row counting as a brand, dropping the hex guard, saving blanks as empty strings — each failed the tests that name them |
 

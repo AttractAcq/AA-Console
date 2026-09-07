@@ -229,7 +229,7 @@ export function ClientDashboardPanel() {
         open={masterOpen}
         onClose={() => setMasterOpen(false)}
         title="Run all agents"
-        body="Queues every agent for this client at once. They run in dependency order — each one waits until the agents it depends on have finished, so nothing has to be sequenced by hand. Anything already queued or running is skipped. This costs roughly $3 in model usage."
+        body="Queues this client's intelligence and strategy agents at once. They run in dependency order — each one waits until the agents it depends on have finished, so nothing has to be sequenced by hand. Anything already queued or running is skipped, as are the agents that act on a specific brief, render or page, which a master run has nothing to hand them. This costs roughly $3 in model usage."
         confirmLabel="Queue all"
         onConfirm={async () => {
           if (!clientId) throw new Error("No client selected.");
