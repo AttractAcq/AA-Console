@@ -40,6 +40,12 @@ export interface RuntimeConfig {
   consoleUrl: string;
 }
 
+// The one origin this system is served from. Both the CORS allow-list and
+// the links in outbound email fall back to it, so a deployment that sets
+// neither still points at the real console rather than at a developer's
+// laptop. Override either with its own variable for a different environment.
+const CONSOLE_ORIGIN = "https://console.attractacq.com";
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value || value.trim().length === 0) {
@@ -131,10 +137,15 @@ export function loadConfig(): RuntimeConfig {
     masterAiDailyLimitUsd: moneyEnv("MASTER_AI_DAILY_LIMIT_USD", 20),
     masterAiConversationLimitUsd: moneyEnv("MASTER_AI_CONVERSATION_LIMIT_USD", 5),
     // The Master AI is called from the browser, so the origin list is a
-    // real control rather than a formality. Defaults to local dev only:
-    // a deployment that forgets to set this cannot be reached from a
-    // hosted front end, which is the failure we want.
-    allowedOrigins: (optionalEnv("MASTER_AI_ALLOWED_ORIGINS") ?? "http://localhost:5173")
+    // real control rather than a formality.
+    //
+    // This used to default to http://localhost:5173, on the reasoning that a
+    // deployment which forgot to set it should be unreachable from a hosted
+    // front end. That was right while no hosted front end existed. Now there
+    // is exactly one, and defaulting to localhost means the failure mode is
+    // a console that silently cannot talk to its own runtime — while still
+    // trusting an origin nobody serves from any more.
+    allowedOrigins: (optionalEnv("MASTER_AI_ALLOWED_ORIGINS") ?? CONSOLE_ORIGIN)
       .split(",")
       .map((origin) => origin.trim())
       .filter(Boolean),
@@ -157,7 +168,10 @@ export function loadConfig(): RuntimeConfig {
     conceptModel: optionalEnv("CREATIVE_CONCEPT_MODEL") ?? "gpt-5.6-sol",
     resendApiKey: optionalEnv("RESEND_API_KEY") ?? null,
     resendFrom: optionalEnv("RESEND_FROM") ?? "AA Console <briefs@attractacq.com>",
-    consoleUrl: (optionalEnv("CONSOLE_URL") ?? "http://localhost:5173").replace(/\/+$/, ""),
+    // A brief email reaches a real person. An unset CONSOLE_URL used to put
+    // http://localhost:5173 in front of them, which is a dead link on every
+    // machine but the one that sent it.
+    consoleUrl: (optionalEnv("CONSOLE_URL") ?? CONSOLE_ORIGIN).replace(/\/+$/, ""),
   };
 }
 

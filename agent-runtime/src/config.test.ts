@@ -12,7 +12,7 @@ let savedEnv: NodeJS.ProcessEnv;
 beforeEach(() => {
   savedEnv = { ...process.env };
   for (const key of Object.keys(process.env)) {
-    if (key.startsWith("AGENT_RUNTIME_") || key.startsWith("MASTER_AI_") || key.startsWith("ANTHROPIC_API_KEY") || key === "SUPABASE_URL" || key === "SUPABASE_SERVICE_ROLE_KEY" || key === "PORT") {
+    if (key.startsWith("AGENT_RUNTIME_") || key.startsWith("MASTER_AI_") || key === "CONSOLE_URL" || key.startsWith("ANTHROPIC_API_KEY") || key === "SUPABASE_URL" || key === "SUPABASE_SERVICE_ROLE_KEY" || key === "PORT") {
       delete process.env[key];
     }
   }
@@ -97,5 +97,39 @@ describe("Master AI spend limits", () => {
   it("refuses to boot on a limit that is not a number", () => {
     process.env.MASTER_AI_DAILY_LIMIT_USD = "twenty";
     expect(() => loadConfig()).toThrow(/non-negative/);
+  });
+});
+
+describe("the console origin", () => {
+  // A brief email reaches a real inbox, and a localhost link is dead on
+  // every machine but the one that sent it.
+  it("links outbound email at the real console when CONSOLE_URL is unset", () => {
+    expect(loadConfig().consoleUrl).toBe("https://console.attractacq.com");
+  });
+
+  it("trusts the deployed console origin when the allow-list is unset", () => {
+    expect(loadConfig().allowedOrigins).toEqual(["https://console.attractacq.com"]);
+  });
+
+  it("still lets an environment override both", () => {
+    process.env.CONSOLE_URL = "https://staging.example.com";
+    process.env.MASTER_AI_ALLOWED_ORIGINS = "https://staging.example.com";
+    const config = loadConfig();
+    expect(config.consoleUrl).toBe("https://staging.example.com");
+    expect(config.allowedOrigins).toEqual(["https://staging.example.com"]);
+  });
+
+  it("takes several origins, trimmed", () => {
+    process.env.MASTER_AI_ALLOWED_ORIGINS = "https://a.example.com , https://b.example.com";
+    expect(loadConfig().allowedOrigins).toEqual([
+      "https://a.example.com",
+      "https://b.example.com",
+    ]);
+  });
+
+  // A trailing slash makes every generated link a double slash.
+  it("strips a trailing slash from the console url", () => {
+    process.env.CONSOLE_URL = "https://console.attractacq.com/";
+    expect(loadConfig().consoleUrl).toBe("https://console.attractacq.com");
   });
 });
