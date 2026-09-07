@@ -29,17 +29,25 @@ The biggest tool, and the one with the most already standing.
 | Module | State | What exists / what is missing |
 |---|---|---|
 | Ideation | **Built** | `client_ideas` (51 rows), ideation agent, Ideation → Generation. Has idea bank, status, selection, metadata |
-| Brief Studio | **Partial** | `client_briefs` + brief agent produce a title and a markdown body. The structured brief — hook, premise, argument, proof, script, visual direction, **shot requirements, B-roll, channel intent** — is not modelled as fields |
+| Brief Studio | **Built** | Twelve fields on `client_briefs`; the agent emits them and the readable body is composed from them, so prose and structure cannot drift. Video-only fields are absent on stills rather than blank. Proved live: HD-0016 came back with a real hook, shot list and B-roll, and stated "no proof point is used, deliberately" rather than inventing one |
 | Production Router | **Partial** | `ApproveAndBuildModal` routes AI vs human, editor vs avatar. Missing: **AI video**, **client-created**, **AA internal**, and any *recommendation* of a method |
 | Work Assignment | **Partial** | `brief_dispatches`, `job_assignments`. Missing the state machine: assigned → accepted → in production → submitted → revisions → approved |
 | Asset Intake | **Partial** | `client_media_assets` takes uploads and generated output. No raw-footage / thumbnail / audio distinction |
 | Repurposing Engine | **Missing** | Nothing. One root asset cannot yet produce reel / short / carousel / quote graphic / email / ad variant |
 | Approval System | **Built** | `client_asset_reviews` with mandatory reasons, Approvals page, decision history on the asset |
 | Distribution Engine | **Partial** | `scheduled_posts` schedules. **Nothing actually posts** — there is no publish step to any platform |
-| Performance Layer | **Stub** | `metrics_daily` exists with 0 rows; blocked on Meta. Nothing attaches performance back to *the asset or the idea* |
+| Performance Layer | **Stub, but the plumbing is there** | `metrics_daily` has 0 rows, blocked on Meta. The chain back to the idea *does* exist and traverses: `metrics_daily.post_id → scheduled_posts.asset_id → client_media_assets.brief_id → client_briefs.source_idea_id`. Verified on real data — HD-0015 walks all four hops. What is missing is data, and anything that reads it |
 | Iteration Engine | **Missing** | Nothing learns. This is the module that makes the loop compound |
 
-**The two that matter most and do not exist: Repurposing and Iteration.**
+**Repurposing and Iteration remain the two that do not exist.** Brief Studio was
+built first because the Iteration Engine learns against `hook` and
+`call_to_action`, and those had to become fields before anything could learn
+from them.
+
+**One thing to know about assets created outside the pipeline.** HD-0001 and
+HD-0002 are uploads with no `brief_id`, so they fall out of the chain above by
+construction. Attribution will always be partial for anything not produced
+through a brief.
 
 ## 2. Conversion Site Builder — *Stub*
 
