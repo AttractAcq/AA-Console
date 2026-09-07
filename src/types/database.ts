@@ -1455,6 +1455,10 @@ export type Database = {
           job_id: string | null
           page_type: Database["public"]["Enums"]["page_type"]
           published_url: string | null
+          html: string | null
+          meta_title: string | null
+          meta_description: string | null
+          built_at: string | null
           status: Database["public"]["Enums"]["record_status"]
           thumbnail_path: string | null
           title: string
@@ -1470,6 +1474,10 @@ export type Database = {
           job_id?: string | null
           page_type: Database["public"]["Enums"]["page_type"]
           published_url?: string | null
+          html?: string | null
+          meta_title?: string | null
+          meta_description?: string | null
+          built_at?: string | null
           status?: Database["public"]["Enums"]["record_status"]
           thumbnail_path?: string | null
           title: string
@@ -1485,6 +1493,10 @@ export type Database = {
           job_id?: string | null
           page_type?: Database["public"]["Enums"]["page_type"]
           published_url?: string | null
+          html?: string | null
+          meta_title?: string | null
+          meta_description?: string | null
+          built_at?: string | null
           status?: Database["public"]["Enums"]["record_status"]
           thumbnail_path?: string | null
           title?: string

@@ -9,6 +9,7 @@ import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
+import { PagePreview } from "../../components/pages/PagePreview";
 
 type Page = {
   id: string;
@@ -17,6 +18,10 @@ type Page = {
   body: string | null;
   published_url: string | null;
   created_at: string;
+  html: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  built_at: string | null;
 };
 
 const FIELDS: FieldDef[] = [
@@ -42,7 +47,9 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
     if (!clientId) return;
     const { data } = await supabase
       .from("client_pages")
-      .select("id, title, status, body, published_url, created_at")
+      .select(
+        "id, title, status, body, published_url, created_at, html, meta_title, meta_description, built_at",
+      )
       .eq("client_id", clientId)
       .eq("page_type", pageType)
       .order("created_at", { ascending: false });
@@ -81,23 +88,28 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {pages.map((p) => (
             <Panel key={p.id} title={p.title}>
-              <p className="text-sm capitalize text-muted-foreground">{p.status}</p>
-              {p.body ? (
+              <p className="text-sm capitalize text-muted-foreground">
+                {p.status}
+                {p.published_url ? " · live" : p.html ? " · built, not published" : ""}
+              </p>
+              {p.html ? (
                 <>
-                  <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm text-muted-foreground">
-                    {p.body}
-                  </p>
+                  {p.meta_description && (
+                    <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+                      {p.meta_description}
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={() => setOpenId(p.id)}
                     className="mt-2 rounded text-sm font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    Read full page
+                    Open the page
                   </button>
                 </>
               ) : (
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Waiting for the agent to write this.
+                  Waiting for the agent to build this.
                 </p>
               )}
               {p.published_url && (
@@ -153,7 +165,7 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
           <div
             role="dialog"
             aria-modal="true"
-            className="relative flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg"
+            className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg"
           >
             <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
               <h2 className="text-base font-semibold text-card-foreground">{open.title}</h2>
@@ -166,7 +178,12 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-              <p className="whitespace-pre-wrap text-sm text-muted-foreground">{open.body}</p>
+              <PagePreview
+                html={open.html}
+                publishedUrl={open.published_url}
+                builtAt={open.built_at}
+                title={open.title}
+              />
             </div>
           </div>
         </div>

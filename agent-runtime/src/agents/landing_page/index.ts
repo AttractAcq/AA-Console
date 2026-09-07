@@ -18,11 +18,39 @@ import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js";
 import type { BusinessContext } from "../shared.js";
+import { loadPagePackage, renderPackage } from "./aggregate.js";
 
 const PAGE_KIND: Record<string, string> = {
   landing: "a primary landing page — the main page traffic is sent to, carrying the core offer",
   offer: "a secondary offer page — a focused page for one specific offer, usually reached from elsewhere",
 };
+
+/**
+ * Why this page cannot be accepted, or null if it can.
+ *
+ * Extracted so it is testable. The script check in particular was written
+ * inline and could be deleted without a single test failing — which is a poor
+ * place for a rule whose whole job is to stop model output reaching a frame in
+ * the agency's own console. The preview sandbox is the last line; this is the
+ * one that should mean the sandbox is never tested in anger.
+ */
+export function pageProblem(headline: string, html: string): string | null {
+  if (!headline) return "The page came back with no headline.";
+  if (html.length < 800) return "The page came back too thin to be usable.";
+  if (/<script\b/i.test(html)) {
+    return "The page came back containing a <script>, which is not allowed on a generated page.";
+  }
+  // An inline handler is script by another name, and would run in any context
+  // that ever renders this without a sandbox — an email, a deploy, a preview
+  // written later by someone who did not read this file.
+  if (/\son[a-z]+\s*=/i.test(html)) {
+    return "The page came back with an inline event handler, which is script by another name.";
+  }
+  if (/<iframe\b/i.test(html)) {
+    return "The page came back containing an iframe, which is not allowed on a generated page.";
+  }
+  return null;
+}
 
 export async function runLandingPageJob(
   sb: SupabaseClient,
@@ -59,6 +87,13 @@ export async function runLandingPageJob(
     };
   }
 
+  const { data: clientRow } = await sb
+    .from("clients")
+    .select("name")
+    .eq("id", job.client_id)
+    .maybeSingle();
+  const clientName = (clientRow?.name as string | undefined) ?? "this business";
+
   const [{ data: context }, records] = await Promise.all([
     sb
       .from("client_business_context")
@@ -79,17 +114,19 @@ export async function runLandingPageJob(
     };
   }
 
-  // Only proof actually on file may be referenced — a landing page is the
-  // single worst place to invent a claim, because it is the page a
-  // regulator or a disappointed customer reads back to you.
-  const { data: proofRows } = await sb
-    .from("client_proof_assets")
-    .select("title, body, source")
-    .eq("client_id", job.client_id)
-    .limit(20);
-  const proof = (proofRows ?? [])
-    .map((p) => `- ${p.title ?? "Untitled"}${p.source ? ` (${p.source})` : ""}: ${p.body ?? "[file]"}`)
-    .join("\n");
+  // Everything the business knows, gathered behind one button. A landing page
+  // is the single worst place to invent a claim, because it is the page a
+  // regulator or a disappointed customer reads back to you — so identity and
+  // proof arrive with the same discipline the creative stages use.
+  const [pkg, { data: brandRow }] = await Promise.all([
+    loadPagePackage(sb, job.client_id, clientName),
+    sb
+      .from("client_brand_profiles")
+      .select("custom_css")
+      .eq("client_id", job.client_id)
+      .maybeSingle(),
+  ]);
+  const packageBlock = renderPackage(pkg, (brandRow?.custom_css as string | null) ?? null);
 
   const submitTool = {
     name: "submit_page",
@@ -101,13 +138,15 @@ export async function runLandingPageJob(
         headline: { type: "string", description: "The main headline a visitor reads first." },
         subheadline: { type: "string", description: "The line under the headline." },
         primary_cta: { type: "string", description: "The primary call to action button text." },
-        body: {
+        meta_title: { type: "string", description: "What a browser tab and a search result show. Under 60 characters." },
+        meta_description: { type: "string", description: "The search-result snippet. Under 155 characters, written to earn the click." },
+        html: {
           type: "string",
           description:
-            "The full page copy in markdown, in reading order, with a heading per section. Include the sections the brief and the offer call for.",
+            "The complete page as a single self-contained HTML document: <!doctype html> through </html>, with all CSS in one <style> block in the head. No external stylesheets, no frameworks, no <script>. Responsive down to 360px.",
         },
       },
-      required: ["title", "headline", "subheadline", "primary_cta", "body"],
+      required: ["title", "headline", "subheadline", "primary_cta", "meta_title", "meta_description", "html"],
       additionalProperties: false,
     },
   };
@@ -128,7 +167,15 @@ ABSOLUTE RULES
 - Only reference proof you were actually given. If there is none, write a page that works without a proof claim and say so at the end of your body under a "Gaps" heading — do not invent a statistic, a testimonial, a customer, a guarantee or a credential. This is the page a regulator or a disappointed customer reads back to you.
 - Respect anything the offer strategy lists as a limit or a thing that cannot be promised. Those are hard constraints, not preferences.
 - Match the brand voice you are given. If it says never to say something, never say it.
-- Write in the buyer's language, taken from the ICP, not in marketing register.`;
+- Write in the buyer's language, taken from the ICP, not in marketing register.
+
+BUILDING THE PAGE
+You return one self-contained HTML document. All styling goes in a single <style> block in the head.
+- No external stylesheets, no CDN, no framework, no web fonts fetched over the network. A page that cannot render offline is a page that renders differently for the client than for you.
+- No <script> of any kind. This page is previewed inside the agency's own console; a page that executes is a page that can act on whoever opens it.
+- No tracking pixels, no analytics, no iframes, no external images. Use CSS for anything decorative. If a photograph is genuinely needed, leave a clearly marked empty block with a note saying what belongs there.
+- Responsive to 360px without horizontal scrolling. Real headings in order, one <h1>, buttons that are buttons or links, alt text on anything that needs it.
+- Every contact detail and every proof claim comes from what you were given, verbatim. This is a page a regulator or a disappointed customer reads back to you.`;
 
   const prompt = `Write ${kind}.
 
@@ -144,8 +191,7 @@ ${renderUpstream(offer)}
 ICP AND BRAND STRATEGY — who is reading, and the voice to hold
 ${renderUpstream(records.filter((r) => r.domain !== "offer_strategy"))}
 
-PROOF ON FILE — the only proof this page may reference
-${proof || "None. Write a page that works without a proof claim, and note that gap at the end."}
+${packageBlock}
 
 Call ${submitTool.name} once when you are done.`;
 
@@ -189,33 +235,29 @@ Call ${submitTool.name} once when you are done.`;
 
   const s = (key: string) => String(result.submitted[key] ?? "").trim();
   const headline = s("headline");
-  const body = s("body");
+  const html = s("html");
 
-  if (!headline || body.length < 300) {
-    return {
-      ok: false,
-      retryable: true,
-      failureMessage: "The page came back too thin to be usable.",
-      usage,
-    };
+  const problem = pageProblem(headline, html);
+  if (problem) {
+    return { ok: false, retryable: true, failureMessage: problem, usage };
   }
 
-  // client_pages stores one body, so the headline block is composed into
-  // it rather than spread across columns the UI would have to reassemble.
-  const composed = [
-    `# ${headline}`,
-    s("subheadline"),
-    "",
-    body,
-    "",
-    `**Call to action:** ${s("primary_cta")}`,
-  ]
+  // body keeps a readable summary so a page is legible without rendering it.
+  const summary = [`# ${headline}`, s("subheadline"), "", `**Call to action:** ${s("primary_cta")}`]
     .filter(Boolean)
     .join("\n\n");
 
   const { error } = await sb
     .from("client_pages")
-    .update({ title: s("title") || page.title, body: composed, job_id: job.id })
+    .update({
+      title: s("title") || page.title,
+      html,
+      meta_title: s("meta_title") || null,
+      meta_description: s("meta_description") || null,
+      body: summary,
+      built_at: new Date().toISOString(),
+      job_id: job.id,
+    })
     .eq("id", page.id);
   if (error) throw new Error(`Failed to write page: ${error.message}`);
 

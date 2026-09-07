@@ -54,19 +54,33 @@ HD-0002 are uploads with no `brief_id`, so they fall out of the chain above by
 construction. Attribution will always be partial for anything not produced
 through a brief.
 
-## 2. Conversion Site Builder — *Stub*
+## 2. Conversion Site Builder — *Built to the console's actual job*
 
-`client_pages` (2 rows), a `landing_page` agent, and a Conversion page with
-landing and offer tabs.
+Scoped deliberately. The console is not a website builder: its job is to
+**aggregate everything the business knows, hand it to an agent behind one
+button, and show what came back**. The agent writes the page.
 
-The shortfall is structural, not cosmetic: **a page is one markdown blob in
-`client_pages.body`**. The tool requires every section to be structured data —
-hero, problem, proof, mechanism, offer, testimonials, FAQ, CTA — precisely so a
-bot can change one component later. A blob cannot be edited by a bot.
+So `Build Page` now gathers business context, offer strategy, ICP, brand
+strategy, **the brand profile including its palette, typefaces and the client's
+own custom CSS**, the real contact identity, and **only cleared proof** — then
+the agent returns one self-contained HTML document. This is the first consumer
+of `client_brand_profiles.custom_css`, which had been stored and read by
+nothing.
 
-Also missing: the select-client → offer → avatar → page-type flow; page types
-beyond landing and offer (lead-gen, application, lead magnet, booking,
-microsite); QA; **deploy**; and tracking.
+The Conversion tab shows the rendered page, the code behind it, a mobile width,
+and a clickable link to where it is live.
+
+**Three defences against generated script, because the preview renders model
+output inside a console holding an admin session against every client's data:**
+the agent is told never to emit script; the runtime rejects a page containing a
+`<script>`, an inline event handler or an `<iframe>`; and the preview frame is
+`sandbox=""` with `srcDoc` — no `allow-scripts`, no `allow-same-origin`. The
+third is the only one that holds if the first two are wrong.
+
+Still open: deploying a page anywhere (`published_url` is set by hand), page
+types beyond landing and offer, and section-level editing. A page is one
+document, so changing the hero means rebuilding it — which is the trade this
+scoping accepts, since the bot regenerates rather than edits.
 
 ## 3. Sales Agent Builder — *Missing entirely*
 
