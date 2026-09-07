@@ -22,7 +22,7 @@ Measured 7 September 2026: 45 tables, 16 agents, 25 admin nav entries.
 
 ---
 
-## 1. Content Production OS — *Partial, and the furthest along*
+## 1. Content Production OS — *Partial, and much further along*
 
 The biggest tool, and the one with the most already standing.
 
@@ -33,16 +33,21 @@ The biggest tool, and the one with the most already standing.
 | Production Router | **Partial** | `ApproveAndBuildModal` routes AI vs human, editor vs avatar. Missing: **AI video**, **client-created**, **AA internal**, and any *recommendation* of a method |
 | Work Assignment | **Partial** | `brief_dispatches`, `job_assignments`. Missing the state machine: assigned → accepted → in production → submitted → revisions → approved |
 | Asset Intake | **Partial** | `client_media_assets` takes uploads and generated output. No raw-footage / thumbnail / audio distinction |
-| Repurposing Engine | **Missing** | Nothing. One root asset cannot yet produce reel / short / carousel / quote graphic / email / ad variant |
+| Repurposing Engine | **Built** | Eight formats; each produces a derivative *brief* rather than a fake file, since AA cannot cut video. Proved live: HD-0015 became a reel brief with a shot list and a text-post brief without one, and the two hooks were written differently for their formats rather than translated |
 | Approval System | **Built** | `client_asset_reviews` with mandatory reasons, Approvals page, decision history on the asset |
 | Distribution Engine | **Partial** | `scheduled_posts` schedules. **Nothing actually posts** — there is no publish step to any platform |
 | Performance Layer | **Stub, but the plumbing is there** | `metrics_daily` has 0 rows, blocked on Meta. The chain back to the idea *does* exist and traverses: `metrics_daily.post_id → scheduled_posts.asset_id → client_media_assets.brief_id → client_briefs.source_idea_id`. Verified on real data — HD-0015 walks all four hops. What is missing is data, and anything that reads it |
 | Iteration Engine | **Missing** | Nothing learns. This is the module that makes the loop compound |
 
-**Repurposing and Iteration remain the two that do not exist.** Brief Studio was
-built first because the Iteration Engine learns against `hook` and
-`call_to_action`, and those had to become fields before anything could learn
-from them.
+**The Iteration Engine is now the only module of this tool that does not
+exist.** Brief Studio came first because Iteration learns against `hook` and
+`call_to_action`; Repurposing came second because a derivative is written from
+those same two fields. Iteration itself is blocked on metrics, not on design —
+the chain it would read already traverses.
+
+Repurposing also widened attribution rather than complicating it: a derivative
+brief records `derived_from_asset_id`, so a reel's performance can be traced to
+the static ad it came from as well as to the idea underneath both.
 
 **One thing to know about assets created outside the pipeline.** HD-0001 and
 HD-0002 are uploads with no `brief_id`, so they fall out of the chain above by
