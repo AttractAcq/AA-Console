@@ -89,6 +89,12 @@ describe("BrandPanel — saving", () => {
     show(FULL);
     await screen.findByText(/3\/5 colours set/);
     await user.click(screen.getByRole("button", { name: /Edit brand/ }));
+    // Wait for the modal to be mounted AND populated before touching it.
+    // Clicking Save straight after the open click raced on a slower runner:
+    // it passed here every time and failed in CI, which is the kind of
+    // difference a fixed wait hides rather than fixes.
+    await screen.findByText(/Leave a field blank/i);
+    await screen.findByDisplayValue("#0064EB");
     return user;
   }
 
@@ -109,7 +115,14 @@ describe("BrandPanel — saving", () => {
     const user = await openEditor();
     await user.click(screen.getByRole("button", { name: /^Save$/ }));
 
-    await waitFor(() => expect(upsert).toHaveBeenCalledOnce());
+    // Surface any visible error first: "upsert was not called" on its own
+    // says nothing about why, which is exactly what made the CI failure hard
+    // to read.
+    await waitFor(() => {
+      const shown = screen.queryByRole("alert")?.textContent;
+      expect(shown ?? "no error shown").toBe("no error shown");
+      expect(upsert).toHaveBeenCalledOnce();
+    });
     const [payload, opts] = upsert.mock.calls[0];
     expect(opts).toEqual({ onConflict: "client_id" });
     expect(payload).toMatchObject({
