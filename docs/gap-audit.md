@@ -294,9 +294,9 @@ The same two keys. Nothing else is needed while the console runs locally:
 `CONSOLE_URL` and `MASTER_AI_ALLOWED_ORIGINS` both default to
 `http://localhost:5173`.
 
-**The console is now deployed** to `console.attractacq.com` from
+**The console is live** at https://console.attractacq.com, deployed from
 `.github/workflows/deploy.yml` (GitHub Pages), so these are required, not
-optional:
+optional — and both are now set:
 
 ```
 CONSOLE_URL=https://console.attractacq.com
@@ -322,8 +322,21 @@ cannot authenticate against.
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Yes | Safe to ship — RLS decides what it can see |
 | `VITE_AGENT_RUNTIME_URL` | For the Master AI | Absent means the chat reports itself unconfigured rather than failing |
 
-Also needed once, outside the repo: **Settings → Pages → Source: GitHub
-Actions**, and a DNS `CNAME` for `console` pointing at `attractacq.github.io`.
+All three secrets are set, and so is the DNS. Two things that cost time and
+are worth recording:
+
+- **GoDaddy already had an `A` record for `console`** pointing at a parking
+  IP, and GitHub rejected it with `InvalidARecordError`. DNS forbids an A
+  record and a CNAME on the same name, so the A had to be deleted before the
+  `CNAME console → attractacq.github.io` could be added. The apex and the
+  `alex`, `portal` and `studio` records were left untouched.
+- **The runtime had no public URL at all.** Railway had it on private
+  networking only — "Unexposed service" — which is why there was nothing to
+  put in `VITE_AGENT_RUNTIME_URL`. It is now
+  `https://aa-console-production.up.railway.app`, and CORS was verified in
+  both directions: the console origin gets an
+  `access-control-allow-origin` header back, and an unlisted origin gets none.
+
 `public/CNAME` pins the domain into the build artifact so a deploy cannot
 quietly drop it.
 
