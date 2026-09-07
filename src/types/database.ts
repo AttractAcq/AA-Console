@@ -858,6 +858,8 @@ export type Database = {
           b_roll: string | null
           body: string | null
           brief_ref: string | null
+          derived_from_asset_id: string | null
+          repurpose_format: string | null
           call_to_action: string | null
           channel_intent: string | null
           client_id: string
@@ -883,6 +885,8 @@ export type Database = {
           b_roll?: string | null
           body?: string | null
           brief_ref?: string | null
+          derived_from_asset_id?: string | null
+          repurpose_format?: string | null
           call_to_action?: string | null
           channel_intent?: string | null
           client_id: string
@@ -908,6 +912,8 @@ export type Database = {
           b_roll?: string | null
           body?: string | null
           brief_ref?: string | null
+          derived_from_asset_id?: string | null
+          repurpose_format?: string | null
           call_to_action?: string | null
           channel_intent?: string | null
           client_id?: string
@@ -2948,6 +2954,10 @@ export type Database = {
       }
       rerender_generation: {
         Args: { p_generation_id: string; p_quality?: string; p_size?: string }
+        Returns: string
+      }
+      repurpose_asset: {
+        Args: { p_asset_id: string; p_formats: string[] }
         Returns: string
       }
       review_media_asset: {

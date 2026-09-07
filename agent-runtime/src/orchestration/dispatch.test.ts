@@ -34,3 +34,13 @@ describe("dispatch registry", () => {
     }
   });
 });
+
+describe("the repurpose agent is wired in", () => {
+  it("has a runner, so a queued repurpose can execute", () => {
+    expect(hasRunner("repurpose")).toBe(true);
+  });
+
+  it("is in the registered set the worker claims from", () => {
+    expect(registeredAgentKeys()).toContain("repurpose");
+  });
+});

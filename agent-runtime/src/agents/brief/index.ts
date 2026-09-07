@@ -18,6 +18,7 @@ import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords } from "../shared.js";
 import { briefSubmitTool, composeBody, briefColumns, fieldsFor } from "./fields.js";
+import { loadIdentity, identityWriterBlock } from "../identity.js";
 
 export async function runBriefJob(
   sb: SupabaseClient,
@@ -69,6 +70,20 @@ export async function runBriefJob(
     .map((p) => `- ${p.title ?? "Untitled"}${p.source ? ` (${p.source})` : ""}: ${p.body ?? "[file]"}`)
     .join("\n");
 
+  // The real, checkable details. Without these the agent writes
+  // "[NAMED PERSON]", which is harmless to a maker and becomes an invention
+  // when the creative stages read this brief's body.
+  const { data: client } = await sb
+    .from("clients")
+    .select("name")
+    .eq("id", job.client_id)
+    .maybeSingle();
+  const identity = await loadIdentity(
+    sb,
+    job.client_id,
+    (client?.name as string | undefined) ?? "this business",
+  );
+
   const submitTool = briefSubmitTool(idea.media_type);
 
   const system = `You work for Attract Acquisition, a marketing agency. You write production briefs.
@@ -105,6 +120,8 @@ ${voice || "(none on file)"}
 
 PROOF ON FILE — the only proof this piece may reference
 ${proof || "None. The piece must work without a proof claim; say so in the brief."}
+
+${identityWriterBlock(identity)}
 
 THE FIELDS
 ${fieldsFor(idea.media_type).map(([name, description]) => `- ${name}: ${description}`).join("\n")}

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Bot, ExternalLink, FileText, User } from "lucide-react";
+import { Bot, ExternalLink, FileText, Repeat, User } from "lucide-react";
 import { REVIEW_TONE, shortDate } from "../lib/media";
 import type { MediaAsset } from "../lib/media";
 import { StatusBadge } from "./MediaCard";
 import { supabase } from "../lib/supabase";
 import { cn } from "../lib/cn";
+import { RepurposeModal } from "./RepurposeModal";
 
 type Review = {
   id: string;
@@ -46,6 +47,8 @@ export function MediaDetailModal({
   onClose: () => void;
 }) {
   const [provenance, setProvenance] = useState<Provenance | null>(null);
+  const [repurposeOpen, setRepurposeOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
 
   const load = useCallback(async () => {
@@ -248,11 +251,33 @@ export function MediaDetailModal({
           )}
         </div>
 
-        {url && (
-          <footer className="flex shrink-0 justify-end border-t border-border px-5 py-3">
+        {notice && (
+          <p role="status" className="border-t border-border px-5 py-2 text-sm text-brand-strong">
+            {notice}
+          </p>
+        )}
+
+        {(url || asset.review_status === "approved") && (
+          <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-3">
+            {/* Approved only: the RPC refuses anything else, and offering a
+                control that will be refused is worse than not offering it. */}
+            {asset.review_status === "approved" && (
+              <button
+                type="button"
+                onClick={() => setRepurposeOpen(true)}
+                className={cn(
+                  "mr-auto inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium",
+                  "text-brand-strong hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                )}
+              >
+                <Repeat className="h-4 w-4" aria-hidden="true" />
+                Repurpose
+              </button>
+            )}
             {/* The bucket is private, so this is a signed URL and it expires.
                 Opening a tab is honest about that; a "download" button that
                 dies in an hour is not. */}
+            {url && (
             <a
               href={url}
               target="_blank"
@@ -265,8 +290,19 @@ export function MediaDetailModal({
               <ExternalLink className="h-4 w-4" aria-hidden="true" />
               Open the full file
             </a>
+            )}
           </footer>
         )}
+
+        <RepurposeModal
+          assetId={asset.id}
+          assetTitle={asset.title ?? "this asset"}
+          open={repurposeOpen}
+          onClose={() => setRepurposeOpen(false)}
+          onQueued={() =>
+            setNotice("Queued. The briefs appear under Ideation → Briefs as the agent writes them.")
+          }
+        />
       </div>
     </div>
   );
