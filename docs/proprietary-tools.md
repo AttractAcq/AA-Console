@@ -129,9 +129,26 @@ the same piece. The brief view shows the backing claim and warns when a proof
 has since lost its clearance, since a brief can outlive the permission that
 justified it.
 
-**What is left is data entry, not code.** Both live records need a claim, an
-avatar and a rights decision. Still deferred: several evidence files per proof,
-since the table holds one `storage_path`.
+**Proof Finder** closes the other half: an agent that searches the web for the
+proof a business has already published — reviews and ratings, directory
+listings, press, awards, registrations, case studies — and files each find as a
+structured record.
+
+Built as a native agent rather than as instructions for a bot to follow,
+because the runtime already carries web search and an agent writing structured
+records lands the result in the shape the rest of the system queries. A bot
+following instructions produces prose somebody then retypes.
+
+Two rules shape it. **Nothing without a URL is filed** — a claim nobody can
+open looks like evidence and is worse than nothing. And **nothing a machine
+found is ever cleared**: finding a review is not permission to advertise with
+it, and the agent cannot know whether a customer agreed to be quoted. Both are
+enforced in code and both are tested, after mutation testing showed the
+clearing rule could be flipped without a single test failing.
+
+**What is left is data entry, not code.** Both original records need a claim,
+an avatar and a rights decision. Still deferred: several evidence files per
+proof, since the table holds one `storage_path`.
 
 ## 7. Attribution & Reporting OS — *Stub*
 

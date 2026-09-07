@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { fetchProofAssets, signPaths, useParams } = vi.hoisted(() => ({
@@ -12,7 +13,11 @@ vi.mock("../../lib/media", async () => {
   return { ...actual, fetchProofAssets, signPaths };
 });
 vi.mock("react-router-dom", () => ({ useParams }));
-vi.mock("../../lib/supabase", () => ({ supabase: { from: () => ({}) } }));
+const { enqueueAgentJob } = vi.hoisted(() => ({ enqueueAgentJob: vi.fn() }));
+vi.mock("../../lib/supabase", () => ({
+  supabase: { from: () => ({ select: () => ({ eq: () => ({ order: () => ({ limit: () => Promise.resolve({ data: [] }) }) }) }) }), channel: () => ({ on: () => ({ subscribe: () => ({}) }) }), removeChannel: vi.fn() },
+  enqueueAgentJob,
+}));
 
 import { ProofBankPanel } from "./ProofBankPanel";
 import type { ProofAsset } from "../../lib/media";
@@ -112,5 +117,38 @@ describe("what each record shows at a glance", () => {
   it("falls back to the filed body when no claim exists yet", async () => {
     show([proof({ claim: null })]);
     expect(await screen.findByText("Zero pain, done in one visit")).toBeInTheDocument();
+  });
+});
+
+describe("finding proof that is already online", () => {
+  // The flow: say what it will do, be explicit that nothing comes back
+  // cleared, and state the cost before a click that spends money.
+  it("explains that nothing found is cleared for use", async () => {
+    const user = userEvent.setup();
+    show([]);
+    await user.click(await screen.findByRole("button", { name: /Find Proof Online/ }));
+    expect(screen.getByText(/finding a review is not permission to advertise with it/i)).toBeInTheDocument();
+    expect(screen.getByText(/awaiting your decision/i)).toBeInTheDocument();
+  });
+
+  it("says what it will cost before committing", async () => {
+    const user = userEvent.setup();
+    show([]);
+    await user.click(await screen.findByRole("button", { name: /Find Proof Online/ }));
+    expect(screen.getByText(/roughly \$0\.40/)).toBeInTheDocument();
+  });
+
+  it("queues the Proof Finder for this client", async () => {
+    enqueueAgentJob.mockResolvedValue("job-1");
+    const user = userEvent.setup();
+    show([]);
+    await user.click(await screen.findByRole("button", { name: /Find Proof Online/ }));
+    await user.click(screen.getByRole("button", { name: /^Search$/ }));
+    await waitFor(() =>
+      expect(enqueueAgentJob).toHaveBeenCalledWith({
+        agentKey: "proof_discovery",
+        clientId: "client-1",
+      }),
+    );
   });
 });

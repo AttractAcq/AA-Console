@@ -28,6 +28,7 @@ import { runCreativeBuildJob } from "../agents/creative_build/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
 import { runRepurposeJob } from "../agents/repurpose/index.js";
+import { runProofDiscoveryJob } from "../agents/proof_discovery/index.js";
 
 export interface JobResult {
   ok: boolean;
@@ -63,6 +64,7 @@ const RUNNERS: Record<string, JobRunner> = {
   ideation: runIdeationJob,
   brief: runBriefJob,
   repurpose: runRepurposeJob,
+  proof_discovery: runProofDiscoveryJob,
   landing_page: runLandingPageJob,
   // Deterministic ETL, no model. Scheduled rather than run by hand.
   metrics_ingest: runMetricsIngestJob,
