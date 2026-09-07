@@ -3081,6 +3081,38 @@ export type Database = {
           opportunity_value: number | null
         }[]
       }
+      acquisition_funnel: {
+        Args: { p_client_id: string; p_days?: number }
+        Returns: {
+          leads: number
+          conversations: number
+          appointments: number
+          sales: number
+          lost: number
+          pipeline_value: number
+          sale_value: number
+          cash_collected: number
+          spend: number
+          lead_to_sale_pct: number | null
+          cost_per_lead: number | null
+          return_on_spend: number | null
+        }[]
+      }
+      top_content_by_revenue: {
+        Args: { p_client_id: string; p_limit?: number }
+        Returns: {
+          asset_ref: string | null
+          asset_title: string | null
+          hook: string | null
+          idea_title: string | null
+          content_territory: string | null
+          leads: number
+          sales: number
+          cash_collected: number
+          spend: number
+          impressions: number
+        }[]
+      }
       review_media_asset: {
         Args: {
           p_asset_id: string

@@ -196,16 +196,51 @@ clearing rule could be flipped without a single test failing.
 an avatar and a rights decision. Still deferred: several evidence files per
 proof, since the table holds one `storage_path`.
 
-## 7. Attribution & Reporting OS — *Stub*
+## 7. Attribution & Reporting OS — *Built on the revenue half; the attention half waits on Meta*
 
-Reporting has five tabs, a `reporting` agent and a `metrics_ingest` agent.
-`metrics_daily` has 0 rows, blocked on Meta.
+The point of this tool is not a dashboard. It is to answer **what caused
+what** — and specifically to let AA say "R2,000 of spend created R38,000 of
+closed revenue" instead of "84 leads".
 
-Even connected, it would be platform metrics only. The tool's actual purpose —
-**what caused what**, campaign → content → distribution → lead → conversation →
-appointment → sale → cash — has no representation at all. None of the five
-example questions ("which ten assets created the most revenue") can be answered
-by the current schema, because nothing links an asset to revenue.
+`content_attribution` walks the chain the business actually runs:
+
+```
+idea → brief → asset → post → (attention) → lead → sale → cash
+```
+
+Each asset carries its idea's hook and angle, its brief's reference, where it
+was posted, and the leads, sales and cash collected behind it. A lead counts
+against an asset if it names **either** the asset or the post it came from —
+both paths are real in the data, and matching on only one silently loses half
+the revenue.
+
+Two functions sit on top. `top_content_by_revenue()` ranks content by cash
+collected rather than by reach, which is the ranking the ranking is for.
+`acquisition_funnel()` returns the stage counts and the three ratios between
+them.
+
+**The funnel returns `null`, not `0`, when a ratio is unknown.** No leads yet
+is not a 0% close rate — it is an unanswered question, and a 0% displayed to a
+client is a claim about their business that the data does not support. The
+panel renders those as "—" with the reason. This was the first thing mutation
+testing checked: replacing the nulls with zeros must, and does, fail the tests.
+
+Proved on staging against a seeded chain end to end: two leads, one sale,
+R38,000 collected, correctly attributed back through post *and* asset, while an
+unattributed walk-in lead stayed out of the content view and inside the funnel
+totals — which is exactly right, since the revenue is real even though its
+cause is unknown.
+
+**Two honest limits, both written into the migration:**
+
+- **Attention is zero until Meta is connected.** Impressions, reach and clicks
+  come from `metrics_daily`, which has no rows. The revenue half of the chain
+  works today; the top of the funnel is a shape with no numbers in it, and the
+  panel says so rather than showing zeros as though they were measurements.
+- **Stage counts are by *current* stage, not furthest reached.** A lead that
+  bought is counted at "sale", not also at "appointment", so the funnel
+  understates the upper stages. `lead_events` records every transition, so
+  furthest-reached is derivable later without a schema change.
 
 ## 8. Campaign Execution Builder — *Stub*
 
@@ -245,11 +280,17 @@ Worth stating, because the gaps above are long and the foundation is not thin:
 
 ## The shape of the remaining work
 
-Built: 1 (bar its Iteration Engine), 2, 4 and 6. Partial with real substance:
-5. Stubs with a page and a table: 7 and 8. Unbuilt: 3 and 9.
+Built: 1 (bar its Iteration Engine), 2, 4, 6 and 7. Partial with real
+substance: 5. Stub with a page and a table: 8. Unbuilt: 3 and 9.
 
 The dependency worth noticing: **7 (Attribution) is what makes 9 (Economics)
 possible, and 1's Iteration Engine depends on both.** Revenue cannot be
-attributed to an asset until leads and sales are modelled, which is tool 4. So
-4 → 7 → 9 → the Iteration Engine is a single chain, and it is the chain that
-turns the console from a production tool into a compounding one.
+attributed to an asset until leads and sales are modelled, which is tool 4, and
+7 is now built on top of it — so the chain 4 → 7 is closed and 7 → 9 → the
+Iteration Engine is what remains. That chain is what turns the console from a
+production tool into a compounding one.
+
+Both of the remaining links have a prerequisite that is not code. 9 needs ad
+spend, which arrives with Meta. The Iteration Engine needs enough attributed
+outcomes to learn from, which needs 9 and needs time — a hook cannot be judged
+against three assets.

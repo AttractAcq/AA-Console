@@ -34,6 +34,7 @@ import { CopyLibraryPanel } from "./media/CopyLibraryPanel";
 import { PaidReportingPanel } from "./reporting/PaidReportingPanel";
 import { OrganicReportingPanel } from "./reporting/OrganicReportingPanel";
 import { PagesReportingPanel } from "./reporting/PagesReportingPanel";
+import { AttributionPanel } from "./reporting/AttributionPanel";
 import { CommentaryPanel } from "./reporting/CommentaryPanel";
 import { ContractsLegalPanel } from "./account/ContractsLegalPanel";
 import { BillingSubscriptionPanel } from "./account/BillingSubscriptionPanel";
@@ -98,6 +99,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     paid: () => <PaidReportingPanel />,
     "landing-pages": () => <PagesReportingPanel pageType="landing" />,
     "offer-pages": () => <PagesReportingPanel pageType="offer" />,
+    attribution: () => <AttributionPanel />,
     commentary: () => <CommentaryPanel />,
   },
 };
