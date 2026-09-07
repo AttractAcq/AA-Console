@@ -253,3 +253,36 @@ describe("BriefDetailModal — who it was sent to", () => {
     expect(await screen.findByText(/Unknown/)).toBeInTheDocument();
   });
 });
+
+describe("BriefDetailModal — the proof behind the brief", () => {
+  const PROOF = {
+    ref_number: "HD-0019",
+    claim: "Four implants placed in one visit",
+    strength: "high",
+    usage_rights: "approved",
+    avatar_relevance: "Full-arch patients",
+  };
+
+  it("shows the proof record a brief relies on, not just its prose", async () => {
+    tables.set("client_proof_assets", { data: PROOF });
+    show({ proof_asset_id: "proof-1" });
+    expect(await screen.findByText(/Backed by HD-0019/)).toBeInTheDocument();
+    expect(screen.getByText("Four implants placed in one visit")).toBeInTheDocument();
+    expect(screen.getByText(/strength high · Full-arch patients/)).toBeInTheDocument();
+  });
+
+  // A brief can outlive the clearance that justified it, and shipping a piece
+  // whose proof has since been withdrawn is exactly the failure this whole
+  // structure exists to prevent.
+  it("warns when the linked proof is no longer cleared", async () => {
+    tables.set("client_proof_assets", { data: { ...PROOF, usage_rights: "not_cleared" } });
+    show({ proof_asset_id: "proof-1" });
+    expect(await screen.findByText(/no longer cleared for use/)).toBeInTheDocument();
+  });
+
+  it("shows nothing when a brief links to no proof", async () => {
+    show({ proof_asset_id: null });
+    await screen.findByRole("heading", { name: "Spring whitening offer" });
+    expect(screen.queryByText(/Backed by/)).not.toBeInTheDocument();
+  });
+});

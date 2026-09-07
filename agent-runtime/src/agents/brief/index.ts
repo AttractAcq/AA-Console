@@ -19,7 +19,7 @@ import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords } from "../shared.js";
 import { briefSubmitTool, composeBody, briefColumns, fieldsFor } from "./fields.js";
 import { loadIdentity, identityWriterBlock } from "../identity.js";
-import { loadUsableProof, renderProof } from "../proof.js";
+import { loadUsableProof, renderProof, proofIdForRef } from "../proof.js";
 
 export async function runBriefJob(
   sb: SupabaseClient,
@@ -89,7 +89,10 @@ export async function runBriefJob(
     (client?.name as string | undefined) ?? "this business",
   );
 
-  const submitTool = briefSubmitTool(idea.media_type);
+  const submitTool = briefSubmitTool(
+    idea.media_type,
+    usable.map((p) => p.ref_number ?? "").filter(Boolean),
+  );
 
   const system = `You work for Attract Acquisition, a marketing agency. You write production briefs.
 
@@ -191,6 +194,9 @@ Call ${submitTool.name} once when you are done.`;
     title: title.slice(0, 300),
     body,
     ...briefColumns(idea.media_type, result.submitted),
+    // The record, not just the prose. A brief that names its proof in words
+    // cannot later answer "which proof produced revenue"; a foreign key can.
+    proof_asset_id: proofIdForRef(usable, result.submitted.proof_ref),
     media_type: idea.media_type,
     status: "draft",
     job_id: job.id,

@@ -14,6 +14,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * adds is saying so, and saying plainly when the list is empty and why.
  */
 export interface ProofRecord {
+  id: string;
   ref_number: string | null;
   proof_type: string | null;
   title: string | null;
@@ -25,6 +26,17 @@ export interface ProofRecord {
   body: string | null;
   source: string | null;
   captured_on: string | null;
+}
+
+/** Resolve a reference the model chose back to the record it names. */
+export function proofIdForRef(records: ProofRecord[], ref: unknown): string | null {
+  const wanted = typeof ref === "string" ? ref.trim() : "";
+  if (!wanted) return null;
+  // Only a record that was actually offered. The schema already constrains
+  // this to an enum, so a mismatch here means something changed underneath —
+  // better to store no link than a wrong one.
+  const found = records.find((r) => r.ref_number === wanted);
+  return found?.id ?? null;
 }
 
 export async function loadUsableProof(

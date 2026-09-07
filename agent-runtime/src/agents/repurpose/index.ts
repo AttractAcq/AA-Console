@@ -44,7 +44,14 @@ async function writeOne(
   job: AgentJobRow,
   deadlineAt: number,
   format: RepurposeFormat,
-  context: { rootTitle: string; rootBrief: string; identityBlock: string; assetId: string; clientId: string },
+  context: {
+    rootTitle: string;
+    rootBrief: string;
+    identityBlock: string;
+    assetId: string;
+    clientId: string;
+    proofAssetId: string | null;
+  },
 ): Promise<{ ok: true; costUsd: number } | { ok: false; costUsd: number; message: string; retryable: boolean }> {
   const submitTool = briefSubmitTool(format.mediaType);
 
@@ -107,6 +114,12 @@ Call ${submitTool.name} once when you are done.`;
     job_id: job.id,
     derived_from_asset_id: context.assetId,
     repurpose_format: format.key,
+    // Inherited rather than chosen again. The system prompt tells this agent
+    // the claim and the proof carry over exactly, so asking a model to
+    // re-pick would spend a turn to reach the same answer — and could reach
+    // a different one, which would be a derivative claiming different proof
+    // from the piece it derives from.
+    proof_asset_id: context.proofAssetId,
   });
   if (error) throw new Error(`Failed to write the ${format.label} brief: ${error.message}`);
 
@@ -162,7 +175,11 @@ export async function runRepurposeJob(
   }
 
   const { data: rootBrief } = asset.brief_id
-    ? await sb.from("client_briefs").select("body").eq("id", asset.brief_id).maybeSingle()
+    ? await sb
+        .from("client_briefs")
+        .select("body, proof_asset_id")
+        .eq("id", asset.brief_id)
+        .maybeSingle()
     : { data: null };
 
   const { data: client } = await sb
@@ -182,6 +199,7 @@ export async function runRepurposeJob(
     identityBlock: identityWriterBlock(identity),
     assetId: String(asset.id),
     clientId: job.client_id,
+    proofAssetId: (rootBrief?.proof_asset_id as string | null) ?? null,
   };
 
   await appendEvent(

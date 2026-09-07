@@ -47,7 +47,7 @@ export function BriefsPanel() {
     const { data } = await supabase
       .from("client_briefs")
       .select(
-        "id, title, body, media_type, brief_ref, status, source_idea_id, created_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method",
+        "id, title, body, media_type, brief_ref, status, source_idea_id, created_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
       )
       .eq("client_id", clientId)
       .order("created_at", { ascending: false });

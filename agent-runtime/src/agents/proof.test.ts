@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { renderProof, type ProofRecord } from "./proof.js";
+import { renderProof, proofIdForRef, type ProofRecord } from "./proof.js";
 
 const rec = (over: Partial<ProofRecord> = {}): ProofRecord => ({
+  id: "proof-1",
   ref_number: "HD-0019",
   proof_type: "customer_result",
   title: "Implant patient",
@@ -69,5 +70,35 @@ describe("when there is nothing to cite", () => {
       expect(renderProof([], { held })).toMatch(/must work without a proof claim/);
       expect(renderProof([], { held })).toMatch(/Say so rather than implying one/);
     }
+  });
+});
+
+describe("resolving a chosen reference back to its record", () => {
+  const offered = [rec({ id: "p1", ref_number: "HD-0019" }), rec({ id: "p2", ref_number: "HD-0020" })];
+
+  it("finds the record the model chose", () => {
+    expect(proofIdForRef(offered, "HD-0020")).toBe("p2");
+  });
+
+  // The schema constrains this to an enum, so a mismatch means something
+  // changed underneath. Storing no link beats storing a wrong one.
+  it("returns nothing for a reference that was not offered", () => {
+    expect(proofIdForRef(offered, "HD-9999")).toBeNull();
+  });
+
+  // An empty string is the model saying "this piece makes no proof claim",
+  // which is a decision and must not become a link.
+  it("treats an empty choice as no proof, not as a failure", () => {
+    expect(proofIdForRef(offered, "")).toBeNull();
+    expect(proofIdForRef(offered, "   ")).toBeNull();
+  });
+
+  it("survives a missing or non-string choice", () => {
+    expect(proofIdForRef(offered, undefined)).toBeNull();
+    expect(proofIdForRef(offered, 42)).toBeNull();
+  });
+
+  it("returns nothing when no proof was offered at all", () => {
+    expect(proofIdForRef([], "HD-0019")).toBeNull();
   });
 });

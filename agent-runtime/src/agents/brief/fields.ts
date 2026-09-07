@@ -31,9 +31,19 @@ export function fieldsFor(mediaType: string): ReadonlyArray<readonly [string, st
   return mediaType === "video" ? BRIEF_FIELDS : BRIEF_FIELDS.filter(([k]) => !VIDEO_ONLY.has(k));
 }
 
-/** The tool schema, built from the same list the prompt describes. */
-export function briefSubmitTool(mediaType: string) {
+/**
+ * The tool schema, built from the same list the prompt describes.
+ *
+ * `proofRefs` are the references of the proof records actually offered to this
+ * brief. When there are any, the schema gains a `proof_ref` whose allowed
+ * values are exactly those references plus the empty string. That is the guard
+ * that matters: an enum makes an invented reference impossible to submit,
+ * where a free-text field would let the model cite proof that does not exist —
+ * which is the same failure as an invented phone number, one step earlier.
+ */
+export function briefSubmitTool(mediaType: string, proofRefs: string[] = []) {
   const fields = fieldsFor(mediaType);
+  const refs = proofRefs.filter((r) => typeof r === "string" && r.trim());
   return {
     name: "submit_brief",
     description: "Submit the finished production brief. Call this exactly once.",
@@ -44,11 +54,21 @@ export function briefSubmitTool(mediaType: string) {
         ...Object.fromEntries(
           fields.map(([name, description]) => [name, { type: "string", description }]),
         ),
+        ...(refs.length
+          ? {
+              proof_ref: {
+                type: "string",
+                enum: [...refs, ""],
+                description:
+                  "The reference of the proof record this piece relies on, chosen from the list you were given. Empty string if the piece makes no proof claim.",
+              },
+            }
+          : {}),
       },
       // Every field is required so the model states an absence rather than
       // omitting it — the same discipline identity and brand follow. An empty
       // proof is a decision; a missing proof key is a silence.
-      required: ["title", ...fields.map(([name]) => name)],
+      required: ["title", ...fields.map(([name]) => name), ...(refs.length ? ["proof_ref"] : [])],
       additionalProperties: false,
     },
   };

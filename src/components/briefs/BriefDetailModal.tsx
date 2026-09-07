@@ -27,6 +27,15 @@ type Brief = {
   call_to_action?: string | null;
   channel_intent?: string | null;
   production_method?: string | null;
+  proof_asset_id?: string | null;
+};
+
+type LinkedProof = {
+  ref_number: string | null;
+  claim: string | null;
+  strength: string;
+  usage_rights: string;
+  avatar_relevance: string | null;
 };
 
 /**
@@ -102,6 +111,7 @@ export function BriefDetailModal({
   const [idea, setIdea] = useState<Idea | null>(null);
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [dispatches, setDispatches] = useState<Dispatch[]>([]);
+  const [linkedProof, setLinkedProof] = useState<LinkedProof | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -129,6 +139,20 @@ export function BriefDetailModal({
     ]);
 
     setIdea((ideaRes.data ?? null) as Idea | null);
+
+    // The proof record this brief actually relies on. Named in prose it is a
+    // claim; linked it is checkable, and later answers which proof produced
+    // revenue.
+    if (brief.proof_asset_id) {
+      const { data: proofRow } = await supabase
+        .from("client_proof_assets")
+        .select("ref_number, claim, strength, usage_rights, avatar_relevance")
+        .eq("id", brief.proof_asset_id)
+        .maybeSingle();
+      setLinkedProof((proofRow as LinkedProof | null) ?? null);
+    } else {
+      setLinkedProof(null);
+    }
     const gens = (genRes.data ?? []) as unknown as Generation[];
     setGenerations(gens);
     setDispatches((dispRes.data ?? []) as unknown as Dispatch[]);
@@ -210,6 +234,27 @@ export function BriefDetailModal({
                 </span>
               )}
             </div>
+
+            {linkedProof && (
+              <div className="mb-2 rounded-lg border border-border bg-muted/40 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Backed by {linkedProof.ref_number ?? "a proof record"}
+                </p>
+                <p className="mt-1 text-sm text-foreground">
+                  {linkedProof.claim ?? "No claim recorded on that proof."}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  strength {linkedProof.strength}
+                  {linkedProof.avatar_relevance ? ` · ${linkedProof.avatar_relevance}` : ""}
+                  {/* A brief can outlive the clearance that justified it. */}
+                  {linkedProof.usage_rights !== "approved" && (
+                    <span className="font-medium text-destructive">
+                      {" "}· no longer cleared for use
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
 
             {structured.length > 0 ? (
               <dl className="divide-y divide-border/60 rounded-lg border border-border">

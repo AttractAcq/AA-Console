@@ -119,11 +119,19 @@ The brief agent now reads this instead of a flattened list, and can tell "none
 exists" from "some exists, nobody cleared it" — different problems needing
 different action, and only the second is a job someone can do.
 
+A brief now **links** to the proof it relies on rather than naming it in prose.
+The agent chooses from an enum of the references it was actually offered, so an
+invented reference is impossible to submit — the same failure as an invented
+phone number, one step earlier — and the choice is resolved back to a foreign
+key rather than trusted as text. A derivative inherits its root's link, because
+the claim carries over and re-asking a model could reach a different answer for
+the same piece. The brief view shows the backing claim and warns when a proof
+has since lost its clearance, since a brief can outlive the permission that
+justified it.
+
 **What is left is data entry, not code.** Both live records need a claim, an
-avatar and a rights decision. Still deferred: several evidence files per proof
-(the table holds one `storage_path`), and `client_briefs.proof_asset_id` exists
-but nothing writes it yet, so a brief still names its proof in prose rather
-than linking to the record.
+avatar and a rights decision. Still deferred: several evidence files per proof,
+since the table holds one `storage_path`.
 
 ## 7. Attribution & Reporting OS — *Stub*
 

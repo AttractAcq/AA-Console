@@ -106,3 +106,51 @@ describe("what gets stored as columns", () => {
     expect(cols).not.toHaveProperty("b_roll");
   });
 });
+
+describe("the proof reference the brief may cite", () => {
+  // The guard that matters. A free-text field would let a model cite proof
+  // that does not exist, which is an invented phone number one step earlier.
+  it("constrains the choice to the records actually offered", () => {
+    const tool = briefSubmitTool("image", ["HD-0019", "HD-0020"]);
+    const prop = tool.inputSchema.properties.proof_ref as { enum: string[] };
+    expect(prop.enum).toEqual(["HD-0019", "HD-0020", ""]);
+  });
+
+  // Empty is a legitimate answer: this piece makes no proof claim.
+  it("always allows an empty choice alongside the real ones", () => {
+    const prop = briefSubmitTool("image", ["HD-0019"]).inputSchema.properties.proof_ref as {
+      enum: string[];
+    };
+    expect(prop.enum).toContain("");
+  });
+
+  it("is required, so the model states a decision rather than omitting it", () => {
+    expect(briefSubmitTool("image", ["HD-0019"]).inputSchema.required).toContain("proof_ref");
+  });
+
+  // With nothing cleared there is nothing to choose from, and an enum of one
+  // empty string would be a strange thing to ask a model to answer.
+  it("is absent entirely when no proof was offered", () => {
+    const tool = briefSubmitTool("image", []);
+    expect(tool.inputSchema.properties).not.toHaveProperty("proof_ref");
+    expect(tool.inputSchema.required).not.toContain("proof_ref");
+  });
+
+  it("ignores blank references rather than offering them as a choice", () => {
+    const tool = briefSubmitTool("image", ["", "  ", "HD-0019"]);
+    const prop = tool.inputSchema.properties.proof_ref as { enum: string[] };
+    expect(prop.enum).toEqual(["HD-0019", ""]);
+  });
+
+  // It is a link, not prose — composing it into the body would put a bare
+  // reference in front of a maker who has no way to look it up.
+  it("never appears as a section of the readable brief", () => {
+    const body = composeBody("image", { hook: "h", premise: "p", proof_ref: "HD-0019" });
+    expect(body).not.toContain("HD-0019");
+    expect(body).not.toMatch(/proof_ref/i);
+  });
+
+  it("is not stored as a brief column, since it resolves to a foreign key", () => {
+    expect(briefColumns("image", { proof_ref: "HD-0019" })).not.toHaveProperty("proof_ref");
+  });
+});
