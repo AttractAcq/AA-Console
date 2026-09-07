@@ -88,15 +88,47 @@ Nothing exists. No table, no page, no agent. The whole tool is unbuilt:
 knowledge base, sales instructions, qualification logic, objection handling,
 CTA/booking rules, agent testing, deployment, conversation logging, learning.
 
-## 4. Revenue Pipeline OS — *Stub*
+## 4. Revenue Pipeline OS — *Built*
 
-`client_leads` exists with **0 rows** and 10 columns, behind a Prospects &
-Leads page.
+The acquisition chain, in the order it happens: lead → conversation →
+qualified conversation → appointment → qualified appointment → showed → sale →
+cash, with lost as its own end.
 
-Missing the entire pipeline: conversation tracking, qualification state, stages
-(attention → lead → conversation → qualified → appointment → show → sale →
-cash), lead owner, next action, follow-up, opportunity value, appointment
-status, outcome, sale value, source attribution.
+**Attention is deliberately not a stage.** Attention is impressions and reach,
+which live in `metrics_daily` against a post; a lead begins when attention
+becomes a name someone can contact. Modelling it here would double-count it and
+put a column on the board that nobody can act on.
+
+Each lead carries an owner, a **next action** and its due date, an opportunity
+value, sale value and cash collected, an appointment with its own outcome, and
+— the columns everything downstream depends on — **where it came from**:
+channel, and foreign keys to the page, asset, post or campaign that produced
+it. Without those, revenue can never be traced back to the content that caused
+it, and the Iteration Engine has nothing to learn from.
+
+`lead_events` records everything that happens to a lead **including stage
+changes**, so "how long did this sit in qualified conversation" is answerable
+rather than lost to an overwritten notes field. `advance_lead` moves a lead and
+writes its event in one statement, so the two cannot come apart, clears the
+next action that has just been completed, and refuses to mark a lead lost
+without a reason — a lost lead with no reason teaches nothing.
+
+`stalled_leads` answers the question the tool exists for: leads with nothing
+scheduled next, or something overdue, oldest first. `cash` and `lost` are
+excluded because they are finished rather than neglected. It leads the page,
+above the board — a board shows the shape, this shows the work.
+
+Proved on staging: of five leads, the two genuinely stalled were returned and
+the healthy, the collected and the out-of-window ones were not; `advance_lead`
+moved a stage, cleared the completed action, wrote the event with both stages,
+and refused a lost with no reason.
+
+The old `pipeline_stage` enum (`first_touch`, `second_touch`, `call_booked`) is
+left in place, unused. Its values do not map onto the chain and the table held
+no rows, so a new `lead_stage` was cleaner than mapping by guesswork.
+
+Still open: nothing writes a lead automatically. Leads arrive by hand until a
+conversion page or a sales agent creates them, which is tools 2 and 3.
 
 ## 5. Client Delivery OS — *Partial*
 
@@ -213,9 +245,8 @@ Worth stating, because the gaps above are long and the foundation is not thin:
 
 ## The shape of the remaining work
 
-Three tools are effectively unbuilt (3, 4, 9), three are stubs with a page and
-a table (2, 7, 8), one is partial with real substance (5), one is built bar its
-Iteration Engine (1), and one is built and waiting on data entry (6).
+Built: 1 (bar its Iteration Engine), 2, 4 and 6. Partial with real substance:
+5. Stubs with a page and a table: 7 and 8. Unbuilt: 3 and 9.
 
 The dependency worth noticing: **7 (Attribution) is what makes 9 (Economics)
 possible, and 1's Iteration Engine depends on both.** Revenue cannot be

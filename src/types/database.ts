@@ -1274,6 +1274,24 @@ export type Database = {
           id: string
           name: string | null
           notes: string | null
+          email: string | null
+          phone: string | null
+          stage: Database["public"]["Enums"]["lead_stage"]
+          stage_at: string
+          lost_reason: string | null
+          owner_member_id: string | null
+          next_action: string | null
+          next_action_due: string | null
+          opportunity_value: number | null
+          sale_value: number | null
+          cash_collected: number | null
+          appointment_at: string | null
+          appointment_outcome: string | null
+          source_channel: string | null
+          source_page_id: string | null
+          source_asset_id: string | null
+          source_post_id: string | null
+          source_campaign_id: string | null
           pipeline_stage: Database["public"]["Enums"]["pipeline_stage"]
           source: string | null
           updated_at: string
@@ -1286,6 +1304,24 @@ export type Database = {
           id?: string
           name?: string | null
           notes?: string | null
+          email?: string | null
+          phone?: string | null
+          stage?: Database["public"]["Enums"]["lead_stage"]
+          stage_at?: string
+          lost_reason?: string | null
+          owner_member_id?: string | null
+          next_action?: string | null
+          next_action_due?: string | null
+          opportunity_value?: number | null
+          sale_value?: number | null
+          cash_collected?: number | null
+          appointment_at?: string | null
+          appointment_outcome?: string | null
+          source_channel?: string | null
+          source_page_id?: string | null
+          source_asset_id?: string | null
+          source_post_id?: string | null
+          source_campaign_id?: string | null
           pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
           source?: string | null
           updated_at?: string
@@ -1298,6 +1334,24 @@ export type Database = {
           id?: string
           name?: string | null
           notes?: string | null
+          email?: string | null
+          phone?: string | null
+          stage?: Database["public"]["Enums"]["lead_stage"]
+          stage_at?: string
+          lost_reason?: string | null
+          owner_member_id?: string | null
+          next_action?: string | null
+          next_action_due?: string | null
+          opportunity_value?: number | null
+          sale_value?: number | null
+          cash_collected?: number | null
+          appointment_at?: string | null
+          appointment_outcome?: string | null
+          source_channel?: string | null
+          source_page_id?: string | null
+          source_asset_id?: string | null
+          source_post_id?: string | null
+          source_campaign_id?: string | null
           pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
           source?: string | null
           updated_at?: string
@@ -3009,6 +3063,24 @@ export type Database = {
         Args: { p_client_id: string; p_avatar?: string; p_limit?: number }
         Returns: Database["public"]["Tables"]["client_proof_assets"]["Row"][]
       }
+      advance_lead: {
+        Args: { p_lead_id: string; p_stage: Database["public"]["Enums"]["lead_stage"]; p_note?: string }
+        Returns: undefined
+      }
+      stalled_leads: {
+        Args: { p_client_id: string; p_days?: number }
+        Returns: {
+          id: string
+          name: string | null
+          stage: Database["public"]["Enums"]["lead_stage"]
+          days_in_stage: number
+          next_action: string | null
+          next_action_due: string | null
+          overdue: boolean
+          owner_name: string | null
+          opportunity_value: number | null
+        }[]
+      }
       review_media_asset: {
         Args: {
           p_asset_id: string
@@ -3065,6 +3137,7 @@ export type Database = {
       metric_entity: "account" | "campaign" | "post" | "page"
       metric_surface: "paid" | "organic" | "landing" | "offer"
       page_type: "landing" | "offer"
+      lead_stage: "lead" | "conversation" | "qualified_conversation" | "appointment" | "qualified_appointment" | "shown" | "sale" | "cash" | "lost"
       pipeline_stage: "first_touch" | "second_touch" | "call_booked"
       post_channel: "organic" | "paid"
       record_domain:
@@ -3238,6 +3311,17 @@ export const Constants = {
       metric_entity: ["account", "campaign", "post", "page"],
       metric_surface: ["paid", "organic", "landing", "offer"],
       page_type: ["landing", "offer"],
+      lead_stage: [
+        "lead",
+        "conversation",
+        "qualified_conversation",
+        "appointment",
+        "qualified_appointment",
+        "shown",
+        "sale",
+        "cash",
+        "lost",
+      ],
       pipeline_stage: ["first_touch", "second_touch", "call_booked"],
       post_channel: ["organic", "paid"],
       record_domain: [
