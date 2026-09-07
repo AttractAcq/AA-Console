@@ -11,8 +11,13 @@ export function DataTable({
   rows?: ReactNode[][];
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
-      <table className="w-full text-left text-sm">
+    // overflow-x-auto, not overflow-hidden. A table with more columns than a
+    // phone is wide used to be clipped at the card's edge with no way to
+    // reach the rest — the last columns simply did not exist on mobile, which
+    // reads as a zoomed-in page rather than as lost content. It scrolls inside
+    // its own card so the page itself never scrolls sideways.
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full min-w-max text-left text-sm">
         <thead className="bg-muted">
           <tr>
             {columns.map((column) => (

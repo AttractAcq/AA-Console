@@ -8,6 +8,7 @@ import type { ConsoleRole } from "../lib/identity";
 import { CONSOLE_NAV } from "../config/consoleNav";
 import type { ConsoleKind } from "../config/consoleNav";
 import { useTheme } from "../context/theme";
+import { useScrollToTop } from "../lib/useScrollToTop";
 import { cn } from "../lib/cn";
 
 const navItemBase =
@@ -96,6 +97,7 @@ export function ConsoleShell({
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mainRef = useScrollToTop<HTMLElement>();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -155,7 +157,7 @@ export function ConsoleShell({
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6 md:p-8">
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-6 md:p-8">
           <div className="mx-auto max-w-5xl">
             <h1 className="mb-6 text-xl font-semibold text-foreground">{heading}</h1>
             {children}

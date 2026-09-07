@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
+import { useScrollToTop } from "../lib/useScrollToTop";
 import { TopBar } from "./TopBar";
 
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mainRef = useScrollToTop<HTMLElement>();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -28,7 +30,7 @@ export function AppShell() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-6 md:p-8">
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-6 md:p-8">
           <Outlet />
         </main>
       </div>
