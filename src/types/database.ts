@@ -787,6 +787,68 @@ export type Database = {
           },
         ]
       }
+      client_brand_profiles: {
+        Row: {
+          client_id: string
+          colour_accent: string | null
+          colour_background: string | null
+          colour_primary: string | null
+          colour_secondary: string | null
+          colour_text: string | null
+          composition_notes: string | null
+          custom_css: string | null
+          font_body: string | null
+          font_heading: string | null
+          imagery_style: string | null
+          lighting: string | null
+          mood: string | null
+          never_do: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          colour_accent?: string | null
+          colour_background?: string | null
+          colour_primary?: string | null
+          colour_secondary?: string | null
+          colour_text?: string | null
+          composition_notes?: string | null
+          custom_css?: string | null
+          font_body?: string | null
+          font_heading?: string | null
+          imagery_style?: string | null
+          lighting?: string | null
+          mood?: string | null
+          never_do?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          colour_accent?: string | null
+          colour_background?: string | null
+          colour_primary?: string | null
+          colour_secondary?: string | null
+          colour_text?: string | null
+          composition_notes?: string | null
+          custom_css?: string | null
+          font_body?: string | null
+          font_heading?: string | null
+          imagery_style?: string | null
+          lighting?: string | null
+          mood?: string | null
+          never_do?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_brand_profiles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_briefs: {
         Row: {
           body: string | null

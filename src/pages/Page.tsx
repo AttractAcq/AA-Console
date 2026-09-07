@@ -28,6 +28,7 @@ import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { ProspectsLeadsPanel } from "./prospects-leads/ProspectsLeadsPanel";
 import { OnboardingPanel } from "./account/OnboardingPanel";
 import { ContactPanel } from "./account/ContactPanel";
+import { BrandPanel } from "./account/BrandPanel";
 import { IntegrationsPanel } from "./account/IntegrationsPanel";
 import { CopyLibraryPanel } from "./media/CopyLibraryPanel";
 import { PaidReportingPanel } from "./reporting/PaidReportingPanel";
@@ -111,6 +112,7 @@ const nodePanels: Record<string, () => ReactNode> = {
   "prospects-leads": () => <ProspectsLeadsPanel />,
   onboarding: () => <OnboardingPanel />,
   contact: () => <ContactPanel />,
+  brand: () => <BrandPanel />,
   integrations: () => <IntegrationsPanel />,
   contracts: () => <ContractsLegalPanel />,
   billing: () => <BillingSubscriptionPanel />,

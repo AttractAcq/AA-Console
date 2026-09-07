@@ -17,10 +17,11 @@ Supersedes the status framing in `ui-data-entry-mapping.md`.
 | Agent runtime | **16 agents, 16 runners.** Nothing can be queued that cannot execute. | `agents` table vs `RUNNERS` in `dispatch.ts`, exact set match |
 | **Hosting** | **Live.** Console at `console.attractacq.com` (Pages, HTTPS enforced), runtime at `aa-console-production.up.railway.app`. Nothing runs on localhost. | `gh api .../pages`, `/health`, and `agent_runtime_status` showing one live worker |
 | Deployment | **Current**, and CI and deploy are both green on every recent push. | `agent_runtime_status.version` matches HEAD; `gh run list` |
-| RLS | **44 tables, all with RLS. 105 policies. No client can see another client's data by any path.** | `pg_class.relrowsecurity`, `pg_policy`, and `scripts/rls-isolation-test.mjs` against two live logins |
+| RLS | **45 tables, all with RLS. 106 policies. No client can see another client's data by any path.** | `pg_class.relrowsecurity`, `pg_policy`, and `scripts/rls-isolation-test.mjs` against two live logins |
 | Exposed functions | **No `SECURITY DEFINER` function is reachable by `anon`.** | `has_function_privilege('anon', ...)` across `public` |
-| Schema in git | **52 migrations, replaying onto a fresh database.** Staging matches production exactly: 44 tables, 0 without RLS, 105 policies, 16 agents. | `supabase db push` onto staging, then a count-for-count comparison |
-| Tests | **237** — 142 frontend, 95 runtime. | `npm test` in both packages |
+| Schema in git | **54 migrations, replaying onto a fresh database.** Staging matches production: 45 tables, 0 without RLS, 106 policies, 16 agents. | `supabase db push` onto staging, then a count-for-count comparison |
+| Tests | **263** — 155 frontend, 108 runtime. | `npm test` in both packages |
+| Brand | **On file and enforced.** Palette, typography, imagery direction and per-brand bans reach both stages of a build. | `client_brand_profiles`, and the render block printed from a real row |
 | Idea → brief → asset → scheduled | **Built end to end**, AI and human routes, and the AI half has produced real assets. | 2 completed renders, 5 media assets, 7 scheduled posts |
 | Reporting ingest | **Built end to end**, scheduled daily. | See gap 1: no live pull has ever succeeded |
 
@@ -108,6 +109,11 @@ it up, because they read the same one. Blocked behind gap 1.
   `brief.scheduled_only` is **false**, so deleting the string would start
   including `brief` in every master run. The fix is two steps in one migration:
   set the flag, then drop the string.
+- **Brand CSS is stored and unused.** `client_brand_profiles.custom_css` exists
+  and the page says so plainly, but nothing renders a generated page as HTML —
+  `client_pages.body` is markdown shown as plain text in both the admin panel
+  and the client view. The palette and treatment tokens *are* used; the CSS is
+  waiting on a page renderer that does not exist yet.
 - **No backfill UI.** `enqueue_metrics_ingest_jobs(p_days)` accepts a window;
   nothing calls it with anything but the default.
 - **A finished render has no route to distribution beyond scheduling.** It can
@@ -249,6 +255,7 @@ credential does not silently start billing API calls.
 | The console was not deployed anywhere | GitHub Pages, custom domain, HTTPS enforced | Live at `console.attractacq.com`; deep links serve the app via a 404.html fallback; icons and manifest serve |
 | A frontend commit restarted the agent worker | A Railway watch path of `/agent-runtime/**` | Railway's own log: the runtime commit deployed, the next docs commit shows SKIPPED — "No changes to watched files" |
 | OpenAI unproven end to end | A real two-stage build | A publishable asset in 78s for $0.115, with the client's real identity composited rather than invented |
+| Every build invented its own look | `client_brand_profiles`, fed to concept and render on the identity pattern | The render block printed from Harbour Dental's real row quotes `exactly #0F4C5C`; a client with no profile gets "No brand palette is on file" instead of silence. Four mutations — a hex as a suggestion, an empty row counting as a brand, dropping the hex guard, saving blanks as empty strings — each failed the tests that name them |
 
 ---
 
@@ -329,7 +336,15 @@ credential does not silently start billing API calls.
     Compare the lease *span* against the lease *remaining* before concluding
     anything about ownership. Stopping the stale worker let the lease lapse
     and Railway completed the job on the next attempt, unaided.
-12. **A suite that passes on first run has not been shown to work.** Every one
+12. **A model told nothing does not leave a gap — it invents one.** This was
+    learned from a fabricated phone number and it generalises further than it
+    first appeared. The same silence that produced an invented practice name
+    also produced a different palette on every asset, because "make it on
+    brand" with no brand on file is a instruction to choose one. Anything the
+    output is expected to be consistent about needs the two-state treatment:
+    the real value quoted verbatim, or its absence stated explicitly. There is
+    no third state, and a blank is not the absence — it is an invitation.
+13. **A suite that passes on first run has not been shown to work.** Every one
     of these did. The check is to break the source deliberately and confirm the
     right tests fail: `isVideo = false` must fail the video tests, and removing
     the orphaned-selection cleanup must fail that one. Both did, and both were

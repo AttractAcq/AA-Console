@@ -29,6 +29,7 @@ import { loadConceptContext } from "./context.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { placeLogo } from "./logo.js";
+import { brandConceptBlock, brandRenderBlock, loadBrandProfile, type BrandProfile } from "./brand.js";
 
 const BUCKET = "client-media";
 
@@ -133,6 +134,7 @@ function composePrompt(
   brief: BriefRow,
   clientName: string,
   identity: Identity,
+  brand: BrandProfile | null,
 ): string {
   const s = (k: string) => String(concept[k] ?? "").trim();
   const text = [s("headline"), s("subhead"), s("call_to_action")].filter(Boolean);
@@ -148,6 +150,10 @@ function composePrompt(
     ``,
     `ART DIRECTION`,
     s("art_direction"),
+    ``,
+    // After art_direction on purpose: the concept's own words come first, and
+    // the brand's literal values follow so they win any disagreement.
+    brandRenderBlock(brand),
     text.length
       ? `\nTEXT ON THE IMAGE — render these words exactly, spelled correctly, in this hierarchy:\n${text.map((t, i) => `${i + 1}. ${t}`).join("\n")}`
       : `\nNo text on the image.`,
@@ -289,7 +295,7 @@ export async function runCreativeBuildJob(
       : `Re-rendering "${typed.title}".`,
   );
 
-  const [{ data: client }, { data: contact }, { data: context }, upstream] = await Promise.all([
+  const [{ data: client }, { data: contact }, { data: context }, upstream, brand] = await Promise.all([
     sb.from("clients").select("name").eq("id", job.client_id).maybeSingle(),
     sb
       .from("client_contact_details")
@@ -303,6 +309,7 @@ export async function runCreativeBuildJob(
       .maybeSingle(),
     // Selected sections, not whole domains — see context.ts.
     loadConceptContext(sb, job.client_id),
+    loadBrandProfile(sb, job.client_id),
   ]);
 
   // The renderer is given the real values so it never has to guess one.
@@ -347,6 +354,8 @@ ${renderContext(context as BusinessContext | null)}
 
 ICP, BRAND AND OFFER
 ${renderUpstream(upstream)}
+
+${brandConceptBlock(brand)}
 
 PROOF ON FILE — the only proof this asset may reference
 ${proof || "None. Make no proof claim."}
@@ -472,7 +481,7 @@ Call ${submitTool.name} once when you are done.`;
   }
 
   // ---- stage two: render -------------------------------------------------
-  const imagePrompt = composePrompt(concept, typed, clientName, identity);
+  const imagePrompt = composePrompt(concept, typed, clientName, identity, brand);
   await sb
     .from("creative_generations")
     .update({
