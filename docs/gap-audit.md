@@ -269,6 +269,17 @@ present.
 Two places, and both are needed. The local file only affects a runtime you
 start yourself; the deployed worker reads Railway's own variables.
 
+**Nothing runs on localhost any more.** The console is served only from
+`console.attractacq.com` and the runtime only from
+`aa-console-production.up.railway.app`. The local runtime was stopped, and
+`MASTER_AI_ALLOWED_ORIGINS` names the deployed origin alone — so `npm run dev`
+against the deployed runtime will be refused by CORS until localhost is added
+back to that variable. That is deliberate, and it is one variable to reverse.
+
+Railway also has a **watch path of `/agent-runtime/**`**, so a frontend-only
+commit no longer rebuilds and restarts the worker. It used to, and any job in
+flight at that moment was orphaned until its lease lapsed.
+
 ### `agent-runtime/.env` — local runs
 
 ```
@@ -398,6 +409,15 @@ credential does not silently start billing API calls.
    minutes — long enough to read as the stall it had just recovered from, and
    it produced a wrong diagnosis before the numbers were checked. It is now
    stamped per attempt.
+
+   **A correction to the above, found later.** "Every model call carries a
+   per-request timeout" is true and does less than it sounds like. The 600s is
+   the Anthropic client's *per HTTP request* timeout, and the client is built
+   with `maxRetries: 2` inside a loop of up to `maxTurns` turns. The worst case
+   is therefore turns x 3 x 600s, not 600s. The only real outer bound on a job
+   is lease expiry and reclaim. That is the mechanism that actually works —
+   see trap 12 — but the audit should not have implied the timeout bounded the
+   job.
 6. **Changing a job's `params` shape is a deploy-ordering problem**, and the
    claim filter does not cover it — it matches on `agent_key`. Deploy the
    runtime *before* migrating the RPC that changes what it is sent.
@@ -422,7 +442,22 @@ credential does not silently start billing API calls.
     default gives a process that looks configured and is not. Zero is a
     legitimate value here (stop entirely), so the check rejects negatives and
     non-numbers specifically rather than anything falsy.
-11. **A suite that passes on first run has not been shown to work.** Every one
+11. **A long-lived local worker is indistinguishable from a broken one.** An
+    ideation job sat "running" for fifteen minutes. The cause was a local
+    runtime started fifteen *hours* earlier, from source that predated the
+    lease-renewal work: it claimed the job, set a 900s lease, and never
+    renewed it. Both workers poll the same queue, and nothing in `agent_jobs`
+    records which one holds a job, so the only way to tell them apart was
+    arithmetic — `lease_until - started_at` was exactly 900, the local
+    `AGENT_RUNTIME_LEASE_SECONDS`, and a decaying static lease rather than a
+    renewed one.
+
+    That distinction produced a wrong diagnosis first: "544s left, so a live
+    worker is renewing it" reads the same as "900s lease set once, 356s ago".
+    Compare the lease *span* against the lease *remaining* before concluding
+    anything about ownership. Stopping the stale worker let the lease lapse
+    and Railway completed the job on the next attempt, unaided.
+12. **A suite that passes on first run has not been shown to work.** Every one
     of these did. The check is to break the source deliberately and confirm the
     right tests fail: `isVideo = false` must fail the video tests, and removing
     the orphaned-selection cleanup must fail that one. Both did, and both were
@@ -447,6 +482,11 @@ credential does not silently start billing API calls.
 - **Orphaned schema:** grep each table name across `src/`, excluding
   `types/database.ts`. Tables read through an RPC or a view look like false
   positives — `metrics_daily` and `agent_runtime_heartbeats` are.
+- **Who is actually holding a job:** compare
+  `lease_until - started_at` (the span the holder asked for) against
+  `lease_until - now()` (what is left). A span equal to a worker's configured
+  `AGENT_RUNTIME_LEASE_SECONDS` with no renewals means the lease was set once —
+  the holder is not progressing, whatever its heartbeat says.
 - **Whether the frontend suites still bite:** break one invariant in the source
   on purpose, run `npm test`, confirm the expected tests fail, and revert. A
   passing suite is evidence only if it can fail.
