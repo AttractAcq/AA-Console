@@ -22,7 +22,7 @@ import { handleMasterChat } from "./route.js";
 import type { RuntimeConfig } from "../config.js";
 
 function fakeSupabase() {
-  const single = (table: string) => ({
+  const single = () => ({
     select: () => ({
       single: () => {
         const row = { id: "conv-1", created_at: "2026-09-07T10:00:00Z" };
@@ -48,7 +48,7 @@ function fakeSupabase() {
       }),
       insert: (row: unknown) => {
         inserted.push({ table, row });
-        return single(table);
+        return single();
       },
       update: () => ({ eq: () => Promise.resolve({ error: null }) }),
     }),
