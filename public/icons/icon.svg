@@ -1,0 +1,5 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 512 512'>
+  <rect width='512' height='512' rx='112.64' ry='112.64' fill='#0064eb'/>
+  <text x='50%' y='50%' font-family='Inter, "Helvetica Neue", Helvetica, Arial, sans-serif' font-size='204.8' font-weight='700'
+        fill='#f8fafc' text-anchor='middle' dominant-baseline='central' letter-spacing='2.56'>AA</text>
+</svg>
