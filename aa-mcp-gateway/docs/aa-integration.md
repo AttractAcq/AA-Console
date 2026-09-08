@@ -25,7 +25,7 @@ Existing runtime HTTP exposes `/health`, `/status`, `/master/chat`. Do not route
 
 ## Required AA-owned endpoint
 
-The gateway implements only this fixed outgoing route:
+The gateway implements these fixed outgoing routes:
 
 `POST /internal/mcp/content/generate-brief`
 
@@ -35,7 +35,11 @@ Request: `{ "client_id": "uuid", "idea_id": "uuid" }`.
 
 Response: `{ "job_id": "uuid", "client_id": "uuid" }` with HTTP 202 on first execution or 200 on AA replay. Gateway returns `accepted`, never claims the asynchronous brief already exists.
 
-The AA-side live smoke test confirmed service authentication, supported Bot validation, bot/client authorization, client/idea matching, approved-state enforcement, durable idempotency, queue creation, attribution, and worker retry safety. These remain AA-owned; the gateway does not duplicate them or access Supabase. The gateway retains its existing credential client allowlist and Tool Registry policy checks before forwarding.
+`POST /internal/mcp/auth/resolve` (Phase 3 dual-read)
+
+Headers: server-to-server Bearer credential. Body: `{ "token_hash": "<sha256 hex>" }`. The gateway hashes the Bot Bearer first; plaintext never leaves the gateway. The hash is never logged. Railway private hop may be HTTP to `aa-console.railway.internal` (host-exact allowlist).
+
+The AA-side live smoke test confirmed service authentication, supported Bot validation, bot/client authorization, client/idea matching, approved-state enforcement, durable idempotency, queue creation, attribution, and worker retry safety. These remain AA-owned; the gateway does not duplicate them or access Supabase. Dual-read still evaluates the code permission matrix; DB grants are compared and a mismatch denies. After cutover (`BOT_AUTH_MODE=db`) the registry is authoritative and nonempty `BOT_CREDENTIALS_JSON` is refused.
 
 The current gateway contains no Supabase dependency, service-role key, raw table adapter, or general URL tool. Enabling `AA_INTERNAL_API_URL` assumes the endpoint contract above has been implemented and verified. Without both AA variables, brief calls safely return `not_implemented`. Set `AA_MCP_SERVICE_SECRET` with the AA service secret. Tests exercise the real adapter against local HTTP mock servers; gateway-to-live-AA validation remains to be run with configured credentials.
 

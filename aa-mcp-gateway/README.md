@@ -17,18 +17,19 @@ cp .env.example .env
 node --env-file=.env --import tsx src/server/main.ts
 ```
 
-Generate independent tokens using `openssl rand -hex 32`. `BOT_CREDENTIALS_JSON` is an array of `{ "bot": "bot_production", "token": "<unique secret>", "clients": ["<AA client UUID>"] }`. Provision only needed identities; each identity occurs once and has explicit clients. All ten canonical identities are in `src/shared/types.ts`. `REVIEWER_CREDENTIALS_JSON` is an array of `{ "id": "<individual human ID>", "token": "<different unique secret>" }`. Empty/malformed credentials prevent startup. Tokens are never returned in errors or logs.
+Generate independent tokens using `openssl rand -hex 32`. `BOT_CREDENTIALS_JSON` is an array of `{ "bot": "bot_production", "token": "<unique secret>", "clients": ["<AA client UUID>"] }`. Provision only needed identities; each identity occurs once and has explicit clients. All ten canonical identities are in `src/shared/types.ts`. `REVIEWER_CREDENTIALS_JSON` is an array of `{ "id": "<individual human ID>", "token": "<different unique secret>" }`. Empty/malformed credentials prevent startup in `env`/`dual` modes. `BOT_AUTH_MODE=db` refuses a nonempty `BOT_CREDENTIALS_JSON` (fail closed). Tokens, Bearer values, and token hashes are never returned in errors or logs. Revoke/suspend takes effect at AA immediately; the gateway positive cache is 30s unless you bounce the process.
 
 Environment variables:
 
 | Variable | Purpose |
 | --- | --- |
-| `BOT_CREDENTIALS_JSON` | Required Bot tokens and client allowlists |
+| `BOT_AUTH_MODE` | `env` \| `dual` \| `db`. Default `dual`. `db` refuses nonempty `BOT_CREDENTIALS_JSON`. |
+| `BOT_CREDENTIALS_JSON` | Required Bot tokens and client allowlists except in `db` mode (must be empty) |
 | `REVIEWER_CREDENTIALS_JSON` | Required separate human reviewer identities/tokens |
 | `HOST` / `PORT` | Bind address; defaults `127.0.0.1:3100` |
 | `PUBLIC_ORIGIN` | Exact public origin/Host; default `http://localhost:3100` |
 | `DATABASE_PATH` | SQLite control store; default `./data/gateway.sqlite` |
-| `AA_INTERNAL_API_URL` / `AA_MCP_SERVICE_SECRET` | Optional pair enabling the fixed AA brief endpoint; HTTPS except loopback |
+| `AA_INTERNAL_API_URL` / `AA_MCP_SERVICE_SECRET` | Optional pair enabling the fixed AA brief endpoint and Bot token resolve; HTTPS except loopback or host-exact `aa-console.railway.internal` |
 | `MCP_DISCOVER_STUBS` | Optional; `true` includes stub contracts in discovery and allows `call` by name. Default off. Local/dev testing only; does not change `/mcp` auth |
 
 `npm run dev` uses already exported environment variables. `npm run build`, `npm run check`, and `npm test` build, typecheck, and run security/domain/HTTP tests. `npm start` runs compiled code with injected environment variables.

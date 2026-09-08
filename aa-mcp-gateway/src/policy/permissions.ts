@@ -68,13 +68,19 @@ export const grants: Record<Bot, string[]> = {
     ...workflow,
   ],
 };
+/** Exact tool name, or single-segment domain wildcard (`content.*` → `content.<one segment>`). */
+export function permissionMatches(grant: string, permission: string): boolean {
+  if (grant === permission) return true;
+  if (!/^[a-z0-9_]+\.\*$/.test(grant)) return false;
+  const prefix = grant.slice(0, -1);
+  if (!permission.startsWith(prefix)) return false;
+  const rest = permission.slice(prefix.length);
+  return rest.length > 0 && !rest.includes(".");
+}
+
 export function allowed(bot: Bot, tool: Tool): boolean {
   if (tool.name === "workflow.record_decision") return false; // human-only API, never discoverable by Bots
   return tool.permissions.every((permission) =>
-    grants[bot].some(
-      (g) =>
-        g === permission ||
-        (g.endsWith(".*") && permission.startsWith(g.slice(0, -1))),
-    ),
+    grants[bot].some((g) => permissionMatches(g, permission)),
   );
 }

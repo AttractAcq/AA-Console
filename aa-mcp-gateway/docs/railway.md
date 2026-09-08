@@ -20,8 +20,9 @@ Compiled output already exists and avoids requiring tsx, which is a pruned devel
 
 | Variable | Value |
 | --- | --- |
-| `BOT_CREDENTIALS_JSON` | Nonempty array of `{ "bot": "bot_production", "token": "<unique >=32-character secret>", "clients": ["<authorized AA client UUID>"] }` |
-| `REVIEWER_CREDENTIALS_JSON` | Nonempty array of `{ "id": "<individual human ID>", "token": "<distinct >=32-character secret>" }` |
+| `BOT_AUTH_MODE` | `dual` for this Phase 3 rollout. `db` after cutover (empty `BOT_CREDENTIALS_JSON`). |
+| `BOT_CREDENTIALS_JSON` | Nonempty array of `{ "bot": "bot_production", "token": "<unique >=32-character secret>", "clients": ["<authorized AA client UUID>"] }` while dual-reading. Must be empty in `db` mode. |
+| `REVIEWER_CREDENTIALS_JSON` | Nonempty array of `{ "id": "<individual human ID>", "token": "<distinct >=32-character secret>" }`. Never stored in `mcp_bots`. |
 | `PUBLIC_ORIGIN` | `https://<actual-gateway-public-domain>`; origin only, no route |
 | `DATABASE_PATH` | `/data/gateway.sqlite` (Docker default) |
 | `HOST` | `0.0.0.0` (Docker and hosted defaults) |
@@ -29,7 +30,7 @@ Compiled output already exists and avoids requiring tsx, which is a pruned devel
 | `RAILWAY_RUN_UID` | `0` for Railway's root-owned volume with this Docker image |
 | `PORT` | Railway supplies this; do not copy the local port override |
 
-To enable the live AA adapter, set BOTH `AA_INTERNAL_API_URL=https://<runtime-public-domain>` and `AA_MCP_SERVICE_SECRET=<same dedicated secret configured on runtime>`. The adapter permits HTTPS origins (HTTP only for loopback development); do not configure a plain HTTP `railway.internal` URL. Without the pair, tools remain available with the configured unimplemented response. Do not use Bot or reviewer tokens for the service secret.
+To enable the live AA adapter and Bot token resolve, set BOTH `AA_INTERNAL_API_URL` (HTTPS origin, or host-exact `http://aa-console.railway.internal`) and `AA_MCP_SERVICE_SECRET=<same dedicated secret configured on runtime>`. The plaintext Bot Bearer never leaves the gateway; only the SHA-256 hash is sent to `/internal/mcp/auth/resolve`. Never log Bearer or hash. Without the pair, dual-read falls back to env credentials and brief tools remain unimplemented. Do not use Bot or reviewer tokens for the service secret. After revoke/suspend, bounce the gateway if you need immediate effect inside the 30s cache TTL.
 
 ## Mandatory persistence
 
