@@ -15,14 +15,25 @@ const canonical = (v: any): string =>
         )
       : v,
   );
+/** Stub contracts stay in the registry; default discovery/call only expose executable tools. */
+export function executable(tool: Tool, discoverStubs: boolean): boolean {
+  return (
+    tool.implementation === "real" ||
+    tool.implementation === "partial" ||
+    (discoverStubs && tool.implementation === "stub")
+  );
+}
 export class ActionEngine {
   constructor(
     readonly store: Store,
     readonly tools: Tool[],
     private adapter: Adapter,
+    readonly discoverStubs = false,
   ) {}
   discover(identity: Identity) {
-    return this.tools.filter((t) => allowed(identity.bot, t));
+    return this.tools.filter(
+      (t) => allowed(identity.bot, t) && executable(t, this.discoverStubs),
+    );
   }
   async call(
     identity: Identity,
@@ -64,7 +75,11 @@ export class ActionEngine {
       });
       return result;
     };
-    if (!tool || !allowed(identity.bot, tool))
+    if (
+      !tool ||
+      !allowed(identity.bot, tool) ||
+      !executable(tool, this.discoverStubs)
+    )
       return finish(
         {
           status: "rejected",

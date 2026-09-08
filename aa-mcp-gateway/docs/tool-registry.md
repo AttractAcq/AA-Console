@@ -89,4 +89,4 @@
 | security.create_finding | stub | write | MEDIUM | no | true | Scoped AA security business API |
 | security.get_incident_status | stub | read | LOW | no | true | Scoped AA security business API |
 
-`workflow.record_decision` is reserved, denied to every Bot; human decisions use the reviewer API. Exact machine-readable input/output schemas and required permissions are in `src/registry/tools.ts` and filtered MCP discovery.
+`workflow.record_decision` is reserved, denied to every Bot; human decisions use the reviewer API. Exact machine-readable input/output schemas and required permissions are in `src/registry/tools.ts`. Default MCP discovery and `call` expose only permitted tools with `implementation: real` (or `partial`). Stub contracts remain catalogued here and appear in `tools/list` only when `MCP_DISCOVER_STUBS=true`.

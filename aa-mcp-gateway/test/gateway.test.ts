@@ -19,9 +19,12 @@ const input = {
   idea_id: idea,
   idempotency_key: "test-key-001",
 };
-function fixture(adapter: Adapter = new AAApiAdapter()) {
+function fixture(adapter: Adapter = new AAApiAdapter(), discoverStubs = false) {
   const store = new Store(":memory:");
-  return { store, engine: new ActionEngine(store, registry, adapter) };
+  return {
+    store,
+    engine: new ActionEngine(store, registry, adapter, discoverStubs),
+  };
 }
 test("authentication rejects absent, malformed and unknown credentials", () => {
   const credentials = [{ ...identity, token: "a".repeat(40) }];
@@ -58,10 +61,21 @@ test("all initial contracts have strict schemas, permissions and output metadata
 });
 test("production discovery and execution enforce role and client scope", async () => {
   const { store, engine } = fixture();
-  const names = engine.discover(identity).map((t) => t.name);
-  assert.ok(names.includes("content.generate_brief"));
+  const discovered = engine.discover(identity);
+  const names = discovered.map((t) => t.name);
+  assert.deepEqual(names.sort(), [
+    "content.generate_brief",
+    "workflow.create_approval",
+    "workflow.get_activity",
+    "workflow.get_pending_approvals",
+  ]);
+  assert.ok(discovered.every((t) => t.implementation === "real"));
+  assert.ok(!names.includes("content.list_ideas"));
+  assert.ok(!names.includes("content.approve_asset"));
   assert.ok(!names.includes("pipeline.update_stage"));
   assert.ok(!names.includes("workflow.record_decision"));
+  for (const t of registry.filter((tool) => tool.implementation === "stub"))
+    assert.ok(!names.includes(t.name));
   assert.equal(
     (await engine.call(identity, "pipeline.update_stage", input)).status,
     "rejected",
@@ -77,6 +91,34 @@ test("production discovery and execution enforce role and client scope", async (
     "rejected",
   );
   store.close();
+});
+test("MCP_DISCOVER_STUBS exposes permitted stubs; default call rejects stub names", async () => {
+  const hidden = fixture();
+  const defaultNames = hidden.engine.discover(identity).map((t) => t.name);
+  assert.ok(defaultNames.includes("content.generate_brief"));
+  assert.ok(!defaultNames.includes("content.list_ideas"));
+  const denied = await hidden.engine.call(identity, "content.list_ideas", {
+    client_id: client,
+  });
+  assert.equal(denied.status, "rejected");
+  assert.equal(denied.message, "Tool unavailable or unauthorized.");
+  hidden.store.close();
+  const shown = fixture(new AAApiAdapter(), true);
+  const stubNames = shown.engine.discover(identity).map((t) => t.name);
+  assert.ok(stubNames.includes("content.generate_brief"));
+  assert.ok(stubNames.includes("content.list_ideas"));
+  assert.ok(stubNames.includes("content.approve_asset"));
+  assert.ok(!stubNames.includes("pipeline.update_stage"));
+  assert.ok(!stubNames.includes("workflow.record_decision"));
+  assert.equal(
+    (
+      await shown.engine.call(identity, "content.list_ideas", {
+        client_id: client,
+      })
+    ).status,
+    "not_implemented",
+  );
+  shown.store.close();
 });
 test("input validation rejects missing business identifier and unknown keys", async () => {
   const { store, engine } = fixture();
@@ -228,7 +270,7 @@ test("Finance critical payment creates approval and cannot execute before human 
   }
 });
 test("approval rejection, expiration and revoked scope block execution", async () => {
-  const { store, engine } = fixture();
+  const { store, engine } = fixture(new AAApiAdapter(), true);
   for (const mode of ["rejected", "expired", "revoked"]) {
     const r = await engine.call(identity, "content.approve_asset", {
       client_id: client,
@@ -328,14 +370,15 @@ test("HTTP MCP discovery/call and human-only approval boundary", async () => {
     });
     assert.equal(response.status, 200);
     const list: any = await response.json();
-    assert.ok(
-      list.result.tools.some((t: any) => t.name === "content.generate_brief"),
-    );
-    assert.ok(
-      !list.result.tools.some(
-        (t: any) => t.name === "workflow.record_decision",
-      ),
-    );
+    const listed = list.result.tools.map((t: any) => t.name).sort();
+    assert.deepEqual(listed, [
+      "content.generate_brief",
+      "workflow.create_approval",
+      "workflow.get_activity",
+      "workflow.get_pending_approvals",
+    ]);
+    assert.ok(!listed.includes("content.list_ideas"));
+    assert.ok(!listed.includes("workflow.record_decision"));
     const call = await fetch(c.PUBLIC_ORIGIN + "/mcp", {
       method: "POST",
       headers,
@@ -460,6 +503,15 @@ test("Railway settings require public binding, origin and persistent path", () =
     REVIEWER_CREDENTIALS_JSON: JSON.stringify([{ id: "reviewer", token: "b".repeat(40) }]),
   };
   assert.equal(config(credentials).PORT, 3100);
+  assert.equal(config(credentials).MCP_DISCOVER_STUBS, false);
+  assert.equal(
+    config({ ...credentials, MCP_DISCOVER_STUBS: "true" }).MCP_DISCOVER_STUBS,
+    true,
+  );
+  assert.equal(
+    config({ ...credentials, MCP_DISCOVER_STUBS: "false" }).MCP_DISCOVER_STUBS,
+    false,
+  );
   const hosted = { ...credentials, RAILWAY_ENVIRONMENT_ID: "test", PUBLIC_ORIGIN: "https://gateway.example.com", DATABASE_PATH: "/data/gateway.sqlite" };
   assert.equal(config({ ...hosted, PORT: "4567" }).PORT, 4567);
   assert.equal(config(hosted).HOST, "0.0.0.0");
