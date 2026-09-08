@@ -125,7 +125,7 @@ export class BotAuthenticator {
       this.alert({ event: "bot_auth_aa_unavailable" });
     }
     if (this.mode === "db") {
-      const identity = this.fromAa(aa);
+      const identity = this.fromAa(aa, true);
       if (!identity) throw unauthorized();
       this.byBot.set(identity.bot, identity);
       return identity;
@@ -171,10 +171,18 @@ export class BotAuthenticator {
     return !sameSet(aa.permissions ?? [], grants[env.bot]);
   }
 
-  private fromAa(aa: AaResolveResult | null | "unavailable"): Identity | undefined {
+  private fromAa(
+    aa: AaResolveResult | null | "unavailable",
+    withPermissions = false,
+  ): Identity | undefined {
     if (aa === "unavailable" || !aa?.found || aa.status !== "active") return;
     if (!aa.bot_id || !bots.includes(aa.bot_id)) return;
-    return { bot: aa.bot_id, clients: [...(aa.clients ?? [])] };
+    const identity: Identity = {
+      bot: aa.bot_id,
+      clients: [...(aa.clients ?? [])],
+    };
+    if (withPermissions) identity.permissions = [...(aa.permissions ?? [])];
+    return identity;
   }
 
   private async lookupAa(hashHex: string): Promise<AaResolveResult | null> {

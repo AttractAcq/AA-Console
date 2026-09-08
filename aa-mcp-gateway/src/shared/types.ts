@@ -12,7 +12,12 @@ export const bots = [
   "bot_security_devops",
 ] as const;
 export type Bot = (typeof bots)[number];
-export type Identity = { bot: Bot; clients: string[] };
+export type Identity = {
+  bot: Bot;
+  clients: string[];
+  /** AA grant patterns. Set in `BOT_AUTH_MODE=db`; omitted identities use the code matrix. */
+  permissions?: string[];
+};
 export const resultSchema = z
   .object({
     status: z.enum([

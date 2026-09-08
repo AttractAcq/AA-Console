@@ -61,7 +61,10 @@ Phase 3 Bot token RPCs (service secret required; hash in, never plaintext):
 - `POST /internal/mcp/auth/issue` / `rotate` (hard-cut) / `revoke` / `suspend`
 
 Do not log Bearer values or token hashes. Gateway dual-read uses resolve;
-`BOT_AUTH_MODE=db` refuses nonempty `BOT_CREDENTIALS_JSON`.
+`BOT_AUTH_MODE=db` refuses nonempty `BOT_CREDENTIALS_JSON` and authorizes from
+AA resolve `permissions` (default deny). Do not enable `db` in production until
+the locked cutover. There is no terminal `revoke_bot` RPC yet (token revoke +
+`suspend_bot` only).
 
 Provision only the client this bot has actually been authorized to operate on,
 using the Supabase SQL editor or another trusted admin connection:

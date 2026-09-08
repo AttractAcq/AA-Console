@@ -17,13 +17,13 @@ cp .env.example .env
 node --env-file=.env --import tsx src/server/main.ts
 ```
 
-Generate independent tokens using `openssl rand -hex 32`. `BOT_CREDENTIALS_JSON` is an array of `{ "bot": "bot_production", "token": "<unique secret>", "clients": ["<AA client UUID>"] }`. Provision only needed identities; each identity occurs once and has explicit clients. All ten canonical identities are in `src/shared/types.ts`. `REVIEWER_CREDENTIALS_JSON` is an array of `{ "id": "<individual human ID>", "token": "<different unique secret>" }`. Empty/malformed credentials prevent startup in `env`/`dual` modes. `BOT_AUTH_MODE=db` refuses a nonempty `BOT_CREDENTIALS_JSON` (fail closed). Tokens, Bearer values, and token hashes are never returned in errors or logs. Revoke/suspend takes effect at AA immediately; the gateway positive cache is 30s unless you bounce the process.
+Generate independent tokens using `openssl rand -hex 32`. `BOT_CREDENTIALS_JSON` is an array of `{ "bot": "bot_production", "token": "<unique secret>", "clients": ["<AA client UUID>"] }`. Provision only needed identities; each identity occurs once and has explicit clients. All ten canonical identities are in `src/shared/types.ts`. `REVIEWER_CREDENTIALS_JSON` is an array of `{ "id": "<individual human ID>", "token": "<different unique secret>" }`. Empty/malformed credentials prevent startup in `env`/`dual` modes. `BOT_AUTH_MODE=db` refuses a nonempty `BOT_CREDENTIALS_JSON` (fail closed) and authorizes discover/call from AA-resolved permission patterns (default deny). `workflow.record_decision` stays hard-denied in code in every mode. Tokens, Bearer values, and token hashes are never returned in errors or logs. Revoke/suspend takes effect at AA immediately; the gateway positive cache is 30s unless you bounce the process. Do not set `BOT_AUTH_MODE=db` in deployed/prod config until the locked cutover runbook.
 
 Environment variables:
 
 | Variable | Purpose |
 | --- | --- |
-| `BOT_AUTH_MODE` | `env` \| `dual` \| `db`. Default `dual`. `db` refuses nonempty `BOT_CREDENTIALS_JSON`. |
+| `BOT_AUTH_MODE` | `env` \| `dual` \| `db`. Default `dual`. `db` refuses nonempty `BOT_CREDENTIALS_JSON` and uses AA permissions. |
 | `BOT_CREDENTIALS_JSON` | Required Bot tokens and client allowlists except in `db` mode (must be empty) |
 | `REVIEWER_CREDENTIALS_JSON` | Required separate human reviewer identities/tokens |
 | `HOST` / `PORT` | Bind address; defaults `127.0.0.1:3100` |

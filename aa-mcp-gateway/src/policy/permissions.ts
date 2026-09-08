@@ -1,4 +1,4 @@
-import type { Bot, Tool } from "../shared/types.js";
+import type { Bot, Identity, Tool } from "../shared/types.js";
 const workflow = [
   "workflow.create_task",
   "workflow.assign_task",
@@ -78,9 +78,20 @@ export function permissionMatches(grant: string, permission: string): boolean {
   return rest.length > 0 && !rest.includes(".");
 }
 
-export function allowed(bot: Bot, tool: Tool): boolean {
+export function grantPatterns(identity: Identity): string[] {
+  return Array.isArray(identity.permissions)
+    ? identity.permissions
+    : grants[identity.bot];
+}
+
+export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   if (tool.name === "workflow.record_decision") return false; // human-only API, never discoverable by Bots
+  const identity: Identity =
+    typeof botOrIdentity === "string"
+      ? { bot: botOrIdentity, clients: [] }
+      : botOrIdentity;
+  const patterns = grantPatterns(identity);
   return tool.permissions.every((permission) =>
-    grants[bot].some((g) => permissionMatches(g, permission)),
+    patterns.some((g) => permissionMatches(g, permission)),
   );
 }

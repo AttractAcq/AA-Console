@@ -32,7 +32,7 @@ export class ActionEngine {
   ) {}
   discover(identity: Identity) {
     return this.tools.filter(
-      (t) => allowed(identity.bot, t) && executable(t, this.discoverStubs),
+      (t) => allowed(identity, t) && executable(t, this.discoverStubs),
     );
   }
   async call(
@@ -77,7 +77,7 @@ export class ActionEngine {
     };
     if (
       !tool ||
-      !allowed(identity.bot, tool) ||
+      !allowed(identity, tool) ||
       !executable(tool, this.discoverStubs)
     )
       return finish(

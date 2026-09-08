@@ -254,8 +254,8 @@ Three stages. No production secret rotation in the design or implementation PR; 
 3. **Cutover (`BOT_AUTH_MODE=db`)**
    - Resolve is the only auth path.
    - **Refuse nonempty `BOT_CREDENTIALS_JSON` (fail closed).** Startup must error if the env is nonempty.
-   - Permissions: **DB authoritative.**
-   - `workflow.record_decision` hard-deny remains in code.
+   - Permissions: **DB authoritative.** Gateway Identity carries AA `permissions`; `allowed()` / discover / call evaluate those patterns (default deny, same single-segment matcher). The code matrix is not consulted.
+   - `workflow.record_decision` hard-deny remains in code (even if AA listed it).
    - Sealed env fallback: **forbidden** unless a written Sec+Alex exception exists.
 
 `REVIEWER_CREDENTIALS_JSON` is **not** migrated into these tables.
@@ -268,7 +268,7 @@ Three stages. No production secret rotation in the design or implementation PR; 
 | --- | --- | --- |
 | **Revoke token** | `revoked_at = now()`. Resolve misses (or returns inactive). Gateway cache expires within positive TTL (30s) **or sooner if operators bounce the gateway**. | Immediate at AA; ≤30s at gateway unless bounced. |
 | **Suspend bot** | `mcp_bots.status = 'suspended'`. Resolve fails even if tokens are unrevoked. Dual-read must **not** fall back to env on this hit. | Same bound. |
-| **Revoke bot** | status `revoked` + revoke all tokens. Terminal. | Same bound. |
+| **Revoke bot** | status `revoked` + revoke all tokens. Terminal. | Same bound. **Not implemented as an RPC yet** — Phase 3 ships `revoke_bot_token` and `suspend_bot` only. Cutover runbook must not assume a terminal `revoke_bot`; track adding `mcp_internal.revoke_bot` before relying on this row. |
 | **Revoke client** | `DELETE FROM mcp_bot_clients`. Gateway cache may still list the UUID until TTL; **AA enqueue already re-checks** and returns `client_forbidden`. | Immediate on AA writes; ≤30s on gateway-only checks (or bounce). |
 | **Rotate** | Insert new hash (`rotated_from = old.token_id`). Operator receives plaintext **once**. Old token: **hard-cut** (`revoked_at = now()`). | Immediate at AA. |
 
@@ -382,9 +382,9 @@ Former open questions. Answers are binding; see the section **Sec decisions (loc
 
 1. Migration (after 63/64): schema `mcp_internal`; tables `mcp_bots`, `mcp_bot_tokens`, `mcp_bot_permissions`, `mcp_bot_token_audit`; FK on `mcp_bot_clients`; seed ten bots + permission rows from `permissions.ts`; CoS prohibition asserts; permission-matcher helper (exact or single-segment `domain.*` only). **No** live token hashes in git. **Do not apply to production without Alex approval.**
 2. AA RPCs in `mcp_internal` + `public` wrappers with `enqueue_mcp_brief` posture; internal HTTP: resolve, issue, rotate (hard-cut), revoke, suspend. Hash in; never plaintext out of the gateway; never log Bearer or hash.
-3. Gateway `BOT_AUTH_MODE=env|dual|db` (default **dual**). Dual-read + 30s positive cache. Mismatch deny + alert. Uniform 401. Reviewer path unchanged. `workflow.record_decision` hard-deny in code. `db` mode refuses nonempty `BOT_CREDENTIALS_JSON`. Document gateway bounce for immediate revoke.
-4. Tests: dual-read match; dual-read mismatch deny; stub/discovery unchanged; production bot still only real tools; permission wildcard single-segment; revoked/suspended bot denied; CoS prohibitions; never log Bearer/hash.
-5. Cutover runbook (ops, later): hash-insert live tokens, confirm dual-read agreement, set `BOT_AUTH_MODE=db`, empty env. Bounce gateway if immediate revoke is required during the 30s TTL.
+3. Gateway `BOT_AUTH_MODE=env|dual|db` (default **dual**). Dual-read + 30s positive cache. Mismatch deny + alert. Uniform 401. Reviewer path unchanged. `workflow.record_decision` hard-deny in code. `db` mode refuses nonempty `BOT_CREDENTIALS_JSON` and evaluates AA `permissions` on Identity (default deny). Document gateway bounce for immediate revoke.
+4. Tests: dual-read match; dual-read mismatch deny; stub/discovery unchanged; production bot still only real tools; permission wildcard single-segment; revoked/suspended bot denied; CoS prohibitions; never log Bearer/hash; db mode AA-only grant; db mode deny when absent from AA; `workflow.record_decision` hard-deny in db.
+5. Cutover runbook (ops, later): hash-insert live tokens, confirm dual-read agreement, set `BOT_AUTH_MODE=db`, empty env. Bounce gateway if immediate revoke is required during the 30s TTL. Terminal bot revoke still needs a dedicated `revoke_bot` RPC (not in this PR); until then use token revoke + `suspend_bot` and do not treat suspend as terminal.
 6. Phase 4: Bot RPC wrappers per domain as adapters are enabled; isolation tests in §7.2 **green on an RLS-enabled database** before each adapter leaves stub; Alex approval before production RLS migrations.
 
 Phase 3 is identity. Phase 4 is data isolation. Neither is a substitute for the other: a valid Bot token with a revoked client grant must still fail at AA.

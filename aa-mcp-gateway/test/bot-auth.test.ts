@@ -175,7 +175,88 @@ test("dual-read falls back to env on AA miss and db mode requires AA", async () 
   const db = new BotAuthenticator("db", [], async () => ({ found: false }));
   await assert.rejects(() => db.authenticate(`Bearer ${token}`), /unauthorized/);
   const dbOk = new BotAuthenticator("db", [], async () => activeResolve());
-  assert.deepEqual(await dbOk.authenticate(`Bearer ${token}`), identity);
+  assert.deepEqual(await dbOk.authenticate(`Bearer ${token}`), {
+    ...identity,
+    permissions: [...grants.bot_production],
+  });
+});
+
+test("db mode allows a tool present only in AA permissions", async () => {
+  const auth = new BotAuthenticator("db", [], async () =>
+    activeResolve({ permissions: ["economics.get_costs"] }),
+  );
+  const id = await auth.authenticate(`Bearer ${token}`);
+  assert.deepEqual(id.permissions, ["economics.get_costs"]);
+  assert.equal(
+    grants.bot_production.some((g) => permissionMatches(g, "economics.get_costs")),
+    false,
+  );
+  const store = new Store(":memory:");
+  const engine = new ActionEngine(
+    store,
+    registry,
+    {
+      async execute() {
+        return { status: "completed", capability: "economics.get_costs" };
+      },
+    },
+    true,
+  );
+  assert.ok(engine.discover(id).some((t) => t.name === "economics.get_costs"));
+  const r = await engine.call(id, "economics.get_costs", { client_id: client });
+  assert.equal(r.status, "completed");
+  store.close();
+});
+
+test("db mode denies a tool in the code matrix but absent from AA permissions", async () => {
+  const auth = new BotAuthenticator("db", [], async () =>
+    activeResolve({ permissions: ["workflow.get_activity"] }),
+  );
+  const id = await auth.authenticate(`Bearer ${token}`);
+  const store = new Store(":memory:");
+  const engine = new ActionEngine(store, registry, {
+    async execute() {
+      return { status: "completed", capability: "content.generate_brief" };
+    },
+  });
+  assert.ok(grants.bot_production.some((g) => permissionMatches(g, "content.generate_brief")));
+  assert.ok(!engine.discover(id).some((t) => t.name === "content.generate_brief"));
+  const r = await engine.call(id, "content.generate_brief", {
+    client_id: client,
+    idea_id: "22222222-2222-4222-8222-222222222222",
+    idempotency_key: "db-deny-brief",
+  });
+  assert.equal(r.status, "rejected");
+  store.close();
+});
+
+test("workflow.record_decision stays hard-denied in db mode even if AA lists it", async () => {
+  const auth = new BotAuthenticator("db", [], async () =>
+    activeResolve({
+      permissions: ["workflow.*", "workflow.record_decision", "content.*"],
+    }),
+  );
+  const id = await auth.authenticate(`Bearer ${token}`);
+  const store = new Store(":memory:");
+  const engine = new ActionEngine(
+    store,
+    registry,
+    {
+      async execute() {
+        return { status: "completed", capability: "workflow.record_decision" };
+      },
+    },
+    true,
+  );
+  assert.ok(!engine.discover(id).some((t) => t.name === "workflow.record_decision"));
+  const r = await engine.call(id, "workflow.record_decision", {
+    client_id: client,
+    approval_id: client,
+    decision: "approved",
+    idempotency_key: "db-decision-key",
+  });
+  assert.equal(r.status, "rejected");
+  store.close();
 });
 
 test("HTTP dual-read match, mismatch 401, and reviewer path stay on REVIEWER_CREDENTIALS_JSON", async () => {
