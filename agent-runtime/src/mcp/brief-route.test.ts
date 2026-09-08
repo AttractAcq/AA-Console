@@ -50,6 +50,7 @@ beforeAll(async () => {
     '20260908080000_63_mcp_brief_enqueue.sql',
     '20260908080100_64_brief_job_idempotency.sql',
     '20260908190000_65_mcp_bot_auth_registry.sql',
+    '20260908200000_66_mcp_domain_rls_bot_isolation.sql',
   ]) await db.exec(await migration(file));
 }, 30_000);
 afterAll(async () => { await db?.close(); });
@@ -184,6 +185,11 @@ describe('MCP HTTP contract through the transactional PostgreSQL queue', () => {
     await db.exec('delete from mcp_bot_clients');
     expect((await call()).body.error.code).toBe('client_forbidden');
     expect(await count('agent_jobs')).toBe(1);
+  });
+  it('denies a suspended bot even with a remaining client grant', async () => {
+    await db.query('select mcp_suspend_bot($1,$2,$3)', ['bot_production', 'operator', 'lock']);
+    expect((await call()).body.error.code).toBe('bot_not_active');
+    expect(await count('agent_jobs')).toBe(0);
   });
   it.each(['paused = true', 'archived_at = now()', "requires_upstream = '{icp}'"])('refuses unavailable brief agent: %s', async (patch) => {
     await db.exec(`update agents set ${patch} where agent_key = 'brief'`);

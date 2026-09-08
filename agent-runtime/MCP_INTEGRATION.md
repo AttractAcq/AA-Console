@@ -43,9 +43,11 @@ part of runtime startup.
 
 ## Database setup and client authorization
 
-Apply migrations 63, 64, and 65 to the intended **non-production** test database through the normal
-migration process before testing. **Do not apply migration 65 to production without Alex approval.**
-Migration 65 creates `mcp_internal` Bot registry tables and RPCs. It does not insert live token hashes.
+Apply migrations 63, 64, 65, and 66 to the intended **non-production** test database through the normal
+migration process before testing. **Do not apply migrations 65 or 66 to production without Alex approval.**
+Migration 65 creates `mcp_internal` Bot registry tables and RPCs. Migration 66 tightens Bot domain RLS
+and shared Bot client-grant helpers. Neither inserts live token hashes. See
+`aa-mcp-gateway/docs/phase-4-rls-isolation.md`.
 
 AA does not currently have the gateway's live bot/client permission model.
 The interim authority is `public.mcp_bot_clients`: an explicit, deny-by-default
