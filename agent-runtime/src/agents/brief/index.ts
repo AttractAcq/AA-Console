@@ -39,6 +39,22 @@ export async function runBriefJob(
     };
   }
 
+  // A completed insert may outlive a crashed worker. Reuse it on retry and
+  // avoid paying for another model call. The unique index is the final guard
+  // if two attempts reach persistence concurrently.
+  const alreadyPersisted = async (): Promise<boolean> => {
+    const { data, error } = await sb.from("client_briefs")
+      .select("id, client_id, source_idea_id")
+      .eq("job_id", job.id).is("repurpose_format", null).maybeSingle();
+    if (error) throw new Error(`Failed to check existing brief: ${error.message}`);
+    if (!data) return false;
+    if (data.client_id !== job.client_id || data.source_idea_id !== job.input_id) {
+      throw new Error("Existing brief does not match this job's input.");
+    }
+    return true;
+  };
+  if (await alreadyPersisted()) return { ok: true, retryable: false };
+
   const { data: idea, error: ideaError } = await sb
     .from("client_ideas")
     .select("id, title, body, media_type, content_territory, source_question, strategic_reason")
@@ -201,7 +217,13 @@ Call ${submitTool.name} once when you are done.`;
     status: "draft",
     job_id: job.id,
   });
-  if (error) throw new Error(`Failed to write brief: ${error.message}`);
+  if (error) {
+    // Only accept a uniqueness conflict when the expected output exists.
+    // Never overwrite an existing brief (including a human-edited one).
+    if (error.code !== "23505" || !(await alreadyPersisted())) {
+      throw new Error(`Failed to write brief: ${error.message}`);
+    }
+  }
 
   await appendEvent(sb, job.id, `Wrote brief "${title}".`, "info", { cost_usd: usage.costUsd });
   return { ok: true, retryable: false, usage };

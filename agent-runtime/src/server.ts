@@ -8,6 +8,7 @@
 // loops run and the process is inert.
 
 import http from "node:http";
+import { handleMcpBrief } from "./mcp/brief-route.js";
 import { loadConfig } from "./config.js";
 import { serviceClient } from "./db.js";
 import { startWorker, type WorkerHandle } from "./worker.js";
@@ -46,6 +47,11 @@ const server = http.createServer((req, res) => {
     res.writeHead(status, { "Content-Type": "application/json" });
     res.end(JSON.stringify(body));
   };
+
+  if (req.url === "/internal/mcp/content/generate-brief") {
+    void handleMcpBrief(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
 
   // The Master AI is browser-called, so it needs CORS. Only listed origins
   // get the header at all — an unlisted origin is refused by the browser
@@ -104,7 +110,7 @@ const server = http.createServer((req, res) => {
   json(404, { ok: false, error: "not found" });
 });
 
-server.listen(config.healthPort, () => {
+server.listen(config.healthPort, "0.0.0.0", () => {
   logger.info("health_server_listening", { port: config.healthPort });
 });
 

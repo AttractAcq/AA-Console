@@ -12,7 +12,7 @@ let savedEnv: NodeJS.ProcessEnv;
 beforeEach(() => {
   savedEnv = { ...process.env };
   for (const key of Object.keys(process.env)) {
-    if (key.startsWith("AGENT_RUNTIME_") || key.startsWith("MASTER_AI_") || key === "CONSOLE_URL" || key.startsWith("ANTHROPIC_API_KEY") || key === "SUPABASE_URL" || key === "SUPABASE_SERVICE_ROLE_KEY" || key === "PORT") {
+    if (key.startsWith("AGENT_RUNTIME_") || key.startsWith("MASTER_AI_") || key === "CONSOLE_URL" || key.startsWith("ANTHROPIC_API_KEY") || key === "SUPABASE_URL" || key === "SUPABASE_SERVICE_ROLE_KEY" || key === "PORT" || key === "AA_MCP_SERVICE_SECRET") {
       delete process.env[key];
     }
   }
@@ -36,6 +36,14 @@ describe("loadConfig", () => {
     expect(config.concurrency).toBe(2);
     expect(config.leaseSeconds).toBe(900);
     expect(config.sharedSecret).toBeNull();
+  });
+
+  it("keeps MCP denied by default and reads its dedicated server credential", () => {
+    expect(loadConfig().mcpServiceSecret).toBeNull();
+    process.env.AA_MCP_SERVICE_SECRET = "test-service-secret";
+    expect(loadConfig().mcpServiceSecret).toBe("test-service-secret");
+    process.env.AA_MCP_SERVICE_SECRET = "   ";
+    expect(loadConfig().mcpServiceSecret).toBeNull();
   });
 
   it("rejects a lease outside the 30-3600s range claim_agent_job accepts", () => {
@@ -131,5 +139,17 @@ describe("the console origin", () => {
   it("strips a trailing slash from the console url", () => {
     process.env.CONSOLE_URL = "https://console.attractacq.com/";
     expect(loadConfig().consoleUrl).toBe("https://console.attractacq.com");
+  });
+});
+
+describe("Railway port", () => {
+  it("uses the local port only when PORT is absent", () => {
+    expect(loadConfig().healthPort).toBe(8787);
+    process.env.PORT = "4567";
+    expect(loadConfig().healthPort).toBe(4567);
+  });
+  it.each(["", " ", "0", "65536", "123abc", "12.5", "-1"])("rejects invalid PORT %j", (port) => {
+    process.env.PORT = port;
+    expect(() => loadConfig()).toThrow(/PORT/);
   });
 });

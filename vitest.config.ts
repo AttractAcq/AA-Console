@@ -5,7 +5,7 @@ import { defineConfig } from "vitest/config";
 // tests via its own `npm test`, not this one.
 export default defineConfig({
   test: {
-    exclude: ["**/node_modules/**", "agent-runtime/**"],
+    exclude: ["**/node_modules/**", "agent-runtime/**", "aa-mcp-gateway/**"],
     // Component tests need a DOM. The pure-logic suites do not care, and
     // jsdom is cheap enough that splitting the run by environment would
     // cost more in config than it saves in milliseconds.

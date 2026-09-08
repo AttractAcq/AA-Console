@@ -20,6 +20,8 @@ export interface RuntimeConfig {
   healthPort: number;
   /** Required in an X-Runtime-Secret header on /status when set. */
   sharedSecret: string | null;
+  /** Dedicated MCP gateway credential. Missing disables the MCP endpoint. */
+  mcpServiceSecret?: string | null;
   /** Ceiling on Master AI spend across every conversation in one UTC day. */
   masterAiDailyLimitUsd: number;
   /** Ceiling on Master AI spend within a single conversation, all time. */
@@ -99,6 +101,15 @@ const AGENT_KEY_ENV_SUFFIX: Record<string, string> = {
   landing_page: "LANDING_PAGE",
 };
 
+function serverPort(): number {
+  const raw = process.env.PORT;
+  if (raw === undefined) return 8787;
+  if (!/^\d+$/.test(raw) || Number(raw) < 1 || Number(raw) > 65535) {
+    throw new Error("PORT must be an integer between 1 and 65535");
+  }
+  return Number(raw);
+}
+
 export function loadConfig(): RuntimeConfig {
   const anthropicApiKey = requireEnv("ANTHROPIC_API_KEY");
   const anthropicApiKeyByAgent: Record<string, string> = {};
@@ -128,8 +139,9 @@ export function loadConfig(): RuntimeConfig {
     // take minutes — but finite, which is the whole point.
     providerTimeoutMs: intEnv("AGENT_RUNTIME_PROVIDER_TIMEOUT_MS", 600_000),
     maxJobSeconds: intEnv("AGENT_RUNTIME_MAX_JOB_SECONDS", 1800),
-    healthPort: intEnv("PORT", 8787),
+    healthPort: serverPort(),
     sharedSecret: optionalEnv("AGENT_RUNTIME_SHARED_SECRET") ?? null,
+    mcpServiceSecret: optionalEnv("AA_MCP_SERVICE_SECRET") ?? null,
     // Calibrated against real use rather than guessed: 13 turns had cost
     // $1.15 in total, the dearest single turn $0.16, and the busiest day
     // $1.10. These sit far above that, so they never interrupt ordinary

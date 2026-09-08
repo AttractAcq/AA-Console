@@ -115,3 +115,12 @@ A runner reads its input (`client_agent_inputs` via the job's
 `input_table`/`input_id`), does the work, writes one `client_agent_records`
 row per `record_templates` item for its domain, and returns
 `{ok, retryable, usage}`.
+
+## MCP gateway integration
+
+The AA-owned brief endpoint, service secret, client allowlist, migrations, and
+manual verification commands are documented in [MCP_INTEGRATION.md](MCP_INTEGRATION.md).
+
+## Railway preparation
+
+See [RAILWAY.md](RAILWAY.md) for the exact compiled start command, environment variables, healthcheck and migration prerequisites.
