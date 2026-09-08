@@ -4,6 +4,10 @@ import {
   BOT, ID, MCP_ERRORS, UUID, authenticated, fail, header, json, readJsonBody,
 } from './http.js';
 
+// Sec Phase 5: these routes call public mcp_* wrappers only. Authorization is
+// require_active_bot + require_bot_client_grant in SQL — never can_access_client.
+// Gateway permission checks and client allowlist still run before this hop.
+
 const FORMATS = new Set([
   'reel', 'short', 'carousel', 'quote_graphic',
   'text_post', 'email', 'ad_variation', 'story_clips',

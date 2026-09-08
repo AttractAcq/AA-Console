@@ -3,6 +3,14 @@
 -- Additive only: mcp_internal ledger + RPCs + public wrappers.
 -- No live token hashes. No permission-row inserts (bot_production already
 -- has content.*). Does not replace enqueue_mcp_brief or human RPCs.
+--
+-- Sec Phase 5 requirements (binding — do not weaken Phase 3–4):
+--   1. Ping Sec on this PR (and each later content RPC/policy PR) before merge.
+--   2. Every Bot content RPC: require_active_bot + require_bot_client_grant.
+--   3. Never can_access_client on Bot paths (human RPCs keep it).
+--   4. Resource client_id must match the granted client (client_mismatch).
+--   5. Gateway permission checks remain; workflow.record_decision hard-denied.
+--   6. Isolation tests must be green before a tool is marked non-stub.
 
 -- ---------------------------------------------------------------------------
 -- Ledger for Bot content writes (revision / approval-request / repurpose).
@@ -372,6 +380,8 @@ declare
   v_limit integer;
   v_ideas jsonb;
 begin
+  -- Sec Phase 5: active bot + mcp_bot_clients grant. Never can_access_client.
+  perform mcp_internal.require_active_bot(p_bot_id);
   perform mcp_internal.require_bot_client_grant(p_bot_id, p_client_id);
   v_limit := least(greatest(coalesce(p_limit, 25), 1), 100);
   if p_status is not null and p_status not in ('draft', 'approved', 'rejected', 'briefed') then
@@ -407,6 +417,8 @@ as $$
 declare
   v_idea client_ideas;
 begin
+  -- Sec Phase 5: active bot + mcp_bot_clients grant. Never can_access_client.
+  perform mcp_internal.require_active_bot(p_bot_id);
   perform mcp_internal.require_bot_client_grant(p_bot_id, p_client_id);
   if p_idea_id is null then
     raise exception using message = 'invalid_request', errcode = 'P0001';
@@ -434,6 +446,8 @@ as $$
 declare
   v record;
 begin
+  -- Sec Phase 5: active bot + mcp_bot_clients grant. Never can_access_client.
+  perform mcp_internal.require_active_bot(p_bot_id);
   perform mcp_internal.require_bot_client_grant(p_bot_id, p_client_id);
   if p_brief_id is null and p_idea_id is null then
     raise exception using message = 'invalid_request', errcode = 'P0001';
@@ -471,6 +485,8 @@ declare
   v_blocked text;
   v_ready boolean := false;
 begin
+  -- Sec Phase 5: active bot + mcp_bot_clients grant. Never can_access_client.
+  perform mcp_internal.require_active_bot(p_bot_id);
   perform mcp_internal.require_bot_client_grant(p_bot_id, p_client_id);
   select * into v from mcp_internal.resolve_content_target(p_client_id, p_idea_id, p_brief_id, p_asset_id);
 
@@ -620,6 +636,8 @@ declare
   v_brief client_briefs;
   v_asset client_media_assets;
 begin
+  -- Sec Phase 5: active bot + mcp_bot_clients grant. Never can_access_client.
+  perform mcp_internal.require_active_bot(p_bot_id);
   perform mcp_internal.require_bot_client_grant(p_bot_id, p_client_id);
   perform mcp_internal.require_mcp_ids(p_request_id, p_execution_id);
   if p_summary is null or length(btrim(p_summary)) < 1 or length(p_summary) > 4000 then
@@ -695,6 +713,8 @@ declare
   v_queue text;
   v_brief_status text;
 begin
+  -- Sec Phase 5: active bot + mcp_bot_clients grant. Never can_access_client.
+  perform mcp_internal.require_active_bot(p_bot_id);
   perform mcp_internal.require_bot_client_grant(p_bot_id, p_client_id);
   perform mcp_internal.require_mcp_ids(p_request_id, p_execution_id);
   if p_summary is not null and length(p_summary) > 4000 then
@@ -787,6 +807,8 @@ declare
     'text_post', 'email', 'ad_variation', 'story_clips'
   ];
 begin
+  -- Sec Phase 5: active bot + mcp_bot_clients grant. Never can_access_client.
+  perform mcp_internal.require_active_bot(p_bot_id);
   perform mcp_internal.require_bot_client_grant(p_bot_id, p_client_id);
   perform mcp_internal.require_mcp_ids(p_request_id, p_execution_id);
   if p_asset_id is null
@@ -976,6 +998,16 @@ end $$;
 comment on table mcp_internal.mcp_content_requests is
   'Phase 5 Bot content write ledger. service_role SECURITY DEFINER RPCs only. Do not apply to production without Alex approval.';
 comment on function public.mcp_list_ideas(text, uuid, integer, text) is
-  'Bot list of client_ideas. mcp_bot_clients scoped. service_role only.';
+  'Bot list of client_ideas. require_active_bot + require_bot_client_grant. Never can_access_client. service_role only.';
+comment on function public.mcp_get_idea(text, uuid, uuid) is
+  'Bot get idea. Grant before lookup; resource client_id must match. Never can_access_client.';
+comment on function public.mcp_get_brief(text, uuid, uuid, uuid) is
+  'Bot get original brief. Grant + client_mismatch. Never can_access_client.';
+comment on function public.mcp_get_production_status(text, uuid, uuid, uuid, uuid) is
+  'Bot production status. Grant + resource client match. Never can_access_client.';
+comment on function public.mcp_request_revision(text, text, text, uuid, uuid, uuid, uuid, text) is
+  'Bot revision request. Grant + client match. Never can_access_client. Does not write client_asset_reviews.';
+comment on function public.mcp_request_approval(text, text, text, uuid, uuid, uuid, uuid, text) is
+  'Bot approval request (not a decision). Grant + client match. Never review_media_asset / can_access_client.';
 comment on function public.mcp_create_repurpose_plan(text, text, text, uuid, uuid, text[]) is
   'Bot repurpose enqueue. Approved asset + mcp_bot_clients. Never can_access_client.';

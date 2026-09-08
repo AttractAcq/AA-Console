@@ -85,6 +85,7 @@ export function grantPatterns(identity: Identity): string[] {
 }
 
 export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
+  // Sec Phase 5 #5 / Phase 3–4 locked: hard-deny stays in gateway code forever.
   if (tool.name === "workflow.record_decision") return false; // human-only API, never discoverable by Bots
   const identity: Identity =
     typeof botOrIdentity === "string"

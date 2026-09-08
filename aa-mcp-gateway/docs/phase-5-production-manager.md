@@ -2,9 +2,22 @@
 
 **Status:** Implementation PR. **Do not apply migration 68 to production without Alex approval. Do not deploy to Railway from this PR.**
 
-**Audience:** Security and Engineering.
+**Audience:** Security and Engineering. **Ping Sec on this PR (and every later content RPC/policy PR) before merge.**
 
-**Depends on:** Phase 3–4 Bot auth / RLS ([phase-3-4-bot-auth-rls.md](./phase-3-4-bot-auth-rls.md), [phase-4-rls-isolation.md](./phase-4-rls-isolation.md)). Locked Sec decisions in those notes stay locked.
+**Depends on:** Phase 3–4 Bot auth / RLS ([phase-3-4-bot-auth-rls.md](./phase-3-4-bot-auth-rls.md), [phase-4-rls-isolation.md](./phase-4-rls-isolation.md)). Locked Sec decisions in those notes stay locked. Do not weaken Phase 3–4 auth/RLS.
+
+---
+
+## Sec Phase 5 requirements (binding)
+
+These six rules are **binding** for this PR and for every later content RPC, policy, or adapter PR. Do not soften, treat as optional, or re-open Phase 3–4 to bypass them.
+
+1. **Ping Sec on each new content RPC/policy PR before merge.** This PR is that ping for migration 68. A follow-on that adds or changes a Bot content RPC, RLS policy, or `mcp_bot_permissions` row must ping Sec again before merge.
+2. **New content RPCs MUST use `require_bot_client_grant` + active bot helpers.** Every Phase 5 Bot RPC calls `mcp_internal.require_active_bot` and `mcp_internal.require_bot_client_grant` (the grant helper also calls `require_service_role` + `require_active_bot` and `FOR SHARE`s `mcp_bot_clients`). Do not invent a third client-scope path.
+3. **Never use `can_access_client` on Bot paths.** That function is human Console membership (`auth.uid()` / assignments). Mixing it in would grant a Bot every client any assigned employee can see. Human RPCs (`enqueue_agent_job`, `review_media_asset`, `repurpose_asset`, …) stay on `can_access_client`.
+4. **Resource `client_id` must match the granted client (no cross-client).** Grant check runs **before** lookup (`client_forbidden` if the `client_id` is not on `mcp_bot_clients`). Loaded idea/brief/asset rows must have `resource.client_id = p_client_id` or `client_mismatch`. List endpoints filter `where client_id = p_client_id` only.
+5. **Gateway permission checks remain.** `BOT_AUTH_MODE=db` uses AA permissions (`mcp_bot_permissions` via resolve). The Action Engine still requires `input.client_id ∈ identity.clients` before AA. `workflow.record_decision` stays **hard-denied in gateway code forever**, even if a DB row or `workflow.*` grant exists.
+6. **Isolation tests required before treating a tool as non-stub.** Do not add a name to the gateway `realContent` set, and do not ship a real AA adapter, until the matching RPC has same-client / other-client-id / other-client-resource / revoked-grant / suspended-bot / `anon`+`authenticated` execute-denied cases green on an RLS-enabled database (see §7 and `agent-runtime/src/mcp/isolation-rls.test.ts`).
 
 ---
 
@@ -32,7 +45,7 @@ approved idea
 
 ## 2. Non-goals / hard constraints
 
-- Do not weaken Phase 3–4 auth/RLS. `BOT_AUTH_MODE=db`, `mcp_internal` / `mcp_bot_*`, `mcp_bot_clients`, no cross-client leaks.
+- Do not weaken Phase 3–4 auth/RLS. `BOT_AUTH_MODE=db`, `mcp_internal` / `mcp_bot_*`, `mcp_bot_clients`, no cross-client leaks. Binding rules: **Sec Phase 5 requirements** above.
 - `workflow.record_decision` remains hard-denied in gateway code forever.
 - No external connectors. No new provider integrations.
 - Do not expand other Bots’ live tokens or mint tokens for other Bots.
@@ -156,14 +169,14 @@ Gateway still has **no Postgres**. All domain access is `SECURITY DEFINER` RPCs 
 
 ## 5. Auth / client-scope rules
 
-Same posture as `enqueue_mcp_brief` (Phase 4 helpers):
+Implements **Sec Phase 5 requirements 2–5** with the same posture as `enqueue_mcp_brief` (Phase 4 helpers):
 
 1. HTTP authenticates the **service** secret (timing-safe). Uniform fail on missing/duplicate `Authorization`.
-2. `x-aa-bot-id` must match `^bot_[a-z0-9_]{1,60}$`. New content routes do **not** hard-code `bot_production` (brief enqueue still does, unchanged). Active-bot is enforced in SQL (`mcp_internal.require_active_bot`).
-3. Every RPC: `mcp_internal.require_service_role()` then `mcp_internal.require_bot_client_grant(p_bot_id, p_client_id)` (`FOR SHARE` on `mcp_bot_clients`). **Never** `can_access_client`.
-4. Resource load `FOR SHARE` / `FOR UPDATE`; `resource.client_id = p_client_id` or `client_mismatch`. Grant check runs **before** lookup so ungranted `client_id` is `client_forbidden` even if the resource exists elsewhere.
+2. `x-aa-bot-id` must match `^bot_[a-z0-9_]{1,60}$`. New content routes do **not** hard-code `bot_production` (brief enqueue still does, unchanged). Active-bot is enforced in SQL (`mcp_internal.require_active_bot`) on every Phase 5 RPC **and** inside `require_bot_client_grant`.
+3. Every RPC: `mcp_internal.require_active_bot(p_bot_id)` then `mcp_internal.require_bot_client_grant(p_bot_id, p_client_id)` (`FOR SHARE` on `mcp_bot_clients`). Public wrappers also `require_service_role()`. **Never** `can_access_client` (requirement 3).
+4. Resource load `FOR SHARE` / `FOR UPDATE`; `resource.client_id = p_client_id` or `client_mismatch` (requirement 4). Grant check runs **before** lookup so ungranted `client_id` is `client_forbidden` even if the resource exists elsewhere.
 5. `REVOKE ALL` from `public` / `anon` / `authenticated`; `GRANT EXECUTE` to `service_role` only.
-6. Gateway Action Engine still requires `input.client_id ∈ identity.clients` **before** AA. DB grants (`content.*` for `bot_production`) are authoritative in `db` mode. Code hard-deny for `workflow.record_decision` unchanged.
+6. Gateway Action Engine still requires `input.client_id ∈ identity.clients` **before** AA (requirement 5). DB grants (`content.*` for `bot_production`) are authoritative in `db` mode. Code hard-deny for `workflow.record_decision` unchanged.
 7. Permission seed: **no new `mcp_bot_permissions` rows.** `bot_production` already has `content.*`, which matches every Phase 5 tool (single-segment wildcard). Migration 68 **asserts** that grant still exists and re-runs CoS prohibitions. Other Bots that already had `content.get_brief` / `content.get_production_status` (`bot_distribution`, `bot_client_delivery`, `bot_marketing`) can call those reads **if they already have a token and client grant**. This PR does not mint or expand tokens.
 8. Reviewers remain env-only. No Bot credential can hit `/admin/approvals`.
 
@@ -197,15 +210,20 @@ File: `supabase/migrations/20260908230000_68_mcp_production_manager.sql`
 - Does **not** replace `enqueue_mcp_brief`. Does **not** drop or rewrite human RPCs (`review_media_asset`, `repurpose_asset`, `approve_idea_and_generate_brief`, `build_brief_with_ai`, `dispatch_brief_to_members`).
 - Long text fields are clipped (8k) in Bot read RPCs so a brief body cannot become an unbounded dump.
 
-Isolation required before adapters left stub (this PR): same-client success; other-client id `client_forbidden`; other-client resource `client_mismatch`; revoked grant denied on replay; suspended bot `bot_not_active`; `anon`/`authenticated` cannot execute; gateway client-scope deny before AA; `workflow.record_decision` still denied.
+**Requirement 6 / isolation (must be green before a tool is `real`):** same-client success; other-client id `client_forbidden`; other-client resource `client_mismatch`; revoked grant denied on replay; suspended bot `bot_not_active`; `anon`/`authenticated` cannot execute; every new RPC source contains `require_bot_client_grant` and `require_active_bot` and must not mention `can_access_client`; gateway client-scope deny before AA; `workflow.record_decision` still denied.
+
+| Tool marked `real` | Isolation coverage |
+| --- | --- |
+| `content.generate_brief` | Phase 4 `isolation-rls.test.ts` (`enqueue_mcp_brief`) |
+| `content.list_ideas` / `get_idea` / `get_brief` / `get_production_status` / `request_revision` / `request_approval` / `create_repurpose_plan` | Phase 5 block in `isolation-rls.test.ts` plus HTTP cases in `content-route.test.ts`; gateway deny-before-AA in `production-manager.test.ts` and `phase-4-isolation.test.ts` |
 
 ---
 
 ## 7. Gate 5 acceptance checklist
 
-Run after merge on a **non-production** DB that already has migrations 63–66 (and 67 if that environment has sales agents). Apply 68 only with the normal non-prod migration process.
+**Ping Sec before merge** (requirement 1). Run after merge on a **non-production** DB that already has migrations 63–66 (and 67 if that environment has sales agents). Apply 68 only with the normal non-prod migration process.
 
-1. `BOT_AUTH_MODE=db` still refuses nonempty `BOT_CREDENTIALS_JSON`. Reviewer env unchanged.
+1. `BOT_AUTH_MODE=db` still refuses nonempty `BOT_CREDENTIALS_JSON`. Reviewer env unchanged. `workflow.record_decision` still hard-denied in gateway code.
 2. Production Manager `tools/list` includes the eight real content tools below plus the three real workflow tools; still hides stubs (`content.approve_asset`, `content.queue_distribution`, …) and `workflow.record_decision`.
 3. Pick a real **approved** idea on a client in `mcp_bot_clients` for `bot_production`.
 4. `content.list_ideas` / `content.get_idea` return only that client. A second client UUID is `Client scope denied` at the gateway; AA `client_forbidden` if the gateway were bypassed.

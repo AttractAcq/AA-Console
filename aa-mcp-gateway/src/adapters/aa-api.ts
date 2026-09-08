@@ -14,6 +14,9 @@ const ROUTES: Record<
   string,
   { path: string; kind: "brief" | "read" | "write" | "queue"; input: z.ZodType }
 > = {
+  // Sec Phase 5: gateway never holds service_role / never calls can_access_client.
+  // AA RPCs enforce require_active_bot + require_bot_client_grant. Client-scope
+  // is also denied in ActionEngine before this adapter runs.
   "content.generate_brief": {
     path: "/internal/mcp/content/generate-brief",
     kind: "brief",

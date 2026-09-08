@@ -89,6 +89,9 @@ export class ActionEngine {
         },
         "denied",
       );
+    // Sec Phase 5 #5: gateway permission + client-scope checks remain (db mode
+    // uses identity.permissions from AA). workflow.record_decision is hard-denied
+    // in allowed() regardless of grants.
     const parsed = tool.input.safeParse(raw);
     if (!parsed.success)
       return finish({

@@ -170,6 +170,90 @@ test("request_revision and request_approval are completed writes", async (t) => 
   assert.equal((approval.data as any).queue, "console_approvals");
 });
 
+test("gateway denies other-client and unauthorized bots before AA for every real content tool", async (t) => {
+  let hits = 0;
+  const { adapter } = await mockAa(t, () => {
+    hits += 1;
+    return { status: 200, body: { client_id: client } };
+  });
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const engine = new ActionEngine(store, registry, adapter);
+  const realContent = registry
+    .filter((x) => x.name.startsWith("content.") && x.implementation === "real")
+    .map((x) => x.name)
+    .sort();
+  assert.deepEqual(realContent, [
+    "content.create_repurpose_plan",
+    "content.generate_brief",
+    "content.get_brief",
+    "content.get_idea",
+    "content.get_production_status",
+    "content.list_ideas",
+    "content.request_approval",
+    "content.request_revision",
+  ]);
+  const inputs: Record<string, Record<string, unknown>> = {
+    "content.list_ideas": { client_id: other, status: "approved" },
+    "content.get_idea": { client_id: other, idea_id: idea },
+    "content.generate_brief": {
+      client_id: other,
+      idea_id: idea,
+      idempotency_key: "scope-brief",
+    },
+    "content.get_brief": { client_id: other, idea_id: idea },
+    "content.get_production_status": { client_id: other, idea_id: idea },
+    "content.request_revision": {
+      client_id: other,
+      brief_id: brief,
+      summary: "No",
+      idempotency_key: "scope-rev",
+    },
+    "content.request_approval": {
+      client_id: other,
+      asset_id: asset,
+      idempotency_key: "scope-appr",
+    },
+    "content.create_repurpose_plan": {
+      client_id: other,
+      asset_id: asset,
+      formats: ["reel"],
+      idempotency_key: "scope-rep",
+    },
+  };
+  for (const name of realContent) {
+    const result = await engine.call(identity, name, inputs[name]);
+    assert.equal(result.status, "rejected", name);
+    assert.equal(result.message, "Client scope denied.", name);
+  }
+  assert.equal(hits, 0);
+  const finance = { bot: "bot_finance" as const, clients: [client] };
+  for (const name of [
+    "content.request_revision",
+    "content.request_approval",
+    "content.create_repurpose_plan",
+    "content.generate_brief",
+  ]) {
+    const result = await engine.call(finance, name, {
+      ...inputs[name],
+      client_id: client,
+    });
+    assert.equal(result.status, "rejected", name);
+  }
+  assert.equal(
+    (
+      await engine.call(identity, "workflow.record_decision", {
+        client_id: client,
+        approval_id: client,
+        decision: "approved",
+        idempotency_key: "no-decision",
+      })
+    ).status,
+    "rejected",
+  );
+  assert.equal(hits, 0);
+});
+
 test("create_repurpose_plan is accepted and does not mint other-bot calls", async (t) => {
   const { adapter, received } = await mockAa(t, () => ({
     status: 202,

@@ -119,7 +119,9 @@ describe('Phase 4 RLS inventory (relrowsecurity must be on)', () => {
     ]) {
       expect(present.some((r) => r.rel === name && r.rls_enabled)).toBe(true);
     }
-    for (const name of ['mcp_bots', 'mcp_bot_tokens', 'mcp_bot_clients', 'mcp_brief_requests']) {
+    for (const name of [
+      'mcp_bots', 'mcp_bot_tokens', 'mcp_bot_clients', 'mcp_brief_requests', 'mcp_content_requests',
+    ]) {
       expect(present.find((r) => r.rel === name)?.rls_forced).toBe(true);
     }
     // Partial PGlite fixture: later domain tables may be absent. Isolation is
@@ -302,7 +304,63 @@ describe('Phase 4 cross-client isolation on an RLS-enabled database', () => {
 });
 
 describe('Phase 5 Production Manager isolation', () => {
-  it('list_ideas is client-scoped and forbidden for the other client', async () => {
+  const BRIEF_A = 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  const BRIEF_B = 'bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+  const ASSET_A = 'aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+  const ASSET_B = 'bbbbbbb2-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+
+  const contentRpcs = [
+    'mcp_internal.list_ideas(text,uuid,integer,text)',
+    'mcp_internal.get_idea(text,uuid,uuid)',
+    'mcp_internal.get_brief(text,uuid,uuid,uuid)',
+    'mcp_internal.get_production_status(text,uuid,uuid,uuid,uuid)',
+    'mcp_internal.request_revision(text,text,text,uuid,uuid,uuid,uuid,text)',
+    'mcp_internal.request_approval(text,text,text,uuid,uuid,uuid,uuid,text)',
+    'mcp_internal.create_repurpose_plan(text,text,text,uuid,uuid,text[])',
+  ];
+
+  beforeEach(async () => {
+    await db.exec(`
+      insert into client_briefs (id, client_id, source_idea_id, title, body, status)
+        values ('${BRIEF_A}','${CLIENT_A}','${IDEA_A}','Brief A','Body A','draft'),
+               ('${BRIEF_B}','${CLIENT_B}','${IDEA_B}','Brief B','Secret B','draft');
+      insert into client_media_assets (id, client_id, brief_id, media_type, title, storage_path, review_status)
+        values ('${ASSET_A}','${CLIENT_A}','${BRIEF_A}','image','Cut A','path/a.png','pending'),
+               ('${ASSET_B}','${CLIENT_B}','${BRIEF_B}','image','Cut B','path/b.png','approved');
+    `);
+  });
+
+  it('every new content RPC uses require_active_bot + require_bot_client_grant and never can_access_client', async () => {
+    const grant = await db.query<{ def: string }>(
+      "select pg_get_functiondef('mcp_internal.require_bot_client_grant(text,uuid)'::regprocedure) as def",
+    );
+    expect(grant.rows[0]?.def).toContain('require_active_bot');
+    expect(grant.rows[0]?.def).not.toMatch(/can_access_client\s*\(/);
+    for (const sig of contentRpcs) {
+      const src = await db.query<{ def: string }>(
+        `select pg_get_functiondef('${sig}'::regprocedure) as def`,
+      );
+      expect(src.rows[0]?.def, sig).toContain('require_active_bot');
+      expect(src.rows[0]?.def, sig).toContain('require_bot_client_grant');
+      expect(src.rows[0]?.def, sig).not.toMatch(/can_access_client\s*\(/);
+      expect(src.rows[0]?.def, sig).not.toMatch(/\breview_media_asset\s*\(/);
+    }
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await expect(db.query('select mcp_list_ideas($1,$2,$3,$4)', ['bot_production', CLIENT_A, 25, null]))
+        .rejects.toThrow('permission denied');
+      await expect(db.query('select mcp_get_brief($1,$2,$3,$4)', ['bot_production', CLIENT_A, null, IDEA_A]))
+        .rejects.toThrow('permission denied');
+      await expect(db.query(
+        'select mcp_request_revision($1,$2,$3,$4,$5,$6,$7,$8)',
+        ['bot_production', 'r', 'e', CLIENT_A, null, BRIEF_A, null, 'x'],
+      )).rejects.toThrow('permission denied');
+      await db.exec('reset role');
+    }
+    await asService();
+  });
+
+  it('list_ideas / get_idea are client-scoped (forbidden vs mismatch)', async () => {
     const ok = await db.query<{ result: { count: number; ideas: { id: string }[] } }>(
       'select mcp_list_ideas($1,$2,$3,$4) as result',
       ['bot_production', CLIENT_A, 25, null],
@@ -319,23 +377,93 @@ describe('Phase 5 Production Manager isolation', () => {
     )).rejects.toThrow('client_mismatch');
   });
 
-  it('new content RPCs stay service_role-only and never use can_access_client', async () => {
-    const src = await db.query<{ def: string }>(
-      "select pg_get_functiondef('mcp_internal.list_ideas(text,uuid,integer,text)'::regprocedure) as def",
+  it('get_brief and get_production_status reject other-client id and resource', async () => {
+    const brief = await db.query<{ result: { id: string } }>(
+      'select mcp_get_brief($1,$2,$3,$4) as result',
+      ['bot_production', CLIENT_A, BRIEF_A, null],
     );
-    expect(src.rows[0]?.def).toContain('require_bot_client_grant');
-    expect(src.rows[0]?.def).not.toMatch(/can_access_client\s*\(/);
-    const write = await db.query<{ def: string }>(
-      "select pg_get_functiondef('mcp_create_repurpose_plan(text,text,text,uuid,uuid,text[])'::regprocedure) as def",
+    expect(brief.rows[0]?.result.id).toBe(BRIEF_A);
+    await expect(db.query(
+      'select mcp_get_brief($1,$2,$3,$4)',
+      ['bot_production', CLIENT_B, BRIEF_B, null],
+    )).rejects.toThrow('client_forbidden');
+    await expect(db.query(
+      'select mcp_get_brief($1,$2,$3,$4)',
+      ['bot_production', CLIENT_A, BRIEF_B, null],
+    )).rejects.toThrow('client_mismatch');
+    const status = await db.query<{ result: { brief: { id: string } } }>(
+      'select mcp_get_production_status($1,$2,$3,$4,$5) as result',
+      ['bot_production', CLIENT_A, IDEA_A, null, null],
     );
-    expect(write.rows[0]?.def).not.toMatch(/can_access_client\s*\(/);
-    expect(write.rows[0]?.def).not.toMatch(/review_media_asset/);
-    for (const role of ['anon', 'authenticated']) {
-      await db.exec(`set role ${role}`);
-      await expect(db.query('select mcp_get_brief($1,$2,$3,$4)', ['bot_production', CLIENT_A, null, IDEA_A]))
-        .rejects.toThrow('permission denied');
-      await db.exec('reset role');
-    }
-    await asService();
+    expect(status.rows[0]?.result.brief.id).toBe(BRIEF_A);
+    await expect(db.query(
+      'select mcp_get_production_status($1,$2,$3,$4,$5)',
+      ['bot_production', CLIENT_A, null, null, ASSET_B],
+    )).rejects.toThrow('client_mismatch');
+  });
+
+  it('request_revision and request_approval isolate writes; approval does not decide', async () => {
+    const revision = await db.query<{ result: { brief_status: string } }>(
+      'select mcp_request_revision($1,$2,$3,$4,$5,$6,$7,$8) as result',
+      ['bot_production', 'rev-r', 'rev-e', CLIENT_A, null, BRIEF_A, null, 'Hook is weak'],
+    );
+    expect(revision.rows[0]?.result.brief_status).toBe('draft');
+    await expect(db.query(
+      'select mcp_request_revision($1,$2,$3,$4,$5,$6,$7,$8)',
+      ['bot_production', 'rev-b', 'rev-b', CLIENT_B, null, BRIEF_B, null, 'Steal'],
+    )).rejects.toThrow('client_forbidden');
+    await expect(db.query(
+      'select mcp_request_revision($1,$2,$3,$4,$5,$6,$7,$8)',
+      ['bot_production', 'rev-m', 'rev-m', CLIENT_A, null, BRIEF_B, null, 'Steal'],
+    )).rejects.toThrow('client_mismatch');
+    expect((await db.query<{ status: string }>(
+      `select status from client_briefs where id = '${BRIEF_B}'`,
+    )).rows[0]?.status).toBe('draft');
+
+    const approval = await db.query<{ result: { queue: string } }>(
+      'select mcp_request_approval($1,$2,$3,$4,$5,$6,$7,$8) as result',
+      ['bot_production', 'ap-r', 'ap-e', CLIENT_A, null, null, ASSET_A, null],
+    );
+    expect(approval.rows[0]?.result.queue).toBe('console_approvals');
+    expect((await db.query<{ n: number }>(
+      'select count(*)::int as n from client_asset_reviews',
+    )).rows[0]?.n).toBe(0);
+    await expect(db.query(
+      'select mcp_request_approval($1,$2,$3,$4,$5,$6,$7,$8)',
+      ['bot_production', 'ap-b', 'ap-b', CLIENT_A, null, null, ASSET_B, null],
+    )).rejects.toThrow('client_mismatch');
+  });
+
+  it('create_repurpose_plan is granted-client only and refuses the other client asset', async () => {
+    await db.exec(`update client_media_assets set review_status = 'approved' where id = '${ASSET_A}'`);
+    const ok = await db.query<{ result: { client_id: string } }>(
+      'select mcp_create_repurpose_plan($1,$2,$3,$4,$5,$6) as result',
+      ['bot_production', 'rp-r', 'rp-e', CLIENT_A, ASSET_A, ['reel']],
+    );
+    expect(ok.rows[0]?.result.client_id).toBe(CLIENT_A);
+    await expect(db.query(
+      'select mcp_create_repurpose_plan($1,$2,$3,$4,$5,$6)',
+      ['bot_production', 'rp-b', 'rp-b', CLIENT_B, ASSET_B, ['reel']],
+    )).rejects.toThrow('client_forbidden');
+    await expect(db.query(
+      'select mcp_create_repurpose_plan($1,$2,$3,$4,$5,$6)',
+      ['bot_production', 'rp-m', 'rp-m', CLIENT_A, ASSET_B, ['reel']],
+    )).rejects.toThrow('client_mismatch');
+    expect((await db.query<{ n: number }>(
+      `select count(*)::int as n from agent_jobs where client_id = '${CLIENT_B}'`,
+    )).rows[0]?.n).toBe(0);
+  });
+
+  it('suspended bot is bot_not_active on Phase 5 RPCs even with a remaining grant', async () => {
+    await db.query('select mcp_issue_bot_token($1,$2,$3,$4)', ['bot_production', HASH, 'operator', 'test']);
+    await db.query('select mcp_suspend_bot($1,$2,$3)', ['bot_production', 'operator', 'lock']);
+    await expect(db.query(
+      'select mcp_list_ideas($1,$2,$3,$4)',
+      ['bot_production', CLIENT_A, 25, null],
+    )).rejects.toThrow('bot_not_active');
+    await expect(db.query(
+      'select mcp_get_idea($1,$2,$3)',
+      ['bot_production', CLIENT_A, IDEA_A],
+    )).rejects.toThrow('bot_not_active');
   });
 });

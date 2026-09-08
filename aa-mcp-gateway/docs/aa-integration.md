@@ -43,7 +43,7 @@ Phase 5 Production Manager (migration 68, **do not apply to production without A
 | `POST /internal/mcp/content/request-approval` | `client_id`, plus a resource id |
 | `POST /internal/mcp/content/create-repurpose-plan` | `client_id`, `asset_id`, `formats` (1–6 known keys) |
 
-Same headers as generate-brief. See [phase-5-production-manager.md](./phase-5-production-manager.md).
+Same headers as generate-brief. Binding Sec rules: [phase-5-production-manager.md](./phase-5-production-manager.md) (ping Sec before merge; `require_bot_client_grant` + active bot; never `can_access_client`; resource client match; gateway permissions + `workflow.record_decision` hard-deny; isolation tests before non-stub).
 
 `POST /internal/mcp/auth/resolve` (Phase 3 dual-read)
 

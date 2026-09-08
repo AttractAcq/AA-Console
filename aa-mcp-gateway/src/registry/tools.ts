@@ -138,6 +138,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         fields.decision = z.enum(["approved", "rejected"]);
       }
       const realContent = new Set([
+        // Sec Phase 5 #6: isolation tests must stay green before adding a name.
         "content.list_ideas",
         "content.get_idea",
         "content.generate_brief",
