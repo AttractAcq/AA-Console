@@ -211,6 +211,20 @@ test("new AA environment pair is validated", () => {
       AA_MCP_SERVICE_SECRET: "c".repeat(40),
     }),
   );
+  assert.throws(() =>
+    config({
+      ...env,
+      AA_INTERNAL_API_URL: "http://other-service.railway.internal",
+      AA_MCP_SERVICE_SECRET: "c".repeat(40),
+    }),
+  );
+  assert.throws(() =>
+    config({
+      ...env,
+      AA_INTERNAL_API_URL: "http://aa-console.railway.internal.evil.com",
+      AA_MCP_SERVICE_SECRET: "c".repeat(40),
+    }),
+  );
   assert.equal(
     config({
       ...env,

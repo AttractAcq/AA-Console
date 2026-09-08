@@ -1,11 +1,16 @@
 import { isAbsolute } from "node:path";
 import { z } from "zod";
 import { credentialSchema } from "../auth/identity.js";
+/** HTTP origins allowed besides HTTPS. Host-exact for Railway private hop. */
+const ALLOWED_HTTP_HOSTS = new Set([
+  "localhost",
+  "127.0.0.1",
+  "aa-console.railway.internal",
+]);
 function isAllowedHttpOrigin(u: URL): boolean {
   if (u.protocol !== "http:") return false;
-  if (["localhost", "127.0.0.1"].includes(u.hostname)) return true;
-  // Railway private network only — do not open arbitrary HTTP.
-  return u.hostname === "railway.internal" || u.hostname.endsWith(".railway.internal");
+  // Exact hostname only — no *.railway.internal wildcard, no IPs/CIDRs.
+  return ALLOWED_HTTP_HOSTS.has(u.hostname);
 }
 export function config(env: NodeJS.ProcessEnv = process.env) {
   const hosted = env.NODE_ENV === "production" || Boolean(env.RAILWAY_ENVIRONMENT_ID);
