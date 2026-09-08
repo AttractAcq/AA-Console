@@ -100,7 +100,7 @@ describe("normaliseQualification", () => {
       { question: "   ", why: "blank" },
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0].question).toBe("Real question?");
+    expect(out[0]?.question).toBe("Real question?");
   });
 
   it("keeps a question that is missing only its reasoning", () => {
