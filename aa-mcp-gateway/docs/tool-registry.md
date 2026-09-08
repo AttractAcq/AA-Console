@@ -1,0 +1,92 @@
+# Tool registry
+
+84 initial business contracts. Status is adapter availability, not evidence of live deployment. Brief generation is implemented and requires AA_INTERNAL_API_URL and AA_MCP_SERVICE_SECRET. Stub schemas reserve bounded business fields and must be versioned/refined before their adapters are enabled. All calls require an authorized client UUID; all writes require an idempotency key. HIGH/CRITICAL policy always requires human approval.
+
+| Tool | Status | Action | Risk | Approval | Reversible | Dependency |
+| --- | --- | --- | --- | --- | --- | --- |
+| delivery.list_clients | stub | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.get_client | stub | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.get_status | stub | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.get_plan | stub | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.get_blockers | stub | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.get_next_action | stub | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.create_task | stub | write | MEDIUM | no | true | Scoped AA delivery business API |
+| delivery.get_client_health | stub | read | LOW | no | true | Scoped AA delivery business API |
+| campaign.list | stub | read | LOW | no | true | Scoped AA campaign business API |
+| campaign.get | stub | read | LOW | no | true | Scoped AA campaign business API |
+| campaign.create | stub | write | MEDIUM | no | true | Scoped AA campaign business API |
+| campaign.update | stub | write | MEDIUM | no | true | Scoped AA campaign business API |
+| campaign.get_status | stub | read | LOW | no | true | Scoped AA campaign business API |
+| campaign.request_approval | stub | write | MEDIUM | no | true | Scoped AA campaign business API |
+| content.list_ideas | stub | read | LOW | no | true | Scoped AA content business API |
+| content.generate_ideas | stub | write | MEDIUM | no | true | Scoped AA content business API |
+| content.get_idea | stub | read | LOW | no | true | Scoped AA content business API |
+| content.select_idea | stub | write | MEDIUM | no | true | Scoped AA content business API |
+| content.generate_brief | real | write | LOW | no | true | Scoped AA content business API |
+| content.get_brief | stub | read | LOW | no | true | Scoped AA content business API |
+| content.assign_production | stub | write | MEDIUM | no | true | Scoped AA content business API |
+| content.get_production_status | stub | read | LOW | no | true | Scoped AA content business API |
+| content.submit_asset | stub | write | MEDIUM | no | true | Scoped AA content business API |
+| content.request_revision | stub | write | MEDIUM | no | true | Scoped AA content business API |
+| content.request_approval | stub | write | MEDIUM | no | true | Scoped AA content business API |
+| content.approve_asset | stub | write | HIGH | required | false | Scoped AA content business API |
+| content.create_repurpose_plan | stub | write | MEDIUM | no | true | Scoped AA content business API |
+| content.queue_distribution | stub | write | HIGH | required | false | Scoped AA content business API |
+| content.get_performance | stub | read | LOW | no | true | Scoped AA content business API |
+| conversion.list_pages | stub | read | LOW | no | true | Scoped AA conversion business API |
+| conversion.get_page | stub | read | LOW | no | true | Scoped AA conversion business API |
+| conversion.create_page | stub | write | MEDIUM | no | true | Scoped AA conversion business API |
+| conversion.generate_structure | stub | write | MEDIUM | no | true | Scoped AA conversion business API |
+| conversion.generate_copy | stub | write | MEDIUM | no | true | Scoped AA conversion business API |
+| conversion.request_approval | stub | write | MEDIUM | no | true | Scoped AA conversion business API |
+| conversion.get_performance | stub | read | LOW | no | true | Scoped AA conversion business API |
+| sales_agents.list | stub | read | LOW | no | true | Scoped AA sales_agents business API |
+| sales_agents.get | stub | read | LOW | no | true | Scoped AA sales_agents business API |
+| sales_agents.create | stub | write | MEDIUM | no | true | Scoped AA sales_agents business API |
+| sales_agents.update_knowledge | stub | write | MEDIUM | no | true | Scoped AA sales_agents business API |
+| sales_agents.update_qualification_rules | stub | write | MEDIUM | no | true | Scoped AA sales_agents business API |
+| sales_agents.test | stub | write | MEDIUM | no | true | Scoped AA sales_agents business API |
+| sales_agents.deploy | stub | write | CRITICAL | required | false | Scoped AA sales_agents business API |
+| sales_agents.get_conversations | stub | read | LOW | no | true | Scoped AA sales_agents business API |
+| pipeline.list_leads | stub | read | LOW | no | true | Scoped AA pipeline business API |
+| pipeline.get_lead | stub | read | LOW | no | true | Scoped AA pipeline business API |
+| pipeline.get_stalled_leads | stub | read | LOW | no | true | Scoped AA pipeline business API |
+| pipeline.update_stage | stub | write | MEDIUM | no | true | Scoped AA pipeline business API |
+| pipeline.create_followup | stub | write | MEDIUM | no | true | Scoped AA pipeline business API |
+| pipeline.get_pipeline_summary | stub | read | LOW | no | true | Scoped AA pipeline business API |
+| pipeline.record_sale | stub | write | HIGH | required | false | Scoped AA pipeline business API |
+| proof.search | stub | read | LOW | no | true | Scoped AA proof business API |
+| proof.get | stub | read | LOW | no | true | Scoped AA proof business API |
+| proof.create | stub | write | MEDIUM | no | true | Scoped AA proof business API |
+| proof.attach_asset | stub | write | MEDIUM | no | true | Scoped AA proof business API |
+| proof.get_for_avatar | stub | read | LOW | no | true | Scoped AA proof business API |
+| proof.get_for_claim | stub | read | LOW | no | true | Scoped AA proof business API |
+| attribution.get_campaign_performance | stub | read | LOW | no | true | Scoped AA attribution business API |
+| attribution.get_content_performance | stub | read | LOW | no | true | Scoped AA attribution business API |
+| attribution.get_revenue_attribution | stub | read | LOW | no | true | Scoped AA attribution business API |
+| attribution.get_conversion_funnel | stub | read | LOW | no | true | Scoped AA attribution business API |
+| attribution.generate_report | stub | write | MEDIUM | no | true | Scoped AA attribution business API |
+| economics.get_client_economics | stub | read | LOW | no | true | Scoped AA economics business API |
+| economics.get_campaign_economics | stub | read | LOW | no | true | Scoped AA economics business API |
+| economics.get_costs | stub | read | LOW | no | true | Scoped AA economics business API |
+| economics.get_revenue | stub | read | LOW | no | true | Scoped AA economics business API |
+| economics.get_roi | stub | read | LOW | no | true | Scoped AA economics business API |
+| workflow.create_task | stub | write | MEDIUM | no | true | Scoped AA workflow business API |
+| workflow.assign_task | stub | write | MEDIUM | no | true | Scoped AA workflow business API |
+| workflow.get_task | stub | read | LOW | no | true | Scoped AA workflow business API |
+| workflow.list_tasks | stub | read | LOW | no | true | Scoped AA workflow business API |
+| workflow.complete_task | stub | write | MEDIUM | no | true | Scoped AA workflow business API |
+| workflow.create_approval | real | write | MEDIUM | creates approval | true | Gateway control store |
+| workflow.get_pending_approvals | real | read | LOW | no | true | Gateway control store |
+| workflow.record_decision | stub | write | HIGH | required | true | Scoped AA workflow business API |
+| workflow.get_activity | real | read | LOW | no | true | Gateway control store |
+| engineering.create_issue | stub | write | MEDIUM | no | true | Scoped AA engineering business API |
+| engineering.get_issue | stub | read | LOW | no | true | Scoped AA engineering business API |
+| engineering.get_release_status | stub | read | LOW | no | true | Scoped AA engineering business API |
+| engineering.get_deployment_status | stub | read | LOW | no | true | Scoped AA engineering business API |
+| security.get_system_status | stub | read | LOW | no | true | Scoped AA security business API |
+| security.get_open_findings | stub | read | LOW | no | true | Scoped AA security business API |
+| security.create_finding | stub | write | MEDIUM | no | true | Scoped AA security business API |
+| security.get_incident_status | stub | read | LOW | no | true | Scoped AA security business API |
+
+`workflow.record_decision` is reserved, denied to every Bot; human decisions use the reviewer API. Exact machine-readable input/output schemas and required permissions are in `src/registry/tools.ts` and filtered MCP discovery.
