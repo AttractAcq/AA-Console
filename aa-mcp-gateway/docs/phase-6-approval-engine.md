@@ -34,11 +34,17 @@ decision ledger. Gateway workflow.create_approval is an informational control-pl
 its reviewer approval cannot satisfy an asset wait. No Bot-visible decision write is added.
 
 Status returns approvals for the requesting Bot and granted client and selected resource.
-The latest 50 matching requests are returned, newest first. Each includes request
+The latest 50 matching requests are returned, newest first, but **all matching waits**
+are evaluated for readiness independently of that display window. There is no implicit
+resolution or supersession by newer requests. Each wait follows its current human
+decision/resource state; a subsequent human approval can resolve a rejected wait.
+Each displayed request includes request
 attribution, current wait state, latest matching human decision
 (ID, reviewer, timestamp, decision; no free-text reason), and durable continuation receipt.
 Asset requests bind exactly that asset. Brief-only requests wait for a human-approved
-asset on that brief. Revision/pending/rejection blocks readiness; an unrelated approved
+asset on that brief until continuation. Once a continuation exists, its persisted
+asset is the sole source of that execution's decision evidence and readiness, including
+a later rejection; approved siblings cannot substitute. Revision/pending/rejection blocks readiness; an unrelated approved
 sibling cannot satisfy an asset-specific wait. Status is a read-only projection of durable
 AA records; no triggers, polling side effects, webhooks, or copied decision authority.
 
@@ -116,8 +122,12 @@ projection and one-continuation-per-approval semantics. No approval-write except
 requested. Sec must be notified before merge; Alex via CoS controls merge/apply/deploy.
 Test results and PR/SHA are supplied with the implementation handoff.
 
-Implementation validation: gateway 64/64 tests; runtime 328/328 tests; both TypeScript
-checks and builds passed. After the transport receipt hardening, all 38 affected runtime
-HTTP/isolation tests passed again. The CI workflow now also runs gateway checks/tests/build.
-Ready for Sec review. Gate 6 live acceptance still requires the Alex-gated staging/Console
+Implementation validation: gateway 64/64 tests; runtime 330/330 tests; both TypeScript
+checks and builds passed. Both Sec P1 regressions failed on the reviewed implementation
+and pass with the fixes. The CI workflow also runs gateway checks/tests/build.
+Ready for Sec re-review. Gate 6 live acceptance still requires the Alex-gated staging/Console
 smoke above, including multi-connection concurrency and PostgREST. No production changes.
+
+Sec P1 follow-up: migration 70 now pins resumed decision evidence to the canonical
+continuation asset and separates readiness evaluation from the 50-row display cap.
+Regression fixtures reproduce both Sec findings using the real human review RPC.

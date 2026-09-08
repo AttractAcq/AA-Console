@@ -648,4 +648,45 @@ describe('Phase 5 Production Manager isolation', () => {
     expect((await resumeApproval()).rows[0]!.result.job_id).toBeTruthy();
   });
 
+  it('Phase 6 P1-1 binds resumed brief decisions to the continuation asset', async () => {
+    await requestApproval('approval-root', CLIENT_A, null);
+    await humanReview('approved');
+    const resumed = (await resumeApproval()).rows[0]!.result;
+    const sibling = 'aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+    await db.exec(`insert into client_media_assets (id,client_id,brief_id,media_type,title,storage_path)
+      values ('${sibling}','${CLIENT_A}','${BRIEF_A}','image','Different asset','s.png')`);
+    await humanReview('approved', sibling);
+    await humanReview('rejected');
+    const status = (await db.query<{ result: any }>('select mcp_get_production_status($1,$2,$3,$4,$5) as result',
+      ['bot_production', CLIENT_A, null, BRIEF_A, null])).rows[0]!.result;
+    expect(status.approvals[0].resume.job_id).toBe(resumed.job_id);
+    expect(status.approvals[0].resume.asset_id).toBe(ASSET_A);
+    expect(status.approvals[0].decision.asset_id).toBe(ASSET_A);
+    expect(status.approvals[0].decision.decision).toBe('rejected');
+    expect(status.approvals[0].approved_asset_id).toBeNull();
+    expect(status.approvals[0].state).toBe('rejected');
+    expect(status.handoff.ready_for_distribution).toBe(false);
+  });
+
+  it('Phase 6 P1-2 evaluates blockers beyond the latest 50 displayed requests', async () => {
+    await requestApproval();
+    await humanReview('rejected');
+    const sibling = 'aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+    await db.exec(`insert into client_media_assets (id,client_id,brief_id,media_type,title,storage_path)
+      values ('${sibling}','${CLIENT_A}','${BRIEF_A}','image','Approved sibling','s.png')`);
+    await humanReview('approved', sibling);
+    const q = () => db.query<{ result: any }>('select mcp_get_production_status($1,$2,$3,$4,$5) as result',
+      ['bot_production', CLIENT_A, null, BRIEF_A, null]);
+    const before = (await q()).rows[0]!.result;
+    expect(before.handoff.ready_for_distribution).toBe(false);
+    for (let n = 0; n < 50; n++) await requestApproval(`new-${n}`, CLIENT_A, sibling);
+    const after = (await q()).rows[0]!.result;
+    expect(after.approvals).toHaveLength(50);
+    expect(after.approvals.some((a: any) => a.execution_id === 'approval-root')).toBe(false);
+    expect(after.handoff.ready_for_distribution).toBe(false);
+    // Only a real human decision resolves the old wait, even while it is off-page.
+    await humanReview('approved');
+    expect((await q()).rows[0]!.result.handoff.ready_for_distribution).toBe(true);
+  });
+
 });

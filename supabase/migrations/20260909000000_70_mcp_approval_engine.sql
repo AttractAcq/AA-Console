@@ -32,16 +32,23 @@ begin
   end if;
   -- Validate all persisted resource ownership before reading decision evidence.
   perform mcp_internal.resolve_content_target(p_client_id, r.idea_id, r.brief_id, r.asset_id);
+  select * into s from mcp_internal.mcp_content_requests
+    where bot_id = p_bot_id and client_id = p_client_id
+      and approval_execution_id = p_execution_id;
+  -- Once continued, this execution's evidence follows its persisted asset only.
+  -- A newly approved sibling must never conceal rejection of the queued asset.
+  if s.execution_id is not null then
+    perform mcp_internal.resolve_content_target(p_client_id, null, null, s.asset_id);
+  end if;
   select * into a from client_media_assets
     where client_id = p_client_id and
-      (id = r.asset_id or (r.asset_id is null and brief_id = r.brief_id))
+      ((s.execution_id is not null and id = s.asset_id)
+        or (s.execution_id is null and
+          (id = r.asset_id or (r.asset_id is null and brief_id = r.brief_id))))
     order by (review_status = 'approved') desc, created_at desc, id
     limit 1;
   select * into d from client_asset_reviews where asset_id = a.id
     order by created_at desc, id desc limit 1;
-  select * into s from mcp_internal.mcp_content_requests
-    where bot_id = p_bot_id and client_id = p_client_id
-      and approval_execution_id = p_execution_id;
   select exists (
     select 1 from client_briefs b where b.id = r.brief_id and b.status = 'draft'
       and exists (select 1 from mcp_internal.mcp_content_requests x
@@ -191,6 +198,7 @@ declare
   v_approvals jsonb := '[]'::jsonb;
   v_request record;
   v_wait jsonb;
+  v_wait_blocked boolean := false;
 begin
   -- Sec Phase 5: active bot + mcp_bot_clients grant. Never can_access_client.
   perform mcp_internal.require_active_bot(p_bot_id);
@@ -301,14 +309,18 @@ begin
         and ((v.asset_id is not null and (r.asset_id = v.asset_id or
               (r.asset_id is null and r.brief_id = v.brief_id)))
           or (v.asset_id is null and r.brief_id = v.brief_id))
-      order by r.created_at desc, r.execution_id limit 50
+      order by r.created_at desc, r.execution_id
   loop
     v_wait := mcp_internal.get_approval(p_bot_id, p_client_id, v_request.execution_id);
-    v_approvals := v_approvals || jsonb_build_array(v_wait);
+    -- All matching waits gate readiness; only the displayed history is capped.
+    -- No implicit supersession: newer requests cannot resolve an older wait.
+    v_wait_blocked := v_wait_blocked or coalesce(
+      v_wait->>'state' not in ('approved', 'resumed'), true);
+    if jsonb_array_length(v_approvals) < 50 then
+      v_approvals := v_approvals || jsonb_build_array(v_wait);
+    end if;
   end loop;
-  -- A linked wait cannot be bypassed with an approved status lacking human evidence.
-  if v_ready and exists (select 1 from jsonb_array_elements(v_approvals) w
-      where w->>'state' not in ('approved', 'resumed')) then
+  if v_ready and v_wait_blocked then
     v_ready := false;
     v_blocked := 'awaiting_asset_approval';
   end if;
