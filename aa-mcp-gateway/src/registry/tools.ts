@@ -112,6 +112,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
       }
       if (name === "content.create_repurpose_plan") {
         fields.asset_id = id;
+        fields.approval_execution_id = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional();
         fields.formats = z
           .array(
             z.enum([

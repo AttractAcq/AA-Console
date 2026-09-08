@@ -288,3 +288,47 @@ test("create_repurpose_plan is accepted and does not mint other-bot calls", asyn
     "rejected",
   );
 });
+
+test("Phase 6 carries the root approval execution through continuation and denies before AA", async (t) => {
+  const { adapter, received } = await mockAa(t, ({ body }) => ({
+    status: 202, body: { client_id: client, job_id: job, approval_execution_id: body.approval_execution_id },
+  }));
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const engine = new ActionEngine(store, registry, adapter);
+  const input = { client_id: client, asset_id: asset, formats: ["reel"], approval_execution_id: "approval-root", idempotency_key: "resume-key" };
+  const ok = await engine.call(identity, "content.create_repurpose_plan", input);
+  assert.equal(ok.status, "accepted");
+  assert.equal((ok.data as any).approval_execution_id, "approval-root");
+  assert.deepEqual(received[0]?.body, { client_id: client, asset_id: asset, formats: ["reel"], approval_execution_id: "approval-root" });
+  assert.equal((await engine.call(identity, "content.create_repurpose_plan", input)).status, "accepted");
+  assert.equal(received.length, 1);
+  for (const denied of [{ ...input, client_id: other }, { ...input, approval_execution_id: "bad root" }, { ...input, approval_execution_id: null }]) {
+    assert.equal((await engine.call(identity, "content.create_repurpose_plan", denied)).status, "rejected");
+  }
+  const wildcard = { ...identity, permissions: ["workflow.*", "content.*"] };
+  assert.equal((await engine.call(wildcard, "workflow.record_decision", {
+    client_id: client, approval_id: asset, decision: "approved", idempotency_key: "no-decide",
+  })).status, "rejected");
+  assert.equal((await engine.call(wildcard, "content.approve_asset", {
+    client_id: client, asset_id: asset, idempotency_key: "no-asset-decide",
+  })).status, "rejected");
+  assert.equal(received.length, 1);
+});
+
+test("Phase 6 approval-required errors are preserved and status returns the AA trail", async (t) => {
+  const trail = [{ execution_id: "approval-root", state: "approved", decision: { decision: "approved" } }];
+  const { adapter } = await mockAa(t, ({ url }) => url?.endsWith("get-production-status")
+    ? { status: 200, body: { client_id: client, approvals: trail, handoff: { ready_for_distribution: true } } }
+    : { status: 409, body: { error: { code: "approval_required" } } });
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const engine = new ActionEngine(store, registry, adapter);
+  const waiting = await engine.call(identity, "content.create_repurpose_plan", {
+    client_id: client, asset_id: asset, formats: ["reel"], approval_execution_id: "approval-root", idempotency_key: "waiting-resume",
+  });
+  assert.equal(waiting.status, "failed");
+  assert.equal(waiting.error?.code, "approval_required");
+  const status = await engine.call(identity, "content.get_production_status", { client_id: client, asset_id: asset });
+  assert.deepEqual((status.data as any).approvals, trail);
+});
