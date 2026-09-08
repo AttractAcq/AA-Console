@@ -25,6 +25,7 @@ import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { OrganicPanel } from "./distribution/OrganicPanel";
 import { PaidPanel } from "./distribution/PaidPanel";
 import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
+import { SalesAgentsPanel } from "./conversion/SalesAgentsPanel";
 import { ProspectsLeadsPanel } from "./prospects-leads/ProspectsLeadsPanel";
 import { OnboardingPanel } from "./account/OnboardingPanel";
 import { ContactPanel } from "./account/ContactPanel";
@@ -93,6 +94,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   conversion: {
     "primary-landing-pages": () => <PageBuilderPanel pageType="landing" />,
     "secondary-offer-pages": () => <PageBuilderPanel pageType="offer" />,
+    "sales-agents": () => <SalesAgentsPanel />,
   },
   reporting: {
     organic: () => <OrganicReportingPanel />,

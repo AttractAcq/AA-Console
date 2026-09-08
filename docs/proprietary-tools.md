@@ -82,11 +82,64 @@ types beyond landing and offer, and section-level editing. A page is one
 document, so changing the hero means rebuilding it — which is the trade this
 scoping accepts, since the bot regenerates rather than edits.
 
-## 3. Sales Agent Builder — *Missing entirely*
+## 3. Sales Agent Builder — *Built; deployment to a live page is the open half*
 
-Nothing exists. No table, no page, no agent. The whole tool is unbuilt:
-knowledge base, sales instructions, qualification logic, objection handling,
-CTA/booking rules, agent testing, deployment, conversation logging, learning.
+The agent a client's own visitors talk to. Tool 2 builds the page; this builds
+the thing standing on it, and the console's job is the same in both: gather
+everything the business knows behind one button, hand it over, and then show
+what came back.
+
+What comes back is not HTML. A client-facing sales agent **is** its operating
+definition, so that is what `client_sales_agents` holds: how it opens, the
+qualification questions in the order they are asked, the objections this ICP
+actually raises, when it books, when it hands over, and what it may never
+promise. Qualification is `[{question, why, good_answer, disqualifier}]` rather
+than prose, so a bot can revise one question later without rewriting the agent.
+
+**The stakes are why this is not just page copy.** A bad page is bad copy. A
+bad sales agent repeats an invented promise to a client's own customers at
+whatever rate the client sends traffic. So the offer strategy's stated limits
+arrive as hard guardrails, only cleared proof is quotable, and the agent is
+told never to claim to be a person. The console puts **"Never says" above the
+script** when you open an agent, because that section is what decides whether
+it is safe to deploy.
+
+Six rules refuse a definition rather than storing it: no greeting, operating
+instructions too thin to run on, fewer than three qualification questions, no
+booking rule, no escalation rule, no guardrails. Two more coerce model output —
+a qualification step with no question is dropped, an objection with no answer
+is dropped — and an unfilled `[PLACEHOLDER]` or `{{variable}}` anywhere a
+visitor would read it is rejected outright.
+
+**Conversations become leads, which is the hole tool 4 was left with.**
+`capture_sales_agent_lead` turns a conversation into a `client_leads` row
+attributed to both the page and the agent — the page earned the visit, the
+agent earned the contact, and only `source_sales_agent_id` can tell a good
+qualification script from a good page. It is idempotent by construction: the
+conversation holds the lead it created, so a visitor who refreshes and finishes
+twice is still one person. It refuses a conversation that captured no way to
+contact anyone. A captured contact lands at `conversation`, never at `lead`,
+because a conversation demonstrably happened; the agent's own judgment of fit
+lifts it to `qualified_conversation` and nothing there claims an appointment.
+
+Proved on staging end to end: a no-contact conversation was refused, an
+unqualified one landed at `conversation` with both source keys and its
+opportunity value, capturing the same conversation twice returned the same lead
+and left the client on one lead, a qualified one landed at
+`qualified_conversation`, both wrote their `lead_events` row, and a stranger
+with a real conversation id was refused for its own reason — "Not permitted for
+this client" — while the same row captured cleanly as `service_role`, so the
+refusal was the permission check and not a missing row.
+
+Conversations are kept **whether or not they produced anything**. The ones that
+went nowhere are what show which question is losing people, and a system that
+only stored wins would throw exactly those away.
+
+**What is open: nothing yet talks to a visitor.** The definition is built,
+reviewable and safe; the runtime that serves it on a live page, and the widget
+that embeds it, are not written. Until then `sales_agent_conversations` fills
+only if something else writes to it, and the panel says "No conversations yet"
+rather than implying silence is a result.
 
 ## 4. Revenue Pipeline OS — *Built*
 
@@ -127,8 +180,9 @@ The old `pipeline_stage` enum (`first_touch`, `second_touch`, `call_booked`) is
 left in place, unused. Its values do not map onto the chain and the table held
 no rows, so a new `lead_stage` was cleaner than mapping by guesswork.
 
-Still open: nothing writes a lead automatically. Leads arrive by hand until a
-conversion page or a sales agent creates them, which is tools 2 and 3.
+Leads no longer only arrive by hand: `capture_sales_agent_lead` (tool 3) writes
+one from a sales agent conversation, attributed to the agent and the page. What
+is still missing is a page form that does the same without a conversation.
 
 ## 5. Client Delivery OS — *Partial*
 
@@ -280,8 +334,14 @@ Worth stating, because the gaps above are long and the foundation is not thin:
 
 ## The shape of the remaining work
 
-Built: 1 (bar its Iteration Engine), 2, 4, 6 and 7. Partial with real
-substance: 5. Stub with a page and a table: 8. Unbuilt: 3 and 9.
+Built: 1 (bar its Iteration Engine), 2, 3, 4, 6 and 7. Partial with real
+substance: 5. Stub with a page and a table: 8. Unbuilt: 9.
+
+Three of the built tools now share one open edge: **nothing of ours is yet
+serving a visitor.** Tool 2 generates a page nobody has published, tool 3
+builds an agent nobody has embedded, and tool 4's automatic lead capture is
+waiting on both. That is one piece of work — a public runtime — rather than
+three gaps, and it is worth naming as such rather than counting it three times.
 
 The dependency worth noticing: **7 (Attribution) is what makes 9 (Economics)
 possible, and 1's Iteration Engine depends on both.** Revenue cannot be

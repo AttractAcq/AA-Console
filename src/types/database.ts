@@ -1289,6 +1289,7 @@ export type Database = {
           appointment_outcome: string | null
           source_channel: string | null
           source_page_id: string | null
+          source_sales_agent_id: string | null
           source_asset_id: string | null
           source_post_id: string | null
           source_campaign_id: string | null
@@ -1319,6 +1320,7 @@ export type Database = {
           appointment_outcome?: string | null
           source_channel?: string | null
           source_page_id?: string | null
+          source_sales_agent_id?: string | null
           source_asset_id?: string | null
           source_post_id?: string | null
           source_campaign_id?: string | null
@@ -1349,6 +1351,7 @@ export type Database = {
           appointment_outcome?: string | null
           source_channel?: string | null
           source_page_id?: string | null
+          source_sales_agent_id?: string | null
           source_asset_id?: string | null
           source_post_id?: string | null
           source_campaign_id?: string | null
@@ -1497,6 +1500,117 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      client_sales_agents: {
+        Row: {
+          booking_rule: string | null
+          built_at: string | null
+          client_id: string
+          created_at: string
+          escalation_rule: string | null
+          greeting: string | null
+          guardrails: string | null
+          id: string
+          job_id: string | null
+          name: string
+          objections: Json
+          page_id: string | null
+          purpose: string
+          qualification: Json
+          status: string
+          system_prompt: string | null
+          updated_at: string
+        }
+        Insert: {
+          booking_rule?: string | null
+          built_at?: string | null
+          client_id: string
+          created_at?: string
+          escalation_rule?: string | null
+          greeting?: string | null
+          guardrails?: string | null
+          id?: string
+          job_id?: string | null
+          name: string
+          objections?: Json
+          page_id?: string | null
+          purpose: string
+          qualification?: Json
+          status?: string
+          system_prompt?: string | null
+          updated_at?: string
+        }
+        Update: {
+          booking_rule?: string | null
+          built_at?: string | null
+          client_id?: string
+          created_at?: string
+          escalation_rule?: string | null
+          greeting?: string | null
+          guardrails?: string | null
+          id?: string
+          job_id?: string | null
+          name?: string
+          objections?: Json
+          page_id?: string | null
+          purpose?: string
+          qualification?: Json
+          status?: string
+          system_prompt?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sales_agent_conversations: {
+        Row: {
+          client_id: string
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          ended_at: string | null
+          handed_over: boolean
+          id: string
+          lead_id: string | null
+          outcome: string | null
+          page_id: string | null
+          qualified: boolean
+          sales_agent_id: string
+          started_at: string
+          transcript: Json
+        }
+        Insert: {
+          client_id: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          ended_at?: string | null
+          handed_over?: boolean
+          id?: string
+          lead_id?: string | null
+          outcome?: string | null
+          page_id?: string | null
+          qualified?: boolean
+          sales_agent_id: string
+          started_at?: string
+          transcript?: Json
+        }
+        Update: {
+          client_id?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          ended_at?: string | null
+          handed_over?: boolean
+          id?: string
+          lead_id?: string | null
+          outcome?: string | null
+          page_id?: string | null
+          qualified?: boolean
+          sales_agent_id?: string
+          started_at?: string
+          transcript?: Json
+        }
+        Relationships: []
       }
       client_pages: {
         Row: {

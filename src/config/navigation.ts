@@ -178,6 +178,7 @@ export const clientNavGroups: NavNode[] = [
         tabs: [
           { id: "primary-landing-pages", label: "Primary Landing Pages" },
           { id: "secondary-offer-pages", label: "Secondary Offer Pages" },
+          { id: "sales-agents", label: "Sales Agents" },
         ],
       },
       {
