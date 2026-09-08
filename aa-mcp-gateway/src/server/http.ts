@@ -7,11 +7,22 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { authenticate } from "../auth/identity.js";
+import { BotAuthenticator } from "../auth/identity.js";
 import type { ActionEngine } from "../policy/engine.js";
 import type { Config } from "./config.js";
 const digest = (v: string) => createHash("sha256").update(v).digest();
-export function createServer(c: Config, engine: ActionEngine) {
+export function createServer(
+  c: Config,
+  engine: ActionEngine,
+  authenticator = BotAuthenticator.fromConfig(c, (event) => {
+    engine.store.audit({
+      authorization: "denied",
+      execution_result: "rejected",
+      error: typeof event.event === "string" ? event.event : "bot_auth_alert",
+      ...event,
+    });
+  }),
+) {
   const rates = new Map<string, { count: number; reset: number }>();
   return http.createServer(
     { requestTimeout: 20000, headersTimeout: 10000 },
@@ -56,7 +67,8 @@ export function createServer(c: Config, engine: ActionEngine) {
             timingSafeEqual(digest(r.token), digest(token)),
           );
           if (!reviewer) throw new Error("unauthorized");
-        } else identity = authenticate(req.headers.authorization, c.bots);
+        } else
+          identity = await authenticator.authenticate(req.headers.authorization);
         if (admin && req.url === "/admin/approvals" && req.method === "GET")
           return json(200, { approvals: engine.store.approvals() });
         if (req.method !== "POST")
@@ -95,7 +107,7 @@ export function createServer(c: Config, engine: ActionEngine) {
             );
           }
           z.object({}).strict().parse(parsed);
-          return json(200, await engine.executeApproval(match[1], c.bots));
+          return json(200, await engine.executeApproval(match[1], authenticator.identities()));
         }
         if (req.url !== "/mcp")
           return json(404, { error: "not_found", request_id });

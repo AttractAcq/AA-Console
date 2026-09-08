@@ -11,6 +11,7 @@ vi.mock("./heartbeat.js", () => ({ startHeartbeat: () => ({ stop: mocks.stop }) 
 vi.mock("./orchestration/dispatch.js", () => ({ registeredAgentKeys: () => [] }));
 vi.mock("./master/route.js", () => ({ handleMasterChat: vi.fn() }));
 vi.mock("./mcp/brief-route.js", () => ({ handleMcpBrief: vi.fn() }));
+vi.mock("./mcp/auth-route.js", () => ({ handleMcpAuth: vi.fn() }));
 vi.mock("./logging/logger.js", () => ({ logger: { info: vi.fn(), warn: vi.fn() } }));
 it("binds the configured port on all IPv4 interfaces and serves public liveness", async () => {
   const signals = vi.spyOn(process, "on").mockReturnValue(process);
