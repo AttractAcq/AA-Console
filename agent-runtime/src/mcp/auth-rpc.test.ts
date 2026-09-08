@@ -38,6 +38,7 @@ beforeAll(async () => {
   for (const file of [
     '20260908080000_63_mcp_brief_enqueue.sql',
     '20260908190000_65_mcp_bot_auth_registry.sql',
+    '20260908200000_66_mcp_domain_rls_bot_isolation.sql',
   ]) await db.exec(await migration(file));
 }, 30_000);
 afterAll(async () => { await db?.close(); });
@@ -61,6 +62,9 @@ describe('mcp_internal bot auth registry', () => {
     expect((await q('content.*', 'content.foo.bar')).rows[0]?.m).toBe(false);
     expect((await q('content.*', 'contentX.generate_brief')).rows[0]?.m).toBe(false);
     expect((await q('content.generate', 'content.generate_brief')).rows[0]?.m).toBe(false);
+    expect((await q('content.*', 'content.')).rows[0]?.m).toBe(false);
+    expect((await q('content.*', 'content')).rows[0]?.m).toBe(false);
+    expect((await q('*', 'content.generate_brief')).rows[0]?.m).toBe(false);
   });
 
   it('seeds all ten bots including bot_security_devops and enforces CoS prohibitions', async () => {

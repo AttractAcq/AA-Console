@@ -346,6 +346,8 @@ Complement `scripts/rls-isolation-test.mjs` (human client logins). Bot tests use
 
 **Locked:** run against a database with RLS actually enabled (staging or local `supabase`, not a migration-only diff) **before each adapter leaves stub**. Record: table list with `relrowsecurity`, policy count, and RPC results. Do not claim isolation from code review alone. **Alex approval is required before applying these RLS / registry migrations to production.**
 
+Phase 4 test coverage (isolation PR, unmerged; **do not apply to prod without Alex**): [phase-4-rls-isolation.md](./phase-4-rls-isolation.md).
+
 ---
 
 ## 8. Sec questions — locked 2026-09-08

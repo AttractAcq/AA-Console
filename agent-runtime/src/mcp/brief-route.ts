@@ -14,6 +14,7 @@ const ERRORS: Record<string, [number, string]> = {
   idea_not_found: [404, 'Idea not found.'],
   client_mismatch: [403, 'Idea does not belong to the requested client.'],
   client_forbidden: [403, 'Bot is not permitted for this client.'],
+  bot_not_active: [403, 'Bot is not active.'],
   invalid_idea_status: [409, 'Idea must already be approved for brief generation.'],
   idempotency_conflict: [409, 'Execution key was already used for a different request.'],
   brief_agent_unavailable: [503, 'Brief agent is unavailable.'],
