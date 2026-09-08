@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# aa-mcp-gateway local state
+aa-mcp-gateway/data/
+aa-mcp-gateway/*.sqlite*

@@ -1,0 +1,27 @@
+{
+  "name": "aa-mcp-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "node --import tsx src/server/main.ts",
+    "build": "tsc",
+    "start": "node dist/src/server/main.js",
+    "test": "node --import tsx --test test/*.test.ts",
+    "check": "tsc --noEmit",
+    "docs": "node --import tsx scripts/docs.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "prettier": "3.9.6",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3"
+  }
+}
