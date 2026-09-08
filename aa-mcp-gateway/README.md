@@ -4,7 +4,7 @@ AA's standalone business-action and authorization boundary for the ten Grok empl
 
 The foundation implements authenticated Streamable HTTP MCP, filtered discovery, explicit permissions and client scope, strict input validation, a central Action Engine, durable idempotency/approval/audit storage, and a fixed content service adapter. All requested domain tools are catalogued; most are explicitly unimplemented. Default `tools/list` and `call` expose only real (executable) tools the Bot is permitted for; stub contracts remain in the internal registry. Set `MCP_DISCOVER_STUBS=true` locally to surface stubs for testing. The brief adapter connects to the AA endpoint proven live by the AA-side smoke test. Gateway tests use a local mock AA server; no gateway deployment or live gateway smoke test is claimed.
 
-See [architecture](docs/architecture.md), [tool registry](docs/tool-registry.md), [Bot permissions](docs/bot-permissions.md), and [AA integration contract](docs/aa-integration.md).
+See [architecture](docs/architecture.md), [tool registry](docs/tool-registry.md), [Bot permissions](docs/bot-permissions.md), [AA integration contract](docs/aa-integration.md), and [Phase 3–4 Bot auth / domain RLS design](docs/phase-3-4-bot-auth-rls.md) (Sec decisions locked 2026-09-08; do not apply registry migrations to production without Alex approval).
 
 ## Local setup
 
@@ -17,18 +17,19 @@ cp .env.example .env
 node --env-file=.env --import tsx src/server/main.ts
 ```
 
-Generate independent tokens using `openssl rand -hex 32`. `BOT_CREDENTIALS_JSON` is an array of `{ "bot": "bot_production", "token": "<unique secret>", "clients": ["<AA client UUID>"] }`. Provision only needed identities; each identity occurs once and has explicit clients. All ten canonical identities are in `src/shared/types.ts`. `REVIEWER_CREDENTIALS_JSON` is an array of `{ "id": "<individual human ID>", "token": "<different unique secret>" }`. Empty/malformed credentials prevent startup. Tokens are never returned in errors or logs.
+Generate independent tokens using `openssl rand -hex 32`. `BOT_CREDENTIALS_JSON` is an array of `{ "bot": "bot_production", "token": "<unique secret>", "clients": ["<AA client UUID>"] }`. Provision only needed identities; each identity occurs once and has explicit clients. All ten canonical identities are in `src/shared/types.ts`. `REVIEWER_CREDENTIALS_JSON` is an array of `{ "id": "<individual human ID>", "token": "<different unique secret>" }`. Empty/malformed credentials prevent startup in `env`/`dual` modes. `BOT_AUTH_MODE=db` refuses a nonempty `BOT_CREDENTIALS_JSON` (fail closed) and authorizes discover/call from AA-resolved permission patterns (default deny). `workflow.record_decision` stays hard-denied in code in every mode. Tokens, Bearer values, and token hashes are never returned in errors or logs. Revoke/suspend takes effect at AA immediately; the gateway positive cache is 30s unless you bounce the process. Do not set `BOT_AUTH_MODE=db` in deployed/prod config until the locked cutover runbook.
 
 Environment variables:
 
 | Variable | Purpose |
 | --- | --- |
-| `BOT_CREDENTIALS_JSON` | Required Bot tokens and client allowlists |
+| `BOT_AUTH_MODE` | `env` \| `dual` \| `db`. Default `dual`. `db` refuses nonempty `BOT_CREDENTIALS_JSON` and uses AA permissions. |
+| `BOT_CREDENTIALS_JSON` | Required Bot tokens and client allowlists except in `db` mode (must be empty) |
 | `REVIEWER_CREDENTIALS_JSON` | Required separate human reviewer identities/tokens |
 | `HOST` / `PORT` | Bind address; defaults `127.0.0.1:3100` |
 | `PUBLIC_ORIGIN` | Exact public origin/Host; default `http://localhost:3100` |
 | `DATABASE_PATH` | SQLite control store; default `./data/gateway.sqlite` |
-| `AA_INTERNAL_API_URL` / `AA_MCP_SERVICE_SECRET` | Optional pair enabling the fixed AA brief endpoint; HTTPS except loopback |
+| `AA_INTERNAL_API_URL` / `AA_MCP_SERVICE_SECRET` | Optional pair enabling the fixed AA brief endpoint and Bot token resolve; HTTPS except loopback or host-exact `aa-console.railway.internal` |
 | `MCP_DISCOVER_STUBS` | Optional; `true` includes stub contracts in discovery and allows `call` by name. Default off. Local/dev testing only; does not change `/mcp` auth |
 
 `npm run dev` uses already exported environment variables. `npm run build`, `npm run check`, and `npm test` build, typecheck, and run security/domain/HTTP tests. `npm start` runs compiled code with injected environment variables.

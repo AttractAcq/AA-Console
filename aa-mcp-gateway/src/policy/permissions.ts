@@ -1,4 +1,4 @@
-import type { Bot, Tool } from "../shared/types.js";
+import type { Bot, Identity, Tool } from "../shared/types.js";
 const workflow = [
   "workflow.create_task",
   "workflow.assign_task",
@@ -68,13 +68,30 @@ export const grants: Record<Bot, string[]> = {
     ...workflow,
   ],
 };
-export function allowed(bot: Bot, tool: Tool): boolean {
+/** Exact tool name, or single-segment domain wildcard (`content.*` → `content.<one segment>`). */
+export function permissionMatches(grant: string, permission: string): boolean {
+  if (grant === permission) return true;
+  if (!/^[a-z0-9_]+\.\*$/.test(grant)) return false;
+  const prefix = grant.slice(0, -1);
+  if (!permission.startsWith(prefix)) return false;
+  const rest = permission.slice(prefix.length);
+  return rest.length > 0 && !rest.includes(".");
+}
+
+export function grantPatterns(identity: Identity): string[] {
+  return Array.isArray(identity.permissions)
+    ? identity.permissions
+    : grants[identity.bot];
+}
+
+export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   if (tool.name === "workflow.record_decision") return false; // human-only API, never discoverable by Bots
+  const identity: Identity =
+    typeof botOrIdentity === "string"
+      ? { bot: botOrIdentity, clients: [] }
+      : botOrIdentity;
+  const patterns = grantPatterns(identity);
   return tool.permissions.every((permission) =>
-    grants[bot].some(
-      (g) =>
-        g === permission ||
-        (g.endsWith(".*") && permission.startsWith(g.slice(0, -1))),
-    ),
+    patterns.some((g) => permissionMatches(g, permission)),
   );
 }

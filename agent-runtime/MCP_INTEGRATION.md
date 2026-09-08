@@ -43,9 +43,9 @@ part of runtime startup.
 
 ## Database setup and client authorization
 
-Apply migrations 63 and 64 to the intended test database through the normal
-migration process before testing. They have not been applied to a deployed
-project as part of this implementation.
+Apply migrations 63, 64, and 65 to the intended **non-production** test database through the normal
+migration process before testing. **Do not apply migration 65 to production without Alex approval.**
+Migration 65 creates `mcp_internal` Bot registry tables and RPCs. It does not insert live token hashes.
 
 AA does not currently have the gateway's live bot/client permission model.
 The interim authority is `public.mcp_bot_clients`: an explicit, deny-by-default
@@ -54,6 +54,17 @@ The runtime recognizes `bot_production`; adding another identity requires adding
 it to `SUPPORTED_BOTS` in `src/mcp/brief-route.ts` and provisioning its grants.
 The authenticated gateway is trusted to assert the bot header. Client grants
 are checked in the database on every call, including idempotent replays.
+
+Phase 3 Bot token RPCs (service secret required; hash in, never plaintext):
+
+- `POST /internal/mcp/auth/resolve` body `{ "token_hash": "<sha256 hex>" }`
+- `POST /internal/mcp/auth/issue` / `rotate` (hard-cut) / `revoke` / `suspend`
+
+Do not log Bearer values or token hashes. Gateway dual-read uses resolve;
+`BOT_AUTH_MODE=db` refuses nonempty `BOT_CREDENTIALS_JSON` and authorizes from
+AA resolve `permissions` (default deny). Do not enable `db` in production until
+the locked cutover. There is no terminal `revoke_bot` RPC yet (token revoke +
+`suspend_bot` only).
 
 Provision only the client this bot has actually been authorized to operate on,
 using the Supabase SQL editor or another trusted admin connection:
