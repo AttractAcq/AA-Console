@@ -64,13 +64,20 @@ test("production discovery and execution enforce role and client scope", async (
   const discovered = engine.discover(identity);
   const names = discovered.map((t) => t.name);
   assert.deepEqual(names.sort(), [
+    "content.create_repurpose_plan",
     "content.generate_brief",
+    "content.get_brief",
+    "content.get_idea",
+    "content.get_production_status",
+    "content.list_ideas",
+    "content.request_approval",
+    "content.request_revision",
     "workflow.create_approval",
     "workflow.get_activity",
     "workflow.get_pending_approvals",
   ]);
   assert.ok(discovered.every((t) => t.implementation === "real"));
-  assert.ok(!names.includes("content.list_ideas"));
+  assert.ok(!names.includes("content.generate_ideas"));
   assert.ok(!names.includes("content.approve_asset"));
   assert.ok(!names.includes("pipeline.update_stage"));
   assert.ok(!names.includes("workflow.record_decision"));
@@ -96,9 +103,11 @@ test("MCP_DISCOVER_STUBS exposes permitted stubs; default call rejects stub name
   const hidden = fixture();
   const defaultNames = hidden.engine.discover(identity).map((t) => t.name);
   assert.ok(defaultNames.includes("content.generate_brief"));
-  assert.ok(!defaultNames.includes("content.list_ideas"));
-  const denied = await hidden.engine.call(identity, "content.list_ideas", {
+  assert.ok(defaultNames.includes("content.list_ideas"));
+  assert.ok(!defaultNames.includes("content.generate_ideas"));
+  const denied = await hidden.engine.call(identity, "content.generate_ideas", {
     client_id: client,
+    idempotency_key: "stub-ideas-001",
   });
   assert.equal(denied.status, "rejected");
   assert.equal(denied.message, "Tool unavailable or unauthorized.");
@@ -107,13 +116,15 @@ test("MCP_DISCOVER_STUBS exposes permitted stubs; default call rejects stub name
   const stubNames = shown.engine.discover(identity).map((t) => t.name);
   assert.ok(stubNames.includes("content.generate_brief"));
   assert.ok(stubNames.includes("content.list_ideas"));
+  assert.ok(stubNames.includes("content.generate_ideas"));
   assert.ok(stubNames.includes("content.approve_asset"));
   assert.ok(!stubNames.includes("pipeline.update_stage"));
   assert.ok(!stubNames.includes("workflow.record_decision"));
   assert.equal(
     (
-      await shown.engine.call(identity, "content.list_ideas", {
+      await shown.engine.call(identity, "content.generate_ideas", {
         client_id: client,
+        idempotency_key: "stub-ideas-001",
       })
     ).status,
     "not_implemented",
@@ -372,12 +383,19 @@ test("HTTP MCP discovery/call and human-only approval boundary", async () => {
     const list: any = await response.json();
     const listed = list.result.tools.map((t: any) => t.name).sort();
     assert.deepEqual(listed, [
+      "content.create_repurpose_plan",
       "content.generate_brief",
+      "content.get_brief",
+      "content.get_idea",
+      "content.get_production_status",
+      "content.list_ideas",
+      "content.request_approval",
+      "content.request_revision",
       "workflow.create_approval",
       "workflow.get_activity",
       "workflow.get_pending_approvals",
     ]);
-    assert.ok(!listed.includes("content.list_ideas"));
+    assert.ok(!listed.includes("content.generate_ideas"));
     assert.ok(!listed.includes("workflow.record_decision"));
     const call = await fetch(c.PUBLIC_ORIGIN + "/mcp", {
       method: "POST",

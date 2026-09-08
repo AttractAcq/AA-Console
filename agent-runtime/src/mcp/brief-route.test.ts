@@ -51,6 +51,7 @@ beforeAll(async () => {
     '20260908080100_64_brief_job_idempotency.sql',
     '20260908190000_65_mcp_bot_auth_registry.sql',
     '20260908200000_66_mcp_domain_rls_bot_isolation.sql',
+    '20260908230000_68_mcp_production_manager.sql',
   ]) await db.exec(await migration(file));
 }, 30_000);
 afterAll(async () => { await db?.close(); });

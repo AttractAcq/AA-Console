@@ -65,6 +65,7 @@ beforeAll(async () => {
     '20260908080100_64_brief_job_idempotency.sql',
     '20260908190000_65_mcp_bot_auth_registry.sql',
     '20260908200000_66_mcp_domain_rls_bot_isolation.sql',
+    '20260908230000_68_mcp_production_manager.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -80,7 +81,7 @@ afterAll(async () => { await db?.close(); });
 beforeEach(async () => {
   await db.exec(`reset role;
     truncate mcp_brief_requests, mcp_bot_clients, mcp_internal.mcp_bot_token_audit,
-      mcp_internal.mcp_bot_tokens, client_ideas, agent_job_events, agent_jobs,
+      mcp_internal.mcp_bot_tokens, mcp_internal.mcp_content_requests, client_ideas, agent_job_events, agent_jobs,
       campaigns, client_leads, finance_entries, finance_periods, client_billing,
       client_users, clients, profiles, auth.users cascade;
     update mcp_internal.mcp_bots set status = 'active';
@@ -296,6 +297,45 @@ describe('Phase 4 cross-client isolation on an RLS-enabled database', () => {
     const clients = await db.query<{ id: string }>('select id from clients');
     expect(clients.rows.map((r) => r.id)).toEqual([CLIENT_A]);
     await db.exec('reset role');
+    await asService();
+  });
+});
+
+describe('Phase 5 Production Manager isolation', () => {
+  it('list_ideas is client-scoped and forbidden for the other client', async () => {
+    const ok = await db.query<{ result: { count: number; ideas: { id: string }[] } }>(
+      'select mcp_list_ideas($1,$2,$3,$4) as result',
+      ['bot_production', CLIENT_A, 25, null],
+    );
+    expect(ok.rows[0]?.result.count).toBe(1);
+    expect(ok.rows[0]?.result.ideas.map((i) => i.id)).toEqual([IDEA_A]);
+    await expect(db.query(
+      'select mcp_list_ideas($1,$2,$3,$4)',
+      ['bot_production', CLIENT_B, 25, null],
+    )).rejects.toThrow('client_forbidden');
+    await expect(db.query(
+      'select mcp_get_idea($1,$2,$3)',
+      ['bot_production', CLIENT_A, IDEA_B],
+    )).rejects.toThrow('client_mismatch');
+  });
+
+  it('new content RPCs stay service_role-only and never use can_access_client', async () => {
+    const src = await db.query<{ def: string }>(
+      "select pg_get_functiondef('mcp_internal.list_ideas(text,uuid,integer,text)'::regprocedure) as def",
+    );
+    expect(src.rows[0]?.def).toContain('require_bot_client_grant');
+    expect(src.rows[0]?.def).not.toMatch(/can_access_client\s*\(/);
+    const write = await db.query<{ def: string }>(
+      "select pg_get_functiondef('mcp_create_repurpose_plan(text,text,text,uuid,uuid,text[])'::regprocedure) as def",
+    );
+    expect(write.rows[0]?.def).not.toMatch(/can_access_client\s*\(/);
+    expect(write.rows[0]?.def).not.toMatch(/review_media_asset/);
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await expect(db.query('select mcp_get_brief($1,$2,$3,$4)', ['bot_production', CLIENT_A, null, IDEA_A]))
+        .rejects.toThrow('permission denied');
+      await db.exec('reset role');
+    }
     await asService();
   });
 });

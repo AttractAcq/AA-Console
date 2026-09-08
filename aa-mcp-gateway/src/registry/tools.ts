@@ -80,6 +80,56 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         delete fields.brief_id;
         fields.idea_id = id;
       }
+      if (name === "content.list_ideas") {
+        delete fields.idea_id;
+        fields.status = z
+          .enum(["draft", "approved", "rejected", "briefed"])
+          .optional();
+      }
+      if (name === "content.get_idea") {
+        fields.idea_id = id;
+        delete fields.limit;
+      }
+      if (name === "content.get_brief") {
+        delete fields.limit;
+        fields.idea_id = id.optional();
+      }
+      if (name === "content.get_production_status") {
+        delete fields.limit;
+        fields.idea_id = id.optional();
+        fields.brief_id = id.optional();
+      }
+      if (name === "content.request_revision") {
+        fields.summary = text;
+        fields.idea_id = id.optional();
+        fields.brief_id = id.optional();
+        delete fields.title;
+      }
+      if (name === "content.request_approval") {
+        fields.idea_id = id.optional();
+        fields.brief_id = id.optional();
+        delete fields.title;
+      }
+      if (name === "content.create_repurpose_plan") {
+        fields.asset_id = id;
+        fields.formats = z
+          .array(
+            z.enum([
+              "reel",
+              "short",
+              "carousel",
+              "quote_graphic",
+              "text_post",
+              "email",
+              "ad_variation",
+              "story_clips",
+            ]),
+          )
+          .min(1)
+          .max(6);
+        delete fields.title;
+        delete fields.summary;
+      }
       if (name === "workflow.create_approval") {
         fields.summary = text;
       }
@@ -87,16 +137,25 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         fields.approval_id = id;
         fields.decision = z.enum(["approved", "rejected"]);
       }
+      const realContent = new Set([
+        "content.list_ideas",
+        "content.get_idea",
+        "content.generate_brief",
+        "content.get_brief",
+        "content.request_revision",
+        "content.get_production_status",
+        "content.create_repurpose_plan",
+        "content.request_approval",
+      ]);
       const implementation =
-        name === "content.generate_brief"
+        realContent.has(name) ||
+        [
+          "workflow.get_pending_approvals",
+          "workflow.get_activity",
+          "workflow.create_approval",
+        ].includes(name)
           ? "real"
-          : [
-                "workflow.get_pending_approvals",
-                "workflow.get_activity",
-                "workflow.create_approval",
-              ].includes(name)
-            ? "real"
-            : "stub";
+          : "stub";
       return {
         name,
         domain,
@@ -123,7 +182,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         audit: "required",
         implementation,
         dependency:
-          name === "content.generate_brief"
+          realContent.has(name)
             ? "Scoped AA content business API"
             : implementation === "real"
               ? "Gateway control store"
