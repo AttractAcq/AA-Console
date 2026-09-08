@@ -305,8 +305,21 @@ test("HTTP dual-read match, mismatch 401, and reviewer path stay on REVIEWER_CRE
     });
     assert.equal(ok.status, 200);
     const list: { result: { tools: { name: string }[] } } = await ok.json();
+    const allowed = new Set([
+      "content.create_repurpose_plan",
+      "content.generate_brief",
+      "content.get_brief",
+      "content.get_idea",
+      "content.get_production_status",
+      "content.list_ideas",
+      "content.request_approval",
+      "content.request_revision",
+      "workflow.create_approval",
+      "workflow.get_activity",
+      "workflow.get_pending_approvals",
+    ]);
     assert.ok(list.result.tools.some((t) => t.name === "content.generate_brief"));
-    assert.ok(list.result.tools.every((t) => ["content.generate_brief", "workflow.create_approval", "workflow.get_activity", "workflow.get_pending_approvals"].includes(t.name)));
+    assert.ok(list.result.tools.every((t) => allowed.has(t.name)));
     assert.deepEqual(resolveBody, { token_hash: hash });
     const otherToken = "d".repeat(40);
     const denied = await fetch(c.PUBLIC_ORIGIN + "/mcp", {

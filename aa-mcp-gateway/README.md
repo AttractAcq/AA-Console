@@ -4,7 +4,7 @@ AA's standalone business-action and authorization boundary for the ten Grok empl
 
 The foundation implements authenticated Streamable HTTP MCP, filtered discovery, explicit permissions and client scope, strict input validation, a central Action Engine, durable idempotency/approval/audit storage, and a fixed content service adapter. All requested domain tools are catalogued; most are explicitly unimplemented. Default `tools/list` and `call` expose only real (executable) tools the Bot is permitted for; stub contracts remain in the internal registry. Set `MCP_DISCOVER_STUBS=true` locally to surface stubs for testing. The brief adapter connects to the AA endpoint proven live by the AA-side smoke test. Gateway tests use a local mock AA server; no gateway deployment or live gateway smoke test is claimed.
 
-See [architecture](docs/architecture.md), [tool registry](docs/tool-registry.md), [Bot permissions](docs/bot-permissions.md), [AA integration contract](docs/aa-integration.md), and [Phase 3–4 Bot auth / domain RLS design](docs/phase-3-4-bot-auth-rls.md) (Sec decisions locked 2026-09-08; do not apply registry migrations to production without Alex approval).
+See [architecture](docs/architecture.md), [tool registry](docs/tool-registry.md), [Bot permissions](docs/bot-permissions.md), [AA integration contract](docs/aa-integration.md), [Phase 3–4 Bot auth / domain RLS design](docs/phase-3-4-bot-auth-rls.md) (Sec decisions locked 2026-09-08; do not apply registry migrations to production without Alex approval), and [Phase 5 Production Manager v1](docs/phase-5-production-manager.md).
 
 ## Local setup
 

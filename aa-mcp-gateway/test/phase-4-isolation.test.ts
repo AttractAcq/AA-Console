@@ -94,13 +94,40 @@ test("CoS: bot_production has no finance, security, or deploy; bot_finance no co
   assert.equal(security.bot, "bot_security_devops");
 });
 
-test("same-client authorization passes for stubs; other-client is denied before the adapter", async () => {
+test("same-client authorization reaches the adapter; other-client is denied before it", async () => {
   const { store, engine } = fixture(true);
   const same = await engine.call(production, "content.list_ideas", { client_id: clientA });
   assert.equal(same.status, "not_implemented");
   const other = await engine.call(production, "content.list_ideas", { client_id: clientB });
   assert.equal(other.status, "rejected");
   assert.equal(other.message, "Client scope denied.");
+  const otherInputs: Record<string, Record<string, unknown>> = {
+    "content.get_idea": { client_id: clientB, idea_id: ideaA },
+    "content.get_brief": { client_id: clientB, idea_id: ideaA },
+    "content.get_production_status": { client_id: clientB, idea_id: ideaA },
+    "content.request_revision": {
+      client_id: clientB,
+      idea_id: ideaA,
+      summary: "Isolation",
+      idempotency_key: "other-rev",
+    },
+    "content.request_approval": {
+      client_id: clientB,
+      idea_id: ideaA,
+      idempotency_key: "other-appr",
+    },
+    "content.create_repurpose_plan": {
+      client_id: clientB,
+      asset_id: ideaA,
+      formats: ["reel"],
+      idempotency_key: "other-rep",
+    },
+  };
+  for (const [name, input] of Object.entries(otherInputs)) {
+    const denied = await engine.call(production, name, input);
+    assert.equal(denied.status, "rejected", name);
+    assert.equal(denied.message, "Client scope denied.", name);
+  }
   store.close();
 });
 

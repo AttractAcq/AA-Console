@@ -8,7 +8,9 @@ Paths below refer to the existing AA Console repository. No live database or pro
 | --- | --- | --- |
 | Authentication/client scoping | `src/lib/supabase.ts`, foundation migration 01, RLS migrations 18/19, `agent-runtime/src/master/auth.ts` | Separate Bot credentials and UUID client allowlists; never mint human admin sessions |
 | Idea → brief | `approve_idea_and_generate_brief` in migration 05; `agent-runtime/src/agents/brief/index.ts`, structured briefs migration 55 | Implemented fixed AA API adapter; AA endpoint proven live by supplied AA smoke test |
-| Ideas/intelligence | `enqueue_agent_job`, runtime `ideation`, `market`, `icp`, `competitor`, `association`, `brand_strategy`, `campaign_intel` | Stub gateway adapters; reuse worker jobs |
+| Ideas (list/get) | `client_ideas`; MCP RPCs in migration 68 | Implemented: `content.list_ideas`, `content.get_idea` |
+| Production status / revision / approval request | `client_briefs`, `client_media_assets`, `agent_jobs`; MCP RPCs in migration 68 | Implemented for Production Manager v1. `content.approve_asset` and `review_media_asset` stay human-only |
+| Distribution / repurpose | `schedule_asset`, migration 56 `repurpose_asset`, runtime `repurpose`; MCP `mcp_create_repurpose_plan` | `content.create_repurpose_plan` implemented (approved asset → derivative briefs). `content.queue_distribution` remains a stub |
 | Campaigns | Migration 14 `campaigns`; `campaign_intel` worker; frontend campaign views | Data and generation exist; scoped lifecycle API missing |
 | Production | Migration 40 `build_brief_with_ai`, `dispatch_brief_to_members`; runtime `creative_build`, `brief_dispatch` | Stub; reuse atomic RPCs, preserve admin/compensation rules |
 | Asset approval | Migration 05 `review_media_asset`, later review-trail migrations; `src/pages/approvals/ApprovalsPanel.tsx` | Stub; human approval policy must precede AA review RPC |
@@ -27,13 +29,21 @@ Existing runtime HTTP exposes `/health`, `/status`, `/master/chat`. Do not route
 
 The gateway implements these fixed outgoing routes:
 
-`POST /internal/mcp/content/generate-brief`
+`POST /internal/mcp/content/generate-brief` — unchanged. Request `{ "client_id", "idea_id" }`. Response `{ "job_id", "client_id" }` with HTTP 202 / 200 replay.
 
-Headers: server-to-server Bearer credential, `x-aa-bot-id`, `x-request-id`, `idempotency-key` (gateway-derived execution ID).
+Phase 5 Production Manager (migration 68, **do not apply to production without Alex**):
 
-Request: `{ "client_id": "uuid", "idea_id": "uuid" }`.
+| Route | Body (UUIDs unless noted) |
+| --- | --- |
+| `POST /internal/mcp/content/list-ideas` | `client_id`, optional `limit`, optional `status` |
+| `POST /internal/mcp/content/get-idea` | `client_id`, `idea_id` |
+| `POST /internal/mcp/content/get-brief` | `client_id` and `brief_id` and/or `idea_id` |
+| `POST /internal/mcp/content/get-production-status` | `client_id` and at least one of `idea_id` / `brief_id` / `asset_id` |
+| `POST /internal/mcp/content/request-revision` | `client_id`, `summary`, plus a resource id |
+| `POST /internal/mcp/content/request-approval` | `client_id`, plus a resource id |
+| `POST /internal/mcp/content/create-repurpose-plan` | `client_id`, `asset_id`, `formats` (1–6 known keys) |
 
-Response: `{ "job_id": "uuid", "client_id": "uuid" }` with HTTP 202 on first execution or 200 on AA replay. Gateway returns `accepted`, never claims the asynchronous brief already exists.
+Same headers as generate-brief. Binding Sec rules: [phase-5-production-manager.md](./phase-5-production-manager.md) (ping Sec before merge; `require_bot_client_grant` + active bot; never `can_access_client`; resource client match; gateway permissions + `workflow.record_decision` hard-deny; isolation tests before non-stub).
 
 `POST /internal/mcp/auth/resolve` (Phase 3 dual-read)
 

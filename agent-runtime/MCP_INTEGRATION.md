@@ -5,6 +5,13 @@ the gateway, calls `enqueue_mcp_brief`, and immediately returns the queued job.
 The existing worker runs `runBriefJob`; no prompt, provider call, context loading,
 or output persistence has been copied into the gateway or HTTP route.
 
+Phase 5 adds Production Manager read/write routes under `/internal/mcp/content/*`
+(list/get idea, get brief, production status, request revision, request approval,
+create repurpose plan). Those call `mcp_*` RPCs from migration 68 with the same
+service-secret HTTP posture. **Do not apply migration 68 to production without
+Alex approval.** See `aa-mcp-gateway/docs/phase-5-production-manager.md`.
+`content.generate_brief` is unchanged.
+
 ## Configuration and local run
 
 Required runtime environment: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
@@ -43,8 +50,8 @@ part of runtime startup.
 
 ## Database setup and client authorization
 
-Apply migrations 63, 64, 65, and 66 to the intended **non-production** test database through the normal
-migration process before testing. **Do not apply migrations 65 or 66 to production without Alex approval.**
+Apply migrations 63, 64, 65, 66, and 68 to the intended **non-production** test database through the normal
+migration process before testing. **Do not apply migrations 65, 66, or 68 to production without Alex approval.**
 Migration 65 creates `mcp_internal` Bot registry tables and RPCs. Migration 66 tightens Bot domain RLS
 and shared Bot client-grant helpers. Neither inserts live token hashes. See
 `aa-mcp-gateway/docs/phase-4-rls-isolation.md`.
