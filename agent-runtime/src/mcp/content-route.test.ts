@@ -55,6 +55,7 @@ beforeAll(async () => {
     '20260908190000_65_mcp_bot_auth_registry.sql',
     '20260908200000_66_mcp_domain_rls_bot_isolation.sql',
     '20260908230000_68_mcp_production_manager.sql',
+    '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
   ]) await db.exec(await migration(file));
 }, 60_000);
 afterAll(async () => { await db?.close(); });

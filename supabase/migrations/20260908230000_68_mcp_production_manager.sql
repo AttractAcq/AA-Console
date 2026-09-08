@@ -364,7 +364,8 @@ grant execute on function mcp_internal.take_content_request(text, text, text, uu
   to service_role;
 
 -- ---------------------------------------------------------------------------
--- Reads
+-- Reads — VOLATILE (not STABLE): require_bot_client_grant uses FOR SHARE.
+-- PostgREST runs STABLE RPCs in a read-only transaction, which rejects FOR SHARE.
 -- ---------------------------------------------------------------------------
 
 create or replace function mcp_internal.list_ideas(
@@ -372,7 +373,7 @@ create or replace function mcp_internal.list_ideas(
 )
 returns jsonb
 language plpgsql
-stable
+volatile
 security definer
 set search_path = mcp_internal, public
 as $$
@@ -410,7 +411,7 @@ create or replace function mcp_internal.get_idea(
 )
 returns jsonb
 language plpgsql
-stable
+volatile
 security definer
 set search_path = mcp_internal, public
 as $$
@@ -439,7 +440,7 @@ create or replace function mcp_internal.get_brief(
 )
 returns jsonb
 language plpgsql
-stable
+volatile
 security definer
 set search_path = mcp_internal, public
 as $$
@@ -466,7 +467,7 @@ create or replace function mcp_internal.get_production_status(
 )
 returns jsonb
 language plpgsql
-stable
+volatile
 security definer
 set search_path = mcp_internal, public
 as $$
@@ -884,7 +885,7 @@ $$;
 create or replace function public.mcp_list_ideas(
   p_bot_id text, p_client_id uuid, p_limit integer default 25, p_status text default null
 )
-returns jsonb language plpgsql stable security definer set search_path = mcp_internal, public as $$
+returns jsonb language plpgsql volatile security definer set search_path = mcp_internal, public as $$
 begin
   perform mcp_internal.require_service_role();
   return mcp_internal.list_ideas(p_bot_id, p_client_id, p_limit, p_status);
@@ -894,7 +895,7 @@ $$;
 create or replace function public.mcp_get_idea(
   p_bot_id text, p_client_id uuid, p_idea_id uuid
 )
-returns jsonb language plpgsql stable security definer set search_path = mcp_internal, public as $$
+returns jsonb language plpgsql volatile security definer set search_path = mcp_internal, public as $$
 begin
   perform mcp_internal.require_service_role();
   return mcp_internal.get_idea(p_bot_id, p_client_id, p_idea_id);
@@ -904,7 +905,7 @@ $$;
 create or replace function public.mcp_get_brief(
   p_bot_id text, p_client_id uuid, p_brief_id uuid default null, p_idea_id uuid default null
 )
-returns jsonb language plpgsql stable security definer set search_path = mcp_internal, public as $$
+returns jsonb language plpgsql volatile security definer set search_path = mcp_internal, public as $$
 begin
   perform mcp_internal.require_service_role();
   return mcp_internal.get_brief(p_bot_id, p_client_id, p_brief_id, p_idea_id);
@@ -915,7 +916,7 @@ create or replace function public.mcp_get_production_status(
   p_bot_id text, p_client_id uuid,
   p_idea_id uuid default null, p_brief_id uuid default null, p_asset_id uuid default null
 )
-returns jsonb language plpgsql stable security definer set search_path = mcp_internal, public as $$
+returns jsonb language plpgsql volatile security definer set search_path = mcp_internal, public as $$
 begin
   perform mcp_internal.require_service_role();
   return mcp_internal.get_production_status(p_bot_id, p_client_id, p_idea_id, p_brief_id, p_asset_id);
