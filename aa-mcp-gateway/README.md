@@ -2,7 +2,7 @@
 
 AA's standalone business-action and authorization boundary for the ten Grok employee Bots. It is not an agent runtime or chatbot. Bots never receive raw Supabase, SQL, shell, filesystem or unrestricted integration tools.
 
-The foundation implements authenticated Streamable HTTP MCP, filtered discovery, explicit permissions and client scope, strict input validation, a central Action Engine, durable idempotency/approval/audit storage, and a fixed content service adapter. All requested domain tools are catalogued; most are explicitly unimplemented. The brief adapter connects to the AA endpoint proven live by the AA-side smoke test. Gateway tests use a local mock AA server; no gateway deployment or live gateway smoke test is claimed.
+The foundation implements authenticated Streamable HTTP MCP, filtered discovery, explicit permissions and client scope, strict input validation, a central Action Engine, durable idempotency/approval/audit storage, and a fixed content service adapter. All requested domain tools are catalogued; most are explicitly unimplemented. Default `tools/list` and `call` expose only real (executable) tools the Bot is permitted for; stub contracts remain in the internal registry. Set `MCP_DISCOVER_STUBS=true` locally to surface stubs for testing. The brief adapter connects to the AA endpoint proven live by the AA-side smoke test. Gateway tests use a local mock AA server; no gateway deployment or live gateway smoke test is claimed.
 
 See [architecture](docs/architecture.md), [tool registry](docs/tool-registry.md), [Bot permissions](docs/bot-permissions.md), and [AA integration contract](docs/aa-integration.md).
 
@@ -29,12 +29,13 @@ Environment variables:
 | `PUBLIC_ORIGIN` | Exact public origin/Host; default `http://localhost:3100` |
 | `DATABASE_PATH` | SQLite control store; default `./data/gateway.sqlite` |
 | `AA_INTERNAL_API_URL` / `AA_MCP_SERVICE_SECRET` | Optional pair enabling the fixed AA brief endpoint; HTTPS except loopback |
+| `MCP_DISCOVER_STUBS` | Optional; `true` includes stub contracts in discovery and allows `call` by name. Default off. Local/dev testing only; does not change `/mcp` auth |
 
 `npm run dev` uses already exported environment variables. `npm run build`, `npm run check`, and `npm test` build, typecheck, and run security/domain/HTTP tests. `npm start` runs compiled code with injected environment variables.
 
 ## Connecting a Grok Bot
 
-Configure the Bot's MCP client for Streamable HTTP at `https://<gateway>/mcp`, with `Authorization: Bearer <that Bot's token>`. Use an MCP client supporting custom authentication headers; OAuth enrollment is not provided in v1. The official [MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/server) supplies the transport. Discovery reveals only permitted tools. Do not put reviewer or AA service credentials in Bot configuration.
+Configure the Bot's MCP client for Streamable HTTP at `https://<gateway>/mcp`, with `Authorization: Bearer <that Bot's token>`. Use an MCP client supporting custom authentication headers; OAuth enrollment is not provided in v1. The official [MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/server) supplies the transport. Discovery reveals only permitted, implemented tools. Stub names are rejected on `call` unless `MCP_DISCOVER_STUBS=true`. Do not put reviewer or AA service credentials in Bot configuration.
 
 Example `tools/call` arguments for Production Manager:
 

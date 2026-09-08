@@ -11,11 +11,11 @@ writeFileSync(
           `| ${t.name} | ${t.implementation} | ${t.action} | ${t.risk} | ${t.approval ? "required" : t.name === "workflow.create_approval" ? "creates approval" : "no"} | ${t.reversible} | ${t.dependency} |`,
       )
       .join("\n") +
-    "\n\n`workflow.record_decision` is reserved, denied to every Bot; human decisions use the reviewer API. Exact machine-readable input/output schemas and required permissions are in `src/registry/tools.ts` and filtered MCP discovery.\n",
+    "\n\n`workflow.record_decision` is reserved, denied to every Bot; human decisions use the reviewer API. Exact machine-readable input/output schemas and required permissions are in `src/registry/tools.ts`. Default MCP discovery and `call` expose only permitted tools with `implementation: real` (or `partial`). Stub contracts remain catalogued here and appear in `tools/list` only when `MCP_DISCOVER_STUBS=true`.\n",
 );
 writeFileSync(
   "docs/bot-permissions.md",
-  "# Bot permissions\n\nDefault deny. Both discovery and calls use the same matrix. Every request is additionally restricted to the credential’s client UUID allowlist; there is no wildcard client grant. Human reviewer credentials are separate. Intelligence modules are not employee Bots.\n\n" +
+  "# Bot permissions\n\nDefault deny. Both discovery and calls use the same permission matrix. Default MCP `tools/list` and `ActionEngine.call` additionally hide stub (unimplemented) contracts unless `MCP_DISCOVER_STUBS=true`. Granted lists below are the full permission matrix, including stubs that stay in the registry. Every request is additionally restricted to the credential’s client UUID allowlist; there is no wildcard client grant. Human reviewer credentials are separate. Intelligence modules are not employee Bots.\n\n" +
     bots
       .map(
         (bot) =>
@@ -26,5 +26,5 @@ writeFileSync(
             .join("\n"),
       )
       .join("\n\n") +
-    "\n\nAll Bots are denied `workflow.record_decision`, including wildcard workflow grants. No finance payment or production deployment capability is exposed. `sales_agents.deploy` is a CRITICAL stub behind mandatory approval.\n",
+    "\n\nAll Bots are denied `workflow.record_decision`, including wildcard workflow grants. No finance payment or production deployment capability is exposed. `sales_agents.deploy` is a CRITICAL stub behind mandatory approval. Production Manager (`bot_production`) default discovery is the real granted tools: `content.generate_brief`, `workflow.create_approval`, `workflow.get_pending_approvals`, and `workflow.get_activity`.\n",
 );

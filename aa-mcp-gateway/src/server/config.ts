@@ -23,6 +23,10 @@ export function config(env: NodeJS.ProcessEnv = process.env) {
     REVIEWER_CREDENTIALS_JSON: z.string(),
     AA_INTERNAL_API_URL: z.string().url().optional(),
     AA_MCP_SERVICE_SECRET: z.string().min(32).optional(),
+    MCP_DISCOVER_STUBS: z
+      .string()
+      .optional()
+      .transform((v) => v?.trim().toLowerCase() === "true"),
   });
   const c = schema.parse(env);
   if (hosted) {

@@ -26,6 +26,7 @@ const engine = new ActionEngine(
       ? { url: c.AA_INTERNAL_API_URL, token: c.AA_MCP_SERVICE_SECRET! }
       : undefined,
   ),
+  c.MCP_DISCOVER_STUBS,
 );
 const server = createServer(c, engine);
 server.listen(c.PORT, c.HOST, () =>
