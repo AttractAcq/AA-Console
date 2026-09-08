@@ -66,6 +66,7 @@ beforeAll(async () => {
     '20260908190000_65_mcp_bot_auth_registry.sql',
     '20260908200000_66_mcp_domain_rls_bot_isolation.sql',
     '20260908230000_68_mcp_production_manager.sql',
+    '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -335,6 +336,7 @@ describe('Phase 5 Production Manager isolation', () => {
       "select pg_get_functiondef('mcp_internal.require_bot_client_grant(text,uuid)'::regprocedure) as def",
     );
     expect(grant.rows[0]?.def).toContain('require_active_bot');
+    expect(grant.rows[0]?.def).toMatch(/for\s+share/i);
     expect(grant.rows[0]?.def).not.toMatch(/can_access_client\s*\(/);
     for (const sig of contentRpcs) {
       const src = await db.query<{ def: string }>(
@@ -344,6 +346,22 @@ describe('Phase 5 Production Manager isolation', () => {
       expect(src.rows[0]?.def, sig).toContain('require_bot_client_grant');
       expect(src.rows[0]?.def, sig).not.toMatch(/can_access_client\s*\(/);
       expect(src.rows[0]?.def, sig).not.toMatch(/\breview_media_asset\s*\(/);
+    }
+    const readRpcs = [
+      'mcp_internal.list_ideas(text,uuid,integer,text)',
+      'mcp_internal.get_idea(text,uuid,uuid)',
+      'mcp_internal.get_brief(text,uuid,uuid,uuid)',
+      'mcp_internal.get_production_status(text,uuid,uuid,uuid,uuid)',
+      'public.mcp_list_ideas(text,uuid,integer,text)',
+      'public.mcp_get_idea(text,uuid,uuid)',
+      'public.mcp_get_brief(text,uuid,uuid,uuid)',
+      'public.mcp_get_production_status(text,uuid,uuid,uuid,uuid)',
+    ];
+    for (const sig of readRpcs) {
+      const vol = await db.query<{ vol: string }>(
+        `select provolatile as vol from pg_proc where oid = '${sig}'::regprocedure`,
+      );
+      expect(vol.rows[0]?.vol, `${sig} must be VOLATILE (FOR SHARE in grant helper)`).toBe('v');
     }
     for (const role of ['anon', 'authenticated']) {
       await db.exec(`set role ${role}`);

@@ -173,7 +173,7 @@ Implements **Sec Phase 5 requirements 2–5** with the same posture as `enqueue_
 
 1. HTTP authenticates the **service** secret (timing-safe). Uniform fail on missing/duplicate `Authorization`.
 2. `x-aa-bot-id` must match `^bot_[a-z0-9_]{1,60}$`. New content routes do **not** hard-code `bot_production` (brief enqueue still does, unchanged). Active-bot is enforced in SQL (`mcp_internal.require_active_bot`) on every Phase 5 RPC **and** inside `require_bot_client_grant`.
-3. Every RPC: `mcp_internal.require_active_bot(p_bot_id)` then `mcp_internal.require_bot_client_grant(p_bot_id, p_client_id)` (`FOR SHARE` on `mcp_bot_clients`). Public wrappers also `require_service_role()`. **Never** `can_access_client` (requirement 3).
+3. Every RPC: `mcp_internal.require_active_bot(p_bot_id)` then `mcp_internal.require_bot_client_grant(p_bot_id, p_client_id)` (`FOR SHARE` on `mcp_bot_clients`). Public wrappers also `require_service_role()`. **Never** `can_access_client` (requirement 3). Phase 5 read RPCs (`list_ideas` / `get_idea` / `get_brief` / `get_production_status` and their `public.mcp_*` wrappers) must be **VOLATILE** because the grant helper uses `FOR SHARE` (PostgREST runs STABLE RPCs in a read-only transaction).
 4. Resource load `FOR SHARE` / `FOR UPDATE`; `resource.client_id = p_client_id` or `client_mismatch` (requirement 4). Grant check runs **before** lookup so ungranted `client_id` is `client_forbidden` even if the resource exists elsewhere.
 5. `REVOKE ALL` from `public` / `anon` / `authenticated`; `GRANT EXECUTE` to `service_role` only.
 6. Gateway Action Engine still requires `input.client_id ∈ identity.clients` **before** AA (requirement 5). DB grants (`content.*` for `bot_production`) are authoritative in `db` mode. Code hard-deny for `workflow.record_decision` unchanged.
@@ -199,7 +199,7 @@ Unknown DB messages still collapse to `internal_error`. No secrets in bodies or 
 
 ## 6. Sec notes for migration 68
 
-File: `supabase/migrations/20260908230000_68_mcp_production_manager.sql`
+File: `supabase/migrations/20260908230000_68_mcp_production_manager.sql` (read RPCs created VOLATILE; migration 69 `ALTER`s the same eight if an older 68 left them STABLE).
 
 **DO NOT APPLY TO PRODUCTION without Alex approval.** Additive only:
 
