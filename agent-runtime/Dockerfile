@@ -2,8 +2,8 @@
 # even with this pinned.
 FROM node:22-alpine AS build
 WORKDIR /app
-COPY package.json package-lock.json* tsconfig.json tsconfig.build.json ./
-RUN npm install --no-audit --no-fund
+COPY package.json package-lock.json tsconfig.json tsconfig.build.json ./
+RUN npm ci --no-audit --no-fund
 COPY src ./src
 RUN npm run build && npm prune --omit=dev
 
@@ -14,4 +14,5 @@ COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 EXPOSE 8787
-CMD ["npm", "start"]
+USER node
+CMD ["node", "dist/server.js"]
