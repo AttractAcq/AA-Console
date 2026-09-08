@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
-import { Panel } from "../../components/Panel";
 import { EmptyState } from "../../components/EmptyState";
 import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
@@ -10,6 +9,7 @@ import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
+import { liveStateOf, sinceLabel, STATE_TONE } from "./liveState";
 
 type QualificationStep = {
   question: string;
@@ -37,24 +37,31 @@ type SalesAgent = {
   created_at: string;
 };
 
-type PageOption = { id: string; title: string };
-
-type Stats = { conversations: number; captured: number; qualified: number };
-
-const STATUS_TONE: Record<string, string> = {
-  draft: "bg-secondary text-secondary-foreground",
-  live: "bg-primary/10 text-brand-strong",
-  retired: "bg-muted text-muted-foreground",
+type Conversation = {
+  id: string;
+  sales_agent_id: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  qualified: boolean;
+  handed_over: boolean;
+  outcome: string | null;
+  lead_id: string | null;
+  started_at: string;
 };
 
-export function SalesAgentsPanel() {
+type PageOption = { id: string; title: string };
+
+export function SalesOverviewPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [agents, setAgents] = useState<SalesAgent[]>([]);
   const [pages, setPages] = useState<PageOption[]>([]);
-  const [stats, setStats] = useState<Record<string, Stats>>({});
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [builds, setBuilds] = useState<Record<string, { status: string }>>({});
   const [buildOpen, setBuildOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -62,7 +69,7 @@ export function SalesAgentsPanel() {
       setLoading(false);
       return;
     }
-    const [agentRes, pageRes, convRes] = await Promise.all([
+    const [agentRes, pageRes, convRes, jobRes] = await Promise.all([
       supabase
         .from("client_sales_agents")
         .select(
@@ -77,25 +84,32 @@ export function SalesAgentsPanel() {
         .order("created_at", { ascending: false }),
       supabase
         .from("sales_agent_conversations")
-        .select("sales_agent_id, qualified, lead_id")
-        .eq("client_id", clientId),
+        .select(
+          "id, sales_agent_id, contact_name, contact_email, contact_phone, qualified, handed_over, outcome, lead_id, started_at",
+        )
+        .eq("client_id", clientId)
+        .order("started_at", { ascending: false }),
+      // Build jobs carry input_id, so each card can speak for its own agent.
+      // useAgentJobs is client-wide and has no input_id, which would put
+      // "Building…" on whichever card happened to render.
+      supabase
+        .from("agent_jobs")
+        .select("status, input_id, created_at")
+        .eq("client_id", clientId)
+        .eq("agent_key", "sales_agent")
+        .order("created_at", { ascending: false }),
     ]);
 
     setAgents((agentRes.data ?? []) as SalesAgent[]);
     setPages((pageRes.data ?? []) as PageOption[]);
+    setConversations((convRes.data ?? []) as Conversation[]);
 
-    const tally: Record<string, Stats> = {};
-    for (const c of (convRes.data ?? []) as {
-      sales_agent_id: string;
-      qualified: boolean;
-      lead_id: string | null;
-    }[]) {
-      const s = (tally[c.sales_agent_id] ??= { conversations: 0, captured: 0, qualified: 0 });
-      s.conversations += 1;
-      if (c.lead_id) s.captured += 1;
-      if (c.qualified) s.qualified += 1;
+    // Newest first, so the first sighting of an agent id is its latest job.
+    const latest: Record<string, { status: string }> = {};
+    for (const j of (jobRes.data ?? []) as { status: string; input_id: string | null }[]) {
+      if (j.input_id && !latest[j.input_id]) latest[j.input_id] = { status: j.status };
     }
-    setStats(tally);
+    setBuilds(latest);
     setLoading(false);
   }, [clientId]);
 
@@ -103,10 +117,29 @@ export function SalesAgentsPanel() {
     void refresh();
   }, [refresh]);
 
-  // The definition appears a minute or two after the click that asked for it.
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
   const open = agents.find((a) => a.id === openId);
+  const openConversations = conversations.filter((c) => c.sales_agent_id === openId);
+
+  const setStatus = async (agent: SalesAgent, status: string) => {
+    setBusy(true);
+    const { error } = await supabase
+      .from("client_sales_agents")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", agent.id);
+    setBusy(false);
+    if (error) {
+      setNotice(`Could not change that: ${error.message}`);
+      return;
+    }
+    setNotice(
+      status === "live"
+        ? `"${agent.name}" is live. It will answer visitors on the page it is attached to.`
+        : `"${agent.name}" is ${status}.`,
+    );
+    void refresh();
+  };
 
   const fields: FieldDef[] = [
     { name: "name", label: "Agent name", kind: "text", required: true },
@@ -150,50 +183,104 @@ export function SalesAgentsPanel() {
       ) : agents.length === 0 ? (
         <EmptyState label="No sales agents built yet" />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {agents.map((a) => {
-            const s = stats[a.id];
+            const mine = conversations.filter((c) => c.sales_agent_id === a.id);
+            const captured = mine.filter((c) => c.lead_id).length;
+            const qualified = mine.filter((c) => c.qualified).length;
+            const state = liveStateOf(a, builds[a.id]);
             const questions = a.qualification?.length ?? 0;
+
             return (
-              <Panel key={a.id} title={a.name}>
-                <span
-                  className={cn(
-                    "inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize",
-                    STATUS_TONE[a.status] ?? "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {a.status}
-                </span>
+              <div
+                key={a.id}
+                className="flex flex-col rounded-lg border border-border bg-card p-4"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-card-foreground">{a.name}</h3>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
+                      STATE_TONE[state.kind],
+                    )}
+                  >
+                    {state.label}
+                  </span>
+                </div>
+
+                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{a.purpose}</p>
 
                 {a.built_at ? (
                   <>
-                    <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{a.greeting}</p>
+                    <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3 text-center">
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Talked to</dt>
+                        <dd className="text-lg font-semibold text-card-foreground">{mine.length}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Qualified</dt>
+                        <dd className="text-lg font-semibold text-card-foreground">{qualified}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Leads</dt>
+                        <dd className="text-lg font-semibold text-card-foreground">{captured}</dd>
+                      </div>
+                    </dl>
+
+                    {/* An agent marked live that has said nothing is the thing
+                        this page exists to surface, so last activity is stated
+                        outright rather than left to be inferred from a zero. */}
                     <p className="mt-2 text-xs text-muted-foreground">
-                      {questions} qualification question{questions === 1 ? "" : "s"} ·{" "}
-                      {a.objections?.length ?? 0} objection{(a.objections?.length ?? 0) === 1 ? "" : "s"} handled
+                      {mine.length === 0
+                        ? a.status === "live"
+                          ? "Live, but has not spoken to anyone yet"
+                          : "No conversations yet"
+                        : `Last conversation ${sinceLabel(mine[0]?.started_at ?? null)}`}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setOpenId(a.id)}
-                      className="mt-2 rounded text-sm font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      Read the agent
-                    </button>
+
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {questions} question{questions === 1 ? "" : "s"} ·{" "}
+                      {a.objections?.length ?? 0} objection
+                      {(a.objections?.length ?? 0) === 1 ? "" : "s"}
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                      <button
+                        type="button"
+                        onClick={() => setOpenId(a.id)}
+                        className="rounded text-xs font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Open
+                      </button>
+                      {a.status !== "live" ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void setStatus(a, "live")}
+                          className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          Go live
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void setStatus(a, "retired")}
+                          className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          Retire
+                        </button>
+                      )}
+                    </div>
                   </>
                 ) : (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Waiting for the agent to build this.
+                  <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+                    {state.kind === "failed"
+                      ? "The last build failed. The agent activity bar above says why."
+                      : "Waiting for the builder to write this."}
                   </p>
                 )}
-
-                {/* Conversations are the only thing that says whether the
-                    script works. Silence is worth showing as silence. */}
-                <p className="mt-3 border-t border-border pt-2 text-xs text-muted-foreground">
-                  {s
-                    ? `${s.conversations} conversation${s.conversations === 1 ? "" : "s"} · ${s.captured} became leads · ${s.qualified} qualified`
-                    : "No conversations yet"}
-                </p>
-              </Panel>
+              </div>
             );
           })}
         </div>
@@ -209,14 +296,13 @@ export function SalesAgentsPanel() {
         submitLabel="Build"
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
-          const pageId = (v.page_id as string) || null;
           const { data, error } = await supabase
             .from("client_sales_agents")
             .insert({
               client_id: clientId,
               name: (v.name as string).trim(),
               purpose: (v.purpose as string).trim(),
-              page_id: pageId,
+              page_id: (v.page_id as string) || null,
             })
             .select("id")
             .single();
@@ -317,6 +403,42 @@ export function SalesAgentsPanel() {
               <section>
                 <h3 className="text-sm font-semibold text-foreground">Hands over to a person when</h3>
                 <p className="mt-1 text-sm text-muted-foreground">{open.escalation_rule}</p>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-semibold text-foreground">Conversations</h3>
+                {openConversations.length === 0 ? (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Nothing yet. Conversations appear here once this agent is answering visitors on
+                    a live page.
+                  </p>
+                ) : (
+                  <ul className="mt-2 space-y-2">
+                    {openConversations.map((c) => (
+                      <li key={c.id} className="rounded-lg border border-border p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-card-foreground">
+                            {c.contact_name ?? "Anonymous visitor"}
+                          </p>
+                          <span className="text-xs text-muted-foreground">
+                            {sinceLabel(c.started_at)}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {c.qualified ? "Qualified" : "Not qualified"}
+                          {c.lead_id ? " · became a lead" : " · no lead"}
+                          {c.handed_over ? " · handed to a person" : ""}
+                          {c.contact_email || c.contact_phone
+                            ? ` · ${c.contact_email ?? c.contact_phone}`
+                            : ""}
+                        </p>
+                        {c.outcome && (
+                          <p className="mt-1 text-xs text-muted-foreground">{c.outcome}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
 
               <section>

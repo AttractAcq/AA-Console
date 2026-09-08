@@ -15,6 +15,7 @@ import {
   Share2,
   TrendingUp,
   UserPlus,
+  MessagesSquare,
   BarChart3,
   ClipboardList,
   Plug,
@@ -178,8 +179,14 @@ export const clientNavGroups: NavNode[] = [
         tabs: [
           { id: "primary-landing-pages", label: "Primary Landing Pages" },
           { id: "secondary-offer-pages", label: "Secondary Offer Pages" },
-          { id: "sales-agents", label: "Sales Agents" },
         ],
+      },
+      {
+        id: "sales",
+        label: "Sales",
+        path: "sales",
+        icon: MessagesSquare,
+        tabs: [{ id: "overview", label: "Overview" }],
       },
       {
         id: "prospects-leads",
