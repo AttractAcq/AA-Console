@@ -258,7 +258,7 @@ describe('Phase 4 cross-client isolation on an RLS-enabled database', () => {
       "select pg_get_functiondef('enqueue_mcp_brief(text,text,text,uuid,uuid)'::regprocedure) as def",
     );
     expect(src.rows[0]?.def).toContain('require_bot_client_grant');
-    expect(src.rows[0]?.def).not.toMatch(/can_access_client/);
+    expect(src.rows[0]?.def).not.toMatch(/can_access_client\s*\(/);
     const human = await db.query<{ def: string }>(
       "select pg_get_functiondef('enqueue_agent_job(text,uuid,text,uuid)'::regprocedure) as def",
     );
@@ -286,7 +286,11 @@ describe('Phase 4 cross-client isolation on an RLS-enabled database', () => {
     const ideas = await db.query<{ client_id: string }>('select client_id from client_ideas');
     expect(ideas.rows.map((r) => r.client_id).sort()).toEqual([CLIENT_A]);
     const campaigns = await db.query<{ client_id: string }>('select client_id from campaigns');
-    expect(campaigns.rows.every((r) => r.client_id === CLIENT_A)).toBe(true);
+    expect(campaigns.rows.map((r) => String(r.client_id)).sort()).toEqual([CLIENT_A]);
+    const leaked = await db.query<{ n: number }>(
+      `select count(*)::int as n from campaigns where client_id = '${CLIENT_B}'`,
+    );
+    expect(leaked.rows[0]?.n).toBe(0);
     const periods = await db.query('select * from finance_periods');
     expect(periods.rows.length).toBe(0);
     const clients = await db.query<{ id: string }>('select id from clients');

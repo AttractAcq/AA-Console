@@ -54,6 +54,21 @@ begin
 end;
 $$;
 
+-- Migration 18 already dropped leftover `dev_open_read` policies in full
+-- environments. Re-drop if any remain so partial fixtures and missed applies
+-- cannot leave a using(true) SELECT on Bot-touched tables.
+do $$
+declare
+  r record;
+begin
+  for r in
+    select schemaname, tablename from pg_policies where policyname = 'dev_open_read'
+  loop
+    execute format('drop policy if exists dev_open_read on %I.%I', r.schemaname, r.tablename);
+    raise notice 'Phase 4: dropped leftover dev_open_read on %.%', r.schemaname, r.tablename;
+  end loop;
+end;
+$$;
 -- Bot-touched tables from the Phase 3–4 design §6. ENABLE is idempotent.
 -- Partial PGlite fixtures may omit later domain tables; those tables enable RLS
 -- in their own create migrations. Missing names are skipped, never created.

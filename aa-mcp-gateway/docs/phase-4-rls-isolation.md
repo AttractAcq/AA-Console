@@ -8,6 +8,7 @@
 
 1. **Migration 66** (`supabase/migrations/20260908200000_66_mcp_domain_rls_bot_isolation.sql`)
    - Idempotent `ENABLE ROW LEVEL SECURITY` on Bot-touched tables from design §6.
+   - Drop leftover `dev_open_read` (`using (true)`) policies if any remain (migration 18 already did this in full environments).
    - `FORCE ROW LEVEL SECURITY` on Bot registry / ledger tables (`mcp_internal.*`, `mcp_bot_clients`, `mcp_brief_requests`) so table-owner bypass cannot open those tables. Domain Console tables are **not** forced.
    - `mcp_internal.require_bot_client_grant` — Bot client scope via `mcp_bot_clients` **only**. Never `can_access_client`.
    - `enqueue_mcp_brief` uses that helper and denies suspended/revoked bots (`bot_not_active`).

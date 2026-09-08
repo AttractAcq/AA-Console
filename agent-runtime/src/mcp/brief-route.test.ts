@@ -59,6 +59,7 @@ beforeEach(async () => {
     truncate mcp_brief_requests, mcp_bot_clients, client_briefs, client_ideas,
       agent_job_events, agent_jobs, ref_counters, clients, profiles, auth.users cascade;
     update agents set paused = false, archived_at = null, requires_upstream = '{}';
+    update mcp_internal.mcp_bots set status = 'active';
     insert into auth.users (id) values ('${ADMIN}');
     update profiles set role = 'admin' where id = '${ADMIN}';
     insert into clients (id,name,initials) values ('${CLIENT}','First','FI'),('${OTHER}','Other','OT');
