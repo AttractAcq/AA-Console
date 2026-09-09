@@ -64,6 +64,7 @@ test("production discovery and execution enforce role and client scope", async (
   const discovered = engine.discover(identity);
   const names = discovered.map((t) => t.name);
   assert.deepEqual(names.sort(), [
+    "content.approve_asset",
     "content.create_repurpose_plan",
     "content.generate_brief",
     "content.get_brief",
@@ -72,6 +73,7 @@ test("production discovery and execution enforce role and client scope", async (
     "content.list_ideas",
     "content.request_approval",
     "content.request_revision",
+    "content.select_idea",
     "workflow.assign_task",
     "workflow.complete_task",
     "workflow.create_approval",
@@ -83,7 +85,7 @@ test("production discovery and execution enforce role and client scope", async (
   ]);
   assert.ok(discovered.every((t) => t.implementation === "real"));
   assert.ok(!names.includes("content.generate_ideas"));
-  assert.ok(!names.includes("content.approve_asset"));
+  assert.ok(!names.includes("content.queue_distribution"));
   assert.ok(!names.includes("pipeline.update_stage"));
   assert.ok(!names.includes("workflow.record_decision"));
   for (const t of registry.filter((tool) => tool.implementation === "stub"))
@@ -104,6 +106,21 @@ test("production discovery and execution enforce role and client scope", async (
   );
   store.close();
 });
+test("Phase 9b: idea/asset decide are bot_production only, even with a wildcard content.* grant", () => {
+  const { store, engine } = fixture(new AAApiAdapter(), true);
+  const marketing: Identity = {
+    bot: "bot_marketing",
+    clients: [client],
+    permissions: ["content.*"],
+  };
+  const marketingNames = engine.discover(marketing).map((t) => t.name);
+  assert.ok(!marketingNames.includes("content.select_idea"));
+  assert.ok(!marketingNames.includes("content.approve_asset"));
+  const productionNames = engine.discover(identity).map((t) => t.name);
+  assert.ok(productionNames.includes("content.select_idea"));
+  assert.ok(productionNames.includes("content.approve_asset"));
+  store.close();
+});
 test("MCP_DISCOVER_STUBS exposes permitted stubs; default call rejects stub names", async () => {
   const hidden = fixture();
   const defaultNames = hidden.engine.discover(identity).map((t) => t.name);
@@ -122,7 +139,7 @@ test("MCP_DISCOVER_STUBS exposes permitted stubs; default call rejects stub name
   assert.ok(stubNames.includes("content.generate_brief"));
   assert.ok(stubNames.includes("content.list_ideas"));
   assert.ok(stubNames.includes("content.generate_ideas"));
-  assert.ok(stubNames.includes("content.approve_asset"));
+  assert.ok(stubNames.includes("content.queue_distribution"));
   assert.ok(!stubNames.includes("pipeline.update_stage"));
   assert.ok(!stubNames.includes("workflow.record_decision"));
   assert.equal(
@@ -288,7 +305,7 @@ test("Finance critical payment creates approval and cannot execute before human 
 test("approval rejection, expiration and revoked scope block execution", async () => {
   const { store, engine } = fixture(new AAApiAdapter(), true);
   for (const mode of ["rejected", "expired", "revoked"]) {
-    const r = await engine.call(identity, "content.approve_asset", {
+    const r = await engine.call(identity, "content.queue_distribution", {
       client_id: client,
       idempotency_key: `approval-${mode}`,
       asset_id: idea,
@@ -388,6 +405,7 @@ test("HTTP MCP discovery/call and human-only approval boundary", async () => {
     const list: any = await response.json();
     const listed = list.result.tools.map((t: any) => t.name).sort();
     assert.deepEqual(listed, [
+      "content.approve_asset",
       "content.create_repurpose_plan",
       "content.generate_brief",
       "content.get_brief",
@@ -396,6 +414,7 @@ test("HTTP MCP discovery/call and human-only approval boundary", async () => {
       "content.list_ideas",
       "content.request_approval",
       "content.request_revision",
+      "content.select_idea",
       "workflow.assign_task",
       "workflow.complete_task",
       "workflow.create_approval",

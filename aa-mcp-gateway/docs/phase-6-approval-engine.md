@@ -4,6 +4,8 @@ Status: design locked for implementation; Sec review required before merge.
 Base: main at 2243a46, including migration 69. No production apply or Railway deploy.
 The [Phase 5 binding security rules](phase-5-production-manager.md) remain binding.
 
+**Amended by Phase 9b** ([phase-9b-production-bot-decide.md](phase-9b-production-bot-decide.md)): the "Forbidden: Bot `review_media_asset`, `content.approve_asset` as a decision" row below is superseded **for `bot_production` only** (`content.approve_asset` is real there under an explicit Alex CLEAR + Sec review). The durable human-wait/continuation pipeline this document defines is otherwise unchanged, including for `bot_production`: `mcp_internal.resume_approval` still requires human review evidence (`reviewed_by is not null`); a Bot's own decision does not satisfy that gate.
+
 ## Classification
 
 | Class | Production Manager actions | Boundary |

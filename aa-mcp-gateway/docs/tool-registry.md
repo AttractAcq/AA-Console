@@ -21,7 +21,7 @@
 | content.list_ideas | real | read | LOW | no | true | Scoped AA content business API |
 | content.generate_ideas | stub | write | MEDIUM | no | true | Scoped AA content business API |
 | content.get_idea | real | read | LOW | no | true | Scoped AA content business API |
-| content.select_idea | stub | write | MEDIUM | no | true | Scoped AA content business API |
+| content.select_idea | real (bot_production only) | write | MEDIUM | no | true | Scoped AA content business API |
 | content.generate_brief | real | write | LOW | no | true | Scoped AA content business API |
 | content.get_brief | real | read | LOW | no | true | Scoped AA content business API |
 | content.assign_production | stub | write | MEDIUM | no | true | Scoped AA content business API |
@@ -29,7 +29,7 @@
 | content.submit_asset | stub | write | MEDIUM | no | true | Scoped AA content business API |
 | content.request_revision | real | write | MEDIUM | no | true | Scoped AA content business API |
 | content.request_approval | real | write | MEDIUM | no | true | Scoped AA content business API |
-| content.approve_asset | stub | write | HIGH | required | false | Scoped AA content business API |
+| content.approve_asset | real (bot_production only) | write | MEDIUM | no | false | Scoped AA content business API |
 | content.create_repurpose_plan | real | write | MEDIUM | no | true | Scoped AA content business API |
 | content.queue_distribution | stub | write | HIGH | required | false | Scoped AA content business API |
 | content.get_performance | stub | read | LOW | no | true | Scoped AA content business API |
@@ -90,3 +90,5 @@
 | security.get_incident_status | stub | read | LOW | no | true | Scoped AA security business API |
 
 `workflow.record_decision` is reserved, denied to every Bot; human decisions use the reviewer API. Exact machine-readable input/output schemas and required permissions are in `src/registry/tools.ts`. Default MCP discovery and `call` expose only permitted tools with `implementation: real` (or `partial`). Stub contracts remain catalogued here and appear in `tools/list` only when `MCP_DISCOVER_STUBS=true`.
+
+`content.select_idea` and `content.approve_asset` are real for `bot_production` only ([Phase 9b](phase-9b-production-bot-decide.md)), hard-coded in `src/policy/permissions.ts` `allowed()` and in the AA RPCs themselves — not through the permission-grant matrix, since `bot_marketing` keeps a `content.*` wildcard for its other real content tools. Every other Bot, including `bot_marketing`, still gets `not_implemented`/"Tool unavailable or unauthorized." for both.

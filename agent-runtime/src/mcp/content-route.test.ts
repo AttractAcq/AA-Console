@@ -57,7 +57,7 @@ beforeAll(async () => {
     '20260908230000_68_mcp_production_manager.sql',
     '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
     '20260909000000_70_mcp_approval_engine.sql',
-    '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
+    '20260909040000_74_mcp_production_bot_decide.sql',
   ]) await db.exec(await migration(file));
 }, 60_000);
 afterAll(async () => { await db?.close(); });
@@ -357,5 +357,118 @@ describe('Phase 6 linked continuation HTTP', () => {
     const absent = await call('/internal/mcp/content/create-repurpose-plan', body);
     expect(absent.status).toBe(404);
     expect(absent.body.error.code).toBe('approval_not_found');
+  });
+});
+
+describe('Phase 9b Production Bot decide HTTP', () => {
+  const DRAFT_IDEA = '99999991-9999-4999-8999-999999999991';
+
+  beforeEach(async () => {
+    await db.exec(`
+      insert into client_ideas (id,client_id,title,source,status)
+        values ('${DRAFT_IDEA}','${CLIENT}','Draft idea','manual','draft');
+    `);
+  });
+
+  it('approves a draft idea and rejects a cross-client idea id', async () => {
+    const ok = await call('/internal/mcp/content/select-idea', { client_id: CLIENT, idea_id: DRAFT_IDEA });
+    expect(ok.status).toBe(200);
+    expect(ok.body.idea_status).toBe('approved');
+    expect((await db.query<{ status: string }>(
+      `select status from client_ideas where id = '${DRAFT_IDEA}'`,
+    )).rows[0]?.status).toBe('approved');
+    const replay = await call('/internal/mcp/content/select-idea', { client_id: CLIENT, idea_id: DRAFT_IDEA });
+    expect(replay.body.replayed).toBe(true);
+    const mismatch = await call('/internal/mcp/content/select-idea', {
+      client_id: CLIENT, idea_id: IDEA_B,
+    }, { headers: { 'idempotency-key': 'idea-mismatch' } });
+    expect(mismatch.body.error.code).toBe('client_mismatch');
+    expect(mismatch.status).toBe(403);
+    expect((await call('/internal/mcp/content/select-idea', { client_id: OTHER, idea_id: DRAFT_IDEA },
+      { headers: { 'idempotency-key': 'idea-forbidden' } })).body.error.code).toBe('client_forbidden');
+  });
+
+  it('decides a pending asset, writes one ledger row with Bot attribution, and refuses to redecide', async () => {
+    const decided = await call('/internal/mcp/content/approve-asset', {
+      client_id: CLIENT, asset_id: ASSET, decision: 'approved', summary: 'Looks good',
+    });
+    expect(decided.status).toBe(200);
+    expect(decided.body.decision).toBe('approved');
+    expect(decided.body.reviewed_by_bot).toBe('bot_production');
+    expect((await db.query<{ review_status: string }>(
+      `select review_status from client_media_assets where id = '${ASSET}'`,
+    )).rows[0]?.review_status).toBe('approved');
+    const review = (await db.query<{ reviewed_by: string | null; reviewed_by_bot: string | null }>(
+      `select reviewed_by, reviewed_by_bot from client_asset_reviews where asset_id = '${ASSET}'`,
+    )).rows[0]!;
+    expect(review.reviewed_by_bot).toBe('bot_production');
+    expect(review.reviewed_by).toBeNull();
+    const again = await call('/internal/mcp/content/approve-asset', {
+      client_id: CLIENT, asset_id: ASSET, decision: 'rejected',
+    }, { headers: { 'idempotency-key': 'asset-redecide' } });
+    expect(again.body.error.code).toBe('invalid_asset_status');
+    expect((await call('/internal/mcp/content/approve-asset', {
+      client_id: CLIENT, asset_id: ASSET_B, decision: 'approved',
+    }, { headers: { 'idempotency-key': 'asset-mismatch' } })).body.error.code).toBe('client_mismatch');
+  });
+
+  it('rejects an unknown decision value and an oversized reason', async () => {
+    expect((await call('/internal/mcp/content/approve-asset', {
+      client_id: CLIENT, asset_id: ASSET, decision: 'maybe',
+    })).body.error.code).toBe('invalid_request');
+    expect((await call('/internal/mcp/content/approve-asset', {
+      client_id: CLIENT, asset_id: ASSET, decision: 'approved', summary: 'x'.repeat(4001),
+    }, { headers: { 'idempotency-key': 'asset-long-reason' } })).body.error.code).toBe('invalid_request');
+  });
+
+  it('a Bot-approved asset is repurposable directly, without Console review', async () => {
+    await call('/internal/mcp/content/approve-asset', {
+      client_id: CLIENT, asset_id: ASSET, decision: 'approved',
+    });
+    const plan = await call('/internal/mcp/content/create-repurpose-plan', {
+      client_id: CLIENT, asset_id: ASSET, formats: ['reel'],
+    }, { headers: { 'idempotency-key': 'repurpose-after-bot-approve' } });
+    expect(plan.status).toBe(202);
+    expect(plan.body.job_id).toBeTruthy();
+  });
+
+  it('anon and authenticated cannot execute the new Bot RPCs', async () => {
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await expect(db.query('select mcp_approve_idea($1,$2,$3,$4,$5)',
+        ['bot_production', 'r', 'e', CLIENT, DRAFT_IDEA])).rejects.toThrow('permission denied');
+      await expect(db.query('select mcp_approve_asset($1,$2,$3,$4,$5,$6,$7)',
+        ['bot_production', 'r', 'e', CLIENT, ASSET, 'approved', null])).rejects.toThrow('permission denied');
+      await db.exec('reset role');
+    }
+  });
+
+  it('bot_forbidden for a Bot other than bot_production, even with a valid client grant', async () => {
+    await db.exec(`insert into mcp_bot_clients (bot_id,client_id) values ('bot_marketing','${CLIENT}');`);
+    const denied = await call('/internal/mcp/content/select-idea', { client_id: CLIENT, idea_id: DRAFT_IDEA }, {
+      headers: { 'x-aa-bot-id': 'bot_marketing' },
+    });
+    expect(denied.body.error.code).toBe('bot_forbidden');
+    const deniedAsset = await call('/internal/mcp/content/approve-asset', {
+      client_id: CLIENT, asset_id: ASSET, decision: 'approved',
+    }, { headers: { 'x-aa-bot-id': 'bot_marketing', 'idempotency-key': 'asset-marketing' } });
+    expect(deniedAsset.body.error.code).toBe('bot_forbidden');
+  });
+
+  it('human Console review can still override an asset the Bot already decided', async () => {
+    await call('/internal/mcp/content/approve-asset', { client_id: CLIENT, asset_id: ASSET, decision: 'approved' });
+    const user = '88888888-8888-4888-8888-888888888888';
+    await db.exec(`insert into auth.users (id) values ('${user}');
+      update profiles set role = 'admin' where id = '${user}';
+      select set_config('request.jwt.claim.role','authenticated',false);
+      select set_config('request.jwt.claim.sub','${user}',false);`);
+    await db.query('select review_media_asset($1,$2,$3)', [ASSET, 'rejected', 'Human override']);
+    await db.exec("select set_config('request.jwt.claim.role','service_role',false); select set_config('request.jwt.claim.sub','',false);");
+    expect((await db.query<{ review_status: string }>(
+      `select review_status from client_media_assets where id = '${ASSET}'`,
+    )).rows[0]?.review_status).toBe('rejected');
+    expect((await db.query<{ n: number }>(
+      `select count(*)::int as n from client_asset_reviews where asset_id = '${ASSET}'`,
+    )).rows[0]?.n).toBe(2);
   });
 });

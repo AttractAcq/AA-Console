@@ -68,7 +68,7 @@ beforeAll(async () => {
     '20260908230000_68_mcp_production_manager.sql',
     '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
     '20260909000000_70_mcp_approval_engine.sql',
-    '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
+    '20260909040000_74_mcp_production_bot_decide.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -689,4 +689,239 @@ describe('Phase 5 Production Manager isolation', () => {
     expect((await q()).rows[0]!.result.handoff.ready_for_distribution).toBe(true);
   });
 
+});
+
+describe('Phase 9b Production Bot decide isolation', () => {
+  const DRAFT_IDEA_A = '99999991-9999-4999-8999-999999999991';
+  const DRAFT_IDEA_B = '99999992-9999-4999-8999-999999999992';
+  const PENDING_ASSET_A = '99999993-9999-4999-8999-999999999993';
+  const PENDING_ASSET_B = '99999994-9999-4999-8999-999999999994';
+
+  const approveIdea = (
+    bot = 'bot_production', client = CLIENT_A, idea = DRAFT_IDEA_A, execution = 'idea-exec',
+  ) => db.query<{ result: any }>(
+    'select mcp_approve_idea($1,$2,$3,$4,$5) as result',
+    [bot, 'idea-req', execution, client, idea],
+  );
+  const approveAsset = (
+    overrides: Partial<{ bot: string; client: string; asset: string; decision: string; execution: string; reason: string | null }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_approve_asset($1,$2,$3,$4,$5,$6,$7) as result',
+    [
+      overrides.bot ?? 'bot_production', 'asset-req', overrides.execution ?? 'asset-exec',
+      overrides.client ?? CLIENT_A, overrides.asset ?? PENDING_ASSET_A,
+      overrides.decision ?? 'approved', overrides.reason ?? null,
+    ],
+  );
+
+  beforeEach(async () => {
+    await db.exec(`
+      insert into client_ideas (id,client_id,title,source,status) values
+        ('${DRAFT_IDEA_A}','${CLIENT_A}','Draft A','manual','draft'),
+        ('${DRAFT_IDEA_B}','${CLIENT_B}','Draft B','manual','draft');
+      insert into client_media_assets (id,client_id,media_type,title,storage_path,review_status) values
+        ('${PENDING_ASSET_A}','${CLIENT_A}','image','Cut A','path/pa.png','pending'),
+        ('${PENDING_ASSET_B}','${CLIENT_B}','image','Cut B','path/pb.png','pending');
+      insert into mcp_bot_clients (bot_id, client_id) values ('bot_marketing', '${CLIENT_A}');
+    `);
+  });
+
+  it('every new RPC uses require_active_bot + require_bot_client_grant, never can_access_client/review_media_asset, and hard-codes bot_production', async () => {
+    const internalSignatures = [
+      'mcp_internal.approve_idea(text,text,text,uuid,uuid)',
+      'mcp_internal.approve_asset(text,text,text,uuid,uuid,text,text)',
+    ];
+    const publicSignatures = [
+      'public.mcp_approve_idea(text,text,text,uuid,uuid)',
+      'public.mcp_approve_asset(text,text,text,uuid,uuid,text,text)',
+    ];
+    for (const sig of internalSignatures) {
+      const src = await db.query<{ def: string }>(
+        `select pg_get_functiondef('${sig}'::regprocedure) as def`,
+      );
+      expect(src.rows[0]?.def, sig).toContain('require_active_bot');
+      expect(src.rows[0]?.def, sig).toContain('require_bot_client_grant');
+      expect(src.rows[0]?.def, sig).not.toMatch(/can_access_client\s*\(/);
+      expect(src.rows[0]?.def, sig).not.toMatch(/\breview_media_asset\s*\(/);
+    }
+    for (const sig of publicSignatures) {
+      const src = await db.query<{ def: string }>(
+        `select pg_get_functiondef('${sig}'::regprocedure) as def`,
+      );
+      expect(src.rows[0]?.def, sig).not.toMatch(/can_access_client\s*\(/);
+      expect(src.rows[0]?.def, sig).not.toMatch(/\breview_media_asset\s*\(/);
+    }
+    for (const sig of ['mcp_internal.approve_idea(text,text,text,uuid,uuid)', 'mcp_internal.approve_asset(text,text,text,uuid,uuid,text,text)']) {
+      const src = await db.query<{ def: string }>(`select pg_get_functiondef('${sig}'::regprocedure) as def`);
+      expect(src.rows[0]?.def, sig).toContain('bot_forbidden');
+    }
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await expect(db.query('select mcp_approve_idea($1,$2,$3,$4,$5)',
+        ['bot_production', 'r', 'e', CLIENT_A, DRAFT_IDEA_A])).rejects.toThrow('permission denied');
+      await expect(db.query('select mcp_approve_asset($1,$2,$3,$4,$5,$6,$7)',
+        ['bot_production', 'r', 'e', CLIENT_A, PENDING_ASSET_A, 'approved', null])).rejects.toThrow('permission denied');
+      await db.exec('reset role');
+    }
+    await asService();
+  });
+
+  it('approves a draft idea for the granted client and composes with generate_brief; leaves other states alone', async () => {
+    const approved = (await approveIdea()).rows[0]!.result;
+    expect(approved.idea_status).toBe('approved');
+    expect(approved.replayed).toBe(false);
+    expect((await db.query<{ status: string }>(
+      `select status from client_ideas where id = '${DRAFT_IDEA_A}'`,
+    )).rows[0]?.status).toBe('approved');
+
+    const replay = (await approveIdea()).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+
+    // Composes with the existing, unchanged generate_brief RPC.
+    const brief = await db.query<{ result: any }>(
+      'select enqueue_mcp_brief($1,$2,$3,$4,$5) as result',
+      ['bot_production', 'brief-req', 'brief-exec', CLIENT_A, DRAFT_IDEA_A],
+    );
+    expect(brief.rows[0]?.result.job_id).toBeTruthy();
+    expect((await db.query<{ status: string }>(
+      `select status from client_ideas where id = '${DRAFT_IDEA_A}'`,
+    )).rows[0]?.status).toBe('briefed');
+
+    // Already-briefed idea: idempotent no-op, not an error, under a new execution id.
+    const noop = (await approveIdea('bot_production', CLIENT_A, DRAFT_IDEA_A, 'idea-exec-2')).rows[0]!.result;
+    expect(noop.idea_status).toBe('briefed');
+
+    // Rejected idea cannot be Bot-approved.
+    await db.exec(`update client_ideas set status = 'rejected' where id = '${DRAFT_IDEA_B}'`);
+    await expect(approveIdea('bot_production', CLIENT_B, DRAFT_IDEA_B, 'idea-exec-3'))
+      .rejects.toThrow('client_forbidden');
+    await db.exec(`insert into mcp_bot_clients (bot_id,client_id) values ('bot_production','${CLIENT_B}')`);
+    await expect(approveIdea('bot_production', CLIENT_B, DRAFT_IDEA_B, 'idea-exec-4'))
+      .rejects.toThrow('invalid_idea_status');
+  });
+
+  it('idea approve is client-scoped: forbidden vs mismatch, and a different payload under the same key conflicts', async () => {
+    await expect(approveIdea('bot_production', CLIENT_B, DRAFT_IDEA_B)).rejects.toThrow('client_forbidden');
+    await expect(approveIdea('bot_production', CLIENT_A, DRAFT_IDEA_B)).rejects.toThrow('client_mismatch');
+    await approveIdea();
+    await expect(db.query('select mcp_approve_idea($1,$2,$3,$4,$5)',
+      ['bot_production', 'idea-req', 'idea-exec', CLIENT_A, DRAFT_IDEA_B])).rejects.toThrow('idempotency_conflict');
+  });
+
+  it('decides a pending asset for the granted client, writes one ledger row with Bot attribution, and refuses to redecide', async () => {
+    const decided = (await approveAsset()).rows[0]!.result;
+    expect(decided.decision).toBe('approved');
+    expect(decided.reviewed_by_bot).toBe('bot_production');
+    expect((await db.query<{ review_status: string }>(
+      `select review_status from client_media_assets where id = '${PENDING_ASSET_A}'`,
+    )).rows[0]?.review_status).toBe('approved');
+    const review = (await db.query<{ reviewed_by: string | null; reviewed_by_bot: string | null; decision: string }>(
+      `select reviewed_by, reviewed_by_bot, decision from client_asset_reviews where asset_id = '${PENDING_ASSET_A}'`,
+    )).rows[0]!;
+    expect(review.reviewed_by_bot).toBe('bot_production');
+    expect(review.reviewed_by).toBeNull();
+    expect(review.decision).toBe('approved');
+    expect((await db.query<{ n: number }>(
+      "select count(*)::int as n from mcp_internal.mcp_content_requests where tool = 'content.approve_asset'",
+    )).rows[0]?.n).toBe(1);
+
+    // Replay is idempotent; a second, fresh decision on the now-decided asset is refused.
+    const replay = (await approveAsset()).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+    await expect(approveAsset({ execution: 'asset-exec-2' })).rejects.toThrow('invalid_asset_status');
+
+    // A decided asset stays out of the Console pending queue, same as a human decision.
+    expect((await db.query<{ n: number }>(
+      `select count(*)::int as n from approvals_queue where id = '${PENDING_ASSET_A}'`,
+    )).rows[0]?.n).toBe(0);
+  });
+
+  it('a rejected Bot decision, an unknown asset, and cross-client access are all refused correctly', async () => {
+    await expect(approveAsset({ client: CLIENT_A, asset: '00000000-0000-4000-8000-000000000000' }))
+      .rejects.toThrow('asset_not_found');
+    await expect(approveAsset({ client: CLIENT_B, asset: PENDING_ASSET_B })).rejects.toThrow('client_forbidden');
+    await expect(approveAsset({ client: CLIENT_A, asset: PENDING_ASSET_B })).rejects.toThrow('client_mismatch');
+    const rejected = (await approveAsset({ decision: 'rejected', execution: 'asset-rej' })).rows[0]!.result;
+    expect(rejected.decision).toBe('rejected');
+    expect((await db.query<{ review_status: string }>(
+      `select review_status from client_media_assets where id = '${PENDING_ASSET_A}'`,
+    )).rows[0]?.review_status).toBe('rejected');
+    await expect(db.query('select mcp_approve_asset($1,$2,$3,$4,$5,$6,$7)',
+      ['bot_production', 'r', 'bad-decision', CLIENT_A, PENDING_ASSET_A, 'maybe', null])).rejects.toThrow('invalid_request');
+  });
+
+  it('human Console review can still decide, or override, an asset the Bot already decided', async () => {
+    await approveAsset();
+    await db.exec(`
+      grant execute on function review_media_asset(uuid,review_status,text) to authenticated;
+      select set_config('request.jwt.claim.role','authenticated',false);
+      select set_config('request.jwt.claim.sub','${USER_A}',false);
+      set role authenticated;
+    `);
+    await db.query('select review_media_asset($1,$2,$3)', [PENDING_ASSET_A, 'rejected', 'Human override']);
+    await asService();
+    expect((await db.query<{ review_status: string }>(
+      `select review_status from client_media_assets where id = '${PENDING_ASSET_A}'`,
+    )).rows[0]?.review_status).toBe('rejected');
+    const rows = (await db.query<{ reviewed_by: string | null; reviewed_by_bot: string | null }>(
+      `select reviewed_by, reviewed_by_bot from client_asset_reviews where asset_id = '${PENDING_ASSET_A}' order by created_at`,
+    )).rows;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.reviewed_by_bot).toBe('bot_production');
+    expect(rows[1]?.reviewed_by).toBe(USER_A);
+  });
+
+  it('a Bot-approved asset is repurposable directly, without going through content.request_approval', async () => {
+    await approveAsset();
+    const plan = await db.query<{ result: any }>(
+      'select mcp_create_repurpose_plan($1,$2,$3,$4,$5,$6) as result',
+      ['bot_production', 'rp-r', 'rp-e', CLIENT_A, PENDING_ASSET_A, ['reel']],
+    );
+    expect(plan.rows[0]?.result.job_id).toBeTruthy();
+  });
+
+  it('a Bot-approved asset does not satisfy the Phase 6 human-evidence resume gate', async () => {
+    await approveAsset();
+    const requested = await db.query<{ result: any }>(
+      'select mcp_request_approval($1,$2,$3,$4,$5,$6,$7,$8) as result',
+      ['bot_production', 'appr-req', 'appr-exec', CLIENT_A, null, null, PENDING_ASSET_A, null],
+    );
+    expect(requested.rows[0]?.result.queue).toBe('already_approved');
+    await expect(db.query(
+      'select mcp_resume_approval($1,$2,$3,$4,$5,$6,$7) as result',
+      ['bot_production', 'resume-req', 'resume-exec', CLIENT_A, PENDING_ASSET_A, ['reel'], 'appr-exec'],
+    )).rejects.toThrow('approval_required');
+  });
+
+  it('bot_forbidden: no Bot other than bot_production can call either RPC, even with an active status and a valid client grant', async () => {
+    await expect(approveIdea('bot_marketing', CLIENT_A, DRAFT_IDEA_A)).rejects.toThrow('bot_forbidden');
+    await expect(approveAsset({ bot: 'bot_marketing' })).rejects.toThrow('bot_forbidden');
+    await expect(approveIdea('bot_finance', CLIENT_A, DRAFT_IDEA_A)).rejects.toThrow('client_forbidden');
+  });
+
+  it('suspended bot is bot_not_active before the bot_forbidden check would otherwise fire, even with a remaining grant', async () => {
+    await db.query('select mcp_issue_bot_token($1,$2,$3,$4)', ['bot_production', HASH, 'operator', 'test']);
+    await db.query('select mcp_suspend_bot($1,$2,$3)', ['bot_production', 'operator', 'lock']);
+    await expect(approveIdea()).rejects.toThrow('bot_not_active');
+    await expect(approveAsset()).rejects.toThrow('bot_not_active');
+  });
+
+  it('revoked grant denies replay before lookup', async () => {
+    await approveIdea();
+    await db.exec(`delete from mcp_bot_clients where bot_id = 'bot_production' and client_id = '${CLIENT_A}'`);
+    await expect(approveIdea('bot_production', CLIENT_A, DRAFT_IDEA_A, 'idea-exec-revoked')).rejects.toThrow('client_forbidden');
+    await expect(approveAsset({ execution: 'asset-exec-revoked' })).rejects.toThrow('client_forbidden');
+  });
+
+  it('permission grants no exact-name row for either tool outside bot_production, and bot_production retains content.*', async () => {
+    const rows = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions
+        where permission_pattern in ('content.select_idea', 'content.approve_asset') and bot_id <> 'bot_production'`,
+    )).rows;
+    expect(rows[0]?.n).toBe(0);
+    const wildcard = (await db.query<{ n: number }>(
+      "select count(*)::int as n from mcp_internal.mcp_bot_permissions where bot_id = 'bot_production' and permission_pattern = 'content.*'",
+    )).rows;
+    expect(wildcard[0]?.n).toBe(1);
+  });
 });

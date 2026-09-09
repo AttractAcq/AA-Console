@@ -23,6 +23,7 @@ export const MCP_ERRORS: Record<string, [number, string]> = {
   client_mismatch: [403, 'Resource does not belong to the requested client.'],
   client_forbidden: [403, 'Bot is not permitted for this client.'],
   bot_not_active: [403, 'Bot is not active.'],
+  bot_forbidden: [403, 'This bot is not authorized for this action.'],
   invalid_idea_status: [409, 'Idea must already be approved for brief generation.'],
   invalid_brief_status: [409, 'Brief is not in a state that allows this action.'],
   invalid_asset_status: [409, 'Asset is not in a state that allows this action.'],

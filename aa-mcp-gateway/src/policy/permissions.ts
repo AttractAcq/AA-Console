@@ -78,6 +78,19 @@ export function grantPatterns(identity: Identity): string[] {
     : grants[identity.bot];
 }
 
+/**
+ * Sec Phase 9b Alex CLEAR (2026-09-09): Bot idea-approve / asset-decide is
+ * bot_production only. bot_marketing already holds `content.*` for its other
+ * real content tools, so this cannot be expressed by withholding a grant —
+ * it is a hard, non-grant-based deny, evaluated before the pattern match,
+ * exactly like the `workflow.record_decision` line below. A future PR that
+ * wants to extend either tool to another Bot must change this set and go
+ * through Sec again; it cannot happen by adding a permission row.
+ */
+const PRODUCTION_ONLY_TOOLS = new Set([
+  "content.select_idea",
+  "content.approve_asset",
+]);
 export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   // Sec Phase 5 #5 / Phase 3–4 locked: hard-deny stays in gateway code forever.
   if (tool.name === "workflow.record_decision") return false; // human-only API, never discoverable by Bots
@@ -85,6 +98,8 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
     typeof botOrIdentity === "string"
       ? { bot: botOrIdentity, clients: [] }
       : botOrIdentity;
+  if (PRODUCTION_ONLY_TOOLS.has(tool.name) && identity.bot !== "bot_production")
+    return false;
   // Locked Marketing ceiling also constrains stale/overbroad database grants.
   if (identity.bot === "bot_marketing" &&
       !marketingDirector.grants.some((name) => name === tool.name)) return false;
