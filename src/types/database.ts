@@ -1612,6 +1612,126 @@ export type Database = {
         }
         Relationships: []
       }
+      client_campaigns: {
+        Row: {
+          ad_campaign_id: string | null
+          audience: string | null
+          brief: string
+          budget: number | null
+          built_at: string | null
+          channels: string[]
+          client_id: string
+          content_count: number
+          core_message: string | null
+          created_at: string
+          ends_on: string | null
+          id: string
+          job_id: string | null
+          kpi_metric: string | null
+          kpi_target: number | null
+          launched_at: string | null
+          name: string
+          needs_landing_page: boolean
+          needs_sales_agent: boolean
+          objective: string | null
+          offer_summary: string | null
+          starts_on: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          ad_campaign_id?: string | null
+          audience?: string | null
+          brief: string
+          budget?: number | null
+          built_at?: string | null
+          channels?: string[]
+          client_id: string
+          content_count?: number
+          core_message?: string | null
+          created_at?: string
+          ends_on?: string | null
+          id?: string
+          job_id?: string | null
+          kpi_metric?: string | null
+          kpi_target?: number | null
+          launched_at?: string | null
+          name: string
+          needs_landing_page?: boolean
+          needs_sales_agent?: boolean
+          objective?: string | null
+          offer_summary?: string | null
+          starts_on?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          ad_campaign_id?: string | null
+          audience?: string | null
+          brief?: string
+          budget?: number | null
+          built_at?: string | null
+          channels?: string[]
+          client_id?: string
+          content_count?: number
+          core_message?: string | null
+          created_at?: string
+          ends_on?: string | null
+          id?: string
+          job_id?: string | null
+          kpi_metric?: string | null
+          kpi_target?: number | null
+          launched_at?: string | null
+          name?: string
+          needs_landing_page?: boolean
+          needs_sales_agent?: boolean
+          objective?: string | null
+          offer_summary?: string | null
+          starts_on?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      campaign_artifacts: {
+        Row: {
+          asset_id: string | null
+          brief_id: string | null
+          campaign_id: string
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          page_id: string | null
+          post_id: string | null
+          sales_agent_id: string | null
+        }
+        Insert: {
+          asset_id?: string | null
+          brief_id?: string | null
+          campaign_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          page_id?: string | null
+          post_id?: string | null
+          sales_agent_id?: string | null
+        }
+        Update: {
+          asset_id?: string | null
+          brief_id?: string | null
+          campaign_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          page_id?: string | null
+          post_id?: string | null
+          sales_agent_id?: string | null
+        }
+        Relationships: []
+      }
       client_pages: {
         Row: {
           body: string | null
@@ -3176,6 +3296,27 @@ export type Database = {
       usable_proof: {
         Args: { p_client_id: string; p_avatar?: string; p_limit?: number }
         Returns: Database["public"]["Tables"]["client_proof_assets"]["Row"][]
+      }
+      campaign_readiness: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          requirement: string
+          required: number
+          have: number
+          met: boolean
+          detail: string
+        }[]
+      }
+      provision_campaign: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          created: string
+          artifact_id: string
+        }[]
+      }
+      launch_campaign: {
+        Args: { p_campaign_id: string }
+        Returns: undefined
       }
       advance_lead: {
         Args: { p_lead_id: string; p_stage: Database["public"]["Enums"]["lead_stage"]; p_note?: string }

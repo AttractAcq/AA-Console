@@ -16,6 +16,7 @@ import {
   TrendingUp,
   UserPlus,
   MessagesSquare,
+  Megaphone,
   BarChart3,
   ClipboardList,
   Plug,
@@ -186,6 +187,13 @@ export const clientNavGroups: NavNode[] = [
         label: "Sales",
         path: "sales",
         icon: MessagesSquare,
+        tabs: [{ id: "overview", label: "Overview" }],
+      },
+      {
+        id: "campaign-execution",
+        label: "Campaigns",
+        path: "campaign-execution",
+        icon: Megaphone,
         tabs: [{ id: "overview", label: "Overview" }],
       },
       {

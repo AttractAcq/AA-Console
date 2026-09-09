@@ -26,6 +26,7 @@ import { OrganicPanel } from "./distribution/OrganicPanel";
 import { PaidPanel } from "./distribution/PaidPanel";
 import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "./sales/SalesOverviewPanel";
+import { CampaignExecutionPanel } from "./campaigns/CampaignExecutionPanel";
 import { ProspectsLeadsPanel } from "./prospects-leads/ProspectsLeadsPanel";
 import { OnboardingPanel } from "./account/OnboardingPanel";
 import { ContactPanel } from "./account/ContactPanel";
@@ -93,6 +94,9 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   },
   sales: {
     overview: () => <SalesOverviewPanel />,
+  },
+  "campaign-execution": {
+    overview: () => <CampaignExecutionPanel />,
   },
   conversion: {
     "primary-landing-pages": () => <PageBuilderPanel pageType="landing" />,

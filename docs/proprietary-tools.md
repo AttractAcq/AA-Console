@@ -296,15 +296,68 @@ cause is unknown.
   understates the upper stages. `lead_events` records every transition, so
   furthest-reached is derivable later without a schema change.
 
-## 8. Campaign Execution Builder — *Stub*
+## 8. Campaign Execution Builder — *Built; content attaches rather than auto-generates*
 
-`campaigns` (5 rows, 14 columns) under Operations, plus a `campaign_intel`
-agent that produces strategy records.
+The orchestrator. A campaign brief becomes a plan, the plan becomes real rows
+in the other tools, and the campaign cannot launch until those rows actually
+exist.
 
-The existing table tracks spend and status. The tool is an **orchestrator**:
-objective, audience, offer, message, proof, channels, budget, assets required,
-landing page, sales agent, distribution schedule, dates, KPIs — and then it
-invokes tools 1, 2, 3, 4 and 7. That orchestration does not exist.
+`campaigns` already existed and is an **ad-platform tracker** — target_role,
+daily_spend, external_id. Conflating the two would have meant a campaign could
+not be planned before somebody opened an ad account, so `client_campaigns`
+holds the plan and links to the ad campaign when there is one.
+
+**The Campaign Planner** writes objective, audience, offer, core message,
+channels, budget, dates, KPI — and, critically, the numbers that say what must
+be built: how many pieces of content, whether it needs a landing page, whether
+it needs a sales agent. A plan asking for **nothing** to be built is rejected
+rather than stored: it would report itself ready the moment it was written,
+which is the exact false "ready" this tool exists to prevent.
+
+The planner also refuses to invent. A budget, date or target it has no basis
+for is omitted rather than guessed, because an invented number here becomes a
+commitment somebody else has to meet. `asAmount` therefore distinguishes a real
+zero from an unknown, and `asDate` rejects anything Postgres would choke on —
+a malformed date would fail the whole write and lose a plan already paid for.
+
+**`provision_campaign` is the orchestration**, and it is real: one call creates
+the `client_pages` row and the `client_sales_agents` row, queues the
+`landing_page` and `sales_agent` agents against them, attaches the agent to the
+page it was built with, and records each as a `campaign_artifact`. It is
+idempotent, because the common way to break a build button is to press it
+twice.
+
+**Readiness is derived, never stored.** `campaign_readiness` computes every
+requirement from the artifact itself:
+
+- A landing page counts when it has **HTML**. A page row carrying a brief is a
+  request, not a page.
+- A sales agent counts when it is **built and live**. Built-but-draft is the
+  state that would otherwise launch a campaign pointing at an agent nobody
+  turned on.
+- Content counts when a brief is **written** or an asset is **approved**. A
+  queued brief is an intention.
+
+`launch_campaign` refuses until every one is met and names the specific missing
+requirement, because "not ready" tells whoever pressed the button nothing they
+can act on. The console shows that refusal verbatim.
+
+Proved on staging, twice — once against the functions and again against the
+migration file itself after dropping everything, so the evidence is the file
+rather than a hand-patched database. An unplanned campaign failed all four
+checks; provisioning refused without a plan; launch refused naming the missing
+content; provisioning then created two artifacts and queued both jobs; a second
+call created nothing; a page row with no HTML still did not count; a built but
+draft agent still did not count, with the right reason; and only once the page
+had HTML, the agent was live and two briefs were written did it launch. A
+stranger was refused on all three RPCs for their own reason while the same rows
+read cleanly as `service_role`.
+
+**What is open: content attaches, it does not auto-generate.** Ideation is
+client-level, not campaign-level, so a campaign's content is linked from what
+tool 1 produces rather than commissioned by the plan. Wiring ideation to a
+campaign is the remaining half of "invokes tool 1", and it is deliberately not
+faked here — the readiness count is honest about what is attached.
 
 ## 9. Client Economics OS — *Missing*
 
@@ -334,8 +387,8 @@ Worth stating, because the gaps above are long and the foundation is not thin:
 
 ## The shape of the remaining work
 
-Built: 1 (bar its Iteration Engine), 2, 3, 4, 6 and 7. Partial with real
-substance: 5. Stub with a page and a table: 8. Unbuilt: 9.
+Built: 1 (bar its Iteration Engine), 2, 3, 4, 6, 7 and 8. Partial with real
+substance: 5. Unbuilt: 9.
 
 Three of the built tools now share one open edge: **nothing of ours is yet
 serving a visitor.** Tool 2 generates a page nobody has published, tool 3
