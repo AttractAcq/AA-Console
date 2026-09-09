@@ -9,6 +9,7 @@ export const MCP_ERRORS: Record<string, [number, string]> = {
   unauthorized: [401, 'Service authentication required.'],
   invalid_bot: [403, 'Bot identity is not supported.'],
   invalid_request: [400, 'Valid headers and JSON body are required.'],
+  client_not_found: [404, 'Client not found.'],
   idea_not_found: [404, 'Idea not found.'],
   brief_not_found: [404, 'Brief not found.'],
   asset_not_found: [404, 'Asset not found.'],

@@ -15,7 +15,7 @@ const FORMATS = new Set([
 const STATUSES = new Set(['draft', 'approved', 'rejected', 'briefed']);
 
 type Kind = 'read' | 'write' | 'queue';
-type Route = {
+export type Route = {
   rpc: string;
   kind: Kind;
   parse: (body: Record<string, unknown>) => Record<string, unknown> | undefined;
@@ -175,13 +175,14 @@ const ROUTES: Record<string, Route> = {
 export async function handleMcpContent(
   req: IncomingMessage, res: ServerResponse, sb: SupabaseClient,
   secret: string | null | undefined,
+  routes: Record<string, Route> = ROUTES,
 ): Promise<void> {
   if (!authenticated(req, secret)) return fail(res, 'unauthorized');
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return json(res, 405, { error: { code: 'invalid_request', message: 'POST required.' } });
   }
-  const route = ROUTES[req.url ?? ''];
+  const route = routes[req.url ?? ''];
   if (!route) return json(res, 404, { error: { code: 'not_found', message: 'Unknown content route.' } });
   const bot = header(req, 'x-aa-bot-id');
   if (!bot || !BOT.test(bot)) return fail(res, 'invalid_bot');
@@ -216,7 +217,13 @@ export async function handleMcpContent(
     if (!data || typeof data !== 'object' || Array.isArray(data)) return fail(res, 'internal_error');
     const record = data as Record<string, unknown>;
     const clientId = typeof record.client_id === 'string' ? record.client_id.toLowerCase() : '';
-    if (!UUID.test(clientId)) return fail(res, 'internal_error');
+    if (req.url === '/internal/mcp/delivery/list-clients') {
+      if (!Array.isArray(record.clients) || record.clients.length > 100
+          || record.clients.some((c: any) => !c || typeof c.id !== 'string' || !UUID.test(c.id))
+          || (record.next_cursor !== null && (typeof record.next_cursor !== 'string' || !UUID.test(record.next_cursor)))) return fail(res, 'internal_error');
+      return json(res, 200, record);
+    }
+    if (clientId !== String(parsed.p_client_id).toLowerCase() || !UUID.test(clientId)) return fail(res, 'internal_error');
     if (route.kind === 'queue') {
       if (typeof record.job_id !== 'string' || !UUID.test(record.job_id)
           || typeof record.replayed !== 'boolean') return fail(res, 'internal_error');

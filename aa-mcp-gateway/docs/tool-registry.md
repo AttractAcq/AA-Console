@@ -4,14 +4,14 @@
 
 | Tool | Status | Action | Risk | Approval | Reversible | Dependency |
 | --- | --- | --- | --- | --- | --- | --- |
-| delivery.list_clients | stub | read | LOW | no | true | Scoped AA delivery business API |
-| delivery.get_client | stub | read | LOW | no | true | Scoped AA delivery business API |
-| delivery.get_status | stub | read | LOW | no | true | Scoped AA delivery business API |
-| delivery.get_plan | stub | read | LOW | no | true | Scoped AA delivery business API |
-| delivery.get_blockers | stub | read | LOW | no | true | Scoped AA delivery business API |
-| delivery.get_next_action | stub | read | LOW | no | true | Scoped AA delivery business API |
-| delivery.create_task | stub | write | MEDIUM | no | true | Scoped AA delivery business API |
-| delivery.get_client_health | stub | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.list_clients | real | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.get_client | real | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.get_status | real | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.get_plan | real | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.get_blockers | real | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.get_next_action | real | read | LOW | no | true | Scoped AA delivery business API |
+| delivery.create_task | real | write | MEDIUM | no | true | Scoped AA delivery business API |
+| delivery.get_client_health | real | read | LOW | no | true | Scoped AA delivery business API |
 | campaign.list | stub | read | LOW | no | true | Scoped AA campaign business API |
 | campaign.get | stub | read | LOW | no | true | Scoped AA campaign business API |
 | campaign.create | stub | write | MEDIUM | no | true | Scoped AA campaign business API |

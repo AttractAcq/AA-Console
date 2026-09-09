@@ -101,7 +101,7 @@ export class ActionEngine {
         message: "Invalid tool input.",
       });
     input = parsed.data;
-    if (!identity.clients.includes(String(input.client_id)))
+    if (name !== "delivery.list_clients" && !identity.clients.includes(String(input.client_id)))
       return finish(
         {
           status: "rejected",

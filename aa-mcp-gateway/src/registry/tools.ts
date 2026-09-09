@@ -76,6 +76,19 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         fields.summary = text.optional();
         fields.title = z.string().min(1).max(200).optional();
       }
+      if (domain === "delivery") {
+        delete fields.limit;
+        if (action === "list_clients") {
+          delete fields.client_id;
+          fields.limit = z.number().int().min(1).max(100).default(25);
+          fields.after = id.optional();
+        }
+        if (action === "create_task") {
+          fields.title = z.string().trim().min(1).max(200);
+          fields.due_date = z.iso.date().optional();
+          fields.brief_id = id.optional();
+        }
+      }
       if (name === "content.generate_brief") {
         delete fields.brief_id;
         fields.idea_id = id;
@@ -150,7 +163,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "content.request_approval",
       ]);
       const implementation =
-        realContent.has(name) ||
+        domain === "delivery" || realContent.has(name) ||
         [
           "workflow.get_pending_approvals",
           "workflow.get_activity",
@@ -184,7 +197,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         audit: "required",
         implementation,
         dependency:
-          realContent.has(name)
+          domain === "delivery" ? "Scoped AA delivery business API" : realContent.has(name)
             ? "Scoped AA content business API"
             : implementation === "real"
               ? "Gateway control store"
