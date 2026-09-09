@@ -9,6 +9,7 @@
 
 import http from "node:http";
 import { handleMcpBrief } from "./mcp/brief-route.js";
+import { handleMcpOrchestration } from "./mcp/orchestration-route.js";
 import { handleMcpDelivery } from "./mcp/delivery-route.js";
 import { handleMcpContent } from "./mcp/content-route.js";
 import { handleMcpAuth } from "./mcp/auth-route.js";
@@ -53,6 +54,10 @@ const server = http.createServer((req, res) => {
 
   if (req.url === "/internal/mcp/content/generate-brief") {
     void handleMcpBrief(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+  if (/^\/internal\/mcp\/(workflow|campaign|attribution)\//.test(req.url ?? '')) {
+    void handleMcpOrchestration(req, res, sb, config.mcpServiceSecret);
     return;
   }
   if (req.url?.startsWith("/internal/mcp/delivery/")) {

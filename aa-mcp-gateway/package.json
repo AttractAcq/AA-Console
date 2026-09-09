@@ -12,7 +12,8 @@
     "start": "node dist/src/server/main.js",
     "test": "node --import tsx --test test/*.test.ts",
     "check": "tsc --noEmit",
-    "docs": "node --import tsx scripts/docs.ts"
+    "docs": "node --import tsx scripts/docs.ts",
+    "smoke:onboarding": "node --import tsx scripts/bot-onboarding-smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
