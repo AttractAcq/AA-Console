@@ -12,11 +12,11 @@
 | delivery.get_next_action | real | read | LOW | no | true | Scoped AA delivery business API |
 | delivery.create_task | real | write | MEDIUM | no | true | Scoped AA delivery business API |
 | delivery.get_client_health | real | read | LOW | no | true | Scoped AA delivery business API |
-| campaign.list | stub | read | LOW | no | true | Scoped AA campaign business API |
-| campaign.get | stub | read | LOW | no | true | Scoped AA campaign business API |
+| campaign.list | real | read | LOW | no | true | Scoped AA orchestration business API |
+| campaign.get | real | read | LOW | no | true | Scoped AA orchestration business API |
 | campaign.create | stub | write | MEDIUM | no | true | Scoped AA campaign business API |
 | campaign.update | stub | write | MEDIUM | no | true | Scoped AA campaign business API |
-| campaign.get_status | stub | read | LOW | no | true | Scoped AA campaign business API |
+| campaign.get_status | real | read | LOW | no | true | Scoped AA orchestration business API |
 | campaign.request_approval | stub | write | MEDIUM | no | true | Scoped AA campaign business API |
 | content.list_ideas | real | read | LOW | no | true | Scoped AA content business API |
 | content.generate_ideas | stub | write | MEDIUM | no | true | Scoped AA content business API |
@@ -61,7 +61,7 @@
 | proof.attach_asset | stub | write | MEDIUM | no | true | Scoped AA proof business API |
 | proof.get_for_avatar | stub | read | LOW | no | true | Scoped AA proof business API |
 | proof.get_for_claim | stub | read | LOW | no | true | Scoped AA proof business API |
-| attribution.get_campaign_performance | stub | read | LOW | no | true | Scoped AA attribution business API |
+| attribution.get_campaign_performance | real | read | LOW | no | true | Scoped AA orchestration business API |
 | attribution.get_content_performance | stub | read | LOW | no | true | Scoped AA attribution business API |
 | attribution.get_revenue_attribution | stub | read | LOW | no | true | Scoped AA attribution business API |
 | attribution.get_conversion_funnel | stub | read | LOW | no | true | Scoped AA attribution business API |
@@ -71,11 +71,11 @@
 | economics.get_costs | stub | read | LOW | no | true | Scoped AA economics business API |
 | economics.get_revenue | stub | read | LOW | no | true | Scoped AA economics business API |
 | economics.get_roi | stub | read | LOW | no | true | Scoped AA economics business API |
-| workflow.create_task | stub | write | MEDIUM | no | true | Scoped AA workflow business API |
-| workflow.assign_task | stub | write | MEDIUM | no | true | Scoped AA workflow business API |
-| workflow.get_task | stub | read | LOW | no | true | Scoped AA workflow business API |
-| workflow.list_tasks | stub | read | LOW | no | true | Scoped AA workflow business API |
-| workflow.complete_task | stub | write | MEDIUM | no | true | Scoped AA workflow business API |
+| workflow.create_task | real | write | MEDIUM | no | true | Scoped AA orchestration business API |
+| workflow.assign_task | real | write | MEDIUM | no | true | Scoped AA orchestration business API |
+| workflow.get_task | real | read | LOW | no | true | Scoped AA orchestration business API |
+| workflow.list_tasks | real | read | LOW | no | true | Scoped AA orchestration business API |
+| workflow.complete_task | real | write | MEDIUM | no | true | Scoped AA orchestration business API |
 | workflow.create_approval | real | write | MEDIUM | creates approval | true | Gateway control store |
 | workflow.get_pending_approvals | real | read | LOW | no | true | Gateway control store |
 | workflow.record_decision | stub | write | HIGH | required | true | Scoped AA workflow business API |

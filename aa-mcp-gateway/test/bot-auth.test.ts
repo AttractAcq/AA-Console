@@ -314,9 +314,14 @@ test("HTTP dual-read match, mismatch 401, and reviewer path stay on REVIEWER_CRE
       "content.list_ideas",
       "content.request_approval",
       "content.request_revision",
+      "workflow.assign_task",
+      "workflow.complete_task",
       "workflow.create_approval",
+      "workflow.create_task",
       "workflow.get_activity",
       "workflow.get_pending_approvals",
+      "workflow.get_task",
+      "workflow.list_tasks",
     ]);
     assert.ok(list.result.tools.some((t) => t.name === "content.generate_brief"));
     assert.ok(list.result.tools.every((t) => allowed.has(t.name)));

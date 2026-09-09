@@ -72,9 +72,14 @@ test("production discovery and execution enforce role and client scope", async (
     "content.list_ideas",
     "content.request_approval",
     "content.request_revision",
+    "workflow.assign_task",
+    "workflow.complete_task",
     "workflow.create_approval",
+    "workflow.create_task",
     "workflow.get_activity",
     "workflow.get_pending_approvals",
+    "workflow.get_task",
+    "workflow.list_tasks",
   ]);
   assert.ok(discovered.every((t) => t.implementation === "real"));
   assert.ok(!names.includes("content.generate_ideas"));
@@ -391,9 +396,14 @@ test("HTTP MCP discovery/call and human-only approval boundary", async () => {
       "content.list_ideas",
       "content.request_approval",
       "content.request_revision",
+      "workflow.assign_task",
+      "workflow.complete_task",
       "workflow.create_approval",
+      "workflow.create_task",
       "workflow.get_activity",
       "workflow.get_pending_approvals",
+      "workflow.get_task",
+      "workflow.list_tasks",
     ]);
     assert.ok(!listed.includes("content.generate_ideas"));
     assert.ok(!listed.includes("workflow.record_decision"));

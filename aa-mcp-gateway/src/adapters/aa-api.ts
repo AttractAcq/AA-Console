@@ -1,10 +1,9 @@
+import { registry, orchestrationTools } from "../registry/tools.js";
 import { z } from "zod";
 import type { Adapter, Context, Tool, Result } from "../shared/types.js";
 
 const uuid = z.string().uuid();
-const briefResponse = z
-  .object({ job_id: uuid, client_id: uuid })
-  .strict();
+const briefResponse = z.object({ job_id: uuid, client_id: uuid }).strict();
 const clientScoped = z
   .object({ client_id: uuid })
   .passthrough()
@@ -26,10 +25,10 @@ const ROUTES: Record<
     path: "/internal/mcp/content/list-ideas",
     kind: "read",
     input: z.object({
-        client_id: uuid,
-        limit: z.number().int().min(1).max(100).optional(),
-        status: z.enum(["draft", "approved", "rejected", "briefed"]).optional(),
-      }),
+      client_id: uuid,
+      limit: z.number().int().min(1).max(100).optional(),
+      status: z.enum(["draft", "approved", "rejected", "briefed"]).optional(),
+    }),
   },
   "content.get_idea": {
     path: "/internal/mcp/content/get-idea",
@@ -89,41 +88,79 @@ const ROUTES: Record<
     path: "/internal/mcp/content/create-repurpose-plan",
     kind: "queue",
     input: z.object({
-        client_id: uuid,
-        asset_id: uuid,
-        approval_execution_id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional(),
-        formats: z
-          .array(
-            z.enum([
-              "reel",
-              "short",
-              "carousel",
-              "quote_graphic",
-              "text_post",
-              "email",
-              "ad_variation",
-              "story_clips",
-            ]),
-          )
-          .min(1)
-          .max(6),
-      }),
+      client_id: uuid,
+      asset_id: uuid,
+      approval_execution_id: z
+        .string()
+        .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/)
+        .optional(),
+      formats: z
+        .array(
+          z.enum([
+            "reel",
+            "short",
+            "carousel",
+            "quote_graphic",
+            "text_post",
+            "email",
+            "ad_variation",
+            "story_clips",
+          ]),
+        )
+        .min(1)
+        .max(6),
+    }),
   },
 };
 
-for (const action of ["list_clients", "get_client", "get_status", "get_blockers", "get_next_action", "get_plan", "get_client_health", "create_task"]) {
+for (const action of [
+  "list_clients",
+  "get_client",
+  "get_status",
+  "get_blockers",
+  "get_next_action",
+  "get_plan",
+  "get_client_health",
+  "create_task",
+]) {
   ROUTES[`delivery.${action}`] = {
     path: `/internal/mcp/delivery/${action.replaceAll("_", "-")}`,
     kind: action === "create_task" ? "write" : "read",
-    input: action === "list_clients"
-      ? z.object({ limit: z.number().int().min(1).max(100).optional(), after: uuid.optional() })
-      : action === "create_task"
-        ? z.object({ client_id: uuid, title: z.string().trim().min(1).max(200), summary: z.string().max(4000).optional(), due_date: z.iso.date().optional(), brief_id: uuid.optional() })
-        : z.object({ client_id: uuid }),
+    input:
+      action === "list_clients"
+        ? z.object({
+            limit: z.number().int().min(1).max(100).optional(),
+            after: uuid.optional(),
+          })
+        : action === "create_task"
+          ? z.object({
+              client_id: uuid,
+              title: z.string().trim().min(1).max(200),
+              summary: z.string().max(4000).optional(),
+              due_date: z.iso.date().optional(),
+              brief_id: uuid.optional(),
+            })
+          : z.object({ client_id: uuid }),
+  };
+}
+
+for (const tool of registry.filter((t) => orchestrationTools.has(t.name))) {
+  const [domain, action] = tool.name.split(".");
+  ROUTES[tool.name] = {
+    path: `/internal/mcp/${domain}/${action!.replaceAll("_", "-")}`,
+    kind: tool.action === "read" ? "read" : "write",
+    input: (tool.action === "write"
+      ? tool.input.omit({ idempotency_key: true } as never)
+      : tool.input
+    ).strip(),
   };
 }
 
 const codes = new Set([
+  "task_not_found",
+  "campaign_not_found",
+  "invalid_assignee",
+  "task_completed",
   "client_not_found",
   "unauthorized",
   "invalid_bot",
@@ -157,7 +194,10 @@ const fallback: Record<number, string> = {
   500: "internal_error",
 };
 
-async function readBody(response: Response, maxBytes: number): Promise<unknown> {
+async function readBody(
+  response: Response,
+  maxBytes: number,
+): Promise<unknown> {
   if (!response.body) throw new Error("missing_body");
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -179,8 +219,11 @@ async function readBody(response: Response, maxBytes: number): Promise<unknown> 
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
-function aaBody(tool: string, input: Record<string, unknown>): Record<string, unknown> {
-  if (tool.startsWith("delivery.")) return input;
+function aaBody(
+  tool: string,
+  input: Record<string, unknown>,
+): Record<string, unknown> {
+  if (/^(delivery|workflow|campaign|attribution)\./.test(tool)) return input;
   if (tool === "content.generate_brief")
     return { client_id: input.client_id, idea_id: input.idea_id };
   if (tool === "content.list_ideas") {
@@ -227,7 +270,9 @@ function aaBody(tool: string, input: Record<string, unknown>): Record<string, un
       client_id: input.client_id,
       asset_id: input.asset_id,
       formats: input.formats,
-      ...(input.approval_execution_id === undefined ? {} : { approval_execution_id: input.approval_execution_id }),
+      ...(input.approval_execution_id === undefined
+        ? {}
+        : { approval_execution_id: input.approval_execution_id }),
     };
   return { client_id: input.client_id };
 }
@@ -277,7 +322,9 @@ export class AAApiAdapter implements Adapter {
           "x-request-id": context.request_id,
           "idempotency-key": context.execution_id,
         },
-        body: JSON.stringify(aaBody(tool.name, parsed.data as Record<string, unknown>)),
+        body: JSON.stringify(
+          aaBody(tool.name, parsed.data as Record<string, unknown>),
+        ),
       });
       let raw: any;
       try {
@@ -314,14 +361,33 @@ export class AAApiAdapter implements Adapter {
         return { status: "accepted", capability: tool.name, data: data.data };
       }
       if (tool.name === "delivery.list_clients") {
-        const listed = z.object({ clients: z.array(z.object({ id: uuid }).passthrough()).max(100), next_cursor: uuid.nullable() }).strict().safeParse(raw);
-        if (response.status !== 200 || !listed.success || listed.data.clients.some(c => !context.clients.includes(c.id))
-            || (listed.data.next_cursor !== null && !listed.data.clients.some(c => c.id === listed.data.next_cursor)))
+        const listed = z
+          .object({
+            clients: z.array(z.object({ id: uuid }).passthrough()).max(100),
+            next_cursor: uuid.nullable(),
+          })
+          .strict()
+          .safeParse(raw);
+        if (
+          response.status !== 200 ||
+          !listed.success ||
+          listed.data.clients.some((c) => !context.clients.includes(c.id)) ||
+          (listed.data.next_cursor !== null &&
+            !listed.data.clients.some((c) => c.id === listed.data.next_cursor))
+        )
           return fail("malformed_response", response.status);
-        return { status: "completed", capability: tool.name, data: listed.data };
+        return {
+          status: "completed",
+          capability: tool.name,
+          data: listed.data,
+        };
       }
       const scoped = clientScoped.safeParse(raw);
-      if (!response.ok || !scoped.success || scoped.data.client_id !== input.client_id)
+      if (
+        !response.ok ||
+        !scoped.success ||
+        scoped.data.client_id !== input.client_id
+      )
         return fail("malformed_response", response.status);
       if (route.kind === "queue") {
         if (![200, 202].includes(response.status))

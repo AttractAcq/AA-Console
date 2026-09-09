@@ -24,6 +24,17 @@ const domains: Record<string, string> = {
   security:
     "get_system_status get_open_findings create_finding get_incident_status",
 };
+export const orchestrationTools = new Set([
+  "workflow.list_tasks",
+  "workflow.get_task",
+  "workflow.create_task",
+  "workflow.assign_task",
+  "workflow.complete_task",
+  "campaign.list",
+  "campaign.get",
+  "campaign.get_status",
+  "attribution.get_campaign_performance",
+]);
 const id = z.string().uuid();
 const text = z.string().min(1).max(4000);
 export const registry: Tool[] = Object.entries(domains).flatMap(
@@ -125,7 +136,10 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
       }
       if (name === "content.create_repurpose_plan") {
         fields.asset_id = id;
-        fields.approval_execution_id = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional();
+        fields.approval_execution_id = z
+          .string()
+          .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/)
+          .optional();
         fields.formats = z
           .array(
             z.enum([
@@ -151,6 +165,29 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         fields.approval_id = id;
         fields.decision = z.enum(["approved", "rejected"]);
       }
+      const orchestration = orchestrationTools.has(name);
+      if (orchestration) {
+        for (const key of Object.keys(fields)) delete fields[key];
+        fields.client_id = id;
+        if (!read) fields.idempotency_key = z.string().min(8).max(128);
+        if (["list", "list_tasks"].includes(action)) {
+          fields.limit = z.number().int().min(1).max(100).default(25);
+          fields.after = id.optional();
+        } else if (action !== "create_task")
+          fields[domain === "workflow" ? "task_id" : "campaign_id"] = id;
+        if (action === "create_task") {
+          fields.title = z.string().trim().min(1).max(200);
+          fields.summary = text.optional();
+        }
+        if (action === "assign_task")
+          fields.assignee = z
+            .string()
+            .regex(/^(bot_[a-z0-9_]{1,60}|member:[0-9a-fA-F-]{36})$/);
+        if (domain === "attribution") {
+          fields.start_date = z.iso.date().optional();
+          fields.end_date = z.iso.date().optional();
+        }
+      }
       const realContent = new Set([
         // Sec Phase 5 #6: isolation tests must stay green before adding a name.
         "content.list_ideas",
@@ -163,7 +200,9 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "content.request_approval",
       ]);
       const implementation =
-        domain === "delivery" || realContent.has(name) ||
+        orchestration ||
+        domain === "delivery" ||
+        realContent.has(name) ||
         [
           "workflow.get_pending_approvals",
           "workflow.get_activity",
@@ -196,12 +235,15 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         ].includes(action),
         audit: "required",
         implementation,
-        dependency:
-          domain === "delivery" ? "Scoped AA delivery business API" : realContent.has(name)
-            ? "Scoped AA content business API"
-            : implementation === "real"
-              ? "Gateway control store"
-              : `Scoped AA ${domain} business API`,
+        dependency: orchestration
+          ? "Scoped AA orchestration business API"
+          : domain === "delivery"
+            ? "Scoped AA delivery business API"
+            : realContent.has(name)
+              ? "Scoped AA content business API"
+              : implementation === "real"
+                ? "Gateway control store"
+                : `Scoped AA ${domain} business API`,
       } satisfies Tool;
     }),
 );
