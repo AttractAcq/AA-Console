@@ -13,6 +13,9 @@ const FORMATS = new Set([
   'text_post', 'email', 'ad_variation', 'story_clips',
 ]);
 const STATUSES = new Set(['draft', 'approved', 'rejected', 'briefed']);
+const CHANNELS = new Set(['organic', 'paid']);
+const PUBLICATION_STATUSES = new Set(['published', 'failed']);
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 type Kind = 'read' | 'write' | 'queue';
 export type Route = {
@@ -174,6 +177,48 @@ const ROUTES: Record<string, Route> = {
         p_bot_id: null, p_client_id: client_id,
         p_idea_id: idea_id ?? null, p_brief_id: brief_id ?? null, p_asset_id: asset_id ?? null,
         ...(summary === undefined ? {} : { p_summary: summary }),
+      };
+    },
+  },
+  '/internal/mcp/content/queue-distribution': {
+    rpc: 'mcp_queue_distribution',
+    kind: 'write',
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const asset_id = uuid(body, 'asset_id');
+      const scheduled_for = str(body, 'scheduled_for');
+      const channel = body.channel === undefined ? undefined : str(body, 'channel');
+      if (!client_id || !asset_id || !scheduled_for || !DATE.test(scheduled_for)
+          || (channel !== undefined && !CHANNELS.has(channel))
+          || !subset(body, ['client_id', 'asset_id', 'scheduled_for', 'channel'])) {
+        return undefined;
+      }
+      return {
+        p_bot_id: null, p_client_id: client_id, p_asset_id: asset_id,
+        p_scheduled_for: scheduled_for,
+        ...(channel === undefined ? {} : { p_channel: channel }),
+      };
+    },
+  },
+  '/internal/mcp/content/record-publication': {
+    rpc: 'mcp_record_publication',
+    kind: 'write',
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const schedule_id = uuid(body, 'schedule_id');
+      const status = str(body, 'status');
+      const external_id = body.external_id === undefined ? undefined : str(body, 'external_id');
+      const failure_reason = body.failure_reason === undefined ? undefined : str(body, 'failure_reason');
+      if (!client_id || !schedule_id || !status || !PUBLICATION_STATUSES.has(status)
+          || (external_id !== undefined && (external_id.length < 1 || external_id.length > 200))
+          || (failure_reason !== undefined && (failure_reason.length < 1 || failure_reason.length > 4000))
+          || !subset(body, ['client_id', 'schedule_id', 'status', 'external_id', 'failure_reason'])) {
+        return undefined;
+      }
+      return {
+        p_bot_id: null, p_client_id: client_id, p_schedule_id: schedule_id, p_status: status,
+        ...(external_id === undefined ? {} : { p_external_id: external_id }),
+        ...(failure_reason === undefined ? {} : { p_failure_reason: failure_reason }),
       };
     },
   },

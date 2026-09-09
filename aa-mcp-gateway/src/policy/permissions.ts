@@ -1,4 +1,5 @@
 import { marketingDirector } from "../onboarding/marketing-director.js";
+import { distributionManager } from "../onboarding/distribution-manager.js";
 import type { Bot, Identity, Tool } from "../shared/types.js";
 const workflow = [
   "workflow.create_task",
@@ -33,14 +34,7 @@ export const grants: Record<Bot, string[]> = {
     "proof.get_for_claim",
     ...workflow,
   ],
-  bot_distribution: [
-    "content.get_brief",
-    "content.get_production_status",
-    "content.queue_distribution",
-    "content.get_performance",
-    "attribution.get_content_performance",
-    ...workflow,
-  ],
+  bot_distribution: [...distributionManager.grants],
   bot_sales_ops: [
     "pipeline.*",
     "sales_agents.*",
@@ -87,9 +81,20 @@ export function grantPatterns(identity: Identity): string[] {
  * wants to extend either tool to another Bot must change this set and go
  * through Sec again; it cannot happen by adding a permission row.
  */
-const PRODUCTION_ONLY_TOOLS = new Set([
+export const PRODUCTION_ONLY_TOOLS = new Set([
   "content.select_idea",
   "content.approve_asset",
+]);
+/**
+ * Sec Phase 10 Alex CLEAR (2026-09-09): distribution schedule/publication
+ * writes are bot_distribution only. bot_production already holds `content.*`
+ * for its other real content tools, so this cannot be expressed by
+ * withholding a grant either — same hard, non-grant-based deny pattern as
+ * PRODUCTION_ONLY_TOOLS above.
+ */
+export const DISTRIBUTION_ONLY_TOOLS = new Set([
+  "content.queue_distribution",
+  "content.record_publication",
 ]);
 export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   // Sec Phase 5 #5 / Phase 3–4 locked: hard-deny stays in gateway code forever.
@@ -100,9 +105,14 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
       : botOrIdentity;
   if (PRODUCTION_ONLY_TOOLS.has(tool.name) && identity.bot !== "bot_production")
     return false;
-  // Locked Marketing ceiling also constrains stale/overbroad database grants.
+  if (DISTRIBUTION_ONLY_TOOLS.has(tool.name) && identity.bot !== "bot_distribution")
+    return false;
+  // Locked Marketing/Distribution ceilings also constrain stale/overbroad
+  // database grants (Alex CLEAR Phase 10 #4: exact allowlist like Marketing).
   if (identity.bot === "bot_marketing" &&
       !marketingDirector.grants.some((name) => name === tool.name)) return false;
+  if (identity.bot === "bot_distribution" &&
+      !distributionManager.grants.some((name) => name === tool.name)) return false;
   const patterns = grantPatterns(identity);
   return tool.permissions.every((permission) =>
     patterns.some((g) => permissionMatches(g, permission)),

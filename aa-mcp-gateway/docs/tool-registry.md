@@ -1,6 +1,6 @@
 # Tool registry
 
-84 initial business contracts. Status is adapter availability, not evidence of live deployment. Brief generation is implemented and requires AA_INTERNAL_API_URL and AA_MCP_SERVICE_SECRET. Stub schemas reserve bounded business fields and must be versioned/refined before their adapters are enabled. All calls require an authorized client UUID; all writes require an idempotency key. HIGH/CRITICAL policy always requires human approval.
+85 initial business contracts. Status is adapter availability, not evidence of live deployment. Brief generation is implemented and requires AA_INTERNAL_API_URL and AA_MCP_SERVICE_SECRET. Stub schemas reserve bounded business fields and must be versioned/refined before their adapters are enabled. All calls require an authorized client UUID; all writes require an idempotency key. HIGH/CRITICAL policy always requires human approval.
 
 | Tool | Status | Action | Risk | Approval | Reversible | Dependency |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -31,7 +31,8 @@
 | content.request_approval | real | write | MEDIUM | no | true | Scoped AA content business API |
 | content.approve_asset | real (bot_production only) | write | MEDIUM | no | false | Scoped AA content business API |
 | content.create_repurpose_plan | real | write | MEDIUM | no | true | Scoped AA content business API |
-| content.queue_distribution | stub | write | HIGH | required | false | Scoped AA content business API |
+| content.queue_distribution | real (bot_distribution only) | write | MEDIUM | no | false | Scoped AA content business API |
+| content.record_publication | real (bot_distribution only) | write | MEDIUM | no | false | Scoped AA content business API |
 | content.get_performance | stub | read | LOW | no | true | Scoped AA content business API |
 | conversion.list_pages | stub | read | LOW | no | true | Scoped AA conversion business API |
 | conversion.get_page | stub | read | LOW | no | true | Scoped AA conversion business API |
@@ -91,4 +92,4 @@
 
 `workflow.record_decision` is reserved, denied to every Bot; human decisions use the reviewer API. Exact machine-readable input/output schemas and required permissions are in `src/registry/tools.ts`. Default MCP discovery and `call` expose only permitted tools with `implementation: real` (or `partial`). Stub contracts remain catalogued here and appear in `tools/list` only when `MCP_DISCOVER_STUBS=true`.
 
-`content.select_idea` and `content.approve_asset` are real for `bot_production` only ([Phase 9b](phase-9b-production-bot-decide.md)), hard-coded in `src/policy/permissions.ts` `allowed()` and in the AA RPCs themselves — not through the permission-grant matrix, since `bot_marketing` keeps a `content.*` wildcard for its other real content tools. Every other Bot, including `bot_marketing`, still gets `not_implemented`/"Tool unavailable or unauthorized." for both.
+`content.select_idea` and `content.approve_asset` are real for `bot_production` only ([Phase 9b](phase-9b-production-bot-decide.md)), hard-coded in `src/policy/permissions.ts` `allowed()` and in the AA RPCs themselves — not through the permission-grant matrix, since `bot_marketing` keeps a `content.*` wildcard for its other real content tools. `content.queue_distribution` and `content.record_publication` are real for `bot_distribution` only ([Phase 10](phase-10-distribution-manager.md)), same hard-coded pattern, since `bot_production` keeps a `content.*` wildcard for its other real content tools. Every other Bot gets `not_implemented`/"Tool unavailable or unauthorized." for all four.

@@ -69,6 +69,7 @@ beforeAll(async () => {
     '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
     '20260909000000_70_mcp_approval_engine.sql',
     '20260909040000_74_mcp_production_bot_decide.sql',
+    '20260909050000_75_mcp_distribution_manager.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -84,7 +85,8 @@ afterAll(async () => { await db?.close(); });
 beforeEach(async () => {
   await db.exec(`reset role;
     truncate mcp_brief_requests, mcp_bot_clients, mcp_internal.mcp_bot_token_audit,
-      mcp_internal.mcp_bot_tokens, mcp_internal.mcp_content_requests, client_ideas, agent_job_events, agent_jobs,
+      mcp_internal.mcp_bot_tokens, mcp_internal.mcp_content_requests, scheduled_posts,
+      client_media_assets, client_ideas, agent_job_events, agent_jobs,
       campaigns, client_leads, finance_entries, finance_periods, client_billing,
       client_users, clients, profiles, auth.users cascade;
     update mcp_internal.mcp_bots set status = 'active';
@@ -923,5 +925,205 @@ describe('Phase 9b Production Bot decide isolation', () => {
       "select count(*)::int as n from mcp_internal.mcp_bot_permissions where bot_id = 'bot_production' and permission_pattern = 'content.*'",
     )).rows;
     expect(wildcard[0]?.n).toBe(1);
+  });
+});
+
+describe('Phase 10 Distribution Manager isolation', () => {
+  const APPROVED_ASSET_A = '99999995-9999-4999-8999-999999999995';
+  const APPROVED_ASSET_B = '99999996-9999-4999-8999-999999999996';
+  const PENDING_ASSET_A = '99999997-9999-4999-8999-999999999997';
+
+  const queue = (
+    overrides: Partial<{
+      bot: string; client: string; asset: string; scheduled_for: string; channel: string; execution: string;
+    }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_queue_distribution($1,$2,$3,$4,$5,$6,$7) as result',
+    [
+      overrides.bot ?? 'bot_distribution', 'sched-req', overrides.execution ?? 'sched-exec',
+      overrides.client ?? CLIENT_A, overrides.asset ?? APPROVED_ASSET_A,
+      overrides.scheduled_for ?? '2026-12-01', overrides.channel ?? 'organic',
+    ],
+  );
+  const record = (
+    overrides: Partial<{
+      bot: string; client: string; schedule: string; status: string; execution: string;
+      external_id: string | null; failure_reason: string | null;
+    }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_record_publication($1,$2,$3,$4,$5,$6,$7,$8) as result',
+    [
+      overrides.bot ?? 'bot_distribution', 'pub-req', overrides.execution ?? 'pub-exec',
+      overrides.client ?? CLIENT_A, overrides.schedule,
+      overrides.status ?? 'published', overrides.external_id ?? null, overrides.failure_reason ?? null,
+    ],
+  );
+
+  beforeEach(async () => {
+    await db.exec(`
+      insert into client_media_assets (id,client_id,media_type,title,storage_path,review_status) values
+        ('${APPROVED_ASSET_A}','${CLIENT_A}','image','Approved A','path/aa.png','approved'),
+        ('${APPROVED_ASSET_B}','${CLIENT_B}','image','Approved B','path/ab.png','approved'),
+        ('${PENDING_ASSET_A}','${CLIENT_A}','image','Pending A','path/pa.png','pending');
+      insert into mcp_bot_clients (bot_id, client_id) values ('bot_distribution', '${CLIENT_A}');
+    `);
+  });
+
+  it('every new RPC uses require_active_bot + require_bot_client_grant, never can_access_client/schedule_asset, and hard-codes bot_distribution', async () => {
+    const internalSignatures = [
+      'mcp_internal.queue_distribution(text,text,text,uuid,uuid,date,text)',
+      'mcp_internal.record_publication(text,text,text,uuid,uuid,text,text,text)',
+    ];
+    const publicSignatures = [
+      'public.mcp_queue_distribution(text,text,text,uuid,uuid,date,text)',
+      'public.mcp_record_publication(text,text,text,uuid,uuid,text,text,text)',
+    ];
+    for (const sig of internalSignatures) {
+      const src = await db.query<{ def: string }>(
+        `select pg_get_functiondef('${sig}'::regprocedure) as def`,
+      );
+      expect(src.rows[0]?.def, sig).toContain('require_active_bot');
+      expect(src.rows[0]?.def, sig).toContain('require_bot_client_grant');
+      expect(src.rows[0]?.def, sig).toContain('bot_forbidden');
+      expect(src.rows[0]?.def, sig).not.toMatch(/can_access_client\s*\(/);
+      expect(src.rows[0]?.def, sig).not.toMatch(/\bschedule_asset\s*\(/);
+    }
+    for (const sig of publicSignatures) {
+      const src = await db.query<{ def: string }>(`select pg_get_functiondef('${sig}'::regprocedure) as def`);
+      expect(src.rows[0]?.def, sig).not.toMatch(/can_access_client\s*\(/);
+      expect(src.rows[0]?.def, sig).not.toMatch(/\bschedule_asset\s*\(/);
+    }
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await expect(db.query('select mcp_queue_distribution($1,$2,$3,$4,$5,$6,$7)',
+        ['bot_distribution', 'r', 'e', CLIENT_A, APPROVED_ASSET_A, '2026-12-01', 'organic'])).rejects.toThrow('permission denied');
+      await expect(db.query('select mcp_record_publication($1,$2,$3,$4,$5,$6,$7,$8)',
+        ['bot_distribution', 'r', 'e', CLIENT_A, '00000000-0000-4000-8000-000000000000', 'published', null, null])).rejects.toThrow('permission denied');
+      await db.exec('reset role');
+    }
+    await asService();
+  });
+
+  it('schedules an approved asset for the granted client, writes one ledger row, and replays idempotently', async () => {
+    const scheduled = (await queue()).rows[0]!.result;
+    expect(scheduled.publication_status).toBe('scheduled');
+    expect(scheduled.created_by_bot).toBe('bot_distribution');
+    expect(scheduled.replayed).toBe(false);
+    const row = (await db.query<{ publication_status: string; created_by_bot: string; created_by: string | null }>(
+      `select publication_status, created_by_bot, created_by from scheduled_posts where id = '${scheduled.schedule_id}'`,
+    )).rows[0]!;
+    expect(row.publication_status).toBe('scheduled');
+    expect(row.created_by_bot).toBe('bot_distribution');
+    expect(row.created_by).toBeNull();
+    expect((await db.query<{ n: number }>(
+      "select count(*)::int as n from mcp_internal.mcp_content_requests where tool = 'content.queue_distribution'",
+    )).rows[0]?.n).toBe(1);
+
+    const replay = (await queue()).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+    await expect(db.query('select mcp_queue_distribution($1,$2,$3,$4,$5,$6,$7)',
+      ['bot_distribution', 'sched-req', 'sched-exec', CLIENT_A, APPROVED_ASSET_A, '2026-12-31', 'organic']))
+      .rejects.toThrow('idempotency_conflict');
+  });
+
+  it('schedule is client-scoped and only ever accepts an approved asset', async () => {
+    await expect(queue({ client: CLIENT_B, asset: APPROVED_ASSET_B })).rejects.toThrow('client_forbidden');
+    await expect(queue({ asset: APPROVED_ASSET_B })).rejects.toThrow('client_mismatch');
+    await expect(queue({ asset: PENDING_ASSET_A, execution: 'sched-pending' })).rejects.toThrow('invalid_asset_status');
+    await expect(queue({ asset: '00000000-0000-4000-8000-000000000000', execution: 'sched-unknown' }))
+      .rejects.toThrow('asset_not_found');
+    await expect(queue({ channel: 'tiktok', execution: 'sched-bad-channel' })).rejects.toThrow('invalid_request');
+  });
+
+  it('records publication for the granted client, writes one ledger row, and refuses to redecide', async () => {
+    const scheduled = (await queue()).rows[0]!.result;
+    const published = (await record({ schedule: scheduled.schedule_id, status: 'published', external_id: 'meta-1' })).rows[0]!.result;
+    expect(published.publication_status).toBe('published');
+    expect(published.published_by_bot).toBe('bot_distribution');
+    const row = (await db.query<{ publication_status: string; external_id: string; published_by_bot: string; published_at: string | null }>(
+      `select publication_status, external_id, published_by_bot, published_at from scheduled_posts where id = '${scheduled.schedule_id}'`,
+    )).rows[0]!;
+    expect(row.publication_status).toBe('published');
+    expect(row.external_id).toBe('meta-1');
+    expect(row.published_by_bot).toBe('bot_distribution');
+    expect(row.published_at).not.toBeNull();
+    expect((await db.query<{ n: number }>(
+      "select count(*)::int as n from mcp_internal.mcp_content_requests where tool = 'content.record_publication'",
+    )).rows[0]?.n).toBe(1);
+
+    const replay = (await record({ schedule: scheduled.schedule_id, status: 'published', external_id: 'meta-1' })).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+    await expect(record({ schedule: scheduled.schedule_id, status: 'failed', execution: 'pub-redecide' }))
+      .rejects.toThrow('invalid_schedule_status');
+  });
+
+  it('publication record is client-scoped and refuses an unknown or malformed status', async () => {
+    const scheduled = (await queue()).rows[0]!.result;
+    // bot_distribution has no grant for CLIENT_B; insert its schedule row
+    // directly (not via the RPC) purely as a cross-client resource fixture.
+    const OTHER_SCHEDULE = '99999998-9999-4999-8999-999999999998';
+    await db.exec(
+      `insert into scheduled_posts (id, asset_id, scheduled_for, channel, created_by_bot)
+         values ('${OTHER_SCHEDULE}', '${APPROVED_ASSET_B}', '2026-12-01', 'organic', 'bot_distribution')`,
+    );
+    await expect(record({ client: CLIENT_B, schedule: scheduled.schedule_id })).rejects.toThrow('client_forbidden');
+    await expect(record({ schedule: OTHER_SCHEDULE, execution: 'pub-mismatch' })).rejects.toThrow('client_mismatch');
+    await expect(record({ schedule: '00000000-0000-4000-8000-000000000000', execution: 'pub-unknown' }))
+      .rejects.toThrow('schedule_not_found');
+    await expect(record({ schedule: scheduled.schedule_id, status: 'maybe', execution: 'pub-bad-status' }))
+      .rejects.toThrow('invalid_request');
+  });
+
+  it('get_production_status distribution field reflects the schedule/publication lifecycle without disturbing Phase 6 approvals', async () => {
+    const scheduled = (await queue()).rows[0]!.result;
+    const before = (await db.query<{ result: any }>(
+      'select mcp_get_production_status($1,$2,$3,$4,$5) as result',
+      ['bot_distribution', CLIENT_A, null, null, APPROVED_ASSET_A],
+    )).rows[0]!.result;
+    expect(before.distribution).toHaveLength(1);
+    expect(before.distribution[0]).toMatchObject({ id: scheduled.schedule_id, publication_status: 'scheduled' });
+    expect(before.approvals).toEqual([]);
+
+    await record({ schedule: scheduled.schedule_id, status: 'published' });
+    const after = (await db.query<{ result: any }>(
+      'select mcp_get_production_status($1,$2,$3,$4,$5) as result',
+      ['bot_distribution', CLIENT_A, null, null, APPROVED_ASSET_A],
+    )).rows[0]!.result;
+    expect(after.distribution[0]).toMatchObject({ id: scheduled.schedule_id, publication_status: 'published' });
+  });
+
+  it('bot_forbidden: no Bot other than bot_distribution can call either RPC, even with an active status and a valid client grant', async () => {
+    await db.exec(`insert into mcp_bot_clients (bot_id,client_id) values ('bot_production','${CLIENT_A}') on conflict do nothing;`);
+    await expect(queue({ bot: 'bot_production' })).rejects.toThrow('bot_forbidden');
+    const scheduled = (await queue()).rows[0]!.result;
+    await expect(record({ bot: 'bot_production', schedule: scheduled.schedule_id, execution: 'pub-prod-denied' }))
+      .rejects.toThrow('bot_forbidden');
+    await expect(queue({ bot: 'bot_finance', execution: 'sched-finance' })).rejects.toThrow('client_forbidden');
+  });
+
+  it('suspended bot is bot_not_active before the bot_forbidden check would otherwise fire, even with a remaining grant', async () => {
+    await db.query('select mcp_issue_bot_token($1,$2,$3,$4)', ['bot_distribution', HASH, 'operator', 'test']);
+    await db.query('select mcp_suspend_bot($1,$2,$3)', ['bot_distribution', 'operator', 'lock']);
+    await expect(queue()).rejects.toThrow('bot_not_active');
+  });
+
+  it('revoked grant denies replay before lookup', async () => {
+    const scheduled = (await queue()).rows[0]!.result;
+    await db.exec(`delete from mcp_bot_clients where bot_id = 'bot_distribution' and client_id = '${CLIENT_A}'`);
+    await expect(queue({ execution: 'sched-revoked' })).rejects.toThrow('client_forbidden');
+    await expect(record({ schedule: scheduled.schedule_id, execution: 'pub-revoked' })).rejects.toThrow('client_forbidden');
+  });
+
+  it('permission grants no exact-name row for either tool outside bot_distribution, and bot_distribution retains both', async () => {
+    const rows = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions
+        where permission_pattern in ('content.queue_distribution', 'content.record_publication') and bot_id <> 'bot_distribution'`,
+    )).rows;
+    expect(rows[0]?.n).toBe(0);
+    const granted = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions
+        where bot_id = 'bot_distribution' and permission_pattern in ('content.queue_distribution', 'content.record_publication')`,
+    )).rows;
+    expect(granted[0]?.n).toBe(2);
   });
 });

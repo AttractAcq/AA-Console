@@ -37,6 +37,7 @@ beforeAll(async () => {
     '20260903104529_02_team_and_operations.sql',
     '20260903104615_03_agent_registry_and_job_queue.sql',
     '20260903104816_05_content_chain_proof_ideas_briefs_media.sql',
+    '20260903104850_06_distribution_conversion_leads.sql',
     '20260904083559_15_brief_refs_and_job_link.sql',
     '20260904203418_23_idea_provenance_fields.sql',
     '20260907170000_55_structured_briefs.sql',
@@ -58,13 +59,14 @@ beforeAll(async () => {
     '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
     '20260909000000_70_mcp_approval_engine.sql',
     '20260909040000_74_mcp_production_bot_decide.sql',
+    '20260909050000_75_mcp_distribution_manager.sql',
   ]) await db.exec(await migration(file));
 }, 60_000);
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => {
   await db.exec(`reset role;
     truncate mcp_internal.mcp_content_requests, mcp_brief_requests, mcp_bot_clients,
-      client_media_assets, client_briefs, client_ideas, agent_job_events, agent_jobs,
+      scheduled_posts, client_media_assets, client_briefs, client_ideas, agent_job_events, agent_jobs,
       ref_counters, clients, profiles, auth.users cascade;
     update agents set paused = false, archived_at = null, requires_upstream = '{}';
     update mcp_internal.mcp_bots set status = 'active';
@@ -77,7 +79,7 @@ beforeEach(async () => {
     insert into client_media_assets (id,client_id,brief_id,media_type,title,storage_path,review_status)
       values ('${ASSET}','${CLIENT}','${BRIEF}','image','Cut','path/a.png','pending'),
              ('${ASSET_B}','${OTHER}',null,'image','Leak','path/b.png','approved');
-    insert into mcp_bot_clients (bot_id,client_id) values ('bot_production','${CLIENT}');
+    insert into mcp_bot_clients (bot_id,client_id) values ('bot_production','${CLIENT}'), ('bot_distribution','${CLIENT}');
     select set_config('request.jwt.claim.role','service_role',false);
     select set_config('request.jwt.claim.sub','',false);
   `);
@@ -470,5 +472,125 @@ describe('Phase 9b Production Bot decide HTTP', () => {
     expect((await db.query<{ n: number }>(
       `select count(*)::int as n from client_asset_reviews where asset_id = '${ASSET}'`,
     )).rows[0]?.n).toBe(2);
+  });
+});
+
+describe('Phase 10 Distribution Manager HTTP', () => {
+  const APPROVED_ASSET = '99999995-9999-4999-8999-999999999995';
+
+  beforeEach(async () => {
+    await db.exec(`
+      insert into client_media_assets (id,client_id,brief_id,media_type,title,storage_path,review_status)
+        values ('${APPROVED_ASSET}','${CLIENT}','${BRIEF}','image','Approved cut','path/appr.png','approved');
+    `);
+  });
+
+  async function distributionCall(path: string, body: unknown, headers: Record<string, string> = {}) {
+    return call(path, body, { headers: { 'x-aa-bot-id': 'bot_distribution', ...headers } });
+  }
+
+  it('schedules an approved asset and rejects a pending/mismatched/ungranted one', async () => {
+    const ok = await distributionCall('/internal/mcp/content/queue-distribution', {
+      client_id: CLIENT, asset_id: APPROVED_ASSET, scheduled_for: '2026-12-01', channel: 'organic',
+    });
+    expect(ok.status).toBe(200);
+    expect(ok.body.publication_status).toBe('scheduled');
+    expect(ok.body.created_by_bot).toBe('bot_distribution');
+    const schedule_id = ok.body.schedule_id;
+    expect((await db.query<{ publication_status: string; created_by_bot: string }>(
+      `select publication_status, created_by_bot from scheduled_posts where id = '${schedule_id}'`,
+    )).rows[0]).toMatchObject({ publication_status: 'scheduled', created_by_bot: 'bot_distribution' });
+
+    const replay = await distributionCall('/internal/mcp/content/queue-distribution', {
+      client_id: CLIENT, asset_id: APPROVED_ASSET, scheduled_for: '2026-12-01', channel: 'organic',
+    });
+    expect(replay.body.replayed).toBe(true);
+
+    const pending = await distributionCall('/internal/mcp/content/queue-distribution', {
+      client_id: CLIENT, asset_id: ASSET, scheduled_for: '2026-12-01',
+    }, { 'idempotency-key': 'sched-pending' });
+    expect(pending.body.error.code).toBe('invalid_asset_status');
+
+    const mismatch = await distributionCall('/internal/mcp/content/queue-distribution', {
+      client_id: CLIENT, asset_id: ASSET_B, scheduled_for: '2026-12-01',
+    }, { 'idempotency-key': 'sched-mismatch' });
+    expect(mismatch.body.error.code).toBe('client_mismatch');
+
+    const forbidden = await distributionCall('/internal/mcp/content/queue-distribution', {
+      client_id: OTHER, asset_id: APPROVED_ASSET, scheduled_for: '2026-12-01',
+    }, { 'idempotency-key': 'sched-forbidden' });
+    expect(forbidden.body.error.code).toBe('client_forbidden');
+  });
+
+  it('records publication, refuses to re-decide, and rejects an unknown schedule', async () => {
+    const scheduled = await distributionCall('/internal/mcp/content/queue-distribution', {
+      client_id: CLIENT, asset_id: APPROVED_ASSET, scheduled_for: '2026-12-01',
+    });
+    const schedule_id = scheduled.body.schedule_id;
+    const published = await distributionCall('/internal/mcp/content/record-publication', {
+      client_id: CLIENT, schedule_id, status: 'published', external_id: 'meta-123',
+    }, { 'idempotency-key': 'pub-first' });
+    expect(published.status).toBe(200);
+    expect(published.body.publication_status).toBe('published');
+    expect((await db.query<{
+      publication_status: string; external_id: string; published_by_bot: string; published_at: string | null;
+    }>(
+      `select publication_status, external_id, published_by_bot, published_at from scheduled_posts where id = '${schedule_id}'`,
+    )).rows[0]).toMatchObject({ publication_status: 'published', external_id: 'meta-123', published_by_bot: 'bot_distribution' });
+
+    const again = await distributionCall('/internal/mcp/content/record-publication', {
+      client_id: CLIENT, schedule_id, status: 'failed',
+    }, { 'idempotency-key': 'pub-redecide' });
+    expect(again.body.error.code).toBe('invalid_schedule_status');
+
+    const unknown = await distributionCall('/internal/mcp/content/record-publication', {
+      client_id: CLIENT, schedule_id: '00000000-0000-4000-8000-000000000000', status: 'published',
+    }, { 'idempotency-key': 'pub-unknown' });
+    expect(unknown.body.error.code).toBe('schedule_not_found');
+  });
+
+  it('bot_forbidden for a Bot other than bot_distribution, even with a valid client grant', async () => {
+    const denied = await call('/internal/mcp/content/queue-distribution', {
+      client_id: CLIENT, asset_id: APPROVED_ASSET, scheduled_for: '2026-12-01',
+    }, { headers: { 'x-aa-bot-id': 'bot_production' } });
+    expect(denied.body.error.code).toBe('bot_forbidden');
+    const deniedPublish = await call('/internal/mcp/content/record-publication', {
+      client_id: CLIENT, schedule_id: '00000000-0000-4000-8000-000000000000', status: 'published',
+    }, { headers: { 'x-aa-bot-id': 'bot_production', 'idempotency-key': 'pub-prod-denied' } });
+    expect(deniedPublish.body.error.code).toBe('bot_forbidden');
+  });
+
+  it('anon and authenticated cannot execute the new Bot RPCs', async () => {
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await expect(db.query('select mcp_queue_distribution($1,$2,$3,$4,$5,$6,$7)',
+        ['bot_distribution', 'r', 'e', CLIENT, APPROVED_ASSET, '2026-12-01', 'organic'])).rejects.toThrow('permission denied');
+      await expect(db.query('select mcp_record_publication($1,$2,$3,$4,$5,$6,$7,$8)',
+        ['bot_distribution', 'r', 'e', CLIENT, '00000000-0000-4000-8000-000000000000', 'published', null, null])).rejects.toThrow('permission denied');
+      await db.exec('reset role');
+    }
+  });
+
+  it('get_production_status reflects the schedule/publication lifecycle for any granted Bot', async () => {
+    const scheduled = await distributionCall('/internal/mcp/content/queue-distribution', {
+      client_id: CLIENT, asset_id: APPROVED_ASSET, scheduled_for: '2026-12-01',
+    });
+    const schedule_id = scheduled.body.schedule_id;
+    const status1 = await call('/internal/mcp/content/get-production-status', {
+      client_id: CLIENT, asset_id: APPROVED_ASSET,
+    });
+    expect(status1.body.distribution).toEqual([
+      expect.objectContaining({ id: schedule_id, publication_status: 'scheduled' }),
+    ]);
+
+    await distributionCall('/internal/mcp/content/record-publication', {
+      client_id: CLIENT, schedule_id, status: 'published',
+    }, { 'idempotency-key': 'pub-lifecycle' });
+    const status2 = await call('/internal/mcp/content/get-production-status', {
+      client_id: CLIENT, asset_id: APPROVED_ASSET,
+    });
+    expect(status2.body.distribution).toEqual([
+      expect.objectContaining({ id: schedule_id, publication_status: 'published' }),
+    ]);
   });
 });
