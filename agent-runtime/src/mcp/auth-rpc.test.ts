@@ -161,9 +161,12 @@ it('Phase 9 migration replaces only Marketing permissions; token and client gran
   try {
     await db.exec(sql);
     await db.exec(sql);
-    const { marketingDirector } = await import('../../../aa-mcp-gateway/src/onboarding/marketing-director.js');
+    // Expected grants from migration SQL only — do not import aa-mcp-gateway sources (TS6059 rootDir).
+    const expectedGrants = [...sql.matchAll(/\('bot_marketing',\s*'([^']+)'/g)]
+      .map((m) => m[1])
+      .sort();
     const actual = await db.query<{ permission_pattern: string }>("select permission_pattern from mcp_internal.mcp_bot_permissions where bot_id = 'bot_marketing' order by permission_pattern");
-    expect(actual.rows.map(r => r.permission_pattern)).toEqual([...marketingDirector.grants].sort());
+    expect(actual.rows.map(r => r.permission_pattern)).toEqual(expectedGrants);
     expect((await db.query("select * from mcp_internal.mcp_bot_permissions where bot_id <> 'bot_marketing' order by bot_id, permission_pattern")).rows).toEqual(before.rows);
     expect((await db.query('select * from mcp_bot_clients order by bot_id, client_id')).rows).toEqual(clients.rows);
     expect((await db.query('select * from mcp_internal.mcp_bot_tokens order by token_id')).rows).toEqual(tokens.rows);
