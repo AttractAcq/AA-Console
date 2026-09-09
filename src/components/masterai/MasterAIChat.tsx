@@ -9,6 +9,7 @@ import { supabase } from "../../lib/supabase";
 import { masterAIConfigured, readMasterSpend, sendMasterMessage } from "../../lib/masterAI";
 import type { MasterLimits, MasterScope, MasterSpend, ToolCall } from "../../lib/masterAI";
 import { cn } from "../../lib/cn";
+import { stickToBottom } from "../../lib/stickToBottom";
 
 type Thread = { id: string; title: string | null; updated_at: string };
 
@@ -56,7 +57,7 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
   // they are learned from a reply rather than mirrored in this app's config
   // where the two would drift apart without anyone noticing.
   const [limits, setLimits] = useState<MasterLimits | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const clientId = scope.kind === "client" ? scope.clientId : null;
 
@@ -113,7 +114,7 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
   }, [conversationId]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    stickToBottom(listRef.current);
   }, [turns.length, busy]);
 
   if (profile?.role !== "admin") return null;
@@ -284,7 +285,10 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
         </div>
       </header>
 
-      <div className="max-h-[26rem] min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+      <div
+        ref={listRef}
+        className="max-h-[26rem] min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4"
+      >
         {turns.length === 0 ? (
           <div className="space-y-3">
             <EmptyState label="Ask it anything about the data, or tell it to run something." minHeight={80} />
@@ -368,7 +372,6 @@ export function MasterAIChat({ scope, title }: { scope: MasterScope; title?: str
             {error}
           </p>
         )}
-        <div ref={endRef} />
       </div>
 
       <ConfirmModal

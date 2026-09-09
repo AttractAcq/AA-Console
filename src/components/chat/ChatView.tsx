@@ -7,6 +7,7 @@ import { FormModal } from "../forms/FormModal";
 import type { FieldDef, Option } from "../forms/fields";
 import { useAuth } from "../../context/auth";
 import { supabase } from "../../lib/supabase";
+import { stickToBottom } from "../../lib/stickToBottom";
 import { cn } from "../../lib/cn";
 
 type Channel = { id: string; name: string };
@@ -58,7 +59,7 @@ export function ChatView({ canManage = false }: { canManage?: boolean }) {
   const [peopleOptions, setPeopleOptions] = useState<Option[]>([]);
   const [memberCount, setMemberCount] = useState(0);
 
-  const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const loadChannels = useCallback(async () => {
     const { data } = await supabase.from("team_channels").select("id, name").order("name");
@@ -129,7 +130,7 @@ export function ChatView({ canManage = false }: { canManage?: boolean }) {
   }, [activeId, loadMessages]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
+    stickToBottom(listRef.current);
   }, [messages]);
 
   // People not already in the channel.
@@ -242,7 +243,7 @@ export function ChatView({ canManage = false }: { canManage?: boolean }) {
               )}
             </div>
 
-            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+            <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto p-4">
               {messages.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted-foreground">
                   No messages yet — say something.
@@ -280,7 +281,6 @@ export function ChatView({ canManage = false }: { canManage?: boolean }) {
                   );
                 })
               )}
-              <div ref={endRef} />
             </div>
 
             <form
