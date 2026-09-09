@@ -96,7 +96,7 @@ Effective tools (23):
 
 Configured grants: `content.*`, `proof.search`, `proof.get`, `proof.get_for_avatar`, `proof.get_for_claim`, `workflow.create_task`, `workflow.assign_task`, `workflow.get_task`, `workflow.list_tasks`, `workflow.complete_task`, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`.
 
-Effective tools (27):
+Effective tools (26):
 
 - `content.list_ideas`
 - `content.generate_ideas`
@@ -111,7 +111,6 @@ Effective tools (27):
 - `content.request_approval`
 - `content.approve_asset`
 - `content.create_repurpose_plan`
-- `content.queue_distribution`
 - `content.get_performance`
 - `proof.search`
 - `proof.get`
@@ -128,13 +127,14 @@ Effective tools (27):
 
 ## bot_distribution
 
-Configured grants: `content.get_brief`, `content.get_production_status`, `content.queue_distribution`, `content.get_performance`, `attribution.get_content_performance`, `workflow.create_task`, `workflow.assign_task`, `workflow.get_task`, `workflow.list_tasks`, `workflow.complete_task`, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`.
+Configured grants: `content.get_brief`, `content.get_production_status`, `workflow.get_task`, `workflow.list_tasks`, `workflow.get_pending_approvals`, `workflow.get_activity`, `content.queue_distribution`, `content.record_publication`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`, `content.get_performance`, `attribution.get_content_performance`.
 
-Effective tools (13):
+Effective tools (14):
 
 - `content.get_brief`
 - `content.get_production_status`
 - `content.queue_distribution`
+- `content.record_publication`
 - `content.get_performance`
 - `attribution.get_content_performance`
 - `workflow.create_task`
@@ -256,6 +256,8 @@ Effective tools (14):
 - `security.create_finding`
 - `security.get_incident_status`
 
-All Bots are denied `workflow.record_decision`, including wildcard workflow grants. No finance payment or production deployment capability is exposed. `sales_agents.deploy` is a CRITICAL stub behind mandatory approval. Production Manager (`bot_production`) default discovery is the real granted tools: `content.list_ideas`, `content.get_idea`, `content.select_idea`, `content.generate_brief`, `content.get_brief`, `content.request_revision`, `content.get_production_status`, `content.approve_asset`, `content.create_repurpose_plan`, `content.request_approval`, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`, and the five durable workflow task tools.
+All Bots are denied `workflow.record_decision`, including wildcard workflow grants. No finance payment or production deployment capability is exposed. `sales_agents.deploy` is a CRITICAL stub behind mandatory approval. Production Manager (`bot_production`) default discovery is the real granted tools: `content.list_ideas`, `content.get_idea`, `content.generate_brief`, `content.get_brief`, `content.request_revision`, `content.get_production_status`, `content.create_repurpose_plan`, `content.request_approval`, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`, and the five durable workflow task tools.
 
 `content.select_idea` (idea approve) and `content.approve_asset` (asset decide) are real **only** for `bot_production` ([Phase 9b](phase-9b-production-bot-decide.md)). `bot_marketing` keeps its `content.*` grant — needed for its other real content tools — but is hard-denied on these two names in `src/policy/permissions.ts` `allowed()` and again inside the AA RPCs themselves, exactly like `workflow.record_decision`. `bot_chief_of_staff` and `bot_client_delivery` never held `content.*` or either exact name.
+
+`content.queue_distribution` (schedule) and `content.record_publication` (Gate 10 publish record) are real **only** for `bot_distribution` ([Phase 10](phase-10-distribution-manager.md)), same hard-coded pattern. `bot_production` keeps its `content.*` grant — needed for its other real content tools — but is hard-denied on these two names. `content.get_performance` and `attribution.get_content_performance` remain stubs (no live performance read yet): granted to `bot_distribution` per the original migration 65 seed, but indistinguishable from an ungranted tool unless `MCP_DISCOVER_STUBS=true`.

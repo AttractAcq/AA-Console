@@ -99,6 +99,27 @@ const ROUTES: Record<
       })
       .refine((v) => Boolean(v.idea_id || v.brief_id || v.asset_id)),
   },
+  "content.queue_distribution": {
+    path: "/internal/mcp/content/queue-distribution",
+    kind: "write",
+    input: z.object({
+      client_id: uuid,
+      asset_id: uuid,
+      scheduled_for: z.iso.date(),
+      channel: z.enum(["organic", "paid"]).optional(),
+    }),
+  },
+  "content.record_publication": {
+    path: "/internal/mcp/content/record-publication",
+    kind: "write",
+    input: z.object({
+      client_id: uuid,
+      schedule_id: uuid,
+      status: z.enum(["published", "failed"]),
+      external_id: z.string().min(1).max(200).optional(),
+      failure_reason: z.string().min(1).max(4000).optional(),
+    }),
+  },
   "content.create_repurpose_plan": {
     path: "/internal/mcp/content/create-repurpose-plan",
     kind: "queue",
@@ -193,6 +214,8 @@ const codes = new Set([
   "invalid_idea_status",
   "invalid_brief_status",
   "invalid_asset_status",
+  "schedule_not_found",
+  "invalid_schedule_status",
   "invalid_formats",
   "idempotency_conflict",
   "brief_agent_unavailable",
@@ -290,6 +313,25 @@ function aaBody(
     if (input.idea_id) body.idea_id = input.idea_id;
     if (input.brief_id) body.brief_id = input.brief_id;
     if (input.asset_id) body.asset_id = input.asset_id;
+    return body;
+  }
+  if (tool === "content.queue_distribution") {
+    const body: Record<string, unknown> = {
+      client_id: input.client_id,
+      asset_id: input.asset_id,
+      scheduled_for: input.scheduled_for,
+    };
+    if (input.channel) body.channel = input.channel;
+    return body;
+  }
+  if (tool === "content.record_publication") {
+    const body: Record<string, unknown> = {
+      client_id: input.client_id,
+      schedule_id: input.schedule_id,
+      status: input.status,
+    };
+    if (input.external_id) body.external_id = input.external_id;
+    if (input.failure_reason) body.failure_reason = input.failure_reason;
     return body;
   }
   if (tool === "content.create_repurpose_plan")

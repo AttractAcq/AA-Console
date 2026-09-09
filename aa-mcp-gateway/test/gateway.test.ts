@@ -139,7 +139,11 @@ test("MCP_DISCOVER_STUBS exposes permitted stubs; default call rejects stub name
   assert.ok(stubNames.includes("content.generate_brief"));
   assert.ok(stubNames.includes("content.list_ideas"));
   assert.ok(stubNames.includes("content.generate_ideas"));
-  assert.ok(stubNames.includes("content.queue_distribution"));
+  // Phase 10 realized queue_distribution for bot_distribution only; it is
+  // hard-denied for bot_production (see permissions.ts) even under
+  // MCP_DISCOVER_STUBS=true. content.get_performance is still a genuine stub.
+  assert.ok(!stubNames.includes("content.queue_distribution"));
+  assert.ok(stubNames.includes("content.get_performance"));
   assert.ok(!stubNames.includes("pipeline.update_stage"));
   assert.ok(!stubNames.includes("workflow.record_decision"));
   assert.equal(
@@ -303,17 +307,21 @@ test("Finance critical payment creates approval and cannot execute before human 
   }
 });
 test("approval rejection, expiration and revoked scope block execution", async () => {
+  // content.queue_distribution left the gateway's HIGH-risk approval gate in
+  // Phase 10 (now MEDIUM, AA-RPC-only, bot_distribution only); pipeline.record_sale
+  // stays in that gate, so it now exercises this approval-lifecycle machinery.
+  const salesOps: Identity = { bot: "bot_sales_ops", clients: [client] };
   const { store, engine } = fixture(new AAApiAdapter(), true);
   for (const mode of ["rejected", "expired", "revoked"]) {
-    const r = await engine.call(identity, "content.queue_distribution", {
+    const r = await engine.call(salesOps, "pipeline.record_sale", {
       client_id: client,
       idempotency_key: `approval-${mode}`,
-      asset_id: idea,
+      lead_id: idea,
     });
     if (mode === "rejected") {
       engine.decide(r.approval_id!, "human", "rejected", "Needs changes");
       await assert.rejects(() =>
-        engine.executeApproval(r.approval_id!, [identity]),
+        engine.executeApproval(r.approval_id!, [salesOps]),
       );
     } else if (mode === "expired") {
       const a = store.getApproval(r.approval_id!);
@@ -328,7 +336,7 @@ test("approval rejection, expiration and revoked scope block execution", async (
       assert.equal(
         (
           await engine.executeApproval(r.approval_id!, [
-            { ...identity, clients: [] },
+            { ...salesOps, clients: [] },
           ])
         ).status,
         "rejected",

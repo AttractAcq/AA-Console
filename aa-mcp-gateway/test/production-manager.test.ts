@@ -61,8 +61,11 @@ test("Phase 5 tools are real and generate_brief stays accepted", async (t) => {
     "content.approve_asset",
   ])
     assert.ok(real.includes(name), name);
+  // Phase 10 realized queue_distribution/record_publication for bot_distribution
+  // only (see distribution-manager.test.ts); content.get_performance stays a
+  // stub (no live performance read yet, documented gap).
   assert.equal(
-    registry.find((x) => x.name === "content.queue_distribution")?.implementation,
+    registry.find((x) => x.name === "content.get_performance")?.implementation,
     "stub",
   );
   assert.equal(
@@ -258,10 +261,19 @@ test("gateway denies other-client and unauthorized bots before AA for every real
     "content.get_idea",
     "content.get_production_status",
     "content.list_ideas",
+    "content.queue_distribution",
+    "content.record_publication",
     "content.request_approval",
     "content.request_revision",
     "content.select_idea",
   ]);
+  // Phase 10's two real content tools are bot_distribution only (hard gate,
+  // see permissions.ts); exercised for bot_production here would hit that
+  // gate before the client-scope check this test targets. Covered instead in
+  // distribution-manager.test.ts.
+  const realContentForProduction = realContent.filter(
+    (name) => name !== "content.queue_distribution" && name !== "content.record_publication",
+  );
   const inputs: Record<string, Record<string, unknown>> = {
     "content.list_ideas": { client_id: other, status: "approved" },
     "content.get_idea": { client_id: other, idea_id: idea },
@@ -301,7 +313,7 @@ test("gateway denies other-client and unauthorized bots before AA for every real
       idempotency_key: "scope-asset",
     },
   };
-  for (const name of realContent) {
+  for (const name of realContentForProduction) {
     const result = await engine.call(identity, name, inputs[name]);
     assert.equal(result.status, "rejected", name);
     assert.equal(result.message, "Client scope denied.", name);

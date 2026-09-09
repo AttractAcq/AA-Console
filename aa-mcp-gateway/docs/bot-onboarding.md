@@ -3,8 +3,11 @@
 Activate one bot at a time. Reference: `../src/onboarding/chief-of-staff.ts`.
 Second reference bot (Phase 9): `../src/onboarding/marketing-director.ts`, an
 intentional allowlist rather than a wildcard grant — see
-`phase-9-marketing-director.md`. Configuration is a testable declaration, not
-authority to issue credentials or grants.
+`phase-9-marketing-director.md`. Third reference bot (Phase 10):
+`../src/onboarding/distribution-manager.ts`, same exact-allowlist shape,
+adding two real writes plus two granted-but-still-stub reads — see
+`phase-10-distribution-manager.md`. Configuration is a testable declaration,
+not authority to issue credentials or grants.
 
 1. Create or verify the bot identity using the Phase 3–4 auth runbook.
 2. Issue a bot-specific bearer only if missing; retain it in the approved secret store.
@@ -71,3 +74,14 @@ against disposable fixtures, not just tracking tasks, and asserts exact discover
 set equality plus forbidden-domain denial of `content.approve_asset` and
 `delivery.list_clients`. Its nonsecret fixture shape is documented in
 `phase-9-marketing-director.md`.
+
+Distribution (Gate 10) runs its own suite (`npm run smoke:distribution --
+fixtures.json headers`, `scripts/distribution-onboarding-smoke.ts`) against an
+already-approved production fixture asset: `content.queue_distribution`
+(schedule) then `content.record_publication` (Gate 10 "publish" — no live
+Meta/etc. publish exists yet, see `phase-10-distribution-manager.md`), replay,
+an unapproved-asset business-rule denial, the same workflow task/approval
+suite as Marketing, and exact discovery set equality including the absence of
+both `content.get_performance` and `attribution.get_content_performance`
+(granted but still stub). Its nonsecret fixture shape is documented in
+`phase-10-distribution-manager.md`.

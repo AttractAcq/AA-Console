@@ -5,7 +5,7 @@ const domains: Record<string, string> = {
     "list_clients get_client get_status get_plan get_blockers get_next_action create_task get_client_health",
   campaign: "list get create update get_status request_approval",
   content:
-    "list_ideas generate_ideas get_idea select_idea generate_brief get_brief assign_production get_production_status submit_asset request_revision request_approval approve_asset create_repurpose_plan queue_distribution get_performance",
+    "list_ideas generate_ideas get_idea select_idea generate_brief get_brief assign_production get_production_status submit_asset request_revision request_approval approve_asset create_repurpose_plan queue_distribution record_publication get_performance",
   conversion:
     "list_pages get_page create_page generate_structure generate_copy request_approval get_performance",
   sales_agents:
@@ -43,11 +43,11 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
       const name = `${domain}.${action}`;
       const read = /^(get|list|search)/.test(action);
       const approval = [
-        // Sec Phase 9b: content.approve_asset moved off this gateway-level
-        // reviewer gate when it went real, to match its sibling Bot content
-        // writes (MEDIUM risk, AA-RPC-only authorization). See the design
-        // note's Sec question before restoring it here.
-        "queue_distribution",
+        // Sec Phase 9b/10: content.approve_asset and content.queue_distribution
+        // moved off this gateway-level reviewer gate when they went real, to
+        // match their sibling Bot content writes (MEDIUM risk, AA-RPC-only
+        // authorization). See each phase's design note Sec question before
+        // restoring either here.
         "deploy",
         "record_sale",
         "record_decision",
@@ -147,6 +147,22 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         fields.decision = z.enum(["approved", "rejected"]);
         delete fields.title;
       }
+      if (name === "content.queue_distribution") {
+        fields.asset_id = id;
+        fields.scheduled_for = z.iso.date();
+        fields.channel = z.enum(["organic", "paid"]).optional();
+        delete fields.title;
+        delete fields.summary;
+      }
+      if (name === "content.record_publication") {
+        delete fields.asset_id;
+        fields.schedule_id = id;
+        fields.status = z.enum(["published", "failed"]);
+        fields.external_id = z.string().min(1).max(200).optional();
+        fields.failure_reason = z.string().min(1).max(4000).optional();
+        delete fields.title;
+        delete fields.summary;
+      }
       if (name === "content.create_repurpose_plan") {
         fields.asset_id = id;
         fields.approval_execution_id = z
@@ -216,6 +232,12 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         // names; the hard per-tool gate in permissions.ts is the real control).
         "content.select_idea",
         "content.approve_asset",
+        // Sec Phase 10: bot_distribution only, enforced by allowed() below,
+        // not by this set (bot_production's content.* wildcard also matches
+        // these names; the hard per-tool gate in permissions.ts is the real
+        // control).
+        "content.queue_distribution",
+        "content.record_publication",
       ]);
       const implementation =
         orchestration ||
@@ -250,6 +272,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
           "queue_distribution",
           "record_sale",
           "approve_asset",
+          "record_publication",
         ].includes(action),
         audit: "required",
         implementation,
