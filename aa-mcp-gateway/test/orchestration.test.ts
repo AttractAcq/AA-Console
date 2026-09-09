@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { assertAuthorizationDenial } from "../scripts/onboarding-denial.js";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
@@ -86,14 +87,14 @@ test("contract 4/8: CoS reference matches existing grants and discovers only all
     chiefOfStaff.forbidden.some((f) => t.name === f || t.domain === f),
   )) {
     assert.ok(!names.includes(tool.name));
-    assert.equal(
-      (
-        await engine.call(identity, tool.name, {
+    assertAuthorizationDenial(
+      {
+        structuredContent: await engine.call(identity, tool.name, {
           client_id: client,
           idempotency_key: "forbidden-key",
-        })
-      ).status,
-      "rejected",
+        }),
+      },
+      "forbidden_tool",
     );
   }
   for (const name of [
@@ -116,9 +117,15 @@ test("contract 7: all Gate 8 tools deny client scope before AA", async (t) => {
     },
   });
   for (const tool of gateTools)
-    assert.equal(
-      (await engine.call(identity, tool.name, input(tool.name, other))).status,
-      "rejected",
+    assertAuthorizationDenial(
+      {
+        structuredContent: await engine.call(
+          identity,
+          tool.name,
+          input(tool.name, other),
+        ),
+      },
+      "client_scope",
     );
   assert.equal(calls, 0);
 });

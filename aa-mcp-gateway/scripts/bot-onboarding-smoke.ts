@@ -1,5 +1,9 @@
 /** Operator-run Gate suite. No bearer input/output; secrets stay in the connector header file. */
 import assert from "node:assert/strict";
+import {
+  assertAuthorizationDenial,
+  type AuthorizationDenial,
+} from "./onboarding-denial.js";
 import { readFileSync, statSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -41,17 +45,19 @@ async function call(
   assert.equal(result?.status, expected, `${name}: unexpected result`);
   return result?.data ?? {};
 }
-async function denied(name: string, args: Record<string, unknown>) {
+async function denied(
+  name: string,
+  args: Record<string, unknown>,
+  expected: AuthorizationDenial,
+) {
   const response = await client.callTool({ name, arguments: args });
   calls++;
-  const result = response.structuredContent as { status?: string } | undefined;
-  assert.ok(
-    response.isError ||
-      result?.status === "rejected" ||
-      result?.status === "failed",
-    `${name}: expected denial`,
+  assertAuthorizationDenial(
+    { structuredContent: response.structuredContent },
+    expected,
   );
 }
+
 try {
   // Step 9: exercise the same stdio bridge as Harbour, not direct HTTP authentication.
   await client.connect(
@@ -146,17 +152,29 @@ try {
       "complete",
     );
     // Step 7: other-client and other-resource fixtures must be known to the operator.
-    await denied("delivery.get_status", {
-      client_id: fixtures.denied_client_id,
-    });
-    await denied("workflow.get_task", {
-      client_id,
-      task_id: fixtures.denied_task_id,
-    });
-    await denied("campaign.get", {
-      client_id,
-      campaign_id: fixtures.denied_campaign_id,
-    });
+    await denied(
+      "delivery.get_status",
+      {
+        client_id: fixtures.denied_client_id,
+      },
+      "client_scope",
+    );
+    await denied(
+      "workflow.get_task",
+      {
+        client_id,
+        task_id: fixtures.denied_task_id,
+      },
+      "foreign_resource",
+    );
+    await denied(
+      "campaign.get",
+      {
+        client_id,
+        campaign_id: fixtures.denied_campaign_id,
+      },
+      "foreign_resource",
+    );
     // Step 8: intentionally invoke forbidden domains even when absent from discovery.
     for (const name of [
       "economics.get_client_economics",
@@ -164,7 +182,11 @@ try {
       "engineering.get_deployment_status",
       "workflow.record_decision",
     ])
-      await denied(name, { client_id, idempotency_key: randomUUID() });
+      await denied(
+        name,
+        { client_id, idempotency_key: randomUUID() },
+        "forbidden_tool",
+      );
   }
   // Step 10: sanitized evidence only; no tool bodies, client business data, or secrets.
   console.log(
