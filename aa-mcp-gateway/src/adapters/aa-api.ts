@@ -111,7 +111,20 @@ const ROUTES: Record<
   },
 };
 
+for (const action of ["list_clients", "get_client", "get_status", "get_blockers", "get_next_action", "get_plan", "get_client_health", "create_task"]) {
+  ROUTES[`delivery.${action}`] = {
+    path: `/internal/mcp/delivery/${action.replaceAll("_", "-")}`,
+    kind: action === "create_task" ? "write" : "read",
+    input: action === "list_clients"
+      ? z.object({ limit: z.number().int().min(1).max(100).optional(), after: uuid.optional() })
+      : action === "create_task"
+        ? z.object({ client_id: uuid, title: z.string().trim().min(1).max(200), summary: z.string().max(4000).optional(), due_date: z.iso.date().optional(), brief_id: uuid.optional() })
+        : z.object({ client_id: uuid }),
+  };
+}
+
 const codes = new Set([
+  "client_not_found",
   "unauthorized",
   "invalid_bot",
   "invalid_request",
@@ -167,6 +180,7 @@ async function readBody(response: Response, maxBytes: number): Promise<unknown> 
 }
 
 function aaBody(tool: string, input: Record<string, unknown>): Record<string, unknown> {
+  if (tool.startsWith("delivery.")) return input;
   if (tool === "content.generate_brief")
     return { client_id: input.client_id, idea_id: input.idea_id };
   if (tool === "content.list_ideas") {
@@ -298,6 +312,13 @@ export class AAApiAdapter implements Adapter {
         )
           return fail("malformed_response", response.status);
         return { status: "accepted", capability: tool.name, data: data.data };
+      }
+      if (tool.name === "delivery.list_clients") {
+        const listed = z.object({ clients: z.array(z.object({ id: uuid }).passthrough()).max(100), next_cursor: uuid.nullable() }).strict().safeParse(raw);
+        if (response.status !== 200 || !listed.success || listed.data.clients.some(c => !context.clients.includes(c.id))
+            || (listed.data.next_cursor !== null && !listed.data.clients.some(c => c.id === listed.data.next_cursor)))
+          return fail("malformed_response", response.status);
+        return { status: "completed", capability: tool.name, data: listed.data };
       }
       const scoped = clientScoped.safeParse(raw);
       if (!response.ok || !scoped.success || scoped.data.client_id !== input.client_id)
