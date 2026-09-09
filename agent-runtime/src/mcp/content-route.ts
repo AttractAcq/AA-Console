@@ -155,15 +155,18 @@ const ROUTES: Record<string, Route> = {
       const client_id = uuid(body, 'client_id');
       const asset_id = uuid(body, 'asset_id');
       const formats = body.formats;
+      const approval = body.approval_execution_id;
       if (!client_id || !asset_id || !Array.isArray(formats)
           || formats.length < 1 || formats.length > 6
-          || keysOf(body) !== 'asset_id,client_id,formats'
+          || !subset(body, ['asset_id', 'client_id', 'formats', 'approval_execution_id'])
+          || (approval !== undefined && (typeof approval !== 'string' || !ID.test(approval)))
           || formats.some((f) => typeof f !== 'string' || !FORMATS.has(f))) {
         return undefined;
       }
       return {
         p_bot_id: null, p_client_id: client_id, p_asset_id: asset_id,
         p_formats: formats as string[],
+        ...(approval === undefined ? {} : { p_approval_execution_id: approval }),
       };
     },
   },
@@ -205,7 +208,7 @@ export async function handleMcpContent(
   }
 
   try {
-    const { data, error } = await sb.rpc(route.rpc, parsed).abortSignal(AbortSignal.timeout(12_000));
+    const { data, error } = await sb.rpc(parsed.p_approval_execution_id === undefined ? route.rpc : 'mcp_resume_approval', parsed).abortSignal(AbortSignal.timeout(12_000));
     if (error) {
       return fail(res, error.code === 'P0001' && Object.hasOwn(MCP_ERRORS, error.message)
         ? error.message : 'internal_error');

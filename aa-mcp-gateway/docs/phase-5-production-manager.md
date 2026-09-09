@@ -21,6 +21,8 @@ These six rules are **binding** for this PR and for every later content RPC, pol
 
 ---
 
+Phase 6 formalizes durable waits and linked continuation: [approval engine](phase-6-approval-engine.md). Human decision boundaries above remain binding.
+
 ## 1. Goal
 
 Give Production Manager (`bot_production`) **implemented** MCP tools so it can take one **already-approved** idea through to **ready for distribution** without opening AA Console. Platform Gates 1–4 are closed. Auth on production is `BOT_AUTH_MODE=db`.

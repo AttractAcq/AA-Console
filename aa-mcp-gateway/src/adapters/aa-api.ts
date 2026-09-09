@@ -91,6 +91,7 @@ const ROUTES: Record<
     input: z.object({
         client_id: uuid,
         asset_id: uuid,
+        approval_execution_id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional(),
         formats: z
           .array(
             z.enum([
@@ -117,6 +118,9 @@ const codes = new Set([
   "idea_not_found",
   "brief_not_found",
   "asset_not_found",
+  "approval_not_found",
+  "approval_required",
+  "approval_resource_mismatch",
   "client_mismatch",
   "client_forbidden",
   "bot_not_active",
@@ -209,6 +213,7 @@ function aaBody(tool: string, input: Record<string, unknown>): Record<string, un
       client_id: input.client_id,
       asset_id: input.asset_id,
       formats: input.formats,
+      ...(input.approval_execution_id === undefined ? {} : { approval_execution_id: input.approval_execution_id }),
     };
   return { client_id: input.client_id };
 }

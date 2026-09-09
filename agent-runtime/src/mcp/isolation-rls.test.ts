@@ -67,6 +67,8 @@ beforeAll(async () => {
     '20260908200000_66_mcp_domain_rls_bot_isolation.sql',
     '20260908230000_68_mcp_production_manager.sql',
     '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
+    '20260909000000_70_mcp_approval_engine.sql',
+    '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -484,4 +486,207 @@ describe('Phase 5 Production Manager isolation', () => {
       ['bot_production', CLIENT_A, IDEA_A],
     )).rejects.toThrow('bot_not_active');
   });
+  const requestApproval = (execution = 'approval-root', client = CLIENT_A, asset: string | null = ASSET_A) => db.query<{ result: any }>(
+    'select mcp_request_approval($1,$2,$3,$4,$5,$6,$7,$8) as result',
+    ['bot_production', 'approval-request', execution, client, null, asset ? null : BRIEF_A, asset, null],
+  );
+  const productionStatus = () => db.query<{ result: any }>(
+    'select mcp_get_production_status($1,$2,$3,$4,$5) as result',
+    ['bot_production', CLIENT_A, null, null, ASSET_A],
+  );
+  const resumeApproval = (overrides: Partial<{ bot: string; client: string; asset: string; root: string; formats: string[]; execution: string }> = {}) =>
+    db.query<{ result: any }>('select mcp_resume_approval($1,$2,$3,$4,$5,$6,$7) as result', [
+      overrides.bot ?? 'bot_production', 'resume-request', overrides.execution ?? 'resume-receipt',
+      overrides.client ?? CLIENT_A, overrides.asset ?? ASSET_A, overrides.formats ?? ['reel'],
+      overrides.root ?? 'approval-root',
+    ]);
+  async function humanReview(decision: 'approved' | 'rejected', asset = ASSET_A) {
+    await db.exec(`reset role;
+      grant execute on function review_media_asset(uuid,review_status,text) to authenticated;
+      select set_config('request.jwt.claim.role','authenticated',false);
+      select set_config('request.jwt.claim.sub','${USER_A}',false);
+      set role authenticated;`);
+    await db.query('select review_media_asset($1,$2,$3)', [asset, decision, 'Human Console fixture']);
+    await asService();
+  }
+
+  it('Phase 6 pauses, observes real human Console approval and resumes one durable logical execution', async () => {
+    const first = (await requestApproval()).rows[0]!.result;
+    const replay = (await requestApproval()).rows[0]!.result;
+    expect(first.approval).toEqual({ execution_id: 'approval-root', request_id: 'approval-request' });
+    expect(replay.replayed).toBe(true);
+    expect((await productionStatus()).rows[0]!.result.approvals[0].state).toBe('waiting_for_human');
+    await expect(resumeApproval()).rejects.toThrow('approval_required');
+    expect((await db.query('select * from client_asset_reviews')).rows).toHaveLength(0);
+    await humanReview('approved');
+    const approved = (await productionStatus()).rows[0]!.result;
+    expect(approved.handoff.ready_for_distribution).toBe(true);
+    expect(approved.approvals[0]).toMatchObject({ state: 'approved', decision: { reviewed_by: USER_A, decision: 'approved' } });
+    const resumed = (await resumeApproval()).rows[0]!.result;
+    const repeated = (await resumeApproval({ execution: 'different-gateway-receipt' })).rows[0]!.result;
+    expect(resumed.approval_execution_id).toBe('approval-root');
+    expect(resumed.replayed).toBe(false);
+    expect(repeated.replayed).toBe(true);
+    expect(repeated.job_id).toBe(resumed.job_id);
+    await expect(resumeApproval({ formats: ['carousel'] })).rejects.toThrow('idempotency_conflict');
+    const status = (await productionStatus()).rows[0]!.result;
+    expect(status.approvals[0]).toMatchObject({ state: 'resumed', execution_id: 'approval-root', resume: { job_id: resumed.job_id } });
+    expect((await db.query("select * from agent_jobs where agent_key = 'repurpose'")).rows).toHaveLength(1);
+    expect((await db.query('select * from mcp_internal.mcp_content_requests where approval_execution_id is not null')).rows).toHaveLength(1);
+    expect((await db.query("select * from mcp_internal.mcp_content_requests where tool = 'content.request_approval'")).rows).toHaveLength(1);
+    await requestApproval('another-root');
+    await expect(resumeApproval({ root: 'another-root' })).rejects.toThrow('idempotency_conflict');
+    await humanReview('rejected');
+    expect((await productionStatus()).rows[0]!.result.approvals[0].state).toBe('rejected');
+    expect((await productionStatus()).rows[0]!.result.handoff.ready_for_distribution).toBe(false);
+    await expect(resumeApproval()).rejects.toThrow('approval_required');
+  });
+
+  it('Phase 6 brief-only wait follows human build and review, and standalone asset waits also resolve', async () => {
+    await db.exec(`delete from client_media_assets where id = '${ASSET_A}'`);
+    await requestApproval('approval-root', CLIENT_A, null);
+    const q = () => db.query<{ result: any }>('select mcp_get_production_status($1,$2,$3,$4,$5) as result',
+      ['bot_production', CLIENT_A, null, BRIEF_A, null]);
+    expect((await q()).rows[0]!.result.approvals[0].state).toBe('awaiting_production');
+    await db.exec(`insert into client_media_assets (id,client_id,brief_id,media_type,title,storage_path)
+      values ('${ASSET_A}','${CLIENT_A}','${BRIEF_A}','image','Built by human','a.png')`);
+    await humanReview('approved');
+    expect((await q()).rows[0]!.result.approvals[0].state).toBe('approved');
+    await resumeApproval();
+    expect((await q()).rows[0]!.result.approvals[0].state).toBe('resumed');
+    await db.exec(`update client_media_assets set brief_id = null where id = '${ASSET_A}'`);
+    await requestApproval('standalone');
+    expect((await productionStatus()).rows[0]!.result.handoff.ready_for_distribution).toBe(true);
+  });
+
+  it('Phase 6 requires human review evidence and cannot use an approved sibling for an exact asset wait', async () => {
+    await requestApproval();
+    await db.exec(`update client_media_assets set review_status = 'approved' where id = '${ASSET_A}'`);
+    expect((await productionStatus()).rows[0]!.result.handoff.ready_for_distribution).toBe(false);
+    await expect(resumeApproval()).rejects.toThrow('approval_required');
+    const sibling = 'aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+    await db.exec(`update client_media_assets set review_status = 'pending' where id = '${ASSET_A}';
+      insert into client_media_assets (id,client_id,brief_id,media_type,title,storage_path)
+        values ('${sibling}','${CLIENT_A}','${BRIEF_A}','image','Sibling','s.png')`);
+    await humanReview('approved', sibling);
+    const status = (await productionStatus()).rows[0]!.result;
+    expect(status.handoff.ready_for_distribution).toBe(false);
+    expect(status.handoff.approved_asset_id).toBeNull();
+    await expect(resumeApproval({ asset: sibling })).rejects.toThrow('approval_resource_mismatch');
+  });
+
+  it('Phase 6 isolates new RPCs and approval projections by Bot, client and resource', async () => {
+    await requestApproval();
+    await humanReview('approved');
+    await expect(resumeApproval({ client: CLIENT_B })).rejects.toThrow('client_forbidden');
+    await expect(resumeApproval({ asset: ASSET_B })).rejects.toThrow('client_mismatch');
+    await db.exec(`insert into mcp_bot_clients (bot_id,client_id) values ('bot_distribution','${CLIENT_A}');`);
+    await expect(resumeApproval({ bot: 'bot_distribution' })).rejects.toThrow('approval_not_found');
+    const otherBot = await db.query<{ result: any }>('select mcp_get_production_status($1,$2,$3,$4,$5) as result',
+      ['bot_distribution', CLIENT_A, null, null, ASSET_A]);
+    expect(otherBot.rows[0]!.result.approvals).toEqual([]);
+    await db.exec(`insert into mcp_bot_clients (bot_id,client_id) values ('bot_production','${CLIENT_B}');`);
+    await expect(resumeApproval({ client: CLIENT_B, asset: ASSET_B })).rejects.toThrow('client_mismatch');
+    await expect(db.query('select mcp_internal.get_approval($1,$2,$3)',
+      ['bot_production', CLIENT_B, 'approval-root'])).rejects.toThrow('client_mismatch');
+    await expect(resumeApproval({ root: 'missing' })).rejects.toThrow('approval_not_found');
+  });
+
+  it('Phase 6 revocation and suspension deny reads and resumed replays before lookup', async () => {
+    await requestApproval();
+    await humanReview('approved');
+    await resumeApproval();
+    await db.exec(`delete from mcp_bot_clients where bot_id = 'bot_production';`);
+    await expect(resumeApproval()).rejects.toThrow('client_forbidden');
+    await expect(productionStatus()).rejects.toThrow('client_forbidden');
+    await expect(requestApproval()).rejects.toThrow('client_forbidden');
+    await db.exec(`insert into mcp_bot_clients (bot_id,client_id) values ('bot_production','${CLIENT_A}');
+      update mcp_internal.mcp_bots set status = 'suspended' where bot_id = 'bot_production';`);
+    await expect(resumeApproval()).rejects.toThrow('bot_not_active');
+    await expect(productionStatus()).rejects.toThrow('bot_not_active');
+    await expect(requestApproval()).rejects.toThrow('bot_not_active');
+    await expect(db.query('select mcp_internal.get_approval($1,$2,$3)',
+      ['bot_production', CLIENT_A, 'approval-root'])).rejects.toThrow('bot_not_active');
+  });
+
+  it('Phase 6 enforces execute ACLs, forced ledger RLS, active/grant helpers and VOLATILE reads', async () => {
+    const signatures = [
+      'mcp_internal.get_approval(text,uuid,text)',
+      'mcp_internal.resume_approval(text,text,text,uuid,uuid,text[],text)',
+      'public.mcp_resume_approval(text,text,text,uuid,uuid,text[],text)',
+    ];
+    for (const sig of signatures) {
+      const def = (await db.query<{ def: string; volatility: string }>(
+        'select pg_get_functiondef(oid) as def, provolatile as volatility from pg_proc where oid = $1::regprocedure', [sig])).rows[0]!;
+      expect(def.def).toContain('require_active_bot');
+      expect(def.def).toContain('require_bot_client_grant');
+      expect(def.def).not.toMatch(/(?:can_access_client|review_media_asset)\s*\(/);
+      expect(def.volatility).toBe('v');
+      for (const role of ['anon', 'authenticated', 'service_role']) {
+        expect((await db.query<{ allowed: boolean }>('select has_function_privilege($1,$2,\'EXECUTE\') as allowed', [role, sig])).rows[0]!.allowed)
+          .toBe(role === 'service_role');
+      }
+    }
+    for (const name of ['mcp_internal.get_production_status(text,uuid,uuid,uuid,uuid)',
+      'public.mcp_get_production_status(text,uuid,uuid,uuid,uuid)',
+      'public.mcp_list_ideas(text,uuid,integer,text)', 'public.mcp_get_idea(text,uuid,uuid)',
+      'public.mcp_get_brief(text,uuid,uuid,uuid)']) {
+      expect((await db.query<{ v: string }>('select provolatile as v from pg_proc where oid = $1::regprocedure', [name])).rows[0]!.v).toBe('v');
+    }
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await expect(resumeApproval()).rejects.toThrow('permission denied');
+      await db.exec('reset role');
+    }
+    await asService();
+    await db.exec('set role service_role');
+    await expect(db.query('select * from mcp_internal.mcp_content_requests')).rejects.toThrow('permission denied');
+    await db.exec('reset role');
+    await requestApproval();
+    await humanReview('approved');
+    await db.exec('set role service_role');
+    expect((await resumeApproval()).rows[0]!.result.job_id).toBeTruthy();
+  });
+
+  it('Phase 6 P1-1 binds resumed brief decisions to the continuation asset', async () => {
+    await requestApproval('approval-root', CLIENT_A, null);
+    await humanReview('approved');
+    const resumed = (await resumeApproval()).rows[0]!.result;
+    const sibling = 'aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+    await db.exec(`insert into client_media_assets (id,client_id,brief_id,media_type,title,storage_path)
+      values ('${sibling}','${CLIENT_A}','${BRIEF_A}','image','Different asset','s.png')`);
+    await humanReview('approved', sibling);
+    await humanReview('rejected');
+    const status = (await db.query<{ result: any }>('select mcp_get_production_status($1,$2,$3,$4,$5) as result',
+      ['bot_production', CLIENT_A, null, BRIEF_A, null])).rows[0]!.result;
+    expect(status.approvals[0].resume.job_id).toBe(resumed.job_id);
+    expect(status.approvals[0].resume.asset_id).toBe(ASSET_A);
+    expect(status.approvals[0].decision.asset_id).toBe(ASSET_A);
+    expect(status.approvals[0].decision.decision).toBe('rejected');
+    expect(status.approvals[0].approved_asset_id).toBeNull();
+    expect(status.approvals[0].state).toBe('rejected');
+    expect(status.handoff.ready_for_distribution).toBe(false);
+  });
+
+  it('Phase 6 P1-2 evaluates blockers beyond the latest 50 displayed requests', async () => {
+    await requestApproval();
+    await humanReview('rejected');
+    const sibling = 'aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+    await db.exec(`insert into client_media_assets (id,client_id,brief_id,media_type,title,storage_path)
+      values ('${sibling}','${CLIENT_A}','${BRIEF_A}','image','Approved sibling','s.png')`);
+    await humanReview('approved', sibling);
+    const q = () => db.query<{ result: any }>('select mcp_get_production_status($1,$2,$3,$4,$5) as result',
+      ['bot_production', CLIENT_A, null, BRIEF_A, null]);
+    const before = (await q()).rows[0]!.result;
+    expect(before.handoff.ready_for_distribution).toBe(false);
+    for (let n = 0; n < 50; n++) await requestApproval(`new-${n}`, CLIENT_A, sibling);
+    const after = (await q()).rows[0]!.result;
+    expect(after.approvals).toHaveLength(50);
+    expect(after.approvals.some((a: any) => a.execution_id === 'approval-root')).toBe(false);
+    expect(after.handoff.ready_for_distribution).toBe(false);
+    // Only a real human decision resolves the old wait, even while it is off-page.
+    await humanReview('approved');
+    expect((await q()).rows[0]!.result.handoff.ready_for_distribution).toBe(true);
+  });
+
 });

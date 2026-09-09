@@ -56,6 +56,8 @@ beforeAll(async () => {
     '20260908200000_66_mcp_domain_rls_bot_isolation.sql',
     '20260908230000_68_mcp_production_manager.sql',
     '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
+    '20260909000000_70_mcp_approval_engine.sql',
+    '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
   ]) await db.exec(await migration(file));
 }, 60_000);
 afterAll(async () => { await db?.close(); });
@@ -313,5 +315,47 @@ describe('Phase 5 Production Manager content RPCs', () => {
     expect(result.body.handoff.ready_for_distribution).toBe(true);
     expect(result.body.handoff.approved_asset_id).toBe(ASSET);
     expect(result.body.handoff.blocked_on).toBeNull();
+  });
+});
+
+describe('Phase 6 linked continuation HTTP', () => {
+  const body = { client_id: CLIENT, asset_id: ASSET, formats: ['reel'], approval_execution_id: 'execution-1' };
+  it('routes optional linkage to the secured resume RPC and retains correlation on 202/200', async () => {
+    const requested = await call('/internal/mcp/content/request-approval', { client_id: CLIENT, asset_id: ASSET });
+    expect(requested.body.approval.execution_id).toBe('execution-1');
+    const waiting = await call('/internal/mcp/content/create-repurpose-plan', body);
+    expect(waiting.status).toBe(409);
+    expect(waiting.body.error.code).toBe('approval_required');
+    expect(waiting.rpc.mock.calls[0]?.[0]).toBe('mcp_resume_approval');
+    const user = '88888888-8888-4888-8888-888888888888';
+    await db.exec(`insert into auth.users (id) values ('${user}');
+      update profiles set role = 'admin' where id = '${user}';
+      select set_config('request.jwt.claim.role','authenticated',false);
+      select set_config('request.jwt.claim.sub','${user}',false);`);
+    await db.query('select review_media_asset($1,$2,$3)', [ASSET, 'approved', 'Console']);
+    await db.exec("select set_config('request.jwt.claim.role','service_role',false); select set_config('request.jwt.claim.sub','',false);");
+    const first = await call('/internal/mcp/content/create-repurpose-plan', body, { headers: { 'idempotency-key': 'resume-1' } });
+    expect(first.status).toBe(202);
+    expect(first.body.approval_execution_id).toBe('execution-1');
+    const retry = await call('/internal/mcp/content/create-repurpose-plan', body, { headers: { 'idempotency-key': 'resume-2' } });
+    expect(retry.status).toBe(200);
+    expect(retry.body.job_id).toBe(first.body.job_id);
+    const status = await call('/internal/mcp/content/get-production-status', { client_id: CLIENT, asset_id: ASSET });
+    expect(status.body.approvals[0].state).toBe('resumed');
+    expect(status.body.approvals[0].resume.job_id).toBe(first.body.job_id);
+  });
+
+  it('rejects malformed root IDs and missing service authentication before SQL', async () => {
+    for (const invalid of [null, '', 'bad root', 42, 'x'.repeat(129)]) {
+      const result = await call('/internal/mcp/content/create-repurpose-plan', { ...body, approval_execution_id: invalid });
+      expect(result.status).toBe(400);
+      expect(result.rpc).not.toHaveBeenCalled();
+    }
+    const unauth = await call('/internal/mcp/content/create-repurpose-plan', body, { headers: { authorization: undefined } });
+    expect(unauth.status).toBe(401);
+    expect(unauth.rpc).not.toHaveBeenCalled();
+    const absent = await call('/internal/mcp/content/create-repurpose-plan', body);
+    expect(absent.status).toBe(404);
+    expect(absent.body.error.code).toBe('approval_not_found');
   });
 });
