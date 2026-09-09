@@ -35,6 +35,21 @@ const ROUTES: Record<
     kind: "read",
     input: z.object({ client_id: uuid, idea_id: uuid }),
   },
+  "content.select_idea": {
+    path: "/internal/mcp/content/select-idea",
+    kind: "write",
+    input: z.object({ client_id: uuid, idea_id: uuid }),
+  },
+  "content.approve_asset": {
+    path: "/internal/mcp/content/approve-asset",
+    kind: "write",
+    input: z.object({
+      client_id: uuid,
+      asset_id: uuid,
+      decision: z.enum(["approved", "rejected"]),
+      summary: z.string().min(1).max(4000).optional(),
+    }),
+  },
   "content.get_brief": {
     path: "/internal/mcp/content/get-brief",
     kind: "read",
@@ -174,6 +189,7 @@ const codes = new Set([
   "client_mismatch",
   "client_forbidden",
   "bot_not_active",
+  "bot_forbidden",
   "invalid_idea_status",
   "invalid_brief_status",
   "invalid_asset_status",
@@ -234,6 +250,17 @@ function aaBody(
   }
   if (tool === "content.get_idea")
     return { client_id: input.client_id, idea_id: input.idea_id };
+  if (tool === "content.select_idea")
+    return { client_id: input.client_id, idea_id: input.idea_id };
+  if (tool === "content.approve_asset") {
+    const body: Record<string, unknown> = {
+      client_id: input.client_id,
+      asset_id: input.asset_id,
+      decision: input.decision,
+    };
+    if (input.summary) body.summary = input.summary;
+    return body;
+  }
   if (tool === "content.get_brief") {
     const body: Record<string, unknown> = { client_id: input.client_id };
     if (input.brief_id) body.brief_id = input.brief_id;

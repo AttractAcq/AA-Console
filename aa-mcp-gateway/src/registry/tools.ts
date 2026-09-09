@@ -43,7 +43,10 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
       const name = `${domain}.${action}`;
       const read = /^(get|list|search)/.test(action);
       const approval = [
-        "approve_asset",
+        // Sec Phase 9b: content.approve_asset moved off this gateway-level
+        // reviewer gate when it went real, to match its sibling Bot content
+        // writes (MEDIUM risk, AA-RPC-only authorization). See the design
+        // note's Sec question before restoring it here.
         "queue_distribution",
         "deploy",
         "record_sale",
@@ -134,6 +137,16 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         fields.brief_id = id.optional();
         delete fields.title;
       }
+      if (name === "content.select_idea") {
+        fields.idea_id = id;
+        delete fields.title;
+        delete fields.summary;
+      }
+      if (name === "content.approve_asset") {
+        fields.asset_id = id;
+        fields.decision = z.enum(["approved", "rejected"]);
+        delete fields.title;
+      }
       if (name === "content.create_repurpose_plan") {
         fields.asset_id = id;
         fields.approval_execution_id = z
@@ -198,6 +211,11 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "content.get_production_status",
         "content.create_repurpose_plan",
         "content.request_approval",
+        // Sec Phase 9b: bot_production only, enforced by allowed() below, not
+        // by this set (bot_marketing's content.* wildcard also matches these
+        // names; the hard per-tool gate in permissions.ts is the real control).
+        "content.select_idea",
+        "content.approve_asset",
       ]);
       const implementation =
         orchestration ||

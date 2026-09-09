@@ -23,6 +23,8 @@ These six rules are **binding** for this PR and for every later content RPC, pol
 
 Phase 6 formalizes durable waits and linked continuation: [approval engine](phase-6-approval-engine.md). Human decision boundaries above remain binding.
 
+**Amended by Phase 9b** ([phase-9b-production-bot-decide.md](phase-9b-production-bot-decide.md)): `content.select_idea` and `content.approve_asset` are real for `bot_production` only, under an explicit Alex CLEAR and Sec review. Every reference below to those two staying stubs / human-only / Bot-decide-forbidden is superseded **for `bot_production` only**; the posture is unchanged for every other Bot.
+
 ## 1. Goal
 
 Give Production Manager (`bot_production`) **implemented** MCP tools so it can take one **already-approved** idea through to **ready for distribution** without opening AA Console. Platform Gates 1–4 are closed. Auth on production is `BOT_AUTH_MODE=db`.

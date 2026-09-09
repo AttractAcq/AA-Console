@@ -66,6 +66,35 @@ const ROUTES: Record<string, Route> = {
       return { p_bot_id: null, p_client_id: client_id, p_idea_id: idea_id };
     },
   },
+  '/internal/mcp/content/select-idea': {
+    rpc: 'mcp_approve_idea',
+    kind: 'write',
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const idea_id = uuid(body, 'idea_id');
+      if (!client_id || !idea_id || keysOf(body) !== 'client_id,idea_id') return undefined;
+      return { p_bot_id: null, p_client_id: client_id, p_idea_id: idea_id };
+    },
+  },
+  '/internal/mcp/content/approve-asset': {
+    rpc: 'mcp_approve_asset',
+    kind: 'write',
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const asset_id = uuid(body, 'asset_id');
+      const decision = str(body, 'decision');
+      const reason = body.summary === undefined ? undefined : str(body, 'summary');
+      if (!client_id || !asset_id || (decision !== 'approved' && decision !== 'rejected')
+          || (reason !== undefined && (reason.length < 1 || reason.length > 4000))
+          || !subset(body, ['client_id', 'asset_id', 'decision', 'summary'])) {
+        return undefined;
+      }
+      return {
+        p_bot_id: null, p_client_id: client_id, p_asset_id: asset_id, p_decision: decision,
+        ...(reason === undefined ? {} : { p_reason: reason }),
+      };
+    },
+  },
   '/internal/mcp/content/get-brief': {
     rpc: 'mcp_get_brief',
     kind: 'read',

@@ -57,15 +57,21 @@ test("Phase 5 tools are real and generate_brief stays accepted", async (t) => {
     "content.get_production_status",
     "content.create_repurpose_plan",
     "content.request_approval",
+    "content.select_idea",
+    "content.approve_asset",
   ])
     assert.ok(real.includes(name), name);
   assert.equal(
-    registry.find((x) => x.name === "content.approve_asset")?.implementation,
+    registry.find((x) => x.name === "content.queue_distribution")?.implementation,
     "stub",
   );
   assert.equal(
-    registry.find((x) => x.name === "content.queue_distribution")?.implementation,
-    "stub",
+    registry.find((x) => x.name === "content.approve_asset")?.risk,
+    "MEDIUM",
+  );
+  assert.equal(
+    registry.find((x) => x.name === "content.approve_asset")?.approval,
+    false,
   );
   const { adapter, received } = await mockAa(t, ({ url }) => {
     if (url === "/internal/mcp/content/generate-brief")
@@ -170,6 +176,67 @@ test("request_revision and request_approval are completed writes", async (t) => 
   assert.equal((approval.data as any).queue, "console_approvals");
 });
 
+test("Phase 9b: content.select_idea and content.approve_asset complete through the AA adapter for bot_production only", async (t) => {
+  const { adapter, received } = await mockAa(t, ({ url, body }) => {
+    if (url === "/internal/mcp/content/select-idea")
+      return {
+        status: 200,
+        body: { client_id: client, idea_id: idea, idea_status: "approved", replayed: false },
+      };
+    if (url === "/internal/mcp/content/approve-asset")
+      return {
+        status: 200,
+        body: {
+          client_id: client, asset_id: asset, decision: body.decision,
+          reviewed_by_bot: "bot_production", replayed: false,
+        },
+      };
+    throw new Error(url);
+  });
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const engine = new ActionEngine(store, registry, adapter);
+  const approvedIdea = await engine.call(identity, "content.select_idea", {
+    client_id: client,
+    idea_id: idea,
+    idempotency_key: "idea-0001",
+  });
+  assert.equal(approvedIdea.status, "completed");
+  assert.equal(received[0]?.url, "/internal/mcp/content/select-idea");
+  assert.deepEqual(received[0]?.body, { client_id: client, idea_id: idea });
+  const decided = await engine.call(identity, "content.approve_asset", {
+    client_id: client,
+    asset_id: asset,
+    decision: "approved",
+    idempotency_key: "asset-0001",
+  });
+  assert.equal(decided.status, "completed");
+  assert.equal(received[1]?.url, "/internal/mcp/content/approve-asset");
+  assert.deepEqual(received[1]?.body, {
+    client_id: client, asset_id: asset, decision: "approved",
+  });
+  assert.equal((decided.data as any).reviewed_by_bot, "bot_production");
+
+  // Sec Phase 9b hard gate: not expressible by withholding a grant, since
+  // bot_marketing already has content.* for its other real content tools.
+  const marketing = { bot: "bot_marketing" as const, clients: [client] };
+  const marketingDenied = await engine.call(marketing, "content.approve_asset", {
+    client_id: client,
+    asset_id: asset,
+    decision: "approved",
+    idempotency_key: "asset-marketing-denied",
+  });
+  assert.equal(marketingDenied.status, "rejected");
+  assert.equal(marketingDenied.message, "Tool unavailable or unauthorized.");
+  const marketingIdeaDenied = await engine.call(marketing, "content.select_idea", {
+    client_id: client,
+    idea_id: idea,
+    idempotency_key: "idea-marketing-denied",
+  });
+  assert.equal(marketingIdeaDenied.status, "rejected");
+  assert.equal(received.length, 2);
+});
+
 test("gateway denies other-client and unauthorized bots before AA for every real content tool", async (t) => {
   let hits = 0;
   const { adapter } = await mockAa(t, () => {
@@ -184,6 +251,7 @@ test("gateway denies other-client and unauthorized bots before AA for every real
     .map((x) => x.name)
     .sort();
   assert.deepEqual(realContent, [
+    "content.approve_asset",
     "content.create_repurpose_plan",
     "content.generate_brief",
     "content.get_brief",
@@ -192,6 +260,7 @@ test("gateway denies other-client and unauthorized bots before AA for every real
     "content.list_ideas",
     "content.request_approval",
     "content.request_revision",
+    "content.select_idea",
   ]);
   const inputs: Record<string, Record<string, unknown>> = {
     "content.list_ideas": { client_id: other, status: "approved" },
@@ -220,6 +289,17 @@ test("gateway denies other-client and unauthorized bots before AA for every real
       formats: ["reel"],
       idempotency_key: "scope-rep",
     },
+    "content.select_idea": {
+      client_id: other,
+      idea_id: idea,
+      idempotency_key: "scope-idea",
+    },
+    "content.approve_asset": {
+      client_id: other,
+      asset_id: asset,
+      decision: "approved",
+      idempotency_key: "scope-asset",
+    },
   };
   for (const name of realContent) {
     const result = await engine.call(identity, name, inputs[name]);
@@ -233,6 +313,8 @@ test("gateway denies other-client and unauthorized bots before AA for every real
     "content.request_approval",
     "content.create_repurpose_plan",
     "content.generate_brief",
+    "content.select_idea",
+    "content.approve_asset",
   ]) {
     const result = await engine.call(finance, name, {
       ...inputs[name],
@@ -310,8 +392,14 @@ test("Phase 6 carries the root approval execution through continuation and denie
   assert.equal((await engine.call(wildcard, "workflow.record_decision", {
     client_id: client, approval_id: asset, decision: "approved", idempotency_key: "no-decide",
   })).status, "rejected");
-  assert.equal((await engine.call(wildcard, "content.approve_asset", {
-    client_id: client, asset_id: asset, idempotency_key: "no-asset-decide",
+  // Phase 9b: bot_production-only hard gate, even for a Bot with a wildcard
+  // content.* grant (Marketing keeps content.* for its other real tools).
+  const marketing = { bot: "bot_marketing" as const, clients: [client] };
+  assert.equal((await engine.call(marketing, "content.approve_asset", {
+    client_id: client, asset_id: asset, decision: "approved", idempotency_key: "no-asset-decide",
+  })).status, "rejected");
+  assert.equal((await engine.call(marketing, "content.select_idea", {
+    client_id: client, idea_id: idea, idempotency_key: "no-idea-decide",
   })).status, "rejected");
   assert.equal(received.length, 1);
 });
