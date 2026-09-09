@@ -1,7 +1,10 @@
 # Bot Onboarding Contract
 
 Activate one bot at a time. Reference: `../src/onboarding/chief-of-staff.ts`.
-Configuration is a testable declaration, not authority to issue credentials or grants.
+Second reference bot (Phase 9): `../src/onboarding/marketing-director.ts`, an
+intentional allowlist rather than a wildcard grant — see
+`phase-9-marketing-director.md`. Configuration is a testable declaration, not
+authority to issue credentials or grants.
 
 1. Create or verify the bot identity using the Phase 3–4 auth runbook.
 2. Issue a bot-specific bearer only if missing; retain it in the approved secret store.
@@ -23,11 +26,13 @@ missing issuance after review. Follow `phase-3-4-bot-auth-rls.md` administration
 Do not rotate Production/CDM. Production migration and Railway deployment are release
 steps for Alex via CoS. No coding-agent production SQL is part of this contract.
 
-Marketing Director instantiates a new config with its existing permissions, allowed
-fixtures and forbidden cases, then runs the same steps. Do not provision other bots
-upfront. Campaign writes remain stubs in Phase 8; subsequent capability implementations
-require their own isolation review. Escalation pings go through Alex's Grok CoS chat;
-MCP adds no email/SMS/Slack sender.
+Marketing Director (Phase 9) instantiates its own locked 15-read/8-write allowlist,
+fixtures and forbidden cases (including a hard deny on `content.approve_asset` and
+withholding `delivery.list_clients`), then runs the same steps via Gate 9
+(`npm run smoke:marketing`, `scripts/marketing-onboarding-smoke.ts`). Do not provision
+other bots upfront. `campaign.*` writes and other FUTURE-listed tools remain hidden
+stubs; subsequent capability implementations require their own isolation review.
+Escalation pings go through Alex's Grok CoS chat; MCP adds no email/SMS/Slack sender.
 
 ## Executable Harbour suite (steps 4–10)
 
@@ -56,5 +61,13 @@ Include every granted client, with an existing campaign. Missing fixtures fail t
 Gate; do not create fake campaigns or fabricate metrics. After an interrupted suite,
 reconcile its `Gate 8 onboarding fixture` tasks using workflow.list_tasks and complete
 them. Operator evidence must also record temporary-secret cleanup (11) and the human
-release/activation decision (12). Marketing uses a matching reference config and this
-same suite, adapting its allowed operating reads to the declared capabilities.
+release/activation decision (12).
+
+Marketing (Gate 9) runs its own suite (`npm run smoke:marketing -- fixtures.json
+headers`, `scripts/marketing-onboarding-smoke.ts`) because it smokes real writes
+(`content.generate_brief`, `content.request_revision`, `content.request_approval`,
+`content.create_repurpose_plan`, workflow task actions, `workflow.create_approval`)
+against disposable fixtures, not just tracking tasks, and asserts exact discovery
+set equality plus forbidden-domain denial of `content.approve_asset` and
+`delivery.list_clients`. Its nonsecret fixture shape is documented in
+`phase-9-marketing-director.md`.

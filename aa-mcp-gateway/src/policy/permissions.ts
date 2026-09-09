@@ -1,3 +1,4 @@
+import { marketingDirector } from "../onboarding/marketing-director.js";
 import type { Bot, Identity, Tool } from "../shared/types.js";
 const workflow = [
   "workflow.create_task",
@@ -23,14 +24,7 @@ export const grants: Record<Bot, string[]> = {
     "campaign.get_status",
     "content.get_production_status",
   ],
-  bot_marketing: [
-    "campaign.*",
-    "content.*",
-    "conversion.*",
-    "proof.*",
-    "attribution.*",
-    ...workflow,
-  ],
+  bot_marketing: [...marketingDirector.grants],
   bot_production: [
     "content.*",
     "proof.search",
@@ -91,6 +85,9 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
     typeof botOrIdentity === "string"
       ? { bot: botOrIdentity, clients: [] }
       : botOrIdentity;
+  // Locked Marketing ceiling also constrains stale/overbroad database grants.
+  if (identity.bot === "bot_marketing" &&
+      !marketingDirector.grants.some((name) => name === tool.name)) return false;
   const patterns = grantPatterns(identity);
   return tool.permissions.every((permission) =>
     patterns.some((g) => permissionMatches(g, permission)),

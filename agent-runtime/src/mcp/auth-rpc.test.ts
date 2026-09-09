@@ -150,3 +150,46 @@ describe('mcp_internal bot auth registry', () => {
     }
   });
 });
+
+
+it('Phase 9 migration replaces only Marketing permissions; token and client grants survive replay', async () => {
+  const before = await db.query("select * from mcp_internal.mcp_bot_permissions where bot_id <> 'bot_marketing' order by bot_id, permission_pattern");
+  const clients = await db.query('select * from mcp_bot_clients order by bot_id, client_id');
+  const tokens = await db.query('select * from mcp_internal.mcp_bot_tokens order by token_id');
+  const bots = await db.query('select * from mcp_internal.mcp_bots order by bot_id');
+  const sql = await migration('20260909030000_73_mcp_marketing_director.sql');
+  try {
+    await db.exec(sql);
+    await db.exec(sql);
+    // Expected grants from migration SQL only — do not import aa-mcp-gateway sources (TS6059 rootDir).
+    const expectedGrants = [...sql.matchAll(/\('bot_marketing',\s*'([^']+)'/g)]
+      .map((m) => m[1])
+      .sort();
+    const actual = await db.query<{ permission_pattern: string }>("select permission_pattern from mcp_internal.mcp_bot_permissions where bot_id = 'bot_marketing' order by permission_pattern");
+    expect(actual.rows.map(r => r.permission_pattern)).toEqual(expectedGrants);
+    expect((await db.query("select * from mcp_internal.mcp_bot_permissions where bot_id <> 'bot_marketing' order by bot_id, permission_pattern")).rows).toEqual(before.rows);
+    expect((await db.query('select * from mcp_bot_clients order by bot_id, client_id')).rows).toEqual(clients.rows);
+    expect((await db.query('select * from mcp_internal.mcp_bot_tokens order by token_id')).rows).toEqual(tokens.rows);
+    expect((await db.query('select * from mcp_internal.mcp_bots order by bot_id')).rows).toEqual(bots.rows);
+  } finally {
+    // This suite also tests the historical seed; restore it for independent tests.
+    // (Migration 65 creates its tables from scratch and cannot be re-run here.)
+    await db.exec("delete from mcp_internal.mcp_bot_permissions where bot_id = 'bot_marketing'");
+    await db.exec(`
+      insert into mcp_internal.mcp_bot_permissions (bot_id, permission_pattern, granted_by) values
+        ('bot_marketing', 'campaign.*', 'seed:code-matrix'),
+        ('bot_marketing', 'content.*', 'seed:code-matrix'),
+        ('bot_marketing', 'conversion.*', 'seed:code-matrix'),
+        ('bot_marketing', 'proof.*', 'seed:code-matrix'),
+        ('bot_marketing', 'attribution.*', 'seed:code-matrix'),
+        ('bot_marketing', 'workflow.create_task', 'seed:code-matrix'),
+        ('bot_marketing', 'workflow.assign_task', 'seed:code-matrix'),
+        ('bot_marketing', 'workflow.get_task', 'seed:code-matrix'),
+        ('bot_marketing', 'workflow.list_tasks', 'seed:code-matrix'),
+        ('bot_marketing', 'workflow.complete_task', 'seed:code-matrix'),
+        ('bot_marketing', 'workflow.create_approval', 'seed:code-matrix'),
+        ('bot_marketing', 'workflow.get_pending_approvals', 'seed:code-matrix'),
+        ('bot_marketing', 'workflow.get_activity', 'seed:code-matrix');
+    `);
+  }
+});
