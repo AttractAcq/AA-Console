@@ -64,49 +64,25 @@ Effective tools (19):
 
 ## bot_marketing
 
-Configured grants: `campaign.*`, `content.*`, `conversion.*`, `proof.*`, `attribution.*`, `workflow.create_task`, `workflow.assign_task`, `workflow.get_task`, `workflow.list_tasks`, `workflow.complete_task`, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`.
+Configured grants: `campaign.list`, `campaign.get`, `campaign.get_status`, `content.list_ideas`, `content.get_idea`, `content.get_brief`, `content.get_production_status`, `attribution.get_campaign_performance`, `delivery.get_client`, `delivery.get_status`, `delivery.get_client_health`, `workflow.get_pending_approvals`, `workflow.get_activity`, `workflow.list_tasks`, `workflow.get_task`, `content.generate_brief`, `content.request_revision`, `content.request_approval`, `content.create_repurpose_plan`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`.
 
-Effective tools (47):
+Effective tools (23):
 
+- `delivery.get_client`
+- `delivery.get_status`
+- `delivery.get_client_health`
 - `campaign.list`
 - `campaign.get`
-- `campaign.create`
-- `campaign.update`
 - `campaign.get_status`
-- `campaign.request_approval`
 - `content.list_ideas`
-- `content.generate_ideas`
 - `content.get_idea`
-- `content.select_idea`
 - `content.generate_brief`
 - `content.get_brief`
-- `content.assign_production`
 - `content.get_production_status`
-- `content.submit_asset`
 - `content.request_revision`
 - `content.request_approval`
-- `content.approve_asset`
 - `content.create_repurpose_plan`
-- `content.queue_distribution`
-- `content.get_performance`
-- `conversion.list_pages`
-- `conversion.get_page`
-- `conversion.create_page`
-- `conversion.generate_structure`
-- `conversion.generate_copy`
-- `conversion.request_approval`
-- `conversion.get_performance`
-- `proof.search`
-- `proof.get`
-- `proof.create`
-- `proof.attach_asset`
-- `proof.get_for_avatar`
-- `proof.get_for_claim`
 - `attribution.get_campaign_performance`
-- `attribution.get_content_performance`
-- `attribution.get_revenue_attribution`
-- `attribution.get_conversion_funnel`
-- `attribution.generate_report`
 - `workflow.create_task`
 - `workflow.assign_task`
 - `workflow.get_task`
