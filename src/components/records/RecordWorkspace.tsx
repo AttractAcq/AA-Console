@@ -26,9 +26,11 @@ type Template = {
 type Record_ = {
   id: string;
   item_key: string;
+  item_type: string;
   title: string;
   body: string | null;
   period: string | null;
+  display_order: number;
   status: string;
   edited_at: string | null;
 };
@@ -92,7 +94,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
     if (!clientId) return;
     const { data } = await supabase
       .from("client_agent_records")
-      .select("id, item_key, title, body, period, status, edited_at")
+      .select("id, item_key, item_type, title, body, period, display_order, status, edited_at")
       .eq("client_id", clientId)
       .eq("domain", domain)
       .order("display_order");
@@ -148,10 +150,39 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
     return periods.length > 0 ? periods.sort().at(-1)! : null;
   }, [records]);
 
-  const byKey = useMemo(() => {
-    const shown = activePeriod ? records.filter((r) => r.period === activePeriod) : records;
-    return new Map(shown.map((r) => [r.item_key, r]));
-  }, [records, activePeriod]);
+  const shownRecords = useMemo(
+    () =>
+      activePeriod
+        ? records.filter((r) => r.period === activePeriod || r.period === null)
+        : records,
+    [records, activePeriod],
+  );
+
+  const byKey = useMemo(
+    () => new Map(shownRecords.map((r) => [r.item_key, r])),
+    [shownRecords],
+  );
+
+  // Templates define the sections the agent generates. A valid client record
+  // without a template is human-managed reference material and must still be
+  // visible in the workspace.
+  const displayTemplates = useMemo(() => {
+    const templateKeys = new Set(templates.map((t) => t.item_key));
+
+    const references: Template[] = shownRecords
+      .filter((record) => !templateKeys.has(record.item_key))
+      .map((record) => ({
+        item_key: record.item_key,
+        item_type: "reference",
+        title: record.title,
+        description: null,
+        display_order: record.display_order,
+      }));
+
+    return [...templates, ...references].sort(
+      (a, b) => a.display_order - b.display_order,
+    );
+  }, [templates, shownRecords]);
 
   const filled = templates.filter((t) => byKey.get(t.item_key)?.body).length;
 
@@ -197,12 +228,13 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
         </p>
       )}
 
-      {templates.length === 0 ? (
-        <EmptyState label="No template defined for this domain" />
+      {displayTemplates.length === 0 ? (
+        <EmptyState label="No template or record defined for this domain" />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {templates.map((t) => {
+          {displayTemplates.map((t) => {
             const record = byKey.get(t.item_key);
+            const isReference = t.item_type === "reference";
             return (
               <div
                 key={t.item_key}
@@ -219,7 +251,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
                           : "bg-secondary text-secondary-foreground",
                       )}
                     >
-                      {t.item_type}
+                      {isReference ? "Reference" : t.item_type}
                     </span>
                   )}
                 </div>
@@ -238,7 +270,15 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
 
                 <div className="mt-auto flex items-center justify-between gap-2 pt-3">
                   <span className="text-xs text-muted-foreground">
-                    {record?.edited_at ? "Edited" : record?.body ? "Generated" : "Not generated"}
+                    {record?.edited_at
+                      ? "Edited"
+                      : isReference
+                        ? record?.body
+                          ? "Saved"
+                          : "Not saved"
+                        : record?.body
+                          ? "Generated"
+                          : "Not generated"}
                   </span>
                   <button
                     type="button"
