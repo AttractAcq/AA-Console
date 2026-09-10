@@ -1,5 +1,6 @@
 import { marketingDirector } from "../onboarding/marketing-director.js";
 import { distributionManager } from "../onboarding/distribution-manager.js";
+import { salesOps } from "../onboarding/sales-ops.js";
 import type { Bot, Identity, Tool } from "../shared/types.js";
 const workflow = [
   "workflow.create_task",
@@ -35,13 +36,7 @@ export const grants: Record<Bot, string[]> = {
     ...workflow,
   ],
   bot_distribution: [...distributionManager.grants],
-  bot_sales_ops: [
-    "pipeline.*",
-    "sales_agents.*",
-    "proof.search",
-    "proof.get",
-    ...workflow,
-  ],
+  bot_sales_ops: [...salesOps.grants],
   bot_admin: ["delivery.list_clients", "delivery.get_client", ...workflow],
   bot_finance: [
     "economics.*",
@@ -113,6 +108,11 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
       !marketingDirector.grants.some((name) => name === tool.name)) return false;
   if (identity.bot === "bot_distribution" &&
       !distributionManager.grants.some((name) => name === tool.name)) return false;
+  // Phase 11 Alex CLEAR / SEC_BAR #1: exact allowlist ceiling for Sales Ops,
+  // same pattern as Marketing/Distribution above. Constrains stale/overbroad
+  // database grants too (e.g. a leftover pipeline.*/sales_agents.* row).
+  if (identity.bot === "bot_sales_ops" &&
+      !salesOps.grants.some((name) => name === tool.name)) return false;
   const patterns = grantPatterns(identity);
   return tool.permissions.every((permission) =>
     patterns.some((g) => permissionMatches(g, permission)),

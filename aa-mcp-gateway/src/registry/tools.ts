@@ -37,6 +37,17 @@ export const orchestrationTools = new Set([
 ]);
 const id = z.string().uuid();
 const text = z.string().min(1).max(4000);
+const leadStage = z.enum([
+  "lead",
+  "conversation",
+  "qualified_conversation",
+  "appointment",
+  "qualified_appointment",
+  "shown",
+  "sale",
+  "cash",
+  "lost",
+]);
 export const registry: Tool[] = Object.entries(domains).flatMap(
   ([domain, actions]) =>
     actions.split(" ").map((action) => {
@@ -187,6 +198,53 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         delete fields.title;
         delete fields.summary;
       }
+      // Phase 11: exact field shapes for the six Sales Ops tools realized this
+      // phase. pipeline.record_sale and the sales_agents write/deploy/test
+      // actions deliberately get no override here — they stay on the generic
+      // shape below and remain stub (Alex CLEAR #5 / SEC_BAR #2).
+      if (name === "pipeline.list_leads") {
+        delete fields.lead_id;
+        fields.stage = leadStage.optional();
+      }
+      if (name === "pipeline.get_lead") {
+        fields.lead_id = id;
+        delete fields.limit;
+      }
+      if (name === "pipeline.get_stalled_leads") {
+        delete fields.lead_id;
+        fields.days = z.number().int().min(1).max(365).optional();
+      }
+      if (name === "pipeline.get_pipeline_summary") {
+        delete fields.lead_id;
+        delete fields.limit;
+      }
+      if (name === "pipeline.update_stage") {
+        fields.lead_id = id;
+        // sale/cash excluded: money-adjacent, deferred to pipeline.record_sale
+        // (see registry/tools.ts realPipeline comment and the migration 76
+        // RPC's hard-coded invalid_stage guard).
+        fields.stage = leadStage.exclude(["sale", "cash"]);
+        fields.note = text.optional();
+        delete fields.summary;
+        delete fields.title;
+      }
+      if (name === "pipeline.create_followup") {
+        fields.lead_id = id;
+        fields.next_action = z.string().trim().min(1).max(500);
+        fields.next_action_due = z.iso.date().optional();
+        delete fields.summary;
+        delete fields.title;
+      }
+      if (name === "sales_agents.list") {
+        delete fields.sales_agent_id;
+      }
+      if (name === "sales_agents.get") {
+        fields.sales_agent_id = id;
+        delete fields.limit;
+      }
+      if (name === "sales_agents.get_conversations") {
+        fields.sales_agent_id = id.optional();
+      }
       if (name === "workflow.create_approval") {
         fields.summary = text;
       }
@@ -239,10 +297,28 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "content.queue_distribution",
         "content.record_publication",
       ]);
+      // Sec Phase 11 #7: isolation tests must stay green before adding a
+      // name. record_sale and every sales_agents write/deploy/test action
+      // stay out of both sets (Alex CLEAR #5 / SEC_BAR #2) — they remain stub.
+      const realPipeline = new Set([
+        "pipeline.list_leads",
+        "pipeline.get_lead",
+        "pipeline.get_stalled_leads",
+        "pipeline.get_pipeline_summary",
+        "pipeline.update_stage",
+        "pipeline.create_followup",
+      ]);
+      const realSalesAgents = new Set([
+        "sales_agents.list",
+        "sales_agents.get",
+        "sales_agents.get_conversations",
+      ]);
       const implementation =
         orchestration ||
         domain === "delivery" ||
         realContent.has(name) ||
+        realPipeline.has(name) ||
+        realSalesAgents.has(name) ||
         [
           "workflow.get_pending_approvals",
           "workflow.get_activity",
@@ -282,9 +358,13 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
             ? "Scoped AA delivery business API"
             : realContent.has(name)
               ? "Scoped AA content business API"
-              : implementation === "real"
-                ? "Gateway control store"
-                : `Scoped AA ${domain} business API`,
+              : realPipeline.has(name)
+                ? "Scoped AA pipeline business API"
+                : realSalesAgents.has(name)
+                  ? "Scoped AA sales_agents business API"
+                  : implementation === "real"
+                    ? "Gateway control store"
+                    : `Scoped AA ${domain} business API`,
       } satisfies Tool;
     }),
 );

@@ -180,6 +180,38 @@ for (const action of [
   };
 }
 
+// Phase 11: pipeline.*/sales_agents.* real tools route the same way as
+// delivery/workflow/campaign/attribution — the AA RPC input shape already
+// matches the gateway's zod schema field-for-field (see registry/tools.ts),
+// so no per-tool body-mapping block is needed (unlike content.*, whose AA
+// route paths and field names diverge from the gateway's tool names).
+for (const action of [
+  "list_leads",
+  "get_lead",
+  "get_stalled_leads",
+  "get_pipeline_summary",
+  "update_stage",
+  "create_followup",
+]) {
+  ROUTES[`pipeline.${action}`] = {
+    path: `/internal/mcp/pipeline/${action.replaceAll("_", "-")}`,
+    kind: ["update_stage", "create_followup"].includes(action) ? "write" : "read",
+    input: (["update_stage", "create_followup"].includes(action)
+      ? registry.find((t) => t.name === `pipeline.${action}`)!.input.omit({
+          idempotency_key: true,
+        } as never)
+      : registry.find((t) => t.name === `pipeline.${action}`)!.input
+    ).strip(),
+  };
+}
+for (const action of ["list", "get", "get_conversations"]) {
+  ROUTES[`sales_agents.${action}`] = {
+    path: `/internal/mcp/sales-agents/${action.replaceAll("_", "-")}`,
+    kind: "read",
+    input: registry.find((t) => t.name === `sales_agents.${action}`)!.input.strip(),
+  };
+}
+
 for (const tool of registry.filter((t) => orchestrationTools.has(t.name))) {
   const [domain, action] = tool.name.split(".");
   ROUTES[tool.name] = {
@@ -217,6 +249,10 @@ const codes = new Set([
   "schedule_not_found",
   "invalid_schedule_status",
   "invalid_formats",
+  "lead_not_found",
+  "sales_agent_not_found",
+  "invalid_stage",
+  "lost_reason_required",
   "idempotency_conflict",
   "brief_agent_unavailable",
   "repurpose_agent_unavailable",
@@ -262,7 +298,8 @@ function aaBody(
   tool: string,
   input: Record<string, unknown>,
 ): Record<string, unknown> {
-  if (/^(delivery|workflow|campaign|attribution)\./.test(tool)) return input;
+  if (/^(delivery|workflow|campaign|attribution|pipeline|sales_agents)\./.test(tool))
+    return input;
   if (tool === "content.generate_brief")
     return { client_id: input.client_id, idea_id: input.idea_id };
   if (tool === "content.list_ideas") {
