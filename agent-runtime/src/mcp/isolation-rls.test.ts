@@ -1536,6 +1536,26 @@ describe('Phase 11b Sales Agent Factory isolation', () => {
     await expect(sandboxTest({ agent: AGENT_B, execution: 'test-mismatch' })).rejects.toThrow('client_mismatch');
   });
 
+  it('test never writes the raw transcript into the ledger payload -- only a digest and turn count', async () => {
+    await sandboxTest({
+      transcript: [
+        { role: 'lead', text: 'Hi, I need help with pricing.' },
+        { role: 'agent', text: 'Happy to help -- what is your timeline?' },
+      ],
+      execution: 'test-digest',
+    });
+    const row = (await db.query<{ payload: any }>(
+      "select payload from mcp_internal.mcp_sales_agent_requests where tool = 'sales_agents.test' and execution_id = 'test-digest'",
+    )).rows[0]!;
+    expect(Object.keys(row.payload).sort()).toEqual(['sales_agent_id', 'transcript_digest', 'turns']);
+    expect(row.payload.turns).toBe(2);
+    expect(row.payload.transcript_digest).toMatch(/^[0-9a-f]{32}$/);
+    const serialized = JSON.stringify(row.payload);
+    expect(serialized).not.toContain('"transcript"');
+    expect(serialized).not.toContain('pricing');
+    expect(serialized).not.toContain('timeline');
+  });
+
   it('bot_forbidden: no Bot other than bot_sales_ops can call any factory write, even with an active status and a valid client grant', async () => {
     await db.exec(`insert into mcp_bot_clients (bot_id,client_id) values ('bot_production','${CLIENT_A}') on conflict do nothing;`);
     await expect(generate({ bot: 'bot_production', execution: 'prod-gen' })).rejects.toThrow('bot_forbidden');

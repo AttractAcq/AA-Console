@@ -115,7 +115,7 @@ the still-deferred set.
 **7. Isolation before unstub: same-client, cross-client, revoked grant, suspended bot, anon/auth
 deny, gateway deny-before-AA, exact discovery equality (22).**
 `agent-runtime/src/mcp/isolation-rls.test.ts`'s new `describe('Phase 11b Sales Agent Factory
-isolation')` block (10 tests) covers, for all five RPCs: source assertions (`require_active_bot`,
+isolation')` block (11 tests) covers, for all five RPCs: source assertions (`require_active_bot`,
 `require_bot_client_grant`, `bot_forbidden`, never `can_access_client`); `generate_config` composes
 a draft for the granted client only and replays idempotently (same execution key + different role
 → `idempotency_conflict`; different client → `client_forbidden`; bad role → `invalid_role`);
@@ -124,7 +124,10 @@ and `update_qualification_rules` write to the owned agent, replay idempotently, 
 cross-client **resource** (an agent that exists but belongs to the other client — `client_mismatch`,
 distinct from an ungranted client, which is `client_forbidden`); `test` runs its sandbox check,
 never touches `sales_agent_conversations` (row count asserted unchanged before/after), and is
-resource-scoped the same way; `bot_forbidden` for every Bot other than `bot_sales_ops` on all five,
+resource-scoped the same way; a dedicated isolation assertion reads the `test` ledger row's
+`payload` column directly and asserts it has no `transcript` key and no raw turn text anywhere in
+its value (only `sales_agent_id`, `turns`, `transcript_digest`); `bot_forbidden` for every Bot other
+than `bot_sales_ops` on all five,
 even with an active status and a valid client grant; suspended bot is `bot_not_active` even with a
 remaining grant; revoked grant denies replay before lookup; and the permission-row assertions from
 §1 (exactly 5 new names, 0 outside `bot_sales_ops`, deploy/record_sale/proof.* still absent, and a
@@ -291,9 +294,17 @@ resource-scoped tools) row lookup with `client_id` match before use → idempote
 (for writes) the actual mutation → ledger insert.
 
 **Data minimization on `test`.** The transcript the caller supplies is validated for shape and
-length only; the RPC never persists it, never forwards it anywhere, and the response is a small
-structured summary (turn count, whether qualification/guardrails are on file, a boolean escalation
-heuristic), not an echo of the input.
+length only and is never forwarded anywhere; the response is a small structured summary (turn
+count, whether qualification/guardrails are on file, a boolean escalation heuristic), not an echo
+of the input. The ledger row for this tool does **not** store the raw transcript either: the
+`payload` column holds `sales_agent_id`, `turns` (the transcript's array length) and
+`transcript_digest` (an `md5()` digest of the transcript's canonical jsonb text form — the same
+core-Postgres primitive migration 70 already uses for its resume step key, deliberately avoiding a
+pgcrypto/`extensions` schema dependency) — enough to detect a same-execution-key replay with a
+different transcript (`idempotency_conflict`) without retaining any visitor-conversation content in
+AA. This is the same minimization discipline as every other ledger row in this table (and in
+`mcp_pipeline_requests` before it): payload is sized and shaped for idempotency comparison, not as a
+content archive.
 
 ---
 
