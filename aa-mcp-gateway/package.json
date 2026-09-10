@@ -15,7 +15,8 @@
     "docs": "node --import tsx scripts/docs.ts",
     "smoke:onboarding": "node --import tsx scripts/bot-onboarding-smoke.ts",
     "smoke:marketing": "node --import tsx scripts/marketing-onboarding-smoke.ts",
-    "smoke:distribution": "node --import tsx scripts/distribution-onboarding-smoke.ts"
+    "smoke:distribution": "node --import tsx scripts/distribution-onboarding-smoke.ts",
+    "smoke:sales-ops": "node --import tsx scripts/sales-ops-onboarding-smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",

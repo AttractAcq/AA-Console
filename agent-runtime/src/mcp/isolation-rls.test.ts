@@ -58,8 +58,22 @@ beforeAll(async () => {
     revoke execute on all functions in schema public from public, anon;
     grant execute on function approve_idea_and_generate_brief(uuid) to authenticated;
     grant execute on function enqueue_agent_job(text,uuid,text,uuid) to authenticated;
+    -- Migration 19 (not otherwise loaded by this partial fixture) is where
+    -- lead_events'/client_sales_agents'/sales_agent_conversations' own
+    -- client-read policies (migrations 60/67) get this from. Defined inline,
+    -- verbatim, rather than loading migration 19's full table sweep, which
+    -- touches several tables this fixture does not create.
+    create or replace function is_client_user(target uuid)
+    returns boolean language sql stable security definer set search_path = public as $$
+      select exists (select 1 from client_users cu where cu.user_id = auth.uid() and cu.client_id = target);
+    $$;
+    revoke execute on function is_client_user(uuid) from anon, public;
+    grant execute on function is_client_user(uuid) to authenticated;
   `);
   for (const file of [
+    '20260908030000_60_revenue_pipeline.sql',
+    '20260908040000_61_lead_operations.sql',
+    '20260908220000_67_sales_agents.sql',
     '20260907190000_56_repurposing.sql',
     '20260908080000_63_mcp_brief_enqueue.sql',
     '20260908080100_64_brief_job_idempotency.sql',
@@ -70,6 +84,7 @@ beforeAll(async () => {
     '20260909000000_70_mcp_approval_engine.sql',
     '20260909040000_74_mcp_production_bot_decide.sql',
     '20260909050000_75_mcp_distribution_manager.sql',
+    '20260910000000_76_mcp_sales_ops.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -85,9 +100,11 @@ afterAll(async () => { await db?.close(); });
 beforeEach(async () => {
   await db.exec(`reset role;
     truncate mcp_brief_requests, mcp_bot_clients, mcp_internal.mcp_bot_token_audit,
-      mcp_internal.mcp_bot_tokens, mcp_internal.mcp_content_requests, scheduled_posts,
+      mcp_internal.mcp_bot_tokens, mcp_internal.mcp_content_requests,
+      mcp_internal.mcp_pipeline_requests, scheduled_posts,
       client_media_assets, client_ideas, agent_job_events, agent_jobs,
-      campaigns, client_leads, finance_entries, finance_periods, client_billing,
+      campaigns, lead_events, client_leads, sales_agent_conversations, client_sales_agents,
+      finance_entries, finance_periods, client_billing,
       client_users, clients, profiles, auth.users cascade;
     update mcp_internal.mcp_bots set status = 'active';
     update agents set paused = false, archived_at = null, requires_upstream = '{}';
@@ -121,11 +138,13 @@ describe('Phase 4 RLS inventory (relrowsecurity must be on)', () => {
     for (const name of [
       'clients', 'client_ideas', 'agent_jobs', 'mcp_bot_clients', 'mcp_brief_requests',
       'mcp_bots', 'mcp_bot_tokens', 'campaigns', 'finance_periods', 'client_leads',
+      'lead_events', 'client_sales_agents', 'sales_agent_conversations',
     ]) {
       expect(present.some((r) => r.rel === name && r.rls_enabled)).toBe(true);
     }
     for (const name of [
       'mcp_bots', 'mcp_bot_tokens', 'mcp_bot_clients', 'mcp_brief_requests', 'mcp_content_requests',
+      'mcp_pipeline_requests',
     ]) {
       expect(present.find((r) => r.rel === name)?.rls_forced).toBe(true);
     }
@@ -1125,5 +1144,225 @@ describe('Phase 10 Distribution Manager isolation', () => {
         where bot_id = 'bot_distribution' and permission_pattern in ('content.queue_distribution', 'content.record_publication')`,
     )).rows;
     expect(granted[0]?.n).toBe(2);
+  });
+});
+
+describe('Phase 11 Sales Ops isolation', () => {
+  const LEAD_A = '9999a001-9999-4999-8999-999999999901';
+  const LEAD_B = '9999a002-9999-4999-8999-999999999902';
+  const AGENT_A = '9999a003-9999-4999-8999-999999999903';
+
+  const stage = (
+    overrides: Partial<{
+      bot: string; client: string; lead: string; stage: string; note: string | null; execution: string;
+    }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_update_lead_stage($1,$2,$3,$4,$5,$6,$7) as result',
+    [
+      overrides.bot ?? 'bot_sales_ops', 'stage-req', overrides.execution ?? 'stage-exec',
+      overrides.client ?? CLIENT_A, overrides.lead ?? LEAD_A,
+      overrides.stage ?? 'conversation', overrides.note ?? null,
+    ],
+  );
+  const followup = (
+    overrides: Partial<{
+      bot: string; client: string; lead: string; next_action: string; next_action_due: string | null; execution: string;
+    }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_create_followup($1,$2,$3,$4,$5,$6,$7) as result',
+    [
+      overrides.bot ?? 'bot_sales_ops', 'fu-req', overrides.execution ?? 'fu-exec',
+      overrides.client ?? CLIENT_A, overrides.lead ?? LEAD_A,
+      overrides.next_action ?? 'Call back Thursday', overrides.next_action_due ?? null,
+    ],
+  );
+
+  beforeEach(async () => {
+    await db.exec(`
+      insert into client_leads (id, client_id, name, email, stage) values
+        ('${LEAD_A}', '${CLIENT_A}', 'Alpha Lead', 'a@example.com', 'lead'),
+        ('${LEAD_B}', '${CLIENT_B}', 'Beta Lead', 'b@example.com', 'lead');
+      insert into client_sales_agents (id, client_id, name, purpose, status) values
+        ('${AGENT_A}', '${CLIENT_A}', 'Closer', 'Qualify and book', 'live');
+      insert into mcp_bot_clients (bot_id, client_id) values ('bot_sales_ops', '${CLIENT_A}');
+    `);
+  });
+
+  it('every new RPC uses require_active_bot + require_bot_client_grant, never can_access_client, and hard-codes bot_sales_ops on the two writes', async () => {
+    const internalSignatures = [
+      'mcp_internal.list_leads(text,uuid,integer,text)',
+      'mcp_internal.get_lead(text,uuid,uuid)',
+      'mcp_internal.get_stalled_leads(text,uuid,integer,integer)',
+      'mcp_internal.get_pipeline_summary(text,uuid)',
+      'mcp_internal.list_sales_agents(text,uuid,integer)',
+      'mcp_internal.get_sales_agent(text,uuid,uuid)',
+      'mcp_internal.get_sales_agent_conversations(text,uuid,uuid,integer)',
+      'mcp_internal.update_lead_stage(text,text,text,uuid,uuid,text,text)',
+      'mcp_internal.create_followup(text,text,text,uuid,uuid,text,date)',
+    ];
+    for (const sig of internalSignatures) {
+      const src = await db.query<{ def: string }>(`select pg_get_functiondef('${sig}'::regprocedure) as def`);
+      expect(src.rows[0]?.def, sig).toContain('require_active_bot');
+      expect(src.rows[0]?.def, sig).toContain('require_bot_client_grant');
+      expect(src.rows[0]?.def, sig).not.toMatch(/can_access_client\s*\(/);
+    }
+    for (const sig of [
+      'mcp_internal.update_lead_stage(text,text,text,uuid,uuid,text,text)',
+      'mcp_internal.create_followup(text,text,text,uuid,uuid,text,date)',
+    ]) {
+      const src = await db.query<{ def: string }>(`select pg_get_functiondef('${sig}'::regprocedure) as def`);
+      expect(src.rows[0]?.def, sig).toContain('bot_forbidden');
+    }
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await expect(db.query('select mcp_list_leads($1,$2,$3,$4)', ['bot_sales_ops', CLIENT_A, 25, null]))
+        .rejects.toThrow('permission denied');
+      await expect(db.query('select mcp_update_lead_stage($1,$2,$3,$4,$5,$6,$7)',
+        ['bot_sales_ops', 'r', 'e', CLIENT_A, LEAD_A, 'conversation', null])).rejects.toThrow('permission denied');
+      await expect(db.query('select mcp_create_followup($1,$2,$3,$4,$5,$6,$7)',
+        ['bot_sales_ops', 'r', 'e', CLIENT_A, LEAD_A, 'x', null])).rejects.toThrow('permission denied');
+      await db.exec('reset role');
+    }
+    await asService();
+  });
+
+  it('reads are client-scoped: same-client succeeds, cross-client id is client_forbidden, cross-client resource is client_mismatch', async () => {
+    const leads = (await db.query<{ result: any }>(
+      'select mcp_list_leads($1,$2,$3,$4) as result', ['bot_sales_ops', CLIENT_A, 25, null],
+    )).rows[0]!.result;
+    expect(leads.leads.some((l: any) => l.id === LEAD_A)).toBe(true);
+    expect(leads.leads.some((l: any) => l.id === LEAD_B)).toBe(false);
+
+    await expect(db.query('select mcp_list_leads($1,$2,$3,$4)', ['bot_sales_ops', CLIENT_B, 25, null]))
+      .rejects.toThrow('client_forbidden');
+    await expect(db.query('select mcp_get_lead($1,$2,$3)', ['bot_sales_ops', CLIENT_A, LEAD_B]))
+      .rejects.toThrow('client_mismatch');
+    await expect(db.query('select mcp_get_sales_agent($1,$2,$3)', ['bot_sales_ops', CLIENT_B, AGENT_A]))
+      .rejects.toThrow('client_forbidden');
+
+    const summary = (await db.query<{ result: any }>(
+      'select mcp_get_pipeline_summary($1,$2) as result', ['bot_sales_ops', CLIENT_A],
+    )).rows[0]!.result;
+    expect(summary.total_leads).toBeGreaterThanOrEqual(1);
+
+    const agents = (await db.query<{ result: any }>(
+      'select mcp_list_sales_agents($1,$2,$3) as result', ['bot_sales_ops', CLIENT_A, 25],
+    )).rows[0]!.result;
+    expect(agents.sales_agents.some((a: any) => a.id === AGENT_A)).toBe(true);
+  });
+
+  it('update_lead_stage moves the lead, writes one Bot-attributed timeline event, records one ledger row, and replays idempotently', async () => {
+    const moved = (await stage()).rows[0]!.result;
+    expect(moved.stage).toBe('conversation');
+    expect(moved.from_stage).toBe('lead');
+    expect(moved.replayed).toBe(false);
+    const row = (await db.query<{ stage: string }>(
+      `select stage from client_leads where id = '${LEAD_A}'`,
+    )).rows[0]!;
+    expect(row.stage).toBe('conversation');
+    const event = (await db.query<{ kind: string; created_by_bot: string | null; created_by: string | null; to_stage: string }>(
+      `select kind, created_by_bot, created_by, to_stage from lead_events where lead_id = '${LEAD_A}' order by occurred_at desc limit 1`,
+    )).rows[0]!;
+    expect(event.kind).toBe('stage_change');
+    expect(event.created_by_bot).toBe('bot_sales_ops');
+    expect(event.created_by).toBeNull();
+    expect(event.to_stage).toBe('conversation');
+    expect((await db.query<{ n: number }>(
+      "select count(*)::int as n from mcp_internal.mcp_pipeline_requests where tool = 'pipeline.update_stage'",
+    )).rows[0]?.n).toBe(1);
+
+    const replay = (await stage()).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+    await expect(stage({ stage: 'appointment', execution: 'stage-exec' })).rejects.toThrow('idempotency_conflict');
+  });
+
+  it('update_lead_stage refuses sale/cash target stages, requires a reason to move to lost, and is client-scoped', async () => {
+    await expect(stage({ stage: 'sale', execution: 's1' })).rejects.toThrow('invalid_stage');
+    await expect(stage({ stage: 'cash', execution: 's2' })).rejects.toThrow('invalid_stage');
+    await expect(stage({ stage: 'lost', note: null, execution: 's3' })).rejects.toThrow('lost_reason_required');
+    const lost = (await stage({ stage: 'lost', note: 'Went with a competitor', execution: 's4' })).rows[0]!.result;
+    expect(lost.stage).toBe('lost');
+    await expect(stage({ client: CLIENT_B, lead: LEAD_B, execution: 's5' })).rejects.toThrow('client_forbidden');
+    await expect(stage({ lead: LEAD_B, execution: 's6' })).rejects.toThrow('client_mismatch');
+    await expect(stage({ lead: '00000000-0000-4000-8000-000000000000', execution: 's7' })).rejects.toThrow('lead_not_found');
+  });
+
+  it('create_followup writes next_action, a followup timeline event, one ledger row, and replays idempotently', async () => {
+    const written = (await followup()).rows[0]!.result;
+    expect(written.next_action).toBe('Call back Thursday');
+    expect(written.replayed).toBe(false);
+    const row = (await db.query<{ next_action: string }>(
+      `select next_action from client_leads where id = '${LEAD_A}'`,
+    )).rows[0]!;
+    expect(row.next_action).toBe('Call back Thursday');
+    const event = (await db.query<{ kind: string; created_by_bot: string | null }>(
+      `select kind, created_by_bot from lead_events where lead_id = '${LEAD_A}' order by occurred_at desc limit 1`,
+    )).rows[0]!;
+    expect(event.kind).toBe('followup');
+    expect(event.created_by_bot).toBe('bot_sales_ops');
+    expect((await db.query<{ n: number }>(
+      "select count(*)::int as n from mcp_internal.mcp_pipeline_requests where tool = 'pipeline.create_followup'",
+    )).rows[0]?.n).toBe(1);
+
+    const replay = (await followup()).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+    await expect(followup({ next_action: 'Something else', execution: 'fu-exec' })).rejects.toThrow('idempotency_conflict');
+    await expect(followup({ client: CLIENT_B, lead: LEAD_B, execution: 'fu-cross' })).rejects.toThrow('client_forbidden');
+    await expect(followup({ lead: LEAD_B, execution: 'fu-mismatch' })).rejects.toThrow('client_mismatch');
+  });
+
+  it('bot_forbidden: no Bot other than bot_sales_ops can call either write RPC, even with an active status and a valid client grant', async () => {
+    await db.exec(`insert into mcp_bot_clients (bot_id,client_id) values ('bot_production','${CLIENT_A}') on conflict do nothing;`);
+    await expect(stage({ bot: 'bot_production', execution: 'prod-denied' })).rejects.toThrow('bot_forbidden');
+    await expect(followup({ bot: 'bot_production', execution: 'prod-denied-fu' })).rejects.toThrow('bot_forbidden');
+    await expect(stage({ bot: 'bot_finance', execution: 'finance-denied' })).rejects.toThrow('client_forbidden');
+  });
+
+  it('suspended bot is bot_not_active even with a remaining grant', async () => {
+    await db.query('select mcp_issue_bot_token($1,$2,$3,$4)', ['bot_sales_ops', HASH, 'operator', 'test']);
+    await db.query('select mcp_suspend_bot($1,$2,$3)', ['bot_sales_ops', 'operator', 'lock']);
+    await expect(stage()).rejects.toThrow('bot_not_active');
+    await expect(db.query('select mcp_list_leads($1,$2,$3,$4)', ['bot_sales_ops', CLIENT_A, 25, null]))
+      .rejects.toThrow('bot_not_active');
+  });
+
+  it('revoked grant denies replay before lookup', async () => {
+    await stage();
+    await db.exec(`delete from mcp_bot_clients where bot_id = 'bot_sales_ops' and client_id = '${CLIENT_A}'`);
+    await expect(stage({ execution: 'stage-revoked' })).rejects.toThrow('client_forbidden');
+    await expect(followup({ execution: 'fu-revoked' })).rejects.toThrow('client_forbidden');
+    await expect(db.query('select mcp_list_leads($1,$2,$3,$4)', ['bot_sales_ops', CLIENT_A, 25, null]))
+      .rejects.toThrow('client_forbidden');
+  });
+
+  it('permission grants no exact-name row for either write tool outside bot_sales_ops, and the wildcard/proof.* rows are gone', async () => {
+    const other = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions
+        where permission_pattern in ('pipeline.update_stage', 'pipeline.create_followup') and bot_id <> 'bot_sales_ops'`,
+    )).rows;
+    expect(other[0]?.n).toBe(0);
+    const exact = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions
+        where bot_id = 'bot_sales_ops'`,
+    )).rows;
+    expect(exact[0]?.n).toBe(17);
+    const wildcardsOrProof = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions
+        where bot_id = 'bot_sales_ops'
+          and permission_pattern in ('pipeline.*', 'sales_agents.*', 'proof.search', 'proof.get')`,
+    )).rows;
+    expect(wildcardsOrProof[0]?.n).toBe(0);
+    const elsewhere = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions
+        where bot_id <> 'bot_sales_ops'
+          and (permission_pattern like 'pipeline.%' or permission_pattern like 'sales_agents.%')`,
+    )).rows;
+    expect(elsewhere[0]?.n).toBe(0);
+    // Ongoing guard, not just this migration: a future stray wildcard row must
+    // still be rejected by the ordinary insert/update/delete trigger.
+    await expect(db.exec(
+      `insert into mcp_internal.mcp_bot_permissions (bot_id, permission_pattern, granted_by)
+       values ('bot_production', 'pipeline.list_leads', 'test')`,
+    )).rejects.toThrow(/Phase 11: pipeline/);
   });
 });
