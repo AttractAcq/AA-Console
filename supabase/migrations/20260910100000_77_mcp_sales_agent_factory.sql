@@ -567,6 +567,7 @@ declare
   v_existing jsonb;
   v_result jsonb;
   v_turns integer;
+  v_digest text;
 begin
   perform mcp_internal.require_active_bot(p_bot_id);
   perform mcp_internal.require_bot_client_grant(p_bot_id, p_client_id);
@@ -582,7 +583,20 @@ begin
     raise exception using message = 'invalid_request', errcode = 'P0001';
   end if;
 
-  v_payload := jsonb_build_object('sales_agent_id', p_sales_agent_id, 'transcript', p_transcript);
+  -- Data minimization: the ledger is an audit/idempotency store, not a
+  -- transcript archive. Never write p_transcript itself into payload --
+  -- only an md5 digest of its canonical jsonb text form (stable per
+  -- distinct transcript, same core-Postgres primitive migration 70 uses for
+  -- its resume step key -- no pgcrypto/extensions dependency) plus the turn
+  -- count, which is enough to detect a same-key replay with a different
+  -- transcript (idempotency_conflict) without retaining the visitor
+  -- conversation content anywhere in AA.
+  v_turns := jsonb_array_length(p_transcript);
+  v_digest := md5(p_transcript::text);
+  v_payload := jsonb_build_object(
+    'sales_agent_id', p_sales_agent_id,
+    'transcript_digest', v_digest,
+    'turns', v_turns);
   v_existing := mcp_internal.take_sales_agent_request(
     p_bot_id, p_execution_id, 'sales_agents.test', p_client_id, v_payload);
   if v_existing is not null then
@@ -597,7 +611,6 @@ begin
     raise exception using message = 'client_mismatch', errcode = 'P0001';
   end if;
 
-  v_turns := jsonb_array_length(p_transcript);
   v_result := jsonb_build_object(
     'client_id', p_client_id,
     'sales_agent_id', p_sales_agent_id,
