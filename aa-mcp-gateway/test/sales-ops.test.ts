@@ -10,6 +10,7 @@ import { salesOps } from "../src/onboarding/sales-ops.js";
 import {
   assertSalesOpsDiscovery,
   runSalesOpsGate,
+  runSalesAgentFactoryGate,
   type SalesOpsFixtures,
 } from "../scripts/sales-ops-gate.js";
 
@@ -47,18 +48,18 @@ async function mockAa(
   return { adapter, received };
 }
 
-test("Phase 11: exact discovery set equality for bot_sales_ops", () => {
+test("Phase 11b: exact discovery set equality for bot_sales_ops (22 = Phase 11's 17 + factory's 5)", () => {
   const engine = new ActionEngine(new Store(":memory:"), registry, new AAApiAdapter());
   const discovered = engine.discover(identity).map((t) => t.name);
   assert.deepEqual(
     [...new Set(discovered)].sort(),
     [...salesOps.expectedDiscovery].sort(),
   );
-  assert.equal(discovered.length, 17);
+  assert.equal(discovered.length, 22);
   engine.store.close();
 });
 
-test("Phase 11: the nine realized tools are real; record_sale/deploy/proof/etc stay stub", () => {
+test("Phase 11b: the fourteen realized pipeline/sales_agents tools are real; record_sale/deploy/proof/etc stay stub", () => {
   const real = registry
     .filter((x) => x.implementation === "real" && (x.name.startsWith("pipeline.") || x.name.startsWith("sales_agents.")))
     .map((x) => x.name)
@@ -70,25 +71,27 @@ test("Phase 11: the nine realized tools are real; record_sale/deploy/proof/etc s
     "pipeline.get_stalled_leads",
     "pipeline.list_leads",
     "pipeline.update_stage",
+    "sales_agents.create",
+    "sales_agents.generate_config",
     "sales_agents.get",
     "sales_agents.get_conversations",
     "sales_agents.list",
-  ]);
-  for (const name of [
-    "pipeline.record_sale",
-    "sales_agents.create",
+    "sales_agents.test",
     "sales_agents.update_knowledge",
     "sales_agents.update_qualification_rules",
-    "sales_agents.test",
-    "sales_agents.deploy",
-  ]) {
+  ]);
+  for (const name of ["pipeline.record_sale", "sales_agents.deploy"]) {
     assert.equal(registry.find((x) => x.name === name)?.implementation, "stub", name);
   }
   assert.equal(registry.find((x) => x.name === "sales_agents.deploy")?.risk, "CRITICAL");
+  assert.equal(registry.find((x) => x.name === "sales_agents.deploy")?.approval, true);
   assert.equal(registry.find((x) => x.name === "pipeline.record_sale")?.approval, true);
-  // Sec-bar #9: update_stage/create_followup were never on the gateway HIGH
-  // approval array; MEDIUM + AA-RPC-only authorization, same as Phase 9b settled on.
-  for (const name of ["pipeline.update_stage", "pipeline.create_followup"]) {
+  // Sec-bar #9: update_stage/create_followup and the 5 factory writes were
+  // never on the gateway HIGH approval array; MEDIUM + AA-RPC-only
+  // authorization, same posture Phase 9b/10/11 settled on.
+  for (const name of ["pipeline.update_stage", "pipeline.create_followup",
+    "sales_agents.generate_config", "sales_agents.create", "sales_agents.update_knowledge",
+    "sales_agents.update_qualification_rules", "sales_agents.test"]) {
     assert.equal(registry.find((x) => x.name === name)?.risk, "MEDIUM", name);
     assert.equal(registry.find((x) => x.name === name)?.approval, false, name);
   }
@@ -179,6 +182,58 @@ test("sales_agents reads complete through the AA adapter", async (t) => {
   assert.equal(received.length, 3);
 });
 
+test("sales_agents factory writes complete through the AA adapter; deploy stays not_implemented", async (t) => {
+  const { adapter, received } = await mockAa(t, ({ url, body }) => {
+    if (url === "/internal/mcp/sales-agents/generate-config")
+      return { status: 200, body: { client_id: client, role: body.role, draft: { qualification: [{ question: "x" }] } } };
+    if (url === "/internal/mcp/sales-agents/create")
+      return { status: 200, body: { client_id: client, id: agent, role: body.role, status: "draft", replayed: false } };
+    if (url === "/internal/mcp/sales-agents/update-knowledge")
+      return { status: 200, body: { client_id: client, id: agent, guardrails: body.guardrails, replayed: false } };
+    if (url === "/internal/mcp/sales-agents/update-qualification-rules")
+      return { status: 200, body: { client_id: client, id: agent, qualification: body.qualification, replayed: false } };
+    if (url === "/internal/mcp/sales-agents/test")
+      return { status: 200, body: { client_id: client, sandbox: true, live_channel_send: false, replayed: false } };
+    throw new Error(url);
+  });
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const engine = new ActionEngine(store, registry, adapter);
+  const generated = await engine.call(identity, "sales_agents.generate_config", {
+    client_id: client, role: "inbound_qualifier", idempotency_key: "gen-00001",
+  });
+  assert.equal(generated.status, "completed");
+  const created = await engine.call(identity, "sales_agents.create", {
+    client_id: client, role: "inbound_qualifier", name: "Front Desk", purpose: "Qualify and book",
+    idempotency_key: "create-0001",
+  });
+  assert.equal(created.status, "completed");
+  const knowledge = await engine.call(identity, "sales_agents.update_knowledge", {
+    client_id: client, sales_agent_id: agent, guardrails: "Never quote a price.",
+    idempotency_key: "know-00001",
+  });
+  assert.equal(knowledge.status, "completed");
+  const rules = await engine.call(identity, "sales_agents.update_qualification_rules", {
+    client_id: client, sales_agent_id: agent,
+    qualification: [{ question: "What is your timeline?" }],
+    idempotency_key: "rules-0001",
+  });
+  assert.equal(rules.status, "completed");
+  const tested = await engine.call(identity, "sales_agents.test", {
+    client_id: client, sales_agent_id: agent,
+    transcript: [{ role: "lead", text: "Hi" }],
+    idempotency_key: "test-00001",
+  });
+  assert.equal(tested.status, "completed");
+  assert.equal(received.length, 5);
+
+  const deployed = await engine.call(identity, "sales_agents.deploy", {
+    client_id: client, sales_agent_id: agent, idempotency_key: "deploy-0001",
+  });
+  assert.equal(deployed.status, "rejected");
+  assert.equal(received.length, 5, "deploy must never reach the AA adapter");
+});
+
 test("gateway denies other-client before AA for every real Sales Ops tool", async (t) => {
   let hits = 0;
   const { adapter } = await mockAa(t, () => {
@@ -198,6 +253,15 @@ test("gateway denies other-client before AA for every real Sales Ops tool", asyn
     "sales_agents.list": {},
     "sales_agents.get": { sales_agent_id: agent },
     "sales_agents.get_conversations": {},
+    "sales_agents.generate_config": { role: "inbound_qualifier", idempotency_key: "scope-gen" },
+    "sales_agents.create": { role: "inbound_qualifier", name: "x", purpose: "y", idempotency_key: "scope-create" },
+    "sales_agents.update_knowledge": { sales_agent_id: agent, guardrails: "x", idempotency_key: "scope-know" },
+    "sales_agents.update_qualification_rules": {
+      sales_agent_id: agent, qualification: [{ question: "x" }], idempotency_key: "scope-rules",
+    },
+    "sales_agents.test": {
+      sales_agent_id: agent, transcript: [{ role: "lead", text: "x" }], idempotency_key: "scope-test",
+    },
   };
   for (const [name, extra] of Object.entries(inputs)) {
     const result = await engine.call(identity, name, { client_id: other, ...extra });
@@ -219,8 +283,7 @@ test("forbidden/deferred tools are absent from discovery and denied if called", 
   const discovered = new Set(engine.discover(identity).map((t) => t.name));
   const forbidden = [
     "pipeline.record_sale",
-    "sales_agents.create", "sales_agents.update_knowledge",
-    "sales_agents.update_qualification_rules", "sales_agents.test", "sales_agents.deploy",
+    "sales_agents.deploy",
     "proof.search", "proof.get",
     "content.select_idea", "content.approve_asset", "content.queue_distribution",
     "content.record_publication", "content.generate_brief", "content.list_ideas",
@@ -248,7 +311,7 @@ test("forbidden/deferred tools are absent from discovery and denied if called", 
   assert.equal(hits, 0);
 });
 
-test("Gate 11 fixtures exercise the exact 17-tool discovery set", () => {
+test("Gate 11b fixtures exercise the exact 22-tool discovery set", () => {
   assertSalesOpsDiscovery(salesOps.expectedDiscovery);
   assert.throws(() => assertSalesOpsDiscovery(salesOps.expectedDiscovery.slice(1)));
   assert.throws(() => assertSalesOpsDiscovery([...salesOps.expectedDiscovery, "pipeline.record_sale"]));
@@ -314,6 +377,56 @@ test("Gate 11 runs the lead-read -> stage-move -> follow-up -> workflow-task cyc
   assert.ok(!hits.includes("pipeline.record_sale"));
 });
 
+test("Gate 11b runs generate_config -> create -> update_knowledge -> update_qualification_rules -> test through the engine, and denies deploy", async (t) => {
+  const id = (n: number) => `${String(n).padStart(8, "0")}-4444-4444-8444-444444444444`;
+  const f: SalesOpsFixtures = {
+    approved_safe_fixtures: true, client_id: id(1), lead_id: id(2), sales_agent_id: id(3),
+    denied_client_id: id(4), denied_lead_id: id(5), denied_task_id: id(6),
+    assignee: "bot_sales_ops",
+  };
+  const gateIdentity = { bot: "bot_sales_ops" as const, clients: [f.client_id] };
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const hits: string[] = [];
+  const createdAgentId = id(7);
+  const engine = new ActionEngine(store, registry, {
+    execute: async (tool, input) => {
+      hits.push(tool.name);
+      if (tool.name === "sales_agents.generate_config")
+        return {
+          status: "completed", capability: tool.name,
+          data: { client_id: f.client_id, role: input.role, draft: { qualification: [{ question: "What is your timeline?" }] } },
+        };
+      if (tool.name === "sales_agents.create")
+        return {
+          status: "completed", capability: tool.name,
+          data: { client_id: f.client_id, id: createdAgentId, role: input.role, status: "draft", replayed: false },
+        };
+      if (tool.name === "sales_agents.update_knowledge")
+        return {
+          status: "completed", capability: tool.name,
+          data: { client_id: f.client_id, id: input.sales_agent_id, guardrails: input.guardrails, replayed: false },
+        };
+      if (tool.name === "sales_agents.update_qualification_rules")
+        return {
+          status: "completed", capability: tool.name,
+          data: { client_id: f.client_id, id: input.sales_agent_id, qualification: input.qualification, replayed: false },
+        };
+      if (tool.name === "sales_agents.test")
+        return {
+          status: "completed", capability: tool.name,
+          data: { client_id: f.client_id, sandbox: true, live_channel_send: false, replayed: false },
+        };
+      throw new Error(`unexpected tool: ${tool.name}`);
+    },
+  });
+  await runSalesAgentFactoryGate((name, input) => engine.call(gateIdentity, name, input), f);
+  for (const name of ["sales_agents.generate_config", "sales_agents.create",
+    "sales_agents.update_knowledge", "sales_agents.update_qualification_rules", "sales_agents.test"])
+    assert.ok(hits.includes(name), `${name}: must execute at least once`);
+  assert.ok(!hits.includes("sales_agents.deploy"), "deploy must never reach the AA adapter");
+});
+
 test("other bots do not gain pipeline.*/sales_agents.* access from this phase", async (t) => {
   const { adapter } = await mockAa(t, () => ({ status: 200, body: { client_id: client } }));
   const store = new Store(":memory:");
@@ -321,7 +434,7 @@ test("other bots do not gain pipeline.*/sales_agents.* access from this phase", 
   const engine = new ActionEngine(store, registry, adapter);
   for (const bot of ["bot_production", "bot_marketing", "bot_distribution", "bot_chief_of_staff", "bot_client_delivery"] as const) {
     const other_identity = { bot, clients: [client] };
-    for (const name of ["pipeline.list_leads", "pipeline.update_stage", "sales_agents.list"]) {
+    for (const name of ["pipeline.list_leads", "pipeline.update_stage", "sales_agents.list", "sales_agents.create"]) {
       const result = await engine.call(other_identity, name, { client_id: client, idempotency_key: "cross-bot" });
       assert.equal(result.status, "rejected", `${bot} / ${name}`);
     }

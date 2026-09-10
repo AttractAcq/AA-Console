@@ -40,6 +40,7 @@ const built = (over: Record<string, unknown> = {}) => ({
   name: "Consult Qualifier",
   purpose: "Qualify and book full-arch consults",
   status: "live",
+  role: "inbound_qualifier",
   page_id: "page-1",
   greeting: "Are you looking into replacing several teeth, or just one?",
   system_prompt: "You are the front desk for a dental practice.",
@@ -161,6 +162,7 @@ describe("the overview grid", () => {
       ],
     );
     expect(await screen.findByText("Consult Qualifier")).toBeInTheDocument();
+    expect(screen.getByText("Inbound qualifier")).toBeInTheDocument();
     const card = screen.getByText("Consult Qualifier").closest("div") as HTMLElement;
     const cell = (label: string) =>
       within(card.parentElement as HTMLElement).getByText(label).parentElement?.textContent;

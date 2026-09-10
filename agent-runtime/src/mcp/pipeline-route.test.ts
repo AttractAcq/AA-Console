@@ -34,6 +34,7 @@ beforeAll(async () => {
     '20260903104450_01_foundations_roles_clients.sql',
     '20260903104529_02_team_and_operations.sql',
     '20260903104615_03_agent_registry_and_job_queue.sql',
+    '20260903104724_04_intelligence_and_strategy.sql',
     '20260903104816_05_content_chain_proof_ideas_briefs_media.sql',
     '20260903104850_06_distribution_conversion_leads.sql',
     '20260904080405_14_campaigns.sql',
@@ -59,6 +60,7 @@ beforeAll(async () => {
   for (const file of [
     '20260908030000_60_revenue_pipeline.sql',
     '20260908040000_61_lead_operations.sql',
+    '20260907130000_53_client_brand_profiles.sql',
     '20260908220000_67_sales_agents.sql',
     '20260907190000_56_repurposing.sql',
     '20260908080000_63_mcp_brief_enqueue.sql',
@@ -71,12 +73,13 @@ beforeAll(async () => {
     '20260909040000_74_mcp_production_bot_decide.sql',
     '20260909050000_75_mcp_distribution_manager.sql',
     '20260910000000_76_mcp_sales_ops.sql',
+    '20260910100000_77_mcp_sales_agent_factory.sql',
   ]) await db.exec(await migration(file));
 }, 60_000);
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => {
   await db.exec(`reset role;
-    truncate mcp_internal.mcp_pipeline_requests, mcp_bot_clients,
+    truncate mcp_internal.mcp_pipeline_requests, mcp_internal.mcp_sales_agent_requests, mcp_bot_clients,
       lead_events, client_leads, sales_agent_conversations, client_sales_agents,
       ref_counters, clients, profiles, auth.users cascade;
     update mcp_internal.mcp_bots set status = 'active';
@@ -230,5 +233,80 @@ describe('Phase 11 sales-agents routes (reads only)', () => {
     expect(result.status).toBe(200);
     expect(result.body.count).toBe(0);
     expect(result.body.conversations).toEqual([]);
+  });
+});
+
+describe('Phase 11b sales agent factory routes', () => {
+  it('generates a draft config for the granted client and rejects an unknown client', async () => {
+    const ok = await salesAgents('generate-config', { client_id: CLIENT, role: 'inbound_qualifier' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.role).toBe('inbound_qualifier');
+    expect(ok.body.draft.qualification.length).toBeGreaterThanOrEqual(1);
+    expect((await salesAgents('generate-config', { client_id: OTHER, role: 'inbound_qualifier' })).body.error.code)
+      .toBe('client_forbidden');
+    const badRole = await salesAgents('generate-config', { client_id: CLIENT, role: 'not-a-role' });
+    expect(badRole.status).toBe(400);
+    expect(badRole.body.error.code).toBe('invalid_request');
+  });
+
+  it('creates a per-client agent and replays idempotently', async () => {
+    const created = await salesAgents('create', {
+      client_id: CLIENT, role: 'inbound_qualifier', name: 'Front Desk', purpose: 'Qualify and book',
+    });
+    expect(created.status).toBe(200);
+    expect(created.body.role).toBe('inbound_qualifier');
+    expect(created.body.status).toBe('draft');
+    const replay = await salesAgents('create', {
+      client_id: CLIENT, role: 'inbound_qualifier', name: 'Front Desk', purpose: 'Qualify and book',
+    });
+    expect(replay.body.replayed).toBe(true);
+    expect(replay.body.id).toBe(created.body.id);
+  });
+
+  it('updates knowledge on the granted client agent and rejects a cross-client id', async () => {
+    const updated = await salesAgents('update-knowledge', {
+      client_id: CLIENT, sales_agent_id: AGENT,
+      objections: [{ objection: 'Too expensive', response: 'Compare to the alternative' }],
+      guardrails: 'Never quote a price.',
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.body.guardrails).toBe('Never quote a price.');
+    expect(updated.body.objections).toHaveLength(1);
+    const empty = await salesAgents('update-knowledge', { client_id: CLIENT, sales_agent_id: AGENT });
+    expect(empty.status).toBe(400);
+    const denied = await salesAgents('update-knowledge', {
+      client_id: OTHER, sales_agent_id: AGENT, guardrails: 'x',
+    }, { headers: { 'idempotency-key': 'uk-cross' } });
+    expect(denied.status).toBe(403);
+    expect(denied.body.error.code).toBe('client_forbidden');
+  });
+
+  it('replaces qualification rules on the granted client agent', async () => {
+    const updated = await salesAgents('update-qualification-rules', {
+      client_id: CLIENT, sales_agent_id: AGENT,
+      qualification: [{ question: 'What is your timeline?', why: 'Timing', good_answer: 'Now', disqualifier: 'Never' }],
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.body.qualification).toHaveLength(1);
+    const badShape = await salesAgents('update-qualification-rules', {
+      client_id: CLIENT, sales_agent_id: AGENT, qualification: [],
+    }, { headers: { 'idempotency-key': 'uq-empty' } });
+    expect(badShape.status).toBe(400);
+  });
+
+  it('runs a sandbox test with no live channel send and rejects a cross-client id', async () => {
+    const tested = await salesAgents('test', {
+      client_id: CLIENT, sales_agent_id: AGENT,
+      transcript: [{ role: 'lead', text: 'Hi, I need help.' }, { role: 'agent', text: 'What is your timeline?' }],
+    });
+    expect(tested.status).toBe(200);
+    expect(tested.body.sandbox).toBe(true);
+    expect(tested.body.live_channel_send).toBe(false);
+    expect(tested.body.turns_evaluated).toBe(2);
+    const denied = await salesAgents('test', {
+      client_id: OTHER, sales_agent_id: AGENT, transcript: [{ role: 'lead', text: 'Hi' }],
+    }, { headers: { 'idempotency-key': 'test-cross' } });
+    expect(denied.status).toBe(403);
+    expect(denied.body.error.code).toBe('client_forbidden');
   });
 });

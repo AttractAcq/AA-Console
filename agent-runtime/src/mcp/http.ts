@@ -33,6 +33,7 @@ export const MCP_ERRORS: Record<string, [number, string]> = {
   lead_not_found: [404, 'Lead not found.'],
   sales_agent_not_found: [404, 'Sales agent not found.'],
   invalid_stage: [400, 'Not a valid Bot-writable pipeline stage.'],
+  invalid_role: [400, 'Not a valid sales agent role.'],
   lost_reason_required: [400, 'A lost lead needs a reason.'],
   idempotency_conflict: [409, 'Execution key was already used for a different request.'],
   brief_agent_unavailable: [503, 'Brief agent is unavailable.'],
