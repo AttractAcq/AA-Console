@@ -309,41 +309,51 @@ test("Finance critical payment creates approval and cannot execute before human 
 test("approval rejection, expiration and revoked scope block execution", async () => {
   // content.queue_distribution left the gateway's HIGH-risk approval gate in
   // Phase 10 (now MEDIUM, AA-RPC-only, bot_distribution only); pipeline.record_sale
-  // stays in that gate, so it now exercises this approval-lifecycle machinery.
-  const salesOps: Identity = { bot: "bot_sales_ops", clients: [client] };
+  // stays in that gate. bot_sales_ops has an exact-allowlist ceiling that forever
+  // excludes record_sale (Phase 11 SEC_BAR), so this lifecycle test must use a
+  // Bot without that ceiling — temporary grant on bot_finance, same pattern as
+  // the critical-payment approval test above.
+  const finance: Identity = { bot: "bot_finance", clients: [client] };
+  grants.bot_finance.push("pipeline.record_sale");
   const { store, engine } = fixture(new AAApiAdapter(), true);
-  for (const mode of ["rejected", "expired", "revoked"]) {
-    const r = await engine.call(salesOps, "pipeline.record_sale", {
-      client_id: client,
-      idempotency_key: `approval-${mode}`,
-      lead_id: idea,
-    });
-    if (mode === "rejected") {
-      engine.decide(r.approval_id!, "human", "rejected", "Needs changes");
-      await assert.rejects(() =>
-        engine.executeApproval(r.approval_id!, [salesOps]),
-      );
-    } else if (mode === "expired") {
-      const a = store.getApproval(r.approval_id!);
-      a.expires_at = new Date(0).toISOString();
-      store.approval(a);
-      assert.equal(
-        engine.decide(r.approval_id!, "human", "approved").status,
-        "expired",
-      );
-    } else {
-      engine.decide(r.approval_id!, "human", "approved");
-      assert.equal(
-        (
-          await engine.executeApproval(r.approval_id!, [
-            { ...salesOps, clients: [] },
-          ])
-        ).status,
-        "rejected",
-      );
+  try {
+    for (const mode of ["rejected", "expired", "revoked"]) {
+      const r = await engine.call(finance, "pipeline.record_sale", {
+        client_id: client,
+        idempotency_key: `approval-${mode}`,
+        lead_id: idea,
+      });
+      assert.equal(r.status, "approval_required");
+      assert.ok(r.approval_id);
+      if (mode === "rejected") {
+        engine.decide(r.approval_id!, "human", "rejected", "Needs changes");
+        await assert.rejects(() =>
+          engine.executeApproval(r.approval_id!, [finance]),
+        );
+      } else if (mode === "expired") {
+        const a = store.getApproval(r.approval_id!);
+        a.expires_at = new Date(0).toISOString();
+        store.approval(a);
+        assert.equal(
+          engine.decide(r.approval_id!, "human", "approved").status,
+          "expired",
+        );
+      } else {
+        engine.decide(r.approval_id!, "human", "approved");
+        assert.equal(
+          (
+            await engine.executeApproval(r.approval_id!, [
+              { ...finance, clients: [] },
+            ])
+          ).status,
+          "rejected",
+        );
+      }
     }
+  } finally {
+    grants.bot_finance.pop();
+    store.close();
   }
-  store.close();
 });
 test("concurrent idempotency reservation prevents duplicate adapter invocation", async () => {
   let release!: () => void;
