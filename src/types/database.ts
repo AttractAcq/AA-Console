@@ -2023,6 +2023,57 @@ export type Database = {
         }
         Relationships: []
       }
+      client_marketing_spend: {
+        Row: {
+          amount: number
+          campaign_id: string | null
+          channel: string | null
+          client_campaign_id: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          external_ref: string | null
+          id: string
+          source: string
+          spent_on: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          campaign_id?: string | null
+          channel?: string | null
+          client_campaign_id?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          external_ref?: string | null
+          id?: string
+          source?: string
+          spent_on: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          campaign_id?: string | null
+          channel?: string | null
+          client_campaign_id?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          external_ref?: string | null
+          id?: string
+          source?: string
+          spent_on?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       client_pages: {
         Row: {
           body: string | null
@@ -3647,6 +3698,57 @@ export type Database = {
       revert_page_to_revision: {
         Args: { p_page_id: string; p_revision_number: number }
         Returns: number
+      }
+      client_economics: {
+        Args: { p_client_id: string; p_since: string; p_until: string }
+        Returns: {
+          spend: number
+          leads: number
+          qualified_leads: number
+          appointments: number
+          customers: number
+          revenue: number
+          cash_collected: number
+          cpl: number | null
+          cpql: number | null
+          cpa: number | null
+          cac: number | null
+          roas: number | null
+          cash_roas: number | null
+          revenue_per_lead: number | null
+          avg_customer_value: number | null
+          currency: string | null
+          mixed_currency: boolean
+        }[]
+      }
+      client_economics_by_channel: {
+        Args: { p_client_id: string; p_since: string; p_until: string }
+        Returns: {
+          channel: string
+          spend: number
+          leads: number
+          customers: number
+          revenue: number
+          cash_collected: number
+          cpl: number | null
+          cac: number | null
+          roas: number | null
+        }[]
+      }
+      client_economics_by_campaign: {
+        Args: { p_client_id: string; p_since: string; p_until: string }
+        Returns: {
+          campaign_id: string | null
+          campaign_ref: string
+          spend: number
+          leads: number
+          customers: number
+          revenue: number
+          cash_collected: number
+          cpl: number | null
+          cac: number | null
+          roas: number | null
+        }[]
       }
       advance_lead: {
         Args: { p_lead_id: string; p_stage: Database["public"]["Enums"]["lead_stage"]; p_note?: string }
