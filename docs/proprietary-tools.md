@@ -38,12 +38,25 @@ tool that works and a tool that is working.
 | 6 | Proof & Asset OS | **Built** | 0 of 2 records cleared for use — data entry, not code |
 | 7 | Attribution & Reporting OS | **Built (revenue half)** | Attention half is zero: `metrics_daily` has no rows |
 | 8 | Campaign Execution Builder | **Built, never run** | No campaign has been planned; content attaches rather than auto-generates |
-| 9 | Client Economics OS | **Missing** | Needs ad spend, which needs Meta |
+| 9 | Client Economics OS | **Built** | Manual spend operational; Meta remains an ingestion adapter |
 
 Measured against the production database, not recalled: 2 leads, 0
 `metrics_daily` rows, 0 `client_integrations`, 12 repurposed briefs from 6
 completed `repurpose` runs, 2 proof records with none cleared, and zero
 `landing_page`, `sales_agent` or `campaign_plan` jobs ever enqueued.
+
+**Release risk worth recording (not Phase 9's to fix).** Migrations applied
+through the Supabase API are recorded under an apply-time version, not their
+filename version, so `schema_migrations` and the filenames can disagree.
+`67_sales_agents` is recorded as `20260908192515` against a file named
+`20260908220000_67_…`, and `79_client_marketing_spend` as `20260911205529`
+against `20260911000000_79_…`. `72_campaign_execution` has two rows because a
+later CLI push reconciled it; `72_mcp_cos_orchestration` has **none** — it is
+applied in production but unrecorded, and shares the version prefix
+`20260909020000` with `72_campaign_execution`. A rebuild from files would
+therefore re-run some migrations and skip others. The fix is a reconciliation
+pass over `schema_migrations` plus renumbering the duplicate 72; both belong to
+whoever owns the release process.
 
 **The MCP work is a different layer.** Phases 3–12 — bot auth, domain RLS,
 Production Manager, Distribution Manager, Marketing Director, Sales Ops, Chief
@@ -391,17 +404,137 @@ tool 1 produces rather than commissioned by the plan. Wiring ideation to a
 campaign is the remaining half of "invokes tool 1", and it is deliberately not
 faked here — the readiness count is honest about what is attached.
 
-## 9. Client Economics OS — *Missing*
+## 9. Client Economics OS — *Built. Manual spend operational; Meta is an adapter, not a missing capability*
 
-`client_billing`, `contract_payments`, `finance_entries`, `finance_periods` and
-Admin → Financials all exist — but these are **AA business finance**, which the
-architecture explicitly separates from client economics.
+The tool that answers what is economically happening for a client: what was
+spent, what it bought, and what acquisition costs.
 
-Client economics — ad spend, lead cost, appointment value, customer value,
-revenue generated, ROAS, CAC, payback — is unbuilt. `campaigns` carries
-`daily_spend` and `total_spend`, and nothing joins that spend to revenue.
+**It was never really blocked on Meta.** It was blocked on there being no
+canonical place to put a cost. Four tables looked like one and none was:
+`finance_entries` and `finance_periods` are **AA's own P&L** — that `cac` is
+what it costs AA to win a client, not what it costs a client to win a customer;
+`client_billing` is what a client pays AA; `contract_payments` is what AA pays
+contractors. `campaigns.total_spend` was closest and still unusable, because a
+lump sum covering a two-month campaign cannot answer "spend in the last 30
+days".
 
----
+`client_marketing_spend` is that canonical ledger. Manual entry works today and
+Meta, Google and file imports become **adapters writing into the same table** —
+the engine never branches on where a row came from. Import duplication is
+guarded per `(client_id, source, external_ref)` rather than globally, because
+two providers can legitimately emit the same id and a global constraint would
+reject the second as a duplicate of something unrelated.
+
+### The window is the cohort, not the revenue period
+
+"Last 30 days" means: spend recorded in those 30 days, leads **acquired** in
+those 30 days, and what those leads have produced so far. It does **not** mean
+revenue that landed in the last 30 days.
+
+That was forced by the schema, and the audit is worth recording. `client_leads`
+has no sale date and no cash date; `sale_value` and `cash_collected` are
+running totals. Event-period reporting would therefore have to pair "the date
+the sale transition happened" with "the amount as it stands today", which
+breaks twice: a closed month would change when an old deal is topped up, and
+cash collected in instalments has no history to split at all — and Cash ROAS is
+the metric AA's whole economic claim rests on. Cohort economics pairs spend with
+the revenue that spend actually bought, which is also what makes CAC mean
+anything. It is additionally what `acquisition_funnel` already did, so the two
+surfaces agree rather than disagreeing about revenue while agreeing about spend.
+
+The cost is stated in the UI rather than buried: **a young cohort understates.**
+September's ROAS is a floor that rises as those leads close.
+
+Event-period reporting needs a dated revenue ledger — `lead_revenue_events`
+with `amount` and `occurred_at`. That is the enabling change and belongs in the
+Revenue Pipeline / Attribution sweep, not here.
+
+### Counting by furthest stage reached
+
+Counting by *current* stage is the trap: a lead sitting at `cash` would not be
+counted as having had an appointment, so cost-per-appointment would be wildly
+overstated. `lead_progress` takes `greatest(current stage, max(lead_events))`,
+which also solves the legacy case without a branch — a lead with no events falls
+back to its current stage, and that is half the leads in production today.
+
+Proved on staging: a lead that went conversation → appointment → **lost** is
+credited with the appointment it reached and flagged `ever_lost`; a lead at
+`sale` with no events at all still counts as a customer.
+
+### Metric contract
+
+| Metric | = | Null when |
+|---|---|---|
+| CPL / CPQL / CPA / CAC | spend ÷ leads / qualified / appointments / customers | that count is 0 |
+| ROAS | `sale_value` ÷ spend | spend is 0 |
+| Cash ROAS | `cash_collected` ÷ spend | spend is 0 |
+| RPL / ACV | `sale_value` ÷ leads / customers | that count is 0 |
+
+Qualified is furthest rank ≥ 3, appointments ≥ 4, customers ≥ 7. `until` is
+exclusive. A window mixing currencies returns spend but **nulls every ratio** —
+a ratio across two currencies is not a number. v1 assumes one currency per
+client, which every ratio already implied, since `client_leads` carries no
+currency at all.
+
+**One display rule sits above the maths.** When spend exists and revenue is
+zero, ROAS is mathematically `0.00`, and the database returns that. The panel
+shows "—" with *"No revenue from this cohort yet"*, because a bare 0.00 reads as
+"this failed" when the truth is "nothing has landed yet". The RPC still returns
+the true 0.00 for anything calling it directly.
+
+### Attribution
+
+Channel economics matches `spend.channel` to `lead.source_channel` on exact
+equality. Nothing is guessed: unmatched spend and unmatched leads both land in
+`(unattributed)`, and a channel with spend but no leads still appears — so
+bucket totals reconcile to the totals. Verified on staging: three buckets
+summing to R10,000 spend / 4 leads / 2 customers / R40,000 revenue, matching
+`client_economics` exactly.
+
+### One source of truth for spend
+
+`acquisition_funnel` read `metrics_daily.spend`, which has no rows and will not
+until Meta is connected — so its `cost_per_lead` and `return_on_spend` had
+always been null in production. It now reads `client_marketing_spend`. Its
+signature, column names and null behaviour are unchanged.
+
+**Legacy naming caveat:** `acquisition_funnel.return_on_spend` computes
+`cash_collected / spend`, which is **Cash ROAS, not ROAS**. The name is kept for
+compatibility; Client Economics exposes `roas` and `cash_roas` separately and
+correctly. Renaming belongs in the tool 7 sweep.
+
+### Production evidence — 11 September 2026
+
+A real manual spend row against a real client, entered under an **authenticated
+admin JWT with RLS active**, not service_role:
+
+- R85.00 on 2026-09-10 for Attract Acquisition, linked to campaign AA-C001, at
+  that campaign's own recorded `daily_spend`.
+- Economics for 1–30 September: **spend R85.00, 1 lead, CPL R85.00**; qualified,
+  appointments and customers all 0, so CPQL, CPA, CAC and ACV are all null.
+- Hand-checked against raw rows: raw spend 85.00, raw leads 1, raw revenue 0 —
+  all three match what the function reported.
+- `acquisition_funnel` spend **85.00**, identical to `client_economics` spend —
+  one ledger, two surfaces.
+- Harbour Dental's client user sees **0** AA spend rows, is **refused** on
+  `client_economics` for AA, and is **refused by RLS** when writing AA spend.
+- ROAS, Cash ROAS and ACV are **not calculable from genuine production data**,
+  because production has no won revenue. They render "—" with the reason. No
+  revenue was manufactured to make them light up; the positive arithmetic is
+  proved by deterministic fixtures instead (R10,000 spend → 4 leads, 2
+  customers, R40,000 revenue → CPL 2,500, CAC 5,000, ROAS 4.00, Cash ROAS 2.00,
+  ACV 20,000).
+
+### Still open
+
+- **Meta ingestion** — an adapter writing into `client_marketing_spend`. The
+  economics engine needs no change when it arrives.
+- **Event-period reporting** — needs the dated revenue ledger above.
+- **Bot tool surface** — deliberately not added. No MCP permission was widened.
+- **Channel vocabulary** — spend `channel` and lead `source_channel` are free
+  text matched exactly. A shared vocabulary would remove a class of silent
+  mismatch, and until then mismatches are visible as `(unattributed)` rather
+  than hidden.
 
 ## Where the console already is genuinely strong
 
@@ -419,8 +552,8 @@ Worth stating, because the gaps above are long and the foundation is not thin:
 
 ## The shape of the remaining work
 
-Built: 1 (bar its Iteration Engine), 2, 3, 4, 6, 7 and 8. Partial with real
-substance: 5. Unbuilt: 9.
+Built: 1 (bar its Iteration Engine), 2, 3, 4, 6, 7, 8 and 9. Partial with real
+substance: 5. Nothing unbuilt.
 
 Three of the built tools now share one open edge: **nothing of ours is yet
 serving a visitor.** Tool 2 generates a page nobody has published, tool 3
