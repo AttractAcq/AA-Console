@@ -17,6 +17,7 @@ import {
   UserPlus,
   MessagesSquare,
   Megaphone,
+  Coins,
   BarChart3,
   ClipboardList,
   Plug,
@@ -201,6 +202,13 @@ export const clientNavGroups: NavNode[] = [
         label: "Prospects & Leads",
         path: "prospects-leads",
         icon: UserPlus,
+      },
+      {
+        id: "economics",
+        label: "Economics",
+        path: "economics",
+        icon: Coins,
+        tabs: [{ id: "overview", label: "Overview" }],
       },
       {
         id: "reporting",
