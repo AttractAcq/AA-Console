@@ -20,6 +20,38 @@ Measured 7 September 2026: 45 tables, 16 agents, 25 admin nav entries.
 - **Stub** — a table or page exists, but not the capability.
 - **Missing** — nothing.
 
+"Built" is a claim about the code, not about use. Three tools are built,
+mutation-tested and proved on staging but have **never run in production** —
+their agents have zero jobs against real data. That is recorded here rather
+than rounded up to Built, because the difference is the whole gap between a
+tool that works and a tool that is working.
+
+## Where the nine stand — 11 September 2026
+
+| # | Tool | State | The one-line shortfall |
+|---|---|---|---|
+| 1 | Content Production OS | **Partial** | Iteration Engine doesn't exist; nothing publishes automatically |
+| 2 | Conversion Site Builder | **Built, never run** | No page in production has HTML — the agent has never been run |
+| 3 | Sales Agent Builder | **Built, never run** | Nothing serves a visitor, so no conversation has ever happened |
+| 4 | Revenue Pipeline OS | **Built** | Leads arrive by hand or from a sales agent; no page form writes one |
+| 5 | Client Delivery OS | **Partial** | Still answers "what have agents done", not "what's next for this client" |
+| 6 | Proof & Asset OS | **Built** | 0 of 2 records cleared for use — data entry, not code |
+| 7 | Attribution & Reporting OS | **Built (revenue half)** | Attention half is zero: `metrics_daily` has no rows |
+| 8 | Campaign Execution Builder | **Built, never run** | No campaign has been planned; content attaches rather than auto-generates |
+| 9 | Client Economics OS | **Missing** | Needs ad spend, which needs Meta |
+
+Measured against the production database, not recalled: 2 leads, 0
+`metrics_daily` rows, 0 `client_integrations`, 12 repurposed briefs from 6
+completed `repurpose` runs, 2 proof records with none cleared, and zero
+`landing_page`, `sales_agent` or `campaign_plan` jobs ever enqueued.
+
+**The MCP work is a different layer.** Phases 3–12 — bot auth, domain RLS,
+Production Manager, Distribution Manager, Marketing Director, Sales Ops, Chief
+of Staff orchestration — give the bots scoped access to these tools. They are
+layer 3 of the architecture, not the tools themselves, so none of them moves a
+row in this table. `mcp_internal.mcp_delivery_tasks` is a bot task ledger, not
+tool 5.
+
 ---
 
 ## 1. Content Production OS — *Partial, and much further along*
