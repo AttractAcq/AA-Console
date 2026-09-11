@@ -1,7 +1,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const CLIENT_A = '11111111-1111-4111-8111-111111111111';
 const CLIENT_B = '22222222-2222-4222-8222-222222222222';
@@ -1514,4 +1514,94 @@ describe('Phase 12 Admin isolation and ledger', () => {
   for(const row of functions.rows){expect(row.def).toContain('require_active_bot');expect(row.def).toContain('require_bot_client_grant');expect(row.def).not.toMatch(/can_access_client\s*\(/);expect(row.def).toContain('SECURITY DEFINER');expect(row.def).toContain('pg_catalog');}
  });
 
+});
+
+
+describe('Phase 12 release: shared workflow compatibility', () => {
+  afterEach(async()=>{
+    const source=await migration('20260910120000_78_mcp_admin_calendar.sql');
+    const start=source.indexOf('function mcp_internal.workflow_task(');
+    await db.exec('create or replace '+source.slice(start,source.indexOf('end $$;',start)+7));
+  });
+  const existing = ['bot_production','bot_client_delivery','bot_chief_of_staff','bot_marketing','bot_distribution','bot_sales_ops'];
+  const call = async (bot:string, action:string, id:string|null=null, assignee:string|null=null, key=action, client=CLIENT_A, title='Release fixture') => {
+    const r=await db.query<{result:any}>(`select mcp_workflow_task($1,$2,$3,p_task_id:=$4,p_title:=$5,p_assignee:=$6,p_request_id:='release-test',p_execution_id:=$7) result`,[bot,client,action,id,action==='create_task'?title:null,assignee,key]);
+    return r.rows[0]!.result;
+  };
+  it('the previous shared function differs only by the explicit Admin guard',async()=>{
+    const old=await migration('20260909020000_72_mcp_cos_orchestration.sql');
+    const next=await migration('20260910120000_78_mcp_admin_calendar.sql');
+    const extract=(s:string)=>s.slice(s.indexOf('function mcp_internal.workflow_task('),s.indexOf('end $$;',s.indexOf('function mcp_internal.workflow_task('))+7);
+    const added=extract(next); const start=added.indexOf(" if p_bot_id='bot_admin' and p_action='assign_task' then");
+    expect(start).toBeGreaterThan(0);
+    const end=added.indexOf("   payload :=",start);
+    const normalize=(sql:string)=>sql.replace(/--[^\n]*/g,'').replace(/\s+/g,' ').trim();
+    expect(normalize(added.slice(0,start)+added.slice(end))).toBe(normalize(extract(old)));
+  });
+  for(const version of ['main','phase12']) for(const bot of existing) it(`${version} ${bot}: lifecycle, replay, assignees, errors and client boundary stay compatible`,async()=>{
+    const source=await migration(version==='main'?'20260909020000_72_mcp_cos_orchestration.sql':'20260910120000_78_mcp_admin_calendar.sql');
+    const start=source.indexOf('function mcp_internal.workflow_task(');
+    await db.exec('create or replace '+source.slice(start,source.indexOf('end $$;',start)+7));
+    await db.query('insert into mcp_bot_clients(bot_id,client_id) values($1,$2) on conflict do nothing',[bot,CLIENT_A]);
+    const created=await call(bot,'create_task'); const id=created.task.id;
+    expect((await call(bot,'create_task')).task).toEqual(created.task);
+    expect((await call(bot,'get_task',id)).task).toEqual(created.task);
+    expect((await call(bot,'list_tasks')).tasks.some((t:any)=>t.id===id)).toBe(true);
+    // Legacy assignees need active identity, not a matching client grant.
+    await db.exec("delete from mcp_bot_clients where bot_id='bot_finance'");
+    const assigned=await call(bot,'assign_task',id,'bot_finance','assign');
+    expect(assigned.task.assignee).toBe('bot_finance');
+    await db.query("insert into team_members(id,category,name,initials) values($1,'smm','Release','RL') on conflict(id) do update set active=true",[IDEA_B]);
+    await db.query('delete from client_assignments where member_id=$1',[IDEA_B]);
+    expect((await call(bot,'assign_task',id,`member:${IDEA_B}`,'member')).task.assignee).toBe(`member:${IDEA_B}`);
+    await db.query('update team_members set active=false where id=$1',[IDEA_B]);
+    await expect(call(bot,'assign_task',id,`member:${IDEA_B}`,'inactive-member')).rejects.toThrow('invalid_assignee');
+    await db.query('update team_members set active=true where id=$1',[IDEA_B]);
+    await expect(call(bot,'assign_task',id,null,'null-assignee')).rejects.toThrow('invalid_request');
+    for(const invalid of ['bot_unknown','bot-invalid',`member:${USER_A}`,'member:bad']) await expect(call(bot,'assign_task',id,invalid,invalid)).rejects.toThrow('invalid_assignee');
+    await db.exec("update mcp_internal.mcp_bots set status='suspended' where bot_id='bot_finance'");
+    await expect(call(bot,'assign_task',id,'bot_finance','suspended')).rejects.toThrow('invalid_assignee');
+    // Legacy successful receipts are returned before revalidating an assignee.
+    expect((await call(bot,'assign_task',id,'bot_finance','assign')).task).toEqual(assigned.task);
+    const complete=await call(bot,'complete_task',id);
+    expect(complete.task.status).toBe('complete');
+    expect((await call(bot,'complete_task',id)).task).toEqual(complete.task);
+    expect((await call(bot,'complete_task',id,null,'complete-again')).task).toEqual(complete.task);
+    await expect(call(bot,'assign_task',id,'bot_finance','after-complete')).rejects.toThrow('task_completed');
+    await expect(call(bot,'create_task',null,null,'create_task',CLIENT_A,'Changed')).rejects.toThrow('idempotency_conflict');
+    await expect(call(bot,'create_task',null,null,'bad-title',CLIENT_A,'')).rejects.toThrow('invalid_request');
+    await expect(call(bot,'get_task',USER_A)).rejects.toThrow('task_not_found');
+    for(const action of ['create_task','assign_task','get_task','list_tasks','complete_task']) await expect(call(bot,action,id,'bot_finance','foreign',CLIENT_B)).rejects.toThrow('client_forbidden');
+    await db.query('insert into mcp_bot_clients(bot_id,client_id) values($1,$2)',[bot,CLIENT_B]);
+    await expect(call(bot,'get_task',id,null,'foreign-id',CLIENT_B)).rejects.toThrow('client_mismatch');
+  });
+});
+
+describe('Phase 12 release: Admin assignee matrix',()=>{
+  let id:string;
+  const assign=(who:string)=>db.query(`select mcp_workflow_task('bot_admin',$1,'assign_task',p_task_id:=$2,p_assignee:=$3,p_request_id:='release-test',p_execution_id:='assign')`,[CLIENT_A,id,who]);
+  beforeEach(async()=>{
+    await db.query("insert into mcp_bot_clients(bot_id,client_id) values('bot_admin',$1)",[CLIENT_A]);
+    id=(await db.query<{result:any}>(`select mcp_workflow_task('bot_admin',$1,'create_task',p_title:='Assignment fixture',p_request_id:='release-test',p_execution_id:='create') result`,[CLIENT_A])).rows[0]!.result.task.id;
+    await db.query("insert into team_members(id,category,name,initials) values($1,'smm','Release','RL') on conflict(id) do update set active=true",[IDEA_B]);
+    await db.query('delete from client_assignments where member_id=$1',[IDEA_B]);
+  });
+  for(const scenario of ['same','wrong','suspended','unknown','malformed','revoke-replay','suspend-replay']) it(`bot assignee ${scenario}`,async()=>{
+    const who=scenario==='unknown'?'bot_unknown':scenario==='malformed'?'bot-invalid':'bot_client_delivery';
+    if(!['unknown','malformed'].includes(scenario)) await db.query('insert into mcp_bot_clients(bot_id,client_id) values($1,$2)',[who,scenario==='wrong'?CLIENT_B:CLIENT_A]);
+    if(scenario==='suspended') await db.query("update mcp_internal.mcp_bots set status='suspended' where bot_id=$1",[who]);
+    if(['wrong','suspended','unknown','malformed'].includes(scenario)) {await expect(assign(who)).rejects.toThrow();return;}
+    await assign(who);await assign(who);
+    if(scenario==='revoke-replay') {await db.query('delete from mcp_bot_clients where bot_id=$1',[who]);await expect(assign(who)).rejects.toThrow('client_forbidden');}
+    if(scenario==='suspend-replay') {await db.query("update mcp_internal.mcp_bots set status='suspended' where bot_id=$1",[who]);await expect(assign(who)).rejects.toThrow('bot_not_active');}
+  });
+  for(const scenario of ['same','wrong','ended','inactive','unknown','malformed','ended-replay']) it(`member assignee ${scenario}`,async()=>{
+    await db.query('insert into client_assignments(member_id,client_id) values($1,$2)',[IDEA_B,scenario==='wrong'?CLIENT_B:CLIENT_A]);
+    if(scenario==='ended') await db.query('update client_assignments set ended_at=now() where member_id=$1',[IDEA_B]);
+    if(scenario==='inactive') await db.query('update team_members set active=false where id=$1',[IDEA_B]);
+    const who=scenario==='unknown'?`member:${USER_A}`:scenario==='malformed'?'member:bad':`member:${IDEA_B}`;
+    if(!['same','ended-replay'].includes(scenario)) {await expect(assign(who)).rejects.toThrow('invalid_assignee');return;}
+    await assign(who);await assign(who);
+    if(scenario==='ended-replay') {await db.query('update client_assignments set ended_at=now() where member_id=$1',[IDEA_B]);await expect(assign(who)).rejects.toThrow('invalid_assignee');}
+  });
 });
