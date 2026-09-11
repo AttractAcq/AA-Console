@@ -1505,6 +1505,8 @@ export type Database = {
         Row: {
           booking_rule: string | null
           built_at: string | null
+          approved_at: string | null
+          approved_by: string | null
           client_id: string
           created_at: string
           escalation_rule: string | null
@@ -1524,6 +1526,8 @@ export type Database = {
         Insert: {
           booking_rule?: string | null
           built_at?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           client_id: string
           created_at?: string
           escalation_rule?: string | null
@@ -1543,6 +1547,8 @@ export type Database = {
         Update: {
           booking_rule?: string | null
           built_at?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           client_id?: string
           created_at?: string
           escalation_rule?: string | null
@@ -1732,6 +1738,189 @@ export type Database = {
         }
         Relationships: []
       }
+      github_app_installations: {
+        Row: {
+          account_login: string
+          account_type: string
+          client_id: string | null
+          connected_at: string
+          created_at: string
+          id: string
+          installation_id: number
+          last_checked_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_login: string
+          account_type?: string
+          client_id?: string | null
+          connected_at?: string
+          created_at?: string
+          id?: string
+          installation_id: number
+          last_checked_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_login?: string
+          account_type?: string
+          client_id?: string | null
+          connected_at?: string
+          created_at?: string
+          id?: string
+          installation_id?: number
+          last_checked_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      client_site_repositories: {
+        Row: {
+          client_id: string
+          created_at: string
+          custom_domain: string | null
+          default_branch: string
+          github_repository_id: number | null
+          id: string
+          installation_id: string
+          last_error: string | null
+          owner: string
+          pages_path: string
+          pages_url: string | null
+          provisioned_at: string | null
+          repo: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          custom_domain?: string | null
+          default_branch?: string
+          github_repository_id?: number | null
+          id?: string
+          installation_id: string
+          last_error?: string | null
+          owner: string
+          pages_path?: string
+          pages_url?: string | null
+          provisioned_at?: string | null
+          repo: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          custom_domain?: string | null
+          default_branch?: string
+          github_repository_id?: number | null
+          id?: string
+          installation_id?: string
+          last_error?: string | null
+          owner?: string
+          pages_path?: string
+          pages_url?: string | null
+          provisioned_at?: string | null
+          repo?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      client_sales_agent_deployments: {
+        Row: {
+          allowed_origin: string
+          client_id: string
+          created_at: string
+          daily_cost_limit_usd: number
+          daily_message_limit: number
+          deployed_at: string | null
+          disabled_at: string | null
+          enabled: boolean
+          id: string
+          page_id: string
+          public_id: string
+          sales_agent_id: string
+          site_repository_id: string | null
+          updated_at: string
+          widget_config: Json
+        }
+        Insert: {
+          allowed_origin: string
+          client_id: string
+          created_at?: string
+          daily_cost_limit_usd?: number
+          daily_message_limit?: number
+          deployed_at?: string | null
+          disabled_at?: string | null
+          enabled?: boolean
+          id?: string
+          page_id: string
+          public_id?: string
+          sales_agent_id: string
+          site_repository_id?: string | null
+          updated_at?: string
+          widget_config?: Json
+        }
+        Update: {
+          allowed_origin?: string
+          client_id?: string
+          created_at?: string
+          daily_cost_limit_usd?: number
+          daily_message_limit?: number
+          deployed_at?: string | null
+          disabled_at?: string | null
+          enabled?: boolean
+          id?: string
+          page_id?: string
+          public_id?: string
+          sales_agent_id?: string
+          site_repository_id?: string | null
+          updated_at?: string
+          widget_config?: Json
+        }
+        Relationships: []
+      }
+      sales_runtime_requests: {
+        Row: {
+          client_id: string
+          conversation_id: string | null
+          cost_usd: number
+          deployment_id: string
+          id: string
+          ip_hash: string | null
+          occurred_at: string
+          origin: string | null
+          outcome: string
+        }
+        Insert: {
+          client_id: string
+          conversation_id?: string | null
+          cost_usd?: number
+          deployment_id: string
+          id?: string
+          ip_hash?: string | null
+          occurred_at?: string
+          origin?: string | null
+          outcome: string
+        }
+        Update: {
+          client_id?: string
+          conversation_id?: string | null
+          cost_usd?: number
+          deployment_id?: string
+          id?: string
+          ip_hash?: string | null
+          occurred_at?: string
+          origin?: string | null
+          outcome?: string
+        }
+        Relationships: []
+      }
       client_pages: {
         Row: {
           body: string | null
@@ -1743,6 +1932,12 @@ export type Database = {
           job_id: string | null
           page_type: Database["public"]["Enums"]["page_type"]
           published_url: string | null
+          site_repository_id: string | null
+          site_path: string | null
+          publish_status: string
+          publish_error: string | null
+          published_at: string | null
+          published_commit: string | null
           html: string | null
           meta_title: string | null
           meta_description: string | null
@@ -1762,6 +1957,12 @@ export type Database = {
           job_id?: string | null
           page_type: Database["public"]["Enums"]["page_type"]
           published_url?: string | null
+          site_repository_id?: string | null
+          site_path?: string | null
+          publish_status?: string
+          publish_error?: string | null
+          published_at?: string | null
+          published_commit?: string | null
           html?: string | null
           meta_title?: string | null
           meta_description?: string | null
@@ -1781,6 +1982,12 @@ export type Database = {
           job_id?: string | null
           page_type?: Database["public"]["Enums"]["page_type"]
           published_url?: string | null
+          site_repository_id?: string | null
+          site_path?: string | null
+          publish_status?: string
+          publish_error?: string | null
+          published_at?: string | null
+          published_commit?: string | null
           html?: string | null
           meta_title?: string | null
           meta_description?: string | null

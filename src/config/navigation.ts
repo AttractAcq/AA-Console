@@ -17,6 +17,7 @@ import {
   UserPlus,
   MessagesSquare,
   Megaphone,
+  Globe,
   BarChart3,
   ClipboardList,
   Plug,
@@ -181,6 +182,13 @@ export const clientNavGroups: NavNode[] = [
           { id: "primary-landing-pages", label: "Primary Landing Pages" },
           { id: "secondary-offer-pages", label: "Secondary Offer Pages" },
         ],
+      },
+      {
+        id: "sites",
+        label: "Sites",
+        path: "sites",
+        icon: Globe,
+        tabs: [{ id: "overview", label: "Overview" }],
       },
       {
         id: "sales",
