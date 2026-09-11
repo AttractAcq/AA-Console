@@ -85,6 +85,9 @@ beforeAll(async () => {
     '20260909040000_74_mcp_production_bot_decide.sql',
     '20260909050000_75_mcp_distribution_manager.sql',
     '20260910000000_76_mcp_sales_ops.sql',
+    '20260909010000_71_mcp_client_delivery.sql',
+    '20260909020000_72_mcp_cos_orchestration.sql',
+    '20260910120000_78_mcp_admin_calendar.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -1365,4 +1368,150 @@ describe('Phase 11 Sales Ops isolation', () => {
        values ('bot_production', 'pipeline.list_leads', 'test')`,
     )).rejects.toThrow(/Phase 11: pipeline/);
   });
+});
+
+describe('Phase 12 Admin isolation and ledger', () => {
+ const create = async (client=CLIENT_A,execution='admin-create',bot='bot_admin',title='Meeting') => {
+   const q=await db.query<{result:any}>(`select public.mcp_admin_create_event($1,$2,'request-12',$3,'meeting',$4,null,'2026-10-01T10:00:00Z','2026-10-01T11:00:00Z') result`,[bot,client,execution,title]);
+   return q.rows[0]!.result;
+ };
+ const change=async(id:string,execution='admin-update',client=CLIENT_A,version=1)=>{
+   const q=await db.query<{result:any}>(`select public.mcp_admin_update_event('bot_admin',$1,'request-update',$2,$3,$4,'completed','Meeting',null,'2026-10-01T10:00:00Z','2026-10-01T11:00:00Z') result`,[client,execution,id,version]);return q.rows[0]!.result;
+ };
+ beforeEach(async()=>{await db.exec(`insert into mcp_bot_clients(bot_id,client_id) values('bot_admin','${CLIENT_A}')`);});
+ it('creates and replays exactly once, including update after terminal state',async()=>{
+  const first=await create();expect((await create()).event).toEqual(first.event);
+  const updated=await change(first.event.id);expect(updated.event.version).toBe(2);
+  expect((await change(first.event.id)).event).toEqual(updated.event);
+  expect((await db.query('select * from mcp_internal.mcp_admin_events')).rows).toHaveLength(1);
+  expect((await db.query('select * from mcp_internal.mcp_admin_requests')).rows).toHaveLength(2);
+ });
+ it('different client, action or payload cannot reuse execution',async()=>{
+  const first=await create();
+  await db.exec(`insert into mcp_bot_clients(bot_id,client_id) values('bot_admin','${CLIENT_B}')`);
+  await expect(create(CLIENT_B)).rejects.toThrow('idempotency_conflict');
+  await expect(create(CLIENT_A,'admin-create','bot_admin','Different')).rejects.toThrow('idempotency_conflict');
+  await expect(change(first.event.id,'admin-create')).rejects.toThrow('idempotency_conflict');
+ });
+ it('all RPCs deny ungranted client, invalid client and suspended bot',async()=>{
+  const first=await create();
+  for(const client of [CLIENT_B,'99999999-9999-4999-8999-999999999999']){
+   await expect(create(client)).rejects.toThrow('client_forbidden');
+   await expect(change(first.event.id,'foreign',client)).rejects.toThrow('client_forbidden');
+   await expect(db.query(`select mcp_admin_list_events('bot_admin',$1)`,[client])).rejects.toThrow('client_forbidden');
+   await expect(db.query(`select mcp_admin_get_event('bot_admin',$1,$2)`,[client,first.event.id])).rejects.toThrow('client_forbidden');
+  }
+  await db.exec(`update mcp_internal.mcp_bots set status='suspended' where bot_id='bot_admin'`);
+  await expect(create()).rejects.toThrow('bot_not_active');
+  await expect(change(first.event.id)).rejects.toThrow('bot_not_active');
+  await expect(db.query(`select mcp_admin_list_events('bot_admin',$1)`,[CLIENT_A])).rejects.toThrow('bot_not_active');
+  await expect(db.query(`select mcp_admin_get_event('bot_admin',$1,$2)`,[CLIENT_A,first.event.id])).rejects.toThrow('bot_not_active');
+ });
+ it('revoked client grant denies saved create and update replay',async()=>{
+  const first=await create();await change(first.event.id);
+  await db.exec(`delete from mcp_bot_clients where bot_id='bot_admin'`);
+  await expect(create()).rejects.toThrow('client_forbidden');
+  await expect(change(first.event.id)).rejects.toThrow('client_forbidden');
+ });
+ it('removed exact permission denies replay even with admin wildcard',async()=>{
+  await create();
+  await db.exec('begin');
+  try {
+   await db.exec(`delete from mcp_internal.mcp_bot_permissions where bot_id='bot_admin' and permission_pattern='admin.create_event'; insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by) values('bot_admin','admin.*','test')`);
+   await expect(create()).rejects.toThrow('bot_forbidden');
+  } finally {await db.exec('rollback');}
+ });
+ it('other active bot with grant cannot call Admin even with explicit permissions',async()=>{
+  await db.exec('begin');
+  try {
+   await db.exec(`insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by) values('bot_production','admin.create_event','test')`);
+   await expect(create(CLIENT_A,'foreign-bot','bot_production')).rejects.toThrow('bot_forbidden');
+  } finally {await db.exec('rollback');}
+ });
+ it('foreign event ID and missing ID return the same denial; cursor cannot cross clients',async()=>{
+  const first=await create();
+  await db.exec(`insert into mcp_bot_clients(bot_id,client_id) values('bot_admin','${CLIENT_B}')`);
+  for(const id of [first.event.id,IDEA_B]){
+   await expect(db.query(`select mcp_admin_get_event('bot_admin',$1,$2)`,[CLIENT_B,id])).rejects.toThrow('event_not_found');
+   await expect(change(id,'foreign-resource',CLIENT_B)).rejects.toThrow('event_not_found');
+   await expect(db.query(`select mcp_admin_list_events('bot_admin',$1,25,$2)`,[CLIENT_B,id])).rejects.toThrow('event_not_found');
+  }
+ });
+ for(const role of ['anon','authenticated']) it(`${role} cannot execute public or internal Admin RPCs`,async()=>{
+  const first=await create();
+  await db.exec(`set role ${role}; select set_config('request.jwt.claim.role','${role}',false)`);
+  for(const prefix of ['public.mcp_','mcp_internal.']) {
+   await expect(db.query(`select ${prefix}admin_list_events('bot_admin',$1)`,[CLIENT_A])).rejects.toThrow(/permission denied/);
+   await expect(db.query(`select ${prefix}admin_get_event('bot_admin',$1,$2)`,[CLIENT_A,first.event.id])).rejects.toThrow(/permission denied/);
+   await expect(db.query(`select ${prefix}admin_create_event('bot_admin',$1,'req','exec','reminder','Title',null,now(),null)`,[CLIENT_A])).rejects.toThrow(/permission denied/);
+   await expect(db.query(`select ${prefix}admin_update_event('bot_admin',$1,'req','exec',$2,1,'cancelled','Title',null,now(),null)`,[CLIENT_A,first.event.id])).rejects.toThrow(/permission denied/);
+  }
+ });
+ for(const role of ['anon','authenticated','service_role']) it(`${role} has no direct Admin table access`,async()=>{
+  await db.exec(`set role ${role}`);
+  for(const table of ['mcp_admin_events','mcp_admin_requests']){
+   await expect(db.query(`select * from mcp_internal.${table}`)).rejects.toThrow(/permission denied/);
+   await expect(db.query(`delete from mcp_internal.${table}`)).rejects.toThrow(/permission denied/);
+  }
+ });
+ it('RLS is enabled and forced; exact Admin grants are 15',async()=>{
+  const tables=await db.query<{relrowsecurity:boolean;relforcerowsecurity:boolean}>(`select relrowsecurity,relforcerowsecurity from pg_class where relname in ('mcp_admin_events','mcp_admin_requests')`);
+  expect(tables.rows).toHaveLength(2);expect(tables.rows.every(x=>x.relrowsecurity&&x.relforcerowsecurity)).toBe(true);
+  const grants=await db.query<{permission_pattern:string}>(`select permission_pattern from mcp_internal.mcp_bot_permissions where bot_id='bot_admin'`);
+  expect(grants.rows).toHaveLength(15);expect(grants.rows.some(x=>x.permission_pattern.includes('*'))).toBe(false);
+ });
+ it('service role can execute guarded wrappers, not internal functions',async()=>{
+  await db.exec(`set role service_role`);
+  expect((await create()).event.created_by_bot).toBe('bot_admin');
+  await expect(db.query(`select mcp_internal.admin_list_events('bot_admin',$1)`,[CLIENT_A])).rejects.toThrow(/permission denied/);
+ });
+ it('SQL rejects invalid temporal structure/status regardless of route validation',async()=>{
+  for(const [kind,start,end] of [['meeting','2026-10-01',null],['reminder','infinity',null],['admin','2026-10-02','2026-10-01'],['external','2026-10-01',null]]){
+   await expect(db.query(`select mcp_admin_create_event('bot_admin',$1,'req','exec',$2,'Title',null,$3,$4)`,[CLIENT_A,kind,start,end])).rejects.toThrow('invalid_request');
+  }
+  const first=await create();
+  await expect(db.query(`select mcp_admin_update_event('bot_admin',$1,'req','exec',$2,1,'published','Title',null,now(),now()+interval '1 hour')`,[CLIENT_A,first.event.id])).rejects.toThrow('invalid_request');
+ });
+ it('Admin workflow assignment denies ungranted assignee before mutation and replay',async()=>{
+  const task=await db.query<{result:any}>(`select mcp_workflow_task('bot_admin',$1,'create_task',p_title:='Admin fixture',p_request_id:='request',p_execution_id:='task-create') result`,[CLIENT_A]);
+  const id=task.rows[0]!.result.task.id;
+  const assign=()=>db.query(`select mcp_workflow_task('bot_admin',$1,'assign_task',p_task_id:=$2,p_assignee:='bot_client_delivery',p_request_id:='request',p_execution_id:='task-assign')`,[CLIENT_A,id]);
+  await expect(assign()).rejects.toThrow('client_forbidden');
+  await db.exec(`insert into mcp_bot_clients(bot_id,client_id) values('bot_client_delivery','${CLIENT_A}')`);
+  await assign();await assign();
+  await db.exec(`delete from mcp_bot_clients where bot_id='bot_client_delivery'`);
+  await expect(assign()).rejects.toThrow('client_forbidden');
+ });
+ it('Admin token resolver reports revoked credentials without affecting other bots',async()=>{
+  await db.query('select mcp_issue_bot_token($1,$2,$3,$4)',['bot_admin',HASH,'local-test','fixture']);
+  expect((await db.query<{result:any}>('select mcp_resolve_bot_token($1) result',[HASH])).rows[0]!.result.status).toBe('active');
+  await db.query('select mcp_revoke_bot_token($1,$2,$3)',[HASH,'local-test','fixture']);
+  expect((await db.query<{result:any}>('select mcp_resolve_bot_token($1) result',[HASH])).rows[0]!.result.status).toBe('revoked_token');
+  expect((await db.query<{status:string}>("select status from mcp_internal.mcp_bots where bot_id='bot_production'")).rows[0]!.status).toBe('active');
+ });
+ it('concurrently submitted identical requests create one record; receipt survives timezone changes',async()=>{
+  const results=await Promise.all(Array.from({length:5},()=>create()));
+  expect(new Set(results.map(r=>r.event.id)).size).toBe(1);
+  await db.exec("set timezone='Pacific/Auckland'");
+  try {expect((await create()).event).toEqual(results[0].event);} finally {await db.exec("set timezone='UTC'");}
+  const updates=await Promise.allSettled([change(results[0].event.id,'update-a'),change(results[0].event.id,'update-b')]);
+  expect(updates.filter(x=>x.status==='fulfilled')).toHaveLength(1);
+  expect((await db.query('select * from mcp_internal.mcp_admin_events')).rows).toHaveLength(1);
+ });
+ it('Admin member assignments require active client membership',async()=>{
+  const task=await db.query<{result:any}>(`select mcp_workflow_task('bot_admin',$1,'create_task',p_title:='Member fixture',p_request_id:='request',p_execution_id:='member-create') result`,[CLIENT_A]);
+  await db.query("insert into team_members(id,category,name,initials) values($1,'smm','Fixture','FX')",[IDEA_B]);
+  const assign=()=>db.query(`select mcp_workflow_task('bot_admin',$1,'assign_task',p_task_id:=$2,p_assignee:=$3,p_request_id:='request',p_execution_id:='member-assign')`,[CLIENT_A,task.rows[0]!.result.task.id,`member:${IDEA_B}`]);
+  await expect(assign()).rejects.toThrow('invalid_assignee');
+  await db.query('insert into client_assignments(member_id,client_id) values($1,$2)',[IDEA_B,CLIENT_A]);
+  await assign();
+  await db.query('update client_assignments set ended_at=now() where member_id=$1',[IDEA_B]);
+  await expect(assign()).rejects.toThrow('invalid_assignee');
+ });
+ it('all eight event RPC definitions guard identity/client and forbid human access helpers',async()=>{
+  const functions=await db.query<{def:string}>(`select pg_get_functiondef(p.oid) def from pg_proc p join pg_namespace n on n.oid=p.pronamespace where (n.nspname='public' and p.proname in ('mcp_admin_list_events','mcp_admin_get_event','mcp_admin_create_event','mcp_admin_update_event')) or (n.nspname='mcp_internal' and p.proname in ('admin_list_events','admin_get_event','admin_create_event','admin_update_event'))`);
+  expect(functions.rows).toHaveLength(8);
+  for(const row of functions.rows){expect(row.def).toContain('require_active_bot');expect(row.def).toContain('require_bot_client_grant');expect(row.def).not.toMatch(/can_access_client\s*\(/);expect(row.def).toContain('SECURITY DEFINER');expect(row.def).toContain('pg_catalog');}
+ });
+
 });

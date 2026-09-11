@@ -66,13 +66,13 @@ type CacheEntry = { expires: number; value: AaResolveResult | null };
 
 export class BotAuthenticator {
   private readonly cache = new Map<string, CacheEntry>();
+  private allowLocalAdminEnv = false;
   private readonly byBot = new Map<Bot, Identity>();
   constructor(
     private readonly mode: BotAuthMode,
     private readonly credentials: Credential[],
     private readonly resolveAa:
-      | ((hashHex: string) => Promise<AaResolveResult>)
-      | undefined,
+      ((hashHex: string) => Promise<AaResolveResult>) | undefined,
     private readonly alert: BotAuthAlert = () => {},
     private readonly now: () => number = Date.now,
     private readonly positiveTtlMs = 30_000,
@@ -82,6 +82,7 @@ export class BotAuthenticator {
   static fromConfig(
     c: {
       BOT_AUTH_MODE: BotAuthMode;
+      PUBLIC_ORIGIN?: string;
       bots: Credential[];
       AA_INTERNAL_API_URL?: string;
       AA_MCP_SERVICE_SECRET?: string;
@@ -99,12 +100,24 @@ export class BotAuthenticator {
               hashHex,
             )
         : undefined);
-    return new BotAuthenticator(c.BOT_AUTH_MODE, c.bots, fn, alert);
+    const auth = new BotAuthenticator(c.BOT_AUTH_MODE, c.bots, fn, alert);
+    // Local mock fixtures may use env auth. Hosted Admin requests require the
+    // DB resolver, without preventing legacy credentials for other bots booting.
+    if (c.PUBLIC_ORIGIN) {
+      const origin = new URL(c.PUBLIC_ORIGIN);
+      auth.allowLocalAdminEnv =
+        origin.protocol === "http:" &&
+        ["localhost", "127.0.0.1"].includes(origin.hostname);
+    }
+    return auth;
   }
 
   identities(): Identity[] {
     if (this.mode === "db") return [...this.byBot.values()];
-    return this.credentials.map((c) => ({ bot: c.bot, clients: [...c.clients] }));
+    return this.credentials.map((c) => ({
+      bot: c.bot,
+      clients: [...c.clients],
+    }));
   }
 
   async authenticate(header: string | undefined): Promise<Identity> {
@@ -113,7 +126,8 @@ export class BotAuthenticator {
     const presented = hash(token);
     const env = envIdentity(token, this.credentials);
     if (this.mode === "env") {
-      if (!env) throw unauthorized();
+      if (!env || (env.bot === "bot_admin" && !this.allowLocalAdminEnv))
+        throw unauthorized();
       return env;
     }
     const hashHex = presented.toString("hex");
@@ -140,6 +154,18 @@ export class BotAuthenticator {
       !aaIdentity
     )
       throw unauthorized();
+    // Admin never falls back to env or stale permissions in dual/db mode.
+    if (env?.bot === "bot_admin" || aaIdentity?.bot === "bot_admin") {
+      const current = this.fromAa(aa, true);
+      if (
+        !current ||
+        current.bot !== "bot_admin" ||
+        (env && this.mismatch(aa, env))
+      )
+        throw unauthorized();
+      this.byBot.set(current.bot, current);
+      return current;
+    }
     if (aaIdentity && env) {
       if (this.mismatch(aa, env)) {
         this.alert({
@@ -164,8 +190,12 @@ export class BotAuthenticator {
     throw unauthorized();
   }
 
-  private mismatch(aa: AaResolveResult | null | "unavailable", env: Identity): boolean {
-    if (aa === "unavailable" || !aa?.found || aa.status !== "active") return false;
+  private mismatch(
+    aa: AaResolveResult | null | "unavailable",
+    env: Identity,
+  ): boolean {
+    if (aa === "unavailable" || !aa?.found || aa.status !== "active")
+      return false;
     if (!aa.bot_id || aa.bot_id !== env.bot) return true;
     if (!sameSet(aa.clients ?? [], env.clients)) return true;
     return !sameSet(aa.permissions ?? [], grants[env.bot]);
@@ -187,7 +217,8 @@ export class BotAuthenticator {
 
   private async lookupAa(hashHex: string): Promise<AaResolveResult | null> {
     const hit = this.cache.get(hashHex);
-    if (hit && hit.expires > this.now()) return hit.value;
+    if (hit && hit.value?.bot_id !== "bot_admin" && hit.expires > this.now())
+      return hit.value;
     if (!this.resolveAa) return null;
     const value = await this.resolveAa(hashHex);
     const ttl =

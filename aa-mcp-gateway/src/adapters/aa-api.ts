@@ -1,4 +1,4 @@
-import { registry, orchestrationTools } from "../registry/tools.js";
+import { registry, orchestrationTools, adminTools } from "../registry/tools.js";
 import { z } from "zod";
 import type { Adapter, Context, Tool, Result } from "../shared/types.js";
 
@@ -195,11 +195,15 @@ for (const action of [
 ]) {
   ROUTES[`pipeline.${action}`] = {
     path: `/internal/mcp/pipeline/${action.replaceAll("_", "-")}`,
-    kind: ["update_stage", "create_followup"].includes(action) ? "write" : "read",
+    kind: ["update_stage", "create_followup"].includes(action)
+      ? "write"
+      : "read",
     input: (["update_stage", "create_followup"].includes(action)
-      ? registry.find((t) => t.name === `pipeline.${action}`)!.input.omit({
-          idempotency_key: true,
-        } as never)
+      ? registry
+          .find((t) => t.name === `pipeline.${action}`)!
+          .input.omit({
+            idempotency_key: true,
+          } as never)
       : registry.find((t) => t.name === `pipeline.${action}`)!.input
     ).strip(),
   };
@@ -208,11 +212,15 @@ for (const action of ["list", "get", "get_conversations"]) {
   ROUTES[`sales_agents.${action}`] = {
     path: `/internal/mcp/sales-agents/${action.replaceAll("_", "-")}`,
     kind: "read",
-    input: registry.find((t) => t.name === `sales_agents.${action}`)!.input.strip(),
+    input: registry
+      .find((t) => t.name === `sales_agents.${action}`)!
+      .input.strip(),
   };
 }
 
-for (const tool of registry.filter((t) => orchestrationTools.has(t.name))) {
+for (const tool of registry.filter(
+  (t) => adminTools.has(t.name) || orchestrationTools.has(t.name),
+)) {
   const [domain, action] = tool.name.split(".");
   ROUTES[tool.name] = {
     path: `/internal/mcp/${domain}/${action!.replaceAll("_", "-")}`,
@@ -225,6 +233,8 @@ for (const tool of registry.filter((t) => orchestrationTools.has(t.name))) {
 }
 
 const codes = new Set([
+  "event_not_found",
+  "event_conflict",
   "task_not_found",
   "campaign_not_found",
   "invalid_assignee",
@@ -298,7 +308,11 @@ function aaBody(
   tool: string,
   input: Record<string, unknown>,
 ): Record<string, unknown> {
-  if (/^(delivery|workflow|campaign|attribution|pipeline|sales_agents)\./.test(tool))
+  if (
+    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents)\./.test(
+      tool,
+    )
+  )
     return input;
   if (tool === "content.generate_brief")
     return { client_id: input.client_id, idea_id: input.idea_id };
@@ -415,7 +429,8 @@ export class AAApiAdapter implements Adapter {
     const parsed = route.input.safeParse(input);
     if (!parsed.success) return fail("invalid_request");
     const signal = AbortSignal.timeout(this.config.timeoutMs ?? 15000);
-    const maxBytes = route.kind === "brief" ? 16384 : 65536;
+    const maxBytes =
+      route.kind === "brief" ? 16384 : tool.domain === "admin" ? 262144 : 65536;
     try {
       const response = await fetch(new URL(route.path, this.config.url), {
         method: "POST",
@@ -495,6 +510,53 @@ export class AAApiAdapter implements Adapter {
         scoped.data.client_id !== input.client_id
       )
         return fail("malformed_response", response.status);
+      if (tool.domain === "admin") {
+        const event = z
+          .object({
+            id: uuid,
+            client_id: uuid,
+            created_by_bot: z.literal("bot_admin"),
+            updated_by_bot: z.literal("bot_admin"),
+            version: z.number().int().positive(),
+            title: z.string(),
+            event_type: z.enum(["meeting", "reminder", "admin"]),
+            status: z.enum(["scheduled", "completed", "cancelled"]),
+            starts_at: z.string(),
+            ends_at: z.string().nullable(),
+            created_at: z.string(),
+            updated_at: z.string(),
+            notes: z.string().nullable().optional(),
+          })
+          .strict();
+        const shape =
+          tool.name === "admin.list_events"
+            ? z
+                .object({
+                  client_id: uuid,
+                  events: z.array(event).max(100),
+                  next_cursor: uuid.nullable(),
+                })
+                .strict()
+            : z
+                .object({
+                  client_id: uuid,
+                  event,
+                  replayed: z.boolean().optional(),
+                })
+                .strict();
+        const result = shape.safeParse(raw);
+        if (!result.success) return fail("malformed_response", response.status);
+        const rows =
+          "events" in result.data ? result.data.events : [result.data.event];
+        const nextCursor =
+          "next_cursor" in result.data ? result.data.next_cursor : null;
+        if (
+          rows.some((e) => e.client_id !== input.client_id) ||
+          (input.event_id !== undefined && rows[0]?.id !== input.event_id) ||
+          (nextCursor !== null && !rows.some((e) => e.id === nextCursor))
+        )
+          return fail("malformed_response", response.status);
+      }
       if (route.kind === "queue") {
         if (![200, 202].includes(response.status))
           return fail("malformed_response", response.status);

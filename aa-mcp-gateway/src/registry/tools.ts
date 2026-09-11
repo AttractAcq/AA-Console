@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { resultSchema, type Tool } from "../shared/types.js";
 const domains: Record<string, string> = {
+  admin: "list_events get_event create_event update_event",
   delivery:
     "list_clients get_client get_status get_plan get_blockers get_next_action create_task get_client_health",
   campaign: "list get create update get_status request_approval",
@@ -24,6 +25,12 @@ const domains: Record<string, string> = {
   security:
     "get_system_status get_open_findings create_finding get_incident_status",
 };
+export const adminTools = new Set([
+  "admin.list_events",
+  "admin.get_event",
+  "admin.create_event",
+  "admin.update_event",
+]);
 export const orchestrationTools = new Set([
   "workflow.list_tasks",
   "workflow.get_task",
@@ -275,6 +282,32 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
           fields.end_date = z.iso.date().optional();
         }
       }
+      if (domain === "admin") {
+        for (const key of Object.keys(fields)) delete fields[key];
+        fields.client_id = id;
+        if (!read) fields.idempotency_key = z.string().min(8).max(128);
+        if (action === "list_events") {
+          fields.limit = z.number().int().min(1).max(100).default(25);
+          fields.after = id.optional();
+          fields.status = z
+            .enum(["scheduled", "completed", "cancelled"])
+            .optional();
+          fields.due_before = z.iso.datetime({ offset: true }).optional();
+        } else if (action !== "create_event") fields.event_id = id;
+        if (!read) {
+          // Complete replacement of editable fields; no ambiguous JSON patch/null semantics.
+          fields.title = z.string().trim().min(1).max(200);
+          fields.notes = z.string().max(2000).nullable();
+          fields.starts_at = z.iso.datetime({ offset: true });
+          fields.ends_at = z.iso.datetime({ offset: true }).nullable();
+          if (action === "create_event")
+            fields.event_type = z.enum(["meeting", "reminder", "admin"]);
+          else {
+            fields.status = z.enum(["scheduled", "completed", "cancelled"]);
+            fields.expected_version = z.number().int().min(1).max(2147483646);
+          }
+        }
+      }
       const realContent = new Set([
         // Sec Phase 5 #6: isolation tests must stay green before adding a name.
         "content.list_ideas",
@@ -314,6 +347,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "sales_agents.get_conversations",
       ]);
       const implementation =
+        adminTools.has(name) ||
         orchestration ||
         domain === "delivery" ||
         realContent.has(name) ||
@@ -352,19 +386,22 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         ].includes(action),
         audit: "required",
         implementation,
-        dependency: orchestration
-          ? "Scoped AA orchestration business API"
-          : domain === "delivery"
-            ? "Scoped AA delivery business API"
-            : realContent.has(name)
-              ? "Scoped AA content business API"
-              : realPipeline.has(name)
-                ? "Scoped AA pipeline business API"
-                : realSalesAgents.has(name)
-                  ? "Scoped AA sales_agents business API"
-                  : implementation === "real"
-                    ? "Gateway control store"
-                    : `Scoped AA ${domain} business API`,
+        dependency:
+          domain === "admin"
+            ? "Scoped AA administrative events API"
+            : orchestration
+              ? "Scoped AA orchestration business API"
+              : domain === "delivery"
+                ? "Scoped AA delivery business API"
+                : realContent.has(name)
+                  ? "Scoped AA content business API"
+                  : realPipeline.has(name)
+                    ? "Scoped AA pipeline business API"
+                    : realSalesAgents.has(name)
+                      ? "Scoped AA sales_agents business API"
+                      : implementation === "real"
+                        ? "Gateway control store"
+                        : `Scoped AA ${domain} business API`,
       } satisfies Tool;
     }),
 );

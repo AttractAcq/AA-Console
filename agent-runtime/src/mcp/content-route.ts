@@ -21,6 +21,8 @@ type Kind = 'read' | 'write' | 'queue';
 export type Route = {
   rpc: string;
   kind: Kind;
+  /** Explicit per-route bound; legacy routes retain the 4 KiB default. */
+  maxBodyBytes?: number;
   parse: (body: Record<string, unknown>) => Record<string, unknown> | undefined;
 };
 
@@ -269,7 +271,7 @@ export async function handleMcpContent(
 
   let parsed: Record<string, unknown> | undefined;
   try {
-    const body = await readJsonBody(req);
+    const body = await readJsonBody(req, route.maxBodyBytes);
     parsed = route.parse(body);
     if (!parsed) throw new Error('invalid_request');
     parsed.p_bot_id = bot;
