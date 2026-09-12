@@ -1,6 +1,6 @@
 # Tool registry
 
-85 initial business contracts. Status is adapter availability, not evidence of live deployment. Brief generation is implemented and requires AA_INTERNAL_API_URL and AA_MCP_SERVICE_SECRET. Stub schemas reserve bounded business fields and must be versioned/refined before their adapters are enabled. All calls require an authorized client UUID; all writes require an idempotency key. HIGH/CRITICAL policy always requires human approval.
+86 initial business contracts. Status is adapter availability, not evidence of live deployment. Brief generation is implemented and requires AA_INTERNAL_API_URL and AA_MCP_SERVICE_SECRET. Stub schemas reserve bounded business fields and must be versioned/refined before their adapters are enabled. All calls require an authorized client UUID; all writes require an idempotency key. HIGH/CRITICAL policy always requires human approval.
 
 | Tool | Status | Action | Risk | Approval | Reversible | Dependency |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -41,12 +41,13 @@
 | conversion.generate_copy | stub | write | MEDIUM | no | true | Scoped AA conversion business API |
 | conversion.request_approval | stub | write | MEDIUM | no | true | Scoped AA conversion business API |
 | conversion.get_performance | stub | read | LOW | no | true | Scoped AA conversion business API |
+| sales_agents.generate_config | real | write | MEDIUM | no | true | Scoped AA sales_agents business API |
 | sales_agents.list | real | read | LOW | no | true | Scoped AA sales_agents business API |
 | sales_agents.get | real | read | LOW | no | true | Scoped AA sales_agents business API |
-| sales_agents.create | stub | write | MEDIUM | no | true | Scoped AA sales_agents business API |
-| sales_agents.update_knowledge | stub | write | MEDIUM | no | true | Scoped AA sales_agents business API |
-| sales_agents.update_qualification_rules | stub | write | MEDIUM | no | true | Scoped AA sales_agents business API |
-| sales_agents.test | stub | write | MEDIUM | no | true | Scoped AA sales_agents business API |
+| sales_agents.create | real | write | MEDIUM | no | true | Scoped AA sales_agents business API |
+| sales_agents.update_knowledge | real | write | MEDIUM | no | true | Scoped AA sales_agents business API |
+| sales_agents.update_qualification_rules | real | write | MEDIUM | no | true | Scoped AA sales_agents business API |
+| sales_agents.test | real | write | MEDIUM | no | true | Scoped AA sales_agents business API |
 | sales_agents.deploy | stub | write | CRITICAL | required | false | Scoped AA sales_agents business API |
 | sales_agents.get_conversations | real | read | LOW | no | true | Scoped AA sales_agents business API |
 | pipeline.list_leads | real | read | LOW | no | true | Scoped AA pipeline business API |

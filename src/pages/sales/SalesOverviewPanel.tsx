@@ -20,11 +20,20 @@ type QualificationStep = {
 
 type Objection = { objection: string; response: string };
 
+const ROLE_LABEL: Record<string, string> = {
+  inbound_qualifier: "Inbound qualifier",
+  appointment_setter: "Appointment setter",
+  nurture: "Nurture",
+  reactivation: "Reactivation",
+  closer_assist: "Closer assist",
+};
+
 type SalesAgent = {
   id: string;
   name: string;
   purpose: string;
   status: string;
+  role: string | null;
   page_id: string | null;
   greeting: string | null;
   system_prompt: string | null;
@@ -73,7 +82,7 @@ export function SalesOverviewPanel() {
       supabase
         .from("client_sales_agents")
         .select(
-          "id, name, purpose, status, page_id, greeting, system_prompt, qualification, objections, booking_rule, escalation_rule, guardrails, built_at, created_at",
+          "id, name, purpose, status, role, page_id, greeting, system_prompt, qualification, objections, booking_rule, escalation_rule, guardrails, built_at, created_at",
         )
         .eq("client_id", clientId)
         .order("created_at", { ascending: false }),
@@ -144,6 +153,14 @@ export function SalesOverviewPanel() {
   const fields: FieldDef[] = [
     { name: "name", label: "Agent name", kind: "text", required: true },
     {
+      name: "role",
+      label: "What surface is this agent for",
+      kind: "select",
+      required: true,
+      options: Object.entries(ROLE_LABEL).map(([value, label]) => ({ value, label })),
+      hint: "Each agent covers one execution surface — build a separate agent for each one you need.",
+    },
+    {
       name: "purpose",
       label: "What this agent is for",
       kind: "textarea",
@@ -208,6 +225,11 @@ export function SalesOverviewPanel() {
                   </span>
                 </div>
 
+                {a.role && (
+                  <p className="mt-1 text-xs font-medium text-brand-strong">
+                    {ROLE_LABEL[a.role] ?? a.role}
+                  </p>
+                )}
                 <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{a.purpose}</p>
 
                 {a.built_at ? (
@@ -301,6 +323,7 @@ export function SalesOverviewPanel() {
             .insert({
               client_id: clientId,
               name: (v.name as string).trim(),
+              role: (v.role as string) || null,
               purpose: (v.purpose as string).trim(),
               page_id: (v.page_id as string) || null,
             })
@@ -335,7 +358,12 @@ export function SalesOverviewPanel() {
             className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg"
           >
             <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
-              <h2 className="text-base font-semibold text-card-foreground">{open.name}</h2>
+              <div>
+                <h2 className="text-base font-semibold text-card-foreground">{open.name}</h2>
+                {open.role && (
+                  <p className="text-xs text-muted-foreground">{ROLE_LABEL[open.role] ?? open.role}</p>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setOpenId(null)}

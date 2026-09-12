@@ -109,10 +109,12 @@ export async function runSalesOpsGate(invoke: Invoke, f: SalesOpsFixtures) {
     ["pipeline.get_lead", { lead_id: f.denied_lead_id }],
     ["workflow.get_task", { task_id: f.denied_task_id }],
   ] as const) await deny(name, args, "foreign_resource");
-  // Absent by design (Alex CLEAR #5 / SEC_BAR #2/#3): deferred money/deploy
+  // Absent by design (Alex CLEAR #5 / SEC_BAR #2/#3/#4): deferred money/deploy
   // actions, dropped proof.*, and every hard-denied domain outside Sales Ops.
-  for (const name of ["pipeline.record_sale", "sales_agents.create", "sales_agents.update_knowledge",
-    "sales_agents.update_qualification_rules", "sales_agents.test", "sales_agents.deploy",
+  // sales_agents.create/update_knowledge/update_qualification_rules/test are
+  // no longer in this list -- Phase 11b realizes and grants them; see
+  // runSalesAgentFactoryGate below for their happy path.
+  for (const name of ["pipeline.record_sale", "sales_agents.deploy",
     "proof.search", "proof.get",
     "content.select_idea", "content.approve_asset", "content.queue_distribution",
     "content.record_publication", "content.generate_brief", "content.list_ideas",
@@ -121,4 +123,59 @@ export async function runSalesOpsGate(invoke: Invoke, f: SalesOpsFixtures) {
     "engineering.get_deployment_status", "engineering.create_issue",
     "workflow.record_decision"])
     await deny(name, { idempotency_key: randomUUID() }, "forbidden_tool");
+}
+
+/**
+ * Gate 11b happy path: generate a draft config -> create a per-client agent
+ * -> update its knowledge + qualification rules -> sandbox test. Runs after
+ * runSalesOpsGate, against the same client/identity, and does not require any
+ * additional fixture ids -- it creates its own agent rather than reusing
+ * f.sales_agent_id (which Gate 11's read fixture may be a pre-existing,
+ * differently-shaped row not owned by this run).
+ */
+export async function runSalesAgentFactoryGate(invoke: Invoke, f: SalesOpsFixtures) {
+  const client_id = f.client_id;
+  const write = async (name: string, args: Record<string, unknown>, status = "completed") => {
+    const input = { ...args, idempotency_key: randomUUID() };
+    const r = await invoke(name, { client_id, ...input });
+    assert.equal(r.status, status, `${name}: unexpected result`);
+    const replay = await invoke(name, { client_id, ...input });
+    assert.deepEqual(replay.data, r.data);
+    return r;
+  };
+
+  const draft = await write("sales_agents.generate_config", { role: "inbound_qualifier" });
+  assert.ok(Array.isArray(draft.data.draft.qualification) && draft.data.draft.qualification.length >= 1);
+
+  const created = await write("sales_agents.create", {
+    role: "inbound_qualifier", name: "Gate 11b Front Desk", purpose: "Qualify and book",
+  });
+  const sales_agent_id = created.data.id;
+  assert.equal(created.data.status, "draft");
+
+  const knowledge = await write("sales_agents.update_knowledge", {
+    sales_agent_id,
+    objections: [{ objection: "This costs too much.", response: "Compare it to what it replaces." }],
+    guardrails: "Never quote a price not on file for this client.",
+  });
+  assert.equal(knowledge.data.guardrails, "Never quote a price not on file for this client.");
+
+  const rules = await write("sales_agents.update_qualification_rules", {
+    sales_agent_id,
+    qualification: [{ question: "What is your timeline?", why: "Timing", good_answer: "Now", disqualifier: "Never" }],
+  });
+  assert.equal(rules.data.qualification.length, 1);
+
+  const tested = await write("sales_agents.test", {
+    sales_agent_id,
+    transcript: [{ role: "lead", text: "Hi, I need help." }, { role: "agent", text: "What is your timeline?" }],
+  });
+  assert.equal(tested.data.sandbox, true);
+  assert.equal(tested.data.live_channel_send, false);
+
+  // sales_agents.deploy stays absent/denied -- Phase 11c / Eng, not this gate.
+  const deployed = await invoke("sales_agents.deploy", {
+    client_id, sales_agent_id, idempotency_key: randomUUID(),
+  });
+  assert.equal(deployed.status, "rejected", "sales_agents.deploy must stay denied in Gate 11b");
 }

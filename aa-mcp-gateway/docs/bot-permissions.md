@@ -148,12 +148,17 @@ Effective tools (14):
 
 ## bot_sales_ops
 
-Configured grants: `pipeline.list_leads`, `pipeline.get_lead`, `pipeline.get_stalled_leads`, `pipeline.get_pipeline_summary`, `sales_agents.list`, `sales_agents.get`, `sales_agents.get_conversations`, `workflow.get_pending_approvals`, `workflow.get_activity`, `workflow.list_tasks`, `workflow.get_task`, `pipeline.update_stage`, `pipeline.create_followup`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`.
+Configured grants: `pipeline.list_leads`, `pipeline.get_lead`, `pipeline.get_stalled_leads`, `pipeline.get_pipeline_summary`, `sales_agents.list`, `sales_agents.get`, `sales_agents.get_conversations`, `workflow.get_pending_approvals`, `workflow.get_activity`, `workflow.list_tasks`, `workflow.get_task`, `pipeline.update_stage`, `pipeline.create_followup`, `sales_agents.generate_config`, `sales_agents.create`, `sales_agents.update_knowledge`, `sales_agents.update_qualification_rules`, `sales_agents.test`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`.
 
-Effective tools (17):
+Effective tools (22):
 
+- `sales_agents.generate_config`
 - `sales_agents.list`
 - `sales_agents.get`
+- `sales_agents.create`
+- `sales_agents.update_knowledge`
+- `sales_agents.update_qualification_rules`
+- `sales_agents.test`
 - `sales_agents.get_conversations`
 - `pipeline.list_leads`
 - `pipeline.get_lead`

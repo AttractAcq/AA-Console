@@ -44,6 +44,7 @@ beforeAll(async () => {
     '20260903104450_01_foundations_roles_clients.sql',
     '20260903104529_02_team_and_operations.sql',
     '20260903104615_03_agent_registry_and_job_queue.sql',
+    '20260903104724_04_intelligence_and_strategy.sql',
     '20260903104816_05_content_chain_proof_ideas_briefs_media.sql',
     '20260903104850_06_distribution_conversion_leads.sql',
     '20260903104939_07_account_and_admin.sql',
@@ -73,6 +74,7 @@ beforeAll(async () => {
   for (const file of [
     '20260908030000_60_revenue_pipeline.sql',
     '20260908040000_61_lead_operations.sql',
+    '20260907130000_53_client_brand_profiles.sql',
     '20260908220000_67_sales_agents.sql',
     '20260907190000_56_repurposing.sql',
     '20260908080000_63_mcp_brief_enqueue.sql',
@@ -85,6 +87,7 @@ beforeAll(async () => {
     '20260909040000_74_mcp_production_bot_decide.sql',
     '20260909050000_75_mcp_distribution_manager.sql',
     '20260910000000_76_mcp_sales_ops.sql',
+    '20260910100000_77_mcp_sales_agent_factory.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -101,7 +104,7 @@ beforeEach(async () => {
   await db.exec(`reset role;
     truncate mcp_brief_requests, mcp_bot_clients, mcp_internal.mcp_bot_token_audit,
       mcp_internal.mcp_bot_tokens, mcp_internal.mcp_content_requests,
-      mcp_internal.mcp_pipeline_requests, scheduled_posts,
+      mcp_internal.mcp_pipeline_requests, mcp_internal.mcp_sales_agent_requests, scheduled_posts,
       client_media_assets, client_ideas, agent_job_events, agent_jobs,
       campaigns, lead_events, client_leads, sales_agent_conversations, client_sales_agents,
       finance_entries, finance_periods, client_billing,
@@ -1345,7 +1348,9 @@ describe('Phase 11 Sales Ops isolation', () => {
       `select count(*)::int as n from mcp_internal.mcp_bot_permissions
         where bot_id = 'bot_sales_ops'`,
     )).rows;
-    expect(exact[0]?.n).toBe(17);
+    // 17 (Phase 11) + 5 (Phase 11b factory writes) = 22, since migration 77
+    // is loaded in the same fixture as migration 76.
+    expect(exact[0]?.n).toBe(22);
     const wildcardsOrProof = (await db.query<{ n: number }>(
       `select count(*)::int as n from mcp_internal.mcp_bot_permissions
         where bot_id = 'bot_sales_ops'
@@ -1363,6 +1368,248 @@ describe('Phase 11 Sales Ops isolation', () => {
     await expect(db.exec(
       `insert into mcp_internal.mcp_bot_permissions (bot_id, permission_pattern, granted_by)
        values ('bot_production', 'pipeline.list_leads', 'test')`,
+    )).rejects.toThrow(/Phase 11: pipeline/);
+  });
+});
+
+describe('Phase 11b Sales Agent Factory isolation', () => {
+  const AGENT_A = '9999b001-9999-4999-8999-999999999911';
+  const AGENT_B = '9999b002-9999-4999-8999-999999999912';
+
+  const generate = (
+    overrides: Partial<{ bot: string; client: string; role: string; execution: string }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_generate_sales_agent_config($1,$2,$3,$4,$5) as result',
+    [
+      overrides.bot ?? 'bot_sales_ops', 'gen-req', overrides.execution ?? 'gen-exec',
+      overrides.client ?? CLIENT_A, overrides.role ?? 'inbound_qualifier',
+    ],
+  );
+  const create = (
+    overrides: Partial<{ bot: string; client: string; role: string; name: string; purpose: string; execution: string }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_create_sales_agent($1,$2,$3,$4,$5,$6,$7) as result',
+    [
+      overrides.bot ?? 'bot_sales_ops', 'create-req', overrides.execution ?? 'create-exec',
+      overrides.client ?? CLIENT_A, overrides.role ?? 'inbound_qualifier',
+      overrides.name ?? 'Front Desk', overrides.purpose ?? 'Qualify and book',
+    ],
+  );
+  const updateKnowledge = (
+    overrides: Partial<{
+      bot: string; client: string; agent: string; objections: unknown; guardrails: string | null;
+      greeting: string | null; execution: string;
+    }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_update_sales_agent_knowledge($1,$2,$3,$4,$5,$6,$7,$8) as result',
+    [
+      overrides.bot ?? 'bot_sales_ops', 'know-req', overrides.execution ?? 'know-exec',
+      overrides.client ?? CLIENT_A, overrides.agent ?? AGENT_A,
+      overrides.objections === undefined
+        ? JSON.stringify([{ objection: 'Too expensive', response: 'Compare to the alternative' }])
+        : overrides.objections === null ? null : JSON.stringify(overrides.objections),
+      overrides.guardrails === undefined ? 'Never quote a price.' : overrides.guardrails,
+      overrides.greeting === undefined ? null : overrides.greeting,
+    ],
+  );
+  const updateQualification = (
+    overrides: Partial<{ bot: string; client: string; agent: string; qualification: unknown; execution: string }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_update_sales_agent_qualification_rules($1,$2,$3,$4,$5,$6) as result',
+    [
+      overrides.bot ?? 'bot_sales_ops', 'qual-req', overrides.execution ?? 'qual-exec',
+      overrides.client ?? CLIENT_A, overrides.agent ?? AGENT_A,
+      JSON.stringify(overrides.qualification ?? [
+        { question: 'What is your timeline?', why: 'Timing', good_answer: 'Now', disqualifier: 'Never' },
+      ]),
+    ],
+  );
+  const sandboxTest = (
+    overrides: Partial<{ bot: string; client: string; agent: string; transcript: unknown; execution: string }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_test_sales_agent($1,$2,$3,$4,$5,$6) as result',
+    [
+      overrides.bot ?? 'bot_sales_ops', 'test-req', overrides.execution ?? 'test-exec',
+      overrides.client ?? CLIENT_A, overrides.agent ?? AGENT_A,
+      JSON.stringify(overrides.transcript ?? [{ role: 'lead', text: 'Hi, I need help.' }]),
+    ],
+  );
+
+  beforeEach(async () => {
+    await db.exec(`
+      insert into client_sales_agents (id, client_id, name, purpose, status, role) values
+        ('${AGENT_A}', '${CLIENT_A}', 'Closer A', 'Qualify and book', 'live', 'inbound_qualifier'),
+        ('${AGENT_B}', '${CLIENT_B}', 'Closer B', 'Qualify and book', 'live', 'inbound_qualifier');
+      insert into mcp_bot_clients (bot_id, client_id) values ('bot_sales_ops', '${CLIENT_A}');
+    `);
+  });
+
+  it('every new RPC uses require_active_bot + require_bot_client_grant, never can_access_client, and hard-codes bot_sales_ops', async () => {
+    const signatures = [
+      'mcp_internal.generate_sales_agent_config(text,text,text,uuid,text)',
+      'mcp_internal.create_sales_agent(text,text,text,uuid,text,text,text)',
+      'mcp_internal.update_sales_agent_knowledge(text,text,text,uuid,uuid,jsonb,text,text)',
+      'mcp_internal.update_sales_agent_qualification_rules(text,text,text,uuid,uuid,jsonb)',
+      'mcp_internal.test_sales_agent(text,text,text,uuid,uuid,jsonb)',
+    ];
+    for (const sig of signatures) {
+      const src = await db.query<{ def: string }>(`select pg_get_functiondef('${sig}'::regprocedure) as def`);
+      expect(src.rows[0]?.def, sig).toContain('require_active_bot');
+      expect(src.rows[0]?.def, sig).toContain('require_bot_client_grant');
+      expect(src.rows[0]?.def, sig).toContain('bot_forbidden');
+      expect(src.rows[0]?.def, sig).not.toMatch(/can_access_client\s*\(/);
+    }
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await expect(db.query('select mcp_generate_sales_agent_config($1,$2,$3,$4,$5)',
+        ['bot_sales_ops', 'r', 'e', CLIENT_A, 'inbound_qualifier'])).rejects.toThrow('permission denied');
+      await expect(db.query('select mcp_create_sales_agent($1,$2,$3,$4,$5,$6,$7)',
+        ['bot_sales_ops', 'r', 'e', CLIENT_A, 'inbound_qualifier', 'x', 'y'])).rejects.toThrow('permission denied');
+      await db.exec('reset role');
+    }
+    await asService();
+  });
+
+  it('generate_config composes a draft for the granted client only and replays idempotently', async () => {
+    const draft = (await generate()).rows[0]!.result;
+    expect(draft.role).toBe('inbound_qualifier');
+    expect(draft.draft.qualification.length).toBeGreaterThanOrEqual(1);
+    expect(draft.replayed).toBe(false);
+    const replay = (await generate()).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+    await expect(generate({ role: 'appointment_setter', execution: 'gen-exec' })).rejects.toThrow('idempotency_conflict');
+    await expect(generate({ client: CLIENT_B, execution: 'gen-cross' })).rejects.toThrow('client_forbidden');
+    await expect(generate({ role: 'not-a-role', execution: 'gen-badrole' })).rejects.toThrow('invalid_role');
+  });
+
+  it('create persists a new per-client agent, binds client_id, and replays idempotently', async () => {
+    const created = (await create()).rows[0]!.result;
+    expect(created.role).toBe('inbound_qualifier');
+    expect(created.status).toBe('draft');
+    expect(created.client_id).toBe(CLIENT_A);
+    const row = (await db.query<{ client_id: string; role: string }>(
+      `select client_id, role from client_sales_agents where id = '${created.id}'`,
+    )).rows[0]!;
+    expect(row.client_id).toBe(CLIENT_A);
+    expect(row.role).toBe('inbound_qualifier');
+    const replay = (await create()).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+    expect(replay.id).toBe(created.id);
+    await expect(create({ name: 'Different Name', execution: 'create-exec' })).rejects.toThrow('idempotency_conflict');
+    await expect(create({ client: CLIENT_B, execution: 'create-cross' })).rejects.toThrow('client_forbidden');
+  });
+
+  it('update_knowledge writes objections/guardrails/greeting on the owned agent and rejects a cross-client resource', async () => {
+    const updated = (await updateKnowledge()).rows[0]!.result;
+    expect(updated.guardrails).toBe('Never quote a price.');
+    expect(updated.objections).toHaveLength(1);
+    const replay = (await updateKnowledge()).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+    await expect(updateKnowledge({ agent: AGENT_B, execution: 'know-mismatch' })).rejects.toThrow('client_mismatch');
+    await expect(updateKnowledge({ client: CLIENT_B, agent: AGENT_B, execution: 'know-forbidden' })).rejects.toThrow('client_forbidden');
+    await expect(updateKnowledge({
+      objections: null, guardrails: null, execution: 'know-empty',
+    })).rejects.toThrow('invalid_request');
+  });
+
+  it('update_qualification_rules replaces the qualification list on the owned agent and rejects a cross-client resource', async () => {
+    const updated = (await updateQualification()).rows[0]!.result;
+    expect(updated.qualification).toHaveLength(1);
+    const replay = (await updateQualification()).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+    await expect(updateQualification({ agent: AGENT_B, execution: 'qual-mismatch' })).rejects.toThrow('client_mismatch');
+    await expect(updateQualification({ qualification: [], execution: 'qual-empty' })).rejects.toThrow('invalid_request');
+  });
+
+  it('test runs a sandbox check against the owned agent, never touches sales_agent_conversations, and rejects a cross-client resource', async () => {
+    const before = (await db.query<{ n: number }>(
+      'select count(*)::int as n from sales_agent_conversations',
+    )).rows[0]?.n;
+    const result = (await sandboxTest()).rows[0]!.result;
+    expect(result.sandbox).toBe(true);
+    expect(result.live_channel_send).toBe(false);
+    expect(result.turns_evaluated).toBe(1);
+    const after = (await db.query<{ n: number }>(
+      'select count(*)::int as n from sales_agent_conversations',
+    )).rows[0]?.n;
+    expect(after).toBe(before);
+    await expect(sandboxTest({ agent: AGENT_B, execution: 'test-mismatch' })).rejects.toThrow('client_mismatch');
+  });
+
+  it('test never writes the raw transcript into the ledger payload -- only a digest and turn count', async () => {
+    await sandboxTest({
+      transcript: [
+        { role: 'lead', text: 'Hi, I need help with pricing.' },
+        { role: 'agent', text: 'Happy to help -- what is your timeline?' },
+      ],
+      execution: 'test-digest',
+    });
+    const row = (await db.query<{ payload: any }>(
+      "select payload from mcp_internal.mcp_sales_agent_requests where tool = 'sales_agents.test' and execution_id = 'test-digest'",
+    )).rows[0]!;
+    expect(Object.keys(row.payload).sort()).toEqual(['sales_agent_id', 'transcript_digest', 'turns']);
+    expect(row.payload.turns).toBe(2);
+    expect(row.payload.transcript_digest).toMatch(/^[0-9a-f]{32}$/);
+    const serialized = JSON.stringify(row.payload);
+    expect(serialized).not.toContain('"transcript"');
+    expect(serialized).not.toContain('pricing');
+    expect(serialized).not.toContain('timeline');
+  });
+
+  it('bot_forbidden: no Bot other than bot_sales_ops can call any factory write, even with an active status and a valid client grant', async () => {
+    await db.exec(`insert into mcp_bot_clients (bot_id,client_id) values ('bot_production','${CLIENT_A}') on conflict do nothing;`);
+    await expect(generate({ bot: 'bot_production', execution: 'prod-gen' })).rejects.toThrow('bot_forbidden');
+    await expect(create({ bot: 'bot_production', execution: 'prod-create' })).rejects.toThrow('bot_forbidden');
+    await expect(updateKnowledge({ bot: 'bot_production', execution: 'prod-know' })).rejects.toThrow('bot_forbidden');
+    await expect(updateQualification({ bot: 'bot_production', execution: 'prod-qual' })).rejects.toThrow('bot_forbidden');
+    await expect(sandboxTest({ bot: 'bot_production', execution: 'prod-test' })).rejects.toThrow('bot_forbidden');
+  });
+
+  it('suspended bot is bot_not_active even with a remaining grant', async () => {
+    await db.query('select mcp_issue_bot_token($1,$2,$3,$4)', ['bot_sales_ops', HASH, 'operator', 'test']);
+    await db.query('select mcp_suspend_bot($1,$2,$3)', ['bot_sales_ops', 'operator', 'lock']);
+    await expect(generate()).rejects.toThrow('bot_not_active');
+    await expect(create()).rejects.toThrow('bot_not_active');
+  });
+
+  it('revoked grant denies replay before lookup', async () => {
+    await create();
+    await db.exec(`delete from mcp_bot_clients where bot_id = 'bot_sales_ops' and client_id = '${CLIENT_A}'`);
+    await expect(create({ execution: 'create-revoked' })).rejects.toThrow('client_forbidden');
+    await expect(updateKnowledge({ execution: 'know-revoked' })).rejects.toThrow('client_forbidden');
+  });
+
+  it('permission rows: exactly 5 new exact-name rows for bot_sales_ops, none outside it, deploy/record_sale/proof.* still absent', async () => {
+    const mine = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions
+        where bot_id = 'bot_sales_ops'
+          and permission_pattern in ('sales_agents.generate_config', 'sales_agents.create',
+            'sales_agents.update_knowledge', 'sales_agents.update_qualification_rules', 'sales_agents.test')`,
+    )).rows;
+    expect(mine[0]?.n).toBe(5);
+    const other = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions
+        where bot_id <> 'bot_sales_ops'
+          and permission_pattern in ('sales_agents.generate_config', 'sales_agents.create',
+            'sales_agents.update_knowledge', 'sales_agents.update_qualification_rules', 'sales_agents.test')`,
+    )).rows;
+    expect(other[0]?.n).toBe(0);
+    const forbidden = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions
+        where bot_id = 'bot_sales_ops'
+          and permission_pattern in ('sales_agents.deploy', 'pipeline.record_sale', 'proof.search', 'proof.get')`,
+    )).rows;
+    expect(forbidden[0]?.n).toBe(0);
+    // Ongoing guard: a future attempt to grant bot_sales_ops the deploy stub
+    // must still be rejected, even though this phase legitimizes its four
+    // siblings.
+    await expect(db.exec(
+      `insert into mcp_internal.mcp_bot_permissions (bot_id, permission_pattern, granted_by)
+       values ('bot_sales_ops', 'sales_agents.deploy', 'test')`,
+    )).rejects.toThrow(/Phase 11b: bot_sales_ops must not hold/);
+    await expect(db.exec(
+      `insert into mcp_internal.mcp_bot_permissions (bot_id, permission_pattern, granted_by)
+       values ('bot_production', 'sales_agents.create', 'test')`,
     )).rejects.toThrow(/Phase 11: pipeline/);
   });
 });

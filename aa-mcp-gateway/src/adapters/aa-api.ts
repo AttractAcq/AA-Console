@@ -211,6 +211,26 @@ for (const action of ["list", "get", "get_conversations"]) {
     input: registry.find((t) => t.name === `sales_agents.${action}`)!.input.strip(),
   };
 }
+// Phase 11b: factory writes realized this phase. sales_agents.deploy
+// deliberately gets no route here — it stays not_implemented (Alex CLEAR #5 /
+// SEC_BAR #4), same "absent from ROUTES ⇒ not_implemented" pattern every
+// other stub tool relies on.
+for (const action of [
+  "generate_config",
+  "create",
+  "update_knowledge",
+  "update_qualification_rules",
+  "test",
+]) {
+  ROUTES[`sales_agents.${action}`] = {
+    path: `/internal/mcp/sales-agents/${action.replaceAll("_", "-")}`,
+    kind: "write",
+    input: registry
+      .find((t) => t.name === `sales_agents.${action}`)!
+      .input.omit({ idempotency_key: true } as never)
+      .strip(),
+  };
+}
 
 for (const tool of registry.filter((t) => orchestrationTools.has(t.name))) {
   const [domain, action] = tool.name.split(".");
@@ -252,6 +272,7 @@ const codes = new Set([
   "lead_not_found",
   "sales_agent_not_found",
   "invalid_stage",
+  "invalid_role",
   "lost_reason_required",
   "idempotency_conflict",
   "brief_agent_unavailable",
