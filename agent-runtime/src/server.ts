@@ -12,6 +12,7 @@ import { handleMcpBrief } from "./mcp/brief-route.js";
 import { handleMcpOrchestration } from "./mcp/orchestration-route.js";
 import { handleMcpDelivery } from "./mcp/delivery-route.js";
 import { handleMcpContent } from "./mcp/content-route.js";
+import { handleMcpAdmin } from "./mcp/admin-route.js";
 import { handleMcpPipeline } from "./mcp/pipeline-route.js";
 import { handleMcpSalesAgents } from "./mcp/sales-agents-route.js";
 import { handleMcpAuth } from "./mcp/auth-route.js";
@@ -68,6 +69,10 @@ const server = http.createServer((req, res) => {
   }
   if (req.url?.startsWith("/internal/mcp/content/")) {
     void handleMcpContent(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+  if (req.url?.startsWith("/internal/mcp/admin/")) {
+    void handleMcpAdmin(req, res, sb, config.mcpServiceSecret);
     return;
   }
   if (req.url?.startsWith("/internal/mcp/pipeline/")) {

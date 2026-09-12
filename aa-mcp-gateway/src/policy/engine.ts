@@ -45,7 +45,20 @@ export class ActionEngine {
     const tool = this.tools.find((t) => t.name === name);
     let input: Record<string, unknown> = {};
     let receiptKey: string | undefined;
+    let executionId: string | undefined;
     const finish = (result: Result, authorization = "allowed"): Result => {
+      const event = result.data?.event as { id?: unknown } | undefined;
+      const eventId = typeof event?.id === "string" ? event.id : undefined;
+      if (
+        tool?.domain === "admin" &&
+        [
+          "client_forbidden",
+          "bot_not_active",
+          "bot_forbidden",
+          "event_not_found",
+        ].includes(result.error?.code ?? "")
+      )
+        authorization = "denied";
       this.store.transaction(() => {
         this.store.audit({
           request_id,
@@ -55,7 +68,13 @@ export class ActionEngine {
             (k) => k !== "idempotency_key",
           ),
           client_id: input.client_id,
-          resource: input.idea_id ?? input.asset_id ?? input.task_id,
+          resource:
+            input.event_id ??
+            eventId ??
+            input.idea_id ??
+            input.asset_id ??
+            input.task_id,
+          execution_id: executionId,
           authorization,
           approval_status: result.approval_id
             ? "pending"
@@ -101,7 +120,10 @@ export class ActionEngine {
         message: "Invalid tool input.",
       });
     input = parsed.data;
-    if (name !== "delivery.list_clients" && !identity.clients.includes(String(input.client_id)))
+    if (
+      name !== "delivery.list_clients" &&
+      !identity.clients.includes(String(input.client_id))
+    )
       return finish(
         {
           status: "rejected",
@@ -133,30 +155,44 @@ export class ActionEngine {
             request_id,
             message: "Idempotency key conflicts with prior input.",
           });
-        return finish(
-          existing.result
-            ? { ...JSON.parse(String(existing.result)), request_id }
-            : {
-                status: "indeterminate",
-                capability: name,
-                request_id,
-                message: "Execution reserved; reconcile before retrying.",
-              },
-        );
+        if (
+          tool.domain !== "admin" &&
+          !(
+            identity.bot === "bot_admin" &&
+            [
+              "workflow.create_task",
+              "workflow.assign_task",
+              "workflow.complete_task",
+            ].includes(name)
+          )
+        )
+          return finish(
+            existing.result
+              ? { ...JSON.parse(String(existing.result)), request_id }
+              : {
+                  status: "indeterminate",
+                  capability: name,
+                  request_id,
+                  message: "Execution reserved; reconcile before retrying.",
+                },
+          );
       }
-      this.store.transaction(() => {
-        this.store.db
-          .prepare("INSERT INTO receipts(key,fingerprint) VALUES (?,?)")
-          .run(key, fingerprint);
-        this.store.audit({
-          request_id,
-          bot: identity.bot,
-          tool: name,
-          client_id: input.client_id,
-          authorization: "allowed",
-          execution_result: "reserved",
+      executionId = createHash("sha256").update(key).digest("hex");
+      if (!existing)
+        this.store.transaction(() => {
+          this.store.db
+            .prepare("INSERT INTO receipts(key,fingerprint) VALUES (?,?)")
+            .run(key, fingerprint);
+          this.store.audit({
+            request_id,
+            bot: identity.bot,
+            tool: name,
+            client_id: input.client_id,
+            authorization: "allowed",
+            execution_result: "reserved",
+            execution_id: executionId,
+          });
         });
-      });
       receiptKey = key;
     }
     const needsApproval =
@@ -212,12 +248,13 @@ export class ActionEngine {
       }
     }
     try {
+      executionId ??= createHash("sha256")
+        .update(receiptKey ?? request_id)
+        .digest("hex");
       const context = {
         ...identity,
         request_id,
-        execution_id: createHash("sha256")
-          .update(receiptKey ?? request_id)
-          .digest("hex"),
+        execution_id: executionId,
       };
       let result: Omit<Result, "request_id">;
       const workflowResult = new WorkflowService(this.store).execute(
