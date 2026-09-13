@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { AlertTriangle, Plus } from "lucide-react";
 import { Button } from "../../components/Button";
@@ -91,6 +91,12 @@ export function ProspectsLeadsPanel() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [stalled, setStalled] = useState<Stalled[]>([]);
   const [loading, setLoading] = useState(true);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropStage, setDropStage] = useState<LeadStage | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const moving = useRef(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -116,6 +122,28 @@ export function ProspectsLeadsPanel() {
     void refresh();
   }, [refresh]);
 
+  async function moveLead(leadId: string, stage: LeadStage) {
+    const lead = leads.find((row) => row.id === leadId);
+    if (!clientId || !lead || lead.stage === stage || moving.current) return;
+    moving.current = true;
+    setBusyId(leadId);
+    setError(null);
+    setNotice(null);
+    try {
+      const { error } = await supabase.rpc("advance_lead", { p_lead_id: leadId, p_stage: stage });
+      if (error) throw error;
+      await refresh();
+      setNotice(`${lead.name ?? "Lead"} moved to ${STAGES.find((s) => s.id === stage)?.label}.`);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : (error as { message?: string }).message ?? "Could not move this lead.");
+    } finally {
+      moving.current = false;
+      setBusyId(null);
+      setDraggedId(null);
+      setDropStage(null);
+    }
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">Loading pipeline…</p>;
 
   const open = leads.filter((l) => l.stage !== "cash" && l.stage !== "lost");
@@ -124,6 +152,9 @@ export function ProspectsLeadsPanel() {
 
   return (
     <div className="space-y-4">
+      {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <p className="text-xs text-muted-foreground">Drag a card to a stage, or use its Move to control.</p>
       {/* What is sitting still, before what exists. A pipeline board shows
           you the shape; this shows you the work. */}
       {stalled.length > 0 && (
@@ -182,7 +213,23 @@ export function ProspectsLeadsPanel() {
           {STAGES.map((stage) => {
             const inStage = leads.filter((l) => l.stage === stage.id);
             return (
-              <div key={stage.id} className="rounded-lg border border-border bg-card p-3.5">
+              <div key={stage.id}
+                aria-label={`${stage.label} stage`}
+                onDragOver={(event) => {
+                  if (!draggedId || busyId) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                  setDropStage(stage.id);
+                }}
+                onDragLeave={() => setDropStage(null)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (draggedId) void moveLead(draggedId, stage.id);
+                  setDraggedId(null);
+                  setDropStage(null);
+                }}
+                className={`rounded-lg border border-border bg-card p-3.5 ${dropStage === stage.id ? "ring-2 ring-ring" : ""}`}>
+
                 <div className="mb-2 flex items-baseline justify-between gap-2">
                   <h3 className="text-sm font-semibold text-card-foreground">{stage.label}</h3>
                   <span className="text-xs text-muted-foreground">{inStage.length}</span>
@@ -192,7 +239,16 @@ export function ProspectsLeadsPanel() {
                 ) : (
                   <ul className="space-y-1.5">
                     {inStage.map((l) => (
-                      <li key={l.id} className="rounded-md border border-border/60 p-2">
+                      <li key={l.id}
+                        draggable={busyId === null}
+                        onDragStart={(event) => {
+                          setDraggedId(l.id);
+                          event.dataTransfer.setData("text/plain", l.id);
+                          event.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragEnd={() => { setDraggedId(null); setDropStage(null); }}
+                        className={`rounded-md border border-border/60 p-2 ${busyId === null ? "cursor-grab" : "opacity-60"}`}>
+
                         <p className="truncate text-sm text-foreground">{l.name ?? "Unnamed"}</p>
                         <p className="truncate text-xs text-muted-foreground">
                           {l.next_action ?? (
@@ -206,6 +262,16 @@ export function ProspectsLeadsPanel() {
                               .join(" · ")}
                           </p>
                         )}
+                        <select
+                          aria-label={`Move ${l.name ?? "Unnamed"} to`}
+                          value={l.stage}
+                          disabled={busyId !== null}
+                          onChange={(event) => void moveLead(l.id, event.target.value as LeadStage)}
+                          className="mt-2 w-full rounded-md border border-input bg-background p-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {STAGES.map((s) => <option key={s.id} value={s.id}>Move to {s.label}</option>)}
+                        </select>
+                        {busyId === l.id && <span role="status" className="text-xs text-muted-foreground">Moving…</span>}
                       </li>
                     ))}
                   </ul>
