@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pageProblem } from "./index.js";
+import { htmlSafetyProblem, pageProblem } from "./safety.js";
 
 const ok = "<!doctype html><html><head><style>body{color:#000}</style></head><body><h1>Hi</h1>" +
   "x".repeat(900) + "</body></html>";
@@ -43,5 +43,37 @@ describe("what a generated page must contain", () => {
 
   it("rejects a page too thin to be a page", () => {
     expect(pageProblem("h", "<html><body>hi</body></html>")).toMatch(/too thin/i);
+  });
+});
+
+describe("the revision path cannot be weaker than the generation path", () => {
+  // The Page Reviser writes client_pages.html too. If it enforced a different
+  // set of rules, a revision could introduce exactly what generation forbids —
+  // and after Phase 10 these pages are served publicly with no sandbox.
+  const ok = "<!doctype html><html><body><h1>Hi</h1>" + "x".repeat(900) + "</body></html>";
+
+  it("rejects through htmlSafetyProblem everything pageProblem rejects about the HTML", () => {
+    const hostile = [
+      ok.replace("<h1>", "<script>alert(1)</script><h1>"),
+      ok.replace("<h1>", '<div onclick="steal()">'),
+      ok.replace("<h1>", '<iframe src="//evil">'),
+      "<html><body>too short</body></html>",
+    ];
+    for (const html of hostile) {
+      expect(htmlSafetyProblem(html)).not.toBeNull();
+      // Same verdict from both entry points, so neither can drift.
+      expect(pageProblem("a headline", html)).toBe(htmlSafetyProblem(html));
+    }
+  });
+
+  it("accepts a clean page through both", () => {
+    expect(htmlSafetyProblem(ok)).toBeNull();
+    expect(pageProblem("a headline", ok)).toBeNull();
+  });
+
+  it("does not require a headline of a revision", () => {
+    // A revision that changes a mid-page section has no new headline to state.
+    expect(htmlSafetyProblem(ok)).toBeNull();
+    expect(pageProblem("", ok)).toMatch(/no headline/i);
   });
 });
