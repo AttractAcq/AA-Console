@@ -1921,6 +1921,108 @@ export type Database = {
         }
         Relationships: []
       }
+      client_page_revisions: {
+        Row: {
+          body: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          html: string
+          id: string
+          job_id: string | null
+          meta_description: string | null
+          meta_title: string | null
+          page_id: string
+          reason: string | null
+          revision_number: number
+          source: string
+          summary: string | null
+        }
+        Insert: {
+          body?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          html: string
+          id?: string
+          job_id?: string | null
+          meta_description?: string | null
+          meta_title?: string | null
+          page_id: string
+          reason?: string | null
+          revision_number: number
+          source: string
+          summary?: string | null
+        }
+        Update: {
+          body?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          html?: string
+          id?: string
+          job_id?: string | null
+          meta_description?: string | null
+          meta_title?: string | null
+          page_id?: string
+          reason?: string | null
+          revision_number?: number
+          source?: string
+          summary?: string | null
+        }
+        Relationships: []
+      }
+      client_page_findings: {
+        Row: {
+          category: string
+          classification: string
+          client_id: string
+          created_at: string
+          explanation: string
+          id: string
+          job_id: string | null
+          page_id: string
+          revision_number: number
+          severity: string
+          status: string
+          suggested_direction: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          classification: string
+          client_id: string
+          created_at?: string
+          explanation: string
+          id?: string
+          job_id?: string | null
+          page_id: string
+          revision_number: number
+          severity?: string
+          status?: string
+          suggested_direction?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          classification?: string
+          client_id?: string
+          created_at?: string
+          explanation?: string
+          id?: string
+          job_id?: string | null
+          page_id?: string
+          revision_number?: number
+          severity?: string
+          status?: string
+          suggested_direction?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       client_pages: {
         Row: {
           body: string | null
@@ -1939,6 +2041,7 @@ export type Database = {
           published_at: string | null
           published_commit: string | null
           html: string | null
+          current_revision: number | null
           meta_title: string | null
           meta_description: string | null
           built_at: string | null
@@ -1964,6 +2067,7 @@ export type Database = {
           published_at?: string | null
           published_commit?: string | null
           html?: string | null
+          current_revision?: number | null
           meta_title?: string | null
           meta_description?: string | null
           built_at?: string | null
@@ -1989,6 +2093,7 @@ export type Database = {
           published_at?: string | null
           published_commit?: string | null
           html?: string | null
+          current_revision?: number | null
           meta_title?: string | null
           meta_description?: string | null
           built_at?: string | null
@@ -3524,6 +3629,24 @@ export type Database = {
       launch_campaign: {
         Args: { p_campaign_id: string }
         Returns: undefined
+      }
+      record_page_revision: {
+        Args: {
+          p_page_id: string
+          p_html: string
+          p_source: string
+          p_summary?: string
+          p_reason?: string
+          p_meta_title?: string
+          p_meta_description?: string
+          p_body?: string
+          p_job_id?: string
+        }
+        Returns: number
+      }
+      revert_page_to_revision: {
+        Args: { p_page_id: string; p_revision_number: number }
+        Returns: number
       }
       advance_lead: {
         Args: { p_lead_id: string; p_stage: Database["public"]["Enums"]["lead_stage"]; p_note?: string }

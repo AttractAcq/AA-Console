@@ -31,6 +31,8 @@ import { runRepurposeJob } from "../agents/repurpose/index.js";
 import { runProofDiscoveryJob } from "../agents/proof_discovery/index.js";
 import { runSalesAgentJob } from "../agents/sales_agent/index.js";
 import { runCampaignPlanJob } from "../agents/campaign_plan/index.js";
+import { runPageAuditJob } from "../agents/page_audit/index.js";
+import { runPageReviseJob } from "../agents/page_revise/index.js";
 
 export interface JobResult {
   ok: boolean;
@@ -72,6 +74,9 @@ const RUNNERS: Record<string, JobRunner> = {
   sales_agent: runSalesAgentJob,
   // The orchestrator's planning half; the executing half is SQL.
   campaign_plan: runCampaignPlanJob,
+  // The polish loop: one reports, a person chooses, the other acts.
+  page_audit: runPageAuditJob,
+  page_revise: runPageReviseJob,
   // Deterministic ETL, no model. Scheduled rather than run by hand.
   metrics_ingest: runMetricsIngestJob,
   // Reads what the ingest wrote and says what it means.
