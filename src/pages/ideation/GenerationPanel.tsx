@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PenLine, Sparkles, BadgeCheck } from "lucide-react";
 import { ActionCard } from "../../components/ActionCard";
@@ -30,12 +30,13 @@ const MANUAL_FIELDS: FieldDef[] = [
   { name: "body", label: "Detail", kind: "textarea", rows: 3 },
 ];
 
-export function GenerationPanel() {
+export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?: boolean; refreshToken?: unknown } = {}) {
   const { clientId } = useParams<{ clientId: string }>();
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [ideas, setIdeas] = useState<Idea[]>([]);
-  const [busyIdeaId, setBusyIdeaId] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<{ ideaId: string; action: "approve" | "brief" | "approve-and-brief" } | null>(null);
+  const actionInFlight = useRef(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const proofOptions = useOptions(
     () => loadProofAssets(clientId ?? ""),
@@ -55,29 +56,46 @@ export function GenerationPanel() {
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+  }, [refresh, refreshToken]);
 
-  const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
+  const { inFlight, recentFailures } = useAgentJobs(watchJobs ? clientId : undefined, refresh);
 
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
   const shown = ideas.filter((i) => i.media_type === activeFilter);
 
-  async function approveAndBrief(ideaId: string) {
-    setBusyIdeaId(ideaId);
+  async function actOnIdea(ideaId: string, action: "approve" | "brief" | "approve-and-brief") {
+    if (!clientId || actionInFlight.current) return;
+    actionInFlight.current = true;
+    setBusyAction({ ideaId, action });
     setNotice(null);
-    const { error } = await supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: ideaId });
-    setBusyIdeaId(null);
-    // Previously this swallowed the error: a failed approve did nothing at
-    // all and looked identical to a successful one.
-    if (error) {
-      setNotice({ kind: "error", text: error.message });
-      return;
+    try {
+      if (action === "approve") {
+        const { data, error } = await supabase
+          .from("client_ideas")
+          .update({ status: "approved" })
+          .eq("id", ideaId)
+          .eq("client_id", clientId)
+          .eq("status", "draft")
+          .select("id")
+          .single();
+        if (error) throw error;
+        if (!data) throw new Error("This idea is no longer a draft. Refresh and try again.");
+        setNotice({ kind: "ok", text: "Idea approved." });
+      } else {
+        const { error } = await supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: ideaId });
+        if (error) throw error;
+        setNotice({
+          kind: "ok",
+          text: `${action === "brief" ? "Brief queued." : "Approved."} The brief agent is writing it now — this takes a couple of minutes and the Briefs tab will fill in on its own.`,
+        });
+      }
+      await refresh();
+    } catch (error) {
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : (error as { message?: string }).message ?? "Something went wrong." });
+    } finally {
+      actionInFlight.current = false;
+      setBusyAction(null);
     }
-    setNotice({
-      kind: "ok",
-      text: "Approved. The brief agent is writing it now — this takes a couple of minutes and the Briefs tab will fill in on its own.",
-    });
-    void refresh();
   }
 
   const proofFields: FieldDef[] = [
@@ -120,16 +138,28 @@ export function GenerationPanel() {
           i.title,
           i.source,
           i.status,
-          i.status === "draft" ? (
-            <button
-              key={i.id}
-              type="button"
-              disabled={busyIdeaId === i.id}
-              onClick={() => void approveAndBrief(i.id)}
-              className="text-sm text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {busyIdeaId === i.id ? "Queueing…" : "Approve & brief"}
-            </button>
+          i.status === "draft" || i.status === "approved" ? (
+            <span key={i.id} className="inline-flex items-center gap-3">
+              {i.status === "draft" && (
+                <button
+                  type="button"
+                  disabled={busyAction !== null}
+                  onClick={() => void actOnIdea(i.id, "approve")}
+                  className="text-sm text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {busyAction?.ideaId === i.id && busyAction.action === "approve" ? "Approving…" : "Approve"}
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={busyAction !== null}
+                onClick={() => void actOnIdea(i.id, i.status === "draft" ? "approve-and-brief" : "brief")}
+                className="text-sm text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {busyAction?.ideaId === i.id && busyAction.action !== "approve"
+                  ? "Queueing…" : i.status === "draft" ? "Approve & brief" : "Brief"}
+              </button>
+            </span>
           ) : (
             "—"
           ),

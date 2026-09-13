@@ -8,6 +8,7 @@ import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
+import { CampaignContentPanel } from "./CampaignContentPanel";
 import { cn } from "../../lib/cn";
 
 type Campaign = {
@@ -64,6 +65,7 @@ export function CampaignExecutionPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [readiness, setReadiness] = useState<Record<string, Requirement[]>>({});
+  const [contentCampaignId, setContentCampaignId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -231,6 +233,11 @@ export function CampaignExecutionPanel() {
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                  <button type="button"
+                    aria-expanded={contentCampaignId === c.id}
+                    onClick={() => setContentCampaignId(contentCampaignId === c.id ? null : c.id)}
+                    className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-card-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >Content production</button>
                   {c.built_at && (c.needs_landing_page || c.needs_sales_agent) && (
                     <button
                       type="button"
@@ -263,6 +270,7 @@ export function CampaignExecutionPanel() {
                     </span>
                   )}
                 </div>
+                {contentCampaignId === c.id && clientId && <CampaignContentPanel key={`${clientId}:${c.id}`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} onChanged={refresh} refreshToken={campaigns} />}
               </div>
             );
           })}

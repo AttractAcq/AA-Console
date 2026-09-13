@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { order, rpc, useParams } = vi.hoisted(() => ({
@@ -121,5 +121,35 @@ describe("where a lead came from", () => {
   it("says plainly when there are no leads at all", async () => {
     show([]);
     expect(await screen.findByText(/Nothing has come in from a page, a post or a referral/)).toBeInTheDocument();
+  });
+});
+
+
+describe("moving leads", () => {
+  it("drops a card into a stage using the existing audited transition", async () => {
+    show([lead({ id: "lead-1" })]);
+    const card = (await screen.findByText("Naledi K")).closest("li")!;
+    const dataTransfer = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
+    fireEvent.dragStart(card, { dataTransfer });
+    fireEvent.dragOver(screen.getByLabelText("Sale stage"), { dataTransfer });
+    fireEvent.drop(screen.getByLabelText("Sale stage"), { dataTransfer });
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("advance_lead", { p_lead_id: "lead-1", p_stage: "sale" }));
+    expect(await screen.findByText("Naledi K moved to Sale.")).toBeInTheDocument();
+    expect(order).toHaveBeenCalledTimes(2);
+  });
+  it("supports keyboard stage selection and reports errors without moving the card", async () => {
+    show([lead({ id: "lead-1" })]);
+    const select = await screen.findByLabelText("Move Naledi K to");
+    rpc.mockResolvedValue({ error: { message: "Not permitted" } });
+    fireEvent.change(select, { target: { value: "sale" } });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Not permitted");
+    expect(select).toHaveValue("conversation");
+  });
+  it("ignores a drop in the current stage", async () => {
+    show([lead({ id: "lead-1" })]);
+    const card = (await screen.findByText("Naledi K")).closest("li")!;
+    fireEvent.dragStart(card, { dataTransfer: { setData: vi.fn() } });
+    fireEvent.drop(screen.getByLabelText("Conversation stage"));
+    expect(rpc).not.toHaveBeenCalledWith("advance_lead", expect.anything());
   });
 });
