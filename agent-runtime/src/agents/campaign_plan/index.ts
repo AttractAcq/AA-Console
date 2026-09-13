@@ -19,6 +19,7 @@ import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js";
 import type { BusinessContext } from "../shared.js";
 import {
+  campaignIdeas,
   asAmount,
   asCount,
   asDate,
@@ -49,13 +50,17 @@ export async function runCampaignPlanJob(
 
   const { data: campaign, error: campaignError } = await sb
     .from("client_campaigns")
-    .select("id, name, brief")
+    .select("*")
     .eq("id", job.input_id)
+    .eq("client_id", job.client_id)
     .maybeSingle();
   if (campaignError) throw new Error(`Failed to load campaign: ${campaignError.message}`);
   if (!campaign) {
     return { ok: false, retryable: false, failureMessage: "That campaign no longer exists." };
   }
+  // A committed batch survives worker crashes and repeated generation requests.
+  if (campaign.content_ideas_generated_at) return { ok: true, retryable: false };
+
   if (!campaign.brief || campaign.brief.trim().length === 0) {
     return {
       ok: false,
@@ -123,13 +128,30 @@ export async function runCampaignPlanJob(
           type: "number",
           description: `How many distinct pieces of content this campaign needs. 0 if none. At most ${MAX_CONTENT}.`,
         },
+        ideas: {
+          type: "array",
+          description: "Exactly content_count distinct campaign-specific ideas, one per planned piece. These become the production queue, not finished briefs.",
+          maxItems: MAX_CONTENT,
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string", maxLength: 300 },
+              body: { type: "string", description: "The concrete angle, buyer question, intended response and call to action for this piece. Respect campaign constraints." },
+              media_type: { type: "string", enum: ["image", "text", "video"] },
+              channel: { type: "string", description: "Which of the campaign's channels this piece is for." },
+              strategic_reason: { type: "string", description: "Why this distinct piece helps achieve the campaign objective." },
+            },
+            required: ["title", "body", "media_type", "channel", "strategic_reason"],
+            additionalProperties: false,
+          },
+        },
         needs_landing_page: { type: "boolean", description: "Whether this campaign needs its own landing page built." },
         needs_sales_agent: { type: "boolean", description: "Whether it needs a client-facing sales agent on that page." },
         reasoning: { type: "string", description: "Why this shape, and what you deliberately left out." },
       },
       required: [
         "objective", "audience", "offer_summary", "core_message", "channels",
-        "kpi_metric", "content_count", "needs_landing_page", "needs_sales_agent", "reasoning",
+        "kpi_metric", "content_count", "ideas", "needs_landing_page", "needs_sales_agent", "reasoning",
       ],
       additionalProperties: false,
     },
@@ -148,6 +170,7 @@ WHAT MAKES A PLAN GOOD
 ABSOLUTE RULES
 - Never invent a budget, a price, a date or a target you have no basis for. Omitting a number is honest; inventing one becomes a commitment somebody else has to meet.
 - Take the audience from the ICP and the offer from the offer strategy. Do not invent either.
+- Supply exactly content_count distinct ideas tailored to this campaign, its audience, offer, dates, channels and constraints. An idea is an angle and purpose, not a finished production brief.
 - Ask only for what is needed. Every piece of content you request is real work for a real person.
 - Respect anything the offer strategy lists as a limit or a thing that cannot be promised.`;
 
@@ -155,6 +178,9 @@ ABSOLUTE RULES
 
 WHAT THIS CAMPAIGN IS FOR — the operator's brief
 ${campaign.brief}
+
+${campaign.built_at ? `EXISTING APPROVED CAMPAIGN PLAN — preserve these decisions. Generate exactly ${campaign.content_count} ideas for it; do not replan it.
+${JSON.stringify({ objective: campaign.objective, audience: campaign.audience, offer_summary: campaign.offer_summary, core_message: campaign.core_message, channels: campaign.channels, starts_on: campaign.starts_on, ends_on: campaign.ends_on, kpi_metric: campaign.kpi_metric, content_count: campaign.content_count })}` : ""}
 
 BUSINESS CONTEXT
 ${renderContext(context as BusinessContext | null)}
@@ -209,7 +235,7 @@ Call ${submitTool.name} once when you are done.`;
   };
 
   const s = (key: string) => String(result.submitted[key] ?? "").trim();
-  const plan: CampaignPlan = {
+  const submittedPlan: CampaignPlan = {
     objective: s("objective"),
     audience: s("audience"),
     offer_summary: s("offer_summary"),
@@ -225,33 +251,34 @@ Call ${submitTool.name} once when you are done.`;
     needs_sales_agent: result.submitted.needs_sales_agent === true,
   };
 
+  const plan: CampaignPlan = campaign.built_at ? {
+    objective: campaign.objective, audience: campaign.audience, offer_summary: campaign.offer_summary,
+    core_message: campaign.core_message, channels: campaign.channels, budget: campaign.budget,
+    starts_on: campaign.starts_on, ends_on: campaign.ends_on, kpi_metric: campaign.kpi_metric,
+    kpi_target: campaign.kpi_target, content_count: campaign.content_count,
+    needs_landing_page: campaign.needs_landing_page, needs_sales_agent: campaign.needs_sales_agent,
+  } : submittedPlan;
   const problem = planProblem(plan);
   if (problem) {
     return { ok: false, retryable: true, failureMessage: problem, usage };
   }
 
-  const { error } = await sb
-    .from("client_campaigns")
-    .update({
-      objective: plan.objective,
-      audience: plan.audience,
-      offer_summary: plan.offer_summary,
-      core_message: plan.core_message,
-      channels: plan.channels,
-      budget: plan.budget,
-      starts_on: plan.starts_on,
-      ends_on: plan.ends_on,
-      kpi_metric: plan.kpi_metric,
-      kpi_target: plan.kpi_target,
-      content_count: plan.content_count,
-      needs_landing_page: plan.needs_landing_page,
-      needs_sales_agent: plan.needs_sales_agent,
-      built_at: new Date().toISOString(),
-      job_id: job.id,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", campaign.id);
-  if (error) throw new Error(`Failed to write campaign plan: ${error.message}`);
+  let ideas;
+  try {
+    ideas = campaignIdeas(result.submitted.ideas, plan.content_count);
+  } catch (error) {
+    return { ok: false, retryable: true, failureMessage: (error as Error).message, usage };
+  }
+  // One transaction commits the plan and its exact idea batch, or neither.
+  // The database locks the campaign so concurrent jobs cannot duplicate it.
+  const { error } = await sb.rpc("save_campaign_plan_with_ideas", {
+    p_campaign_id: campaign.id,
+    p_client_id: job.client_id,
+    p_job_id: job.id,
+    p_plan: plan,
+    p_ideas: ideas,
+  });
+  if (error) throw new Error(`Failed to write campaign plan and ideas: ${error.message}`);
 
   await appendEvent(sb, job.id, `Planned "${campaign.name}".\n\n${planSummary(plan)}`, "info", {
     cost_usd: usage.costUsd,

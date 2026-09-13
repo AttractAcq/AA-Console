@@ -106,3 +106,34 @@ export function planSummary(plan: CampaignPlan): string {
     `**Needs built:** ${needs.join(", ")}`,
   ].join("\n\n");
 }
+
+export interface CampaignIdea {
+  title: string;
+  body: string;
+  media_type: "image" | "text" | "video";
+  channel: string;
+  strategic_reason: string;
+}
+
+/** Reject incomplete batches rather than silently saving fewer ideas than promised. */
+export function campaignIdeas(raw: unknown, expected: number): CampaignIdea[] {
+  if (!Number.isInteger(expected) || expected < 0 || expected > MAX_CONTENT ||
+      !Array.isArray(raw) || raw.length !== expected) {
+    throw new Error(`The campaign needs exactly ${expected} distinct ideas.`);
+  }
+  const titles = new Set<string>();
+  return raw.map((value) => {
+    const item = value as Record<string, unknown> | null;
+    const title = str(item?.title);
+    const body = str(item?.body);
+    const channel = str(item?.channel);
+    const strategic_reason = str(item?.strategic_reason);
+    const media_type = item?.media_type;
+    if (!title || title.length > 300 || !body || !channel || !strategic_reason ||
+        !["image", "text", "video"].includes(String(media_type)) || titles.has(title.toLowerCase())) {
+      throw new Error("Each campaign idea needs a distinct title, angle, channel, media type and reason.");
+    }
+    titles.add(title.toLowerCase());
+    return { title, body, channel, strategic_reason, media_type: media_type as CampaignIdea["media_type"] };
+  });
+}

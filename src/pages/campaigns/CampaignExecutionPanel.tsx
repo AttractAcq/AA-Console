@@ -30,6 +30,7 @@ type Campaign = {
   needs_landing_page: boolean;
   needs_sales_agent: boolean;
   built_at: string | null;
+  content_ideas_generated_at: string | null;
   launched_at: string | null;
   created_at: string;
 };
@@ -80,7 +81,7 @@ export function CampaignExecutionPanel() {
     const { data } = await supabase
       .from("client_campaigns")
       .select(
-        "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, launched_at, created_at",
+        "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, launched_at, created_at",
       )
       .eq("client_id", clientId)
       .order("created_at", { ascending: false });
@@ -270,7 +271,7 @@ export function CampaignExecutionPanel() {
                     </span>
                   )}
                 </div>
-                {contentCampaignId === c.id && clientId && <CampaignContentPanel key={`${clientId}:${c.id}`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} onChanged={refresh} refreshToken={campaigns} />}
+                {contentCampaignId === c.id && clientId && <CampaignContentPanel key={`${clientId}:${c.id}`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} onChanged={refresh} refreshToken={campaigns} />}
               </div>
             );
           })}
