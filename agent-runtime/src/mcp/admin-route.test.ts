@@ -70,7 +70,7 @@ beforeAll(async () => {
   for (const file of [
     "20260908030000_60_revenue_pipeline.sql",
     "20260908040000_61_lead_operations.sql",
-    "20260908220000_67_sales_agents.sql",
+    "20260908192515_67_sales_agents.sql",
     "20260907190000_56_repurposing.sql",
     "20260908080000_63_mcp_brief_enqueue.sql",
     "20260908080100_64_brief_job_idempotency.sql",
@@ -83,8 +83,8 @@ beforeAll(async () => {
     "20260909050000_75_mcp_distribution_manager.sql",
     "20260910000000_76_mcp_sales_ops.sql",
     "20260909010000_71_mcp_client_delivery.sql",
-    "20260909020000_72_mcp_cos_orchestration.sql",
-    "20260910120000_78_mcp_admin_calendar.sql",
+    "20260909020100_72_mcp_cos_orchestration.sql",
+    "20260911210000_78_mcp_admin_calendar.sql",
   ])
     await db.exec(await migration(file));
 }, 60_000);

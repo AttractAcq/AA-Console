@@ -87,7 +87,7 @@ Writes use complete editable-field replacement rather than ambiguous nullable pa
 
 ## Migration
 
-`supabase/migrations/20260910120000_78_mcp_admin_calendar.sql`.
+`supabase/migrations/20260911210000_78_mcp_admin_calendar.sql`.
 
 Latest base migration is `20260910000000_76_mcp_sales_ops.sql`. Deferred PR #16 contains `20260910100000_77_mcp_sales_agent_factory.sql`, absent from main and untouched. Migration 78 uses a later unique timestamp, with no dependency on 77. It replaces only Admin permission rows; it does not insert client grants, issue tokens, activate identities or change other bot permissions.
 

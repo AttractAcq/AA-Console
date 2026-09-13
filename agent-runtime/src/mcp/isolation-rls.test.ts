@@ -73,7 +73,7 @@ beforeAll(async () => {
   for (const file of [
     '20260908030000_60_revenue_pipeline.sql',
     '20260908040000_61_lead_operations.sql',
-    '20260908220000_67_sales_agents.sql',
+    '20260908192515_67_sales_agents.sql',
     '20260907190000_56_repurposing.sql',
     '20260908080000_63_mcp_brief_enqueue.sql',
     '20260908080100_64_brief_job_idempotency.sql',
@@ -86,8 +86,8 @@ beforeAll(async () => {
     '20260909050000_75_mcp_distribution_manager.sql',
     '20260910000000_76_mcp_sales_ops.sql',
     '20260909010000_71_mcp_client_delivery.sql',
-    '20260909020000_72_mcp_cos_orchestration.sql',
-    '20260910120000_78_mcp_admin_calendar.sql',
+    '20260909020100_72_mcp_cos_orchestration.sql',
+    '20260911210000_78_mcp_admin_calendar.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -1519,7 +1519,7 @@ describe('Phase 12 Admin isolation and ledger', () => {
 
 describe('Phase 12 release: shared workflow compatibility', () => {
   afterEach(async()=>{
-    const source=await migration('20260910120000_78_mcp_admin_calendar.sql');
+    const source=await migration('20260911210000_78_mcp_admin_calendar.sql');
     const start=source.indexOf('function mcp_internal.workflow_task(');
     await db.exec('create or replace '+source.slice(start,source.indexOf('end $$;',start)+7));
   });
@@ -1529,8 +1529,8 @@ describe('Phase 12 release: shared workflow compatibility', () => {
     return r.rows[0]!.result;
   };
   it('the previous shared function differs only by the explicit Admin guard',async()=>{
-    const old=await migration('20260909020000_72_mcp_cos_orchestration.sql');
-    const next=await migration('20260910120000_78_mcp_admin_calendar.sql');
+    const old=await migration('20260909020100_72_mcp_cos_orchestration.sql');
+    const next=await migration('20260911210000_78_mcp_admin_calendar.sql');
     const extract=(s:string)=>s.slice(s.indexOf('function mcp_internal.workflow_task('),s.indexOf('end $$;',s.indexOf('function mcp_internal.workflow_task('))+7);
     const added=extract(next); const start=added.indexOf(" if p_bot_id='bot_admin' and p_action='assign_task' then");
     expect(start).toBeGreaterThan(0);
@@ -1539,7 +1539,7 @@ describe('Phase 12 release: shared workflow compatibility', () => {
     expect(normalize(added.slice(0,start)+added.slice(end))).toBe(normalize(extract(old)));
   });
   for(const version of ['main','phase12']) for(const bot of existing) it(`${version} ${bot}: lifecycle, replay, assignees, errors and client boundary stay compatible`,async()=>{
-    const source=await migration(version==='main'?'20260909020000_72_mcp_cos_orchestration.sql':'20260910120000_78_mcp_admin_calendar.sql');
+    const source=await migration(version==='main'?'20260909020100_72_mcp_cos_orchestration.sql':'20260911210000_78_mcp_admin_calendar.sql');
     const start=source.indexOf('function mcp_internal.workflow_task(');
     await db.exec('create or replace '+source.slice(start,source.indexOf('end $$;',start)+7));
     await db.query('insert into mcp_bot_clients(bot_id,client_id) values($1,$2) on conflict do nothing',[bot,CLIENT_A]);
