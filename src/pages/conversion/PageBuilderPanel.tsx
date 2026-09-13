@@ -10,6 +10,7 @@ import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
 import { PagePreview } from "../../components/pages/PagePreview";
+import { PagePolish } from "./PagePolish";
 
 type Page = {
   id: string;
@@ -19,6 +20,7 @@ type Page = {
   published_url: string | null;
   created_at: string;
   html: string | null;
+  current_revision: number | null;
   meta_title: string | null;
   meta_description: string | null;
   built_at: string | null;
@@ -48,7 +50,7 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
     const { data } = await supabase
       .from("client_pages")
       .select(
-        "id, title, status, body, published_url, created_at, html, meta_title, meta_description, built_at",
+        "id, title, status, body, published_url, created_at, html, current_revision, meta_title, meta_description, built_at",
       )
       .eq("client_id", clientId)
       .eq("page_type", pageType)
@@ -184,6 +186,19 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
                 builtAt={open.built_at}
                 title={open.title}
               />
+              {/* Polish happens here, before anything is pushed to a repo. A
+                  page on a Pages-served branch is public the instant it lands,
+                  so the place to fix gaps is before the push, not after. */}
+              {clientId && open.html && (
+                <div className="mt-6">
+                  <PagePolish
+                    pageId={open.id}
+                    clientId={clientId}
+                    currentRevision={open.current_revision}
+                    onChanged={refresh}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

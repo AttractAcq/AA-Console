@@ -15,6 +15,7 @@ import { handleMcpContent } from "./mcp/content-route.js";
 import { handleMcpPipeline } from "./mcp/pipeline-route.js";
 import { handleMcpSalesAgents } from "./mcp/sales-agents-route.js";
 import { handleMcpAuth } from "./mcp/auth-route.js";
+import { handlePublicSales, isPublicSalesRequest } from "./public/sales-route.js";
 import { loadConfig } from "./config.js";
 import { serviceClient } from "./db.js";
 import { startWorker, type WorkerHandle } from "./worker.js";
@@ -80,6 +81,14 @@ const server = http.createServer((req, res) => {
   }
   if (req.url?.startsWith("/internal/mcp/auth/")) {
     void handleMcpAuth(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+
+  // The public sales widget. Handled before the console CORS block because its
+  // allowed origin comes from the deployment record, not from a static env
+  // allowlist — a static list cannot express one origin per client site.
+  if (isPublicSalesRequest(req.url)) {
+    void handlePublicSales(req, res, sb, config);
     return;
   }
 

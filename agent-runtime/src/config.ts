@@ -20,6 +20,8 @@ export interface RuntimeConfig {
   healthPort: number;
   /** Required in an X-Runtime-Secret header on /status when set. */
   sharedSecret: string | null;
+  /** Salt for hashing public-widget caller IPs. A leaked hash must be useless against an IP list. */
+  publicIpSalt: string;
   /** Dedicated MCP gateway credential. Missing disables the MCP endpoint. */
   mcpServiceSecret?: string | null;
   /** Ceiling on Master AI spend across every conversation in one UTC day. */
@@ -141,6 +143,10 @@ export function loadConfig(): RuntimeConfig {
     maxJobSeconds: intEnv("AGENT_RUNTIME_MAX_JOB_SECONDS", 1800),
     healthPort: serverPort(),
     sharedSecret: optionalEnv("AGENT_RUNTIME_SHARED_SECRET") ?? null,
+    publicIpSalt:
+      optionalEnv("PUBLIC_SALES_IP_SALT") ??
+      optionalEnv("AGENT_RUNTIME_SHARED_SECRET") ??
+      "aa-public-sales-unsalted",
     mcpServiceSecret: optionalEnv("AA_MCP_SERVICE_SECRET") ?? null,
     // Calibrated against real use rather than guessed: 13 turns had cost
     // $1.15 in total, the dearest single turn $0.16, and the busiest day
