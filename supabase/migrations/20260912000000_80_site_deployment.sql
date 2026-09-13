@@ -89,7 +89,7 @@ create table client_sales_agent_deployments (
   page_id             uuid not null references client_pages (id) on delete cascade,
   site_repository_id  uuid references client_site_repositories (id) on delete set null,
 
-  public_id           text not null unique default encode(gen_random_bytes(16), 'hex'),
+  public_id           text not null unique default encode(extensions.gen_random_bytes(16), 'hex'),
   allowed_origin      text not null,
   enabled             boolean not null default false,
   widget_config       jsonb not null default '{}'::jsonb,
