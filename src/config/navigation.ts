@@ -174,8 +174,11 @@ export const clientNavGroups: NavNode[] = [
         ],
       },
       {
+        // The page-building half of Sites. Kept as its own route so nothing
+        // bookmarked breaks, but labelled so it no longer reads as a second,
+        // competing website system.
         id: "conversion",
-        label: "Conversion",
+        label: "Page Builder",
         path: "conversion",
         icon: TrendingUp,
         tabs: [
@@ -188,7 +191,10 @@ export const clientNavGroups: NavNode[] = [
         label: "Sites",
         path: "sites",
         icon: Globe,
-        tabs: [{ id: "overview", label: "Overview" }],
+        tabs: [
+          { id: "overview", label: "Overview" },
+          { id: "settings", label: "Settings" },
+        ],
       },
       {
         id: "sales",

@@ -28,6 +28,7 @@ import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "./sales/SalesOverviewPanel";
 import { CampaignExecutionPanel } from "./campaigns/CampaignExecutionPanel";
 import { SitesPanel } from "./sites/SitesPanel";
+import { GitHubSettingsPanel } from "./sites/GitHubSettingsPanel";
 import { ProspectsLeadsPanel } from "./prospects-leads/ProspectsLeadsPanel";
 import { OnboardingPanel } from "./account/OnboardingPanel";
 import { ContactPanel } from "./account/ContactPanel";
@@ -95,6 +96,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   },
   sites: {
     overview: () => <SitesPanel />,
+    settings: () => <GitHubSettingsPanel />,
   },
   sales: {
     overview: () => <SalesOverviewPanel />,
