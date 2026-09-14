@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   checkPermissions,
+  classifyError,
   missingConfig,
   readGitHubStatus,
   satisfies,
@@ -8,7 +9,12 @@ import {
   unconfiguredStatus,
   REQUIRED_PERMISSIONS,
 } from "./status.js";
-import { mintAppJwt, normalisePrivateKey } from "./app-auth.js";
+import {
+  GitHubApiError,
+  GitHubSigningError,
+  mintAppJwt,
+  normalisePrivateKey,
+} from "./app-auth.js";
 import { generateKeyPairSync } from "node:crypto";
 
 const { privateKey } = generateKeyPairSync("rsa", {
@@ -94,8 +100,9 @@ describe("what reaches the browser", () => {
   it("carries only identifiers and configuration facts", () => {
     const status = statusFromInstallation("123456", installation());
     expect(Object.keys(status).sort()).toEqual([
-      "appId", "configured", "error", "installationId", "missing", "owner",
-      "permissions", "ready", "repositorySelection", "targetType", "verifiedAt",
+      "appId", "configured", "error", "errorKind", "installationId", "missing",
+      "owner", "permissions", "ready", "repositorySelection", "targetType",
+      "verifiedAt",
     ]);
   });
 
@@ -129,6 +136,7 @@ describe("readGitHubStatus", () => {
     );
     expect(status.configured).toBe(true);
     expect(status.ready).toBe(false);
+    expect(status.errorKind).toBe("github_api_error");
     expect(status.error).toMatch(/401/);
     // The body is never echoed — it can carry request detail.
     expect(status.error).not.toContain("nope");
@@ -209,5 +217,165 @@ describe("nothing secret can reach the browser by construction", () => {
     expect(serialised).not.toContain("abc123");
     expect(serialised).not.toContain("access_tokens_url");
     expect(serialised).not.toContain("client_secret");
+  });
+});
+
+
+// The bug this suite exists for: a private key the runtime could not read was
+// reported to the operator as "GitHub rejected the connection", naming the one
+// system that had not been contacted. Three failures that look alike on a
+// status screen need three different people to do three different things, so
+// the status has to say which one it is.
+describe("classifying what went wrong", () => {
+  const MALFORMED = "-----BEGIN RSA PRIVATE KEY-----\nnot actually a key\n-----END RSA PRIVATE KEY-----";
+
+  it("calls an unreadable private key a signing error, not a GitHub refusal", async () => {
+    let reached = false;
+    const status = await readGitHubStatus(
+      { appId: "123456", privateKey: MALFORMED, installationId: "1" },
+      (async () => {
+        reached = true;
+        return new Response("{}");
+      }) as never,
+    );
+
+    // Nothing was sent, so GitHub cannot have rejected anything.
+    expect(reached).toBe(false);
+    expect(status.errorKind).toBe("auth_signing_error");
+    expect(status.error).toBe("GitHub App private key could not be parsed by the runtime.");
+    expect(status.ready).toBe(false);
+    expect(status.configured).toBe(true);
+  });
+
+  it("does not put OpenSSL's complaint in front of the operator", async () => {
+    const status = await readGitHubStatus(
+      { appId: "123456", privateKey: MALFORMED, installationId: "1" },
+      (async () => new Response("{}")) as never,
+    );
+    const serialised = JSON.stringify(status);
+    // The exact string that shipped to production, and the shape of its family.
+    expect(serialised).not.toContain("DECODER");
+    expect(serialised).not.toContain("1E08010C");
+    expect(serialised).not.toMatch(/error:[0-9A-F]{8}:/);
+    expect(serialised).not.toContain("routines");
+    // Nor the key that failed to parse.
+    expect(serialised).not.toContain("BEGIN");
+    expect(serialised).not.toContain("not actually a key");
+  });
+
+  it("keeps the raw cause on the server, where it is worth having", () => {
+    // Dropping it entirely would trade one debugging problem for another.
+    let caught: unknown;
+    try {
+      mintAppJwt({ appId: "1", privateKey: MALFORMED, installationId: null });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(GitHubSigningError);
+    expect((caught as GitHubSigningError).cause).toBeDefined();
+    // Even the Error's own message is safe, in case a caller renders it.
+    expect((caught as Error).message).not.toContain("DECODER");
+  });
+
+  it("calls a GitHub 403 an API error and shows the status, never the body", async () => {
+    const status = await readGitHubStatus(
+      { appId: "123456", privateKey, installationId: "1" },
+      (async () =>
+        new Response(JSON.stringify({ message: "Resource not accessible", token: "ghs_leak" }), {
+          status: 403,
+        })) as never,
+    );
+    expect(status.errorKind).toBe("github_api_error");
+    expect(status.error).toContain("403");
+    expect(status.error).not.toContain("Resource not accessible");
+    expect(JSON.stringify(status)).not.toContain("ghs_leak");
+  });
+
+  it("does not call a permission shortfall a connection failure", async () => {
+    const status = await readGitHubStatus(
+      { appId: "123456", privateKey, installationId: "1" },
+      (async () =>
+        new Response(
+          JSON.stringify({
+            id: 12345678,
+            account: { login: "AttractAcq", type: "Organization" },
+            repository_selection: "selected",
+            permissions: { ...GRANTED, pages: "read", administration: undefined },
+          }),
+          { status: 200 },
+        )) as never,
+    );
+
+    // The connection resolved. The installation is real and readable.
+    expect(status.configured).toBe(true);
+    expect(status.errorKind).toBe("permission_error");
+    expect(status.error).toBeNull();
+    expect(status.owner).toBe("AttractAcq");
+    expect(status.installationId).toBe(12345678);
+    expect(status.repositorySelection).toBe("selected");
+    // And the matrix is the real one, not four blank rows.
+    expect(status.ready).toBe(false);
+    expect(status.permissions.find((p) => p.permission === "pages")?.current).toBe("read");
+    expect(status.permissions.find((p) => p.permission === "contents")?.sufficient).toBe(true);
+    expect(status.permissions.filter((p) => !p.sufficient).map((p) => p.permission).sort()).toEqual([
+      "administration",
+      "pages",
+    ]);
+  });
+
+  it("calls absent env vars a configuration error, by name and never by value", async () => {
+    const status = await readGitHubStatus({ privateKey: "-----BEGIN PRIVATE KEY-----shhh" });
+    expect(status.errorKind).toBe("configuration_error");
+    expect(status.missing).toEqual(["GITHUB_APP_ID"]);
+    expect(status.error).toBeNull();
+    const serialised = JSON.stringify(status);
+    expect(serialised).not.toContain("shhh");
+    expect(serialised).not.toContain("BEGIN");
+  });
+
+  it("reports a healthy connection as no error at all", async () => {
+    const status = await readGitHubStatus(
+      { appId: "123456", privateKey, installationId: "12345678" },
+      (async () =>
+        new Response(
+          JSON.stringify({
+            id: 12345678,
+            account: { login: "AttractAcq", type: "Organization" },
+            repository_selection: "all",
+            permissions: GRANTED,
+          }),
+          { status: 200 },
+        )) as never,
+    );
+    expect(status.errorKind).toBeNull();
+    expect(status.ready).toBe(true);
+  });
+});
+
+describe("classifyError", () => {
+  it("classifies by type, so an unknown throw cannot choose its own wording", () => {
+    // A DNS failure carries a hostname; a TLS error carries a chain. Neither is
+    // ours to render, and neither is predictable enough to sanitise by reading.
+    const leaky = new Error("getaddrinfo ENOTFOUND internal-proxy.attractacq.local");
+    const { kind, message } = classifyError(leaky);
+    expect(kind).toBe("github_api_error");
+    expect(message).toBe("Could not reach GitHub.");
+    expect(message).not.toContain("internal-proxy");
+  });
+
+  it("lets only the two deliberate errors supply their own message", () => {
+    expect(classifyError(new GitHubSigningError(new Error("x")))).toEqual({
+      kind: "auth_signing_error",
+      message: "GitHub App private key could not be parsed by the runtime.",
+    });
+    expect(classifyError(new GitHubApiError(401))).toEqual({
+      kind: "github_api_error",
+      message: "GitHub rejected the connection request (HTTP 401).",
+    });
+  });
+
+  it("survives something that is not an Error at all", () => {
+    expect(classifyError("boom").message).toBe("Could not reach GitHub.");
+    expect(classifyError(undefined).kind).toBe("github_api_error");
   });
 });

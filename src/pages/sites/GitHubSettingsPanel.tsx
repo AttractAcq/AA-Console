@@ -12,6 +12,12 @@ type PermissionCheck = {
   sufficient: boolean;
 };
 
+type ErrorKind =
+  | "configuration_error"
+  | "auth_signing_error"
+  | "github_api_error"
+  | "permission_error";
+
 type Status = {
   configured: boolean;
   missing: string[];
@@ -23,7 +29,31 @@ type Status = {
   permissions: PermissionCheck[];
   ready: boolean;
   verifiedAt: string | null;
+  errorKind: ErrorKind | null;
   error: string | null;
+};
+
+/**
+ * What kind of failure this is.
+ *
+ * The runtime says so directly. The fallback exists because the console and the
+ * runtime deploy separately: a console that has shipped ahead of the runtime
+ * would otherwise read a missing `errorKind` as "no problem" and show a broken
+ * connection as Connected, which is the worst possible direction to be wrong in.
+ */
+function kindOf(status: Status): ErrorKind | null {
+  if (status.errorKind) return status.errorKind;
+  if (!status.configured) return "configuration_error";
+  if (status.error) return "github_api_error";
+  if (!status.ready) return "permission_error";
+  return null;
+}
+
+const STATE: Record<ErrorKind, { label: string; tone: string }> = {
+  configuration_error: { label: "Not connected", tone: "bg-destructive/10 text-destructive" },
+  auth_signing_error: { label: "Key unreadable", tone: "bg-destructive/10 text-destructive" },
+  github_api_error: { label: "Failing", tone: "bg-destructive/10 text-destructive" },
+  permission_error: { label: "Permissions insufficient", tone: "bg-destructive/10 text-destructive" },
 };
 
 /**
@@ -75,15 +105,12 @@ export function GitHubSettingsPanel() {
     void verify();
   }, [verify]);
 
+  const kind = status ? kindOf(status) : null;
   const state = !status
     ? { label: "Unknown", tone: "bg-muted text-muted-foreground" }
-    : !status.configured
-      ? { label: "Not connected", tone: "bg-destructive/10 text-destructive" }
-      : status.error
-        ? { label: "Failing", tone: "bg-destructive/10 text-destructive" }
-        : status.ready
-          ? { label: "Connected", tone: "bg-primary/10 text-brand-strong" }
-          : { label: "Permissions short", tone: "bg-destructive/10 text-destructive" };
+    : kind
+      ? STATE[kind]
+      : { label: "Connected", tone: "bg-primary/10 text-brand-strong" };
 
   return (
     <div className="space-y-6">
@@ -150,9 +177,20 @@ export function GitHubSettingsPanel() {
           )}
 
           {status.error && (
-            <p role="alert" className="text-sm text-destructive">
-              GitHub rejected the connection: {status.error}
-            </p>
+            <div role="alert" className="text-sm text-destructive">
+              {/* The runtime's sentence, verbatim. Prefixing it with "GitHub
+                  rejected the connection" was how a key the runtime could not
+                  read got reported as GitHub's refusal. */}
+              <p>{status.error}</p>
+              {kind === "auth_signing_error" && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Nothing was sent to GitHub — the runtime could not build the signed request.
+                  GITHUB_APP_PRIVATE_KEY is set but is not readable as a PEM. Set it again with the
+                  .pem file&rsquo;s contents unaltered, or with base64 of the whole file if the field
+                  will not take multiple lines.
+                </p>
+              )}
+            </div>
           )}
 
           <div>
@@ -177,7 +215,7 @@ export function GitHubSettingsPanel() {
                 </span>,
               ])}
             />
-            {!status.ready && status.configured && !status.error && (
+            {kind === "permission_error" && (
               <p className="mt-2 text-xs text-muted-foreground">
                 Publishing needs every permission above. Change them on the GitHub App, then accept
                 the update on the installation — GitHub does not apply new permissions until the
