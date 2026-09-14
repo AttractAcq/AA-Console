@@ -43,6 +43,13 @@ export async function handleGitHubStatus(
     logger.error("github_status_failed", {
       error: err instanceof Error ? err.message : String(err),
     });
-    json(200, { ok: true, configured: false, missing: [], ready: false, error: "Could not check GitHub." });
+    json(200, {
+      ok: true,
+      configured: false,
+      missing: [],
+      ready: false,
+      errorKind: "github_api_error",
+      error: "Could not check GitHub.",
+    });
   }
 }
