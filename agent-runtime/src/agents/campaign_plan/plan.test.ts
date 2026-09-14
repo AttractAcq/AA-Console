@@ -3,6 +3,7 @@ import {
   asAmount,
   asCount,
   asDate,
+  campaignIdeas,
   normaliseChannels,
   planProblem,
   planSummary,
@@ -142,5 +143,36 @@ describe("planSummary", () => {
     expect(summary).toContain("a landing page");
     expect(summary).toContain("a sales agent");
     expect(summary).toContain("consultations booked");
+  });
+});
+
+describe("campaignIdeas", () => {
+  const idea = (title: string) => ({
+    title,
+    body: "Use the festive diary deadline to make the assessment feel urgent.",
+    media_type: "text",
+    channel: "whatsapp",
+    strategic_reason: "It turns a vague enquiry into a booked written plan assessment.",
+  });
+
+  it("accepts exactly the promised number of complete ideas", () => {
+    expect(campaignIdeas([idea("Photo triage"), idea("Written total")], 2)).toEqual([
+      idea("Photo triage"),
+      idea("Written total"),
+    ]);
+  });
+
+  it("rejects missing, extra or duplicate ideas", () => {
+    expect(() => campaignIdeas([idea("Only one")], 2)).toThrow(/exactly 2/i);
+    expect(() => campaignIdeas([idea("Same"), idea("same")], 2)).toThrow(/distinct title/i);
+  });
+
+  it("rejects incomplete ideas and unsupported media types", () => {
+    expect(() => campaignIdeas([{ ...idea("No body"), body: "" }], 1)).toThrow(/angle/i);
+    expect(() => campaignIdeas([{ ...idea("Carousel"), media_type: "carousel" }], 1)).toThrow(/media type/i);
+  });
+
+  it("allows a campaign that asks for no content to save an empty batch", () => {
+    expect(campaignIdeas([], 0)).toEqual([]);
   });
 });

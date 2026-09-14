@@ -38,6 +38,7 @@ const planned = (over: Record<string, unknown> = {}) => ({
   needs_landing_page: true,
   needs_sales_agent: true,
   built_at: "2026-09-09T10:00:00Z",
+  content_ideas_generated_at: "2026-09-09T10:02:00Z",
   launched_at: null,
   created_at: "2026-09-09T09:00:00Z",
   ...over,
@@ -53,14 +54,14 @@ const req = (name: string, met: boolean, detail: string): Requirement => ({
 
 const READY: Requirement[] = [
   req("Plan", true, "Written by the planner."),
-  req("Content", true, "2 of 2 pieces written or approved."),
+  req("Content", true, "2 of 2 pieces ready to distribute."),
   req("Landing page", true, "Built."),
   req("Sales agent", true, "Built and live."),
 ];
 
 const NOT_READY: Requirement[] = [
   req("Plan", true, "Written by the planner."),
-  req("Content", false, "0 of 2 pieces written or approved."),
+  req("Content", false, "0 of 2 pieces ready to distribute."),
   req("Landing page", false, "No page with any HTML in it is attached to this campaign."),
   req("Sales agent", true, "Built and live."),
 ];
@@ -109,7 +110,7 @@ describe("readiness", () => {
     expect(
       await screen.findByText("No page with any HTML in it is attached to this campaign."),
     ).toBeInTheDocument();
-    expect(screen.getByText("0 of 2 pieces written or approved.")).toBeInTheDocument();
+    expect(screen.getByText("0 of 2 pieces ready to distribute.")).toBeInTheDocument();
   });
 
   it("will not let an unready campaign be launched", async () => {
@@ -175,7 +176,7 @@ describe("building what the campaign needs", () => {
       if (name === "campaign_readiness") return Promise.resolve({ data: READY, error: null });
       return Promise.resolve({
         data: null,
-        error: { message: "Not ready to launch: 0 of 2 pieces written or approved." },
+        error: { message: "Not ready to launch: 0 of 2 pieces ready to distribute." },
       });
     });
     from.mockImplementation(() => {
@@ -193,7 +194,7 @@ describe("building what the campaign needs", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Launch" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Not ready to launch: 0 of 2 pieces written or approved.",
+      "Not ready to launch: 0 of 2 pieces ready to distribute.",
     );
   });
 });

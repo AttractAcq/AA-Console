@@ -1135,6 +1135,8 @@ export type Database = {
       client_ideas: {
         Row: {
           body: string | null
+          campaign_id: string | null
+          campaign_position: number | null
           client_id: string
           content_territory: string | null
           created_at: string
@@ -1152,6 +1154,8 @@ export type Database = {
         }
         Insert: {
           body?: string | null
+          campaign_id?: string | null
+          campaign_position?: number | null
           client_id: string
           content_territory?: string | null
           created_at?: string
@@ -1169,6 +1173,8 @@ export type Database = {
         }
         Update: {
           body?: string | null
+          campaign_id?: string | null
+          campaign_position?: number | null
           client_id?: string
           content_territory?: string | null
           created_at?: string
@@ -1628,6 +1634,7 @@ export type Database = {
           channels: string[]
           client_id: string
           content_count: number
+          content_ideas_generated_at: string | null
           core_message: string | null
           created_at: string
           ends_on: string | null
@@ -1654,6 +1661,7 @@ export type Database = {
           channels?: string[]
           client_id: string
           content_count?: number
+          content_ideas_generated_at?: string | null
           core_message?: string | null
           created_at?: string
           ends_on?: string | null
@@ -1680,6 +1688,7 @@ export type Database = {
           channels?: string[]
           client_id?: string
           content_count?: number
+          content_ideas_generated_at?: string | null
           core_message?: string | null
           created_at?: string
           ends_on?: string | null
@@ -3669,6 +3678,16 @@ export type Database = {
           met: boolean
           detail: string
         }[]
+      }
+      save_campaign_plan_with_ideas: {
+        Args: {
+          p_campaign_id: string
+          p_client_id: string
+          p_job_id: string
+          p_plan: Json
+          p_ideas: Json
+        }
+        Returns: number
       }
       provision_campaign: {
         Args: { p_campaign_id: string }
