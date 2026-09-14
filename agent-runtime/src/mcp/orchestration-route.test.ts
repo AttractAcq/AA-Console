@@ -89,7 +89,7 @@ beforeAll(async () => {
       ),
     ),
   );
-  await db.exec(await migration("20260909020000_72_mcp_cos_orchestration.sql"));
+  await db.exec(await migration("20260909020100_72_mcp_cos_orchestration.sql"));
 }, 60_000);
 afterAll(async () => {
   await db?.close();
