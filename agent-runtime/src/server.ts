@@ -22,6 +22,7 @@ import { startWorker, type WorkerHandle } from "./worker.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { registeredAgentKeys } from "./orchestration/dispatch.js";
 import { handleMasterChat } from "./master/route.js";
+import { handleGitHubStatus } from "./github/status-route.js";
 import { logger } from "./logging/logger.js";
 
 const config = loadConfig();
@@ -100,12 +101,19 @@ const server = http.createServer((req, res) => {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    // GET is here for /admin/github/status. A GET carrying Authorization
+    // is preflighted, and the browser refuses it unless the method is listed.
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Max-Age", "86400");
   }
   if (req.method === "OPTIONS") {
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  if (req.url === "/admin/github/status") {
+    void handleGitHubStatus(req, res, sb, config);
     return;
   }
 
