@@ -172,12 +172,17 @@ Effective tools (17):
 
 ## bot_admin
 
-Configured grants: `delivery.list_clients`, `delivery.get_client`, `workflow.create_task`, `workflow.assign_task`, `workflow.get_task`, `workflow.list_tasks`, `workflow.complete_task`, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`.
+Configured grants: `delivery.list_clients`, `delivery.get_client`, `delivery.get_status`, `workflow.get_task`, `workflow.list_tasks`, `workflow.get_pending_approvals`, `workflow.get_activity`, `admin.list_events`, `admin.get_event`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`, `admin.create_event`, `admin.update_event`.
 
-Effective tools (10):
+Effective tools (15):
 
+- `admin.list_events`
+- `admin.get_event`
+- `admin.create_event`
+- `admin.update_event`
 - `delivery.list_clients`
 - `delivery.get_client`
+- `delivery.get_status`
 - `workflow.create_task`
 - `workflow.assign_task`
 - `workflow.get_task`
@@ -253,3 +258,6 @@ All Bots are denied `workflow.record_decision`, including wildcard workflow gran
 `content.select_idea` (idea approve) and `content.approve_asset` (asset decide) are real **only** for `bot_production` ([Phase 9b](phase-9b-production-bot-decide.md)). `bot_marketing` keeps its `content.*` grant — needed for its other real content tools — but is hard-denied on these two names in `src/policy/permissions.ts` `allowed()` and again inside the AA RPCs themselves, exactly like `workflow.record_decision`. `bot_chief_of_staff` and `bot_client_delivery` never held `content.*` or either exact name.
 
 `content.queue_distribution` (schedule) and `content.record_publication` (Gate 10 publish record) are real **only** for `bot_distribution` ([Phase 10](phase-10-distribution-manager.md)), same hard-coded pattern. `bot_production` keeps its `content.*` grant — needed for its other real content tools — but is hard-denied on these two names. `content.get_performance` and `attribution.get_content_performance` remain stubs (no live performance read yet): granted to `bot_distribution` per the original migration 65 seed, but indistinguishable from an ungranted tool unless `MCP_DISCOVER_STUBS=true`.
+
+
+Phase 12: `bot_admin` has an exact 15-tool ceiling (nine reads/six writes), including four AA-native `admin.*` event tools. Other Bots cannot invoke Admin tools even with stale wildcard grants. Admin has no Finance, Security, Engineering, pipeline, sales_agents or content tools, and `workflow.record_decision` remains universally denied. Events do not send invitations or notifications. See [Phase 12](phase-12-admin-calendar.md) for database objects, guarded RPCs, replay authorization and `smoke:admin`. Gate 12 is NOT YET CLOSED.

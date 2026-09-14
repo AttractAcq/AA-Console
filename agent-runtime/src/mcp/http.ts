@@ -9,6 +9,8 @@ export const MCP_ERRORS: Record<string, [number, string]> = {
   unauthorized: [401, 'Service authentication required.'],
   invalid_bot: [403, 'Bot identity is not supported.'],
   invalid_request: [400, 'Valid headers and JSON body are required.'],
+  event_not_found: [404, "Event unavailable for this client."],
+  event_conflict: [409, "Event version or status conflicts with this update."],
   task_not_found: [404, 'Task not found.'],
   campaign_not_found: [404, 'Campaign not found.'],
   task_completed: [409, 'Task is already complete.'],
