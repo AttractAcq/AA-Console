@@ -218,6 +218,7 @@ export class ActionEngine {
           tool.domain !== "admin" &&
           tool.domain !== "engineering" &&
           tool.domain !== "security" &&
+          tool.domain !== "sites" &&
           !(
             (identity.bot === "bot_admin" ||
               identity.bot === "bot_engineering" ||

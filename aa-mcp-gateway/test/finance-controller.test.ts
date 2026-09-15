@@ -79,9 +79,12 @@ test("Finance exact discovery equality is 14 and money writes stay stub", (t) =>
     "pipeline.record_sale",
     "sales_agents.deploy",
     "attribution.generate_report",
-    "attribution.get_content_performance",
   ])
     assert.equal(registry.find((x) => x.name === name)?.implementation, "stub");
+  assert.equal(
+    registry.find((x) => x.name === "attribution.get_content_performance")?.implementation,
+    "real",
+  );
   assert.equal(registry.find((t) => t.name === "pipeline.record_sale")?.risk, "HIGH");
   assert.equal(registry.find((t) => t.name === "pipeline.record_sale")?.approval, true);
   assert.equal(grants.bot_finance.includes("economics.*"), false);
