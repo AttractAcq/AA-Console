@@ -61,7 +61,7 @@ CoS keeps `campaign.*` (covers the new real execution names). CDM keeps exact `c
 
 ## Database changes
 
-Migration `supabase/migrations/20260916120000_89_mcp_conversion_campaign.sql`:
+Migration `supabase/migrations/20260916130000_89_mcp_conversion_campaign.sql`:
 
 - Ledgers `mcp_internal.mcp_conversion_requests` and `mcp_internal.mcp_campaign_requests` (forced RLS, privileges revoked including `service_role`).
 - `mcp_internal.page_json` / `campaign_json` / `campaign_readiness_rows` (no HTML, no job params/costs).

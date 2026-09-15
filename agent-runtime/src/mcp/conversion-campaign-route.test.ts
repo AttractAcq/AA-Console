@@ -97,7 +97,7 @@ beforeAll(async () => {
     "20260915220000_87_mcp_security_devops.sql",
     "20260913000000_82_page_revisions.sql",
     "20260913010000_83_page_polish_agents.sql",
-    "20260916120000_89_mcp_conversion_campaign.sql",
+    "20260916130000_89_mcp_conversion_campaign.sql",
   ])
     await db.exec(await migration(file));
 }, 90_000);
