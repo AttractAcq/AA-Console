@@ -1,7 +1,7 @@
 # Phase 16b — Sales deployment ops + Proof Bank + production assign/submit
 
 Status: implemented for Sec review; **do not merge, apply to production, or deploy to Railway without Alex via Chief of Staff.**
-Base: latest `origin/main` (post #44/#45). Batch A (conversion/campaign) was not on main at branch time — start from main; rebase if it lands first.
+Base: latest `origin/main` after #48 (`8facd5e`, mig 89 conversion/campaign). This PR is mig **90** and merges second.
 
 The [Phase 3–4](phase-3-4-bot-auth-rls.md), [Phase 5](phase-5-production-manager.md), [Phase 9b](phase-9b-production-bot-decide.md), [Phase 11](phase-11-sales-ops.md) and [Phase 11b](phase-11b-sales-agent-factory.md) binding Sec rules remain binding. This phase realizes Bot-safe **page attach / kill-switch / enqueue**, **Proof Bank**, and **production assign/submit**. It does **not** realize live Meta/WhatsApp `sales_agents.deploy`, Bot `approved_at`, or Bot `usage_rights` clearance.
 
@@ -75,7 +75,7 @@ Migration `supabase/migrations/20260916140000_90_mcp_sales_proof_production.sql`
 
 ## Gateway / runtime
 
-- Registry: `realSalesAgents` += attach/enable/build; `realProof` = all six; `realContent` += assign/submit. `sales_agents.deploy` stays stub. Catalog after this PR only: **93** (90 + the three new sales_agents names; proof + assign/submit were already stubbed). Phase 16c (#46) adds more catalog names.
+- Registry: `realSalesAgents` += attach/enable/build; `realProof` = all six; `realContent` += assign/submit. `sales_agents.deploy` stays stub. Catalog after this PR on post-#48 main: **100** (97 + the three new sales_agents names; proof + assign/submit were already stubbed). Phase 16c (#46) adds more catalog names.
 - `sales-ops.ts` exact ceiling 25. `proof.search`/`proof.get` stay forbidden for Sales Ops.
 - `permissions.ts`: production grants `proof.create` / `proof.attach_asset`; `PRODUCTION_ONLY_TOOLS` += assign/submit.
 - AA adapter routes under `/internal/mcp/sales-agents/`, `/internal/mcp/proof/`, `/internal/mcp/content/assign-production|submit-asset`.

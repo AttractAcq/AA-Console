@@ -111,9 +111,9 @@ async function mockAa(
 test("Security exact discovery equality is 14 and related stubs stay stub", (t) => {
   const e = engine(t);
   assertSecurityDiscovery(e.discover(identity).map((x) => x.name));
-  // Catalog after PR #47 / Phase 16b only (90 + attach/enable/build).
+  // Catalog after #48 (97) + this PR's 3 sales_agents names.
   // Phase 16c (#46) adds more names.
-  assert.equal(registry.length, 93);
+  assert.equal(registry.length, 100);
   for (const name of securityDevops.grants)
     assert.equal(registry.find((x) => x.name === name)?.implementation, "real");
   for (const name of ["sales_agents.deploy", "pipeline.record_sale"])

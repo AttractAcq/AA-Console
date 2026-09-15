@@ -59,9 +59,10 @@ test("Phase 16b: exact discovery set equality for bot_sales_ops (25 = Phase 11b'
   assert.equal(salesOps.reads.length + salesOps.writes.length, 25);
   assert.equal(salesOps.grants.length, 25);
   assert.equal(discovered.length, 25);
-  // Catalog after this PR only. Phase 16c (#46) appends brand/sites; do not
-  // expect those names here, and do not drop attach/enable/build.
-  assert.equal(registry.length, 93);
+  // Catalog after #48 (97) + this PR's 3 sales_agents names. Phase 16c (#46)
+  // appends brand/sites; do not expect those names here, and do not drop
+  // attach/enable/build.
+  assert.equal(registry.length, 100);
   for (const name of [
     "sales_agents.attach_to_page",
     "sales_agents.set_deployment_enabled",

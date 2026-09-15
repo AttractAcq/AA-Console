@@ -83,9 +83,9 @@ test("Admin exact discovery equality is 15 and all 11 existing names remain real
   const e = engine(t);
   assertAdminDiscovery(e.discover(identity).map((t) => t.name));
   // Factory adds generate_config to the global registry; Admin stays at 15.
-  // Catalog after PR #47 / Phase 16b only (90 + attach/enable/build).
+  // Catalog after #48 (97) + this PR's 3 sales_agents names.
   // Phase 16c (#46) adds more names.
-  assert.equal(registry.length, 93);
+  assert.equal(registry.length, 100);
   for (const name of adminCalendar.grants)
     assert.equal(registry.find((t) => t.name === name)?.implementation, "real");
   for (const name of [

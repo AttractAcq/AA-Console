@@ -1325,12 +1325,14 @@ begin
         or p.permission_pattern like 'finance%'
         or p.permission_pattern like 'security%'
         or p.permission_pattern like '%deploy%'
+        or p.permission_pattern like 'conversion%'
         or mcp_internal.permission_matches(p.permission_pattern, 'economics.get_costs')
         or mcp_internal.permission_matches(p.permission_pattern, 'security.get_system_status')
         or mcp_internal.permission_matches(p.permission_pattern, 'sales_agents.deploy')
+        or mcp_internal.permission_matches(p.permission_pattern, 'conversion.list_pages')
       )
   ) then
-    raise exception 'CoS: bot_production must not have finance, security, or deploy grants';
+    raise exception 'CoS: bot_production must not have finance, security, deploy or conversion grants';
   end if;
   if exists (
     select 1 from mcp_internal.mcp_bot_permissions p
@@ -1465,6 +1467,22 @@ begin
   end if;
   if exists (
     select 1 from mcp_internal.mcp_bot_permissions p
+    where p.permission_pattern = 'conversion.*'
+  ) then
+    raise exception 'Phase 16: conversion.* wildcard is forbidden';
+  end if;
+  if exists (
+    select 1 from mcp_internal.mcp_bot_permissions p
+    where p.bot_id <> 'bot_marketing'
+      and (
+        p.permission_pattern like 'conversion.%'
+        or p.permission_pattern = 'conversion.*'
+      )
+  ) then
+    raise exception 'Phase 16: conversion tools must not be granted outside bot_marketing';
+  end if;
+  if exists (
+    select 1 from mcp_internal.mcp_bot_permissions p
     where p.bot_id <> 'bot_production'
       and p.permission_pattern like 'proof.%'
   ) then
@@ -1547,6 +1565,8 @@ begin
     ('public', 'agent_jobs'),
     ('public', 'agent_job_events'),
     ('public', 'campaigns'),
+    ('public', 'client_campaigns'),
+    ('public', 'campaign_artifacts'),
     ('public', 'client_ideas'),
     ('public', 'client_briefs'),
     ('public', 'client_media_assets'),
@@ -1557,6 +1577,8 @@ begin
     ('public', 'mcp_brief_requests'),
     ('public', 'mcp_bot_clients'),
     ('public', 'client_pages'),
+    ('public', 'client_page_revisions'),
+    ('public', 'client_page_findings'),
     ('public', 'client_brand_profiles'),
     ('public', 'client_leads'),
     ('public', 'lead_events'),
@@ -1581,7 +1603,9 @@ begin
     ('mcp_internal', 'mcp_engineering_issues'),
     ('mcp_internal', 'mcp_engineering_requests'),
     ('mcp_internal', 'mcp_security_findings'),
-    ('mcp_internal', 'mcp_security_requests')
+    ('mcp_internal', 'mcp_security_requests'),
+    ('mcp_internal', 'mcp_conversion_requests'),
+    ('mcp_internal', 'mcp_campaign_requests')
   ) as t(nsp, rel)
   left join pg_class c
     on c.relname = t.rel
