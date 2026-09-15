@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { SUBMIT_TOOL } from "./index.js";
+import { unsupportedStrictKeywords } from "../../tools/schema.js";
 import {
   asAmount,
   asCount,
@@ -176,3 +178,48 @@ describe("campaignIdeas", () => {
     expect(campaignIdeas([], 0)).toEqual([]);
   });
 });
+
+
+// The Campaign Planner was down in production with
+//   Anthropic 400: tools.0.custom: For 'array' type, property 'maxItems' is
+//   not supported
+// because the ideas array carried maxItems and its title carried maxLength.
+// Neither is accepted on a strict tool, and every run failed.
+describe("the submit tool schema", () => {
+  it("uses only what a strict tool may contain", () => {
+    expect(unsupportedStrictKeywords(SUBMIT_TOOL.inputSchema)).toEqual([]);
+  });
+
+  it("still asks for the ideas the campaign needs", () => {
+    // The fix must not have been to delete the field.
+    const props = SUBMIT_TOOL.inputSchema.properties as Record<string, Record<string, unknown>>;
+    expect(props.ideas?.type).toBe("array");
+    expect(SUBMIT_TOOL.inputSchema.required).toContain("ideas");
+  });
+
+  it("tells the model the limits that code will enforce anyway", () => {
+    // A constraint removed from the schema still has to be stated somewhere, or
+    // the model is guessing and every run pays for a rejected batch.
+    const props = SUBMIT_TOOL.inputSchema.properties as Record<string, Record<string, unknown>>;
+    expect(String(props.ideas?.description)).toContain(String(MAX_CONTENT));
+    const items = props.ideas?.items as Record<string, Record<string, Record<string, unknown>>>;
+    expect(String(items.properties?.title?.description)).toMatch(/300/);
+  });
+
+  it("enforces in code what the schema can no longer say", () => {
+    // The real guarantee: a batch longer than promised is refused outright.
+    expect(() => campaignIdeas(new Array(4).fill(idea()), 3)).toThrow(/exactly 3/i);
+    expect(() => campaignIdeas([idea({ title: "x".repeat(301) })], 1)).toThrow(/distinct title/i);
+  });
+});
+
+function idea(over: Record<string, unknown> = {}) {
+  return {
+    title: "A distinct angle",
+    body: "The concrete angle and the call to action.",
+    media_type: "text",
+    channel: "instagram",
+    strategic_reason: "It answers the buyer's first objection.",
+    ...over,
+  };
+}

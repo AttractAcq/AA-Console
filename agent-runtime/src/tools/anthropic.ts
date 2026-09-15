@@ -14,6 +14,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "../logging/logger.js";
 import { estimateCostUsd, type TokenUsage } from "../usage/cost.js";
 
+import { unsupportedStrictKeywords } from "./schema.js";
+
 export interface SubmitToolSpec {
   name: string;
   description: string;
@@ -127,6 +129,17 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   // the bound that makes the call eventually fail instead.
   const timeoutMs = options.timeoutMs ?? 600_000;
   const client = new Anthropic({ apiKey, maxRetries: 2, timeout: timeoutMs });
+
+  // Checked before the request, because the API's refusal names a keyword and
+  // not the agent that carries it — and because retrying sends exactly the
+  // same schema. Failing here says which agent, which property, and what to do.
+  const unsupported = unsupportedStrictKeywords(submitTool.inputSchema);
+  if (unsupported.length > 0) {
+    throw new ProviderError(
+      `The ${submitTool.name} schema uses ${unsupported.join(", ")}, which the API rejects for strict tools. Enforce the constraint in code after the model answers instead.`,
+      false,
+    );
+  }
 
   const tools: Anthropic.Messages.ToolUnion[] = [
     {
