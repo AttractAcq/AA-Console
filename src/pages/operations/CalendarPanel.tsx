@@ -22,12 +22,20 @@ export function CalendarPanel() {
   const [posts, setPosts] = useState<Post[]>([]);
   const assetOptions = useOptions(loadApprovedAssets, addOpen);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    const { data } = await supabase
-      .from("scheduled_posts")
-      .select("id, scheduled_for, ref_number, media_type, channel")
-      .order("scheduled_for");
-    setPosts((data ?? []) as Post[]);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("scheduled_posts")
+        .select("id, scheduled_for, ref_number, media_type, channel")
+        .order("scheduled_for");
+      if (error) throw error;
+      setPosts((data ?? []) as Post[]);
+    } catch (error) {
+      setLoadError("Failed to load calendar: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, []);
 
   useEffect(() => {
@@ -52,6 +60,8 @@ export function CalendarPanel() {
   const calendarAssets: ScheduledAsset[] = posts
     .filter((p) => p.scheduled_for.startsWith(thisMonth))
     .map((p) => ({ day: Number(p.scheduled_for.slice(8, 10)), refNumber: p.ref_number ?? "—" }));
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

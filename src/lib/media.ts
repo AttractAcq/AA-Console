@@ -53,7 +53,8 @@ export async function fetchClientAssets(
   if (opts.mediaType) query = query.eq("media_type", opts.mediaType);
   if (opts.reviewStatus) query = query.eq("review_status", opts.reviewStatus);
 
-  const { data } = await query.order("created_at", { ascending: opts.ascending ?? false });
+  const { data, error } = await query.order("created_at", { ascending: opts.ascending ?? false });
+  if (error) throw error;
   return (data ?? []) as MediaAsset[];
 }
 
@@ -92,7 +93,8 @@ export async function fetchProofAssets(
     .eq("client_id", clientId);
   if (mediaType) query = query.eq("media_type", mediaType);
 
-  const { data } = await query.order("created_at", { ascending: false });
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) throw error;
   return (data ?? []) as ProofAsset[];
 }
 

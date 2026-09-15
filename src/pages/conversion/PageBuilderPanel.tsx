@@ -45,17 +45,25 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
   const [pages, setPages] = useState<Page[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    if (!clientId) return;
-    const { data } = await supabase
-      .from("client_pages")
-      .select(
-        "id, title, status, body, published_url, created_at, html, current_revision, meta_title, meta_description, built_at",
-      )
-      .eq("client_id", clientId)
-      .eq("page_type", pageType)
-      .order("created_at", { ascending: false });
-    setPages((data ?? []) as Page[]);
+    setLoadError(null);
+    try {
+      if (!clientId) return;
+      const { data, error } = await supabase
+        .from("client_pages")
+        .select(
+          "id, title, status, body, published_url, created_at, html, current_revision, meta_title, meta_description, built_at",
+        )
+        .eq("client_id", clientId)
+        .eq("page_type", pageType)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setPages((data ?? []) as Page[]);
+    } catch (error) {
+      setLoadError("Failed to load pages: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [clientId, pageType]);
 
   useEffect(() => {
@@ -67,6 +75,8 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
   const open = pages.find((p) => p.id === openId);
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

@@ -31,16 +31,26 @@ export function CommentaryPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    if (!clientId) return;
-    const { data } = await supabase
-      .from("client_agent_records")
-      .select("id, item_key, title, body, status, edited_at, updated_at")
-      .eq("client_id", clientId)
-      .eq("domain", "reporting")
-      .order("item_key");
-    setRecords((data ?? []) as Record_[]);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      if (!clientId) return;
+      const { data, error } = await supabase
+        .from("client_agent_records")
+        .select("id, item_key, title, body, status, edited_at, updated_at")
+        .eq("client_id", clientId)
+        .eq("domain", "reporting")
+        .order("item_key");
+      if (error) throw error;
+      setRecords((data ?? []) as Record_[]);
+      setLoading(false);
+    } catch (error) {
+      setLoadError("Failed to load commentary: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -64,6 +74,8 @@ export function CommentaryPanel() {
   const written = sorted.length > 0 ? new Date(sorted[0]!.updated_at) : null;
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

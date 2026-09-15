@@ -35,27 +35,39 @@ export function TeamCategoryPanel({ category }: { category: TeamCategory }) {
   const [loading, setLoading] = useState(true);
   const { addButtonLabel } = teamCategoryLabels[category];
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    const { data } = await supabase
-      .from("team_members")
-      .select("id, name, initials, engagement")
-      .eq("category", category)
-      .eq("active", true)
-      .order("name");
-    setMembers(
-      (data ?? []).map((m) => ({
-        id: m.id,
-        name: m.name,
-        initials: m.initials,
-        engagementType: m.engagement === "employee" ? "Employee" : "Contractor",
-      })),
-    );
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("team_members")
+        .select("id, name, initials, engagement")
+        .eq("category", category)
+        .eq("active", true)
+        .order("name");
+      if (error) throw error;
+      setMembers(
+        (data ?? []).map((m) => ({
+          id: m.id,
+          name: m.name,
+          initials: m.initials,
+          engagementType: m.engagement === "employee" ? "Employee" : "Contractor",
+        })),
+      );
+      setLoading(false);
+    } catch (error) {
+      setLoadError("Failed to load team members: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [category]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

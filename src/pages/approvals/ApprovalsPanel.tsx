@@ -29,7 +29,11 @@ export function ApprovalsPanel() {
   const [rejecting, setRejecting] = useState<MediaAsset | null>(null);
   const [reason, setReason] = useState("");
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
+    setLoadError(null);
+    try {
     if (!clientId) {
       setLoading(false);
       return;
@@ -41,6 +45,11 @@ export function ApprovalsPanel() {
     setAssets(rows);
     setUrls(await signPaths("client-media", rows.map((r) => r.storage_path)));
     setLoading(false);
+    } catch (error) {
+      setLoadError("Failed to load approvals: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [clientId, activeFilter]);
 
   useEffect(() => {
@@ -68,6 +77,8 @@ export function ApprovalsPanel() {
   }
 
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

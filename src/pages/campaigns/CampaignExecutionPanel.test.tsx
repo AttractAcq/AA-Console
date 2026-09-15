@@ -211,18 +211,18 @@ describe("campaign visibility", () => {
     show([]);
     expect(await screen.findByText("No campaigns yet")).toBeInTheDocument();
   });
-  it("surfaces query errors rather than an empty state", async () => {
+  it.each(["RLS query denied", "column client_campaigns.content_ideas_generated_at does not exist"])("surfaces query errors rather than an empty state: %s", async (message) => {
     const initial = show();
     initial.unmount();
     from.mockImplementation(() => {
       const chain = { select: () => chain, eq: () => chain, order: () => chain,
         limit: () => Promise.resolve({ data: [] }),
-        then: (r: (v: unknown) => unknown) => Promise.resolve({ data: null, error: { message: "RLS query denied" } }).then(r) };
+        then: (r: (v: unknown) => unknown) => Promise.resolve({ data: null, error: { message } }).then(r) };
       return chain;
     });
     // A fresh mount starts the failing request.
     const { unmount } = render(<CampaignExecutionPanel />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load campaigns: RLS query denied");
+    expect(await screen.findByRole("alert")).toHaveTextContent(`Failed to load campaigns: ${message}`);
     expect(screen.queryByText("No campaigns yet")).not.toBeInTheDocument();
     unmount();
   });

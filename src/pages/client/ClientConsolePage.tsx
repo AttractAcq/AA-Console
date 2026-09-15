@@ -33,7 +33,11 @@ export function ClientConsolePage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
+    setLoadError(null);
+    try {
     if (!clientId) return;
     const [c, ctx, distributed, proof, waiting] = await Promise.all([
       supabase.from("clients").select("id, name, sector, tier").eq("id", clientId).maybeSingle(),
@@ -53,10 +57,15 @@ export function ClientConsolePage() {
         .eq("client_id", clientId),
       fetchClientAssets(clientId, { reviewStatus: "pending" }),
     ]);
+    const failure = c.error ?? ctx.error ?? distributed.error ?? proof.error;
+    if (failure) throw failure;
     setClient(c.data as ClientRow | null);
     setContext(ctx.data as ContextRow | null);
     setCounts({ distributed: distributed.count ?? 0, proof: proof.count ?? 0 });
     setPending(waiting);
+    } catch (error) {
+      setLoadError("Failed to load client overview: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -167,6 +176,8 @@ export function ClientConsolePage() {
       </div>
     );
   }
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <ConsoleShell

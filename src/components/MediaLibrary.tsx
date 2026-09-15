@@ -30,7 +30,11 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<MediaAsset | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
+    setLoadError(null);
+    try {
     if (!clientId) {
       setLoading(false);
       return;
@@ -62,11 +66,18 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
       setBodies(fetched);
     }
     setLoading(false);
+    } catch (error) {
+      setLoadError("Failed to load media: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [clientId, mediaType, sort]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

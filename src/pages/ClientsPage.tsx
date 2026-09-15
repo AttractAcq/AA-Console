@@ -31,28 +31,40 @@ export function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    const { data } = await supabase
-      .from("clients")
-      .select("id, name, initials, sector, location, tier, is_internal")
-      .order("name");
-    setClients(
-      (data ?? []).map((c) => ({
-        id: c.id,
-        name: c.name,
-        initials: c.initials,
-        sector: c.sector ?? "",
-        location: c.location ?? "",
-        tier: c.tier ?? "",
-        isInternal: c.is_internal,
-      })),
-    );
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name, initials, sector, location, tier, is_internal")
+        .order("name");
+      if (error) throw error;
+      setClients(
+        (data ?? []).map((c) => ({
+          id: c.id,
+          name: c.name,
+          initials: c.initials,
+          sector: c.sector ?? "",
+          location: c.location ?? "",
+          tier: c.tier ?? "",
+          isInternal: c.is_internal,
+        })),
+      );
+      setLoading(false);
+    } catch (error) {
+      setLoadError("Failed to load clients: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>
