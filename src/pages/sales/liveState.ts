@@ -10,6 +10,7 @@ export type LiveState =
   | { kind: "failed"; label: string }
   | { kind: "unbuilt"; label: string }
   | { kind: "live"; label: string }
+  | { kind: "approved"; label: string }
   | { kind: "draft"; label: string }
   | { kind: "retired"; label: string };
 
@@ -18,6 +19,7 @@ export const STATE_TONE: Record<LiveState["kind"], string> = {
   failed: "bg-destructive/10 text-destructive",
   unbuilt: "bg-secondary text-secondary-foreground",
   live: "bg-primary/10 text-brand-strong",
+  approved: "bg-primary/10 text-brand-strong",
   draft: "bg-secondary text-secondary-foreground",
   retired: "bg-muted text-muted-foreground",
 };
@@ -36,7 +38,7 @@ export const STATE_TONE: Record<LiveState["kind"], string> = {
  * lying about the only thing it is for.
  */
 export function liveStateOf(
-  agent: { status: string; built_at: string | null },
+  agent: { status: string; built_at: string | null; approved_at?: string | null },
   job: { status: string } | undefined,
 ): LiveState {
   if (job && (job.status === "queued" || job.status === "claimed" || job.status === "running")) {
@@ -46,7 +48,12 @@ export function liveStateOf(
     return { kind: "failed", label: "Build failed" };
   }
   if (!agent.built_at) return { kind: "unbuilt", label: "Not built yet" };
-  if (agent.status === "live") return { kind: "live", label: "Live" };
+  if (agent.status === "live") {
+    // Live and approved are different facts. A live agent that nobody has
+    // read is not ready for a site, and the badge has to say so.
+    if (agent.approved_at) return { kind: "approved", label: "Live — approved" };
+    return { kind: "live", label: "Live — not approved" };
+  }
   if (agent.status === "retired") return { kind: "retired", label: "Retired" };
   return { kind: "draft", label: "Draft — not answering anyone" };
 }
