@@ -2129,7 +2129,7 @@ describe('Phase 14 Engineering Ops isolation', () => {
   });
 
   it('other bots cannot create or get issues; Security can read status', async () => {
-    await db.exec(`insert into mcp_bot_clients(bot_id,client_id) values('bot_production','${CLIENT_A}')`);
+    // bot_production already has CLIENT_A from the shared fixture; extra insert would PK-conflict.
     await expect(create(CLIENT_A, 'prod-create', 'bot_production')).rejects.toThrow('bot_forbidden');
     const pages = (await db.query<{ result: any }>(
       `select mcp_engineering_get_release_status('bot_security_devops',$1) result`,
