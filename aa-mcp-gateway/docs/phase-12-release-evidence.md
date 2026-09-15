@@ -124,3 +124,5 @@ No auth redesign or production code change was needed.
 
 Human CLEAR still requires remote history/effects evidence and actual clean replay,
 followed by any explicitly approved reconciliation/bootstrap work and its tests.
+
+Historical Factory references above describe the Phase 12 release boundary. Factory is now revived separately with migration 84 (`20260915120000_84_mcp_sales_agent_factory.sql`); the original Factory migration 77 was renamed.

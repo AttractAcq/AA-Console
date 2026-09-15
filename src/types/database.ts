@@ -1525,6 +1525,7 @@ export type Database = {
           page_id: string | null
           purpose: string
           qualification: Json
+          role: string | null
           status: string
           system_prompt: string | null
           updated_at: string
@@ -1546,6 +1547,7 @@ export type Database = {
           page_id?: string | null
           purpose: string
           qualification?: Json
+          role?: string | null
           status?: string
           system_prompt?: string | null
           updated_at?: string
@@ -1567,6 +1569,7 @@ export type Database = {
           page_id?: string | null
           purpose?: string
           qualification?: Json
+          role?: string | null
           status?: string
           system_prompt?: string | null
           updated_at?: string
