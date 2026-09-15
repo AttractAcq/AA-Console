@@ -343,7 +343,7 @@ function aaBody(
   input: Record<string, unknown>,
 ): Record<string, unknown> {
   if (
-    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents|economics)\./.test(
+    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents|economics|engineering)\./.test(
       tool,
     )
   )

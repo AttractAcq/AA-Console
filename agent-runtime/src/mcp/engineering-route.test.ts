@@ -45,6 +45,8 @@ beforeAll(async () => {
     "20260903104450_01_foundations_roles_clients.sql",
     "20260903104529_02_team_and_operations.sql",
     "20260903104615_03_agent_registry_and_job_queue.sql",
+    // 04 defines client_business_context (table + composite type). Migration 84
+    // declares `v_ctx client_business_context` and will fail without it.
     "20260903104724_04_intelligence_and_strategy.sql",
     "20260903104816_05_content_chain_proof_ideas_briefs_media.sql",
     "20260903104850_06_distribution_conversion_leads.sql",
@@ -87,6 +89,19 @@ beforeAll(async () => {
     "20260909020100_72_mcp_cos_orchestration.sql",
     "20260911210000_78_mcp_admin_calendar.sql",
     "20260915120000_84_mcp_sales_agent_factory.sql",
+  ])
+    await db.exec(await migration(file));
+  // Same stub as isolation-rls / economics-route: 79 needs client_campaigns
+  // for the FK, but 72_campaign_execution is not in this partial fixture.
+  await db.exec(`
+    create table if not exists client_campaigns (
+      id uuid primary key default gen_random_uuid(),
+      client_id uuid not null references clients (id) on delete cascade
+    );
+  `);
+  for (const file of [
+    "20260911205529_79_client_marketing_spend.sql",
+    "20260915180000_85_mcp_finance_controller.sql",
     "20260915200000_86_mcp_engineering_ops.sql",
   ])
     await db.exec(await migration(file));

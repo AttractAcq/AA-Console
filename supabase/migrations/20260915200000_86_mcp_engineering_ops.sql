@@ -467,6 +467,28 @@ begin
   end if;
   if exists (
     select 1 from mcp_internal.mcp_bot_permissions p
+    where p.bot_id = 'bot_finance'
+      and (
+        p.permission_pattern = 'economics.*'
+        or p.permission_pattern like 'finance.%'
+        or p.permission_pattern like '%payment%'
+        or p.permission_pattern like '%stripe%'
+        or p.permission_pattern like '%xero%'
+        or p.permission_pattern like '%bank%'
+        or p.permission_pattern = 'pipeline.record_sale'
+      )
+  ) then
+    raise exception 'Phase 13: bot_finance must not hold economics.* wildcard or money-write/payment grants';
+  end if;
+  if exists (
+    select 1 from mcp_internal.mcp_bot_permissions p
+    where p.bot_id <> 'bot_finance'
+      and p.permission_pattern like 'economics%'
+  ) then
+    raise exception 'Phase 13: economics.* must not be granted outside bot_finance';
+  end if;
+  if exists (
+    select 1 from mcp_internal.mcp_bot_permissions p
     where p.permission_pattern = 'engineering.*'
   ) then
     raise exception 'Phase 14: engineering.* wildcard is forbidden';
