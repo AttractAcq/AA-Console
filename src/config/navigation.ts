@@ -199,7 +199,7 @@ export const clientNavGroups: NavNode[] = [
       },
       {
         id: "sales",
-        label: "Sales",
+        label: "Sales Agents",
         path: "sales",
         icon: MessagesSquare,
         tabs: [{ id: "overview", label: "Overview" }],
