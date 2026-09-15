@@ -33,15 +33,23 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [assetOptions, setAssetOptions] = useState<Array<{ value: string; label: string }>>([]);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
+    setLoadError(null);
+    try {
     if (!clientId) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("scheduled_posts")
       .select("id, scheduled_for, ref_number, media_type, published_at")
       .eq("client_id", clientId)
       .eq("channel", channel)
       .order("scheduled_for");
+    if (error) throw error;
     setPosts((data ?? []) as Post[]);
+    } catch (error) {
+      setLoadError("Failed to load schedule: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [clientId, channel]);
 
   useEffect(() => {
@@ -60,6 +68,8 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
           label: `${r.ref_number ?? "—"} · ${r.title ?? "Untitled"}`,
         })),
       );
+    }).catch((error: unknown) => {
+      if (!cancelled) setLoadError("Failed to load approved assets: " + ((error as { message?: string })?.message ?? "Unknown query error"));
     });
     return () => {
       cancelled = true;
@@ -85,6 +95,8 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
     },
     { name: "scheduled_for", label: "Date", kind: "date", required: true },
   ];
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div className="space-y-4">

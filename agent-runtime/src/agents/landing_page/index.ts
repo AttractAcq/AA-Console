@@ -19,38 +19,12 @@ import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js";
 import type { BusinessContext } from "../shared.js";
 import { loadPagePackage, renderPackage } from "./aggregate.js";
+import { pageProblem } from "./safety.js";
 
 const PAGE_KIND: Record<string, string> = {
   landing: "a primary landing page — the main page traffic is sent to, carrying the core offer",
   offer: "a secondary offer page — a focused page for one specific offer, usually reached from elsewhere",
 };
-
-/**
- * Why this page cannot be accepted, or null if it can.
- *
- * Extracted so it is testable. The script check in particular was written
- * inline and could be deleted without a single test failing — which is a poor
- * place for a rule whose whole job is to stop model output reaching a frame in
- * the agency's own console. The preview sandbox is the last line; this is the
- * one that should mean the sandbox is never tested in anger.
- */
-export function pageProblem(headline: string, html: string): string | null {
-  if (!headline) return "The page came back with no headline.";
-  if (html.length < 800) return "The page came back too thin to be usable.";
-  if (/<script\b/i.test(html)) {
-    return "The page came back containing a <script>, which is not allowed on a generated page.";
-  }
-  // An inline handler is script by another name, and would run in any context
-  // that ever renders this without a sandbox — an email, a deploy, a preview
-  // written later by someone who did not read this file.
-  if (/\son[a-z]+\s*=/i.test(html)) {
-    return "The page came back with an inline event handler, which is script by another name.";
-  }
-  if (/<iframe\b/i.test(html)) {
-    return "The page came back containing an iframe, which is not allowed on a generated page.";
-  }
-  return null;
-}
 
 export async function runLandingPageJob(
   sb: SupabaseClient,

@@ -2,10 +2,11 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, useParams } = vi.hoisted(() => ({
+const { from, rpc, useParams, useAgentJobs } = vi.hoisted(() => ({
   from: vi.fn(),
   rpc: vi.fn(),
   useParams: vi.fn(),
+  useAgentJobs: vi.fn(),
 }));
 vi.mock("../../lib/supabase", () => ({
   supabase: {
@@ -16,6 +17,12 @@ vi.mock("../../lib/supabase", () => ({
   },
 }));
 vi.mock("react-router-dom", () => ({ useParams }));
+// Only the hook is faked; agentLabel and elapsedLabel are real, because the
+// activity bar renders them.
+vi.mock("../../lib/useAgentJobs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/useAgentJobs")>()),
+  useAgentJobs,
+}));
 
 import { CampaignExecutionPanel, type Requirement } from "./CampaignExecutionPanel";
 
@@ -87,6 +94,7 @@ function show(campaigns: unknown[] = [planned()], reqs: Requirement[] = NOT_READ
 beforeEach(() => {
   vi.clearAllMocks();
   useParams.mockReturnValue({ clientId: "client-1" });
+  useAgentJobs.mockReturnValue({ inFlight: [], recentFailures: [] });
 });
 
 describe("the plan", () => {
@@ -196,5 +204,145 @@ describe("building what the campaign needs", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Not ready to launch: 0 of 2 pieces ready to distribute.",
     );
+  });
+});
+
+describe("campaign visibility", () => {
+  it("renders all 15 planning campaigns for Attract Acquisition", async () => {
+    useParams.mockReturnValue({ clientId: "e4b4b001-81f6-4997-8429-ff21f4ee1fbe" });
+    show(Array.from({ length: 15 }, (_, i) => planned({ id: `camp-${i}`, name: `Planning ${i}` })));
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(await screen.findAllByRole("heading", { level: 3 })).toHaveLength(15);
+    expect(from).toHaveBeenCalledWith("client_campaigns");
+  });
+  it("distinguishes a successful empty query", async () => {
+    show([]);
+    expect(await screen.findByText("No campaigns yet")).toBeInTheDocument();
+  });
+  it.each(["RLS query denied", "column client_campaigns.content_ideas_generated_at does not exist"])("surfaces query errors rather than an empty state: %s", async (message) => {
+    const initial = show();
+    initial.unmount();
+    from.mockImplementation(() => {
+      const chain = { select: () => chain, eq: () => chain, order: () => chain,
+        limit: () => Promise.resolve({ data: [] }),
+        then: (r: (v: unknown) => unknown) => Promise.resolve({ data: null, error: { message } }).then(r) };
+      return chain;
+    });
+    // A fresh mount starts the failing request.
+    const { unmount } = render(<CampaignExecutionPanel />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(`Failed to load campaigns: ${message}`);
+    expect(screen.queryByText("No campaigns yet")).not.toBeInTheDocument();
+    unmount();
+  });
+  it("shows readiness failure and disables launch", async () => {
+    show();
+    rpc.mockResolvedValue({ data: null, error: { message: "Not permitted" } });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load readiness");
+    expect(screen.getByRole("button", { name: "Launch" })).toBeDisabled();
+  });
+  it("reports a missing route client instead of pretending there are no campaigns", async () => {
+    useParams.mockReturnValue({});
+    show([]);
+    expect(await screen.findByRole("alert")).toHaveTextContent("No client selected");
+    expect(screen.queryByText("No campaigns yet")).not.toBeInTheDocument();
+  });
+  it("launches a ready campaign through the existing RPC", async () => {
+    show([planned()], READY);
+    await userEvent.click(await screen.findByRole("button", { name: "Launch" }));
+    expect(rpc).toHaveBeenCalledWith("launch_campaign", { p_campaign_id: "camp-1" });
+    expect(await screen.findByText(/is live\./)).toBeInTheDocument();
+  });
+});
+
+
+// A campaign can exist without ever having been planned: seeded, created
+// through the gateway, or left behind by a planner run that failed. New
+// Campaign queues the planner at creation and nothing else ever did, so those
+// campaigns were unrecoverable — the panel showed an empty card and offered no
+// way to ask for the plan it was waiting for.
+describe("starting the planner on a campaign that has none", () => {
+  const unplanned = () => planned({ built_at: null, objective: null });
+
+  it("offers to run the planner", async () => {
+    show([unplanned()]);
+    expect(await screen.findByRole("button", { name: "Run the planner" })).toBeEnabled();
+  });
+
+  it("queues the planner against that campaign", async () => {
+    show([unplanned()]);
+    await userEvent.click(await screen.findByRole("button", { name: "Run the planner" }));
+    expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", {
+      p_agent_key: "campaign_plan",
+      p_client_id: "client-1",
+      p_input_table: "client_campaigns",
+      p_input_id: "camp-1",
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent(/planner is writing/i);
+  });
+
+  it("shows the database's refusal, because it names the missing upstream work", async () => {
+    show([unplanned()]);
+    const button = await screen.findByRole("button", { name: "Run the planner" });
+    // Set after render: show() installs its own rpc implementation.
+    rpc.mockImplementation((name: string) => {
+      if (name === "campaign_readiness") return Promise.resolve({ data: NOT_READY, error: null });
+      return Promise.resolve({
+        data: null,
+        error: { message: "Agent campaign_plan is missing required upstream intelligence" },
+      });
+    });
+    await userEvent.click(button);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/missing required upstream/i);
+  });
+
+  it("does not offer to re-plan a campaign that already has a plan", async () => {
+    // Re-planning would rewrite the numbers the readiness check and anything
+    // already provisioned were measured against.
+    show([planned()]);
+    await screen.findByText("Winter full-arch push");
+    expect(screen.queryByRole("button", { name: "Run the planner" })).not.toBeInTheDocument();
+  });
+});
+
+describe("while the planner is running", () => {
+  const running = (inputId: string | null) => ({
+    id: "job-1",
+    agent_key: "campaign_plan",
+    input_id: inputId,
+    status: "running",
+    attempts: 1,
+    error: null,
+    created_at: "2026-09-14T10:00:00Z",
+    started_at: "2026-09-14T10:00:01Z",
+    completed_at: null,
+  });
+
+  it("will not queue a second paid run of the same planner", async () => {
+    useAgentJobs.mockReturnValue({ inFlight: [running("camp-1")], recentFailures: [] });
+    show([planned({ built_at: null, objective: null })]);
+    const button = await screen.findByRole("button", { name: "Planning…" });
+    expect(button).toBeDisabled();
+  });
+
+  it("says the planner is working rather than that nobody is", async () => {
+    useAgentJobs.mockReturnValue({ inFlight: [running("camp-1")], recentFailures: [] });
+    show([planned({ built_at: null, objective: null })]);
+    expect(await screen.findByText(/planner is writing this now/i)).toBeInTheDocument();
+  });
+
+  it("only disables the campaign actually being planned", async () => {
+    // A job in flight for a different campaign must not lock this one.
+    useAgentJobs.mockReturnValue({ inFlight: [running("camp-OTHER")], recentFailures: [] });
+    show([planned({ built_at: null, objective: null })]);
+    expect(await screen.findByRole("button", { name: "Run the planner" })).toBeEnabled();
+  });
+
+  it("ignores another agent's job that happens to be in flight", async () => {
+    useAgentJobs.mockReturnValue({
+      inFlight: [{ ...running("camp-1"), agent_key: "page_audit" }],
+      recentFailures: [],
+    });
+    show([planned({ built_at: null, objective: null })]);
+    expect(await screen.findByRole("button", { name: "Run the planner" })).toBeEnabled();
   });
 });

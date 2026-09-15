@@ -22,21 +22,29 @@ export function AgentLogsSection() {
   const { agentId } = useParams<{ agentId: string }>();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!agentId) {
       setLoading(false);
       return;
     }
-    // Events belong to jobs; the job carries the agent_key.
-    const { data } = await supabase
-      .from("agent_job_events")
-      .select("id, description, level, created_at, agent_jobs!inner(agent_key)")
-      .eq("agent_jobs.agent_key", agentId)
-      .order("created_at", { ascending: false })
-      .limit(200);
-    setEvents((data ?? []) as unknown as Event[]);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      // Events belong to jobs; the job carries the agent_key.
+      const { data, error } = await supabase
+        .from("agent_job_events")
+        .select("id, description, level, created_at, agent_jobs!inner(agent_key)")
+        .eq("agent_jobs.agent_key", agentId)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setEvents((data ?? []) as unknown as Event[]);
+    } catch (error) {
+      setLoadError("Failed to load logs: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [agentId]);
 
   useEffect(() => {
@@ -44,6 +52,7 @@ export function AgentLogsSection() {
   }, [refresh]);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading logs…</p>;
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <DataTable

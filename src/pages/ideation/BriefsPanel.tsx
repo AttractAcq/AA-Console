@@ -39,20 +39,30 @@ export function BriefsPanel() {
   const [viewing, setViewing] = useState<Brief | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    if (!clientId) {
+    setLoadError(null);
+    try {
+      if (!clientId) {
+        setLoading(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("client_briefs")
+        .select(
+          "id, title, body, media_type, brief_ref, status, source_idea_id, created_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
+        )
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setBriefs((data ?? []) as Brief[]);
       setLoading(false);
-      return;
+    } catch (error) {
+      setLoadError("Failed to load briefs: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
     }
-    const { data } = await supabase
-      .from("client_briefs")
-      .select(
-        "id, title, body, media_type, brief_ref, status, source_idea_id, created_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
-      )
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
-    setBriefs((data ?? []) as Brief[]);
-    setLoading(false);
   }, [clientId]);
 
   useEffect(() => {
@@ -67,6 +77,8 @@ export function BriefsPanel() {
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
   const shown = briefs.filter((b) => b.media_type === activeFilter);
   const elsewhere = briefs.length - shown.length;
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

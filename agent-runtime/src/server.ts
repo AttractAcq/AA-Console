@@ -12,15 +12,18 @@ import { handleMcpBrief } from "./mcp/brief-route.js";
 import { handleMcpOrchestration } from "./mcp/orchestration-route.js";
 import { handleMcpDelivery } from "./mcp/delivery-route.js";
 import { handleMcpContent } from "./mcp/content-route.js";
+import { handleMcpAdmin } from "./mcp/admin-route.js";
 import { handleMcpPipeline } from "./mcp/pipeline-route.js";
 import { handleMcpSalesAgents } from "./mcp/sales-agents-route.js";
 import { handleMcpAuth } from "./mcp/auth-route.js";
+import { handlePublicSales, isPublicSalesRequest } from "./public/sales-route.js";
 import { loadConfig } from "./config.js";
 import { serviceClient } from "./db.js";
 import { startWorker, type WorkerHandle } from "./worker.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { registeredAgentKeys } from "./orchestration/dispatch.js";
 import { handleMasterChat } from "./master/route.js";
+import { handleGitHubStatus } from "./github/status-route.js";
 import { logger } from "./logging/logger.js";
 
 const config = loadConfig();
@@ -70,6 +73,10 @@ const server = http.createServer((req, res) => {
     void handleMcpContent(req, res, sb, config.mcpServiceSecret);
     return;
   }
+  if (req.url?.startsWith("/internal/mcp/admin/")) {
+    void handleMcpAdmin(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
   if (req.url?.startsWith("/internal/mcp/pipeline/")) {
     void handleMcpPipeline(req, res, sb, config.mcpServiceSecret);
     return;
@@ -83,6 +90,14 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // The public sales widget. Handled before the console CORS block because its
+  // allowed origin comes from the deployment record, not from a static env
+  // allowlist — a static list cannot express one origin per client site.
+  if (isPublicSalesRequest(req.url)) {
+    void handlePublicSales(req, res, sb, config);
+    return;
+  }
+
   // The Master AI is browser-called, so it needs CORS. Only listed origins
   // get the header at all — an unlisted origin is refused by the browser
   // before the request is even attempted.
@@ -91,12 +106,19 @@ const server = http.createServer((req, res) => {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    // GET is here for /admin/github/status. A GET carrying Authorization
+    // is preflighted, and the browser refuses it unless the method is listed.
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Max-Age", "86400");
   }
   if (req.method === "OPTIONS") {
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  if (req.url === "/admin/github/status") {
+    void handleGitHubStatus(req, res, sb, config);
     return;
   }
 

@@ -10,6 +10,7 @@ import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
 import { PagePreview } from "../../components/pages/PagePreview";
+import { PagePolish } from "./PagePolish";
 
 type Page = {
   id: string;
@@ -19,6 +20,7 @@ type Page = {
   published_url: string | null;
   created_at: string;
   html: string | null;
+  current_revision: number | null;
   meta_title: string | null;
   meta_description: string | null;
   built_at: string | null;
@@ -38,25 +40,34 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    if (!clientId) return;
-    const [pageRows, campaignRows] = await Promise.all([
-      supabase
-        .from("client_pages")
-        .select(
-          "id, title, status, body, published_url, created_at, html, meta_title, meta_description, built_at",
-        )
-        .eq("client_id", clientId)
-        .eq("page_type", pageType)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("client_campaigns")
-        .select("id, name, status")
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false }),
-    ]);
-    setPages((pageRows.data ?? []) as Page[]);
-    setCampaigns((campaignRows.data ?? []) as CampaignOption[]);
+    setLoadError(null);
+    try {
+      if (!clientId) return;
+      const [pageRows, campaignRows] = await Promise.all([
+        supabase
+          .from("client_pages")
+          .select(
+            "id, title, status, body, published_url, created_at, html, current_revision, meta_title, meta_description, built_at",
+          )
+          .eq("client_id", clientId)
+          .eq("page_type", pageType)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("client_campaigns")
+          .select("id, name, status")
+          .eq("client_id", clientId)
+          .order("created_at", { ascending: false }),
+      ]);
+      if (pageRows.error) throw pageRows.error;
+      if (campaignRows.error) throw campaignRows.error;
+      setPages((pageRows.data ?? []) as Page[]);
+      setCampaigns((campaignRows.data ?? []) as CampaignOption[]);
+    } catch (error) {
+      setLoadError("Failed to load pages: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [clientId, pageType]);
 
   useEffect(() => {
@@ -98,6 +109,8 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
       hint: "Required if no HTML file is uploaded. The agent writes the page from this, your offer strategy, your ICP and whatever proof is on file.",
     },
   ], [campaigns]);
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>
@@ -249,6 +262,19 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
                 builtAt={open.built_at}
                 title={open.title}
               />
+              {/* Polish happens here, before anything is pushed to a repo. A
+                  page on a Pages-served branch is public the instant it lands,
+                  so the place to fix gaps is before the push, not after. */}
+              {clientId && open.html && (
+                <div className="mt-6">
+                  <PagePolish
+                    pageId={open.id}
+                    clientId={clientId}
+                    currentRevision={open.current_revision}
+                    onChanged={refresh}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

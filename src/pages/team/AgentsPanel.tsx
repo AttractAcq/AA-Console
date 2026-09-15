@@ -15,19 +15,27 @@ export function AgentsPanel() {
   const [showArchived, setShowArchived] = useState(false);
   const [agents, setAgents] = useState<Agent[]>([]);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    const { data } = await supabase
-      .from("agents")
-      .select("agent_key, name, initials, paused, archived_at")
-      .order("name");
-    setAgents(
-      (data ?? []).map((a) => ({
-        id: a.agent_key,
-        name: a.name,
-        initials: a.initials,
-        status: a.archived_at ? "Archived" : a.paused ? "Idle" : "Active",
-      })),
-    );
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("agents")
+        .select("agent_key, name, initials, paused, archived_at")
+        .order("name");
+      if (error) throw error;
+      setAgents(
+        (data ?? []).map((a) => ({
+          id: a.agent_key,
+          name: a.name,
+          initials: a.initials,
+          status: a.archived_at ? "Archived" : a.paused ? "Idle" : "Active",
+        })),
+      );
+    } catch (error) {
+      setLoadError("Failed to load agents: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, []);
 
   useEffect(() => {
@@ -60,6 +68,8 @@ export function AgentsPanel() {
       hint: "Comma-separated agent keys that must have completed before this one may run.",
     },
   ];
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

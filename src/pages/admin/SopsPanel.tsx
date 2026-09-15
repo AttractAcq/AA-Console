@@ -20,12 +20,20 @@ export function SopsPanel() {
   const [sops, setSops] = useState<Sop[]>([]);
   const ownerOptions = useOptions(loadTeamMembers, addOpen);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    const { data } = await supabase
-      .from("sops")
-      .select("id, title, updated_at, team_members(name)")
-      .order("updated_at", { ascending: false });
-    setSops((data ?? []) as unknown as Sop[]);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("sops")
+        .select("id, title, updated_at, team_members(name)")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      setSops((data ?? []) as unknown as Sop[]);
+    } catch (error) {
+      setLoadError("Failed to load SOPs: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, []);
 
   useEffect(() => {
@@ -42,6 +50,8 @@ export function SopsPanel() {
     },
     { name: "owner_id", label: "Owner", kind: "select", options: ownerOptions },
   ];
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

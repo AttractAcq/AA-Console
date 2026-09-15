@@ -27,6 +27,9 @@ import { PaidPanel } from "./distribution/PaidPanel";
 import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "./sales/SalesOverviewPanel";
 import { CampaignExecutionPanel } from "./campaigns/CampaignExecutionPanel";
+import { SitesPanel } from "./sites/SitesPanel";
+import { GitHubSettingsPanel } from "./sites/GitHubSettingsPanel";
+import { ClientEconomicsPanel } from "./economics/ClientEconomicsPanel";
 import { ProspectsLeadsPanel } from "./prospects-leads/ProspectsLeadsPanel";
 import { OnboardingPanel } from "./account/OnboardingPanel";
 import { ContactPanel } from "./account/ContactPanel";
@@ -92,11 +95,18 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     organic: () => <OrganicPanel />,
     paid: () => <PaidPanel />,
   },
+  sites: {
+    overview: () => <SitesPanel />,
+    settings: () => <GitHubSettingsPanel />,
+  },
   sales: {
     overview: () => <SalesOverviewPanel />,
   },
   "campaign-execution": {
     overview: () => <CampaignExecutionPanel />,
+  },
+  economics: {
+    overview: () => <ClientEconomicsPanel />,
   },
   conversion: {
     "primary-landing-pages": () => <PageBuilderPanel pageType="landing" />,

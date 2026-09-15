@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { resultSchema, type Tool } from "../shared/types.js";
 const domains: Record<string, string> = {
+  admin: "list_events get_event create_event update_event",
   delivery:
     "list_clients get_client get_status get_plan get_blockers get_next_action create_task get_client_health",
   campaign: "list get create update get_status request_approval",
@@ -9,7 +10,7 @@ const domains: Record<string, string> = {
   conversion:
     "list_pages get_page create_page generate_structure generate_copy request_approval get_performance",
   sales_agents:
-    "list get create update_knowledge update_qualification_rules test deploy get_conversations",
+    "generate_config list get create update_knowledge update_qualification_rules test deploy get_conversations",
   pipeline:
     "list_leads get_lead get_stalled_leads update_stage create_followup get_pipeline_summary record_sale",
   proof: "search get create attach_asset get_for_avatar get_for_claim",
@@ -24,6 +25,12 @@ const domains: Record<string, string> = {
   security:
     "get_system_status get_open_findings create_finding get_incident_status",
 };
+export const adminTools = new Set([
+  "admin.list_events",
+  "admin.get_event",
+  "admin.create_event",
+  "admin.update_event",
+]);
 export const orchestrationTools = new Set([
   "workflow.list_tasks",
   "workflow.get_task",
@@ -48,6 +55,33 @@ const leadStage = z.enum([
   "cash",
   "lost",
 ]);
+const salesAgentRole = z.enum([
+  "inbound_qualifier",
+  "appointment_setter",
+  "nurture",
+  "reactivation",
+  "closer_assist",
+]);
+const qualificationStep = z
+  .object({
+    question: z.string().trim().min(1).max(300),
+    why: z.string().trim().min(1).max(300).optional(),
+    good_answer: z.string().trim().min(1).max(300).optional(),
+    disqualifier: z.string().trim().min(1).max(300).optional(),
+  })
+  .strict();
+const objection = z
+  .object({
+    objection: z.string().trim().min(1).max(300),
+    response: z.string().trim().min(1).max(2000),
+  })
+  .strict();
+const transcriptTurn = z
+  .object({
+    role: z.enum(["lead", "agent"]),
+    text: z.string().trim().min(1).max(2000),
+  })
+  .strict();
 export const registry: Tool[] = Object.entries(domains).flatMap(
   ([domain, actions]) =>
     actions.split(" ").map((action) => {
@@ -245,6 +279,43 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
       if (name === "sales_agents.get_conversations") {
         fields.sales_agent_id = id.optional();
       }
+      // Phase 11b: factory writes realized this phase (SEC_BAR #3). deploy
+      // deliberately gets no override here -- it stays on the generic shape
+      // below and remains stub (Alex CLEAR #5 / SEC_BAR #4).
+      if (name === "sales_agents.generate_config") {
+        delete fields.sales_agent_id;
+        delete fields.summary;
+        delete fields.title;
+        fields.role = salesAgentRole;
+      }
+      if (name === "sales_agents.create") {
+        delete fields.sales_agent_id;
+        delete fields.summary;
+        delete fields.title;
+        fields.role = salesAgentRole;
+        fields.name = z.string().trim().min(1).max(200);
+        fields.purpose = z.string().trim().min(1).max(4000);
+      }
+      if (name === "sales_agents.update_knowledge") {
+        fields.sales_agent_id = id;
+        delete fields.summary;
+        delete fields.title;
+        fields.objections = z.array(objection).min(1).max(30).optional();
+        fields.guardrails = z.string().trim().min(1).max(4000).optional();
+        fields.greeting = z.string().trim().min(1).max(2000).optional();
+      }
+      if (name === "sales_agents.update_qualification_rules") {
+        fields.sales_agent_id = id;
+        delete fields.summary;
+        delete fields.title;
+        fields.qualification = z.array(qualificationStep).min(1).max(20);
+      }
+      if (name === "sales_agents.test") {
+        fields.sales_agent_id = id;
+        delete fields.summary;
+        delete fields.title;
+        fields.transcript = z.array(transcriptTurn).min(1).max(60);
+      }
       if (name === "workflow.create_approval") {
         fields.summary = text;
       }
@@ -275,6 +346,32 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
           fields.end_date = z.iso.date().optional();
         }
       }
+      if (domain === "admin") {
+        for (const key of Object.keys(fields)) delete fields[key];
+        fields.client_id = id;
+        if (!read) fields.idempotency_key = z.string().min(8).max(128);
+        if (action === "list_events") {
+          fields.limit = z.number().int().min(1).max(100).default(25);
+          fields.after = id.optional();
+          fields.status = z
+            .enum(["scheduled", "completed", "cancelled"])
+            .optional();
+          fields.due_before = z.iso.datetime({ offset: true }).optional();
+        } else if (action !== "create_event") fields.event_id = id;
+        if (!read) {
+          // Complete replacement of editable fields; no ambiguous JSON patch/null semantics.
+          fields.title = z.string().trim().min(1).max(200);
+          fields.notes = z.string().max(2000).nullable();
+          fields.starts_at = z.iso.datetime({ offset: true });
+          fields.ends_at = z.iso.datetime({ offset: true }).nullable();
+          if (action === "create_event")
+            fields.event_type = z.enum(["meeting", "reminder", "admin"]);
+          else {
+            fields.status = z.enum(["scheduled", "completed", "cancelled"]);
+            fields.expected_version = z.number().int().min(1).max(2147483646);
+          }
+        }
+      }
       const realContent = new Set([
         // Sec Phase 5 #6: isolation tests must stay green before adding a name.
         "content.list_ideas",
@@ -298,8 +395,8 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "content.record_publication",
       ]);
       // Sec Phase 11 #7: isolation tests must stay green before adding a
-      // name. record_sale and every sales_agents write/deploy/test action
-      // stay out of both sets (Alex CLEAR #5 / SEC_BAR #2) — they remain stub.
+      // name. record_sale stays out of realPipeline (Alex CLEAR #5 / SEC_BAR
+      // #2) — it remains stub.
       const realPipeline = new Set([
         "pipeline.list_leads",
         "pipeline.get_lead",
@@ -308,12 +405,21 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "pipeline.update_stage",
         "pipeline.create_followup",
       ]);
+      // Sec Phase 11b #7: isolation tests (Phase 11b block) must stay green
+      // before adding a name. sales_agents.deploy stays out of this set
+      // (Alex CLEAR #5 / SEC_BAR #4) — it remains stub, CRITICAL, approval.
       const realSalesAgents = new Set([
         "sales_agents.list",
         "sales_agents.get",
         "sales_agents.get_conversations",
+        "sales_agents.generate_config",
+        "sales_agents.create",
+        "sales_agents.update_knowledge",
+        "sales_agents.update_qualification_rules",
+        "sales_agents.test",
       ]);
       const implementation =
+        adminTools.has(name) ||
         orchestration ||
         domain === "delivery" ||
         realContent.has(name) ||
@@ -352,19 +458,22 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         ].includes(action),
         audit: "required",
         implementation,
-        dependency: orchestration
-          ? "Scoped AA orchestration business API"
-          : domain === "delivery"
-            ? "Scoped AA delivery business API"
-            : realContent.has(name)
-              ? "Scoped AA content business API"
-              : realPipeline.has(name)
-                ? "Scoped AA pipeline business API"
-                : realSalesAgents.has(name)
-                  ? "Scoped AA sales_agents business API"
-                  : implementation === "real"
-                    ? "Gateway control store"
-                    : `Scoped AA ${domain} business API`,
+        dependency:
+          domain === "admin"
+            ? "Scoped AA administrative events API"
+            : orchestration
+              ? "Scoped AA orchestration business API"
+              : domain === "delivery"
+                ? "Scoped AA delivery business API"
+                : realContent.has(name)
+                  ? "Scoped AA content business API"
+                  : realPipeline.has(name)
+                    ? "Scoped AA pipeline business API"
+                    : realSalesAgents.has(name)
+                      ? "Scoped AA sales_agents business API"
+                      : implementation === "real"
+                        ? "Gateway control store"
+                        : `Scoped AA ${domain} business API`,
       } satisfies Tool;
     }),
 );

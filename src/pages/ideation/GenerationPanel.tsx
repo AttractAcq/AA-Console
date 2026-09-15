@@ -44,14 +44,22 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
     [clientId],
   );
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    if (!clientId) return;
-    const { data } = await supabase
-      .from("client_ideas")
-      .select("id, title, media_type, source, status")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
-    setIdeas((data ?? []) as Idea[]);
+    setLoadError(null);
+    try {
+      if (!clientId) return;
+      const { data, error } = await supabase
+        .from("client_ideas")
+        .select("id, title, media_type, source, status")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setIdeas((data ?? []) as Idea[]);
+    } catch (error) {
+      setLoadError("Failed to load ideas: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -108,6 +116,8 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
       hint: "Proof Bank has no writer in the admin console yet — add proof from the Client console.",
     },
   ];
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

@@ -85,3 +85,6 @@ suite as Marketing, and exact discovery set equality including the absence of
 both `content.get_performance` and `attribution.get_content_performance`
 (granted but still stub). Its nonsecret fixture shape is documented in
 `phase-10-distribution-manager.md`.
+
+
+Admin (Phase 12) follows `src/onboarding/admin-calendar.ts`: exact 15-tool discovery, no wildcard grants, AA-native meeting/reminder/admin records only. Use `npm run smoke:admin -- fixtures.json <private-header-file> <staging-or-local-mcp-url>` after the separately approved staging setup. The script refuses the known Production MCP hostname and requires reversible Harbour Dental fixtures, with Attract Acquisition denied. No OAuth, external invitations, notifications or live connector changes. See [Phase 12](phase-12-admin-calendar.md); Gate 12 is NOT YET CLOSED.

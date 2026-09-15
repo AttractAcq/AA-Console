@@ -53,6 +53,7 @@ export function ChatView({ canManage = false }: { canManage?: boolean }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [addChannelOpen, setAddChannelOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
@@ -62,11 +63,18 @@ export function ChatView({ canManage = false }: { canManage?: boolean }) {
   const listRef = useRef<HTMLDivElement>(null);
 
   const loadChannels = useCallback(async () => {
-    const { data } = await supabase.from("team_channels").select("id, name").order("name");
-    const rows = (data ?? []) as Channel[];
-    setChannels(rows);
-    setActiveId((current) => current ?? rows[0]?.id ?? null);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase.from("team_channels").select("id, name").order("name");
+      if (error) throw error;
+      const rows = (data ?? []) as Channel[];
+      setChannels(rows);
+      setActiveId((current) => current ?? rows[0]?.id ?? null);
+    } catch (error) {
+      setLoadError("Failed to load channels: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -74,12 +82,17 @@ export function ChatView({ canManage = false }: { canManage?: boolean }) {
   }, [loadChannels]);
 
   const loadMessages = useCallback(async (channelId: string) => {
-    const { data } = await supabase
+    setLoadError(null);
+    const { data, error } = await supabase
       .from("team_messages")
       .select("id, channel_id, author_id, body, created_at")
       .eq("channel_id", channelId)
       .order("created_at")
       .limit(200);
+    if (error) {
+      setLoadError("Failed to load messages: " + error.message);
+      return;
+    }
     const rows = (data ?? []) as Message[];
     setMessages(rows);
 
@@ -183,6 +196,7 @@ export function ChatView({ canManage = false }: { canManage?: boolean }) {
   ];
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading chat…</p>;
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void loadChannels()}>Retry</button></div>;
 
   return (
     <div className="grid gap-4 md:grid-cols-[220px_1fr]">

@@ -17,6 +17,8 @@ import {
   UserPlus,
   MessagesSquare,
   Megaphone,
+  Globe,
+  Coins,
   BarChart3,
   ClipboardList,
   Plug,
@@ -173,13 +175,26 @@ export const clientNavGroups: NavNode[] = [
         ],
       },
       {
+        // The page-building half of Sites. Kept as its own route so nothing
+        // bookmarked breaks, but labelled so it no longer reads as a second,
+        // competing website system.
         id: "conversion",
-        label: "Conversion",
+        label: "Page Builder",
         path: "conversion",
         icon: TrendingUp,
         tabs: [
           { id: "primary-landing-pages", label: "Primary Landing Pages" },
           { id: "secondary-offer-pages", label: "Secondary Offer Pages" },
+        ],
+      },
+      {
+        id: "sites",
+        label: "Sites",
+        path: "sites",
+        icon: Globe,
+        tabs: [
+          { id: "overview", label: "Overview" },
+          { id: "settings", label: "Settings" },
         ],
       },
       {
@@ -201,6 +216,13 @@ export const clientNavGroups: NavNode[] = [
         label: "Prospects & Leads",
         path: "prospects-leads",
         icon: UserPlus,
+      },
+      {
+        id: "economics",
+        label: "Economics",
+        path: "economics",
+        icon: Coins,
+        tabs: [{ id: "overview", label: "Overview" }],
       },
       {
         id: "reporting",

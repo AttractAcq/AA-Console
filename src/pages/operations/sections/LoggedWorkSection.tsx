@@ -17,19 +17,27 @@ export function LoggedWorkSection() {
   const { memberId } = useParams<{ memberId: string }>();
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!memberId) {
       setLoading(false);
       return;
     }
-    const { data } = await supabase
-      .from("work_logs")
-      .select("id, work_done, logged_on, minutes, clients(name)")
-      .eq("member_id", memberId)
-      .order("logged_on", { ascending: false });
-    setLogs((data ?? []) as unknown as Log[]);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("work_logs")
+        .select("id, work_done, logged_on, minutes, clients(name)")
+        .eq("member_id", memberId)
+        .order("logged_on", { ascending: false });
+      if (error) throw error;
+      setLogs((data ?? []) as unknown as Log[]);
+    } catch (error) {
+      setLoadError("Failed to load logged work: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [memberId]);
 
   useEffect(() => {
@@ -41,6 +49,7 @@ export function LoggedWorkSection() {
   const minutes = totalMinutes % 60;
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading logged work…</p>;
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div className="space-y-4">

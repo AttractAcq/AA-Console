@@ -76,7 +76,7 @@ create index sp_created_by_bot_idx on scheduled_posts (created_by_bot)
 alter table scheduled_posts
   add column publication_status text not null default 'scheduled'
     check (publication_status in ('scheduled', 'published', 'failed'));
-alter table scheduled_posts add column external_id text;
+alter table scheduled_posts add column if not exists external_id text;
 alter table scheduled_posts add column failure_reason text;
 alter table scheduled_posts
   add column published_by_bot text references mcp_internal.mcp_bots(bot_id);

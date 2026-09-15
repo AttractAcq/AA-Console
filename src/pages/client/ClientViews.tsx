@@ -1,3 +1,4 @@
+import { useOperationalCampaigns } from "../campaigns/useOperationalCampaigns";
 import { useCallback, useEffect, useState } from "react";
 import { Panel } from "../../components/Panel";
 import { DataTable } from "../../components/DataTable";
@@ -17,91 +18,17 @@ import { cn } from "../../lib/cn";
  */
 
 export function ActiveCampaignsView({ clientId }: { clientId: string }) {
-  const [rows, setRows] = useState<
-    Array<{
-      id: string;
-      campaign_ref: string;
-      target_role: string;
-      daily_spend: number;
-      total_spend: number;
-      objective_achieved: string | null;
-      status: string;
-      started_on: string;
-    }>
-  >([]);
-  const [loading, setLoading] = useState(true);
-
-  const refresh = useCallback(async () => {
-    const { data } = await supabase
-      .from("campaigns")
-      .select(
-        "id, campaign_ref, target_role, daily_spend, total_spend, objective_achieved, status, started_on",
-      )
-      .eq("client_id", clientId)
-      .order("started_on", { ascending: false });
-    setRows((data ?? []) as typeof rows);
-    setLoading(false);
-  }, [clientId]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  if (loading) return <p className="text-sm text-muted-foreground">Loading campaigns…</p>;
-
-  const active = rows.filter((r) => r.status === "active");
-  const past = rows.filter((r) => r.status !== "active");
-  const dailySpend = active.reduce((sum, r) => sum + Number(r.daily_spend), 0);
-  const totalSpend = rows.reduce((sum, r) => sum + Number(r.total_spend), 0);
-
-  const money = (v: number) => v.toFixed(2);
-
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Panel title="Active campaigns">
-          <p className="text-2xl font-semibold text-card-foreground">{active.length}</p>
-        </Panel>
-        <Panel title="Current daily spend">
-          <p className="text-2xl font-semibold text-card-foreground">{money(dailySpend)}</p>
-        </Panel>
-        <Panel title="Total spend to date">
-          <p className="text-2xl font-semibold text-card-foreground">{money(totalSpend)}</p>
-        </Panel>
-      </div>
-
-      <div>
-        <h2 className="mb-3 text-sm font-semibold text-foreground">Running now</h2>
-        <DataTable
-          columns={["Campaign", "Target", "Daily spend", "Total spend", "Objective achieved"]}
-          emptyLabel="Nothing is running at the moment"
-          rows={active.map((r) => [
-            r.campaign_ref,
-            r.target_role,
-            money(Number(r.daily_spend)),
-            money(Number(r.total_spend)),
-            r.objective_achieved ?? "In progress",
-          ])}
-        />
-      </div>
-
-      {past.length > 0 && (
-        <div>
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Finished</h2>
-          <DataTable
-            columns={["Campaign", "Target", "Total spend", "Objective achieved"]}
-            emptyLabel=""
-            rows={past.map((r) => [
-              r.campaign_ref,
-              r.target_role,
-              money(Number(r.total_spend)),
-              r.objective_achieved ?? "—",
-            ])}
-          />
-        </div>
-      )}
-    </div>
-  );
+  const { rows, loading, error } = useOperationalCampaigns(clientId);
+  if (loading) return <p>Loading campaigns…</p>;
+  if (error) return <p role="alert">{error}</p>;
+  const live = rows.filter(r => r.status === "live");
+  const planning = rows.filter(r => r.status === "planning").length;
+  return <div className="space-y-4">
+    <Panel title="Live campaigns"><p>{live.length}</p></Panel>
+    {planning > 0 && <p>{planning} campaigns are currently in planning.</p>}
+    <DataTable columns={["Campaign", "Status", "Objective", "Channels", "Start", "End"]}
+      emptyLabel="No live campaigns" rows={live.map(r => [r.name, r.status, r.objective ?? "—", (r.channels ?? []).join(", ") || "—", r.starts_on ?? "—", r.ends_on ?? "—"])} />
+  </div>;
 }
 
 export function ActiveOrganicView({ clientId }: { clientId: string }) {
@@ -115,16 +42,24 @@ export function ActiveOrganicView({ clientId }: { clientId: string }) {
     }>
   >([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const { data } = await supabase
-      .from("scheduled_posts")
-      .select("id, scheduled_for, ref_number, media_type, published_at")
-      .eq("client_id", clientId)
-      .eq("channel", "organic")
-      .order("scheduled_for");
-    setPosts((data ?? []) as typeof posts);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("scheduled_posts")
+        .select("id, scheduled_for, ref_number, media_type, published_at")
+        .eq("client_id", clientId)
+        .eq("channel", "organic")
+        .order("scheduled_for");
+      if (error) throw error;
+      setPosts((data ?? []) as typeof posts);
+    } catch (error) {
+      setLoadError("Failed to load schedule: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -132,6 +67,7 @@ export function ActiveOrganicView({ clientId }: { clientId: string }) {
   }, [refresh]);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading schedule…</p>;
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
@@ -192,15 +128,23 @@ export function ActiveConversionView({ clientId }: { clientId: string }) {
   >([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const { data } = await supabase
-      .from("client_pages")
-      .select("id, title, page_type, status, published_url, body")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
-    setPages((data ?? []) as typeof pages);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("client_pages")
+        .select("id, title, page_type, status, published_url, body")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setPages((data ?? []) as typeof pages);
+    } catch (error) {
+      setLoadError("Failed to load pages: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -208,6 +152,7 @@ export function ActiveConversionView({ clientId }: { clientId: string }) {
   }, [refresh]);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading pages…</p>;
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
   if (pages.length === 0) {
     return <EmptyState label="No pages built yet — landing and offer pages appear here as they are made" />;
   }
