@@ -19,8 +19,8 @@ Paths below refer to the existing AA Console repository. No live database or pro
 | Conversion | `src/pages/conversion/PageBuilderPanel.tsx`, runtime `landing_page`, migration 59 page HTML | Stub; no fabricated page/deployment API |
 | Leads / pipeline | Migration 61 `advance_lead`, `stalled_leads`; prospects/leads panel | Stub; reuse transition logic |
 | Proof | Migrations 57/58, runtime `proof_discovery`, proof modules | Stub; preserve provenance and claim matching |
-| Attribution | Migration 62 `top_content_by_revenue`, `acquisition_funnel`; reporting `useMetrics.ts`, `metrics_period_summary` | Stub; reuse metric basis and attribution calculations |
-| Economics | Migration 07 billing/finance tables, reporting metrics | Stub; no validated economics business API found |
+| Attribution | Migration 62 `top_content_by_revenue`, `acquisition_funnel`; reporting `useMetrics.ts`, `metrics_period_summary`; Phase 13 `mcp_attribution_revenue` | `attribution.get_campaign_performance` real (observed paid metrics). `attribution.get_revenue_attribution` real (cohort campaign economics; Gate 13). Other attribution names remain stub |
+| Economics | Migration 79 Client Economics OS (`client_economics`, spend ledger); Phase 13 `mcp_economics_read` | Five named reads real for `bot_finance` only. Does not expose `finance_entries` / `client_billing` / payments |
 | Workflow | Production `job_assignments`, worker `agent_jobs`, onboarding steps, review trails | These are distinct lifecycles, not a general task service. Only gateway approvals/activity are implemented |
 | Sales agents, engineering, security | No matching complete business APIs found in inspected service surface | Stub |
 

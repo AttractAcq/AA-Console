@@ -18,6 +18,7 @@
     "smoke:distribution": "node --import tsx scripts/distribution-onboarding-smoke.ts",
     "smoke:sales-ops": "node --import tsx scripts/sales-ops-onboarding-smoke.ts",
     "smoke:admin": "node --import tsx scripts/admin-onboarding-smoke.ts",
+    "smoke:finance": "node --import tsx scripts/finance-onboarding-smoke.ts",
     "smoke:sales-agent-factory": "node --import tsx scripts/sales-agent-factory-onboarding-smoke.ts"
   },
   "dependencies": {

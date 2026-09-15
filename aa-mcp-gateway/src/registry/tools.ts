@@ -31,6 +31,14 @@ export const adminTools = new Set([
   "admin.create_event",
   "admin.update_event",
 ]);
+export const financeReadTools = new Set([
+  "economics.get_client_economics",
+  "economics.get_campaign_economics",
+  "economics.get_costs",
+  "economics.get_revenue",
+  "economics.get_roi",
+  "attribution.get_revenue_attribution",
+]);
 export const orchestrationTools = new Set([
   "workflow.list_tasks",
   "workflow.get_task",
@@ -346,6 +354,19 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
           fields.end_date = z.iso.date().optional();
         }
       }
+      if (domain === "economics" || name === "attribution.get_revenue_attribution") {
+        for (const key of Object.keys(fields)) delete fields[key];
+        fields.client_id = id;
+        fields.start_date = z.iso.date().optional();
+        fields.end_date = z.iso.date().optional();
+        if (
+          action === "get_campaign_economics" ||
+          name === "attribution.get_revenue_attribution"
+        ) {
+          fields.campaign_id = id.optional();
+          fields.limit = z.number().int().min(1).max(100).default(25);
+        }
+      }
       if (domain === "admin") {
         for (const key of Object.keys(fields)) delete fields[key];
         fields.client_id = id;
@@ -418,6 +439,17 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "sales_agents.update_qualification_rules",
         "sales_agents.test",
       ]);
+      // Sec Phase 13: isolation tests must stay green before adding a name.
+      // Money writes (pipeline.record_sale, payments, bank/Stripe/Xero) stay
+      // out of this set and are not granted to bot_finance.
+      const realEconomics = new Set([
+        "economics.get_client_economics",
+        "economics.get_campaign_economics",
+        "economics.get_costs",
+        "economics.get_revenue",
+        "economics.get_roi",
+      ]);
+      const realAttributionRevenue = name === "attribution.get_revenue_attribution";
       const implementation =
         adminTools.has(name) ||
         orchestration ||
@@ -425,6 +457,8 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         realContent.has(name) ||
         realPipeline.has(name) ||
         realSalesAgents.has(name) ||
+        realEconomics.has(name) ||
+        realAttributionRevenue ||
         [
           "workflow.get_pending_approvals",
           "workflow.get_activity",
@@ -471,9 +505,13 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
                     ? "Scoped AA pipeline business API"
                     : realSalesAgents.has(name)
                       ? "Scoped AA sales_agents business API"
-                      : implementation === "real"
-                        ? "Gateway control store"
-                        : `Scoped AA ${domain} business API`,
+                      : realEconomics.has(name)
+                        ? "Scoped AA economics business API"
+                        : realAttributionRevenue
+                          ? "Scoped AA attribution business API"
+                          : implementation === "real"
+                            ? "Gateway control store"
+                            : `Scoped AA ${domain} business API`,
       } satisfies Tool;
     }),
 );

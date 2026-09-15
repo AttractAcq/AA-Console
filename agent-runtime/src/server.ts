@@ -15,6 +15,7 @@ import { handleMcpContent } from "./mcp/content-route.js";
 import { handleMcpAdmin } from "./mcp/admin-route.js";
 import { handleMcpPipeline } from "./mcp/pipeline-route.js";
 import { handleMcpSalesAgents } from "./mcp/sales-agents-route.js";
+import { handleMcpEconomics } from "./mcp/economics-route.js";
 import { handleMcpAuth } from "./mcp/auth-route.js";
 import { handlePublicSales, isPublicSalesRequest } from "./public/sales-route.js";
 import { loadConfig } from "./config.js";
@@ -59,6 +60,11 @@ const server = http.createServer((req, res) => {
 
   if (req.url === "/internal/mcp/content/generate-brief") {
     void handleMcpBrief(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+  if (req.url === "/internal/mcp/attribution/get-revenue-attribution"
+      || req.url?.startsWith("/internal/mcp/economics/")) {
+    void handleMcpEconomics(req, res, sb, config.mcpServiceSecret);
     return;
   }
   if (/^\/internal\/mcp\/(workflow|campaign|attribution)\//.test(req.url ?? '')) {

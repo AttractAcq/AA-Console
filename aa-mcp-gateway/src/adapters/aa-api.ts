@@ -1,4 +1,4 @@
-import { registry, orchestrationTools, adminTools } from "../registry/tools.js";
+import { registry, orchestrationTools, adminTools, financeReadTools } from "../registry/tools.js";
 import { z } from "zod";
 import type { Adapter, Context, Tool, Result } from "../shared/types.js";
 
@@ -239,7 +239,10 @@ for (const action of [
 }
 
 for (const tool of registry.filter(
-  (t) => adminTools.has(t.name) || orchestrationTools.has(t.name),
+  (t) =>
+    adminTools.has(t.name) ||
+    orchestrationTools.has(t.name) ||
+    financeReadTools.has(t.name),
 )) {
   const [domain, action] = tool.name.split(".");
   ROUTES[tool.name] = {
@@ -330,7 +333,7 @@ function aaBody(
   input: Record<string, unknown>,
 ): Record<string, unknown> {
   if (
-    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents)\./.test(
+    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents|economics)\./.test(
       tool,
     )
   )

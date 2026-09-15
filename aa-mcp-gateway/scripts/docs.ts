@@ -14,7 +14,9 @@ const status = (name: string, implementation: string) =>
       ? "real (bot_distribution only)"
       : implementation === "real" && name.startsWith("admin.")
         ? "real (bot_admin only)"
-        : implementation;
+        : implementation === "real" && name.startsWith("economics.")
+          ? "real (bot_finance only)"
+          : implementation;
 writeFileSync(
   "docs/tool-registry.md",
   `# Tool registry\n\n${registry.length} initial business contracts. Status is adapter availability, not evidence of live deployment. Brief generation is implemented and requires AA_INTERNAL_API_URL and AA_MCP_SERVICE_SECRET. Stub schemas reserve bounded business fields and must be versioned/refined before their adapters are enabled. All calls require an authorized client UUID; all writes require an idempotency key. HIGH/CRITICAL policy always requires human approval.\n\n| Tool | Status | Action | Risk | Approval | Reversible | Dependency |\n| --- | --- | --- | --- | --- | --- | --- |\n` +
@@ -48,5 +50,9 @@ writeFileSync(
 // Phase 12 exact Admin surface and AA-native provider boundary.
 const adminNote =
   "\n\nPhase 12: `bot_admin` has an exact 15-tool ceiling (nine reads/six writes), including four AA-native `admin.*` event tools. Other Bots cannot invoke Admin tools even with stale wildcard grants. Admin has no Finance, Security, Engineering, pipeline, sales_agents or content tools, and `workflow.record_decision` remains universally denied. Events do not send invitations or notifications. See [Phase 12](phase-12-admin-calendar.md) for database objects, guarded RPCs, replay authorization and `smoke:admin`. Gate 12 is NOT YET CLOSED.\n";
-for (const file of ["docs/tool-registry.md", "docs/bot-permissions.md"])
+const financeNote =
+  "\n\nPhase 13: `bot_finance` has an exact 14-tool ceiling (ten reads/four writes): five named `economics.*` Client Economics OS reads, `attribution.get_revenue_attribution`, and the eight-tool workflow suite. The seeded `economics.*` wildcard is replaced with exact rows. Other Bots cannot invoke `economics.*` even with stale wildcards. Money writes (`pipeline.record_sale`, payments, bank/Stripe/Xero) are not granted and stay stub. See [Phase 13](phase-13-finance-controller.md) for guarded RPCs and `smoke:finance`. Gate 13 is NOT YET CLOSED.\n";
+for (const file of ["docs/tool-registry.md", "docs/bot-permissions.md"]) {
   appendFileSync(file, adminNote);
+  appendFileSync(file, financeNote);
+}
