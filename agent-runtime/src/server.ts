@@ -19,6 +19,7 @@ import { handleMcpEngineering } from "./mcp/engineering-route.js";
 import { handleMcpSecurity } from "./mcp/security-route.js";
 import { handleMcpPipeline } from "./mcp/pipeline-route.js";
 import { handleMcpSalesAgents } from "./mcp/sales-agents-route.js";
+import { handleMcpProof } from "./mcp/proof-route.js";
 import { handleMcpEconomics } from "./mcp/economics-route.js";
 import { handleMcpAuth } from "./mcp/auth-route.js";
 import { handlePublicSales, isPublicSalesRequest } from "./public/sales-route.js";
@@ -110,6 +111,10 @@ const server = http.createServer((req, res) => {
   }
   if (req.url?.startsWith("/internal/mcp/sales-agents/")) {
     void handleMcpSalesAgents(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+  if (req.url?.startsWith("/internal/mcp/proof/")) {
+    void handleMcpProof(req, res, sb, config.mcpServiceSecret);
     return;
   }
   if (req.url?.startsWith("/internal/mcp/auth/")) {

@@ -192,6 +192,48 @@ const ROUTES: Record<string, Route> = {
       return { p_bot_id: null, p_client_id: client_id, p_sales_agent_id: sales_agent_id, p_transcript: transcript };
     },
   },
+  '/internal/mcp/sales-agents/attach-to-page': {
+    rpc: 'mcp_attach_sales_agent_to_page',
+    kind: 'write',
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const sales_agent_id = uuid(body, 'sales_agent_id');
+      const page_id = uuid(body, 'page_id');
+      if (!client_id || !sales_agent_id || !page_id
+          || !subset(body, ['client_id', 'sales_agent_id', 'page_id'])) {
+        return undefined;
+      }
+      return { p_bot_id: null, p_client_id: client_id, p_sales_agent_id: sales_agent_id, p_page_id: page_id };
+    },
+  },
+  '/internal/mcp/sales-agents/set-deployment-enabled': {
+    rpc: 'mcp_set_sales_agent_deployment_enabled',
+    kind: 'write',
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const deployment_id = uuid(body, 'deployment_id');
+      const enabled = body.enabled;
+      if (!client_id || !deployment_id || typeof enabled !== 'boolean'
+          || !subset(body, ['client_id', 'deployment_id', 'enabled'])) {
+        return undefined;
+      }
+      return {
+        p_bot_id: null, p_client_id: client_id, p_deployment_id: deployment_id, p_enabled: enabled,
+      };
+    },
+  },
+  '/internal/mcp/sales-agents/build': {
+    rpc: 'mcp_build_sales_agent',
+    kind: 'queue',
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const sales_agent_id = uuid(body, 'sales_agent_id');
+      if (!client_id || !sales_agent_id || !subset(body, ['client_id', 'sales_agent_id'])) {
+        return undefined;
+      }
+      return { p_bot_id: null, p_client_id: client_id, p_sales_agent_id: sales_agent_id };
+    },
+  },
 };
 
 export const handleMcpSalesAgents: typeof handleMcpContent = (req, res, sb, secret) =>

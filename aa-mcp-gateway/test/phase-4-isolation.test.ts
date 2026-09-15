@@ -122,6 +122,27 @@ test("same-client authorization reaches the adapter; other-client is denied befo
       formats: ["reel"],
       idempotency_key: "other-rep",
     },
+    "content.assign_production": {
+      client_id: clientB,
+      brief_id: ideaA,
+      route: "ai",
+      idempotency_key: "other-assign",
+    },
+    "content.submit_asset": {
+      client_id: clientB,
+      storage_path: "path/a.png",
+      media_type: "image",
+      brief_id: ideaA,
+      idempotency_key: "other-submit",
+    },
+    "proof.search": { client_id: clientB },
+    "proof.get": { client_id: clientB, proof_id: ideaA },
+    "proof.create": {
+      client_id: clientB,
+      media_type: "text",
+      body: "x",
+      idempotency_key: "other-proof",
+    },
   };
   for (const [name, input] of Object.entries(otherInputs)) {
     const denied = await engine.call(production, name, input);

@@ -54,9 +54,9 @@ async function mockAa(
 }
 
 test("Phase 16 registry: conversion and campaign execution tools are real", () => {
-  // Catalog size after #48 only. Sibling PRs #46/#47 may add names and must
-  // update their own registry.length asserts; do not treat 97 as a final ceiling.
-  assert.equal(registry.length, 97);
+  // Catalog after #48 (97) + #47's 3 sales_agents names. Phase 16c (#46) adds
+  // more; do not treat 100 as a final ceiling.
+  assert.equal(registry.length, 100);
   assert.equal(marketingDirector.grants.length, 40);
   assert.equal(marketingDirector.phase16Owned.length, 17);
   for (const name of [

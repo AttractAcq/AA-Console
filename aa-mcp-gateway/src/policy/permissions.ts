@@ -37,6 +37,8 @@ export const grants: Record<Bot, string[]> = {
     "proof.get",
     "proof.get_for_avatar",
     "proof.get_for_claim",
+    "proof.create",
+    "proof.attach_asset",
     ...workflow,
   ],
   bot_distribution: [...distributionManager.grants],
@@ -74,6 +76,8 @@ export function grantPatterns(identity: Identity): string[] {
 export const PRODUCTION_ONLY_TOOLS = new Set([
   "content.select_idea",
   "content.approve_asset",
+  "content.assign_production",
+  "content.submit_asset",
 ]);
 /**
  * Sec Phase 10 Alex CLEAR (2026-09-09): distribution schedule/publication
@@ -138,6 +142,7 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   // Phase 11 Alex CLEAR / SEC_BAR #1: exact allowlist ceiling for Sales Ops,
   // same pattern as Marketing/Distribution above. Constrains stale/overbroad
   // database grants too (e.g. a leftover pipeline.*/sales_agents.* row).
+  // Phase 16b this PR: salesOps.grants is 25. Phase 16c (#46) appends 3.
   if (
     identity.bot === "bot_sales_ops" &&
     !salesOps.grants.some((name) => name === tool.name)
