@@ -27,12 +27,20 @@ import { MediaLibrary } from "../components/MediaLibrary";
 import { ProofBankPanel } from "./proof-bank/ProofBankPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { TeamCategoryPanel } from "./operations/TeamCategoryPanel";
+import { ActiveOrganicView, ActiveConversionView } from "./client/ClientViews";
+import { BusinessContextPanel } from "./intelligence/BusinessContextPanel";
+import { OnboardingPanel } from "./account/OnboardingPanel";
+import { IntegrationsPanel } from "./account/IntegrationsPanel";
+import { BillingSubscriptionPanel } from "./account/BillingSubscriptionPanel";
+import { BrandPanel } from "./account/BrandPanel";
 const OrganicDistribution = () => <DistributionBoard channel="organic" />;
 const ImageLibrary = () => <MediaLibrary mediaType="image" />;
 const EditorsTeam = () => <TeamCategoryPanel category="editors" />;
+const ActiveOrganic = () => <ActiveOrganicView clientId="client-1" />;
+const ActiveConversion = () => <ActiveConversionView clientId="client-1" />;
 
 beforeEach(() => vi.clearAllMocks());
-const panels = [OrganicDistribution, ImageLibrary, ProofBankPanel, ApprovalsPanel, EditorsTeam, ClientsPage, PageBuilderPanel, GenerationPanel, BriefsPanel, AgentsPanel, CalendarPanel, SopsPanel, CommentaryPanel, ContractsLegalPanel, AuditLogPanel];
+const panels = [OrganicDistribution, ImageLibrary, ProofBankPanel, ApprovalsPanel, EditorsTeam, ClientsPage, PageBuilderPanel, GenerationPanel, BriefsPanel, AgentsPanel, CalendarPanel, SopsPanel, CommentaryPanel, ContractsLegalPanel, AuditLogPanel, ActiveOrganic, ActiveConversion, BusinessContextPanel, OnboardingPanel, IntegrationsPanel, BillingSubscriptionPanel, BrandPanel];
 for (const Component of panels) {
   it(`${Component.name} surfaces database errors and recovers on retry`, async () => {
     let fail = true;

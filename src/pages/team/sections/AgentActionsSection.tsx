@@ -29,17 +29,24 @@ export function AgentActionsSection() {
   );
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const clientOptions = useOptions(loadClients, openAction === "run");
 
   const refresh = useCallback(async () => {
     if (!agentId) return;
-    const { data } = await supabase
-      .from("agents")
-      .select("agent_key, name, paused, archived_at, domain, description, requires_upstream, config")
-      .eq("agent_key", agentId)
-      .maybeSingle();
-    setAgent((data as AgentRow) ?? null);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("agents")
+        .select("agent_key, name, paused, archived_at, domain, description, requires_upstream, config")
+        .eq("agent_key", agentId)
+        .maybeSingle();
+      if (error) throw error;
+      setAgent((data as AgentRow) ?? null);
+    } catch (error) {
+      setLoadError("Failed to load agent: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [agentId]);
 
   useEffect(() => {
@@ -92,6 +99,7 @@ export function AgentActionsSection() {
     void refresh();
   }
 
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
   if (!agent) return <p className="text-sm text-muted-foreground">Loading agent…</p>;
 
   const archived = Boolean(agent.archived_at);

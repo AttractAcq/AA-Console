@@ -96,16 +96,24 @@ export function BrandPanel() {
   const [row, setRow] = useState<Row | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
-    const { data } = await supabase
-      .from("client_brand_profiles")
-      .select("*")
-      .eq("client_id", clientId)
-      .maybeSingle();
-    setRow((data as Row) ?? null);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("client_brand_profiles")
+        .select("*")
+        .eq("client_id", clientId)
+        .maybeSingle();
+      if (error) throw error;
+      setRow((data as Row) ?? null);
+    } catch (error) {
+      setLoadError("Failed to load brand profile: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -117,6 +125,7 @@ export function BrandPanel() {
   );
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   const coloursSet = COLOURS.filter(([k]) => row?.[k]).length;
   const hasAny = FIELDS.some((f) => f.name !== "custom_css" && row?.[f.name]);

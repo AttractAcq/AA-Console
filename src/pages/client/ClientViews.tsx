@@ -42,16 +42,24 @@ export function ActiveOrganicView({ clientId }: { clientId: string }) {
     }>
   >([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const { data } = await supabase
-      .from("scheduled_posts")
-      .select("id, scheduled_for, ref_number, media_type, published_at")
-      .eq("client_id", clientId)
-      .eq("channel", "organic")
-      .order("scheduled_for");
-    setPosts((data ?? []) as typeof posts);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("scheduled_posts")
+        .select("id, scheduled_for, ref_number, media_type, published_at")
+        .eq("client_id", clientId)
+        .eq("channel", "organic")
+        .order("scheduled_for");
+      if (error) throw error;
+      setPosts((data ?? []) as typeof posts);
+    } catch (error) {
+      setLoadError("Failed to load schedule: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -59,6 +67,7 @@ export function ActiveOrganicView({ clientId }: { clientId: string }) {
   }, [refresh]);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading schedule…</p>;
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
@@ -119,15 +128,23 @@ export function ActiveConversionView({ clientId }: { clientId: string }) {
   >([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const { data } = await supabase
-      .from("client_pages")
-      .select("id, title, page_type, status, published_url, body")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
-    setPages((data ?? []) as typeof pages);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("client_pages")
+        .select("id, title, page_type, status, published_url, body")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setPages((data ?? []) as typeof pages);
+    } catch (error) {
+      setLoadError("Failed to load pages: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -135,6 +152,7 @@ export function ActiveConversionView({ clientId }: { clientId: string }) {
   }, [refresh]);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading pages…</p>;
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
   if (pages.length === 0) {
     return <EmptyState label="No pages built yet — landing and offer pages appear here as they are made" />;
   }

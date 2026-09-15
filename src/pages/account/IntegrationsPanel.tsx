@@ -67,15 +67,22 @@ export function IntegrationsPanel() {
   const [rows, setRows] = useState<Integration[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
-    const { data } = await supabase
-      .from("client_integrations")
-      .select("id, provider, credential_label, access_level, status, ingest_enabled, last_checked_at")
-      .eq("client_id", clientId)
-      .order("provider");
-    setRows((data ?? []) as Integration[]);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("client_integrations")
+        .select("id, provider, credential_label, access_level, status, ingest_enabled, last_checked_at")
+        .eq("client_id", clientId)
+        .order("provider");
+      if (error) throw error;
+      setRows((data ?? []) as Integration[]);
+    } catch (error) {
+      setLoadError("Failed to load integrations: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -107,6 +114,8 @@ export function IntegrationsPanel() {
     }
     setSaving(null);
   };
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

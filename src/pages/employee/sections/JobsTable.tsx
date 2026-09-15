@@ -39,26 +39,36 @@ export function JobsTable({
 }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [brief, setBrief] = useState<Brief | null>(null);
   const [briefOpen, setBriefOpen] = useState(false);
   const [briefLoading, setBriefLoading] = useState(false);
+  const [briefError, setBriefError] = useState<string | null>(null);
+  const [openBriefId, setOpenBriefId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    let query = supabase
-      .from("job_assignments")
-      .select(
-        "id, title, due_date, compensation, completed_at, brief_id, clients(name), client_briefs(brief_ref)",
-      )
-      .eq("member_id", memberId);
+    setLoadError(null);
+    try {
+      let query = supabase
+        .from("job_assignments")
+        .select(
+          "id, title, due_date, compensation, completed_at, brief_id, clients(name), client_briefs(brief_ref)",
+        )
+        .eq("member_id", memberId);
 
-    query =
-      scope === "current"
-        ? query.is("completed_at", null).order("due_date", { nullsFirst: false })
-        : query.not("completed_at", "is", null).order("completed_at", { ascending: false });
+      query =
+        scope === "current"
+          ? query.is("completed_at", null).order("due_date", { nullsFirst: false })
+          : query.not("completed_at", "is", null).order("completed_at", { ascending: false });
 
-    const { data } = await query;
-    setJobs((data ?? []) as unknown as Job[]);
-    setLoading(false);
+      const { data, error } = await query;
+      if (error) throw error;
+      setJobs((data ?? []) as unknown as Job[]);
+    } catch (error) {
+      setLoadError("Failed to load jobs: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [memberId, scope]);
 
   useEffect(() => {
@@ -69,17 +79,28 @@ export function JobsTable({
     setBrief(null);
     setBriefOpen(true);
     setBriefLoading(true);
-    const { data } = await supabase
-      .from("client_briefs")
-      .select("id, brief_ref, title, body, media_type, status")
-      .eq("id", briefId)
-      .maybeSingle();
-    setBrief((data as Brief) ?? null);
-    setBriefLoading(false);
+    setBriefError(null);
+    setOpenBriefId(briefId);
+    try {
+      const { data, error } = await supabase
+        .from("client_briefs")
+        .select("id, brief_ref, title, body, media_type, status")
+        .eq("id", briefId)
+        .maybeSingle();
+      if (error) throw error;
+      setBrief((data as Brief) ?? null);
+    } catch (error) {
+      setBriefError("Failed to load brief: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setBriefLoading(false);
+    }
   }
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
+  }
+  if (loadError) {
+    return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
   }
 
   const columns =
@@ -127,6 +148,13 @@ export function JobsTable({
       >
         {briefLoading ? (
           <p className="text-sm text-muted-foreground">Loading brief…</p>
+        ) : briefError ? (
+          <div role="alert">
+            <p>{briefError}</p>
+            <button type="button" onClick={() => openBriefId && void openBrief(openBriefId)}>
+              Retry
+            </button>
+          </div>
         ) : !brief ? (
           <EmptyState label="This brief is no longer available" minHeight={120} />
         ) : (

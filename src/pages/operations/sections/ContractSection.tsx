@@ -31,15 +31,22 @@ export function ContractSection() {
   const [addOpen, setAddOpen] = useState(false);
   const { memberId } = useParams<{ memberId: string }>();
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!memberId) return;
-    const { data } = await supabase
-      .from("contract_payments")
-      .select("id, service_rendered, compensation, due_date, payment_date")
-      .eq("member_id", memberId)
-      .order("due_date", { nullsFirst: false });
-    setPayments((data ?? []) as Payment[]);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("contract_payments")
+        .select("id, service_rendered, compensation, due_date, payment_date")
+        .eq("member_id", memberId)
+        .order("due_date", { nullsFirst: false });
+      if (error) throw error;
+      setPayments((data ?? []) as Payment[]);
+    } catch (error) {
+      setLoadError("Failed to load payments: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [memberId]);
 
   useEffect(() => {
@@ -48,6 +55,8 @@ export function ContractSection() {
 
   const unpaid = payments.filter((p) => !p.payment_date);
   const payDue = unpaid.reduce((sum, p) => sum + Number(p.compensation), 0);
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

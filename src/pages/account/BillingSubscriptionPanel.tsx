@@ -33,15 +33,22 @@ export function BillingSubscriptionPanel() {
   const [addOpen, setAddOpen] = useState(false);
   const { clientId } = useParams<{ clientId: string }>();
   const [billing, setBilling] = useState<Billing | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
-    const { data } = await supabase
-      .from("client_billing_view")
-      .select("current_plan, monthly_amount, upsell_opportunity, started_on, duration_days")
-      .eq("client_id", clientId)
-      .maybeSingle();
-    setBilling((data as Billing) ?? null);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("client_billing_view")
+        .select("current_plan, monthly_amount, upsell_opportunity, started_on, duration_days")
+        .eq("client_id", clientId)
+        .maybeSingle();
+      if (error) throw error;
+      setBilling((data as Billing) ?? null);
+    } catch (error) {
+      setLoadError("Failed to load billing: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -54,6 +61,8 @@ export function BillingSubscriptionPanel() {
     started_on: billing?.started_on ?? "",
     upsell_opportunity: billing?.upsell_opportunity ?? "",
   };
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

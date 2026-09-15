@@ -16,24 +16,32 @@ export function FinishedWorkSection() {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!memberId) {
       setLoading(false);
       return;
     }
-    const { data } = await supabase
-      .from("client_media_assets")
-      .select(
-        "id, client_id, brief_id, ref_number, media_type, title, storage_path, review_status, member_id, created_at",
-      )
-      .eq("member_id", memberId)
-      .eq("media_type", activeFilter)
-      .order("created_at", { ascending: false });
-    const rows = (data ?? []) as MediaAsset[];
-    setAssets(rows);
-    setUrls(await signPaths("client-media", rows.map((r) => r.storage_path)));
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("client_media_assets")
+        .select(
+          "id, client_id, brief_id, ref_number, media_type, title, storage_path, review_status, member_id, created_at",
+        )
+        .eq("member_id", memberId)
+        .eq("media_type", activeFilter)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      const rows = (data ?? []) as MediaAsset[];
+      setAssets(rows);
+      setUrls(await signPaths("client-media", rows.map((r) => r.storage_path)));
+    } catch (error) {
+      setLoadError("Failed to load submissions: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [memberId, activeFilter]);
 
   useEffect(() => {
@@ -48,7 +56,9 @@ export function FinishedWorkSection() {
         <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
       </div>
 
-      {loading ? (
+      {loadError ? (
+        <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>
+      ) : loading ? (
         <p className="text-sm text-muted-foreground">Loading submissions…</p>
       ) : assets.length === 0 ? (
         <EmptyState label={`No ${activeLabel.toLowerCase()} submissions yet`} />

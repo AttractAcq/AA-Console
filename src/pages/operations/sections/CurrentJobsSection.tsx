@@ -21,17 +21,24 @@ export function CurrentJobsSection() {
   const [assignOpen, setAssignOpen] = useState(false);
   const { memberId } = useParams<{ memberId: string }>();
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const clientOptions = useOptions(loadClients, assignOpen);
   const briefOptions = useOptions(loadBriefs, assignOpen);
 
   const refresh = useCallback(async () => {
     if (!memberId) return;
-    const { data } = await supabase
-      .from("job_assignments")
-      .select("id, title, due_date, compensation, completed_at")
-      .eq("member_id", memberId)
-      .order("due_date", { nullsFirst: false });
-    setJobs((data ?? []) as Job[]);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("job_assignments")
+        .select("id, title, due_date, compensation, completed_at")
+        .eq("member_id", memberId)
+        .order("due_date", { nullsFirst: false });
+      if (error) throw error;
+      setJobs((data ?? []) as Job[]);
+    } catch (error) {
+      setLoadError("Failed to load current jobs: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [memberId]);
 
   useEffect(() => {
@@ -61,6 +68,8 @@ export function CurrentJobsSection() {
 
   const open = jobs.filter((j) => !j.completed_at);
   const nextDue = open.find((j) => j.due_date)?.due_date ?? "—";
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

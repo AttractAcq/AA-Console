@@ -24,16 +24,24 @@ type RuntimeStatus = {
 export function RuntimeHealthPanel() {
   const [status, setStatus] = useState<RuntimeStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const { data } = await supabase
-      .from("agent_runtime_status")
-      .select("worker_id, version, queue_depth, active_jobs, metadata, reported_at, is_live")
-      .order("reported_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    setStatus((data as RuntimeStatus) ?? null);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("agent_runtime_status")
+        .select("worker_id, version, queue_depth, active_jobs, metadata, reported_at, is_live")
+        .order("reported_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      setStatus((data as RuntimeStatus) ?? null);
+    } catch (error) {
+      setLoadError("Failed to load runtime status: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -45,6 +53,13 @@ export function RuntimeHealthPanel() {
   }, [refresh]);
 
   if (loading) return null;
+  if (loadError) {
+    return (
+      <div role="alert" className="mb-4 rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+        {loadError} <button type="button" onClick={() => void refresh()}>Retry</button>
+      </div>
+    );
+  }
 
   const enabled = status?.metadata?.enabled !== false;
   const live = status?.is_live === true;

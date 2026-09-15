@@ -20,16 +20,23 @@ export function CurrentClientsSection() {
   const [assignOpen, setAssignOpen] = useState(false);
   const { memberId } = useParams<{ memberId: string }>();
   const [rows, setRows] = useState<Row[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const clientOptions = useOptions(loadClients, assignOpen);
 
   const refresh = useCallback(async () => {
     if (!memberId) return;
-    const { data } = await supabase
-      .from("client_assignments")
-      .select("id, due_date, compensation, clients(name)")
-      .eq("member_id", memberId)
-      .is("ended_at", null);
-    setRows((data ?? []) as unknown as Row[]);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("client_assignments")
+        .select("id, due_date, compensation, clients(name)")
+        .eq("member_id", memberId)
+        .is("ended_at", null);
+      if (error) throw error;
+      setRows((data ?? []) as unknown as Row[]);
+    } catch (error) {
+      setLoadError("Failed to load current clients: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [memberId]);
 
   useEffect(() => {
@@ -41,6 +48,8 @@ export function CurrentClientsSection() {
     { name: "due_date", label: "Due date", kind: "date" },
     { name: "compensation", label: "Compensation", kind: "number" },
   ];
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

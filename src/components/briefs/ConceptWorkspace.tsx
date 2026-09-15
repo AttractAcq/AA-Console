@@ -99,54 +99,62 @@ export function ConceptWorkspace({
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("creative_renders")
-      .select("id, status, quality, size, asset_id, cost_usd, error, selected, created_at")
-      .eq("generation_id", generation.id)
-      .order("created_at", { ascending: false });
-    const rows = (data ?? []) as Render[];
-    setRenders(rows);
+    setError(null);
+    try {
+      const { data, error: loadError } = await supabase
+        .from("creative_renders")
+        .select("id, status, quality, size, asset_id, cost_usd, error, selected, created_at")
+        .eq("generation_id", generation.id)
+        .order("created_at", { ascending: false });
+      if (loadError) throw loadError;
+      const rows = (data ?? []) as Render[];
+      setRenders(rows);
 
-    const ids = rows.map((r) => r.asset_id).filter((id): id is string => Boolean(id));
-    if (ids.length === 0) {
-      setUrls(new Map());
-      return;
+      const ids = rows.map((r) => r.asset_id).filter((id): id is string => Boolean(id));
+      if (ids.length === 0) {
+        setUrls(new Map());
+        return;
+      }
+      const { data: assetRows, error: assetError } = await supabase
+        .from("client_media_assets")
+        .select("id, storage_path, review_status, ref_number")
+        .in("id", ids);
+      if (assetError) throw assetError;
+      const signed = await signPaths("client-media", (assetRows ?? []).map((a) => a.storage_path));
+      setUrls(
+        new Map(
+          (assetRows ?? [])
+            .map((a) => [a.id, signed.get(a.storage_path) ?? ""] as [string, string])
+            .filter(([, u]) => u),
+        ),
+      );
+
+      // Whether each asset has already been booked in, so the action bar
+      // offers the next step rather than one that has been taken.
+      const { data: posts, error: postsError } = await supabase
+        .from("scheduled_posts")
+        .select("asset_id, scheduled_for, channel")
+        .in("asset_id", ids);
+      if (postsError) throw postsError;
+      const booked = new Map(
+        (posts ?? []).map((p) => [p.asset_id as string, p] as [string, typeof p]),
+      );
+      setAssets(
+        new Map(
+          (assetRows ?? []).map((a) => [
+            a.id,
+            {
+              review_status: a.review_status as AssetState["review_status"],
+              ref_number: a.ref_number,
+              scheduled_for: booked.get(a.id)?.scheduled_for ?? null,
+              channel: booked.get(a.id)?.channel ?? null,
+            },
+          ]),
+        ),
+      );
+    } catch (loadError) {
+      setError("Failed to load renders: " + (loadError instanceof Error ? loadError.message : (loadError as { message?: string })?.message ?? "Unknown query error"));
     }
-    const { data: assetRows } = await supabase
-      .from("client_media_assets")
-      .select("id, storage_path, review_status, ref_number")
-      .in("id", ids);
-    const signed = await signPaths("client-media", (assetRows ?? []).map((a) => a.storage_path));
-    setUrls(
-      new Map(
-        (assetRows ?? [])
-          .map((a) => [a.id, signed.get(a.storage_path) ?? ""] as [string, string])
-          .filter(([, u]) => u),
-      ),
-    );
-
-    // Whether each asset has already been booked in, so the action bar
-    // offers the next step rather than one that has been taken.
-    const { data: posts } = await supabase
-      .from("scheduled_posts")
-      .select("asset_id, scheduled_for, channel")
-      .in("asset_id", ids);
-    const booked = new Map(
-      (posts ?? []).map((p) => [p.asset_id as string, p] as [string, typeof p]),
-    );
-    setAssets(
-      new Map(
-        (assetRows ?? []).map((a) => [
-          a.id,
-          {
-            review_status: a.review_status as AssetState["review_status"],
-            ref_number: a.ref_number,
-            scheduled_for: booked.get(a.id)?.scheduled_for ?? null,
-            channel: booked.get(a.id)?.channel ?? null,
-          },
-        ]),
-      ),
-    );
   }, [generation.id]);
 
   useEffect(() => {
@@ -510,7 +518,7 @@ export function ConceptWorkspace({
 
       {error && (
         <p role="alert" className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">
-          {error}
+          {error} <button type="button" onClick={() => void load()}>Retry</button>
         </p>
       )}
 
