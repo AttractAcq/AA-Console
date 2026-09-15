@@ -4,6 +4,8 @@ import { supabase } from "./supabase";
 export type LiveJob = {
   id: string;
   agent_key: string;
+  /** What the job was pointed at, so a panel can tell whose work is running. */
+  input_id: string | null;
   status: string;
   attempts: number;
   error: string | null;
@@ -39,7 +41,7 @@ export function useAgentJobs(clientId: string | undefined, onSettled?: () => voi
     }
     const { data } = await supabase
       .from("agent_jobs")
-      .select("id, agent_key, status, attempts, error, created_at, started_at, completed_at")
+      .select("id, agent_key, input_id, status, attempts, error, created_at, started_at, completed_at")
       .eq("client_id", clientId)
       .order("created_at", { ascending: false })
       .limit(25);

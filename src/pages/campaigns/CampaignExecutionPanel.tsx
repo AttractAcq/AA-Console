@@ -131,6 +131,44 @@ export function CampaignExecutionPanel() {
 
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
+  // Which campaigns have a planner running right now. Taken from the job queue
+  // rather than local state so it survives a reload and is still right when the
+  // planner was started from somewhere else.
+  const planning = new Set(
+    inFlight.filter((j) => j.agent_key === "campaign_plan").map((j) => j.input_id),
+  );
+
+  /**
+   * Start the planner on a campaign that has no plan.
+   *
+   * New Campaign queues this at creation, but a campaign can arrive without
+   * ever having been planned — seeded, created through the gateway, or left
+   * behind by a planner run that failed. Until now those were unrecoverable:
+   * the panel had nothing to show and no way to ask for it.
+   */
+  const plan = async (campaign: Campaign) => {
+    if (!clientId) {
+      setProblem("No client selected.");
+      return;
+    }
+    setBusy(true);
+    setProblem(null);
+    const { error } = await supabase.rpc("enqueue_agent_job", {
+      p_agent_key: "campaign_plan",
+      p_client_id: clientId,
+      p_input_table: "client_campaigns",
+      p_input_id: campaign.id,
+    });
+    setBusy(false);
+    if (error) {
+      // Names the missing upstream intelligence when that is the reason.
+      setProblem(error.message);
+      return;
+    }
+    setNotice(`Queued. The planner is writing "${campaign.name}" now.`);
+    void refresh();
+  };
+
   const act = async (
     rpc: "provision_campaign" | "launch_campaign",
     campaign: Campaign,
@@ -184,6 +222,7 @@ export function CampaignExecutionPanel() {
             const reqs = readiness[c.id] ?? [];
             const unmet = reqs.filter((r) => !r.met);
             const ready = reqs.length > 0 && unmet.length === 0;
+            const isPlanning = planning.has(c.id);
 
             return (
               <div key={c.id} className="rounded-lg border border-border bg-card p-4">
@@ -230,7 +269,9 @@ export function CampaignExecutionPanel() {
                   </dl>
                 ) : (
                   <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
-                    Waiting for the planner to write this.
+                    {isPlanning
+                      ? "The planner is writing this now."
+                      : "Waiting for the planner to write this."}
                   </p>
                 )}
 
@@ -258,6 +299,16 @@ export function CampaignExecutionPanel() {
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                  {!c.built_at && (
+                    <button
+                      type="button"
+                      disabled={busy || isPlanning}
+                      onClick={() => void plan(c)}
+                      className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-card-foreground hover:bg-accent disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {isPlanning ? "Planning…" : "Run the planner"}
+                    </button>
+                  )}
                   <button type="button"
                     aria-expanded={contentCampaignId === c.id}
                     onClick={() => setContentCampaignId(contentCampaignId === c.id ? null : c.id)}
