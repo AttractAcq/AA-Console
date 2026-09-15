@@ -9,6 +9,7 @@ import {
   normaliseOrigin,
   originAllowed,
   publicConfig,
+  reachableContact,
   transcriptToTurns,
   validateMessage,
 } from "./guard.js";
@@ -231,5 +232,43 @@ describe("publicConfig", () => {
   it("falls back to a usable greeting rather than an empty bubble", () => {
     expect(publicConfig({ greeting: null, widget_config: null }).greeting).toMatch(/how can we help/i);
     expect(publicConfig({ greeting: "   ", widget_config: [] }).widget.label).toBe("Chat");
+  });
+});
+
+
+// A sales agent conversation used to end in a table nobody opens:
+// capture_sales_agent_lead existed and nothing ever called it, so a visitor
+// who left their number never appeared in Prospects & Leads. This is the
+// question the runtime asks before promoting a conversation to a lead.
+describe("reachableContact", () => {
+  it("is true when there is an email", () => {
+    expect(reachableContact({ contact_email: "sam@example.com", contact_phone: null })).toBe(true);
+  });
+
+  it("is true when there is only a phone", () => {
+    // Plenty of people give a number and not an address.
+    expect(reachableContact({ contact_email: null, contact_phone: "031 555 0100" })).toBe(true);
+  });
+
+  it("is false for a conversation that left no way to reach anyone", () => {
+    // The normal case. Most visitors chat and leave nothing, and that must not
+    // be an exception thrown and caught on every message.
+    expect(reachableContact({ transcript: [] })).toBe(false);
+    expect(reachableContact({ contact_email: null, contact_phone: null })).toBe(false);
+  });
+
+  it("does not count whitespace as a way to reach somebody", () => {
+    expect(reachableContact({ contact_email: "   ", contact_phone: "\n\t" })).toBe(false);
+  });
+
+  it("does not count a name as a way to reach somebody", () => {
+    // A lead with a name and no contact details is a row that pads the
+    // pipeline and measures nothing — the same rule the database enforces.
+    expect(reachableContact({ contact_name: "Sam", outcome: "Wants a quote" })).toBe(false);
+  });
+
+  it("ignores non-string values rather than treating them as contact details", () => {
+    expect(reachableContact({ contact_email: 42, contact_phone: {} })).toBe(false);
+    expect(reachableContact({ contact_email: true })).toBe(false);
   });
 });
