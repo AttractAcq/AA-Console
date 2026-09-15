@@ -142,6 +142,7 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   // Phase 11 Alex CLEAR / SEC_BAR #1: exact allowlist ceiling for Sales Ops,
   // same pattern as Marketing/Distribution above. Constrains stale/overbroad
   // database grants too (e.g. a leftover pipeline.*/sales_agents.* row).
+  // Phase 16b this PR: salesOps.grants is 25. Phase 16c (#46) appends 3.
   if (
     identity.bot === "bot_sales_ops" &&
     !salesOps.grants.some((name) => name === tool.name)

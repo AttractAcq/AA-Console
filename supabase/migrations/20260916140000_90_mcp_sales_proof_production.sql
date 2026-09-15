@@ -6,6 +6,11 @@
 --   proof.search/get/create/attach_asset/get_for_avatar/get_for_claim
 --   content.assign_production, content.submit_asset
 --
+-- Sales Ops ceiling after THIS migration: exactly 25 (Phase 11b's 22 + the
+-- three names above). Phase 16c (PR #46, mig 91) additively grants
+-- brand.get_profile, sites.provision, sites.publish_page → 28. Do not DELETE
+-- attach/enable/build. Assert count=25 after this mig only.
+--
 -- Binding bars unchanged: require_active_bot + require_bot_client_grant on every
 -- new Bot RPC; never can_access_client; no workflow.record_decision; deploy and
 -- record_sale stay stub+ungranted.
@@ -1471,34 +1476,27 @@ revoke all on function mcp_internal.assert_cos_prohibitions() from public, anon,
 grant execute on function mcp_internal.assert_cos_prohibitions() to service_role;
 
 insert into mcp_internal.mcp_bot_permissions (bot_id, permission_pattern, granted_by)
-select 'bot_sales_ops', name, 'phase-16b:sales-ops-attach-enable-build'
-from (values
-  ('sales_agents.attach_to_page'),
-  ('sales_agents.set_deployment_enabled'),
-  ('sales_agents.build')
-) as v(name)
-where not exists (
-  select 1 from mcp_internal.mcp_bot_permissions p
-   where p.bot_id = 'bot_sales_ops' and p.permission_pattern = v.name
-);
+values
+  ('bot_sales_ops', 'sales_agents.attach_to_page', 'phase-16b:sales-ops-attach-enable-build'),
+  ('bot_sales_ops', 'sales_agents.set_deployment_enabled', 'phase-16b:sales-ops-attach-enable-build'),
+  ('bot_sales_ops', 'sales_agents.build', 'phase-16b:sales-ops-attach-enable-build')
+on conflict (bot_id, permission_pattern) do nothing;
 
 insert into mcp_internal.mcp_bot_permissions (bot_id, permission_pattern, granted_by)
-select 'bot_production', name, 'phase-16b:proof-writes'
-from (values
-  ('proof.create'),
-  ('proof.attach_asset')
-) as v(name)
-where not exists (
-  select 1 from mcp_internal.mcp_bot_permissions p
-   where p.bot_id = 'bot_production' and p.permission_pattern = v.name
-);
+values
+  ('bot_production', 'proof.create', 'phase-16b:proof-writes'),
+  ('bot_production', 'proof.attach_asset', 'phase-16b:proof-writes')
+on conflict (bot_id, permission_pattern) do nothing;
 
 do $$
 declare n integer;
 begin
+  -- Count 25 is for THIS migration only (Phase 11b's 22 + attach/enable/build).
+  -- Phase 16c (PR #46, mig 91) additively grants brand.get_profile,
+  -- sites.provision, sites.publish_page → 28. Do not DELETE these three rows.
   select count(*) into n from mcp_internal.mcp_bot_permissions where bot_id = 'bot_sales_ops';
   if n is distinct from 25 then
-    raise exception 'Phase 16b: bot_sales_ops must have exactly 25 permission rows, found %', n;
+    raise exception 'Phase 16b: bot_sales_ops must have exactly 25 permission rows after this migration (22+attach/enable/build), found %', n;
   end if;
   if exists (
     select 1 from mcp_internal.mcp_bot_permissions

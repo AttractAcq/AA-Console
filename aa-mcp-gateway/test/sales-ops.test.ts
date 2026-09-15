@@ -56,7 +56,21 @@ test("Phase 16b: exact discovery set equality for bot_sales_ops (25 = Phase 11b'
     [...new Set(discovered)].sort(),
     [...salesOps.expectedDiscovery].sort(),
   );
+  assert.equal(salesOps.reads.length + salesOps.writes.length, 25);
+  assert.equal(salesOps.grants.length, 25);
   assert.equal(discovered.length, 25);
+  // Catalog after this PR only. Phase 16c (#46) appends brand/sites; do not
+  // expect those names here, and do not drop attach/enable/build.
+  assert.equal(registry.length, 93);
+  for (const name of [
+    "sales_agents.attach_to_page",
+    "sales_agents.set_deployment_enabled",
+    "sales_agents.build",
+  ] as const)
+    assert.ok(salesOps.grants.includes(name), name);
+  const later = ["brand.get_profile", "sites.provision", "sites.publish_page"];
+  for (const name of later)
+    assert.ok(!(salesOps.grants as readonly string[]).includes(name), `${name} is Phase 16c (#46), not this PR`);
   engine.store.close();
 });
 

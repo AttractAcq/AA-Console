@@ -99,6 +99,8 @@ async function mockAa(
 test("Engineering exact discovery equality is 12 and related stubs stay stub", (t) => {
   const e = engine(t);
   assertEngineeringDiscovery(e.discover(identity).map((t) => t.name));
+  // Catalog after PR #47 / Phase 16b only (90 + attach/enable/build).
+  // Phase 16c (#46) adds more names.
   assert.equal(registry.length, 93);
   for (const name of engineeringOps.grants)
     assert.equal(registry.find((t) => t.name === name)?.implementation, "real");

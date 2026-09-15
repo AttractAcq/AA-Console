@@ -7,13 +7,23 @@ The [Phase 3–4](phase-3-4-bot-auth-rls.md), [Phase 5](phase-5-production-manag
 
 ## What this phase realizes
 
-### Sales Ops (`bot_sales_ops` only) — ceiling 22 → **25**
+### Sales Ops (`bot_sales_ops` only) — ceiling 22 → **25** (this PR)
+
+After this PR, `bot_sales_ops` discovery is exactly these **25** names:
+
+Reads (11): `pipeline.list_leads`, `pipeline.get_lead`, `pipeline.get_stalled_leads`, `pipeline.get_pipeline_summary`, `sales_agents.list`, `sales_agents.get`, `sales_agents.get_conversations`, `workflow.get_pending_approvals`, `workflow.get_activity`, `workflow.list_tasks`, `workflow.get_task`.
+
+Writes (14): `pipeline.update_stage`, `pipeline.create_followup`, `sales_agents.generate_config`, `sales_agents.create`, `sales_agents.update_knowledge`, `sales_agents.update_qualification_rules`, `sales_agents.test`, `sales_agents.attach_to_page`, `sales_agents.set_deployment_enabled`, `sales_agents.build`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`.
+
+New in this phase:
 
 | Tool | Action | AA tables / jobs | Notes |
 | --- | --- | --- | --- |
 | `sales_agents.attach_to_page` | Write | `client_sales_agent_deployments` | Inserts `enabled:false`. Origin is scheme+host of `client_pages.published_url` (same rule as `originForPage` / `deployBlocker`). Requires agent `built_at`, `approved_at`, `status=live`, and page `publish_status=published` with a URL. Duplicate agent+page → `already_attached`. |
 | `sales_agents.set_deployment_enabled` | Write | same | Kill-switch: `enabled` / `disabled_at` / `deployed_at`. Unique index: one enabled deployment per page (`deployment_conflict`). |
 | `sales_agents.build` | Write (enqueue) | `enqueue_agent_job_internal('sales_agent')` | Console enqueue step. `sales_agents.create` stays draft-only (migration 84) so Gate 11b live smoke does not spend. |
+
+**Phase 16c (PR #46, merge third, mig 91)** additively grants `brand.get_profile` + `sites.provision` + `sites.publish_page` → final Sales Ops **28**. That PR must **append** those three; it must not overwrite `sales-ops.ts` / permission rows from the Phase 11b 22-tool baseline (that would drop attach/enable/build). This migration asserts count=25 after it runs only.
 
 **Not realized (unchanged posture):**
 
@@ -60,12 +70,12 @@ Migration `supabase/migrations/20260916140000_90_mcp_sales_proof_production.sql`
 - Creates `mcp_internal.mcp_proof_requests` + `take_proof_request`.
 - Helpers: `origin_for_page`, `enqueue_sales_agent_build`, `proof_json`, `deployment_json`.
 - Public `mcp_*` wrappers.
-- Inserts three Sales Ops grants (assert count **25**) and two proof write grants for production.
+- Inserts three Sales Ops grants via `INSERT … ON CONFLICT DO NOTHING` (assert count **25** after this mig only) and two proof write grants for production.
 - Replaces `assert_cos_prohibitions` with a Phase 16b proof-outside-production check (prior 11–15 checks kept).
 
 ## Gateway / runtime
 
-- Registry: `realSalesAgents` += attach/enable/build; `realProof` = all six; `realContent` += assign/submit. `sales_agents.deploy` stays stub.
+- Registry: `realSalesAgents` += attach/enable/build; `realProof` = all six; `realContent` += assign/submit. `sales_agents.deploy` stays stub. Catalog after this PR only: **93** (90 + the three new sales_agents names; proof + assign/submit were already stubbed). Phase 16c (#46) adds more catalog names.
 - `sales-ops.ts` exact ceiling 25. `proof.search`/`proof.get` stay forbidden for Sales Ops.
 - `permissions.ts`: production grants `proof.create` / `proof.attach_asset`; `PRODUCTION_ONLY_TOOLS` += assign/submit.
 - AA adapter routes under `/internal/mcp/sales-agents/`, `/internal/mcp/proof/`, `/internal/mcp/content/assign-production|submit-asset`.

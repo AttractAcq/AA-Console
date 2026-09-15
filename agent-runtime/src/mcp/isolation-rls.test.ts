@@ -2884,7 +2884,7 @@ describe('Phase 16b Sales attach/enable/build + Proof Bank + production assign/s
     expect(human.assigned).toBe(1);
   });
 
-  it('permission rows: sales ops is exactly 25, deploy stays ungranted, proof writes are production-only', async () => {
+  it('permission rows: sales ops is exactly 25 after mig 90 (22+attach/enable/build); 16c appends 3 later', async () => {
     const n = (await db.query<{ n: number }>(
       `select count(*)::int as n from mcp_internal.mcp_bot_permissions where bot_id = 'bot_sales_ops'`,
     )).rows[0]?.n;
