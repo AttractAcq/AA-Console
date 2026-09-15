@@ -192,3 +192,24 @@ export function publicConfig(row: {
     },
   };
 }
+
+
+/**
+ * Whether this conversation now has a way to reach somebody.
+ *
+ * capture_sales_agent_lead refuses a conversation with neither an email nor a
+ * phone, because a lead nobody can contact is a row that pads the pipeline and
+ * measures nothing. This asks the same question before calling, so the normal
+ * case — a visitor who chatted and left no details — is not an exception
+ * thrown and caught on every message.
+ *
+ * Deliberately the same rule as the database, not a looser one. If these ever
+ * disagree the database wins, and the only cost is a wasted call.
+ */
+export function reachableContact(update: Record<string, unknown>): boolean {
+  const value = (key: string) => {
+    const raw = update[key];
+    return typeof raw === "string" ? raw.trim() : "";
+  };
+  return value("contact_email").length > 0 || value("contact_phone").length > 0;
+}

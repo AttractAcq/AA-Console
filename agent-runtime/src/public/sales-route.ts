@@ -30,6 +30,7 @@ import {
   MAX_BODY_BYTES,
   originAllowed,
   publicConfig,
+  reachableContact,
   transcriptToTurns,
   validateMessage,
   type DenyReason,
@@ -362,6 +363,25 @@ export async function handlePublicSales(
     update.qualified = contact.qualified === true;
   }
   await sb.from("sales_agent_conversations").update(update).eq("id", convId);
+
+  // A conversation that has left a way to contact somebody becomes a lead, so
+  // it reaches Prospects & Leads rather than sitting in a table nobody opens.
+  //
+  // Never at the visitor's expense. They are mid-conversation and waiting for a
+  // reply; a pipeline write that fails is a thing to fix later, not a reason to
+  // show them an error. capture_sales_agent_lead is idempotent, so a retry on
+  // the next message costs nothing.
+  if (reachableContact(update)) {
+    const { error: leadError } = await sb.rpc("capture_sales_agent_lead", {
+      p_conversation_id: convId,
+    });
+    if (leadError) {
+      logger.error("public_sales_lead_capture_failed", {
+        deployment: d.deployment_id,
+        error: leadError.message,
+      });
+    }
+  }
 
   await log("ok", costUsd, convId);
 
