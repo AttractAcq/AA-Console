@@ -22,7 +22,8 @@ Paths below refer to the existing AA Console repository. No live database or pro
 | Attribution | Migration 62 `top_content_by_revenue`, `acquisition_funnel`; reporting `useMetrics.ts`, `metrics_period_summary`; Phase 13 `mcp_attribution_revenue` | `attribution.get_campaign_performance` real (observed paid metrics). `attribution.get_revenue_attribution` real (cohort campaign economics; Gate 13). Other attribution names remain stub |
 | Economics | Migration 79 Client Economics OS (`client_economics`, spend ledger); Phase 13 `mcp_economics_read` | Five named reads real for `bot_finance` only. Does not expose `finance_entries` / `client_billing` / payments |
 | Workflow | Production `job_assignments`, worker `agent_jobs`, onboarding steps, review trails | These are distinct lifecycles, not a general task service. Only gateway approvals/activity are implemented |
-| Sales agents, engineering, security | No matching complete business APIs found in inspected service surface | Stub |
+| Sales agents, security | No matching complete business APIs found in inspected service surface | Stub |
+| Engineering | Migration 86 `mcp_engineering_*`; `client_pages` / `agent_jobs` safe projections | Implemented for `bot_engineering` (issue create/get; status also `bot_security_devops`). No Railway write, secret rotation or unrestricted deploy |
 
 Existing runtime HTTP exposes `/health`, `/status`, `/master/chat`. Do not route business actions through Master AI chat. No local `supabase/functions` directory exists. Local migrations extend beyond the stale migration count in `supabase/README.md`; verify deployed versions separately.
 

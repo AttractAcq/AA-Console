@@ -1,4 +1,10 @@
-import { registry, orchestrationTools, adminTools, financeReadTools } from "../registry/tools.js";
+import {
+  registry,
+  orchestrationTools,
+  adminTools,
+  financeReadTools,
+  engineeringTools,
+} from "../registry/tools.js";
 import { z } from "zod";
 import type { Adapter, Context, Tool, Result } from "../shared/types.js";
 
@@ -242,7 +248,8 @@ for (const tool of registry.filter(
   (t) =>
     adminTools.has(t.name) ||
     orchestrationTools.has(t.name) ||
-    financeReadTools.has(t.name),
+    financeReadTools.has(t.name) ||
+    engineeringTools.has(t.name),
 )) {
   const [domain, action] = tool.name.split(".");
   ROUTES[tool.name] = {
@@ -258,6 +265,9 @@ for (const tool of registry.filter(
 const codes = new Set([
   "event_not_found",
   "event_conflict",
+  "issue_not_found",
+  "page_not_found",
+  "job_not_found",
   "task_not_found",
   "campaign_not_found",
   "invalid_assignee",
@@ -580,6 +590,110 @@ export class AAApiAdapter implements Adapter {
           (nextCursor !== null && !rows.some((e) => e.id === nextCursor))
         )
           return fail("malformed_response", response.status);
+      }
+      if (tool.domain === "engineering") {
+        const issue = z
+          .object({
+            id: uuid,
+            client_id: uuid,
+            title: z.string(),
+            notes: z.string().nullable(),
+            status: z.enum(["open", "in_progress", "resolved", "cancelled"]),
+            created_by_bot: z.literal("bot_engineering"),
+            updated_by_bot: z.literal("bot_engineering"),
+            version: z.number().int().positive(),
+            created_at: z.string(),
+            updated_at: z.string(),
+          })
+          .strict();
+        const page = z
+          .object({
+            id: uuid,
+            client_id: uuid,
+            page_type: z.string(),
+            title: z.string(),
+            status: z.string(),
+            published_url: z.string().nullable(),
+            created_at: z.string(),
+            updated_at: z.string(),
+          })
+          .strict();
+        const job = z
+          .object({
+            id: uuid,
+            client_id: uuid,
+            agent_key: z.string(),
+            status: z.string(),
+            attempts: z.number().int().nonnegative(),
+            created_at: z.string(),
+            started_at: z.string().nullable(),
+            completed_at: z.string().nullable(),
+          })
+          .strict();
+        const shape =
+          tool.name === "engineering.create_issue" ||
+          tool.name === "engineering.get_issue"
+            ? z
+                .object({
+                  client_id: uuid,
+                  issue,
+                  replayed: z.boolean().optional(),
+                })
+                .strict()
+            : tool.name === "engineering.get_release_status"
+              ? z
+                  .object({
+                    client_id: uuid,
+                    projection: z.literal("client_pages_v1"),
+                    pages: z.array(page).max(100),
+                    next_cursor: uuid.nullable(),
+                  })
+                  .strict()
+              : z
+                  .object({
+                    client_id: uuid,
+                    projection: z.literal("agent_jobs_v1"),
+                    jobs: z.array(job).max(100),
+                    next_cursor: uuid.nullable(),
+                  })
+                  .strict();
+        const result = shape.safeParse(raw);
+        if (!result.success) return fail("malformed_response", response.status);
+        if (
+          tool.name === "engineering.create_issue" ||
+          tool.name === "engineering.get_issue"
+        ) {
+          const row = result.data as { issue: { id: string; client_id: string } };
+          if (
+            row.issue.client_id !== input.client_id ||
+            (input.issue_id !== undefined && row.issue.id !== input.issue_id)
+          )
+            return fail("malformed_response", response.status);
+        } else if (tool.name === "engineering.get_release_status") {
+          const row = result.data as {
+            pages: { id: string; client_id: string }[];
+            next_cursor: string | null;
+          };
+          if (
+            row.pages.some((p) => p.client_id !== input.client_id) ||
+            (input.page_id !== undefined && row.pages[0]?.id !== input.page_id) ||
+            (row.next_cursor !== null &&
+              !row.pages.some((p) => p.id === row.next_cursor))
+          )
+            return fail("malformed_response", response.status);
+        } else {
+          const row = result.data as {
+            jobs: { id: string; client_id: string }[];
+            next_cursor: string | null;
+          };
+          if (
+            row.jobs.some((j) => j.client_id !== input.client_id) ||
+            (input.job_id !== undefined && row.jobs[0]?.id !== input.job_id) ||
+            (row.next_cursor !== null &&
+              !row.jobs.some((j) => j.id === row.next_cursor))
+          )
+            return fail("malformed_response", response.status);
+        }
       }
       if (route.kind === "queue") {
         if (![200, 202].includes(response.status))

@@ -39,6 +39,12 @@ export const financeReadTools = new Set([
   "economics.get_roi",
   "attribution.get_revenue_attribution",
 ]);
+export const engineeringTools = new Set([
+  "engineering.create_issue",
+  "engineering.get_issue",
+  "engineering.get_release_status",
+  "engineering.get_deployment_status",
+]);
 export const orchestrationTools = new Set([
   "workflow.list_tasks",
   "workflow.get_task",
@@ -393,6 +399,25 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
           }
         }
       }
+      if (domain === "engineering") {
+        for (const key of Object.keys(fields)) delete fields[key];
+        fields.client_id = id;
+        if (action === "create_issue") {
+          fields.idempotency_key = z.string().min(8).max(128);
+          fields.title = z.string().trim().min(1).max(200);
+          fields.notes = z.string().max(2000).nullable();
+        } else if (action === "get_issue") {
+          fields.issue_id = id;
+        } else if (action === "get_release_status") {
+          fields.limit = z.number().int().min(1).max(100).default(25);
+          fields.after = id.optional();
+          fields.page_id = id.optional();
+        } else if (action === "get_deployment_status") {
+          fields.limit = z.number().int().min(1).max(100).default(25);
+          fields.after = id.optional();
+          fields.job_id = id.optional();
+        }
+      }
       const realContent = new Set([
         // Sec Phase 5 #6: isolation tests must stay green before adding a name.
         "content.list_ideas",
@@ -450,6 +475,14 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "economics.get_roi",
       ]);
       const realAttributionRevenue = name === "attribution.get_revenue_attribution";
+      // Sec Phase 14: isolation tests must stay green before adding a name.
+      // Railway writes, secret rotation and unrestricted deploy stay out.
+      const realEngineering = new Set([
+        "engineering.create_issue",
+        "engineering.get_issue",
+        "engineering.get_release_status",
+        "engineering.get_deployment_status",
+      ]);
       const implementation =
         adminTools.has(name) ||
         orchestration ||
@@ -459,6 +492,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         realSalesAgents.has(name) ||
         realEconomics.has(name) ||
         realAttributionRevenue ||
+        realEngineering.has(name) ||
         [
           "workflow.get_pending_approvals",
           "workflow.get_activity",
@@ -509,9 +543,11 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
                         ? "Scoped AA economics business API"
                         : realAttributionRevenue
                           ? "Scoped AA attribution business API"
-                          : implementation === "real"
-                            ? "Gateway control store"
-                            : `Scoped AA ${domain} business API`,
+                          : realEngineering.has(name)
+                            ? "Scoped AA engineering business API"
+                            : implementation === "real"
+                              ? "Gateway control store"
+                              : `Scoped AA ${domain} business API`,
       } satisfies Tool;
     }),
 );

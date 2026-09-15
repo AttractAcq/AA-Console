@@ -49,6 +49,8 @@ export class ActionEngine {
     const finish = (result: Result, authorization = "allowed"): Result => {
       const event = result.data?.event as { id?: unknown } | undefined;
       const eventId = typeof event?.id === "string" ? event.id : undefined;
+      const issue = result.data?.issue as { id?: unknown } | undefined;
+      const issueId = typeof issue?.id === "string" ? issue.id : undefined;
       if (
         tool?.domain === "admin" &&
         [
@@ -56,6 +58,18 @@ export class ActionEngine {
           "bot_not_active",
           "bot_forbidden",
           "event_not_found",
+        ].includes(result.error?.code ?? "")
+      )
+        authorization = "denied";
+      if (
+        tool?.domain === "engineering" &&
+        [
+          "client_forbidden",
+          "bot_not_active",
+          "bot_forbidden",
+          "issue_not_found",
+          "page_not_found",
+          "job_not_found",
         ].includes(result.error?.code ?? "")
       )
         authorization = "denied";
@@ -73,7 +87,11 @@ export class ActionEngine {
             eventId ??
             input.idea_id ??
             input.asset_id ??
-            input.task_id,
+            input.task_id ??
+            input.issue_id ??
+            issueId ??
+            input.page_id ??
+            input.job_id,
           execution_id: executionId,
           authorization,
           approval_status: result.approval_id
