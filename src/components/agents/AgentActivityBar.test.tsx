@@ -8,6 +8,7 @@ function job(over: Partial<LiveJob> = {}): LiveJob {
   return {
     id: "job-1",
     agent_key: "creative_build",
+    input_id: null,
     status: "failed",
     attempts: 1,
     error: "No image renderer is configured.",
