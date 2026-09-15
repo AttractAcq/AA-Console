@@ -26,6 +26,20 @@ export const WIDGET_SOURCE = String.raw`(function () {
   var conversationId = null;
   try { conversationId = sessionStorage.getItem(storageKey); } catch (e) {}
 
+  // An outline robot, drawn rather than fetched: one more network request for a
+  // 300-byte icon is a request that can fail on somebody else's landing page.
+  var ROBOT = [
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ',
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">',
+    '<rect x="4" y="8" width="16" height="12" rx="3"/>',
+    '<path d="M12 4.5v3.5"/><circle cx="12" cy="3.2" r="1.3"/>',
+    '<path d="M2.5 13v3"/><path d="M21.5 13v3"/>',
+    '<circle cx="9" cy="13.5" r="1.1" fill="currentColor" stroke="none"/>',
+    '<circle cx="15" cy="13.5" r="1.1" fill="currentColor" stroke="none"/>',
+    '<path d="M9.5 17h5"/>',
+    "</svg>",
+  ].join("");
+
   var host = document.createElement("div");
   host.setAttribute("data-aa-sales-agent", "");
   var root = host.attachShadow ? host.attachShadow({ mode: "open" }) : null;
@@ -35,10 +49,26 @@ export const WIDGET_SOURCE = String.raw`(function () {
   style.textContent = [
     ":host{all:initial}",
     "*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}",
-    ".launch{position:fixed;right:20px;bottom:20px;z-index:2147483000;border:0;border-radius:999px;",
-    "padding:14px 22px;font-size:15px;font-weight:600;color:#fff;background:var(--aa-accent,#1f2937);",
+    // The launcher is a circle, not a pill: it has to read as one small object
+    // in the corner of somebody else's page rather than a second call to action
+    // competing with the one the page exists for.
+    ".dock{position:fixed;right:20px;bottom:20px;z-index:2147483000;display:flex;align-items:flex-end;gap:10px}",
+    ".launch{width:56px;height:56px;flex:0 0 56px;border:0;border-radius:999px;padding:0;display:flex;",
+    "align-items:center;justify-content:center;color:#fff;background:var(--aa-accent,#1f2937);",
     "box-shadow:0 6px 24px rgba(0,0,0,.18);cursor:pointer}",
     ".launch:focus-visible{outline:3px solid #fff;outline-offset:2px}",
+    ".launch svg{width:28px;height:28px;display:block}",
+    // The teaser sits to the LEFT of the circle, because the circle is already
+    // hard against the right edge of the viewport.
+    ".teaser{position:relative;order:-1;max-width:210px;background:#fff;color:#111827;border:1px solid #e5e7eb;",
+    "border-radius:14px;padding:10px 26px 10px 13px;font-size:13px;line-height:1.4;",
+    "box-shadow:0 6px 20px rgba(0,0,0,.14);cursor:pointer;text-align:left}",
+    ".teaser .dismiss{position:absolute;top:3px;right:3px;width:20px;height:20px;border:0;background:none;",
+    "color:#9ca3af;font-size:15px;line-height:1;cursor:pointer;border-radius:999px;padding:0}",
+    ".teaser .dismiss:hover{color:#374151;background:#f3f4f6}",
+    ".teaser .dismiss:focus-visible{outline:2px solid var(--aa-accent,#1f2937);outline-offset:1px}",
+    "@media (prefers-reduced-motion:no-preference){.teaser{animation:rise .22s ease-out}}",
+    "@media (max-width:480px){.teaser{max-width:150px;font-size:12px}}",
     ".panel{position:fixed;right:20px;bottom:20px;z-index:2147483000;width:360px;max-width:calc(100vw - 32px);",
     "height:520px;max-height:calc(100vh - 40px);display:flex;flex-direction:column;background:#fff;",
     "border-radius:14px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.22)}",
@@ -65,24 +95,93 @@ export const WIDGET_SOURCE = String.raw`(function () {
   root.appendChild(wrap);
   document.body.appendChild(host);
 
-  var cfg = { greeting: "Hello - how can we help?", widget: { label: "Chat", accent: null, title: null } };
+  var cfg = {
+    greeting: "Hello - how can we help?",
+    widget: { label: "Chat", accent: null, title: null, teaser: null },
+  };
   var open = false;
   var busy = false;
+
+  // The transcript is kept for the session, not just for the page.
+  //
+  // The conversation id already survived a navigation, so the server remembered
+  // the visitor while the visitor's own screen went blank - they came back to an
+  // empty panel and an agent that acted as though they had already spoken. This
+  // is the other half of that memory.
   var said = [];
+  var logKey = storageKey + "-log";
+  var teaserKey = storageKey + "-teaser";
+  try {
+    var saved = sessionStorage.getItem(logKey);
+    if (saved) said = JSON.parse(saved) || [];
+  } catch (e) { said = []; }
+  function remember() {
+    try { sessionStorage.setItem(logKey, JSON.stringify(said.slice(-40))); } catch (e) {}
+  }
+
+  // Dismissing the teaser is a decision, and re-offering it on the next page
+  // would be ignoring it.
+  var teaserHidden = false;
+  try { teaserHidden = sessionStorage.getItem(teaserKey) === "1"; } catch (e) {}
+  // Someone who has already talked to the agent does not need inviting.
+  if (said.length > 0) teaserHidden = true;
 
   function esc(s) { return String(s == null ? "" : s); }
+
+  /** Opening the chat answers the invitation, so it does not come back. */
+  function openChat() {
+    open = true;
+    teaserHidden = true;
+    try { sessionStorage.setItem(teaserKey, "1"); } catch (e) {}
+    render();
+  }
 
   function render() {
     if (cfg.widget.accent) wrap.style.setProperty("--aa-accent", cfg.widget.accent);
     if (!open) {
       wrap.innerHTML = "";
+      var dock = document.createElement("div");
+      dock.className = "dock";
+
       var b = document.createElement("button");
       b.className = "launch";
       b.type = "button";
-      b.textContent = cfg.widget.label || "Chat";
       b.setAttribute("aria-haspopup", "dialog");
-      b.addEventListener("click", function () { open = true; render(); });
-      wrap.appendChild(b);
+      // The circle carries no text, so the label has to live here or a screen
+      // reader is offered an unnamed button.
+      b.setAttribute("aria-label", cfg.widget.label || "Chat");
+      b.innerHTML = ROBOT;
+      b.addEventListener("click", function () { openChat(); });
+      dock.appendChild(b);
+
+      if (!teaserHidden) {
+        var teaser = document.createElement("div");
+        teaser.className = "teaser";
+        // Clicking the invitation opens the chat, which is what it invites.
+        teaser.addEventListener("click", function () { openChat(); });
+
+        var teaserText = document.createElement("span");
+        teaserText.textContent = cfg.widget.teaser || "Hi - ask me anything.";
+        teaser.appendChild(teaserText);
+
+        var dismiss = document.createElement("button");
+        dismiss.className = "dismiss";
+        dismiss.type = "button";
+        dismiss.setAttribute("aria-label", "Dismiss this message");
+        dismiss.innerHTML = "&times;";
+        dismiss.addEventListener("click", function (e) {
+          // Without this the click reaches the teaser and opens the chat the
+          // visitor just declined.
+          e.stopPropagation();
+          teaserHidden = true;
+          try { sessionStorage.setItem(teaserKey, "1"); } catch (err) {}
+          render();
+        });
+        teaser.appendChild(dismiss);
+        dock.appendChild(teaser);
+      }
+
+      wrap.appendChild(dock);
       return;
     }
 
@@ -151,6 +250,7 @@ export const WIDGET_SOURCE = String.raw`(function () {
 
   function ask(text) {
     said.push({ role: "user", content: text });
+    remember();
     busy = true;
     render();
 
@@ -169,6 +269,7 @@ export const WIDGET_SOURCE = String.raw`(function () {
           // The server deliberately does not say why. Repeat what it said and
           // nothing more - guessing a reason here would be inventing one.
           said.push({ role: "note", content: (out.body && out.body.error) || "Something went wrong." });
+          remember();
           render();
           return;
         }
@@ -177,11 +278,13 @@ export const WIDGET_SOURCE = String.raw`(function () {
           try { sessionStorage.setItem(storageKey, conversationId); } catch (e) {}
         }
         said.push({ role: "assistant", content: esc(out.body.reply) });
+        remember();
         render();
       })
       .catch(function () {
         busy = false;
         said.push({ role: "note", content: "Could not reach us just now." });
+        remember();
         render();
       });
   }
@@ -193,7 +296,12 @@ export const WIDGET_SOURCE = String.raw`(function () {
     .then(function (j) {
       if (j && j.ok) {
         if (j.greeting) cfg.greeting = j.greeting;
-        if (j.widget) cfg.widget = { label: j.widget.label || "Chat", accent: j.widget.accent, title: j.widget.title };
+        if (j.widget) cfg.widget = {
+          label: j.widget.label || "Chat",
+          accent: j.widget.accent,
+          title: j.widget.title,
+          teaser: j.widget.teaser,
+        };
       }
       render();
     })

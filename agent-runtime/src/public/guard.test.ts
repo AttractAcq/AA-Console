@@ -207,8 +207,22 @@ describe("publicConfig", () => {
     const out = publicConfig({ greeting: "Hi there", widget_config: { label: "Ask us" } });
     expect(out).toEqual({
       greeting: "Hi there",
-      widget: { label: "Ask us", accent: null, title: null },
+      widget: { label: "Ask us", accent: null, title: null, teaser: null },
     });
+  });
+
+  it("passes the teaser line the widget invites visitors with", () => {
+    const out = publicConfig({
+      greeting: "Hi",
+      widget_config: { teaser: "Welcome to Attract — ask me anything" },
+    });
+    expect(out.widget.teaser).toBe("Welcome to Attract — ask me anything");
+  });
+
+  it("refuses a teaser that is not a string, rather than rendering an object", () => {
+    expect(publicConfig({ greeting: "Hi", widget_config: { teaser: { text: "hi" } } }).widget.teaser)
+      .toBeNull();
+    expect(publicConfig({ greeting: "Hi", widget_config: { teaser: 42 } }).widget.teaser).toBeNull();
   });
 
   it("cannot leak the prompt, guardrails or script even when handed them", () => {
