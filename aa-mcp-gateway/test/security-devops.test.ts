@@ -6,7 +6,7 @@ import { AAApiAdapter } from "../src/adapters/aa-api.js";
 import { ActionEngine } from "../src/policy/engine.js";
 import { Store } from "../src/audit/store.js";
 import { registry } from "../src/registry/tools.js";
-import { engineeringOps } from "../src/onboarding/engineering-ops.js";
+import { securityDevops } from "../src/onboarding/security-devops.js";
 import { allowed, grants } from "../src/policy/permissions.js";
 import { bots } from "../src/shared/types.js";
 import {
@@ -14,9 +14,9 @@ import {
   type AaResolveResult,
 } from "../src/auth/identity.js";
 import {
-  assertEngineeringDiscovery,
-  runEngineeringGate,
-} from "../scripts/engineering-gate.js";
+  assertSecurityDiscovery,
+  runSecurityGate,
+} from "../scripts/security-gate.js";
 import { createServer } from "../src/server/http.js";
 import { config } from "../src/server/config.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -24,22 +24,26 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 const client = "11111111-1111-4111-8111-111111111111",
   other = "22222222-2222-4222-8222-222222222222",
   id = "33333333-3333-4333-8333-333333333333";
-const identity = { bot: "bot_engineering" as const, clients: [client] };
+const identity = { bot: "bot_security_devops" as const, clients: [client] };
 const input = {
   client_id: client,
   title: "Fixture",
   notes: null,
-  idempotency_key: "engineering-fixture-key",
+  severity: "medium",
+  kind: "finding",
+  idempotency_key: "security-fixture-key",
 };
-const issue = {
+const finding = {
   id,
   client_id: client,
   title: "Fixture",
   notes: null,
+  kind: "finding",
+  severity: "medium",
   status: "open",
   version: 1,
-  created_by_bot: "bot_engineering",
-  updated_by_bot: "bot_engineering",
+  created_by_bot: "bot_security_devops",
+  updated_by_bot: "bot_security_devops",
   created_at: "2026-09-15T10:00:00.000Z",
   updated_at: "2026-09-15T10:00:00.000Z",
 };
@@ -50,8 +54,8 @@ const page = {
   title: "Harbour Home",
   status: "approved",
   published_url: "https://example.test/harbour",
-  created_at: issue.created_at,
-  updated_at: issue.updated_at,
+  created_at: finding.created_at,
+  updated_at: finding.updated_at,
 };
 const job = {
   id,
@@ -59,9 +63,17 @@ const job = {
   agent_key: "landing_page",
   status: "completed",
   attempts: 1,
-  created_at: issue.created_at,
-  started_at: issue.created_at,
-  completed_at: issue.updated_at,
+  created_at: finding.created_at,
+  started_at: finding.created_at,
+  completed_at: finding.updated_at,
+};
+const systemStatus = {
+  client_id: client,
+  projection: "security_system_status_v1",
+  jobs_by_status: { completed: 1 },
+  pages_by_status: { approved: 1 },
+  open_findings: 1,
+  open_incidents: 0,
 };
 function engine(t: any, adapter: any = new AAApiAdapter()) {
   const e = new ActionEngine(new Store(":memory:"), registry, adapter);
@@ -96,54 +108,50 @@ async function mockAa(
     }),
   };
 }
-test("Engineering exact discovery equality is 12 and related stubs stay stub", (t) => {
+test("Security exact discovery equality is 14 and related stubs stay stub", (t) => {
   const e = engine(t);
-  assertEngineeringDiscovery(e.discover(identity).map((t) => t.name));
+  assertSecurityDiscovery(e.discover(identity).map((x) => x.name));
   assert.equal(registry.length, 90);
-  for (const name of engineeringOps.grants)
-    assert.equal(registry.find((t) => t.name === name)?.implementation, "real");
-  for (const name of [
-    "sales_agents.deploy",
-    "pipeline.record_sale",
-  ])
-    assert.equal(registry.find((t) => t.name === name)?.implementation, "stub");
-  for (const name of [
-    "security.get_system_status",
-    "security.create_finding",
-  ]) {
-    assert.equal(registry.find((t) => t.name === name)?.implementation, "real");
-    assert.equal(
-      allowed(identity, registry.find((t) => t.name === name)!),
-      false,
-    );
-  }
+  for (const name of securityDevops.grants)
+    assert.equal(registry.find((x) => x.name === name)?.implementation, "real");
+  for (const name of ["sales_agents.deploy", "pipeline.record_sale"])
+    assert.equal(registry.find((x) => x.name === name)?.implementation, "stub");
+  assert.equal(grants.bot_security_devops.includes("security.*"), false);
+  assert.deepEqual(
+    [...grants.bot_security_devops].sort(),
+    [...securityDevops.grants].sort(),
+  );
 });
-test("Engineering ceiling rejects broad grants; issue tools deny every other bot", (t) => {
+test("Security ceiling rejects broad grants; security tools deny every other bot", (t) => {
   const e = engine(t);
   const broad = {
     ...identity,
-    permissions: registry.map((t) => `${t.domain}.*`),
+    permissions: registry.map((x) => `${x.domain}.*`),
   };
-  assertEngineeringDiscovery(e.discover(broad).map((t) => t.name));
-  for (const bot of bots.filter((b) => b !== "bot_engineering")) {
-    for (const name of ["engineering.create_issue", "engineering.get_issue"]) {
-      const tool = registry.find((t) => t.name === name)!;
+  assertSecurityDiscovery(e.discover(broad).map((x) => x.name));
+  for (const bot of bots.filter((b) => b !== "bot_security_devops")) {
+    for (const name of securityDevops.grants.filter((n) => n.startsWith("security."))) {
+      const tool = registry.find((x) => x.name === name)!;
       assert.equal(
-        allowed({ bot, clients: [client], permissions: ["engineering.*"] }, tool),
+        allowed({ bot, clients: [client], permissions: ["security.*"] }, tool),
         false,
       );
     }
   }
-  const security = {
-    bot: "bot_security_devops" as const,
+  const engineering = {
+    bot: "bot_engineering" as const,
     clients: [client],
   };
   assert.equal(
-    allowed(security, registry.find((t) => t.name === "engineering.get_release_status")!),
+    allowed(engineering, registry.find((x) => x.name === "engineering.get_release_status")!),
     true,
   );
   assert.equal(
-    allowed(security, registry.find((t) => t.name === "engineering.create_issue")!),
+    allowed(engineering, registry.find((x) => x.name === "security.create_finding")!),
+    false,
+  );
+  assert.equal(
+    allowed(identity, registry.find((x) => x.name === "engineering.create_issue")!),
     false,
   );
 });
@@ -156,12 +164,12 @@ test("forbidden tools, record_decision and cross-client inputs never reach adapt
     },
   });
   for (const tool of registry.filter(
-    (t) => !engineeringOps.grants.some((n) => n === t.name),
+    (x) => !securityDevops.grants.some((n) => n === x.name),
   ))
     assert.equal(
       (
         await e.call(
-          { ...identity, permissions: registry.map((t) => `${t.domain}.*`) },
+          { ...identity, permissions: registry.map((x) => `${x.domain}.*`) },
           tool.name,
           {},
         )
@@ -169,78 +177,90 @@ test("forbidden tools, record_decision and cross-client inputs never reach adapt
       "rejected",
     );
   for (const name of [
-    "engineering.get_issue",
-    "engineering.get_release_status",
-    "engineering.get_deployment_status",
-    "engineering.create_issue",
+    "security.get_system_status",
+    "security.get_open_findings",
+    "security.get_incident_status",
+    "security.create_finding",
   ]) {
     const args =
-      name === "engineering.get_issue"
-        ? { client_id: other, issue_id: id }
-        : name === "engineering.create_issue"
-          ? { ...input, client_id: other }
+      name === "security.create_finding"
+        ? { ...input, client_id: other }
+        : name === "security.get_open_findings"
+          ? { client_id: other, finding_id: id }
           : { client_id: other };
     assert.equal((await e.call(identity, name, args)).message, "Client scope denied.");
   }
   assert.equal(calls, 0);
 });
-test("Engineering adapter routes all four tools with exact fields and correlation", async (t) => {
+test("Security adapter routes domain tools with exact fields and correlation", async (t) => {
   const { adapter, seen } = await mockAa(t, (_body, path) => ({
-    body: path.endsWith("create-issue") || path.endsWith("get-issue")
-      ? { client_id: client, issue }
-      : path.endsWith("get-release-status")
-        ? {
-            client_id: client,
-            projection: "client_pages_v1",
-            pages: [page],
-            next_cursor: null,
-          }
-        : {
-            client_id: client,
-            projection: "agent_jobs_v1",
-            jobs: [job],
-            next_cursor: null,
-          },
+    body: path.endsWith("create-finding")
+      ? { client_id: client, finding }
+      : path.endsWith("get-open-findings")
+        ? { client_id: client, findings: [finding], next_cursor: null }
+        : path.endsWith("get-incident-status")
+          ? { client_id: client, incidents: [], next_cursor: null }
+          : path.endsWith("get-system-status")
+            ? systemStatus
+            : path.endsWith("get-release-status")
+              ? {
+                  client_id: client,
+                  projection: "client_pages_v1",
+                  pages: [page],
+                  next_cursor: null,
+                }
+              : {
+                  client_id: client,
+                  projection: "agent_jobs_v1",
+                  jobs: [job],
+                  next_cursor: null,
+                },
   }));
   const e = engine(t, adapter);
   const cases = [
+    ["security.get_system_status", { client_id: client }],
+    ["security.get_open_findings", { client_id: client }],
+    ["security.get_incident_status", { client_id: client }],
     ["engineering.get_release_status", { client_id: client }],
     ["engineering.get_deployment_status", { client_id: client }],
-    ["engineering.get_issue", { client_id: client, issue_id: id }],
-    ["engineering.create_issue", input],
+    ["security.create_finding", input],
   ] as const;
   for (const [name, args] of cases)
     assert.equal((await e.call(identity, name, args)).status, "completed");
   assert.deepEqual(
     seen.map((x) => x.path),
     [
+      "/internal/mcp/security/get-system-status",
+      "/internal/mcp/security/get-open-findings",
+      "/internal/mcp/security/get-incident-status",
       "/internal/mcp/engineering/get-release-status",
       "/internal/mcp/engineering/get-deployment-status",
-      "/internal/mcp/engineering/get-issue",
-      "/internal/mcp/engineering/create-issue",
+      "/internal/mcp/security/create-finding",
     ],
   );
   for (const x of seen) {
-    assert.equal(x.headers["x-aa-bot-id"], "bot_engineering");
+    assert.equal(x.headers["x-aa-bot-id"], "bot_security_devops");
     assert.ok(x.headers["x-request-id"]);
     assert.ok(x.headers["idempotency-key"]);
     assert.equal(x.body.idempotency_key, undefined);
+    assert.equal(x.body.railway_token, undefined);
+    assert.equal(x.body.env, undefined);
   }
 });
-test("Engineering replay reauthorizes in backend; same execution key, no cached success", async (t) => {
+test("Security replay reauthorizes in backend; same execution key, no cached success", async (t) => {
   let permitted = true;
   const { adapter, seen } = await mockAa(t, () =>
     permitted
-      ? { body: { client_id: client, issue, replayed: false } }
+      ? { body: { client_id: client, finding, replayed: false } }
       : { status: 403, body: { error: { code: "client_forbidden" } } },
   );
   const e = engine(t, adapter);
   assert.equal(
-    (await e.call(identity, "engineering.create_issue", input)).status,
+    (await e.call(identity, "security.create_finding", input)).status,
     "completed",
   );
   permitted = false;
-  const replay = await e.call(identity, "engineering.create_issue", input);
+  const replay = await e.call(identity, "security.create_finding", input);
   assert.equal(replay.error?.code, "client_forbidden");
   assert.equal(seen.length, 2);
   assert.equal(
@@ -249,7 +269,7 @@ test("Engineering replay reauthorizes in backend; same execution key, no cached 
   );
   assert.equal(
     (
-      await e.call(identity, "engineering.create_issue", {
+      await e.call(identity, "security.create_finding", {
         ...input,
         title: "Changed",
       })
@@ -257,27 +277,44 @@ test("Engineering replay reauthorizes in backend; same execution key, no cached 
     "rejected",
   );
   assert.equal(seen.length, 2);
-  const audit = e.store.activity(client, "bot_engineering", 10);
+  const audit = e.store.activity(client, "bot_security_devops", 10);
   assert.ok(
     audit.some((a) => a.execution_id === seen[0].headers["idempotency-key"]),
   );
 });
 test("adapter rejects nested cross-client or extra secret fields", async (t) => {
-  let raw: any = { client_id: client, issue: { ...issue, client_id: other } };
+  let raw: any = {
+    client_id: client,
+    findings: [{ ...finding, client_id: other }],
+    next_cursor: null,
+  };
   const { adapter } = await mockAa(t, () => ({ body: raw }));
   const e = engine(t, adapter);
   for (const value of [
     raw,
-    { client_id: client, issue: { ...issue, id: other } },
-    { client_id: client, issue: { ...issue, railway_token: "unexpected" } },
+    {
+      client_id: client,
+      findings: [{ ...finding, id: other }],
+      next_cursor: null,
+    },
+    {
+      client_id: client,
+      findings: [{ ...finding, token: "unexpected" }],
+      next_cursor: null,
+    },
+    {
+      client_id: client,
+      findings: [{ ...finding, env: { SECRET: "x" } }],
+      next_cursor: null,
+    },
     { client_id: client },
   ]) {
     raw = value;
     assert.equal(
       (
-        await e.call(identity, "engineering.get_issue", {
+        await e.call(identity, "security.get_open_findings", {
           client_id: client,
-          issue_id: id,
+          finding_id: id,
         })
       ).error?.code,
       "malformed_response",
@@ -285,13 +322,16 @@ test("adapter rejects nested cross-client or extra secret fields", async (t) => 
   }
   raw = {
     client_id: client,
-    projection: "client_pages_v1",
-    pages: [{ ...page, client_id: other }],
-    next_cursor: null,
+    projection: "security_system_status_v1",
+    jobs_by_status: { completed: 1 },
+    pages_by_status: { approved: 1 },
+    open_findings: 0,
+    open_incidents: 0,
+    params: { secret: true },
   };
   assert.equal(
     (
-      await e.call(identity, "engineering.get_release_status", {
+      await e.call(identity, "security.get_system_status", {
         client_id: client,
       })
     ).error?.code,
@@ -301,28 +341,31 @@ test("adapter rejects nested cross-client or extra secret fields", async (t) => 
 for (const patch of [
   { title: "" },
   { notes: 5 },
-  { created_by_bot: "bot_production" },
+  { severity: "secret" },
+  { kind: "global" },
+  { created_by_bot: "bot_engineering" },
   { railway_service: "web" },
+  { env: { TOKEN: "x" } },
 ])
   test(`registry rejects malformed ${Object.keys(patch)[0]}`, () => {
     assert.equal(
       registry
-        .find((t) => t.name === "engineering.create_issue")!
+        .find((x) => x.name === "security.create_finding")!
         .input.safeParse({ ...input, ...patch }).success,
       false,
     );
   });
-test("DB and dual Engineering auth refresh each request and deny revoked token/grants", async () => {
+test("DB and dual Security auth refresh each request and deny revoked token/grants", async () => {
   for (const mode of ["db", "dual"] as const) {
     let value: AaResolveResult = {
       found: true,
       status: "active",
-      bot_id: "bot_engineering",
+      bot_id: "bot_security_devops",
       clients: [client],
-      permissions: [...grants.bot_engineering],
+      permissions: [...grants.bot_security_devops],
     };
     let calls = 0;
-    const token = "engineering-test-only-credential".repeat(2);
+    const token = "security-test-only-credential".repeat(2);
     const auth = new BotAuthenticator(
       mode,
       mode === "dual" ? [{ ...identity, token }] : [],
@@ -342,9 +385,53 @@ test("DB and dual Engineering auth refresh each request and deny revoked token/g
     assert.equal(calls, 3);
   }
 });
-test("MCP HTTP discovery is 12, bad/revoked credentials return 401 immediately", async (t) => {
+test("hosted Security env credentials are refused except loopback HTTP", async () => {
+  const token = "security-test-only-credential".repeat(2);
+  const bots = [{ ...identity, token }];
+  for (const origin of [
+    "https://gateway.example.test",
+    "http://localhost.evil.test",
+    "https://localhost",
+    "http://127.0.0.2",
+  ]) {
+    const auth = BotAuthenticator.fromConfig({
+      BOT_AUTH_MODE: "env",
+      PUBLIC_ORIGIN: origin,
+      bots,
+    });
+    await assert.rejects(auth.authenticate(`Bearer ${token}`), /unauthorized/);
+  }
+  for (const origin of ["http://localhost", "http://127.0.0.1"]) {
+    const auth = BotAuthenticator.fromConfig({
+      BOT_AUTH_MODE: "env",
+      PUBLIC_ORIGIN: origin,
+      bots,
+    });
+    assert.equal(
+      (await auth.authenticate(`Bearer ${token}`)).bot,
+      "bot_security_devops",
+    );
+  }
+});
+test("dual Security never uses environment fallback on miss or resolver outage", async () => {
+  const token = "security-test-only-credential".repeat(2);
+  const envCreds = [{ ...identity, token }];
+  await assert.rejects(
+    new BotAuthenticator("dual", envCreds, async () => ({ found: false })).authenticate(
+      `Bearer ${token}`,
+    ),
+    /unauthorized/,
+  );
+  await assert.rejects(
+    new BotAuthenticator("dual", envCreds, async () => {
+      throw Error("offline");
+    }).authenticate(`Bearer ${token}`),
+    /unauthorized/,
+  );
+});
+test("MCP HTTP discovery is 14, bad/revoked credentials return 401 immediately", async (t) => {
   const e = engine(t);
-  const token = "engineering-test-only-credential".repeat(2);
+  const token = "security-test-only-credential".repeat(2);
   let active = true;
   const { tokenHashHex } = await import("../src/auth/identity.js");
   const realAuth = new BotAuthenticator("db", [], async (hash) =>
@@ -352,9 +439,9 @@ test("MCP HTTP discovery is 12, bad/revoked credentials return 401 immediately",
       ? {
           found: true,
           status: active ? "active" : "revoked",
-          bot_id: "bot_engineering",
+          bot_id: "bot_security_devops",
           clients: [client],
-          permissions: [...grants.bot_engineering],
+          permissions: [...grants.bot_security_devops],
         }
       : { found: false },
   );
@@ -376,14 +463,14 @@ test("MCP HTTP discovery is 12, bad/revoked credentials return 401 immediately",
   });
   const origin = `http://127.0.0.1:${(server.address() as any).port}`;
   c.PUBLIC_ORIGIN = origin;
-  const mcp = new Client({ name: "engineering-test", version: "1" });
+  const mcp = new Client({ name: "security-test", version: "1" });
   t.after(() => mcp.close());
   await mcp.connect(
     new StreamableHTTPClientTransport(new URL("/mcp", origin), {
       requestInit: { headers: { authorization: `Bearer ${token}` } },
     }),
   );
-  assertEngineeringDiscovery((await mcp.listTools()).tools.map((t) => t.name));
+  assertSecurityDiscovery((await mcp.listTools()).tools.map((x) => x.name));
   for (const credential of ["invalid-test-only", token]) {
     active = false;
     const response = await fetch(`${origin}/mcp`, {
@@ -398,9 +485,9 @@ test("MCP HTTP discovery is 12, bad/revoked credentials return 401 immediately",
     await response.body?.cancel();
   }
 });
-test("Gate 14 smoke runner executes through local MCP and reconciles fixtures", async (t) => {
+test("Gate 15 smoke runner executes through local MCP and reconciles fixtures", async (t) => {
   const { randomUUID } = await import("node:crypto");
-  const issues = new Map<string, any>(),
+  const findings = new Map<string, any>(),
     tasks = new Map<string, any>(),
     receipts = new Map<string, any>();
   const e = engine(t, {
@@ -414,6 +501,25 @@ test("Gate 14 smoke runner executes through local MCP and reconciles fixtures", 
       });
       let result: any;
       switch (tool.name) {
+        case "security.get_system_status":
+          return ok({
+            client_id: client,
+            projection: "security_system_status_v1",
+            jobs_by_status: {},
+            pages_by_status: {},
+            open_findings: findings.size,
+            open_incidents: 0,
+          });
+        case "security.get_open_findings":
+          return ok({
+            client_id: client,
+            findings: args.finding_id
+              ? [findings.get(args.finding_id)]
+              : [...findings.values()],
+            next_cursor: null,
+          });
+        case "security.get_incident_status":
+          return ok({ client_id: client, incidents: [], next_cursor: null });
         case "engineering.get_release_status":
           return ok({
             client_id: client,
@@ -428,14 +534,19 @@ test("Gate 14 smoke runner executes through local MCP and reconciles fixtures", 
             jobs: [],
             next_cursor: null,
           });
-        case "engineering.create_issue": {
-          const row = { ...issue, ...args, id: randomUUID(), status: "open", version: 1 };
-          issues.set(row.id, row);
-          result = ok({ client_id: client, issue: row });
+        case "security.create_finding": {
+          const row = {
+            ...finding,
+            ...args,
+            id: randomUUID(),
+            status: "open",
+            version: 1,
+            kind: args.kind ?? "finding",
+          };
+          findings.set(row.id, row);
+          result = ok({ client_id: client, finding: row });
           break;
         }
-        case "engineering.get_issue":
-          return ok({ client_id: client, issue: issues.get(args.issue_id) });
         case "workflow.list_tasks":
           return ok({
             client_id: client,
@@ -470,7 +581,7 @@ test("Gate 14 smoke runner executes through local MCP and reconciles fixtures", 
       return structuredClone(result);
     },
   });
-  const token = "local-engineering-test-only".repeat(3);
+  const token = "local-security-test-only".repeat(3);
   const c = config({
     BOT_AUTH_MODE: "env",
     BOT_CREDENTIALS_JSON: JSON.stringify([{ ...identity, token }]),
@@ -487,15 +598,15 @@ test("Gate 14 smoke runner executes through local MCP and reconciles fixtures", 
   });
   const origin = `http://127.0.0.1:${(server.address() as any).port}`;
   c.PUBLIC_ORIGIN = origin;
-  const mcp = new Client({ name: "gate14-local", version: "1" });
+  const mcp = new Client({ name: "gate15-local", version: "1" });
   t.after(() => mcp.close());
   await mcp.connect(
     new StreamableHTTPClientTransport(new URL("/mcp", origin), {
       requestInit: { headers: { authorization: `Bearer ${token}` } },
     }),
   );
-  assertEngineeringDiscovery((await mcp.listTools()).tools.map((t) => t.name));
-  await runEngineeringGate(
+  assertSecurityDiscovery((await mcp.listTools()).tools.map((x) => x.name));
+  await runSecurityGate(
     async (name, args) =>
       (await mcp.callTool({ name, arguments: args })).structuredContent,
     {
@@ -503,13 +614,13 @@ test("Gate 14 smoke runner executes through local MCP and reconciles fixtures", 
       client_id: client,
       denied_client_id: other,
       denied_client_name: "Attract Acquisition",
-      assignee: "bot_engineering",
+      assignee: "bot_security_devops",
     },
   );
-  assert.equal(issues.size, 1);
-  assert.ok([...tasks.values()].every((t) => t.status === "complete"));
+  assert.equal(findings.size, 1);
+  assert.ok([...tasks.values()].every((x) => x.status === "complete"));
 });
-test("Engineering approval requests remain informational and cannot record decisions", async (t) => {
+test("Security approval requests remain informational and cannot record decisions", async (t) => {
   let calls = 0;
   const e = engine(t, {
     execute: async () => {
@@ -520,7 +631,7 @@ test("Engineering approval requests remain informational and cannot record decis
   const result = await e.call(identity, "workflow.create_approval", {
     client_id: client,
     summary: "Local informational fixture",
-    idempotency_key: "approval-test-14",
+    idempotency_key: "approval-test-15",
   });
   assert.equal(result.status, "approval_required");
   assert.equal(calls, 0);

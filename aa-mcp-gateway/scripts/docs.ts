@@ -7,6 +7,7 @@ import {
   PRODUCTION_ONLY_TOOLS,
   DISTRIBUTION_ONLY_TOOLS,
   ENGINEERING_ISSUE_TOOLS,
+  SECURITY_TOOLS,
 } from "../src/policy/permissions.js";
 const status = (name: string, implementation: string) =>
   implementation === "real" && PRODUCTION_ONLY_TOOLS.has(name)
@@ -19,9 +20,11 @@ const status = (name: string, implementation: string) =>
           ? "real (bot_finance only)"
           : implementation === "real" && ENGINEERING_ISSUE_TOOLS.has(name)
             ? "real (bot_engineering only)"
-            : implementation === "real" && name.startsWith("engineering.")
-              ? "real (bot_engineering; status also bot_security_devops)"
-              : implementation;
+            : implementation === "real" && SECURITY_TOOLS.has(name)
+              ? "real (bot_security_devops only)"
+              : implementation === "real" && name.startsWith("engineering.")
+                ? "real (bot_engineering; status also bot_security_devops)"
+                : implementation;
 writeFileSync(
   "docs/tool-registry.md",
   `# Tool registry\n\n${registry.length} initial business contracts. Status is adapter availability, not evidence of live deployment. Brief generation is implemented and requires AA_INTERNAL_API_URL and AA_MCP_SERVICE_SECRET. Stub schemas reserve bounded business fields and must be versioned/refined before their adapters are enabled. All calls require an authorized client UUID; all writes require an idempotency key. HIGH/CRITICAL policy always requires human approval.\n\n| Tool | Status | Action | Risk | Approval | Reversible | Dependency |\n| --- | --- | --- | --- | --- | --- | --- |\n` +
@@ -59,8 +62,11 @@ const financeNote =
   "\n\nPhase 13: `bot_finance` has an exact 14-tool ceiling (ten reads/four writes): five named `economics.*` Client Economics OS reads, `attribution.get_revenue_attribution`, and the eight-tool workflow suite. The seeded `economics.*` wildcard is replaced with exact rows. Other Bots cannot invoke `economics.*` even with stale wildcards. Money writes (`pipeline.record_sale`, payments, bank/Stripe/Xero) are not granted and stay stub. See [Phase 13](phase-13-finance-controller.md) for guarded RPCs and `smoke:finance`. Gate 13 is NOT YET CLOSED.\n";
 const engineeringNote =
   "\n\nPhase 14: `bot_engineering` has an exact 12-tool ceiling (seven reads/five writes). The seeded `engineering.*` wildcard is replaced with four named engineering tools plus the eight workflow names. Issue create/get are bot_engineering only. Release and deployment status reads project client-scoped `client_pages` / `agent_jobs` (no HTML, params, costs or secrets) and remain callable by `bot_security_devops` via its existing exact grants. No Railway write, secret rotation or unrestricted deploy tools. See [Phase 14](phase-14-engineering-ops.md). Gate 14 is NOT YET CLOSED.\n";
+const securityNote =
+  "\n\nPhase 15: `bot_security_devops` has an exact 14-tool ceiling (nine reads/five writes). The seeded `security.*` wildcard is replaced with four named security tools, two engineering status reads, and the eight workflow names. Security tools are bot_security_devops only. System status is client-scoped counts (no HTML, params, costs, tokens or env). Findings/incidents are AA-native tracking records. No destroy, secret rotation, Railway write, unrestricted deploy or global/unscoped client tools. See [Phase 15](phase-15-security-devops.md). Gate 15 is NOT YET CLOSED.\n";
 for (const file of ["docs/tool-registry.md", "docs/bot-permissions.md"]) {
   appendFileSync(file, adminNote);
   appendFileSync(file, financeNote);
   appendFileSync(file, engineeringNote);
+  appendFileSync(file, securityNote);
 }

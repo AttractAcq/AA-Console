@@ -66,7 +66,7 @@ type CacheEntry = { expires: number; value: AaResolveResult | null };
 
 export class BotAuthenticator {
   private readonly cache = new Map<string, CacheEntry>();
-  private allowLocalAdminEnv = false;
+  private allowLocalPrivilegedEnv = false;
   private readonly byBot = new Map<Bot, Identity>();
   constructor(
     private readonly mode: BotAuthMode,
@@ -101,11 +101,12 @@ export class BotAuthenticator {
             )
         : undefined);
     const auth = new BotAuthenticator(c.BOT_AUTH_MODE, c.bots, fn, alert);
-    // Local mock fixtures may use env auth. Hosted Admin requests require the
-    // DB resolver, without preventing legacy credentials for other bots booting.
+    // Local mock fixtures may use env auth. Hosted Admin and Security requests
+    // require the DB resolver, without preventing legacy credentials for other
+    // bots booting. Loopback HTTP origins keep the same exception as Admin.
     if (c.PUBLIC_ORIGIN) {
       const origin = new URL(c.PUBLIC_ORIGIN);
-      auth.allowLocalAdminEnv =
+      auth.allowLocalPrivilegedEnv =
         origin.protocol === "http:" &&
         ["localhost", "127.0.0.1"].includes(origin.hostname);
     }
@@ -126,7 +127,10 @@ export class BotAuthenticator {
     const presented = hash(token);
     const env = envIdentity(token, this.credentials);
     if (this.mode === "env") {
-      if (!env || (env.bot === "bot_admin" && !this.allowLocalAdminEnv))
+      if (
+        !env ||
+        (this.requiresHostedDb(env.bot) && !this.allowLocalPrivilegedEnv)
+      )
         throw unauthorized();
       return env;
     }
@@ -166,6 +170,22 @@ export class BotAuthenticator {
       this.byBot.set(current.bot, current);
       return current;
     }
+    // Security matches Admin: never fall back to env or stale permissions.
+    // Prod db mode alone is not this posture — dual must refuse env too.
+    if (
+      env?.bot === "bot_security_devops" ||
+      aaIdentity?.bot === "bot_security_devops"
+    ) {
+      const current = this.fromAa(aa, true);
+      if (
+        !current ||
+        current.bot !== "bot_security_devops" ||
+        (env && this.mismatch(aa, env))
+      )
+        throw unauthorized();
+      this.byBot.set(current.bot, current);
+      return current;
+    }
     if (aaIdentity && env) {
       if (this.mismatch(aa, env)) {
         this.alert({
@@ -188,6 +208,10 @@ export class BotAuthenticator {
     }
     if (env) return env;
     throw unauthorized();
+  }
+
+  private requiresHostedDb(bot: Bot): boolean {
+    return bot === "bot_admin" || bot === "bot_security_devops";
   }
 
   private mismatch(
@@ -217,12 +241,14 @@ export class BotAuthenticator {
 
   private async lookupAa(hashHex: string): Promise<AaResolveResult | null> {
     const hit = this.cache.get(hashHex);
-    // Admin and Engineering must re-resolve every request so revoked tokens
-    // and removed client grants take effect immediately (no cached success).
+    // Admin, Engineering and Security must re-resolve every request so
+    // revoked tokens and removed client grants take effect immediately
+    // (no cached success). Security is the highest-risk Bot identity.
     if (
       hit &&
       hit.value?.bot_id !== "bot_admin" &&
       hit.value?.bot_id !== "bot_engineering" &&
+      hit.value?.bot_id !== "bot_security_devops" &&
       hit.expires > this.now()
     )
       return hit.value;

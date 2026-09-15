@@ -14,6 +14,7 @@ import { handleMcpDelivery } from "./mcp/delivery-route.js";
 import { handleMcpContent } from "./mcp/content-route.js";
 import { handleMcpAdmin } from "./mcp/admin-route.js";
 import { handleMcpEngineering } from "./mcp/engineering-route.js";
+import { handleMcpSecurity } from "./mcp/security-route.js";
 import { handleMcpPipeline } from "./mcp/pipeline-route.js";
 import { handleMcpSalesAgents } from "./mcp/sales-agents-route.js";
 import { handleMcpEconomics } from "./mcp/economics-route.js";
@@ -86,6 +87,10 @@ const server = http.createServer((req, res) => {
   }
   if (req.url?.startsWith("/internal/mcp/engineering/")) {
     void handleMcpEngineering(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+  if (req.url?.startsWith("/internal/mcp/security/")) {
+    void handleMcpSecurity(req, res, sb, config.mcpServiceSecret);
     return;
   }
   if (req.url?.startsWith("/internal/mcp/pipeline/")) {

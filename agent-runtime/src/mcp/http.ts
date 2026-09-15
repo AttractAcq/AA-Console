@@ -14,6 +14,8 @@ export const MCP_ERRORS: Record<string, [number, string]> = {
   issue_not_found: [404, "Issue unavailable for this client."],
   page_not_found: [404, "Page unavailable for this client."],
   job_not_found: [404, "Job unavailable for this client."],
+  finding_not_found: [404, "Finding unavailable for this client."],
+  incident_not_found: [404, "Incident unavailable for this client."],
   task_not_found: [404, 'Task not found.'],
   campaign_not_found: [404, 'Campaign not found.'],
   task_completed: [409, 'Task is already complete.'],

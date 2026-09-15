@@ -4,6 +4,7 @@ import {
   adminTools,
   financeReadTools,
   engineeringTools,
+  securityTools,
 } from "../registry/tools.js";
 import { z } from "zod";
 import type { Adapter, Context, Tool, Result } from "../shared/types.js";
@@ -249,7 +250,8 @@ for (const tool of registry.filter(
     adminTools.has(t.name) ||
     orchestrationTools.has(t.name) ||
     financeReadTools.has(t.name) ||
-    engineeringTools.has(t.name),
+    engineeringTools.has(t.name) ||
+    securityTools.has(t.name),
 )) {
   const [domain, action] = tool.name.split(".");
   ROUTES[tool.name] = {
@@ -268,6 +270,8 @@ const codes = new Set([
   "issue_not_found",
   "page_not_found",
   "job_not_found",
+  "finding_not_found",
+  "incident_not_found",
   "task_not_found",
   "campaign_not_found",
   "invalid_assignee",
@@ -343,7 +347,7 @@ function aaBody(
   input: Record<string, unknown>,
 ): Record<string, unknown> {
   if (
-    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents|economics|engineering)\./.test(
+    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents|economics|engineering|security)\./.test(
       tool,
     )
   )
@@ -692,6 +696,99 @@ export class AAApiAdapter implements Adapter {
             (row.next_cursor !== null &&
               !row.jobs.some((j) => j.id === row.next_cursor))
           )
+            return fail("malformed_response", response.status);
+        }
+      }
+      if (tool.domain === "security") {
+        const finding = z
+          .object({
+            id: uuid,
+            client_id: uuid,
+            title: z.string(),
+            notes: z.string().nullable(),
+            kind: z.enum(["finding", "incident"]),
+            severity: z.enum(["low", "medium", "high", "critical"]),
+            status: z.enum(["open", "in_progress", "resolved", "dismissed"]),
+            created_by_bot: z.literal("bot_security_devops"),
+            updated_by_bot: z.literal("bot_security_devops"),
+            version: z.number().int().positive(),
+            created_at: z.string(),
+            updated_at: z.string(),
+          })
+          .strict();
+        const counts = z.record(z.string(), z.number().int().nonnegative());
+        const shape =
+          tool.name === "security.create_finding"
+            ? z
+                .object({
+                  client_id: uuid,
+                  finding,
+                  replayed: z.boolean().optional(),
+                })
+                .strict()
+            : tool.name === "security.get_open_findings"
+              ? z
+                  .object({
+                    client_id: uuid,
+                    findings: z.array(finding).max(100),
+                    next_cursor: uuid.nullable(),
+                  })
+                  .strict()
+              : tool.name === "security.get_incident_status"
+                ? z
+                    .object({
+                      client_id: uuid,
+                      incidents: z.array(finding).max(100),
+                      next_cursor: uuid.nullable(),
+                    })
+                    .strict()
+                : z
+                    .object({
+                      client_id: uuid,
+                      projection: z.literal("security_system_status_v1"),
+                      jobs_by_status: counts,
+                      pages_by_status: counts,
+                      open_findings: z.number().int().nonnegative(),
+                      open_incidents: z.number().int().nonnegative(),
+                    })
+                    .strict();
+        const parsedSecurity = shape.safeParse(raw);
+        if (!parsedSecurity.success) return fail("malformed_response", response.status);
+        if (tool.name === "security.create_finding") {
+          const row = parsedSecurity.data as {
+            finding: { id: string; client_id: string };
+          };
+          if (row.finding.client_id !== input.client_id)
+            return fail("malformed_response", response.status);
+        } else if (tool.name === "security.get_open_findings") {
+          const row = parsedSecurity.data as {
+            findings: { id: string; client_id: string }[];
+            next_cursor: string | null;
+          };
+          if (
+            row.findings.some((f) => f.client_id !== input.client_id) ||
+            (input.finding_id !== undefined &&
+              row.findings[0]?.id !== input.finding_id) ||
+            (row.next_cursor !== null &&
+              !row.findings.some((f) => f.id === row.next_cursor))
+          )
+            return fail("malformed_response", response.status);
+        } else if (tool.name === "security.get_incident_status") {
+          const row = parsedSecurity.data as {
+            incidents: { id: string; client_id: string }[];
+            next_cursor: string | null;
+          };
+          if (
+            row.incidents.some((f) => f.client_id !== input.client_id) ||
+            (input.incident_id !== undefined &&
+              row.incidents[0]?.id !== input.incident_id) ||
+            (row.next_cursor !== null &&
+              !row.incidents.some((f) => f.id === row.next_cursor))
+          )
+            return fail("malformed_response", response.status);
+        } else {
+          const row = parsedSecurity.data as { client_id: string };
+          if (row.client_id !== input.client_id)
             return fail("malformed_response", response.status);
         }
       }
