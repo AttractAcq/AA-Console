@@ -175,8 +175,10 @@ export class ActionEngine {
           });
         if (
           tool.domain !== "admin" &&
+          tool.domain !== "engineering" &&
           !(
-            identity.bot === "bot_admin" &&
+            (identity.bot === "bot_admin" ||
+              identity.bot === "bot_engineering") &&
             [
               "workflow.create_task",
               "workflow.assign_task",

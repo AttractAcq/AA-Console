@@ -69,7 +69,9 @@ Public wrappers require service role. Internal functions are not executable by P
 
 Gateway: `src/onboarding/engineering-ops.ts`, registry, permissions ceiling, AA adapter routes, Engineering tests, smoke scripts, package script and generated docs. Runtime: `src/mcp/engineering-route.ts` and tests; route registration in `server.ts`. Database: migration 86 only.
 
-Engineering does **not** copy Admin's hosted-env denial / dual-mode no-fallback. Gate 14 is read-heavy; env credentials remain valid for non-Admin bots. Flagged as a Sec question.
+Engineering matches Admin for **identity refresh**: db/dual auth skips the token cache for `bot_engineering`, so a revoked token is 401 on the next request and a removed client grant is re-checked on write replay (`client_forbidden`, not a cached success). Gateway receipts still bind the execution key; they do not short-circuit the AA call.
+
+Engineering does **not** copy Admin's hosted-env denial / dual-mode no-fallback. Gate 14 is read-heavy; env credentials remain valid for non-Admin bots when AA is unavailable. Flagged as a Sec question.
 
 ## Tests
 

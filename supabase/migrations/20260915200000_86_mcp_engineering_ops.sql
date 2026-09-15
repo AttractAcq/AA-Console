@@ -485,7 +485,9 @@ begin
         p.permission_pattern like 'railway%'
         or p.permission_pattern like 'secret%'
         or p.permission_pattern like 'infra%'
-        or p.permission_pattern like '%deploy%'
+        or p.permission_pattern in ('sales_agents.deploy', 'deploy')
+        or p.permission_pattern like '%.deploy'
+        or p.permission_pattern like 'deploy.%'
         or p.permission_pattern like 'finance%'
         or p.permission_pattern like 'economics%'
       )
