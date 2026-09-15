@@ -26,7 +26,7 @@ import {
   latestPagesBuild,
 } from "../github/repos.js";
 import { shellFiles, shellPaths } from "./shell.js";
-import { pagePath, publicUrl } from "./paths.js";
+import { pagePath, publicUrl, embedSnippet, injectWidget } from "./paths.js";
 
 export interface InstallationRecord {
   installationId: number;
@@ -53,6 +53,13 @@ export interface PageRecord {
   sitePath: string | null;
 }
 
+/** A deployment row as stored. The store does not pick which one to embed. */
+export interface PageDeploymentRecord {
+  publicId: string;
+  enabled: boolean;
+  createdAt: string;
+}
+
 /** What provisioning and publishing need to remember. */
 export interface SiteStore {
   upsertInstallation(record: InstallationRecord): Promise<string>;
@@ -73,6 +80,8 @@ export interface SiteStore {
     lastError: string | null;
   }): Promise<SiteRepoRecord>;
   loadPage(pageId: string): Promise<PageRecord | null>;
+  /** Deployments for this page, as stored. Newest-first is typical; the caller decides. */
+  deploymentsForPage(pageId: string): Promise<PageDeploymentRecord[]>;
   markPublishing(pageId: string, repoId: string, path: string): Promise<void>;
   markPublished(pageId: string, fields: { commit: string; url: string; at: Date }): Promise<void>;
   markPublishFailed(pageId: string, error: string): Promise<void>;
@@ -240,9 +249,10 @@ export async function publishPage(
 
   try {
     const token = (await mintInstallationToken(app, record.installationId, fetchImpl)).token;
+    const html = await htmlToPublish(store, site, pageId, page.html);
     const commit = await commitFiles(
       token, repo.owner, repo.repo, repo.defaultBranch,
-      [{ path, content: page.html }],
+      [{ path, content: html }],
       `Publish ${page.title}`,
       fetchImpl,
     );
@@ -260,6 +270,35 @@ export async function publishPage(
     await store.markPublishFailed(pageId, message);
     throw error;
   }
+}
+
+/**
+ * Page HTML as it should go into the commit: original bytes, plus the widget
+ * if this page has a sales-agent deployment.
+ *
+ * Prefers the enabled deployment — that is the agent visitors will actually
+ * reach. Otherwise the most recent attachment, so attach-then-republish still
+ * embeds the public_id while Enable stays a separate switch. The runtime
+ * refuses a disabled deployment on every request.
+ */
+async function htmlToPublish(
+  store: SiteStore,
+  site: SiteConfig,
+  pageId: string,
+  html: string,
+): Promise<string> {
+  const deployments = await store.deploymentsForPage(pageId);
+  const publicId = publicIdToEmbed(deployments);
+  if (!publicId) return html;
+  return injectWidget(html, embedSnippet(publicId, site.runtimeBase));
+}
+
+export function publicIdToEmbed(deployments: PageDeploymentRecord[]): string | null {
+  if (deployments.length === 0) return null;
+  const enabled = deployments.find((d) => d.enabled);
+  if (enabled) return enabled.publicId;
+  const newest = [...deployments].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  return newest[0]?.publicId ?? null;
 }
 
 /**
