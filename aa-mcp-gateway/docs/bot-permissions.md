@@ -68,9 +68,9 @@ Effective tools (19):
 
 ## bot_marketing
 
-Configured grants: `campaign.list`, `campaign.get`, `campaign.get_status`, `content.list_ideas`, `content.get_idea`, `content.get_brief`, `content.get_production_status`, `attribution.get_campaign_performance`, `delivery.get_client`, `delivery.get_status`, `delivery.get_client_health`, `workflow.get_pending_approvals`, `workflow.get_activity`, `workflow.list_tasks`, `workflow.get_task`, `campaign.get_readiness`, `conversion.list_pages`, `conversion.get_page`, `conversion.get_performance`, `content.generate_brief`, `content.request_revision`, `content.request_approval`, `content.create_repurpose_plan`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`, `conversion.create_page`, `conversion.generate_structure`, `conversion.generate_copy`, `conversion.request_approval`, `conversion.audit_page`, `conversion.revise_page`, `conversion.revert_page`, `campaign.create`, `campaign.update`, `campaign.request_approval`, `campaign.plan`, `campaign.provision`, `campaign.launch`.
+Configured grants: `campaign.list`, `campaign.get`, `campaign.get_status`, `content.list_ideas`, `content.get_idea`, `content.get_brief`, `content.get_production_status`, `attribution.get_campaign_performance`, `delivery.get_client`, `delivery.get_status`, `delivery.get_client_health`, `workflow.get_pending_approvals`, `workflow.get_activity`, `workflow.list_tasks`, `workflow.get_task`, `campaign.get_readiness`, `conversion.list_pages`, `conversion.get_page`, `conversion.get_performance`, `attribution.get_conversion_funnel`, `attribution.get_content_performance`, `brand.get_profile`, `content.generate_brief`, `content.request_revision`, `content.request_approval`, `content.create_repurpose_plan`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`, `conversion.create_page`, `conversion.generate_structure`, `conversion.generate_copy`, `conversion.request_approval`, `conversion.audit_page`, `conversion.revise_page`, `conversion.revert_page`, `campaign.create`, `campaign.update`, `campaign.request_approval`, `campaign.plan`, `campaign.provision`, `campaign.launch`, `sites.provision`, `sites.publish_page`.
 
-Effective tools (40):
+Effective tools (45):
 
 - `delivery.get_client`
 - `delivery.get_status`
@@ -104,6 +104,8 @@ Effective tools (40):
 - `conversion.revise_page`
 - `conversion.revert_page`
 - `attribution.get_campaign_performance`
+- `attribution.get_content_performance`
+- `attribution.get_conversion_funnel`
 - `workflow.create_task`
 - `workflow.assign_task`
 - `workflow.get_task`
@@ -112,12 +114,15 @@ Effective tools (40):
 - `workflow.create_approval`
 - `workflow.get_pending_approvals`
 - `workflow.get_activity`
+- `brand.get_profile`
+- `sites.provision`
+- `sites.publish_page`
 
 ## bot_production
 
-Configured grants: `content.*`, `proof.search`, `proof.get`, `proof.get_for_avatar`, `proof.get_for_claim`, `proof.create`, `proof.attach_asset`, `workflow.create_task`, `workflow.assign_task`, `workflow.get_task`, `workflow.list_tasks`, `workflow.complete_task`, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`.
+Configured grants: `content.*`, `proof.search`, `proof.get`, `proof.get_for_avatar`, `proof.get_for_claim`, `proof.create`, `proof.attach_asset`, `brand.get_profile`, `workflow.create_task`, `workflow.assign_task`, `workflow.get_task`, `workflow.list_tasks`, `workflow.complete_task`, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`.
 
-Effective tools (28):
+Effective tools (29):
 
 - `content.list_ideas`
 - `content.generate_ideas`
@@ -147,10 +152,11 @@ Effective tools (28):
 - `workflow.create_approval`
 - `workflow.get_pending_approvals`
 - `workflow.get_activity`
+- `brand.get_profile`
 
 ## bot_distribution
 
-Configured grants: `content.get_brief`, `content.get_production_status`, `workflow.get_task`, `workflow.list_tasks`, `workflow.get_pending_approvals`, `workflow.get_activity`, `content.queue_distribution`, `content.record_publication`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`, `content.get_performance`, `attribution.get_content_performance`.
+Configured grants: `content.get_brief`, `content.get_production_status`, `attribution.get_content_performance`, `workflow.get_task`, `workflow.list_tasks`, `workflow.get_pending_approvals`, `workflow.get_activity`, `content.queue_distribution`, `content.record_publication`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`, `content.get_performance`.
 
 Effective tools (14):
 
@@ -171,9 +177,9 @@ Effective tools (14):
 
 ## bot_sales_ops
 
-Configured grants: `pipeline.list_leads`, `pipeline.get_lead`, `pipeline.get_stalled_leads`, `pipeline.get_pipeline_summary`, `sales_agents.list`, `sales_agents.get`, `sales_agents.get_conversations`, `workflow.get_pending_approvals`, `workflow.get_activity`, `workflow.list_tasks`, `workflow.get_task`, `pipeline.update_stage`, `pipeline.create_followup`, `sales_agents.generate_config`, `sales_agents.create`, `sales_agents.update_knowledge`, `sales_agents.update_qualification_rules`, `sales_agents.test`, `sales_agents.attach_to_page`, `sales_agents.set_deployment_enabled`, `sales_agents.build`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`.
+Configured grants: `pipeline.list_leads`, `pipeline.get_lead`, `pipeline.get_stalled_leads`, `pipeline.get_pipeline_summary`, `sales_agents.list`, `sales_agents.get`, `sales_agents.get_conversations`, `brand.get_profile`, `workflow.get_pending_approvals`, `workflow.get_activity`, `workflow.list_tasks`, `workflow.get_task`, `pipeline.update_stage`, `pipeline.create_followup`, `sales_agents.generate_config`, `sales_agents.create`, `sales_agents.update_knowledge`, `sales_agents.update_qualification_rules`, `sales_agents.test`, `sales_agents.attach_to_page`, `sales_agents.set_deployment_enabled`, `sales_agents.build`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`, `sites.provision`, `sites.publish_page`.
 
-Effective tools (25):
+Effective tools (28):
 
 - `sales_agents.generate_config`
 - `sales_agents.list`
@@ -200,6 +206,9 @@ Effective tools (25):
 - `workflow.create_approval`
 - `workflow.get_pending_approvals`
 - `workflow.get_activity`
+- `brand.get_profile`
+- `sites.provision`
+- `sites.publish_page`
 
 ## bot_admin
 
@@ -307,3 +316,6 @@ Phase 16 (PR #48 / mig 89): `bot_marketing` post-#48 ceiling is **40** exact too
 
 
 Phase 16b: `bot_sales_ops` has an exact 25-tool ceiling after this PR (Phase 11b's 22 plus `sales_agents.attach_to_page`, `sales_agents.set_deployment_enabled`, `sales_agents.build`). Phase 16c (PR #46) additively grants `brand.get_profile`, `sites.provision`, `sites.publish_page` → final 28; it must append, not overwrite from the 22-tool baseline. `sales_agents.create` stays draft-only; `build` enqueues the Console `sales_agent` job. Attach inserts `client_sales_agent_deployments` with `enabled:false` and origin from the published URL. Enable is a kill-switch (one enabled deployment per page). `sales_agents.deploy` stays CRITICAL stub + ungranted. `approved_at` remains human-only. All six `proof.*` tools are real for `bot_production`; bots cannot set `usage_rights` clearance. `content.assign_production` and `content.submit_asset` are real for `bot_production` only; `content.approve_asset` stays Production-only. Catalog after #48 (97) + this PR's 3 sales_agents names: **100**. See [Phase 16b](phase-16b-sales-proof-production.md). Gate 16b is NOT YET CLOSED.
+
+
+Phase 16c: Attribution funnel and content-performance reads are real (empty data returns zeros/null ratios or `items: []`, never invented numbers). `attribution.generate_report` stays stub. `attribution.get_revenue_attribution` remains Finance/CoS. `brand.get_profile` is read-only for Marketing, Sales Ops and Production. `sites.provision` / `sites.publish_page` call the same runtime orchestration as Console admin routes; GitHub App keys stay on the agent-runtime. Owners are `bot_marketing` and `bot_sales_ops` — not Engineering. Both sites writes require gateway approval (HIGH, irreversible GitHub write). Conversion and campaign execution tools stay **real** after this last-writer PR (merge order #48→#47→#46). Marketing ceiling is **45**; Sales Ops is **28**. Catalog after A+B+C: **103**. See [Phase 16c](phase-16c-attribution-brand-sites.md). Gate 16c is NOT YET CLOSED.

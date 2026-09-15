@@ -38,7 +38,7 @@ exactly — it does not reopen the Phase 5/6 posture for any other Bot or tool.
 | Autonomous (extended, unchanged tool name) | `content.get_production_status` | Granted client only | Additive `distribution` field: the scheduled/publication rows for the resolved asset (or every asset on the resolved brief). No existing key changed. This is the "read schedule/publication status" surface from the brief — reusing the existing tool rather than inventing a new read, per Alex CLEAR #1. |
 | Autonomous (unchanged) | `content.get_brief`, workflow task/approval suite | Granted client only | Phase 5/Phase 3–4 contract unchanged; already real and already seeded to `bot_distribution` (migration 65). |
 | Deferred (out of scope) | Reschedule / cancel a `scheduled_posts` row | — | Gate 10's happy path does not need it (brief §"Proposed capability classes" item 2: "add only if needed for Gate 10; otherwise defer"). Add as a follow-on `content.queue_distribution` variant or new companion tool, with its own isolation review, if Distribution's live use surfaces the need. |
-| Documented gap (unchanged, honest) | `content.get_performance`, `attribution.get_content_performance` | — | Remain **stubs**. `metrics_daily` is frequently empty; there is no live Meta/TikTok/etc. read today. Still granted to `bot_distribution` (migration 65 seed, kept — Alex CLEAR #4 only asks to trim workflow writes, not these), so a future implementation activates with zero permission-matrix change, but until then a call returns `not_implemented`/is invisible outside `MCP_DISCOVER_STUBS=true`, identical to any other stub. |
+| Documented gap (updated Phase 16c) | `content.get_performance` | — | Remains a **stub** (no live Meta/TikTok/etc. read). `attribution.get_content_performance` is now real: empty `items` when no content exists; never invented numbers. Still granted to `bot_distribution`. |
 | Forbidden (unchanged) | `workflow.record_decision` | All Bots | Hard-denied in gateway code forever (`allowed()`), independent of any DB grant. |
 | Forbidden (unchanged) | Bot SQL access | All Bots | Gateway has no Postgres client; all AA access is `SECURITY DEFINER` RPC over the internal HTTP hop. |
 | Forbidden (new, explicit) | `content.queue_distribution`, `content.record_publication` for any Bot other than `bot_distribution` | Production, Marketing, CoS, Client Delivery, Sales Ops, Admin, Finance, Engineering, Security | Hard-coded deny in gateway `allowed()` **and** a hard-coded `p_bot_id <> 'bot_distribution'` check inside both new AA RPCs — exactly the Phase 9b pattern. Not expressed through the permission-grant matrix (see §5) because `bot_production` already holds `content.*` and must keep it for its other real content tools. |
@@ -221,14 +221,14 @@ Both new RPCs follow the Phase 3–5/9b pattern exactly:
 
 ## 7. Distribution's final grant matrix (Alex CLEAR #4)
 
-Locked, exact allowlist — `src/onboarding/distribution-manager.ts` — 14 grants, mirroring
+Locked, exact allowlist — `src/onboarding/distribution-manager.ts` — 14 grants (13 discoverable + 1 stub), mirroring
 Marketing's shape:
 
 | Group | Tools | Discoverable by default |
 | --- | --- | --- |
-| Reads (6) | `content.get_brief`, `content.get_production_status`, `workflow.get_task`, `workflow.list_tasks`, `workflow.get_pending_approvals`, `workflow.get_activity` | Yes |
+| Reads (7) | `content.get_brief`, `content.get_production_status`, `attribution.get_content_performance`, `workflow.get_task`, `workflow.list_tasks`, `workflow.get_pending_approvals`, `workflow.get_activity` | Yes |
 | Writes (6) | `content.queue_distribution`, `content.record_publication`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval` | Yes |
-| Granted stubs (2) | `content.get_performance`, `attribution.get_content_performance` | No (stub; requires `MCP_DISCOVER_STUBS=true`) |
+| Granted stubs (1) | `content.get_performance` | No (stub; requires `MCP_DISCOVER_STUBS=true`) |
 
 **Workflow write suite kept in full** (`create_task`, `assign_task`, `complete_task`,
 `create_approval` — the same four every other Bot with a workflow grant holds): none of the four
@@ -334,7 +334,7 @@ Additive-only migration, no destructive step required:
 3. §5: confirm hard-coding `bot_distribution` inside the two new RPCs (rather than only in the
    gateway) is the right belt-and-suspenders layer, same question Phase 9b raised for
    `bot_production`.
-4. §1: confirm leaving `content.get_performance` / `attribution.get_content_performance` as
+4. §1: confirm leaving `content.get_performance` as a granted stub. `attribution.get_content_performance` is realized in [Phase 16c](phase-16c-attribution-brand-sites.md).
    documented stubs (rather than attempting a real, frequently-empty `metrics_daily` read in this
    phase) is acceptable for Gate 10 closure — Alex CLEAR did not ask for performance reads to go
    live, only for the schedule → publish → read loop.

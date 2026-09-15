@@ -18,6 +18,7 @@ intentional 23-tool allowlist. Discovery uses **exact set equality**
 | Content brief/revision/approval-request/repurpose writes, workflow task + approval writes (8 tools) | Autonomous | Idempotent, audited, replay-safe |
 | `campaign.*` writes, `content.generate_ideas`/`select_idea`, `attribution.get_content_performance`, `proof.*` | Future (hidden) | Registry may exist; not discoverable until made real in a separate PR |
 | Conversion Page Builder + Campaign Execution OS | Real in [Phase 16](phase-16-conversion-campaign.md) | `conversion.*` and Execution OS `campaign.*` are no longer future |
+| Attribution funnel/content, brand read, sites writes | Real in [Phase 16c](phase-16c-attribution-brand-sites.md) | Empty data is zeros/null/`[]`. Both sites writes HIGH+approval. Engineering denied |
 | `content.approve_asset`, `content.queue_distribution`, `content.assign_production`, `content.submit_asset`, `attribution.get_revenue_attribution`, `delivery.list_clients` | Forbidden | Marketing may request approval/revision but cannot approve, assign production, submit assets, or see cross-client rollups/revenue |
 | `economics.*`, `security.*`, `engineering.*`, `pipeline.*`, `sales_agents.*`, `finance.*`, `deploy.*`, `infra.*`, `secrets.*`, `admin.*`, `workflow.record_decision` | Forbidden | Same hard-deny posture as every other Bot |
 

@@ -42,6 +42,9 @@ export const financeController = {
     "sales_agents.deploy",
     "attribution.get_campaign_performance",
     "attribution.generate_report",
+    "brand.get_profile",
+    "sites.provision",
+    "sites.publish_page",
   ],
   future: [
     "pipeline.record_sale",

@@ -178,6 +178,20 @@ beforeAll(async () => {
     on conflict (agent_key) do nothing;
   `);
   await db.exec(await migration('20260916140000_90_mcp_sales_proof_production.sql'));
+  // Phase 16c content-performance joins metrics_daily (migration 32, not
+  // loaded by this partial fixture). Stub the columns the RPC reads.
+  await db.exec(`
+    create table if not exists metrics_daily (
+      id uuid primary key default gen_random_uuid(),
+      client_id uuid not null references clients (id) on delete cascade,
+      post_id uuid,
+      impressions bigint,
+      spend numeric
+    );
+    alter table metrics_daily enable row level security;
+    alter table client_ideas add column if not exists content_territory text;
+  `);
+  await db.exec(await migration('20260916150000_91_mcp_attribution_brand_sites.sql'));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
       client_leads, client_billing, finance_entries to authenticated;
@@ -1442,8 +1456,8 @@ describe('Phase 11 Sales Ops isolation', () => {
       `select count(*)::int as n from mcp_internal.mcp_bot_permissions
         where bot_id = 'bot_sales_ops'`,
     )).rows;
-    // 17 (Phase 11) + 5 (Phase 11b) + 3 (Phase 16b attach/enable/build) = 25.
-    expect(exact[0]?.n).toBe(25);
+    // 17 (Phase 11) + 5 (Phase 11b) + 3 (Phase 16b attach/enable/build) + 3 (Phase 16c brand/sites) = 28.
+    expect(exact[0]?.n).toBe(28);
     const wildcardsOrProof = (await db.query<{ n: number }>(
       `select count(*)::int as n from mcp_internal.mcp_bot_permissions
         where bot_id = 'bot_sales_ops'
@@ -2664,11 +2678,11 @@ describe('Phase 16 Conversion + Campaign Execution isolation', () => {
     ).rejects.toThrow(/CoS: bot_production must not have finance, security, deploy or conversion grants/);
   });
 
-  it('Marketing permission rows are the post-#48 additive 40-name allowlist, not final 45', async () => {
+  it('Marketing permission rows are the post-#48+#46 additive 45-name allowlist', async () => {
     const grants = await db.query<{ n: number }>(
       `select count(*)::int n from mcp_internal.mcp_bot_permissions where bot_id='bot_marketing'`,
     );
-    expect(grants.rows[0]?.n).toBe(40);
+    expect(grants.rows[0]?.n).toBe(45);
     const phase9 = await db.query<{ n: number }>(
       `select count(*)::int n from mcp_internal.mcp_bot_permissions
         where bot_id='bot_marketing' and granted_by='alex-locked:phase-9'`,
@@ -2884,11 +2898,11 @@ describe('Phase 16b Sales attach/enable/build + Proof Bank + production assign/s
     expect(human.assigned).toBe(1);
   });
 
-  it('permission rows: sales ops is exactly 25 after mig 90 (22+attach/enable/build); 16c appends 3 later', async () => {
+  it('permission rows: sales ops is exactly 28 after mig 90+91 (25+brand/sites)', async () => {
     const n = (await db.query<{ n: number }>(
       `select count(*)::int as n from mcp_internal.mcp_bot_permissions where bot_id = 'bot_sales_ops'`,
     )).rows[0]?.n;
-    expect(n).toBe(25);
+    expect(n).toBe(28);
     const forbidden = (await db.query<{ n: number }>(
       `select count(*)::int as n from mcp_internal.mcp_bot_permissions
         where bot_id = 'bot_sales_ops'
@@ -2912,3 +2926,235 @@ describe('Phase 16b Sales attach/enable/build + Proof Bank + production assign/s
   });
 });
 
+describe('Phase 16c Attribution Brand Sites isolation', () => {
+  const PAGE_A = 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  const PAGE_B = 'bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+  const ASSET_A = 'aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+  const n = (v: unknown) => Number(v);
+
+  beforeEach(async () => {
+    await db.exec(`
+      truncate client_brand_profiles, client_marketing_spend, client_media_assets, client_pages, client_leads cascade;
+      insert into mcp_bot_clients(bot_id,client_id) values
+        ('bot_marketing','${CLIENT_A}'),
+        ('bot_sales_ops','${CLIENT_A}'),
+        ('bot_distribution','${CLIENT_A}'),
+        ('bot_engineering','${CLIENT_A}');
+      insert into client_pages (id,client_id,page_type,title,status) values
+        ('${PAGE_A}','${CLIENT_A}','landing','Harbour Home','approved'),
+        ('${PAGE_B}','${CLIENT_B}','landing','Other Home','draft');
+    `);
+  });
+
+  it('empty funnel returns zeros and null ratios, never invented numbers', async () => {
+    const row = (await db.query<{ result: any }>(
+      `select mcp_attribution_conversion_funnel('bot_marketing',$1,30) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(row.projection).toBe('acquisition_funnel_v1');
+    expect(n(row.funnel.leads)).toBe(0);
+    expect(n(row.funnel.sales)).toBe(0);
+    expect(n(row.funnel.spend)).toBe(0);
+    expect(row.funnel.lead_to_sale_pct).toBeNull();
+    expect(row.funnel.cost_per_lead).toBeNull();
+    expect(row.funnel.return_on_spend).toBeNull();
+  });
+
+  it('funnel counts match inserted leads and spend; ratios stay null when spend is zero', async () => {
+    await db.exec(`
+      insert into client_leads (client_id, name, stage, sale_value, cash_collected)
+        values ('${CLIENT_A}','Lead','lead',0,0),
+               ('${CLIENT_A}','Sold','sale',100,80);
+      insert into client_marketing_spend (client_id, amount, spent_on)
+        values ('${CLIENT_A}', 40, current_date);
+    `);
+    const row = (await db.query<{ result: any }>(
+      `select mcp_attribution_conversion_funnel('bot_marketing',$1,30) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(n(row.funnel.leads)).toBe(2);
+    expect(n(row.funnel.sales)).toBe(1);
+    expect(n(row.funnel.spend)).toBe(40);
+    expect(n(row.funnel.lead_to_sale_pct)).toBe(50);
+    expect(n(row.funnel.cost_per_lead)).toBe(20);
+  });
+
+  it('empty content performance returns items: []', async () => {
+    const row = (await db.query<{ result: any }>(
+      `select mcp_attribution_content_performance('bot_distribution',$1,10) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(row.projection).toBe('content_attribution_v1');
+    expect(row.items).toEqual([]);
+  });
+
+  it('content performance lists the client asset with zero metrics when none exist', async () => {
+    await db.exec(`
+      insert into client_media_assets (id, client_id, media_type, title, storage_path, review_status)
+        values ('${ASSET_A}','${CLIENT_A}','image','Hook','assets/hook.png','approved');
+    `);
+    const row = (await db.query<{ result: any }>(
+      `select mcp_attribution_content_performance('bot_marketing',$1,10) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(row.items).toHaveLength(1);
+    expect(row.items[0].asset_id).toBe(ASSET_A);
+    expect(n(row.items[0].leads)).toBe(0);
+    expect(n(row.items[0].cash_collected)).toBe(0);
+  });
+
+  it('missing brand profile is found=false with null profile', async () => {
+    const row = (await db.query<{ result: any }>(
+      `select mcp_brand_get_profile('bot_production',$1) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(row.found).toBe(false);
+    expect(row.profile).toBeNull();
+  });
+
+  it('brand profile returns stored colours and never_do; nulls stay null', async () => {
+    await db.exec(`
+      insert into client_brand_profiles (client_id, colour_primary, mood, never_do)
+        values ('${CLIENT_A}','#112233','calm','never a handshake');
+    `);
+    const row = (await db.query<{ result: any }>(
+      `select mcp_brand_get_profile('bot_marketing',$1) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(row.found).toBe(true);
+    expect(row.profile.colour_primary).toBe('#112233');
+    expect(row.profile.mood).toBe('calm');
+    expect(row.profile.never_do).toBe('never a handshake');
+    expect(row.profile.colour_secondary).toBeNull();
+    expect(row.profile.font_heading).toBeNull();
+  });
+
+  it('sites authorize allows marketing/sales_ops and binds publish to the client page', async () => {
+    const provision = (await db.query<{ result: any }>(
+      `select mcp_sites_authorize('bot_marketing',$1,'sites.provision',null) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(provision.authorized).toBe(true);
+    const published = (await db.query<{ result: any }>(
+      `select mcp_sites_authorize('bot_sales_ops',$1,'sites.publish_page',$2) result`,
+      [CLIENT_A, PAGE_A],
+    )).rows[0]!.result;
+    expect(published.page_id).toBe(PAGE_A);
+  });
+
+  it('ungranted client, foreign page, engineering and other bots deny', async () => {
+    await expect(
+      db.query(`select mcp_attribution_conversion_funnel('bot_marketing',$1,30)`, [CLIENT_B]),
+    ).rejects.toThrow('client_forbidden');
+    await expect(
+      db.query(`select mcp_brand_get_profile('bot_engineering',$1)`, [CLIENT_A]),
+    ).rejects.toThrow('bot_forbidden');
+    await db.exec(`insert into mcp_bot_clients(bot_id,client_id) values('bot_finance','${CLIENT_A}')`);
+    await expect(
+      db.query(`select mcp_brand_get_profile('bot_finance',$1)`, [CLIENT_A]),
+    ).rejects.toThrow('bot_forbidden');
+    await expect(
+      db.query(`select mcp_sites_authorize('bot_engineering',$1,'sites.provision',null)`, [CLIENT_A]),
+    ).rejects.toThrow('bot_forbidden');
+    await expect(
+      db.query(`select mcp_sites_authorize('bot_marketing',$1,'sites.publish_page',$2)`, [CLIENT_A, PAGE_B]),
+    ).rejects.toThrow('page_not_found');
+    await expect(
+      db.query(`select mcp_sites_authorize('bot_marketing',$1,'sites.publish_page',null)`, [CLIENT_A]),
+    ).rejects.toThrow('invalid_request');
+  });
+
+  it('suspended bot and revoked grant deny', async () => {
+    await db.exec(`update mcp_internal.mcp_bots set status='suspended' where bot_id='bot_marketing'`);
+    await expect(
+      db.query(`select mcp_attribution_conversion_funnel('bot_marketing',$1,30)`, [CLIENT_A]),
+    ).rejects.toThrow('bot_not_active');
+    await db.exec(`update mcp_internal.mcp_bots set status='active' where bot_id='bot_marketing'`);
+    await db.exec(`delete from mcp_bot_clients where bot_id='bot_marketing'`);
+    await expect(
+      db.query(`select mcp_brand_get_profile('bot_marketing',$1)`, [CLIENT_A]),
+    ).rejects.toThrow('client_forbidden');
+  });
+
+  it('sites/brand wildcards and off-role grants are forbidden', async () => {
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_marketing','sites.*','test')`,
+      ),
+    ).rejects.toThrow(/Phase 16c: sites\.\* \/ brand\.\* wildcards are forbidden/);
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_admin','sites.provision','test')`,
+      ),
+    ).rejects.toThrow(/Phase 16c: sites tools must not be granted outside bot_marketing\/bot_sales_ops/);
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_engineering','sites.provision','test')`,
+      ),
+    ).rejects.toThrow(/Phase 14: bot_engineering must not hold deploy, secrets, infra, sites/);
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_finance','brand.get_profile','test')`,
+      ),
+    ).rejects.toThrow(/Phase 16c: brand.get_profile must not be granted outside/);
+  });
+
+  it('anon and authenticated cannot execute public wrappers', async () => {
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      for (const sql of [
+        `select mcp_attribution_conversion_funnel('bot_marketing','${CLIENT_A}',30)`,
+        `select mcp_attribution_content_performance('bot_distribution','${CLIENT_A}',10)`,
+        `select mcp_brand_get_profile('bot_marketing','${CLIENT_A}')`,
+        `select mcp_sites_authorize('bot_marketing','${CLIENT_A}','sites.provision',null)`,
+      ]) {
+        await expect(db.query(sql)).rejects.toThrow(/permission denied/);
+      }
+      await db.exec('reset role');
+    }
+    await db.exec(`select set_config('request.jwt.claim.role','service_role',false)`);
+  });
+
+  it('permission rows match the Phase 16c ceilings', async () => {
+    const marketing = await db.query<{ n: number }>(
+      `select count(*)::int n from mcp_internal.mcp_bot_permissions where bot_id='bot_marketing'`,
+    );
+    expect(marketing.rows[0]!.n).toBe(45);
+    const sales = await db.query<{ n: number }>(
+      `select count(*)::int n from mcp_internal.mcp_bot_permissions where bot_id='bot_sales_ops'`,
+    );
+    expect(sales.rows[0]!.n).toBe(28);
+    const brand = await db.query(
+      `select 1 from mcp_internal.mcp_bot_permissions where bot_id='bot_production' and permission_pattern='brand.get_profile'`,
+    );
+    expect(brand.rows).toHaveLength(1);
+    const engSites = await db.query(
+      `select 1 from mcp_internal.mcp_bot_permissions where bot_id='bot_engineering' and permission_pattern like 'sites%'`,
+    );
+    expect(engSites.rows).toHaveLength(0);
+  });
+
+  it('Bot RPC sources require active bot + client grant and never can_access_client', async () => {
+    const functions = await db.query<{ def: string }>(
+      `select pg_get_functiondef(p.oid) def from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+        where (n.nspname='public' and p.proname in (
+            'mcp_attribution_conversion_funnel','mcp_attribution_content_performance',
+            'mcp_brand_get_profile','mcp_sites_authorize'
+          ))
+           or (n.nspname='mcp_internal' and p.proname in (
+            'attribution_conversion_funnel','attribution_content_performance',
+            'brand_get_profile','sites_authorize'
+          ))`,
+    );
+    expect(functions.rows.length).toBeGreaterThan(0);
+    for (const row of functions.rows) {
+      expect(row.def).toContain('require_active_bot');
+      expect(row.def).toContain('require_bot_client_grant');
+      expect(row.def).not.toContain('can_access_client');
+    }
+  });
+});

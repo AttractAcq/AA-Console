@@ -39,6 +39,7 @@ export const grants: Record<Bot, string[]> = {
     "proof.get_for_claim",
     "proof.create",
     "proof.attach_asset",
+    "brand.get_profile",
     ...workflow,
   ],
   bot_distribution: [...distributionManager.grants],
@@ -113,6 +114,17 @@ export const SECURITY_TOOLS = new Set([
   "security.create_finding",
   "security.get_incident_status",
 ]);
+/**
+ * Phase 16c: GitHub site writes are Marketing/Sales Ops only. Phase 14 forbids
+ * Engineering GitHub writes / unrestricted deploy.
+ */
+export const SITES_TOOLS = new Set(["sites.provision", "sites.publish_page"]);
+export const BRAND_READ_BOTS = new Set([
+  "bot_marketing",
+  "bot_sales_ops",
+  "bot_production",
+]);
+export const SITES_BOTS = new Set(["bot_marketing", "bot_sales_ops"]);
 export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   // Sec Phase 5 #5 / Phase 3–4 locked: hard-deny stays in gateway code forever.
   if (tool.name === "workflow.record_decision") return false; // human-only API, never discoverable by Bots
@@ -142,7 +154,7 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   // Phase 11 Alex CLEAR / SEC_BAR #1: exact allowlist ceiling for Sales Ops,
   // same pattern as Marketing/Distribution above. Constrains stale/overbroad
   // database grants too (e.g. a leftover pipeline.*/sales_agents.* row).
-  // Phase 16b this PR: salesOps.grants is 25. Phase 16c (#46) appends 3.
+  // Phase 16b this PR: salesOps.grants is 25 then Phase 16c (#46) appends 3 → 28.
   if (
     identity.bot === "bot_sales_ops" &&
     !salesOps.grants.some((name) => name === tool.name)
@@ -190,6 +202,11 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   )
     return false;
   if (SECURITY_TOOLS.has(tool.name) && identity.bot !== "bot_security_devops")
+    return false;
+  if (tool.domain === "sites" && !SITES_BOTS.has(identity.bot)) return false;
+  if (SITES_TOOLS.has(tool.name) && !SITES_BOTS.has(identity.bot)) return false;
+  if (tool.domain === "brand" && !BRAND_READ_BOTS.has(identity.bot)) return false;
+  if (tool.name === "brand.get_profile" && !BRAND_READ_BOTS.has(identity.bot))
     return false;
   const patterns = grantPatterns(identity);
   return tool.permissions.every((permission) =>

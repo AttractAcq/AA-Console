@@ -1,12 +1,12 @@
 import { chiefOfStaff } from "./chief-of-staff.js";
 /**
- * Alex-locked 2026-09-15 Phase 16 (PR #48 / mig 89).
+ * Alex-locked 2026-09-15 Phase 16 (PR #48 / mig 89) then Phase 16c (PR #46 / mig 91).
  * Declaration only; provisions no credentials or grants.
  *
- * Post-#48 Marketing ceiling is these 40 exact names (Gate 9's 23 + 17
- * additive Phase 16 names). This is NOT the final 45 — brand.*, sites.*,
- * and remaining attribution tools are out of this PR. Sibling PRs #46/#47
- * MUST APPEND (not replace) to reach Marketing 45 / Sales Ops 28.
+ * Post-#48 Marketing ceiling is 40 (Gate 9's 23 + 17 conversion/campaign).
+ * Phase 16c APPENDS five names: attribution.get_conversion_funnel,
+ * attribution.get_content_performance, brand.get_profile, sites.provision,
+ * sites.publish_page → **45**. Do not replace Gate 9 or Phase 16 grants.
  */
 const gate9Reads = [
   "campaign.list",
@@ -35,7 +35,7 @@ const gate9Writes = [
   "workflow.complete_task",
   "workflow.create_approval",
 ] as const;
-/** Tools this PR realizes and additively grants. #46/#47 must not delete these. */
+/** Tools PR #48 realizes and additively grants. #46 must not delete these. */
 const phase16Reads = [
   "campaign.get_readiness",
   "conversion.list_pages",
@@ -57,8 +57,14 @@ const phase16Writes = [
   "campaign.provision",
   "campaign.launch",
 ] as const;
-const reads = [...gate9Reads, ...phase16Reads] as const;
-const writes = [...gate9Writes, ...phase16Writes] as const;
+const phase16cReads = [
+  "attribution.get_conversion_funnel",
+  "attribution.get_content_performance",
+  "brand.get_profile",
+] as const;
+const phase16cWrites = ["sites.provision", "sites.publish_page"] as const;
+const reads = [...gate9Reads, ...phase16Reads, ...phase16cReads] as const;
+const writes = [...gate9Writes, ...phase16Writes, ...phase16cWrites] as const;
 export const marketingDirector = {
   bot_id: "bot_marketing",
   reads,
@@ -84,11 +90,11 @@ export const marketingDirector = {
     "content.submit_asset",
     "attribution.get_revenue_attribution",
     "delivery.list_clients",
+    "sales_agents.deploy",
   ],
   future: [
     "content.generate_ideas",
     "content.select_idea",
-    "attribution.get_content_performance",
     "proof.search",
     "proof.get",
     "proof.get_for_avatar",

@@ -24,6 +24,8 @@ const domains: Record<string, string> = {
     "create_issue get_issue get_release_status get_deployment_status",
   security:
     "get_system_status get_open_findings create_finding get_incident_status",
+  brand: "get_profile",
+  sites: "provision publish_page",
 };
 export const adminTools = new Set([
   "admin.list_events",
@@ -72,6 +74,12 @@ export const campaignExecutionTools = new Set([
   "campaign.launch",
   "campaign.get_readiness",
 ]);
+export const attributionReportingTools = new Set([
+  "attribution.get_conversion_funnel",
+  "attribution.get_content_performance",
+]);
+export const brandTools = new Set(["brand.get_profile"]);
+export const sitesTools = new Set(["sites.provision", "sites.publish_page"]);
 export const orchestrationTools = new Set([
   "workflow.list_tasks",
   "workflow.get_task",
@@ -128,16 +136,21 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
     actions.split(" ").map((action) => {
       const name = `${domain}.${action}`;
       const read = /^(get|list|search)/.test(action);
-      const approval = [
-        // Sec Phase 9b/10: content.approve_asset and content.queue_distribution
-        // moved off this gateway-level reviewer gate when they went real, to
-        // match their sibling Bot content writes (MEDIUM risk, AA-RPC-only
-        // authorization). See each phase's design note Sec question before
-        // restoring either here.
-        "deploy",
-        "record_sale",
-        "record_decision",
-      ].includes(action);
+      const approval =
+        [
+          // Sec Phase 9b/10: content.approve_asset and content.queue_distribution
+          // moved off this gateway-level reviewer gate when they went real, to
+          // match their sibling Bot content writes (MEDIUM risk, AA-RPC-only
+          // authorization). See each phase's design note Sec question before
+          // restoring either here.
+          "deploy",
+          "record_sale",
+          "record_decision",
+        ].includes(action) ||
+        // Phase 16c: GitHub Pages provision/publish are irreversible public
+        // writes. Use the tool name so campaign.provision stays ungated.
+        name === "sites.provision" ||
+        name === "sites.publish_page";
       const fields: Record<string, z.ZodType> = { client_id: id };
       if (!read) fields.idempotency_key = z.string().min(8).max(128);
       if (read) {
@@ -161,6 +174,8 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         security: "finding",
         attribution: "campaign",
         economics: "campaign",
+        brand: "brand",
+        sites: "page",
       };
       if (
         domain !== "delivery" &&
@@ -657,6 +672,36 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         fields.campaign_id = id;
         delete fields.limit;
       }
+      if (name === "attribution.get_conversion_funnel") {
+        for (const key of Object.keys(fields)) delete fields[key];
+        fields.client_id = id;
+        fields.days = z.number().int().min(1).max(3650).default(30);
+      }
+      if (name === "attribution.get_content_performance") {
+        for (const key of Object.keys(fields)) delete fields[key];
+        fields.client_id = id;
+        fields.limit = z.number().int().min(1).max(100).default(10);
+      }
+      if (domain === "brand") {
+        for (const key of Object.keys(fields)) delete fields[key];
+        fields.client_id = id;
+      }
+      if (domain === "sites") {
+        for (const key of Object.keys(fields)) delete fields[key];
+        fields.client_id = id;
+        fields.idempotency_key = z.string().min(8).max(128);
+        if (action === "provision") {
+          fields.repo = z
+            .string()
+            .trim()
+            .min(1)
+            .max(80)
+            .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/)
+            .refine((value) => !value.includes("--"));
+        } else {
+          fields.page_id = id;
+        }
+      }
       const realContent = new Set([
         // Sec Phase 5 #6: isolation tests must stay green before adding a name.
         "content.list_ideas",
@@ -730,6 +775,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "economics.get_roi",
       ]);
       const realAttributionRevenue = name === "attribution.get_revenue_attribution";
+      const realAttributionReporting = attributionReportingTools.has(name);
       // Sec Phase 14: isolation tests must stay green before adding a name.
       // Railway writes, secret rotation and unrestricted deploy stay out.
       const realEngineering = new Set([
@@ -747,7 +793,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "security.get_incident_status",
       ]);
       // Sec Phase 16: isolation tests must stay green before adding a name.
-      // Page publish / sites.* stay out. Production is not granted conversion.
+      // Production is not granted conversion. Sites are Phase 16c (Marketing/Sales Ops).
       const realConversion = conversionTools;
       const realCampaignExecution = campaignExecutionTools;
       const implementation =
@@ -760,6 +806,9 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         realProof.has(name) ||
         realEconomics.has(name) ||
         realAttributionRevenue ||
+        realAttributionReporting ||
+        brandTools.has(name) ||
+        sitesTools.has(name) ||
         realEngineering.has(name) ||
         realSecurity.has(name) ||
         realConversion.has(name) ||
@@ -794,7 +843,9 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
           "record_sale",
           "approve_asset",
           "record_publication",
-        ].includes(action),
+        ].includes(action) &&
+        name !== "sites.provision" &&
+        name !== "sites.publish_page",
         audit: "required",
         implementation,
         dependency:
@@ -816,6 +867,12 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
                         ? "Scoped AA economics business API"
                         : realAttributionRevenue
                           ? "Scoped AA attribution business API"
+                          : realAttributionReporting
+                            ? "Scoped AA attribution business API"
+                            : brandTools.has(name)
+                              ? "Scoped AA brand business API"
+                              : sitesTools.has(name)
+                                ? "Scoped AA sites business API"
                           : realEngineering.has(name)
                             ? "Scoped AA engineering business API"
                           : realSecurity.has(name)

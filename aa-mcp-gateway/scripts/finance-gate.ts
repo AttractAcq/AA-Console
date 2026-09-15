@@ -62,6 +62,9 @@ export async function runFinanceGate(invoke: Invoke, raw: FinanceFixtures) {
     "sales_agents.create",
     "delivery.list_clients",
     "workflow.record_decision",
+    "sites.provision",
+    "sites.publish_page",
+    "brand.get_profile",
   ]) {
     assertAuthorizationDenial(
       {

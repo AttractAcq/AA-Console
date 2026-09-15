@@ -54,10 +54,9 @@ async function mockAa(
 }
 
 test("Phase 16 registry: conversion and campaign execution tools are real", () => {
-  // Catalog after #48 (97) + #47's 3 sales_agents names. Phase 16c (#46) adds
-  // more; do not treat 100 as a final ceiling.
-  assert.equal(registry.length, 100);
-  assert.equal(marketingDirector.grants.length, 40);
+  // Catalog size after #48+#47+#46 (90+7 conversion/campaign + 3 sales + 3 brand/sites).
+  assert.equal(registry.length, 103);
+  assert.equal(marketingDirector.grants.length, 45);
   assert.equal(marketingDirector.phase16Owned.length, 17);
   for (const name of [
     ...marketingDirector.grants.filter((n) => n.startsWith("conversion.") || n.startsWith("campaign.")),
@@ -67,7 +66,7 @@ test("Phase 16 registry: conversion and campaign execution tools are real", () =
   ]) {
     assert.equal(registry.find((t) => t.name === name)?.implementation, "real", name);
   }
-  assert.equal(registry.find((t) => t.name.startsWith("sites."))?.implementation, undefined);
+  assert.equal(registry.find((t) => t.name === "sites.provision")?.implementation, "real");
   assert.equal(registry.find((t) => t.name === "pipeline.record_sale")?.implementation, "stub");
 });
 

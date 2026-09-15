@@ -24,10 +24,10 @@ const f: DistributionFixtures = {
 };
 const identity = { bot: "bot_distribution" as const, clients: [f.client_id] };
 
-test("locked 6 reads / 6 writes / 2 granted-stub allowlist; exact discovery rejects missing and unexpected tools", () => {
-  assert.equal(config.reads.length, 6);
+test("locked 7 reads / 6 writes / 1 granted-stub allowlist; exact discovery rejects missing and unexpected tools", () => {
+  assert.equal(config.reads.length, 7);
   assert.equal(config.writes.length, 6);
-  assert.equal(config.stubs.length, 2);
+  assert.equal(config.stubs.length, 1);
   assert.deepEqual(grants.bot_distribution, [...config.grants]);
   assertDistributionDiscovery(config.expectedDiscovery);
   assert.throws(() => assertDistributionDiscovery(config.expectedDiscovery.slice(1)));
@@ -41,6 +41,8 @@ test("locked 6 reads / 6 writes / 2 granted-stub allowlist; exact discovery reje
   assert.equal(registry.find(t => t.name === "content.queue_distribution")?.risk, "MEDIUM");
   assert.equal(registry.find(t => t.name === "content.queue_distribution")?.approval, false);
   assert.equal(registry.find(t => t.name === "content.record_publication")?.risk, "MEDIUM");
+  assert.equal(registry.find(t => t.name === "attribution.get_content_performance")?.implementation, "real");
+  assert.equal(registry.find(t => t.name === "content.get_performance")?.implementation, "stub");
 });
 
 test("Distribution ceiling constrains stale db wildcards, explicit excess grants, and the stub debug flag before AA", async t => {
@@ -67,7 +69,7 @@ test("Distribution ceiling constrains stale db wildcards, explicit excess grants
   );
 });
 
-test("all 12 real Distribution tools deny other-client before adapter or approval creation", async t => {
+test("all 13 real Distribution tools deny other-client before adapter or approval creation", async t => {
   const store = new Store(":memory:"); t.after(() => store.close()); let calls = 0;
   const engine = new ActionEngine(store, registry, { execute: async tool => { calls++; return { status: "completed", capability: tool.name }; } });
   for (const name of config.expectedDiscovery) {
@@ -123,6 +125,8 @@ test("Gate 10 runs the schedule -> record-publication -> read cycle through the 
             handoff: { ready_for_distribution: true } },
         };
       }
+      if (tool.name === "attribution.get_content_performance")
+        return { status: "completed", capability: tool.name, data: { client_id: f.client_id, projection: "content_attribution_v1", items: [] } };
       if (tool.name === "workflow.get_task" && input.task_id === f.denied_task_id)
         return { status: "failed", capability: tool.name, error: { code: "client_mismatch" } };
       if (tool.name === "workflow.assign_task") task.assignee = String(input.assignee);

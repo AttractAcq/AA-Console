@@ -72,9 +72,7 @@ async function mockAa(
 test("Finance exact discovery equality is 14 and money writes stay stub", (t) => {
   const e = engine(t);
   assertFinanceDiscovery(e.discover(identity).map((x) => x.name));
-  // Catalog after #48 (97) + this PR's 3 sales_agents names.
-  // Phase 16c (#46) adds more names.
-  assert.equal(registry.length, 100);
+  assert.equal(registry.length, 103); // catalog after #48+#47+#46 (90+7+3+3)
   for (const name of financeController.grants)
     assert.equal(registry.find((x) => x.name === name)?.implementation, "real");
   for (const name of [

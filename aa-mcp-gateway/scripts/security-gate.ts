@@ -66,6 +66,9 @@ export async function runSecurityGate(invoke: Invoke, raw: SecurityFixtures) {
     "engineering.create_issue",
     "engineering.get_issue",
     "workflow.record_decision",
+    "sites.provision",
+    "sites.publish_page",
+    "brand.get_profile",
   ]) {
     assertAuthorizationDenial(
       {
