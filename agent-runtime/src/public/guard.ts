@@ -189,6 +189,10 @@ export function publicConfig(row: {
       label: typeof widget.label === "string" ? widget.label : "Chat",
       accent: typeof widget.accent === "string" ? widget.accent : null,
       title: typeof widget.title === "string" ? widget.title : null,
+      // The line that invites a visitor to open the chat. Allow-listed like
+      // everything else here: a field added to widget_config later cannot
+      // start reaching a browser on its own.
+      teaser: typeof widget.teaser === "string" ? widget.teaser : null,
     },
   };
 }
