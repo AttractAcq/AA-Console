@@ -298,10 +298,9 @@ length only and is never forwarded anywhere; the response is a small structured 
 count, whether qualification/guardrails are on file, a boolean escalation heuristic), not an echo
 of the input. The ledger row for this tool does **not** store the raw transcript either: the
 `payload` column holds `sales_agent_id`, `turns` (the transcript's array length) and
-`transcript_digest` (an `md5()` digest of the transcript's canonical jsonb text form — the same
-core-Postgres primitive migration 70 already uses for its resume step key, deliberately avoiding a
-pgcrypto/`extensions` schema dependency) — enough to detect a same-execution-key replay with a
-different transcript (`idempotency_conflict`) without retaining any visitor-conversation content in
+`transcript_digest` (a 64-character hexadecimal sha256 digest of the transcript's canonical jsonb text
+form, UTF-8 encoded and hashed with PostgreSQL's built-in `sha256(bytea)`) — enough to detect a
+same-execution-key replay with a different transcript (`idempotency_conflict`) without retaining any visitor-conversation content in
 AA. This is the same minimization discipline as every other ledger row in this table (and in
 `mcp_pipeline_requests` before it): payload is sized and shaped for idempotency comparison, not as a
 content archive.

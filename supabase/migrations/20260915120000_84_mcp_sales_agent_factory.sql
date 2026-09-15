@@ -585,14 +585,13 @@ begin
 
   -- Data minimization: the ledger is an audit/idempotency store, not a
   -- transcript archive. Never write p_transcript itself into payload --
-  -- only an md5 digest of its canonical jsonb text form (stable per
-  -- distinct transcript, same core-Postgres primitive migration 70 uses for
-  -- its resume step key -- no pgcrypto/extensions dependency) plus the turn
+  -- only a sha256 digest of its canonical jsonb text form (UTF-8 encoded,
+  -- using the built-in PostgreSQL sha256 function) plus the turn
   -- count, which is enough to detect a same-key replay with a different
   -- transcript (idempotency_conflict) without retaining the visitor
   -- conversation content anywhere in AA.
   v_turns := jsonb_array_length(p_transcript);
-  v_digest := md5(p_transcript::text);
+  v_digest := encode(sha256(convert_to(p_transcript::text, 'UTF8')), 'hex');
   v_payload := jsonb_build_object(
     'sales_agent_id', p_sales_agent_id,
     'transcript_digest', v_digest,

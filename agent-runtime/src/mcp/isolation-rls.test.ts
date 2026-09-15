@@ -1788,7 +1788,7 @@ describe('Phase 11b Sales Agent Factory isolation', () => {
     )).rows[0]!;
     expect(Object.keys(row.payload).sort()).toEqual(['sales_agent_id', 'transcript_digest', 'turns']);
     expect(row.payload.turns).toBe(2);
-    expect(row.payload.transcript_digest).toMatch(/^[0-9a-f]{32}$/);
+    expect(row.payload.transcript_digest).toMatch(/^[0-9a-f]{64}$/);
     const serialized = JSON.stringify(row.payload);
     expect(serialized).not.toContain('"transcript"');
     expect(serialized).not.toContain('pricing');
