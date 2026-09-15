@@ -9,8 +9,6 @@
 // enforce the same rules independently. This exists so nobody has to press a
 // button to discover why it will not work.
 
-export type Installation = { id: string; account_login: string; status: string };
-
 export type SiteRepo = {
   id: string;
   owner: string;
@@ -35,15 +33,6 @@ export type PublishablePage = {
   published_url: string | null;
   site_repository_id: string | null;
 };
-
-/** Why a website repository cannot be created yet, or null. */
-export function provisionBlocker(installations: Installation[]): string | null {
-  const active = installations.filter((i) => i.status === "active");
-  if (active.length === 0) {
-    return "Connect the AA GitHub App before creating a website. Nothing can be published without it.";
-  }
-  return null;
-}
 
 /**
  * Why this page cannot be published, or null.
