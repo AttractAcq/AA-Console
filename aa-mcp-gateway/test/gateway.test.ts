@@ -65,6 +65,7 @@ test("production discovery and execution enforce role and client scope", async (
   const names = discovered.map((t) => t.name);
   assert.deepEqual(names.sort(), [
     "content.approve_asset",
+    "content.assign_production",
     "content.create_repurpose_plan",
     "content.generate_brief",
     "content.get_brief",
@@ -74,6 +75,13 @@ test("production discovery and execution enforce role and client scope", async (
     "content.request_approval",
     "content.request_revision",
     "content.select_idea",
+    "content.submit_asset",
+    "proof.attach_asset",
+    "proof.create",
+    "proof.get",
+    "proof.get_for_avatar",
+    "proof.get_for_claim",
+    "proof.search",
     "workflow.assign_task",
     "workflow.complete_task",
     "workflow.create_approval",
@@ -116,9 +124,13 @@ test("Phase 9b: idea/asset decide are bot_production only, even with a wildcard 
   const marketingNames = engine.discover(marketing).map((t) => t.name);
   assert.ok(!marketingNames.includes("content.select_idea"));
   assert.ok(!marketingNames.includes("content.approve_asset"));
+  assert.ok(!marketingNames.includes("content.assign_production"));
+  assert.ok(!marketingNames.includes("content.submit_asset"));
   const productionNames = engine.discover(identity).map((t) => t.name);
   assert.ok(productionNames.includes("content.select_idea"));
   assert.ok(productionNames.includes("content.approve_asset"));
+  assert.ok(productionNames.includes("content.assign_production"));
+  assert.ok(productionNames.includes("content.submit_asset"));
   store.close();
 });
 test("MCP_DISCOVER_STUBS exposes permitted stubs; default call rejects stub names", async () => {
@@ -423,6 +435,7 @@ test("HTTP MCP discovery/call and human-only approval boundary", async () => {
     const listed = list.result.tools.map((t: any) => t.name).sort();
     assert.deepEqual(listed, [
       "content.approve_asset",
+      "content.assign_production",
       "content.create_repurpose_plan",
       "content.generate_brief",
       "content.get_brief",
@@ -432,6 +445,13 @@ test("HTTP MCP discovery/call and human-only approval boundary", async () => {
       "content.request_approval",
       "content.request_revision",
       "content.select_idea",
+      "content.submit_asset",
+      "proof.attach_asset",
+      "proof.create",
+      "proof.get",
+      "proof.get_for_avatar",
+      "proof.get_for_claim",
+      "proof.search",
       "workflow.assign_task",
       "workflow.complete_task",
       "workflow.create_approval",

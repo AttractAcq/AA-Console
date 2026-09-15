@@ -59,6 +59,8 @@ test("Phase 5 tools are real and generate_brief stays accepted", async (t) => {
     "content.request_approval",
     "content.select_idea",
     "content.approve_asset",
+    "content.assign_production",
+    "content.submit_asset",
   ])
     assert.ok(real.includes(name), name);
   // Phase 10 realized queue_distribution/record_publication for bot_distribution
@@ -255,6 +257,7 @@ test("gateway denies other-client and unauthorized bots before AA for every real
     .sort();
   assert.deepEqual(realContent, [
     "content.approve_asset",
+    "content.assign_production",
     "content.create_repurpose_plan",
     "content.generate_brief",
     "content.get_brief",
@@ -266,6 +269,7 @@ test("gateway denies other-client and unauthorized bots before AA for every real
     "content.request_approval",
     "content.request_revision",
     "content.select_idea",
+    "content.submit_asset",
   ]);
   // Phase 10's two real content tools are bot_distribution only (hard gate,
   // see permissions.ts); exercised for bot_production here would hit that
@@ -312,6 +316,19 @@ test("gateway denies other-client and unauthorized bots before AA for every real
       decision: "approved",
       idempotency_key: "scope-asset",
     },
+    "content.assign_production": {
+      client_id: other,
+      brief_id: brief,
+      route: "ai",
+      idempotency_key: "scope-assign",
+    },
+    "content.submit_asset": {
+      client_id: other,
+      storage_path: "path/a.png",
+      media_type: "image",
+      brief_id: brief,
+      idempotency_key: "scope-submit",
+    },
   };
   for (const name of realContentForProduction) {
     const result = await engine.call(identity, name, inputs[name]);
@@ -327,6 +344,8 @@ test("gateway denies other-client and unauthorized bots before AA for every real
     "content.generate_brief",
     "content.select_idea",
     "content.approve_asset",
+    "content.assign_production",
+    "content.submit_asset",
   ]) {
     const result = await engine.call(finance, name, {
       ...inputs[name],
@@ -431,4 +450,87 @@ test("Phase 6 approval-required errors are preserved and status returns the AA t
   assert.equal(waiting.error?.code, "approval_required");
   const status = await engine.call(identity, "content.get_production_status", { client_id: client, asset_id: asset });
   assert.deepEqual((status.data as any).approvals, trail);
+});
+
+test("Phase 16b: assign_production and submit_asset complete for bot_production; approve_asset stays production-only", async (t) => {
+  const member = "88888888-8888-4888-8888-888888888888";
+  const { adapter, received } = await mockAa(t, ({ url, body }) => {
+    if (url === "/internal/mcp/content/assign-production")
+      return {
+        status: 200,
+        body: { client_id: client, brief_id: body.brief_id, route: body.route, job_id: job, replayed: false },
+      };
+    if (url === "/internal/mcp/content/submit-asset")
+      return {
+        status: 200,
+        body: { client_id: client, asset_id: asset, brief_id: body.brief_id, review_status: "pending", replayed: false },
+      };
+    throw new Error(url);
+  });
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const engine = new ActionEngine(store, registry, adapter);
+  const assigned = await engine.call(identity, "content.assign_production", {
+    client_id: client, brief_id: brief, route: "ai", idempotency_key: "assign-0001",
+  });
+  assert.equal(assigned.status, "completed");
+  assert.deepEqual(received[0]?.body, { client_id: client, brief_id: brief, route: "ai" });
+  const submitted = await engine.call(identity, "content.submit_asset", {
+    client_id: client, storage_path: "path/a.png", media_type: "image", brief_id: brief,
+    idempotency_key: "submit-0001",
+  });
+  assert.equal(submitted.status, "completed");
+  const marketing = { bot: "bot_marketing" as const, clients: [client] };
+  for (const name of ["content.assign_production", "content.submit_asset", "content.approve_asset"] as const) {
+    const denied = await engine.call(marketing, name, {
+      client_id: client, brief_id: brief, asset_id: asset, decision: "approved",
+      storage_path: "path/a.png", media_type: "image", route: "ai",
+      member_ids: [member], idempotency_key: `mkt-${name}`,
+    });
+    assert.equal(denied.status, "rejected", name);
+  }
+  assert.equal(received.length, 2);
+});
+
+test("Phase 16b: proof reads and writes complete for bot_production; usage_rights is not a Bot field", async (t) => {
+  const proof = "99999999-9999-4999-8999-999999999999";
+  const { adapter, received } = await mockAa(t, ({ url, body }) => {
+    if (url === "/internal/mcp/proof/search")
+      return { status: 200, body: { client_id: client, proof: [{ id: proof, usage_rights: "not_cleared" }], count: 1 } };
+    if (url === "/internal/mcp/proof/get")
+      return { status: 200, body: { client_id: client, id: proof, usage_rights: "not_cleared" } };
+    if (url === "/internal/mcp/proof/get-for-avatar")
+      return { status: 200, body: { client_id: client, proof: [], count: 0 } };
+    if (url === "/internal/mcp/proof/get-for-claim")
+      return { status: 200, body: { client_id: client, proof: [], count: 0 } };
+    if (url === "/internal/mcp/proof/create")
+      return { status: 200, body: { client_id: client, id: proof, usage_rights: "not_cleared", replayed: false } };
+    if (url === "/internal/mcp/proof/attach-asset")
+      return { status: 200, body: { client_id: client, id: body.proof_id, storage_path: body.storage_path, replayed: false } };
+    throw new Error(url);
+  });
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const engine = new ActionEngine(store, registry, adapter);
+  assert.equal((await engine.call(identity, "proof.search", { client_id: client })).status, "completed");
+  assert.equal((await engine.call(identity, "proof.get", { client_id: client, proof_id: proof })).status, "completed");
+  assert.equal((await engine.call(identity, "proof.get_for_avatar", { client_id: client, avatar: "owner" })).status, "completed");
+  assert.equal((await engine.call(identity, "proof.get_for_claim", { client_id: client, claim: "renovation" })).status, "completed");
+  const created = await engine.call(identity, "proof.create", {
+    client_id: client, media_type: "text", body: "A Google review.", idempotency_key: "proof-create-1",
+  });
+  assert.equal(created.status, "completed");
+  assert.equal((created.data as any).usage_rights, "not_cleared");
+  const attached = await engine.call(identity, "proof.attach_asset", {
+    client_id: client, proof_id: proof, storage_path: "proof/a.png", idempotency_key: "proof-attach-1",
+  });
+  assert.equal(attached.status, "completed");
+  const withRights = await engine.call(identity, "proof.create", {
+    client_id: client, media_type: "text", body: "x", usage_rights: "approved", idempotency_key: "proof-rights",
+  } as any);
+  assert.equal(withRights.status, "rejected");
+  assert.equal(received.length, 6);
+  for (const name of ["proof.search", "proof.get", "proof.create"] as const) {
+    assert.equal(registry.find((x) => x.name === name)?.implementation, "real", name);
+  }
 });

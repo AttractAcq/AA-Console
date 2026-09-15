@@ -236,10 +236,13 @@ for (const action of [
   "update_knowledge",
   "update_qualification_rules",
   "test",
+  "attach_to_page",
+  "set_deployment_enabled",
+  "build",
 ]) {
   ROUTES[`sales_agents.${action}`] = {
     path: `/internal/mcp/sales-agents/${action.replaceAll("_", "-")}`,
-    kind: "write",
+    kind: action === "build" ? "queue" : "write",
     input: registry
       .find((t) => t.name === `sales_agents.${action}`)!
       .input.omit({ idempotency_key: true } as never)
@@ -256,6 +259,43 @@ const queuedTools = new Set([
   "campaign.create",
   "campaign.plan",
 ]);
+
+for (const action of [
+  "search",
+  "get",
+  "create",
+  "attach_asset",
+  "get_for_avatar",
+  "get_for_claim",
+]) {
+  const tool = registry.find((t) => t.name === `proof.${action}`)!;
+  ROUTES[`proof.${action}`] = {
+    path: `/internal/mcp/proof/${action.replaceAll("_", "-")}`,
+    kind: tool.action === "read" ? "read" : "write",
+    input: (tool.action === "write"
+      ? tool.input.omit({ idempotency_key: true } as never)
+      : tool.input
+    ).strip(),
+  };
+}
+
+ROUTES["content.assign_production"] = {
+  path: "/internal/mcp/content/assign-production",
+  kind: "write",
+  input: registry
+    .find((t) => t.name === "content.assign_production")!
+    .input.omit({ idempotency_key: true } as never)
+    .strip(),
+};
+ROUTES["content.submit_asset"] = {
+  path: "/internal/mcp/content/submit-asset",
+  kind: "write",
+  input: registry
+    .find((t) => t.name === "content.submit_asset")!
+    .input.omit({ idempotency_key: true } as never)
+    .strip(),
+};
+
 for (const tool of registry.filter(
   (t) =>
     adminTools.has(t.name) ||
@@ -318,6 +358,15 @@ const codes = new Set([
   "invalid_stage",
   "invalid_role",
   "lost_reason_required",
+  "agent_not_ready",
+  "page_not_published",
+  "origin_unavailable",
+  "already_attached",
+  "deployment_not_found",
+  "deployment_conflict",
+  "proof_not_found",
+  "invalid_production_route",
+  "member_not_found",
   "idempotency_conflict",
   "brief_agent_unavailable",
   "repurpose_agent_unavailable",
@@ -370,7 +419,7 @@ function aaBody(
   input: Record<string, unknown>,
 ): Record<string, unknown> {
   if (
-    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents|economics|engineering|security|conversion)\./.test(
+    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents|proof|economics|engineering|security|conversion)\./.test(
       tool,
     )
   )
@@ -455,6 +504,30 @@ function aaBody(
         ? {}
         : { approval_execution_id: input.approval_execution_id }),
     };
+  if (tool === "content.assign_production") {
+    const body: Record<string, unknown> = {
+      client_id: input.client_id,
+      brief_id: input.brief_id,
+      route: input.route,
+    };
+    if (input.member_ids !== undefined) body.member_ids = input.member_ids;
+    if (input.due_date !== undefined) body.due_date = input.due_date;
+    if (input.compensation !== undefined) body.compensation = input.compensation;
+    if (input.quality !== undefined) body.quality = input.quality;
+    if (input.size !== undefined) body.size = input.size;
+    return body;
+  }
+  if (tool === "content.submit_asset") {
+    const body: Record<string, unknown> = {
+      client_id: input.client_id,
+      storage_path: input.storage_path,
+      media_type: input.media_type,
+    };
+    if (input.brief_id !== undefined) body.brief_id = input.brief_id;
+    if (input.assignment_id !== undefined) body.assignment_id = input.assignment_id;
+    if (input.title !== undefined) body.title = input.title;
+    return body;
+  }
   return { client_id: input.client_id };
 }
 

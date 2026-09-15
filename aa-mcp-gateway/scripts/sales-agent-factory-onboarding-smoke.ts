@@ -4,7 +4,7 @@ import { readFileSync, statSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { salesOps as config } from "../src/onboarding/sales-ops.js";
-import { assertSalesOpsDiscovery, runSalesOpsGate, runSalesAgentFactoryGate } from "./sales-ops-gate.js";
+import { assertSalesOpsDiscovery, runSalesOpsGate, runSalesAgentFactoryGate, runSalesOpsDeploymentGate } from "./sales-ops-gate.js";
 const client = new Client({ name: "aa-sales-agent-factory-gate11b", version: "1.0.0" });
 let calls = 0;
 try {
@@ -31,6 +31,7 @@ try {
   // Phase 11b factory slice runs on top of it -- additive, not a replacement.
   await runSalesOpsGate(invoke as any, fixtures);
   await runSalesAgentFactoryGate(invoke as any, fixtures);
+  await runSalesOpsDeploymentGate(invoke as any, fixtures);
   console.log(JSON.stringify({ bot_id: config.bot_id, gate: "11b", calls, discovery: names.length,
     status: "PASS", at: new Date().toISOString() }));
 } catch {

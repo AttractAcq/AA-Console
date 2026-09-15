@@ -246,6 +246,66 @@ const ROUTES: Record<string, Route> = {
       };
     },
   },
+  '/internal/mcp/content/assign-production': {
+    rpc: 'mcp_assign_production',
+    kind: 'write',
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const brief_id = uuid(body, 'brief_id');
+      const route = str(body, 'route');
+      const member_ids = body.member_ids;
+      const due_date = body.due_date === undefined ? undefined : str(body, 'due_date');
+      const compensation = body.compensation;
+      const quality = body.quality === undefined ? undefined : str(body, 'quality');
+      const size = body.size === undefined ? undefined : str(body, 'size');
+      if (!client_id || !brief_id || (route !== 'ai' && route !== 'human')
+          || (due_date !== undefined && !DATE.test(due_date))
+          || (compensation !== undefined && (typeof compensation !== 'number' || compensation < 0 || compensation > 1_000_000))
+          || (quality !== undefined && quality !== 'low' && quality !== 'medium' && quality !== 'high')
+          || (size !== undefined && size !== '1024x1536' && size !== '1024x1024' && size !== '1536x1024')
+          || (member_ids !== undefined && (!Array.isArray(member_ids) || member_ids.length < 1 || member_ids.length > 20
+            || member_ids.some((m) => typeof m !== 'string' || !UUID.test(m))))
+          || (route === 'human' && (!Array.isArray(member_ids) || member_ids.length < 1))
+          || !subset(body, ['client_id', 'brief_id', 'route', 'member_ids', 'due_date', 'compensation', 'quality', 'size'])) {
+        return undefined;
+      }
+      return {
+        p_bot_id: null, p_client_id: client_id, p_brief_id: brief_id, p_route: route,
+        ...(member_ids === undefined ? {} : { p_member_ids: member_ids }),
+        ...(due_date === undefined ? {} : { p_due_date: due_date }),
+        ...(compensation === undefined ? {} : { p_compensation: compensation }),
+        ...(quality === undefined ? {} : { p_quality: quality }),
+        ...(size === undefined ? {} : { p_size: size }),
+      };
+    },
+  },
+  '/internal/mcp/content/submit-asset': {
+    rpc: 'mcp_submit_asset',
+    kind: 'write',
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const storage_path = str(body, 'storage_path');
+      const media_type = str(body, 'media_type');
+      const brief_id = body.brief_id === undefined ? undefined : uuid(body, 'brief_id');
+      const assignment_id = body.assignment_id === undefined ? undefined : uuid(body, 'assignment_id');
+      const title = body.title === undefined ? undefined : str(body, 'title');
+      if (!client_id || !storage_path || storage_path.length < 1 || storage_path.length > 500
+          || (media_type !== 'image' && media_type !== 'video' && media_type !== 'text')
+          || (!brief_id && !assignment_id)
+          || (body.brief_id !== undefined && !brief_id)
+          || (body.assignment_id !== undefined && !assignment_id)
+          || (title !== undefined && (title.length < 1 || title.length > 200))
+          || !subset(body, ['client_id', 'storage_path', 'media_type', 'brief_id', 'assignment_id', 'title'])) {
+        return undefined;
+      }
+      return {
+        p_bot_id: null, p_client_id: client_id, p_storage_path: storage_path, p_media_type: media_type,
+        ...(brief_id === undefined ? {} : { p_brief_id: brief_id }),
+        ...(assignment_id === undefined ? {} : { p_assignment_id: assignment_id }),
+        ...(title === undefined ? {} : { p_title: title }),
+      };
+    },
+  },
 };
 
 export async function handleMcpContent(

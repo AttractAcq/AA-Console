@@ -17,6 +17,7 @@ export type SalesOpsFixtures = {
   denied_lead_id: string;
   denied_task_id: string;
   assignee: string;
+  page_id?: string;
 };
 type Invoke = (name: string, args: Record<string, unknown>) => Promise<any>;
 
@@ -114,6 +115,7 @@ export async function runSalesOpsGate(invoke: Invoke, f: SalesOpsFixtures) {
   // sales_agents.create/update_knowledge/update_qualification_rules/test are
   // no longer in this list -- Phase 11b realizes and grants them; see
   // runSalesAgentFactoryGate below for their happy path.
+  // attach/enable/build are Phase 16b; see runSalesOpsDeploymentGate.
   for (const name of ["pipeline.record_sale", "sales_agents.deploy",
     "proof.search", "proof.get",
     "content.select_idea", "content.approve_asset", "content.queue_distribution",
@@ -174,8 +176,50 @@ export async function runSalesAgentFactoryGate(invoke: Invoke, f: SalesOpsFixtur
   assert.equal(tested.data.live_channel_send, false);
 
   // sales_agents.deploy stays absent/denied -- Phase 11c / Eng, not this gate.
+  // sales_agents.build is realized (Phase 16b) but is not invoked here: Gate 11b
+  // live smoke must stay draft-only and must not enqueue a sales_agent job.
   const deployed = await invoke("sales_agents.deploy", {
     client_id, sales_agent_id, idempotency_key: randomUUID(),
   });
   assert.equal(deployed.status, "rejected", "sales_agents.deploy must stay denied in Gate 11b");
+}
+
+/**
+ * Phase 16b: attach a live/approved/built agent to a published page
+ * (enabled:false), then kill-switch enable/disable. Requires fixture page_id.
+ * Live smoke may omit page_id; unit tests supply it against a mock AA.
+ */
+export async function runSalesOpsDeploymentGate(invoke: Invoke, f: SalesOpsFixtures) {
+  if (!f.page_id) return;
+  const client_id = f.client_id;
+  const write = async (name: string, args: Record<string, unknown>, status = "completed") => {
+    const input = { ...args, idempotency_key: randomUUID() };
+    const r = await invoke(name, { client_id, ...input });
+    assert.equal(r.status, status, `${name}: unexpected result`);
+    const replay = await invoke(name, { client_id, ...input });
+    assert.deepEqual(replay.data, r.data);
+    return r;
+  };
+
+  const attached = await write("sales_agents.attach_to_page", {
+    sales_agent_id: f.sales_agent_id, page_id: f.page_id,
+  });
+  assert.equal(attached.data.enabled, false);
+  const deployment_id = attached.data.id;
+  assert.ok(typeof deployment_id === "string");
+
+  const enabled = await write("sales_agents.set_deployment_enabled", {
+    deployment_id, enabled: true,
+  });
+  assert.equal(enabled.data.enabled, true);
+
+  const disabled = await write("sales_agents.set_deployment_enabled", {
+    deployment_id, enabled: false,
+  });
+  assert.equal(disabled.data.enabled, false);
+
+  const deployed = await invoke("sales_agents.deploy", {
+    client_id, sales_agent_id: f.sales_agent_id, idempotency_key: randomUUID(),
+  });
+  assert.equal(deployed.status, "rejected", "sales_agents.deploy must stay denied in Gate 16b");
 }

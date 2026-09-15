@@ -104,6 +104,80 @@ beforeAll(async () => {
     '20260913010000_83_page_polish_agents.sql',
     '20260916130000_89_mcp_conversion_campaign.sql',
   ]) await db.exec(await migration(file));
+  // Phase 16b: do not load migration 80 (extensions.gen_random_bytes) or 39/57/81.
+  // Stub the columns and tables the new RPCs touch, then load 89.
+  await db.exec(`
+    alter table client_sales_agents add column approved_at timestamptz;
+    alter table client_pages add column if not exists publish_status text not null default 'unpublished';
+    alter table client_pages add column if not exists site_repository_id uuid;
+    alter table client_proof_assets
+      add column ref_number text,
+      add column proof_type text,
+      add column claim text,
+      add column evidence text,
+      add column avatar_relevance text,
+      add column strength text not null default 'medium',
+      add column usage_rights text not null default 'not_cleared',
+      add column captured_on date,
+      add column expires_on date,
+      add column updated_at timestamptz not null default now();
+    create table if not exists client_sales_agent_deployments (
+      id uuid primary key default gen_random_uuid(),
+      client_id uuid not null references clients (id) on delete cascade,
+      sales_agent_id uuid not null references client_sales_agents (id) on delete cascade,
+      page_id uuid not null references client_pages (id) on delete cascade,
+      site_repository_id uuid,
+      public_id text not null unique default md5(random()::text),
+      allowed_origin text not null,
+      enabled boolean not null default false,
+      deployed_at timestamptz,
+      disabled_at timestamptz,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+    create unique index if not exists client_sales_agent_deployments_one_live
+      on client_sales_agent_deployments (page_id) where enabled;
+    alter table client_sales_agent_deployments enable row level security;
+    alter table client_sales_agent_deployments force row level security;
+    create table if not exists creative_generations (
+      id uuid primary key default gen_random_uuid(),
+      client_id uuid not null references clients (id) on delete cascade,
+      brief_id uuid not null references client_briefs (id) on delete cascade,
+      job_id uuid references agent_jobs (id) on delete set null,
+      media_type media_type not null,
+      stage text not null default 'concept',
+      quality text not null default 'medium',
+      size text not null default '1024x1536',
+      asset_id uuid,
+      error text,
+      created_at timestamptz not null default now(),
+      constraint creative_generations_no_ai_video check (media_type <> 'video')
+    );
+    create table if not exists brief_dispatches (
+      id uuid primary key default gen_random_uuid(),
+      client_id uuid not null references clients (id) on delete cascade,
+      brief_id uuid not null references client_briefs (id) on delete cascade,
+      member_id uuid not null references team_members (id) on delete cascade,
+      assignment_id uuid references job_assignments (id) on delete set null,
+      job_id uuid references agent_jobs (id) on delete set null,
+      email_status text not null default 'pending',
+      email_error text,
+      emailed_at timestamptz,
+      sent_by uuid,
+      created_at timestamptz not null default now(),
+      unique (brief_id, member_id)
+    );
+    alter table creative_generations enable row level security;
+    alter table creative_generations force row level security;
+    alter table brief_dispatches enable row level security;
+    alter table brief_dispatches force row level security;
+    insert into agents (agent_key, name, initials, domain, description, requires_upstream)
+    values
+      ('creative_build', 'Creative Build', 'CB', 'content', 'Phase 16b fixture', '{}'),
+      ('brief_dispatch', 'Brief Dispatch', 'BD', 'content', 'Phase 16b fixture', '{}')
+    on conflict (agent_key) do nothing;
+  `);
+  await db.exec(await migration('20260916120000_89_mcp_sales_proof_production.sql'));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
       client_leads, client_billing, finance_entries to authenticated;
@@ -120,8 +194,12 @@ beforeEach(async () => {
     truncate mcp_brief_requests, mcp_bot_clients, mcp_internal.mcp_bot_token_audit,
       mcp_internal.mcp_bot_tokens, mcp_internal.mcp_content_requests,
       mcp_internal.mcp_pipeline_requests, mcp_internal.mcp_sales_agent_requests,
-      mcp_internal.mcp_conversion_requests, mcp_internal.mcp_campaign_requests, scheduled_posts,
-      client_media_assets, client_ideas, agent_job_events, agent_jobs,
+      mcp_internal.mcp_conversion_requests, mcp_internal.mcp_campaign_requests,
+      mcp_internal.mcp_proof_requests, scheduled_posts,
+      client_media_assets, client_ideas, client_briefs, client_proof_assets,
+      creative_generations, brief_dispatches, job_assignments,
+      client_sales_agent_deployments, client_pages,
+      agent_job_events, agent_jobs,
       campaigns, lead_events, client_leads, sales_agent_conversations, client_sales_agents,
       finance_entries, finance_periods, client_billing,
       client_users, clients, profiles, auth.users cascade;
@@ -1364,9 +1442,8 @@ describe('Phase 11 Sales Ops isolation', () => {
       `select count(*)::int as n from mcp_internal.mcp_bot_permissions
         where bot_id = 'bot_sales_ops'`,
     )).rows;
-    // 17 (Phase 11) + 5 (Phase 11b factory writes) = 22, since migration 84
-    // is loaded in the same fixture as migration 76.
-    expect(exact[0]?.n).toBe(22);
+    // 17 (Phase 11) + 5 (Phase 11b) + 3 (Phase 16b attach/enable/build) = 25.
+    expect(exact[0]?.n).toBe(25);
     const wildcardsOrProof = (await db.query<{ n: number }>(
       `select count(*)::int as n from mcp_internal.mcp_bot_permissions
         where bot_id = 'bot_sales_ops'
@@ -2624,3 +2701,214 @@ describe('Phase 16 Conversion + Campaign Execution isolation', () => {
     }
   });
 });
+describe('Phase 16b Sales attach/enable/build + Proof Bank + production assign/submit', () => {
+  const AGENT_A = 'aaaa1601-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  const AGENT_B = 'bbbb1601-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+  const PAGE_A = 'aaaa1602-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+  const PAGE_B = 'bbbb1602-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+  const BRIEF_A = 'aaaa1603-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+  const MEMBER_A = 'aaaa1604-aaaa-4aaa-8aaa-aaaaaaaaaaa4';
+  const PROOF_B = 'bbbb1605-bbbb-4bbb-8bbb-bbbbbbbbbbb5';
+
+  const attach = (
+    overrides: Partial<{ bot: string; client: string; agent: string; page: string; execution: string }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_attach_sales_agent_to_page($1,$2,$3,$4,$5,$6) as result',
+    [
+      overrides.bot ?? 'bot_sales_ops', 'attach-req', overrides.execution ?? 'attach-exec',
+      overrides.client ?? CLIENT_A, overrides.agent ?? AGENT_A, overrides.page ?? PAGE_A,
+    ],
+  );
+  const enable = (
+    overrides: Partial<{ bot: string; client: string; deployment: string; enabled: boolean; execution: string }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_set_sales_agent_deployment_enabled($1,$2,$3,$4,$5,$6) as result',
+    [
+      overrides.bot ?? 'bot_sales_ops', 'enable-req', overrides.execution ?? 'enable-exec',
+      overrides.client ?? CLIENT_A, overrides.deployment, overrides.enabled ?? true,
+    ],
+  );
+  const build = (
+    overrides: Partial<{ bot: string; client: string; agent: string; execution: string }> = {},
+  ) => db.query<{ result: any }>(
+    'select mcp_build_sales_agent($1,$2,$3,$4,$5) as result',
+    [
+      overrides.bot ?? 'bot_sales_ops', 'build-req', overrides.execution ?? 'build-exec',
+      overrides.client ?? CLIENT_A, overrides.agent ?? AGENT_A,
+    ],
+  );
+
+  beforeEach(async () => {
+    await db.exec(`
+      insert into mcp_bot_clients (bot_id, client_id) values
+        ('bot_sales_ops', '${CLIENT_A}'),
+        ('bot_production', '${CLIENT_A}')
+      on conflict do nothing;
+      insert into client_pages (id, client_id, page_type, title, status, published_url, publish_status) values
+        ('${PAGE_A}', '${CLIENT_A}', 'landing', 'Harbour Home', 'approved', 'https://harbour.example.test/offer', 'published'),
+        ('${PAGE_B}', '${CLIENT_B}', 'landing', 'Other Home', 'approved', 'https://other.example.test/offer', 'published');
+      insert into client_sales_agents
+        (id, client_id, name, purpose, status, role, built_at, approved_at) values
+        ('${AGENT_A}', '${CLIENT_A}', 'Closer A', 'Qualify', 'live', 'inbound_qualifier', now(), now()),
+        ('${AGENT_B}', '${CLIENT_B}', 'Closer B', 'Qualify', 'live', 'inbound_qualifier', now(), now());
+      insert into client_briefs (id, client_id, title, body, status, media_type)
+        values ('${BRIEF_A}', '${CLIENT_A}', 'Brief A', 'Body', 'approved', 'image');
+      insert into team_members (id, category, name, initials)
+        values ('${MEMBER_A}', 'editors', 'Editor A', 'EA')
+        on conflict (id) do update set active = true, category = 'editors';
+      insert into client_proof_assets (id, client_id, media_type, title, body, claim, usage_rights, strength)
+        values
+          ('${PROOF_B}', '${CLIENT_B}', 'text', 'Other proof', 'Secret body', 'other claim', 'approved', 'high');
+    `);
+  });
+
+  it('every new write RPC uses require_active_bot + require_bot_client_grant, never can_access_client', async () => {
+    const signatures = [
+      'mcp_internal.attach_sales_agent_to_page(text,text,text,uuid,uuid,uuid)',
+      'mcp_internal.set_sales_agent_deployment_enabled(text,text,text,uuid,uuid,boolean)',
+      'mcp_internal.build_sales_agent(text,text,text,uuid,uuid)',
+      'mcp_internal.proof_create(text,text,text,uuid,text,text,text,text,text,text,text,text,text,text)',
+      'mcp_internal.proof_attach_asset(text,text,text,uuid,uuid,text,uuid)',
+      'mcp_internal.assign_production(text,text,text,uuid,uuid,text,uuid[],date,numeric,text,text)',
+      'mcp_internal.submit_asset(text,text,text,uuid,text,text,uuid,uuid,text)',
+    ];
+    for (const sig of signatures) {
+      const src = await db.query<{ def: string }>(`select pg_get_functiondef('${sig}'::regprocedure) as def`);
+      expect(src.rows[0]?.def, sig).toContain('require_active_bot');
+      expect(src.rows[0]?.def, sig).toContain('require_bot_client_grant');
+      expect(src.rows[0]?.def, sig).toContain('bot_forbidden');
+      expect(src.rows[0]?.def, sig).not.toMatch(/can_access_client\s*\(/);
+    }
+  });
+
+  it('attach inserts enabled:false with origin from published URL and refuses an unready agent', async () => {
+    const first = (await attach()).rows[0]!.result;
+    expect(first.enabled).toBe(false);
+    expect(first.allowed_origin).toBe('https://harbour.example.test');
+    expect(first.replayed).toBe(false);
+    const replay = (await attach()).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+    expect(replay.id).toBe(first.id);
+    await expect(attach({ page: PAGE_A, execution: 'attach-again' })).rejects.toThrow('already_attached');
+    await db.exec(`update client_sales_agents set approved_at = null where id = '${AGENT_A}'`);
+    await expect(attach({ execution: 'attach-unapproved' })).rejects.toThrow('agent_not_ready');
+  });
+
+  it('set_deployment_enabled toggles the kill-switch and conflicts when another page deployment is live', async () => {
+    const first = (await attach()).rows[0]!.result;
+    const on = (await enable({ deployment: first.id })).rows[0]!.result;
+    expect(on.enabled).toBe(true);
+    expect(on.disabled_at).toBeNull();
+    expect(on.deployed_at).toBeTruthy();
+    const off = (await enable({ deployment: first.id, enabled: false, execution: 'enable-off' })).rows[0]!.result;
+    expect(off.enabled).toBe(false);
+    expect(off.disabled_at).toBeTruthy();
+    await expect(enable({ deployment: first.id, client: CLIENT_B, execution: 'enable-cross' }))
+      .rejects.toThrow('client_forbidden');
+  });
+
+  it('build enqueues a sales_agent job for the granted client only', async () => {
+    const first = (await build()).rows[0]!.result;
+    expect(first.job_id).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(first.replayed).toBe(false);
+    const replay = (await build()).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+    expect(replay.job_id).toBe(first.job_id);
+    await expect(build({ agent: AGENT_B, execution: 'build-mismatch' })).rejects.toThrow('client_mismatch');
+    await expect(build({ client: CLIENT_B, agent: AGENT_B, execution: 'build-forbidden' }))
+      .rejects.toThrow('client_forbidden');
+  });
+
+  it('proof search/get see uncleared rows; get_for_avatar/claim only return human-cleared unexpired proof', async () => {
+    const created = (await db.query<{ result: any }>(
+      `select mcp_proof_create('bot_production','req-p','exec-p','${CLIENT_A}','text','Review','A Google review.','Google',null,'We finish on time',null,null,'testimonial','high') as result`,
+    )).rows[0]!.result;
+    expect(created.usage_rights).toBe('not_cleared');
+    const searched = (await db.query<{ result: any }>(
+      `select mcp_proof_search('bot_production','${CLIENT_A}',25,null,null,null) as result`,
+    )).rows[0]!.result;
+    expect(searched.count).toBeGreaterThanOrEqual(1);
+    expect(searched.proof.some((p: any) => p.id === created.id)).toBe(true);
+    const avatar = (await db.query<{ result: any }>(
+      `select mcp_proof_get_for_avatar('bot_production','${CLIENT_A}','owner',10) as result`,
+    )).rows[0]!.result;
+    expect(avatar.proof.every((p: any) => p.usage_rights === 'approved')).toBe(true);
+    expect(avatar.proof.some((p: any) => p.id === created.id)).toBe(false);
+    await db.exec(`update client_proof_assets set usage_rights = 'approved' where id = '${created.id}'`);
+    const cleared = (await db.query<{ result: any }>(
+      `select mcp_proof_get_for_claim('bot_production','${CLIENT_A}','finish on time',10) as result`,
+    )).rows[0]!.result;
+    expect(cleared.proof.some((p: any) => p.id === created.id)).toBe(true);
+    await expect(db.query(
+      `select mcp_proof_get('bot_production','${CLIENT_A}','${PROOF_B}')`,
+    )).rejects.toThrow('client_mismatch');
+  });
+
+  it('proof.create ignores Bot clearance: usage_rights stays not_cleared and attach never writes rights', async () => {
+    const created = (await db.query<{ result: any }>(
+      `select mcp_proof_create('bot_production','req-c','exec-c','${CLIENT_A}','image','Photo',null,'site','clients/a.png','Claim',null,null,null,'medium') as result`,
+    )).rows[0]!.result;
+    expect(created.usage_rights).toBe('not_cleared');
+    const attached = (await db.query<{ result: any }>(
+      `select mcp_proof_attach_asset('bot_production','req-a','exec-a','${CLIENT_A}','${created.id}','clients/b.png',null) as result`,
+    )).rows[0]!.result;
+    expect(attached.storage_path).toBe('clients/b.png');
+    expect(attached.usage_rights).toBe('not_cleared');
+    await expect(db.query(
+      `select mcp_proof_create('bot_sales_ops','req-s','exec-s','${CLIENT_A}','text','x','body',null,null,null,null,null,null,'medium')`,
+    )).rejects.toThrow('bot_forbidden');
+  });
+
+  it('assign_production AI enqueues creative_build; human requires an editor/avatar; submit_asset files pending media', async () => {
+    const assigned = (await db.query<{ result: any }>(
+      `select mcp_assign_production('bot_production','req-as','exec-as','${CLIENT_A}','${BRIEF_A}','ai',null,null,null,'medium','1024x1536') as result`,
+    )).rows[0]!.result;
+    expect(assigned.route).toBe('ai');
+    expect(assigned.job_id).toBeTruthy();
+    const submitted = (await db.query<{ result: any }>(
+      `select mcp_submit_asset('bot_production','req-sub','exec-sub','${CLIENT_A}','clients/out.png','image','${BRIEF_A}',null,'Cut') as result`,
+    )).rows[0]!.result;
+    expect(submitted.review_status).toBe('pending');
+    expect(submitted.asset_id).toBeTruthy();
+    await expect(db.query(
+      `select mcp_assign_production('bot_sales_ops','req-x','exec-x','${CLIENT_A}','${BRIEF_A}','ai',null,null,null,'medium','1024x1536')`,
+    )).rejects.toThrow('bot_forbidden');
+    await db.exec(`update client_briefs set status = 'approved', media_type = 'video' where id = '${BRIEF_A}'`);
+    await expect(db.query(
+      `select mcp_assign_production('bot_production','req-vid','exec-vid','${CLIENT_A}','${BRIEF_A}','ai',null,null,null,'medium','1024x1536')`,
+    )).rejects.toThrow('invalid_production_route');
+    const human = (await db.query<{ result: any }>(
+      `select mcp_assign_production('bot_production','req-h','exec-h','${CLIENT_A}','${BRIEF_A}','human',array['${MEMBER_A}']::uuid[],null,null,'medium','1024x1536') as result`,
+    )).rows[0]!.result;
+    expect(human.route).toBe('human');
+    expect(human.assigned).toBe(1);
+  });
+
+  it('permission rows: sales ops is exactly 25, deploy stays ungranted, proof writes are production-only', async () => {
+    const n = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions where bot_id = 'bot_sales_ops'`,
+    )).rows[0]?.n;
+    expect(n).toBe(25);
+    const forbidden = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions
+        where bot_id = 'bot_sales_ops'
+          and permission_pattern in ('sales_agents.deploy', 'pipeline.record_sale', 'proof.search', 'proof.get')`,
+    )).rows[0]?.n;
+    expect(forbidden).toBe(0);
+    const proofWrites = (await db.query<{ n: number }>(
+      `select count(*)::int as n from mcp_internal.mcp_bot_permissions
+        where bot_id = 'bot_production'
+          and permission_pattern in ('proof.create', 'proof.attach_asset')`,
+    )).rows[0]?.n;
+    expect(proofWrites).toBe(2);
+    await expect(db.exec(
+      `insert into mcp_internal.mcp_bot_permissions (bot_id, permission_pattern, granted_by)
+       values ('bot_sales_ops', 'proof.create', 'test')`,
+    )).rejects.toThrow(/Phase 16b: proof/);
+    await expect(db.exec(
+      `insert into mcp_internal.mcp_bot_permissions (bot_id, permission_pattern, granted_by)
+       values ('bot_sales_ops', 'sales_agents.deploy', 'test')`,
+    )).rejects.toThrow(/Phase 11b: bot_sales_ops must not hold/);
+  });
+});
+

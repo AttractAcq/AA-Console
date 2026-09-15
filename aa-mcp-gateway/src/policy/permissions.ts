@@ -37,6 +37,8 @@ export const grants: Record<Bot, string[]> = {
     "proof.get",
     "proof.get_for_avatar",
     "proof.get_for_claim",
+    "proof.create",
+    "proof.attach_asset",
     ...workflow,
   ],
   bot_distribution: [...distributionManager.grants],
@@ -74,6 +76,8 @@ export function grantPatterns(identity: Identity): string[] {
 export const PRODUCTION_ONLY_TOOLS = new Set([
   "content.select_idea",
   "content.approve_asset",
+  "content.assign_production",
+  "content.submit_asset",
 ]);
 /**
  * Sec Phase 10 Alex CLEAR (2026-09-09): distribution schedule/publication

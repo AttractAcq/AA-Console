@@ -11,6 +11,7 @@ import {
   assertSalesOpsDiscovery,
   runSalesOpsGate,
   runSalesAgentFactoryGate,
+  runSalesOpsDeploymentGate,
   type SalesOpsFixtures,
 } from "../scripts/sales-ops-gate.js";
 
@@ -48,18 +49,18 @@ async function mockAa(
   return { adapter, received };
 }
 
-test("Phase 11b: exact discovery set equality for bot_sales_ops (22 = Phase 11's 17 + factory's 5)", () => {
+test("Phase 16b: exact discovery set equality for bot_sales_ops (25 = Phase 11b's 22 + attach/enable/build)", () => {
   const engine = new ActionEngine(new Store(":memory:"), registry, new AAApiAdapter());
   const discovered = engine.discover(identity).map((t) => t.name);
   assert.deepEqual(
     [...new Set(discovered)].sort(),
     [...salesOps.expectedDiscovery].sort(),
   );
-  assert.equal(discovered.length, 22);
+  assert.equal(discovered.length, 25);
   engine.store.close();
 });
 
-test("Phase 11b: the fourteen realized pipeline/sales_agents tools are real; record_sale/deploy/proof/etc stay stub", () => {
+test("Phase 16b: the realized pipeline/sales_agents tools are real; record_sale/deploy stay stub", () => {
   const real = registry
     .filter((x) => x.implementation === "real" && (x.name.startsWith("pipeline.") || x.name.startsWith("sales_agents.")))
     .map((x) => x.name)
@@ -71,11 +72,14 @@ test("Phase 11b: the fourteen realized pipeline/sales_agents tools are real; rec
     "pipeline.get_stalled_leads",
     "pipeline.list_leads",
     "pipeline.update_stage",
+    "sales_agents.attach_to_page",
+    "sales_agents.build",
     "sales_agents.create",
     "sales_agents.generate_config",
     "sales_agents.get",
     "sales_agents.get_conversations",
     "sales_agents.list",
+    "sales_agents.set_deployment_enabled",
     "sales_agents.test",
     "sales_agents.update_knowledge",
     "sales_agents.update_qualification_rules",
@@ -91,7 +95,8 @@ test("Phase 11b: the fourteen realized pipeline/sales_agents tools are real; rec
   // authorization, same posture Phase 9b/10/11 settled on.
   for (const name of ["pipeline.update_stage", "pipeline.create_followup",
     "sales_agents.generate_config", "sales_agents.create", "sales_agents.update_knowledge",
-    "sales_agents.update_qualification_rules", "sales_agents.test"]) {
+    "sales_agents.update_qualification_rules", "sales_agents.test",
+    "sales_agents.attach_to_page", "sales_agents.set_deployment_enabled", "sales_agents.build"]) {
     assert.equal(registry.find((x) => x.name === name)?.risk, "MEDIUM", name);
     assert.equal(registry.find((x) => x.name === name)?.approval, false, name);
   }
@@ -234,6 +239,44 @@ test("sales_agents factory writes complete through the AA adapter; deploy stays 
   assert.equal(received.length, 5, "deploy must never reach the AA adapter");
 });
 
+test("sales_agents attach/enable/build complete through the AA adapter; deploy stays not_implemented", async (t) => {
+  const deployment = "55555555-5555-4555-8555-555555555555";
+  const page = "66666666-6666-4666-8666-666666666666";
+  const job = "77777777-7777-4777-8777-777777777777";
+  const { adapter, received } = await mockAa(t, ({ url, body }) => {
+    if (url === "/internal/mcp/sales-agents/attach-to-page")
+      return { status: 200, body: { client_id: client, id: deployment, page_id: body.page_id, enabled: false, replayed: false } };
+    if (url === "/internal/mcp/sales-agents/set-deployment-enabled")
+      return { status: 200, body: { client_id: client, id: body.deployment_id, enabled: body.enabled, replayed: false } };
+    if (url === "/internal/mcp/sales-agents/build")
+      return { status: 202, body: { client_id: client, job_id: job, id: body.sales_agent_id } };
+    throw new Error(url);
+  });
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const engine = new ActionEngine(store, registry, adapter);
+  const attached = await engine.call(identity, "sales_agents.attach_to_page", {
+    client_id: client, sales_agent_id: agent, page_id: page, idempotency_key: "attach-0001",
+  });
+  assert.equal(attached.status, "completed");
+  assert.equal((attached.data as any).enabled, false);
+  const enabled = await engine.call(identity, "sales_agents.set_deployment_enabled", {
+    client_id: client, deployment_id: deployment, enabled: true, idempotency_key: "enable-0001",
+  });
+  assert.equal(enabled.status, "completed");
+  const built = await engine.call(identity, "sales_agents.build", {
+    client_id: client, sales_agent_id: agent, idempotency_key: "build-0001",
+  });
+  assert.equal(built.status, "accepted");
+  assert.equal((built.data as any).job_id, job);
+  assert.equal(received.length, 3);
+  const deployed = await engine.call(identity, "sales_agents.deploy", {
+    client_id: client, sales_agent_id: agent, idempotency_key: "deploy-0002",
+  });
+  assert.equal(deployed.status, "rejected");
+  assert.equal(received.length, 3);
+});
+
 test("gateway denies other-client before AA for every real Sales Ops tool", async (t) => {
   let hits = 0;
   const { adapter } = await mockAa(t, () => {
@@ -262,6 +305,13 @@ test("gateway denies other-client before AA for every real Sales Ops tool", asyn
     "sales_agents.test": {
       sales_agent_id: agent, transcript: [{ role: "lead", text: "x" }], idempotency_key: "scope-test",
     },
+    "sales_agents.attach_to_page": {
+      sales_agent_id: agent, page_id: agent, idempotency_key: "scope-attach",
+    },
+    "sales_agents.set_deployment_enabled": {
+      deployment_id: agent, enabled: true, idempotency_key: "scope-enable",
+    },
+    "sales_agents.build": { sales_agent_id: agent, idempotency_key: "scope-build" },
   };
   for (const [name, extra] of Object.entries(inputs)) {
     const result = await engine.call(identity, name, { client_id: other, ...extra });
@@ -311,7 +361,7 @@ test("forbidden/deferred tools are absent from discovery and denied if called", 
   assert.equal(hits, 0);
 });
 
-test("Gate 11b fixtures exercise the exact 22-tool discovery set", () => {
+test("Gate 16b fixtures exercise the exact 25-tool discovery set", () => {
   assertSalesOpsDiscovery(salesOps.expectedDiscovery);
   assert.throws(() => assertSalesOpsDiscovery(salesOps.expectedDiscovery.slice(1)));
   assert.throws(() => assertSalesOpsDiscovery([...salesOps.expectedDiscovery, "pipeline.record_sale"]));
@@ -425,6 +475,41 @@ test("Gate 11b runs generate_config -> create -> update_knowledge -> update_qual
     "sales_agents.update_knowledge", "sales_agents.update_qualification_rules", "sales_agents.test"])
     assert.ok(hits.includes(name), `${name}: must execute at least once`);
   assert.ok(!hits.includes("sales_agents.deploy"), "deploy must never reach the AA adapter");
+  assert.ok(!hits.includes("sales_agents.build"), "factory gate must not enqueue build");
+});
+
+test("Gate 16b runs attach -> enable -> disable through the engine, and denies deploy", async (t) => {
+  const id = (n: number) => `${String(n).padStart(8, "0")}-5555-4555-8555-555555555555`;
+  const f: SalesOpsFixtures = {
+    approved_safe_fixtures: true, client_id: id(1), lead_id: id(2), sales_agent_id: id(3),
+    denied_client_id: id(4), denied_lead_id: id(5), denied_task_id: id(6),
+    assignee: "bot_sales_ops", page_id: id(8),
+  };
+  const gateIdentity = { bot: "bot_sales_ops" as const, clients: [f.client_id] };
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const hits: string[] = [];
+  const deploymentId = id(9);
+  const engine = new ActionEngine(store, registry, {
+    execute: async (tool, input) => {
+      hits.push(tool.name);
+      if (tool.name === "sales_agents.attach_to_page")
+        return {
+          status: "completed", capability: tool.name,
+          data: { client_id: f.client_id, id: deploymentId, page_id: input.page_id, enabled: false, replayed: false },
+        };
+      if (tool.name === "sales_agents.set_deployment_enabled")
+        return {
+          status: "completed", capability: tool.name,
+          data: { client_id: f.client_id, id: input.deployment_id, enabled: input.enabled, replayed: false },
+        };
+      throw new Error(`unexpected tool: ${tool.name}`);
+    },
+  });
+  await runSalesOpsDeploymentGate((name, input) => engine.call(gateIdentity, name, input), f);
+  assert.ok(hits.includes("sales_agents.attach_to_page"));
+  assert.equal(hits.filter((n) => n === "sales_agents.set_deployment_enabled").length, 2);
+  assert.ok(!hits.includes("sales_agents.deploy"));
 });
 
 test("other bots do not gain pipeline.*/sales_agents.* access from this phase", async (t) => {

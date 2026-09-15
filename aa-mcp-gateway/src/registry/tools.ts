@@ -10,7 +10,7 @@ const domains: Record<string, string> = {
   conversion:
     "list_pages get_page create_page generate_structure generate_copy request_approval get_performance audit_page revise_page revert_page",
   sales_agents:
-    "generate_config list get create update_knowledge update_qualification_rules test deploy get_conversations",
+    "generate_config list get create update_knowledge update_qualification_rules test deploy attach_to_page set_deployment_enabled build get_conversations",
   pipeline:
     "list_leads get_lead get_stalled_leads update_stage create_followup get_pipeline_summary record_sale",
   proof: "search get create attach_asset get_for_avatar get_for_claim",
@@ -357,6 +357,119 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         delete fields.title;
         fields.transcript = z.array(transcriptTurn).min(1).max(60);
       }
+      // Phase 16b: page attach / kill-switch / enqueue. deploy stays generic
+      // + stub (Alex CLEAR: no live Meta/WhatsApp).
+      if (name === "sales_agents.attach_to_page") {
+        fields.sales_agent_id = id;
+        fields.page_id = id;
+        delete fields.summary;
+        delete fields.title;
+      }
+      if (name === "sales_agents.set_deployment_enabled") {
+        delete fields.sales_agent_id;
+        fields.deployment_id = id;
+        fields.enabled = z.boolean();
+        delete fields.summary;
+        delete fields.title;
+      }
+      if (name === "sales_agents.build") {
+        fields.sales_agent_id = id;
+        delete fields.summary;
+        delete fields.title;
+      }
+      if (name === "proof.search") {
+        delete fields.proof_id;
+        fields.q = z.string().trim().min(1).max(400).optional();
+        fields.media_type = z.enum(["image", "video", "text"]).optional();
+        fields.proof_type = z
+          .enum([
+            "customer_result",
+            "testimonial",
+            "review",
+            "case_study",
+            "before_after",
+            "stat",
+            "credential",
+            "award",
+            "press",
+            "process",
+            "team_expertise",
+            "customer_story",
+          ])
+          .optional();
+      }
+      if (name === "proof.get") {
+        fields.proof_id = id;
+        delete fields.limit;
+      }
+      if (name === "proof.get_for_avatar") {
+        delete fields.proof_id;
+        fields.avatar = z.string().trim().min(1).max(300);
+        fields.limit = z.number().int().min(1).max(50).default(10);
+      }
+      if (name === "proof.get_for_claim") {
+        delete fields.proof_id;
+        fields.claim = z.string().trim().min(1).max(400);
+        fields.limit = z.number().int().min(1).max(50).default(10);
+      }
+      if (name === "proof.create") {
+        delete fields.proof_id;
+        delete fields.summary;
+        delete fields.title;
+        fields.media_type = z.enum(["image", "video", "text"]);
+        fields.title = z.string().trim().min(1).max(200).optional();
+        fields.body = z.string().trim().min(1).max(8000).optional();
+        fields.source = z.string().trim().min(1).max(500).optional();
+        fields.storage_path = z.string().trim().min(1).max(500).optional();
+        fields.claim = z.string().trim().min(1).max(400).optional();
+        fields.evidence = z.string().trim().min(1).max(4000).optional();
+        fields.avatar_relevance = z.string().trim().min(1).max(300).optional();
+        fields.proof_type = z
+          .enum([
+            "customer_result",
+            "testimonial",
+            "review",
+            "case_study",
+            "before_after",
+            "stat",
+            "credential",
+            "award",
+            "press",
+            "process",
+            "team_expertise",
+            "customer_story",
+          ])
+          .optional();
+        fields.strength = z.enum(["high", "medium", "low"]).optional();
+      }
+      if (name === "proof.attach_asset") {
+        fields.proof_id = id;
+        fields.storage_path = z.string().trim().min(1).max(500);
+        fields.brief_id = id.optional();
+        delete fields.summary;
+        delete fields.title;
+      }
+      if (name === "content.assign_production") {
+        delete fields.asset_id;
+        fields.brief_id = id;
+        fields.route = z.enum(["ai", "human"]);
+        fields.member_ids = z.array(id).min(1).max(20).optional();
+        fields.due_date = z.iso.date().optional();
+        fields.compensation = z.number().nonnegative().max(1_000_000).optional();
+        fields.quality = z.enum(["low", "medium", "high"]).optional();
+        fields.size = z.enum(["1024x1536", "1024x1024", "1536x1024"]).optional();
+        delete fields.title;
+        delete fields.summary;
+      }
+      if (name === "content.submit_asset") {
+        delete fields.asset_id;
+        fields.storage_path = z.string().trim().min(1).max(500);
+        fields.media_type = z.enum(["image", "video", "text"]);
+        fields.brief_id = id.optional();
+        fields.assignment_id = id.optional();
+        fields.title = z.string().trim().min(1).max(200).optional();
+        delete fields.summary;
+      }
       if (name === "workflow.create_approval") {
         fields.summary = text;
       }
@@ -565,6 +678,19 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         // control).
         "content.queue_distribution",
         "content.record_publication",
+        // Sec Phase 16b: bot_production only (PRODUCTION_ONLY_TOOLS + RPC).
+        "content.assign_production",
+        "content.submit_asset",
+      ]);
+      // Sec Phase 16b: isolation tests must stay green before adding a name.
+      // Bots never set usage_rights clearance — create forces not_cleared.
+      const realProof = new Set([
+        "proof.search",
+        "proof.get",
+        "proof.create",
+        "proof.attach_asset",
+        "proof.get_for_avatar",
+        "proof.get_for_claim",
       ]);
       // Sec Phase 11 #7: isolation tests must stay green before adding a
       // name. record_sale stays out of realPipeline (Alex CLEAR #5 / SEC_BAR
@@ -589,6 +715,9 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "sales_agents.update_knowledge",
         "sales_agents.update_qualification_rules",
         "sales_agents.test",
+        "sales_agents.attach_to_page",
+        "sales_agents.set_deployment_enabled",
+        "sales_agents.build",
       ]);
       // Sec Phase 13: isolation tests must stay green before adding a name.
       // Money writes (pipeline.record_sale, payments, bank/Stripe/Xero) stay
@@ -628,6 +757,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         realContent.has(name) ||
         realPipeline.has(name) ||
         realSalesAgents.has(name) ||
+        realProof.has(name) ||
         realEconomics.has(name) ||
         realAttributionRevenue ||
         realEngineering.has(name) ||
@@ -680,6 +810,8 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
                     ? "Scoped AA pipeline business API"
                     : realSalesAgents.has(name)
                       ? "Scoped AA sales_agents business API"
+                      : realProof.has(name)
+                        ? "Scoped AA proof business API"
                       : realEconomics.has(name)
                         ? "Scoped AA economics business API"
                         : realAttributionRevenue

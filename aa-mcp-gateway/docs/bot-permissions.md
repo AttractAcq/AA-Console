@@ -115,9 +115,9 @@ Effective tools (40):
 
 ## bot_production
 
-Configured grants: `content.*`, `proof.search`, `proof.get`, `proof.get_for_avatar`, `proof.get_for_claim`, `workflow.create_task`, `workflow.assign_task`, `workflow.get_task`, `workflow.list_tasks`, `workflow.complete_task`, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`.
+Configured grants: `content.*`, `proof.search`, `proof.get`, `proof.get_for_avatar`, `proof.get_for_claim`, `proof.create`, `proof.attach_asset`, `workflow.create_task`, `workflow.assign_task`, `workflow.get_task`, `workflow.list_tasks`, `workflow.complete_task`, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`.
 
-Effective tools (26):
+Effective tools (28):
 
 - `content.list_ideas`
 - `content.generate_ideas`
@@ -135,6 +135,8 @@ Effective tools (26):
 - `content.get_performance`
 - `proof.search`
 - `proof.get`
+- `proof.create`
+- `proof.attach_asset`
 - `proof.get_for_avatar`
 - `proof.get_for_claim`
 - `workflow.create_task`
@@ -169,9 +171,9 @@ Effective tools (14):
 
 ## bot_sales_ops
 
-Configured grants: `pipeline.list_leads`, `pipeline.get_lead`, `pipeline.get_stalled_leads`, `pipeline.get_pipeline_summary`, `sales_agents.list`, `sales_agents.get`, `sales_agents.get_conversations`, `workflow.get_pending_approvals`, `workflow.get_activity`, `workflow.list_tasks`, `workflow.get_task`, `pipeline.update_stage`, `pipeline.create_followup`, `sales_agents.generate_config`, `sales_agents.create`, `sales_agents.update_knowledge`, `sales_agents.update_qualification_rules`, `sales_agents.test`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`.
+Configured grants: `pipeline.list_leads`, `pipeline.get_lead`, `pipeline.get_stalled_leads`, `pipeline.get_pipeline_summary`, `sales_agents.list`, `sales_agents.get`, `sales_agents.get_conversations`, `workflow.get_pending_approvals`, `workflow.get_activity`, `workflow.list_tasks`, `workflow.get_task`, `pipeline.update_stage`, `pipeline.create_followup`, `sales_agents.generate_config`, `sales_agents.create`, `sales_agents.update_knowledge`, `sales_agents.update_qualification_rules`, `sales_agents.test`, `sales_agents.attach_to_page`, `sales_agents.set_deployment_enabled`, `sales_agents.build`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`.
 
-Effective tools (22):
+Effective tools (25):
 
 - `sales_agents.generate_config`
 - `sales_agents.list`
@@ -180,6 +182,9 @@ Effective tools (22):
 - `sales_agents.update_knowledge`
 - `sales_agents.update_qualification_rules`
 - `sales_agents.test`
+- `sales_agents.attach_to_page`
+- `sales_agents.set_deployment_enabled`
+- `sales_agents.build`
 - `sales_agents.get_conversations`
 - `pipeline.list_leads`
 - `pipeline.get_lead`
@@ -279,9 +284,9 @@ Effective tools (14):
 - `security.create_finding`
 - `security.get_incident_status`
 
-All Bots are denied `workflow.record_decision`, including wildcard workflow grants. No finance payment or production deployment capability is exposed. `sales_agents.deploy` is a CRITICAL stub behind mandatory approval. Production Manager (`bot_production`) default discovery is the real granted tools: `content.list_ideas`, `content.get_idea`, `content.generate_brief`, `content.get_brief`, `content.request_revision`, `content.get_production_status`, `content.create_repurpose_plan`, `content.request_approval`, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`, and the five durable workflow task tools.
+All Bots are denied `workflow.record_decision`, including wildcard workflow grants. No finance payment or production deployment capability is exposed. `sales_agents.deploy` is a CRITICAL stub behind mandatory approval. Production Manager (`bot_production`) default discovery is the real granted tools: `content.list_ideas`, `content.get_idea`, `content.generate_brief`, `content.get_brief`, `content.request_revision`, `content.get_production_status`, `content.create_repurpose_plan`, `content.request_approval`, `content.select_idea`, `content.approve_asset`, `content.assign_production`, `content.submit_asset`, all six `proof.*` tools, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`, and the five durable workflow task tools.
 
-`content.select_idea` (idea approve) and `content.approve_asset` (asset decide) are real **only** for `bot_production` ([Phase 9b](phase-9b-production-bot-decide.md)). `bot_marketing` keeps its `content.*` grant — needed for its other real content tools — but is hard-denied on these two names in `src/policy/permissions.ts` `allowed()` and again inside the AA RPCs themselves, exactly like `workflow.record_decision`. `bot_chief_of_staff` and `bot_client_delivery` never held `content.*` or either exact name.
+`content.select_idea` (idea approve), `content.approve_asset` (asset decide), `content.assign_production` and `content.submit_asset` are real **only** for `bot_production` ([Phase 9b](phase-9b-production-bot-decide.md), [Phase 16b](phase-16b-sales-proof-production.md)). `bot_marketing` keeps its `content.*` grant — needed for its other real content tools — but is hard-denied on these names in `src/policy/permissions.ts` `allowed()` and again inside the AA RPCs themselves, exactly like `workflow.record_decision`. `bot_chief_of_staff` and `bot_client_delivery` never held `content.*` or these exact names.
 
 `content.queue_distribution` (schedule) and `content.record_publication` (Gate 10 publish record) are real **only** for `bot_distribution` ([Phase 10](phase-10-distribution-manager.md)), same hard-coded pattern. `bot_production` keeps its `content.*` grant — needed for its other real content tools — but is hard-denied on these two names. `content.get_performance` and `attribution.get_content_performance` remain stubs (no live performance read yet): granted to `bot_distribution` per the original migration 65 seed, but indistinguishable from an ungranted tool unless `MCP_DISCOVER_STUBS=true`.
 
@@ -299,3 +304,5 @@ Phase 15: `bot_security_devops` has an exact 14-tool ceiling (nine reads/five wr
 
 
 Phase 16 (PR #48 / mig 89): `bot_marketing` post-#48 ceiling is **40** exact tools (19 reads/21 writes) via **additive** grants — Gate 9's 23 rows stay; this phase insert-only-owns 17 conversion + campaign execution names. This is **not** the final 45 (`brand.*` / `sites.*` / remaining attribution are out). After #48 then #46 then #47 the target is Marketing **45** / Sales Ops **28**; those PRs must APPEND, not replace. Registry length **97** is catalog size after #48 only. Ten `conversion.*` Page Builder tools are real against `client_pages` / polish jobs (no page publish). `campaign.launch` marks Execution OS `client_campaigns.status=live` only — no ad spend, Meta, or paid channels — so it stays MEDIUM without approval. CoS keeps `campaign.*` and is denied conversion. Production does not get conversion. See [Phase 16](phase-16-conversion-campaign.md). Gate 16 is NOT YET CLOSED.
+
+Phase 16b: `bot_sales_ops` has an exact 25-tool ceiling (Phase 11b's 22 plus `sales_agents.attach_to_page`, `sales_agents.set_deployment_enabled`, `sales_agents.build`). `sales_agents.create` stays draft-only; `build` enqueues the Console `sales_agent` job. Attach inserts `client_sales_agent_deployments` with `enabled:false` and origin from the published URL. Enable is a kill-switch (one enabled deployment per page). `sales_agents.deploy` stays CRITICAL stub + ungranted. `approved_at` remains human-only. All six `proof.*` tools are real for `bot_production`; bots cannot set `usage_rights` clearance. `content.assign_production` and `content.submit_asset` are real for `bot_production` only; `content.approve_asset` stays Production-only. See [Phase 16b](phase-16b-sales-proof-production.md). Gate 16b is NOT YET CLOSED.

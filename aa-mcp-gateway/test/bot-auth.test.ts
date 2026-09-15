@@ -307,6 +307,7 @@ test("HTTP dual-read match, mismatch 401, and reviewer path stay on REVIEWER_CRE
     const list: { result: { tools: { name: string }[] } } = await ok.json();
     const allowed = new Set([
       "content.approve_asset",
+      "content.assign_production",
       "content.create_repurpose_plan",
       "content.generate_brief",
       "content.get_brief",
@@ -316,6 +317,13 @@ test("HTTP dual-read match, mismatch 401, and reviewer path stay on REVIEWER_CRE
       "content.request_approval",
       "content.request_revision",
       "content.select_idea",
+      "content.submit_asset",
+      "proof.attach_asset",
+      "proof.create",
+      "proof.get",
+      "proof.get_for_avatar",
+      "proof.get_for_claim",
+      "proof.search",
       "workflow.assign_task",
       "workflow.complete_task",
       "workflow.create_approval",
