@@ -151,6 +151,8 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
     return false;
   if (tool.domain === "economics" && identity.bot !== "bot_finance")
     return false;
+  if (tool.domain === "conversion" && identity.bot !== "bot_marketing")
+    return false;
   if (
     identity.bot === "bot_finance" &&
     !financeController.grants.some((name) => name === tool.name)

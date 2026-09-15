@@ -16,7 +16,8 @@ intentional 23-tool allowlist. Discovery uses **exact set equality**
 | --- | --- | --- |
 | Campaign/content/attribution/delivery/workflow reads (15 tools) | Autonomous | True reads only; `delivery.list_clients` withheld |
 | Content brief/revision/approval-request/repurpose writes, workflow task + approval writes (8 tools) | Autonomous | Idempotent, audited, replay-safe |
-| `campaign.*` writes, `content.generate_ideas`/`select_idea`, `attribution.get_content_performance`, `proof.*`, `conversion.*` | Future (hidden) | Registry may exist; not discoverable until made real in a separate PR |
+| `campaign.*` writes, `content.generate_ideas`/`select_idea`, `attribution.get_content_performance`, `proof.*` | Future (hidden) | Registry may exist; not discoverable until made real in a separate PR |
+| Conversion Page Builder + Campaign Execution OS | Real in [Phase 16](phase-16-conversion-campaign.md) | `conversion.*` and Execution OS `campaign.*` are no longer future |
 | `content.approve_asset`, `content.queue_distribution`, `content.assign_production`, `content.submit_asset`, `attribution.get_revenue_attribution`, `delivery.list_clients` | Forbidden | Marketing may request approval/revision but cannot approve, assign production, submit assets, or see cross-client rollups/revenue |
 | `economics.*`, `security.*`, `engineering.*`, `pipeline.*`, `sales_agents.*`, `finance.*`, `deploy.*`, `infra.*`, `secrets.*`, `admin.*`, `workflow.record_decision` | Forbidden | Same hard-deny posture as every other Bot |
 

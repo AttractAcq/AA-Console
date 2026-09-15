@@ -4,11 +4,11 @@ const domains: Record<string, string> = {
   admin: "list_events get_event create_event update_event",
   delivery:
     "list_clients get_client get_status get_plan get_blockers get_next_action create_task get_client_health",
-  campaign: "list get create update get_status request_approval",
+  campaign: "list get create update get_status request_approval plan provision launch get_readiness",
   content:
     "list_ideas generate_ideas get_idea select_idea generate_brief get_brief assign_production get_production_status submit_asset request_revision request_approval approve_asset create_repurpose_plan queue_distribution record_publication get_performance",
   conversion:
-    "list_pages get_page create_page generate_structure generate_copy request_approval get_performance",
+    "list_pages get_page create_page generate_structure generate_copy request_approval get_performance audit_page revise_page revert_page",
   sales_agents:
     "generate_config list get create update_knowledge update_qualification_rules test deploy get_conversations",
   pipeline:
@@ -50,6 +50,27 @@ export const securityTools = new Set([
   "security.get_open_findings",
   "security.create_finding",
   "security.get_incident_status",
+]);
+export const conversionTools = new Set([
+  "conversion.list_pages",
+  "conversion.get_page",
+  "conversion.create_page",
+  "conversion.generate_structure",
+  "conversion.generate_copy",
+  "conversion.request_approval",
+  "conversion.get_performance",
+  "conversion.audit_page",
+  "conversion.revise_page",
+  "conversion.revert_page",
+]);
+export const campaignExecutionTools = new Set([
+  "campaign.create",
+  "campaign.update",
+  "campaign.request_approval",
+  "campaign.plan",
+  "campaign.provision",
+  "campaign.launch",
+  "campaign.get_readiness",
 ]);
 export const orchestrationTools = new Set([
   "workflow.list_tasks",
@@ -443,6 +464,85 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
           fields.incident_id = id.optional();
         }
       }
+      // Phase 16: Page Builder verbs match Console PageBuilderPanel / polish.
+      if (name === "conversion.list_pages") {
+        delete fields.page_id;
+        fields.after = id.optional();
+        fields.page_type = z.enum(["landing", "offer"]).optional();
+      }
+      if (name === "conversion.get_page" || name === "conversion.get_performance") {
+        fields.page_id = id;
+        delete fields.limit;
+      }
+      if (name === "conversion.create_page") {
+        delete fields.page_id;
+        delete fields.summary;
+        fields.title = z.string().trim().min(1).max(200);
+        fields.brief = text;
+        fields.page_type = z.enum(["landing", "offer"]).optional();
+        fields.campaign_id = id.optional();
+      }
+      if (
+        name === "conversion.generate_structure" ||
+        name === "conversion.generate_copy" ||
+        name === "conversion.audit_page"
+      ) {
+        fields.page_id = id;
+        delete fields.title;
+        delete fields.summary;
+      }
+      if (name === "conversion.request_approval") {
+        fields.page_id = id;
+        delete fields.title;
+      }
+      if (name === "conversion.revise_page") {
+        fields.page_id = id;
+        fields.finding_ids = z.array(id).min(1).max(50);
+        delete fields.title;
+        delete fields.summary;
+      }
+      if (name === "conversion.revert_page") {
+        fields.page_id = id;
+        fields.revision_number = z.number().int().min(1).max(2147483646);
+        delete fields.title;
+        delete fields.summary;
+      }
+      // Phase 16: Campaign Execution OS (client_campaigns). list/get/get_status
+      // keep the orchestration shape below.
+      if (name === "campaign.create") {
+        delete fields.campaign_id;
+        delete fields.summary;
+        delete fields.title;
+        fields.name = z.string().trim().min(1).max(200);
+        fields.brief = text;
+      }
+      if (name === "campaign.update") {
+        fields.campaign_id = id;
+        delete fields.title;
+        delete fields.summary;
+        fields.name = z.string().trim().min(1).max(200).optional();
+        fields.brief = text.optional();
+        fields.status = z.enum(["complete", "cancelled"]).optional();
+      }
+      if (name === "campaign.request_approval") {
+        fields.campaign_id = id;
+        delete fields.title;
+      }
+      if (name === "campaign.plan" || name === "campaign.launch") {
+        fields.campaign_id = id;
+        delete fields.title;
+        delete fields.summary;
+      }
+      if (name === "campaign.provision") {
+        fields.campaign_id = id;
+        fields.kind = z.enum(["landing_page", "sales_agent"]).optional();
+        delete fields.title;
+        delete fields.summary;
+      }
+      if (name === "campaign.get_readiness") {
+        fields.campaign_id = id;
+        delete fields.limit;
+      }
       const realContent = new Set([
         // Sec Phase 5 #6: isolation tests must stay green before adding a name.
         "content.list_ideas",
@@ -516,6 +616,10 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "security.create_finding",
         "security.get_incident_status",
       ]);
+      // Sec Phase 16: isolation tests must stay green before adding a name.
+      // Page publish / sites.* stay out. Production is not granted conversion.
+      const realConversion = conversionTools;
+      const realCampaignExecution = campaignExecutionTools;
       const implementation =
         adminTools.has(name) ||
         orchestration ||
@@ -527,6 +631,8 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         realAttributionRevenue ||
         realEngineering.has(name) ||
         realSecurity.has(name) ||
+        realConversion.has(name) ||
+        realCampaignExecution.has(name) ||
         [
           "workflow.get_pending_approvals",
           "workflow.get_activity",
@@ -579,8 +685,12 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
                           ? "Scoped AA attribution business API"
                           : realEngineering.has(name)
                             ? "Scoped AA engineering business API"
-                            : realSecurity.has(name)
-                              ? "Scoped AA security business API"
+                          : realSecurity.has(name)
+                            ? "Scoped AA security business API"
+                            : realConversion.has(name)
+                              ? "Scoped AA conversion business API"
+                              : realCampaignExecution.has(name)
+                                ? "Scoped AA campaign execution API"
                               : implementation === "real"
                                 ? "Gateway control store"
                                 : `Scoped AA ${domain} business API`,

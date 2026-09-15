@@ -1,6 +1,6 @@
 # Tool registry
 
-90 initial business contracts. Status is adapter availability, not evidence of live deployment. Brief generation is implemented and requires AA_INTERNAL_API_URL and AA_MCP_SERVICE_SECRET. Stub schemas reserve bounded business fields and must be versioned/refined before their adapters are enabled. All calls require an authorized client UUID; all writes require an idempotency key. HIGH/CRITICAL policy always requires human approval.
+97 initial business contracts. Status is adapter availability, not evidence of live deployment. Brief generation is implemented and requires AA_INTERNAL_API_URL and AA_MCP_SERVICE_SECRET. Stub schemas reserve bounded business fields and must be versioned/refined before their adapters are enabled. All calls require an authorized client UUID; all writes require an idempotency key. HIGH/CRITICAL policy always requires human approval.
 
 | Tool | Status | Action | Risk | Approval | Reversible | Dependency |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -18,10 +18,14 @@
 | delivery.get_client_health | real | read | LOW | no | true | Scoped AA delivery business API |
 | campaign.list | real | read | LOW | no | true | Scoped AA orchestration business API |
 | campaign.get | real | read | LOW | no | true | Scoped AA orchestration business API |
-| campaign.create | stub | write | MEDIUM | no | true | Scoped AA campaign business API |
-| campaign.update | stub | write | MEDIUM | no | true | Scoped AA campaign business API |
+| campaign.create | real | write | MEDIUM | no | true | Scoped AA campaign execution API |
+| campaign.update | real | write | MEDIUM | no | true | Scoped AA campaign execution API |
 | campaign.get_status | real | read | LOW | no | true | Scoped AA orchestration business API |
-| campaign.request_approval | stub | write | MEDIUM | no | true | Scoped AA campaign business API |
+| campaign.request_approval | real | write | MEDIUM | no | true | Scoped AA campaign execution API |
+| campaign.plan | real | write | MEDIUM | no | true | Scoped AA campaign execution API |
+| campaign.provision | real | write | MEDIUM | no | true | Scoped AA campaign execution API |
+| campaign.launch | real | write | MEDIUM | no | true | Scoped AA campaign execution API |
+| campaign.get_readiness | real | read | LOW | no | true | Scoped AA campaign execution API |
 | content.list_ideas | real | read | LOW | no | true | Scoped AA content business API |
 | content.generate_ideas | stub | write | MEDIUM | no | true | Scoped AA content business API |
 | content.get_idea | real | read | LOW | no | true | Scoped AA content business API |
@@ -38,13 +42,16 @@
 | content.queue_distribution | real (bot_distribution only) | write | MEDIUM | no | false | Scoped AA content business API |
 | content.record_publication | real (bot_distribution only) | write | MEDIUM | no | false | Scoped AA content business API |
 | content.get_performance | stub | read | LOW | no | true | Scoped AA content business API |
-| conversion.list_pages | stub | read | LOW | no | true | Scoped AA conversion business API |
-| conversion.get_page | stub | read | LOW | no | true | Scoped AA conversion business API |
-| conversion.create_page | stub | write | MEDIUM | no | true | Scoped AA conversion business API |
-| conversion.generate_structure | stub | write | MEDIUM | no | true | Scoped AA conversion business API |
-| conversion.generate_copy | stub | write | MEDIUM | no | true | Scoped AA conversion business API |
-| conversion.request_approval | stub | write | MEDIUM | no | true | Scoped AA conversion business API |
-| conversion.get_performance | stub | read | LOW | no | true | Scoped AA conversion business API |
+| conversion.list_pages | real | read | LOW | no | true | Scoped AA conversion business API |
+| conversion.get_page | real | read | LOW | no | true | Scoped AA conversion business API |
+| conversion.create_page | real | write | MEDIUM | no | true | Scoped AA conversion business API |
+| conversion.generate_structure | real | write | MEDIUM | no | true | Scoped AA conversion business API |
+| conversion.generate_copy | real | write | MEDIUM | no | true | Scoped AA conversion business API |
+| conversion.request_approval | real | write | MEDIUM | no | true | Scoped AA conversion business API |
+| conversion.get_performance | real | read | LOW | no | true | Scoped AA conversion business API |
+| conversion.audit_page | real | write | MEDIUM | no | true | Scoped AA conversion business API |
+| conversion.revise_page | real | write | MEDIUM | no | true | Scoped AA conversion business API |
+| conversion.revert_page | real | write | MEDIUM | no | true | Scoped AA conversion business API |
 | sales_agents.generate_config | real | write | MEDIUM | no | true | Scoped AA sales_agents business API |
 | sales_agents.list | real | read | LOW | no | true | Scoped AA sales_agents business API |
 | sales_agents.get | real | read | LOW | no | true | Scoped AA sales_agents business API |
@@ -110,3 +117,6 @@ Phase 14: `bot_engineering` has an exact 12-tool ceiling (seven reads/five write
 
 
 Phase 15: `bot_security_devops` has an exact 14-tool ceiling (nine reads/five writes). The seeded `security.*` wildcard is replaced with four named security tools, two engineering status reads, and the eight workflow names. Security tools are bot_security_devops only. System status is client-scoped counts (no HTML, params, costs, tokens or env). Findings/incidents are AA-native tracking records. No destroy, secret rotation, Railway write, unrestricted deploy or global/unscoped client tools. See [Phase 15](phase-15-security-devops.md). Gate 15 is NOT YET CLOSED.
+
+
+Phase 16: `bot_marketing` has an exact 40-tool ceiling (19 reads/21 writes). Ten `conversion.*` Page Builder tools are real against `client_pages` / polish jobs (no page publish). `campaign.list`/`get`/`get_status` plus create/update/request_approval/plan/provision/launch/get_readiness bind to Execution OS `client_campaigns`. Legacy `public.campaigns` remains the attribution spend tracker via `attribution.get_campaign_performance` only. Conversion tools are Marketing only. CoS keeps `campaign.*`. Production does not get conversion. See [Phase 16](phase-16-conversion-campaign.md). Gate 16 is NOT YET CLOSED.

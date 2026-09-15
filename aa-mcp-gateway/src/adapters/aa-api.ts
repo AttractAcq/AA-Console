@@ -5,6 +5,8 @@ import {
   financeReadTools,
   engineeringTools,
   securityTools,
+  conversionTools,
+  campaignExecutionTools,
 } from "../registry/tools.js";
 import { z } from "zod";
 import type { Adapter, Context, Tool, Result } from "../shared/types.js";
@@ -245,18 +247,33 @@ for (const action of [
   };
 }
 
+const queuedTools = new Set([
+  "conversion.create_page",
+  "conversion.generate_structure",
+  "conversion.generate_copy",
+  "conversion.audit_page",
+  "conversion.revise_page",
+  "campaign.create",
+  "campaign.plan",
+]);
 for (const tool of registry.filter(
   (t) =>
     adminTools.has(t.name) ||
     orchestrationTools.has(t.name) ||
     financeReadTools.has(t.name) ||
     engineeringTools.has(t.name) ||
-    securityTools.has(t.name),
+    securityTools.has(t.name) ||
+    conversionTools.has(t.name) ||
+    campaignExecutionTools.has(t.name),
 )) {
   const [domain, action] = tool.name.split(".");
   ROUTES[tool.name] = {
     path: `/internal/mcp/${domain}/${action!.replaceAll("_", "-")}`,
-    kind: tool.action === "read" ? "read" : "write",
+    kind: queuedTools.has(tool.name)
+      ? "queue"
+      : tool.action === "read"
+        ? "read"
+        : "write",
     input: (tool.action === "write"
       ? tool.input.omit({ idempotency_key: true } as never)
       : tool.input
@@ -306,6 +323,12 @@ const codes = new Set([
   "repurpose_agent_unavailable",
   "queue_failure",
   "internal_error",
+  "revision_not_found",
+  "invalid_page_status",
+  "page_agent_unavailable",
+  "campaign_agent_unavailable",
+  "not_ready",
+  "no_plan",
 ]);
 const fallback: Record<number, string> = {
   400: "invalid_request",
@@ -347,7 +370,7 @@ function aaBody(
   input: Record<string, unknown>,
 ): Record<string, unknown> {
   if (
-    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents|economics|engineering|security)\./.test(
+    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents|economics|engineering|security|conversion)\./.test(
       tool,
     )
   )

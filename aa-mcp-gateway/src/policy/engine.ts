@@ -86,6 +86,19 @@ export class ActionEngine {
         ].includes(result.error?.code ?? "")
       )
         authorization = "denied";
+      if (
+        (tool?.domain === "conversion" || tool?.domain === "campaign") &&
+        [
+          "client_forbidden",
+          "bot_not_active",
+          "bot_forbidden",
+          "page_not_found",
+          "campaign_not_found",
+          "client_mismatch",
+          "revision_not_found",
+        ].includes(result.error?.code ?? "")
+      )
+        authorization = "denied";
       this.store.transaction(() => {
         this.store.audit({
           request_id,
@@ -107,7 +120,8 @@ export class ActionEngine {
             input.job_id ??
             input.finding_id ??
             findingId ??
-            input.incident_id,
+            input.incident_id ??
+            input.campaign_id,
           execution_id: executionId,
           authorization,
           approval_status: result.approval_id

@@ -64,9 +64,12 @@ const engineeringNote =
   "\n\nPhase 14: `bot_engineering` has an exact 12-tool ceiling (seven reads/five writes). The seeded `engineering.*` wildcard is replaced with four named engineering tools plus the eight workflow names. Issue create/get are bot_engineering only. Release and deployment status reads project client-scoped `client_pages` / `agent_jobs` (no HTML, params, costs or secrets) and remain callable by `bot_security_devops` via its existing exact grants. No Railway write, secret rotation or unrestricted deploy tools. See [Phase 14](phase-14-engineering-ops.md). Gate 14 is NOT YET CLOSED.\n";
 const securityNote =
   "\n\nPhase 15: `bot_security_devops` has an exact 14-tool ceiling (nine reads/five writes). The seeded `security.*` wildcard is replaced with four named security tools, two engineering status reads, and the eight workflow names. Security tools are bot_security_devops only. System status is client-scoped counts (no HTML, params, costs, tokens or env). Findings/incidents are AA-native tracking records. No destroy, secret rotation, Railway write, unrestricted deploy or global/unscoped client tools. See [Phase 15](phase-15-security-devops.md). Gate 15 is NOT YET CLOSED.\n";
+const conversionNote =
+  "\n\nPhase 16: `bot_marketing` has an exact 40-tool ceiling (19 reads/21 writes). Ten `conversion.*` Page Builder tools are real against `client_pages` / polish jobs (no page publish). `campaign.list`/`get`/`get_status` plus create/update/request_approval/plan/provision/launch/get_readiness bind to Execution OS `client_campaigns`. Legacy `public.campaigns` remains the attribution spend tracker via `attribution.get_campaign_performance` only. Conversion tools are Marketing only. CoS keeps `campaign.*`. Production does not get conversion. See [Phase 16](phase-16-conversion-campaign.md). Gate 16 is NOT YET CLOSED.\n";
 for (const file of ["docs/tool-registry.md", "docs/bot-permissions.md"]) {
   appendFileSync(file, adminNote);
   appendFileSync(file, financeNote);
   appendFileSync(file, engineeringNote);
   appendFileSync(file, securityNote);
+  appendFileSync(file, conversionNote);
 }
