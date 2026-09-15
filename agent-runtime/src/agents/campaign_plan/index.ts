@@ -30,6 +30,69 @@ import {
   type CampaignPlan,
 } from "./plan.js";
 
+/**
+ * The submit tool, at module scope so the schema can be tested.
+ *
+ * It is sent with `strict: true`, so it may only use the subset of JSON
+ * Schema the API accepts — see tools/schema.ts. Constraints that do not
+ * survive that subset are enforced in plan.ts after the model answers.
+ */
+export const SUBMIT_TOOL = {
+  name: "submit_campaign_plan",
+  description: "Submit the finished campaign plan. Call this exactly once.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      objective: { type: "string", description: "What this campaign is for, in one sentence, stated as an outcome rather than an activity." },
+      audience: { type: "string", description: "Who it is aimed at, taken from the ICP rather than invented." },
+      offer_summary: { type: "string", description: "What is being offered, drawn from the offer strategy." },
+      core_message: { type: "string", description: "The one idea every piece of this campaign carries." },
+      channels: {
+        type: "array",
+        items: { type: "string" },
+        description: "Where it runs. Only channels this business can actually operate.",
+      },
+      budget: { type: "number", description: "Total budget in the client's currency, or omit if unknown. Do not invent one." },
+      starts_on: { type: "string", description: "YYYY-MM-DD, or omit." },
+      ends_on: { type: "string", description: "YYYY-MM-DD, or omit." },
+      kpi_metric: { type: "string", description: "The single number this campaign is scored on." },
+      kpi_target: { type: "number", description: "The target for that number, or omit if there is no basis for one." },
+      content_count: {
+        type: "number",
+        description: `How many distinct pieces of content this campaign needs. 0 if none. At most ${MAX_CONTENT}.`,
+      },
+      ideas: {
+        type: "array",
+        // No maxItems, and no maxLength on the title: the API rejects both on
+        // a strict tool. They were redundant anyway — campaignIdeas() refuses
+        // a batch whose length is not exactly content_count and a title over
+        // 300 characters, which is the constraint that actually holds.
+        description: `Exactly content_count distinct campaign-specific ideas, one per planned piece, and never more than ${MAX_CONTENT}. These become the production queue, not finished briefs.`,
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "At most 300 characters." },
+            body: { type: "string", description: "The concrete angle, buyer question, intended response and call to action for this piece. Respect campaign constraints." },
+            media_type: { type: "string", enum: ["image", "text", "video"] },
+            channel: { type: "string", description: "Which of the campaign's channels this piece is for." },
+            strategic_reason: { type: "string", description: "Why this distinct piece helps achieve the campaign objective." },
+          },
+          required: ["title", "body", "media_type", "channel", "strategic_reason"],
+          additionalProperties: false,
+        },
+      },
+      needs_landing_page: { type: "boolean", description: "Whether this campaign needs its own landing page built." },
+      needs_sales_agent: { type: "boolean", description: "Whether it needs a client-facing sales agent on that page." },
+      reasoning: { type: "string", description: "Why this shape, and what you deliberately left out." },
+    },
+    required: [
+      "objective", "audience", "offer_summary", "core_message", "channels",
+      "kpi_metric", "content_count", "ideas", "needs_landing_page", "needs_sales_agent", "reasoning",
+    ],
+    additionalProperties: false,
+  },
+};
+
 export async function runCampaignPlanJob(
   sb: SupabaseClient,
   runtime: RuntimeConfig,
@@ -104,58 +167,7 @@ export async function runCampaignPlanJob(
     };
   }
 
-  const submitTool = {
-    name: "submit_campaign_plan",
-    description: "Submit the finished campaign plan. Call this exactly once.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        objective: { type: "string", description: "What this campaign is for, in one sentence, stated as an outcome rather than an activity." },
-        audience: { type: "string", description: "Who it is aimed at, taken from the ICP rather than invented." },
-        offer_summary: { type: "string", description: "What is being offered, drawn from the offer strategy." },
-        core_message: { type: "string", description: "The one idea every piece of this campaign carries." },
-        channels: {
-          type: "array",
-          items: { type: "string" },
-          description: "Where it runs. Only channels this business can actually operate.",
-        },
-        budget: { type: "number", description: "Total budget in the client's currency, or omit if unknown. Do not invent one." },
-        starts_on: { type: "string", description: "YYYY-MM-DD, or omit." },
-        ends_on: { type: "string", description: "YYYY-MM-DD, or omit." },
-        kpi_metric: { type: "string", description: "The single number this campaign is scored on." },
-        kpi_target: { type: "number", description: "The target for that number, or omit if there is no basis for one." },
-        content_count: {
-          type: "number",
-          description: `How many distinct pieces of content this campaign needs. 0 if none. At most ${MAX_CONTENT}.`,
-        },
-        ideas: {
-          type: "array",
-          description: "Exactly content_count distinct campaign-specific ideas, one per planned piece. These become the production queue, not finished briefs.",
-          maxItems: MAX_CONTENT,
-          items: {
-            type: "object",
-            properties: {
-              title: { type: "string", maxLength: 300 },
-              body: { type: "string", description: "The concrete angle, buyer question, intended response and call to action for this piece. Respect campaign constraints." },
-              media_type: { type: "string", enum: ["image", "text", "video"] },
-              channel: { type: "string", description: "Which of the campaign's channels this piece is for." },
-              strategic_reason: { type: "string", description: "Why this distinct piece helps achieve the campaign objective." },
-            },
-            required: ["title", "body", "media_type", "channel", "strategic_reason"],
-            additionalProperties: false,
-          },
-        },
-        needs_landing_page: { type: "boolean", description: "Whether this campaign needs its own landing page built." },
-        needs_sales_agent: { type: "boolean", description: "Whether it needs a client-facing sales agent on that page." },
-        reasoning: { type: "string", description: "Why this shape, and what you deliberately left out." },
-      },
-      required: [
-        "objective", "audience", "offer_summary", "core_message", "channels",
-        "kpi_metric", "content_count", "ideas", "needs_landing_page", "needs_sales_agent", "reasoning",
-      ],
-      additionalProperties: false,
-    },
-  };
+  const submitTool = SUBMIT_TOOL;
 
   const system = `You plan marketing campaigns for Attract Acquisition, a marketing agency.
 
