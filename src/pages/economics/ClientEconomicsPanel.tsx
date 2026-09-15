@@ -83,7 +83,8 @@ export function ClientEconomicsPanel() {
       supabase.rpc("client_economics_by_campaign", args),
       supabase.from("campaigns").select("id, campaign_ref").eq("client_id", clientId),
     ]);
-    if (t.error) setProblem(t.error.message);
+    const failure = t.error ?? ch.error ?? cp.error ?? cam.error;
+    setProblem(failure ? `Failed to load economics: ${failure.message}` : null);
     setTotals(((t.data as Economics[] | null) ?? [])[0] ?? null);
     setByChannel((ch.data as ChannelRow[] | null) ?? []);
     setByCampaign((cp.data as CampaignRow[] | null) ?? []);
@@ -106,10 +107,10 @@ export function ClientEconomicsPanel() {
     },
     {
       name: "campaign_id",
-      label: "Campaign",
+      label: "Ad spend tracker (legacy)",
       kind: "select",
       options: [
-        { value: "", label: "No campaign" },
+        { value: "", label: "No ad spend tracker" },
         ...campaigns.map((c) => ({ value: c.id, label: c.campaign_ref })),
       ],
     },
@@ -159,7 +160,7 @@ export function ClientEconomicsPanel() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : !totals ? (
+      ) : problem ? null : !totals ? (
         <p className="text-sm text-muted-foreground">No economics for this window.</p>
       ) : (
         <div className="space-y-6">
@@ -243,9 +244,9 @@ export function ClientEconomicsPanel() {
           </div>
 
           <div>
-            <h2 className="mb-3 text-sm font-semibold text-foreground">By campaign</h2>
+            <h2 className="mb-3 text-sm font-semibold text-foreground">By ad spend tracker (legacy)</h2>
             <DataTable
-              columns={["Campaign", "Spend", "Leads", "Customers", "Revenue", "CPL", "ROAS"]}
+              columns={["Ad spend tracker", "Spend", "Leads", "Customers", "Revenue", "CPL", "ROAS"]}
               emptyLabel="No spend or leads in this window"
               rows={byCampaign.map((r) => [
                 r.campaign_ref,

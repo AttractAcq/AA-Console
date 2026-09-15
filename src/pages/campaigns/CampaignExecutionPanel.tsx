@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
@@ -73,37 +73,60 @@ export function CampaignExecutionPanel() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [readinessError, setReadinessError] = useState<string | null>(null);
+  const request = useRef(0);
+
   const refresh = useCallback(async () => {
-    if (!clientId) {
-      setLoading(false);
-      return;
+    const version = ++request.current;
+    setLoadError(null);
+    setReadinessError(null);
+    setLoading(true);
+    setReadiness({});
+    try {
+      if (!clientId) {
+        throw new Error("No client selected.");
+      }
+      const { data, error } = await supabase
+        .from("client_campaigns")
+        .select(
+          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, launched_at, created_at",
+        )
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false });
+
+      if (version !== request.current) return;
+      if (error) throw error;
+      const rows = (data ?? []) as Campaign[];
+      setCampaigns(rows);
+
+      // Readiness is computed in the database from the real artifacts, never
+      // stored — so it is fetched per campaign rather than read off a column.
+      const checks = await Promise.allSettled(
+        rows.map((c) => supabase.rpc("campaign_readiness", { p_campaign_id: c.id })),
+      );
+      const next: Record<string, Requirement[]> = {};
+      if (version !== request.current) return;
+      rows.forEach((c, i) => {
+        const check = checks[i];
+        if (check.status === "rejected" || check.value.error) {
+          setReadinessError("Failed to load readiness. Launch is disabled for unchecked campaigns.");
+        } else next[c.id] = (check.value.data ?? []) as Requirement[];
+      });
+      setReadiness(next);
+    } catch (error) {
+      if (version === request.current) {
+        setCampaigns([]);
+        setLoadError(`Failed to load campaigns: ${(error as { message?: string }).message ?? "Unknown query error"}`);
+      }
+    } finally {
+      if (version === request.current) setLoading(false);
     }
-    const { data } = await supabase
-      .from("client_campaigns")
-      .select(
-        "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, launched_at, created_at",
-      )
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
-
-    const rows = (data ?? []) as Campaign[];
-    setCampaigns(rows);
-
-    // Readiness is computed in the database from the real artifacts, never
-    // stored — so it is fetched per campaign rather than read off a column.
-    const checks = await Promise.all(
-      rows.map((c) => supabase.rpc("campaign_readiness", { p_campaign_id: c.id })),
-    );
-    const next: Record<string, Requirement[]> = {};
-    rows.forEach((c, i) => {
-      next[c.id] = (checks[i]?.data ?? []) as Requirement[];
-    });
-    setReadiness(next);
-    setLoading(false);
   }, [clientId]);
 
   useEffect(() => {
     void refresh();
+    return () => { request.current++; };
   }, [refresh]);
 
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
@@ -150,7 +173,8 @@ export function CampaignExecutionPanel() {
         </p>
       )}
 
-      {loading ? (
+      {readinessError && <p role="alert">{readinessError}</p>}
+      {loadError ? <p role="alert">{loadError}</p> : loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : campaigns.length === 0 ? (
         <EmptyState label="No campaigns yet" />
@@ -213,7 +237,7 @@ export function CampaignExecutionPanel() {
                 <div className="mt-3 border-t border-border pt-3">
                   <h4 className="text-xs font-semibold text-foreground">Before this can launch</h4>
                   {reqs.length === 0 ? (
-                    <p className="mt-1 text-xs text-muted-foreground">Nothing to check yet.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Readiness unavailable.</p>
                   ) : (
                     <ul className="mt-2 space-y-1">
                       {reqs.map((r) => (
