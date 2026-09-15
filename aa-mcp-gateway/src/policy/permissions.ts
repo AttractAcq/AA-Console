@@ -4,6 +4,7 @@ import { marketingDirector } from "../onboarding/marketing-director.js";
 import { distributionManager } from "../onboarding/distribution-manager.js";
 import { salesOps } from "../onboarding/sales-ops.js";
 import { financeController } from "../onboarding/finance-controller.js";
+import { securityDevops } from "../onboarding/security-devops.js";
 import type { Bot, Identity, Tool } from "../shared/types.js";
 const workflow = [
   "workflow.create_task",
@@ -43,12 +44,7 @@ export const grants: Record<Bot, string[]> = {
   bot_admin: [...adminCalendar.grants],
   bot_finance: [...financeController.grants],
   bot_engineering: [...engineeringOps.grants],
-  bot_security_devops: [
-    "security.*",
-    "engineering.get_release_status",
-    "engineering.get_deployment_status",
-    ...workflow,
-  ],
+  bot_security_devops: [...securityDevops.grants],
 };
 /** Exact tool name, or single-segment domain wildcard (`content.*` → `content.<one segment>`). */
 export function permissionMatches(grant: string, permission: string): boolean {
@@ -102,6 +98,16 @@ export const ENGINEERING_ISSUE_TOOLS = new Set([
 export const ENGINEERING_STATUS_TOOLS = new Set([
   "engineering.get_release_status",
   "engineering.get_deployment_status",
+]);
+/**
+ * Phase 15: every security.* tool is bot_security_devops only. A stale
+ * security.* wildcard on any other bot must not widen discovery/call.
+ */
+export const SECURITY_TOOLS = new Set([
+  "security.get_system_status",
+  "security.get_open_findings",
+  "security.create_finding",
+  "security.get_incident_status",
 ]);
 export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   // Sec Phase 5 #5 / Phase 3–4 locked: hard-deny stays in gateway code forever.
@@ -168,6 +174,15 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   )
     return false;
   if (ENGINEERING_ISSUE_TOOLS.has(tool.name) && identity.bot !== "bot_engineering")
+    return false;
+  if (tool.domain === "security" && identity.bot !== "bot_security_devops")
+    return false;
+  if (
+    identity.bot === "bot_security_devops" &&
+    !securityDevops.grants.some((name) => name === tool.name)
+  )
+    return false;
+  if (SECURITY_TOOLS.has(tool.name) && identity.bot !== "bot_security_devops")
     return false;
   const patterns = grantPatterns(identity);
   return tool.permissions.every((permission) =>

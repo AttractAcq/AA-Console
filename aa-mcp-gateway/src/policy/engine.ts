@@ -51,6 +51,8 @@ export class ActionEngine {
       const eventId = typeof event?.id === "string" ? event.id : undefined;
       const issue = result.data?.issue as { id?: unknown } | undefined;
       const issueId = typeof issue?.id === "string" ? issue.id : undefined;
+      const finding = result.data?.finding as { id?: unknown } | undefined;
+      const findingId = typeof finding?.id === "string" ? finding.id : undefined;
       if (
         tool?.domain === "admin" &&
         [
@@ -73,6 +75,17 @@ export class ActionEngine {
         ].includes(result.error?.code ?? "")
       )
         authorization = "denied";
+      if (
+        tool?.domain === "security" &&
+        [
+          "client_forbidden",
+          "bot_not_active",
+          "bot_forbidden",
+          "finding_not_found",
+          "incident_not_found",
+        ].includes(result.error?.code ?? "")
+      )
+        authorization = "denied";
       this.store.transaction(() => {
         this.store.audit({
           request_id,
@@ -91,7 +104,10 @@ export class ActionEngine {
             input.issue_id ??
             issueId ??
             input.page_id ??
-            input.job_id,
+            input.job_id ??
+            input.finding_id ??
+            findingId ??
+            input.incident_id,
           execution_id: executionId,
           authorization,
           approval_status: result.approval_id
@@ -176,9 +192,11 @@ export class ActionEngine {
         if (
           tool.domain !== "admin" &&
           tool.domain !== "engineering" &&
+          tool.domain !== "security" &&
           !(
             (identity.bot === "bot_admin" ||
-              identity.bot === "bot_engineering") &&
+              identity.bot === "bot_engineering" ||
+              identity.bot === "bot_security_devops") &&
             [
               "workflow.create_task",
               "workflow.assign_task",

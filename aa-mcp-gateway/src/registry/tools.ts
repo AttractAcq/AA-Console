@@ -45,6 +45,12 @@ export const engineeringTools = new Set([
   "engineering.get_release_status",
   "engineering.get_deployment_status",
 ]);
+export const securityTools = new Set([
+  "security.get_system_status",
+  "security.get_open_findings",
+  "security.create_finding",
+  "security.get_incident_status",
+]);
 export const orchestrationTools = new Set([
   "workflow.list_tasks",
   "workflow.get_task",
@@ -418,6 +424,25 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
           fields.job_id = id.optional();
         }
       }
+      if (domain === "security") {
+        for (const key of Object.keys(fields)) delete fields[key];
+        fields.client_id = id;
+        if (action === "create_finding") {
+          fields.idempotency_key = z.string().min(8).max(128);
+          fields.title = z.string().trim().min(1).max(200);
+          fields.notes = z.string().max(2000).nullable();
+          fields.severity = z.enum(["low", "medium", "high", "critical"]);
+          fields.kind = z.enum(["finding", "incident"]).default("finding");
+        } else if (action === "get_open_findings") {
+          fields.limit = z.number().int().min(1).max(100).default(25);
+          fields.after = id.optional();
+          fields.finding_id = id.optional();
+        } else if (action === "get_incident_status") {
+          fields.limit = z.number().int().min(1).max(100).default(25);
+          fields.after = id.optional();
+          fields.incident_id = id.optional();
+        }
+      }
       const realContent = new Set([
         // Sec Phase 5 #6: isolation tests must stay green before adding a name.
         "content.list_ideas",
@@ -483,6 +508,14 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "engineering.get_release_status",
         "engineering.get_deployment_status",
       ]);
+      // Sec Phase 15: isolation tests must stay green before adding a name.
+      // Secret dumps, destroy, Railway writes and unrestricted deploy stay out.
+      const realSecurity = new Set([
+        "security.get_system_status",
+        "security.get_open_findings",
+        "security.create_finding",
+        "security.get_incident_status",
+      ]);
       const implementation =
         adminTools.has(name) ||
         orchestration ||
@@ -493,6 +526,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         realEconomics.has(name) ||
         realAttributionRevenue ||
         realEngineering.has(name) ||
+        realSecurity.has(name) ||
         [
           "workflow.get_pending_approvals",
           "workflow.get_activity",
@@ -545,9 +579,11 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
                           ? "Scoped AA attribution business API"
                           : realEngineering.has(name)
                             ? "Scoped AA engineering business API"
-                            : implementation === "real"
-                              ? "Gateway control store"
-                              : `Scoped AA ${domain} business API`,
+                            : realSecurity.has(name)
+                              ? "Scoped AA security business API"
+                              : implementation === "real"
+                                ? "Gateway control store"
+                                : `Scoped AA ${domain} business API`,
       } satisfies Tool;
     }),
 );

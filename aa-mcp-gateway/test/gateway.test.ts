@@ -310,7 +310,7 @@ test("approval rejection, expiration and revoked scope block execution", async (
   // content.queue_distribution left the gateway's HIGH-risk approval gate in
   // Phase 10 (now MEDIUM, AA-RPC-only, bot_distribution only); pipeline.record_sale
   // stays in that gate. Bots with exact-allowlist ceilings (sales_ops, finance,
-  // engineering, admin, marketing, distribution) cannot hold a temporary extra
+  // engineering, security, admin, marketing, distribution) cannot hold a temporary extra
   // grant for this lifecycle test — use bot_production.
   const production: Identity = { bot: "bot_production", clients: [client] };
   grants.bot_production.push("pipeline.record_sale");

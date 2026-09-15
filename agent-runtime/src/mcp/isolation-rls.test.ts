@@ -106,6 +106,7 @@ beforeAll(async () => {
     '20260911205529_79_client_marketing_spend.sql',
     '20260915180000_85_mcp_finance_controller.sql',
     '20260915200000_86_mcp_engineering_ops.sql',
+    '20260915220000_87_mcp_security_devops.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -2219,6 +2220,230 @@ describe('Phase 14 Engineering Ops isolation', () => {
       `select pg_get_functiondef(p.oid) def from pg_proc p join pg_namespace n on n.oid=p.pronamespace
         where (n.nspname='public' and p.proname like 'mcp_engineering_%')
            or (n.nspname='mcp_internal' and p.proname like 'engineering_%')`,
+    );
+    expect(functions.rows.length).toBeGreaterThan(0);
+    for (const row of functions.rows) {
+      expect(row.def).toContain('require_active_bot');
+      expect(row.def).toContain('require_bot_client_grant');
+      expect(row.def).not.toContain('can_access_client');
+    }
+  });
+});
+
+describe('Phase 15 Security DevOps isolation', () => {
+  const PAGE_A = 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  const JOB_A = 'aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+  const JOB_GLOBAL = 'ccccccc2-cccc-4ccc-8ccc-ccccccccccc2';
+  const create = async (
+    client = CLIENT_A,
+    execution = 'sec-create',
+    bot = 'bot_security_devops',
+    title = 'Open redirect',
+    severity = 'medium',
+    kind = 'finding',
+  ) => {
+    const q = await db.query<{ result: any }>(
+      `select public.mcp_security_create_finding($1,$2,'request-15',$3,$4,null,$5,$6) result`,
+      [bot, client, execution, title, severity, kind],
+    );
+    return q.rows[0]!.result;
+  };
+  beforeEach(async () => {
+    await db.exec(`
+      insert into mcp_bot_clients(bot_id,client_id) values
+        ('bot_security_devops','${CLIENT_A}'),
+        ('bot_engineering','${CLIENT_A}');
+      insert into client_pages (id,client_id,page_type,title,status,published_url,body) values
+        ('${PAGE_A}','${CLIENT_A}','landing','Harbour Home','approved','https://example.test/h','SECRET BODY');
+      insert into agent_jobs (id,agent_key,client_id,status,params,cost_usd,error) values
+        ('${JOB_A}','landing_page','${CLIENT_A}','completed','{"token":"SECRET"}',9.99,'SECRET ERR');
+      insert into agent_jobs (id,agent_key,client_id,status) values
+        ('${JOB_GLOBAL}','landing_page',null,'queued');
+    `);
+  });
+
+  it('same-client finding create/list and system status omit secrets and unscoped jobs', async () => {
+    const made = await create();
+    expect(made.finding.created_by_bot).toBe('bot_security_devops');
+    expect((await db.query('select * from mcp_internal.mcp_security_findings')).rows).toHaveLength(1);
+    const open = (await db.query<{ result: any }>(
+      `select mcp_security_get_open_findings('bot_security_devops',$1) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(open.findings).toHaveLength(1);
+    expect(open.findings[0].id).toBe(made.finding.id);
+    const status = (await db.query<{ result: any }>(
+      `select mcp_security_get_system_status('bot_security_devops',$1) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(status.projection).toBe('security_system_status_v1');
+    expect(status.open_findings).toBe(1);
+    expect(status.jobs_by_status.completed).toBe(1);
+    expect(status.jobs_by_status.queued).toBeUndefined();
+    expect(JSON.stringify(status)).not.toMatch(/SECRET|9\.99/);
+    const incidents = (await db.query<{ result: any }>(
+      `select mcp_security_get_incident_status('bot_security_devops',$1) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(incidents.incidents).toHaveLength(0);
+  });
+
+  it('replay returns the saved finding; changed payload conflicts', async () => {
+    const first = await create();
+    const again = await create();
+    expect(again.finding).toEqual(first.finding);
+    expect(again.replayed).toBe(true);
+    await expect(create(CLIENT_A, 'sec-create', 'bot_security_devops', 'Different')).rejects.toThrow(
+      'idempotency_conflict',
+    );
+  });
+
+  it('incident kind is not an open finding and wrong-kind ids are not found', async () => {
+    const incident = await create(CLIENT_A, 'sec-incident', 'bot_security_devops', 'Live', 'high', 'incident');
+    const open = (await db.query<{ result: any }>(
+      `select mcp_security_get_open_findings('bot_security_devops',$1) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(open.findings).toHaveLength(0);
+    const listed = (await db.query<{ result: any }>(
+      `select mcp_security_get_incident_status('bot_security_devops',$1) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(listed.incidents[0].id).toBe(incident.finding.id);
+    await expect(
+      db.query(`select mcp_security_get_open_findings('bot_security_devops',$1,25,null,$2)`, [CLIENT_A, incident.finding.id]),
+    ).rejects.toThrow('finding_not_found');
+    const finding = await create(CLIENT_A, 'sec-finding-2', 'bot_security_devops', 'Bug');
+    await expect(
+      db.query(`select mcp_security_get_incident_status('bot_security_devops',$1,25,null,$2)`, [CLIENT_A, finding.finding.id]),
+    ).rejects.toThrow('incident_not_found');
+  });
+
+  it('ungranted client, suspended bot and revoked grant deny', async () => {
+    await expect(
+      db.query(`select mcp_security_get_system_status('bot_security_devops',$1)`, [CLIENT_B]),
+    ).rejects.toThrow('client_forbidden');
+    await db.exec(`update mcp_internal.mcp_bots set status='suspended' where bot_id='bot_security_devops'`);
+    await expect(
+      db.query(`select mcp_security_get_system_status('bot_security_devops',$1)`, [CLIENT_A]),
+    ).rejects.toThrow('bot_not_active');
+    await db.exec(`update mcp_internal.mcp_bots set status='active' where bot_id='bot_security_devops'`);
+    await db.exec(`delete from mcp_bot_clients where bot_id='bot_security_devops'`);
+    await expect(create()).rejects.toThrow('client_forbidden');
+  });
+
+  it('missing and foreign finding ids are indistinguishable', async () => {
+    const first = await create();
+    await db.exec(`insert into mcp_bot_clients(bot_id,client_id) values('bot_security_devops','${CLIENT_B}')`);
+    await expect(
+      db.query(`select mcp_security_get_open_findings('bot_security_devops',$1,25,null,$2)`, [CLIENT_B, first.finding.id]),
+    ).rejects.toThrow('finding_not_found');
+    await expect(
+      db.query(`select mcp_security_get_open_findings('bot_security_devops',$1,25,null,$2)`, [CLIENT_A, CLIENT_B]),
+    ).rejects.toThrow('finding_not_found');
+  });
+
+  it('other bots cannot create or list findings; Engineering still has no security writes', async () => {
+    await expect(create(CLIENT_A, 'eng-create', 'bot_engineering')).rejects.toThrow('bot_forbidden');
+    await expect(create(CLIENT_A, 'prod-create', 'bot_production')).rejects.toThrow('bot_forbidden');
+    await expect(
+      db.query(`select mcp_security_get_system_status('bot_engineering',$1)`, [CLIENT_A]),
+    ).rejects.toThrow('bot_forbidden');
+  });
+
+  it('removed exact permission denies even with security wildcard attempt', async () => {
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_security_devops','security.*','test')`,
+      ),
+    ).rejects.toThrow(/Phase 15: security\.\* wildcard is forbidden/);
+    await db.exec(
+      `delete from mcp_internal.mcp_bot_permissions where bot_id='bot_security_devops' and permission_pattern='security.create_finding'`,
+    );
+    await expect(create()).rejects.toThrow('bot_forbidden');
+    await db.exec(
+      `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+       values('bot_security_devops','security.create_finding','phase-15:security-devops-allowlist')`,
+    );
+  });
+
+  it('security tools cannot be granted outside bot_security_devops; destroy/secret grants deny', async () => {
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_production','security.create_finding','test')`,
+      ),
+    ).rejects.toThrow(/Phase 15: security tools must not be granted outside bot_security_devops/);
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_security_devops','secrets.dump','test')`,
+      ),
+    ).rejects.toThrow(/Phase 15: bot_security_devops must not hold destroy, secrets/);
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_security_devops','infra.destroy','test')`,
+      ),
+    ).rejects.toThrow(/Phase 15: bot_security_devops must not hold destroy, secrets/);
+  });
+
+  it('anon and authenticated cannot execute public wrappers; tables deny including service_role', async () => {
+    const first = await create();
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      for (const sql of [
+        `select mcp_security_get_system_status('bot_security_devops','${CLIENT_A}')`,
+        `select mcp_security_get_open_findings('bot_security_devops','${CLIENT_A}')`,
+        `select mcp_security_create_finding('bot_security_devops','${CLIENT_A}','req','exec','Title',null,'low','finding')`,
+        `select mcp_security_get_incident_status('bot_security_devops','${CLIENT_A}')`,
+      ]) {
+        await expect(db.query(sql)).rejects.toThrow(/permission denied/);
+      }
+      await db.exec('reset role');
+    }
+    await db.exec(`reset role`);
+    await db.exec(`set role service_role`);
+    for (const table of ['mcp_security_findings', 'mcp_security_requests']) {
+      await expect(db.query(`select * from mcp_internal.${table}`)).rejects.toThrow(/permission denied/);
+    }
+    await db.exec('reset role');
+    await db.exec(`select set_config('request.jwt.claim.role','service_role',false)`);
+    expect(first.finding.id).toBeTruthy();
+  });
+
+  it('RLS is forced and permission rows are the exact 14-name allowlist', async () => {
+    const tables = await db.query<{ relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+      `select relrowsecurity, relforcerowsecurity from pg_class where relname in ('mcp_security_findings','mcp_security_requests')`,
+    );
+    expect(tables.rows.every((r) => r.relrowsecurity && r.relforcerowsecurity)).toBe(true);
+    const grants = await db.query<{ permission_pattern: string }>(
+      `select permission_pattern from mcp_internal.mcp_bot_permissions where bot_id='bot_security_devops' order by 1`,
+    );
+    expect(grants.rows.map((r) => r.permission_pattern)).toEqual([
+      'engineering.get_deployment_status',
+      'engineering.get_release_status',
+      'security.create_finding',
+      'security.get_incident_status',
+      'security.get_open_findings',
+      'security.get_system_status',
+      'workflow.assign_task',
+      'workflow.complete_task',
+      'workflow.create_approval',
+      'workflow.create_task',
+      'workflow.get_activity',
+      'workflow.get_pending_approvals',
+      'workflow.get_task',
+      'workflow.list_tasks',
+    ]);
+  });
+
+  it('Bot RPC sources require active bot + client grant and never can_access_client', async () => {
+    const functions = await db.query<{ def: string }>(
+      `select pg_get_functiondef(p.oid) def from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+        where (n.nspname='public' and p.proname like 'mcp_security_%')
+           or (n.nspname='mcp_internal' and (p.proname like 'security_%' or p.proname = 'require_security_permission'))`,
     );
     expect(functions.rows.length).toBeGreaterThan(0);
     for (const row of functions.rows) {
