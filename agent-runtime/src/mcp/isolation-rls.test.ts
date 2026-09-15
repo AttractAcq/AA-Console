@@ -2372,7 +2372,7 @@ describe('Phase 15 Security DevOps isolation', () => {
     await expect(
       db.exec(
         `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
-         values('bot_production','security.create_finding','test')`,
+         values('bot_engineering','security.create_finding','test')`,
       ),
     ).rejects.toThrow(/Phase 15: security tools must not be granted outside bot_security_devops/);
     await expect(

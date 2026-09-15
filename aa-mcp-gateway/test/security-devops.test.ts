@@ -283,20 +283,39 @@ test("Security replay reauthorizes in backend; same execution key, no cached suc
   );
 });
 test("adapter rejects nested cross-client or extra secret fields", async (t) => {
-  let raw: any = { client_id: client, finding: { ...finding, client_id: other } };
+  let raw: any = {
+    client_id: client,
+    findings: [{ ...finding, client_id: other }],
+    next_cursor: null,
+  };
   const { adapter } = await mockAa(t, () => ({ body: raw }));
   const e = engine(t, adapter);
   for (const value of [
     raw,
-    { client_id: client, finding: { ...finding, id: other } },
-    { client_id: client, finding: { ...finding, token: "unexpected" } },
-    { client_id: client, finding: { ...finding, env: { SECRET: "x" } } },
+    {
+      client_id: client,
+      findings: [{ ...finding, id: other }],
+      next_cursor: null,
+    },
+    {
+      client_id: client,
+      findings: [{ ...finding, token: "unexpected" }],
+      next_cursor: null,
+    },
+    {
+      client_id: client,
+      findings: [{ ...finding, env: { SECRET: "x" } }],
+      next_cursor: null,
+    },
     { client_id: client },
   ]) {
     raw = value;
     assert.equal(
       (
-        await e.call(identity, "security.create_finding", input)
+        await e.call(identity, "security.get_open_findings", {
+          client_id: client,
+          finding_id: id,
+        })
       ).error?.code,
       "malformed_response",
     );
