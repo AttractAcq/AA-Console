@@ -281,44 +281,43 @@ test("Finance critical payment creates approval and cannot execute before human 
       return { status: "completed", capability: t.name };
     },
   });
-  const engineering: Identity = { bot: "bot_engineering", clients: [client] };
-  grants.bot_engineering.push("finance.execute_payment");
+  const production: Identity = { bot: "bot_production", clients: [client] };
+  grants.bot_production.push("finance.execute_payment");
   try {
-    const r = await engine.call(engineering, critical.name, {
+    const r = await engine.call(production, critical.name, {
       client_id: client,
       idempotency_key: "payment-key",
     });
     assert.equal(r.status, "approval_required");
     assert.equal(calls, 0);
     await assert.rejects(() =>
-      engine.executeApproval(r.approval_id!, [engineering]),
+      engine.executeApproval(r.approval_id!, [production]),
     );
     engine.decide(r.approval_id!, "human_alex", "approved");
-    const executed = await engine.executeApproval(r.approval_id!, [engineering]);
+    const executed = await engine.executeApproval(r.approval_id!, [production]);
     assert.equal(executed.status, "completed");
     assert.equal(calls, 1);
     await assert.rejects(() =>
-      engine.executeApproval(r.approval_id!, [engineering]),
+      engine.executeApproval(r.approval_id!, [production]),
     );
     assert.equal(calls, 1);
   } finally {
-    grants.bot_engineering.pop();
+    grants.bot_production.pop();
     store.close();
   }
 });
 test("approval rejection, expiration and revoked scope block execution", async () => {
   // content.queue_distribution left the gateway's HIGH-risk approval gate in
   // Phase 10 (now MEDIUM, AA-RPC-only, bot_distribution only); pipeline.record_sale
-  // stays in that gate. bot_sales_ops and bot_finance have exact-allowlist
-  // ceilings that forever exclude record_sale (Phase 11 / Phase 13), so this
-  // lifecycle test must use a Bot without that ceiling — temporary grant on
-  // bot_engineering.
-  const engineering: Identity = { bot: "bot_engineering", clients: [client] };
-  grants.bot_engineering.push("pipeline.record_sale");
+  // stays in that gate. Bots with exact-allowlist ceilings (sales_ops, finance,
+  // engineering, admin, marketing, distribution) cannot hold a temporary extra
+  // grant for this lifecycle test — use bot_production.
+  const production: Identity = { bot: "bot_production", clients: [client] };
+  grants.bot_production.push("pipeline.record_sale");
   const { store, engine } = fixture(new AAApiAdapter(), true);
   try {
     for (const mode of ["rejected", "expired", "revoked"]) {
-      const r = await engine.call(engineering, "pipeline.record_sale", {
+      const r = await engine.call(production, "pipeline.record_sale", {
         client_id: client,
         idempotency_key: `approval-${mode}`,
         lead_id: idea,
@@ -328,7 +327,7 @@ test("approval rejection, expiration and revoked scope block execution", async (
       if (mode === "rejected") {
         engine.decide(r.approval_id!, "human", "rejected", "Needs changes");
         await assert.rejects(() =>
-          engine.executeApproval(r.approval_id!, [engineering]),
+          engine.executeApproval(r.approval_id!, [production]),
         );
       } else if (mode === "expired") {
         const a = store.getApproval(r.approval_id!);
@@ -343,7 +342,7 @@ test("approval rejection, expiration and revoked scope block execution", async (
         assert.equal(
           (
             await engine.executeApproval(r.approval_id!, [
-              { ...engineering, clients: [] },
+              { ...production, clients: [] },
             ])
           ).status,
           "rejected",
@@ -351,7 +350,7 @@ test("approval rejection, expiration and revoked scope block execution", async (
       }
     }
   } finally {
-    grants.bot_engineering.pop();
+    grants.bot_production.pop();
     store.close();
   }
 });

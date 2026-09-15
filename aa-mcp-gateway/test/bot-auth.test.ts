@@ -183,12 +183,12 @@ test("dual-read falls back to env on AA miss and db mode requires AA", async () 
 
 test("db mode allows a tool present only in AA permissions", async () => {
   const auth = new BotAuthenticator("db", [], async () =>
-    activeResolve({ permissions: ["engineering.get_issue"] }),
+    activeResolve({ permissions: ["security.get_system_status"] }),
   );
   const id = await auth.authenticate(`Bearer ${token}`);
-  assert.deepEqual(id.permissions, ["engineering.get_issue"]);
+  assert.deepEqual(id.permissions, ["security.get_system_status"]);
   assert.equal(
-    grants.bot_production.some((g) => permissionMatches(g, "engineering.get_issue")),
+    grants.bot_production.some((g) => permissionMatches(g, "security.get_system_status")),
     false,
   );
   const store = new Store(":memory:");
@@ -197,13 +197,13 @@ test("db mode allows a tool present only in AA permissions", async () => {
     registry,
     {
       async execute() {
-        return { status: "completed", capability: "engineering.get_issue" };
+        return { status: "completed", capability: "security.get_system_status" };
       },
     },
     true,
   );
-  assert.ok(engine.discover(id).some((t) => t.name === "engineering.get_issue"));
-  const r = await engine.call(id, "engineering.get_issue", { client_id: client });
+  assert.ok(engine.discover(id).some((t) => t.name === "security.get_system_status"));
+  const r = await engine.call(id, "security.get_system_status", { client_id: client });
   assert.equal(r.status, "completed");
   store.close();
 });
