@@ -2,6 +2,7 @@ import { adminCalendar } from "../onboarding/admin-calendar.js";
 import { marketingDirector } from "../onboarding/marketing-director.js";
 import { distributionManager } from "../onboarding/distribution-manager.js";
 import { salesOps } from "../onboarding/sales-ops.js";
+import { financeController } from "../onboarding/finance-controller.js";
 import type { Bot, Identity, Tool } from "../shared/types.js";
 const workflow = [
   "workflow.create_task",
@@ -39,11 +40,7 @@ export const grants: Record<Bot, string[]> = {
   bot_distribution: [...distributionManager.grants],
   bot_sales_ops: [...salesOps.grants],
   bot_admin: [...adminCalendar.grants],
-  bot_finance: [
-    "economics.*",
-    "attribution.get_revenue_attribution",
-    ...workflow,
-  ],
+  bot_finance: [...financeController.grants],
   bot_engineering: ["engineering.*", ...workflow],
   bot_security_devops: [
     "security.*",
@@ -130,6 +127,13 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   if (
     identity.bot === "bot_admin" &&
     !adminCalendar.grants.some((name) => name === tool.name)
+  )
+    return false;
+  if (tool.domain === "economics" && identity.bot !== "bot_finance")
+    return false;
+  if (
+    identity.bot === "bot_finance" &&
+    !financeController.grants.some((name) => name === tool.name)
   )
     return false;
   const patterns = grantPatterns(identity);

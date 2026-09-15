@@ -92,6 +92,20 @@ beforeAll(async () => {
     '20260911210000_78_mcp_admin_calendar.sql',
     '20260915120000_84_mcp_sales_agent_factory.sql',
   ]) await db.exec(await migration(file));
+  // Migration 79 FKs client_marketing_spend.client_campaign_id to
+  // client_campaigns (created in 20260909020000_72_campaign_execution.sql).
+  // That file also needs client_pages / campaign_artifacts / scheduled_posts
+  // columns this partial fixture does not load, so stub the table only.
+  await db.exec(`
+    create table if not exists client_campaigns (
+      id uuid primary key default gen_random_uuid(),
+      client_id uuid not null references clients (id) on delete cascade
+    );
+  `);
+  for (const file of [
+    '20260911205529_79_client_marketing_spend.sql',
+    '20260915180000_85_mcp_finance_controller.sql',
+  ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
       client_leads, client_billing, finance_entries to authenticated;
@@ -1850,5 +1864,167 @@ describe('Phase 11b Sales Agent Factory isolation', () => {
       `insert into mcp_internal.mcp_bot_permissions (bot_id, permission_pattern, granted_by)
        values ('bot_production', 'sales_agents.create', 'test')`,
     )).rejects.toThrow(/Phase 11: pipeline/);
+  });
+});
+
+describe('Phase 13 Finance Controller isolation', () => {
+  const CAMP_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const CAMP_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const LEAD_A = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const read = (
+    action = 'get_client_economics',
+    client = CLIENT_A,
+    bot = 'bot_finance',
+    start = '2026-09-01',
+    end = '2026-10-01',
+    campaign: string | null = null,
+  ) => db.query<{ result: any }>(
+    `select public.mcp_economics_read($1,$2,$3,$4,$5::date,$6::date,25) result`,
+    [bot, client, action, campaign, start, end],
+  );
+  const attrib = (
+    client = CLIENT_A,
+    bot = 'bot_finance',
+    campaign: string | null = null,
+  ) => db.query<{ result: any }>(
+    `select public.mcp_attribution_revenue($1,$2,$3,'2026-09-01'::date,'2026-10-01'::date,25) result`,
+    [bot, client, campaign],
+  );
+
+  beforeEach(async () => {
+    await db.exec(`
+      insert into mcp_bot_clients(bot_id,client_id) values
+        ('bot_finance','${CLIENT_A}'),
+        ('bot_chief_of_staff','${CLIENT_A}');
+      insert into campaigns (id, campaign_ref, client_id, target_role, daily_spend)
+        values ('${CAMP_A}','FIN-A','${CLIENT_A}','owner',1),
+               ('${CAMP_B}','FIN-B','${CLIENT_B}','owner',1);
+      insert into client_marketing_spend (client_id, spent_on, amount, currency, source, campaign_id)
+        values ('${CLIENT_A}','2026-09-10',1000,'ZAR','manual','${CAMP_A}'),
+               ('${CLIENT_B}','2026-09-10',9999,'ZAR','manual','${CAMP_B}');
+      insert into client_leads (id, client_id, name, email, stage, sale_value, cash_collected, source_campaign_id, created_at)
+        values ('${LEAD_A}','${CLIENT_A}','Alpha','a@example.com','sale',2000,1500,'${CAMP_A}','2026-09-12T00:00:00Z');
+    `);
+  });
+
+  it('returns cohort economics for the granted client and never leaks the other client', async () => {
+    const row = (await read()).rows[0]!.result;
+    expect(row.client_id).toBe(CLIENT_A);
+    expect(row.projection).toBe('acquisition_cohort_economics_v1');
+    expect(row.exclusive_end).toBe(true);
+    expect(Number(row.economics.spend)).toBe(1000);
+    expect(row.economics.leads).toBe(1);
+    expect(row.economics.customers).toBe(1);
+    expect(Number(row.economics.revenue)).toBe(2000);
+    expect(Number(row.economics.cash_collected)).toBe(1500);
+    expect(Number(row.economics.roas)).toBe(2);
+    expect(Number(row.economics.cac)).toBe(1000);
+    expect(JSON.stringify(row)).not.toContain(CLIENT_B);
+    expect(JSON.stringify(row)).not.toContain('9999');
+    expect(JSON.stringify(row)).not.toContain('a@example.com');
+    const costs = (await read('get_costs')).rows[0]!.result.economics;
+    expect(Number(costs.spend)).toBe(1000);
+    expect(costs.revenue).toBeUndefined();
+    const revenue = (await read('get_revenue')).rows[0]!.result.economics;
+    expect(Number(revenue.revenue)).toBe(2000);
+    expect(revenue.spend).toBeUndefined();
+    const roi = (await read('get_roi')).rows[0]!.result.economics;
+    expect(Number(roi.roas)).toBe(2);
+    expect(Number(roi.cash_roas)).toBe(1.5);
+    const campaigns = (await read('get_campaign_economics')).rows[0]!.result.campaigns;
+    expect(campaigns).toHaveLength(1);
+    expect(campaigns[0].campaign_id).toBe(CAMP_A);
+    const one = (await read('get_campaign_economics', CLIENT_A, 'bot_finance', '2026-09-01', '2026-10-01', CAMP_A)).rows[0]!.result;
+    expect(one.campaigns).toHaveLength(1);
+    const attr = (await attrib()).rows[0]!.result;
+    expect(attr.projection).toBe('acquisition_cohort_revenue_attribution_v1');
+    expect(attr.campaigns[0].campaign_id).toBe(CAMP_A);
+  });
+
+  it('denies ungranted clients, other bots, revoked grants, suspended identity, and foreign campaigns', async () => {
+    await expect(read('get_client_economics', CLIENT_B)).rejects.toThrow('client_forbidden');
+    await expect(attrib(CLIENT_B)).rejects.toThrow('client_forbidden');
+    await expect(read('get_costs', CLIENT_A, 'bot_production')).rejects.toThrow('bot_forbidden');
+    await expect(attrib(CLIENT_A, 'bot_production')).rejects.toThrow('bot_forbidden');
+    await db.exec(`delete from mcp_bot_clients where bot_id='bot_finance'`);
+    await expect(read()).rejects.toThrow('client_forbidden');
+    await db.exec(`insert into mcp_bot_clients(bot_id,client_id) values('bot_finance','${CLIENT_A}')`);
+    await db.exec(`update mcp_internal.mcp_bots set status='suspended' where bot_id='bot_finance'`);
+    await expect(read()).rejects.toThrow('bot_not_active');
+    await db.exec(`update mcp_internal.mcp_bots set status='active' where bot_id='bot_finance'`);
+    await expect(read('get_campaign_economics', CLIENT_A, 'bot_finance', '2026-09-01', '2026-10-01', CAMP_B)).rejects.toThrow('campaign_not_found');
+    await expect(read('get_campaign_economics', CLIENT_A, 'bot_finance', '2026-09-01', '2026-10-01', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd')).rejects.toThrow('campaign_not_found');
+  });
+
+  it('rejects invalid windows, client-level campaign_id, and campaign_id on get_costs', async () => {
+    await expect(read('get_client_economics', CLIENT_A, 'bot_finance', '2026-10-01', '2026-09-01')).rejects.toThrow('invalid_request');
+    await expect(read('get_client_economics', CLIENT_A, 'bot_finance', '2020-01-01', '2022-01-02')).rejects.toThrow('invalid_request');
+    await expect(read('get_costs', CLIENT_A, 'bot_finance', '2026-09-01', '2026-10-01', CAMP_A)).rejects.toThrow('invalid_request');
+  });
+
+  it('lets CoS use attribution.get_revenue_attribution via its existing wildcard, not economics', async () => {
+    const attr = (await attrib(CLIENT_A, 'bot_chief_of_staff')).rows[0]!.result;
+    expect(attr.client_id).toBe(CLIENT_A);
+    await expect(read('get_client_economics', CLIENT_A, 'bot_chief_of_staff')).rejects.toThrow('bot_forbidden');
+  });
+
+  it('revokes exact economics permission even if a wildcard is attempted', async () => {
+    await db.exec(`delete from mcp_internal.mcp_bot_permissions where bot_id='bot_finance' and permission_pattern='economics.get_costs'`);
+    await expect(read('get_costs')).rejects.toThrow('bot_forbidden');
+    await expect(db.exec(
+      `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+       values ('bot_finance','economics.*','test')`,
+    )).rejects.toThrow(/Phase 13: bot_finance must not hold economics\.\*/);
+    await expect(db.exec(
+      `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+       values ('bot_marketing','economics.get_costs','test')`,
+    )).rejects.toThrow(/Phase 13: economics/);
+    await db.exec(
+      `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+       values ('bot_finance','economics.get_costs','phase-13-locked')`,
+    );
+  });
+
+  it('every new RPC uses require_active_bot + require_bot_client_grant, never can_access_client, and hard-codes bot_finance on economics', async () => {
+    const functions = await db.query<{ def: string; proname: string }>(
+      `select p.proname, pg_get_functiondef(p.oid) def
+         from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+        where (n.nspname='public' and p.proname in ('mcp_economics_read','mcp_attribution_revenue'))
+           or (n.nspname='mcp_internal' and p.proname in ('economics_read','attribution_revenue','require_finance_permission','cohort_economics','cohort_economics_by_campaign'))`,
+    );
+    expect(functions.rows.length).toBe(7);
+    for (const row of functions.rows) {
+      expect(row.def, row.proname).not.toMatch(/can_access_client\s*\(/);
+      expect(row.def, row.proname).toContain('SECURITY DEFINER');
+      if (row.proname === 'cohort_economics' || row.proname === 'cohort_economics_by_campaign') continue;
+      expect(row.def, row.proname).toContain('require_active_bot');
+      expect(row.def, row.proname).toContain('require_bot_client_grant');
+    }
+    const econ = functions.rows.find((r) => r.proname === 'economics_read')!.def;
+    expect(econ).toContain('bot_finance');
+    expect(econ).toContain('bot_forbidden');
+  });
+
+  it('service_role may execute public wrappers; anon/authenticated and internal functions cannot', async () => {
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await expect(read()).rejects.toThrow(/permission denied|unauthorized/);
+      await expect(attrib()).rejects.toThrow(/permission denied|unauthorized/);
+      await asService();
+    }
+    await db.exec(`set role service_role`);
+    await expect(db.query(`select mcp_internal.economics_read('bot_finance',$1,'get_costs')`, [CLIENT_A])).rejects.toThrow(/permission denied/);
+    await expect(db.query(`select mcp_internal.attribution_revenue('bot_finance',$1)`, [CLIENT_A])).rejects.toThrow(/permission denied/);
+    await asService();
+  });
+
+  it('bot_finance has exactly 14 exact permission rows and no economics.* wildcard', async () => {
+    const rows = await db.query<{ permission_pattern: string }>(
+      `select permission_pattern from mcp_internal.mcp_bot_permissions where bot_id='bot_finance' order by 1`,
+    );
+    expect(rows.rows).toHaveLength(14);
+    expect(rows.rows.map((r) => r.permission_pattern)).not.toContain('economics.*');
+    expect(rows.rows.some((r) => r.permission_pattern === 'economics.get_client_economics')).toBe(true);
+    expect(rows.rows.some((r) => r.permission_pattern === 'pipeline.record_sale')).toBe(false);
   });
 });

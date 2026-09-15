@@ -69,14 +69,14 @@
 | proof.get_for_claim | stub | read | LOW | no | true | Scoped AA proof business API |
 | attribution.get_campaign_performance | real | read | LOW | no | true | Scoped AA orchestration business API |
 | attribution.get_content_performance | stub | read | LOW | no | true | Scoped AA attribution business API |
-| attribution.get_revenue_attribution | stub | read | LOW | no | true | Scoped AA attribution business API |
+| attribution.get_revenue_attribution | real | read | LOW | no | true | Scoped AA attribution business API |
 | attribution.get_conversion_funnel | stub | read | LOW | no | true | Scoped AA attribution business API |
 | attribution.generate_report | stub | write | MEDIUM | no | true | Scoped AA attribution business API |
-| economics.get_client_economics | stub | read | LOW | no | true | Scoped AA economics business API |
-| economics.get_campaign_economics | stub | read | LOW | no | true | Scoped AA economics business API |
-| economics.get_costs | stub | read | LOW | no | true | Scoped AA economics business API |
-| economics.get_revenue | stub | read | LOW | no | true | Scoped AA economics business API |
-| economics.get_roi | stub | read | LOW | no | true | Scoped AA economics business API |
+| economics.get_client_economics | real (bot_finance only) | read | LOW | no | true | Scoped AA economics business API |
+| economics.get_campaign_economics | real (bot_finance only) | read | LOW | no | true | Scoped AA economics business API |
+| economics.get_costs | real (bot_finance only) | read | LOW | no | true | Scoped AA economics business API |
+| economics.get_revenue | real (bot_finance only) | read | LOW | no | true | Scoped AA economics business API |
+| economics.get_roi | real (bot_finance only) | read | LOW | no | true | Scoped AA economics business API |
 | workflow.create_task | real | write | MEDIUM | no | true | Scoped AA orchestration business API |
 | workflow.assign_task | real | write | MEDIUM | no | true | Scoped AA orchestration business API |
 | workflow.get_task | real | read | LOW | no | true | Scoped AA orchestration business API |
@@ -101,3 +101,6 @@
 
 
 Phase 12: `bot_admin` has an exact 15-tool ceiling (nine reads/six writes), including four AA-native `admin.*` event tools. Other Bots cannot invoke Admin tools even with stale wildcard grants. Admin has no Finance, Security, Engineering, pipeline, sales_agents or content tools, and `workflow.record_decision` remains universally denied. Events do not send invitations or notifications. See [Phase 12](phase-12-admin-calendar.md) for database objects, guarded RPCs, replay authorization and `smoke:admin`. Gate 12 is NOT YET CLOSED.
+
+
+Phase 13: `bot_finance` has an exact 14-tool ceiling (ten reads/four writes): five named `economics.*` Client Economics OS reads, `attribution.get_revenue_attribution`, and the eight-tool workflow suite. The seeded `economics.*` wildcard is replaced with exact rows. Other Bots cannot invoke `economics.*` even with stale wildcards. Money writes (`pipeline.record_sale`, payments, bank/Stripe/Xero) are not granted and stay stub. See [Phase 13](phase-13-finance-controller.md) for guarded RPCs and `smoke:finance`. Gate 13 is NOT YET CLOSED.
