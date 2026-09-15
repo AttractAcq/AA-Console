@@ -48,10 +48,10 @@ beforeEach(() => {
 it("uploads a built HTML page and links it to the selected campaign without queueing the agent", async () => {
   render(<PageBuilderPanel />);
   fireEvent.click(screen.getByRole("button", { name: "Build Page" }));
-  fireEvent.change(await screen.findByLabelText("Page title"), { target: { value: "Christmas Sale landing" } });
+  fireEvent.change(await screen.findByLabelText(/Page title/), { target: { value: "Christmas Sale landing" } });
   await screen.findByText("Christmas Sale · planning");
-  fireEvent.change(screen.getByLabelText("Campaign"), { target: { value: "campaign-1" } });
-  fireEvent.change(screen.getByLabelText("Built HTML file"), {
+  fireEvent.change(screen.getByLabelText(/Campaign/), { target: { value: "campaign-1" } });
+  fireEvent.change(screen.getByLabelText(/Built HTML file/), {
     target: { files: [new File(["<!doctype html><html><body>Ready</body></html>"], "landing.html", { type: "text/html" })] },
   });
   fireEvent.click(screen.getByRole("button", { name: "Save page" }));
@@ -82,10 +82,10 @@ it("uploads a built HTML page and links it to the selected campaign without queu
 it("queues the page agent when no HTML file is uploaded and still links the campaign", async () => {
   render(<PageBuilderPanel />);
   fireEvent.click(screen.getByRole("button", { name: "Build Page" }));
-  fireEvent.change(await screen.findByLabelText("Page title"), { target: { value: "Agent-built page" } });
+  fireEvent.change(await screen.findByLabelText(/Page title/), { target: { value: "Agent-built page" } });
   await screen.findByText("Christmas Sale · planning");
-  fireEvent.change(screen.getByLabelText("Campaign"), { target: { value: "campaign-1" } });
-  fireEvent.change(screen.getByLabelText("What this page is for"), { target: { value: "Write the festive campaign page." } });
+  fireEvent.change(screen.getByLabelText(/Campaign/), { target: { value: "campaign-1" } });
+  fireEvent.change(screen.getByLabelText(/What this page is for/), { target: { value: "Write the festive campaign page." } });
   fireEvent.click(screen.getByRole("button", { name: "Save page" }));
 
   await waitFor(() => expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", {
@@ -105,7 +105,7 @@ it("queues the page agent when no HTML file is uploaded and still links the camp
 it("requires a brief when there is no uploaded HTML", async () => {
   render(<PageBuilderPanel />);
   fireEvent.click(screen.getByRole("button", { name: "Build Page" }));
-  fireEvent.change(await screen.findByLabelText("Page title"), { target: { value: "No brief" } });
+  fireEvent.change(await screen.findByLabelText(/Page title/), { target: { value: "No brief" } });
   fireEvent.click(screen.getByRole("button", { name: "Save page" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent("required unless you upload a built HTML file");
