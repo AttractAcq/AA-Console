@@ -141,12 +141,12 @@ beforeAll(async () => {
     values ('creative_build', 'Creative Build', 'CB', 'content', 'fixture', '{}'),
            ('brief_dispatch', 'Brief Dispatch', 'BD', 'content', 'fixture', '{}')
     on conflict (agent_key) do nothing;
-    -- This HTTP fixture does not load 85/86/87. 90's assert_cos_prohibitions
+    -- This HTTP fixture does not load 85/86/87/89. 90's assert_cos_prohibitions
     -- still includes those phases, so drop the leftover seed wildcards they
     -- would have replaced. Also drop marketing's leftover proof.* so the
     -- Phase 16b proof-outside-production check can run.
     delete from mcp_internal.mcp_bot_permissions
-     where permission_pattern in ('economics.*', 'engineering.*', 'security.*', 'proof.*');
+     where permission_pattern in ('economics.*', 'engineering.*', 'security.*', 'proof.*', 'conversion.*');
   `);
   await db.exec(await migration('20260916140000_90_mcp_sales_proof_production.sql'));
 }, 60_000);
