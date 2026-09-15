@@ -10,6 +10,7 @@ import type { FieldDef } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
 import { useGitHubStatus, provisionBlockerFromStatus } from "../../lib/useGitHubStatus";
 import { callRuntime } from "../../lib/callRuntime";
+import { PublishButton } from "../../components/sites/PublishButton";
 import { cn } from "../../lib/cn";
 import {
   repoStateLabel,
@@ -26,7 +27,14 @@ type Deployment = {
   deployed_at: string | null;
 };
 
-type PageRow = { id: string; title: string; published_url: string | null; publish_status: string };
+type PageRow = {
+  id: string;
+  title: string;
+  html: string | null;
+  published_url: string | null;
+  publish_status: string;
+  site_repository_id: string | null;
+};
 type AgentRow = { id: string; name: string };
 
 const STATE_TONE: Record<string, string> = {
@@ -66,7 +74,7 @@ export function SitesPanel() {
         .order("created_at", { ascending: false }),
       supabase
         .from("client_pages")
-        .select("id, title, published_url, publish_status")
+        .select("id, title, html, published_url, publish_status, site_repository_id")
         .eq("client_id", clientId),
       supabase.from("client_sales_agents").select("id, name").eq("client_id", clientId),
     ]);
@@ -191,6 +199,31 @@ export function SitesPanel() {
               ))}
             </div>
           )}
+
+          {/* One site holds many pages, each at its own path — so this lists
+              every page and where it stands, rather than assuming one. */}
+          <div className="mb-6">
+            <h3 className="mb-3 text-sm font-semibold text-foreground">Pages on this site</h3>
+            {pages.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No pages built for this client yet. Build one in Page Builder first.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {pages.map((p) => (
+                  <div key={p.id} className="rounded-lg border border-border bg-card p-3">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="text-sm font-medium text-card-foreground">{p.title}</span>
+                      <span className="text-xs capitalize text-muted-foreground">{p.publish_status}</span>
+                    </div>
+                    <div className="mt-2">
+                      <PublishButton page={p} repos={repos} onPublished={() => void refresh()} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div>
             <h3 className="mb-3 text-sm font-semibold text-foreground">Agents on pages</h3>

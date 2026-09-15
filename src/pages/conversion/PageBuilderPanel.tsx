@@ -9,6 +9,8 @@ import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
+import { PublishButton } from "../../components/sites/PublishButton";
+import type { SiteRepo } from "../sites/readiness";
 import { PagePreview } from "../../components/pages/PagePreview";
 import { PagePolish } from "./PagePolish";
 
@@ -18,6 +20,8 @@ type Page = {
   status: string;
   body: string | null;
   published_url: string | null;
+  publish_status: string;
+  site_repository_id: string | null;
   created_at: string;
   html: string | null;
   current_revision: number | null;
@@ -45,6 +49,7 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
   const [pages, setPages] = useState<Page[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [pageLinks, setPageLinks] = useState<PageCampaignLink[]>([]);
+  const [repos, setRepos] = useState<SiteRepo[]>([]);
   const [campaignSelections, setCampaignSelections] = useState<Record<string, string>>({});
   const [busyPageId, setBusyPageId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -56,11 +61,11 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
     setLoadError(null);
     try {
       if (!clientId) return;
-      const [pageRows, campaignRows, linkRows] = await Promise.all([
+      const [pageRows, campaignRows, linkRows, repoRows] = await Promise.all([
         supabase
           .from("client_pages")
           .select(
-            "id, title, status, body, published_url, created_at, html, current_revision, meta_title, meta_description, built_at",
+            "id, title, status, body, published_url, publish_status, site_repository_id, created_at, html, current_revision, meta_title, meta_description, built_at",
           )
           .eq("client_id", clientId)
           .eq("page_type", pageType)
@@ -75,6 +80,12 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
           .select("id, page_id, campaign_id")
           .eq("client_id", clientId)
           .eq("kind", "landing_page"),
+        // The site this client's pages publish onto. One site holds many
+        // pages, each at its own path.
+        supabase
+          .from("client_site_repositories")
+          .select("id, owner, repo, status, pages_url")
+          .eq("client_id", clientId),
       ]);
       if (pageRows.error) throw pageRows.error;
       if (campaignRows.error) throw campaignRows.error;
@@ -83,6 +94,7 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
       setCampaigns((campaignRows.data ?? []) as CampaignOption[]);
       const links = (linkRows.data ?? []) as PageCampaignLink[];
       setPageLinks(links);
+      setRepos((repoRows.data ?? []) as SiteRepo[]);
       setCampaignSelections((previous) => {
         const selections: Record<string, string> = {};
         for (const page of (pageRows.data ?? []) as Page[]) {
@@ -261,6 +273,21 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
               {p.published_url && (
                 <p className="mt-1 truncate text-xs text-muted-foreground">{p.published_url}</p>
               )}
+              <div className="mt-4 border-t border-border pt-3">
+                <PublishButton
+                  page={{
+                    id: p.id,
+                    title: p.title,
+                    html: p.html,
+                    publish_status: p.publish_status,
+                    published_url: p.published_url,
+                    site_repository_id: p.site_repository_id,
+                  }}
+                  repos={repos}
+                  onPublished={() => void refresh()}
+                />
+              </div>
+
               <div className="mt-4 border-t border-border pt-3">
                 <label htmlFor={`page-campaign-${p.id}`} className="mb-1 block text-xs text-muted-foreground">
                   Campaign for {p.title}
