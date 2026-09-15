@@ -14,7 +14,7 @@ persist a per-client agent, edit its knowledge/qualification rules, sandbox-test
 1. Harbour-only first grant (client `d4c87828-741b-44eb-bbeb-16eac3471710`).
 2. Exact discovery ceiling **22** on `bot_sales_ops` = Phase 11 (17) + factory (5). Additive only —
    Phase 11's pipeline surface is not touched or rebuilt.
-3. Migration **77**, additive, next free after 76.
+3. Migration **84**, additive, next free after 83.
 4. Realize `sales_agents.generate_config`, `create`, `update_knowledge`,
    `update_qualification_rules`, `test` (sandbox — no live channel send).
 5. Defer `sales_agents.deploy` + live Meta/WhatsApp OAuth/webhook/send to Phase 11c / Eng — keep
@@ -46,12 +46,12 @@ Done exactly the way Phase 11 extended Marketing/Distribution's pattern:
   is unchanged in shape (`identity.bot === "bot_sales_ops" && !salesOps.grants.some(...)` denies).
   Because it re-reads `salesOps.grants` rather than a hard-coded count, it automatically re-caps at
   22 the moment `sales-ops.ts` changes; the ceiling logic itself needed no edit.
-- Migration 77 **inserts** the five new exact names for `bot_sales_ops` and asserts the final count
+- Migration 84 **inserts** the five new exact names for `bot_sales_ops` and asserts the final count
   is exactly 22, that `sales_agents.generate_config` is present, and that `sales_agents.deploy` /
   `pipeline.record_sale` are absent — it never touches the 17 rows migration 76 already owns.
   `agent-runtime/src/mcp/isolation-rls.test.ts`'s existing Phase 11 permission-row test (which
   asserted "exactly 17") is updated to 22 in the same PR, since that fixture loads migrations 76 and
-  77 together; the new Phase 11b block adds its own "exactly 5 new names, 0 outside `bot_sales_ops`"
+  84 together; the new Phase 11b block adds its own "exactly 5 new names, 0 outside `bot_sales_ops`"
   assertion. `aa-mcp-gateway/test/sales-ops.test.ts`'s discovery-equality test is updated to 22.
 
 **2. Per-client agent configs only — never a global AA sales bot; client isolation on every RPC
@@ -84,9 +84,9 @@ does that would be exactly the kind of dishonesty Alex's brief asks the design n
 **4. Defer `sales_agents.deploy` + live Meta/WhatsApp OAuth/webhook/send to Phase 11c / Eng — keep
 HIGH/CRITICAL reviewer posture if deploy stays in registry; do not realize in 11b.**
 `sales_agents.deploy` is untouched: absent from `realSalesAgents` (stays `implementation: "stub"`),
-absent from `salesOps.grants`/`expectedDiscovery`, and gets no permission row in migration 77. It
+absent from `salesOps.grants`/`expectedDiscovery`, and gets no permission row in migration 84. It
 keeps `risk: "CRITICAL"` and `approval: true` from the registry's generic `action === "deploy"`
-branch — unchanged code path, no edit needed. `assert_cos_prohibitions()` (migration 77's replaced
+branch — unchanged code path, no edit needed. `assert_cos_prohibitions()` (migration 84's replaced
 version) still hard-forbids any future row that tries to grant `bot_sales_ops` either
 `sales_agents.deploy` or `pipeline.record_sale`. Being both ungranted *and* stub, it is unreachable
 by two independent mechanisms — same posture Phase 11 used for `record_sale`. Live Meta/WhatsApp
@@ -134,7 +134,7 @@ remaining grant; revoked grant denies replay before lookup; and the permission-r
 fresh attempt to grant `bot_sales_ops` the deploy stub or grant `bot_production` a factory name is
 still rejected by the trigger). `agent-runtime/src/mcp/pipeline-route.test.ts`'s new `describe('Phase
 11b sales agent factory routes')` block (5 tests) exercises the actual HTTP route layer
-(`sales-agents-route.ts`) against the real migration-77 RPCs over PGlite: happy path per route,
+(`sales-agents-route.ts`) against the real migration-84 RPCs over PGlite: happy path per route,
 cross-client denial, and malformed-body rejection (missing required field, unknown extra key, bad
 role/shape) before the RPC is ever reached. `aa-mcp-gateway/test/sales-ops.test.ts` (gateway layer)
 adds exact discovery-set equality (22), the `implementation`/`risk`/`approval` classification for
@@ -209,7 +209,7 @@ own gate.
 
 ### Does any other Bot's wildcard require a per-tool hard gate?
 
-No. Grepping every migration's permission seed/grant statements (65 through 77) and
+No. Grepping every migration's permission seed/grant statements (65 through 84) and
 `src/policy/permissions.ts`'s `grants` matrix for `sales_agents` or `pipeline` on any Bot other than
 `bot_sales_ops` returns nothing — no Bot has ever held either domain as a wildcard or an exact name.
 That means the Phase 9b/10 situation this phase's Sec bar item explicitly asks about — *"`bot_X`
@@ -362,7 +362,7 @@ Additive-only migration, same shape as Phase 9b/10/11:
    made by the Bot before rollback remain valid, audited state (same shape a human Console edit would
    produce, distinguishable by the absence of a `created_by` profile id and presence of the ledger
    row); rollback stops *new* Bot writes, it does not retroactively invalidate ones already recorded.
-5. **Migration 77 itself is never reverted** — inert once the gateway stops calling it.
+5. **Migration 84 itself is never reverted** — inert once the gateway stops calling it.
 
 ---
 
@@ -371,7 +371,7 @@ Additive-only migration, same shape as Phase 9b/10/11:
 1. **PR URL / SHA:** filled in after the draft PR is opened (this note ships in the same PR).
 2. **Design note path:** `aa-mcp-gateway/docs/phase-11b-sales-agent-factory.md` (this file).
    **Onboarding config path:** `aa-mcp-gateway/src/onboarding/sales-ops.ts`.
-3. **Migration #:** **77** (`supabase/migrations/20260910100000_77_mcp_sales_agent_factory.sql`),
+3. **Migration #:** **84** (`supabase/migrations/20260915120000_84_mcp_sales_agent_factory.sql`),
    additive.
 4. **Exact discovery tool list (final, 22):** `pipeline.list_leads`, `pipeline.get_lead`,
    `pipeline.get_stalled_leads`, `pipeline.get_pipeline_summary`, `pipeline.update_stage`,

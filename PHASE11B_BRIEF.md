@@ -186,7 +186,7 @@ If Alex rejects `generate_config` as a separate name: fold generate-from-intel i
 - [ ] **Config generate + persist + Console Sales page hooks** (list/create/update agent config) **before** live Meta/WhatsApp connect
 - [ ] **Sales Ops** gets factory reads/writes that supervise (`generate_config` + `create` + knowledge + rules + `test`); **exact allowlist** additive on `bot_sales_ops` only
 - [ ] **Eng Ops** gets deploy/infra pieces (or human Admin stub) — **`sales_agents.deploy` not** on Sales Ops discovery by default
-- [ ] Additive migration next free after 76 → **77**
+- [ ] Additive migration next free after 83 → **84**
 - [ ] **Defer live channel OAuth/webhook** to **Phase 11c**; Gate 11b documents gap
 - [ ] Design note **first**; isolation green **before** unstub
 - [ ] **No merge / Railway / prod mig apply / token / connector** until Sec APPROVE + Alex CLEAR
@@ -231,7 +231,7 @@ Absent from discovery **and** denied if called:
 1. **Design note first:** `aa-mcp-gateway/docs/phase-11b-sales-agent-factory.md`  
    (factory vs Sales Ops split, config schema, intel sources, Admin Sales page mapping, stub honesty for deploy/channels → 11c, isolation plan, Gate 11b plan)
 2. Extend onboarding config `aa-mcp-gateway/src/onboarding/sales-ops.ts` (additive exact grants; keep Phase 11 forbiddens)
-3. Additive migration (**77**): Bot-safe factory RPCs + permission rows for `bot_sales_ops` only (+ Eng deploy grant **only if** CLEAR and Eng bot exists)
+3. Additive migration (**84**): Bot-safe factory RPCs + permission rows for `bot_sales_ops` only (+ Eng deploy grant **only if** CLEAR and Eng bot exists)
 4. Admin **client Sales page** hooks: list / create / update agent config against same AA store
 5. Make proposed factory tools **real** (or document already-real); isolation green before unstub
 6. Gateway policy/registry/docs/tests + `smoke:sales-agent-factory` / Gate 11b script (Harbour)
@@ -286,7 +286,7 @@ Negative tests:
 
 1. **PR URL** + **SHA**
 2. Design note path + onboarding config path (`sales-ops.ts` delta)
-3. **Migration #** (expect **77**)
+3. **Migration #** (expect **84**)
 4. **Exact discovery tool list** (final, post-CLEAR) + count
 5. Admin Sales page paths / screens touched
 6. Test counts (unit + isolation + Gate 11b) + fixture assumptions (Harbour client / agent ids)

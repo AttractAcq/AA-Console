@@ -172,3 +172,5 @@ All merge, deployment, live migration and credential/connector actions remain wi
 ## Rollback
 
 Authorized operator disables Admin access/revokes only its new credential and connector, then rolls back gateway/runtime to the reviewed prior release if needed. Do not rotate other bots. Preserve additive event/receipt tables and audit data for reconciliation; do not drop tables or rename applied migrations. Any DB correction is a separate reviewed forward migration limiting only Admin capability/execute grants. Reconcile outstanding fixture events/tasks. Do not promise reminder delivery while inactive or restore credentials solely because code rolled back. Production tokens/header files remain untouched.
+
+Historical Factory references above describe the Phase 12 release boundary. Factory is now revived separately with migration 84 (`20260915120000_84_mcp_sales_agent_factory.sql`); the original Factory migration 77 was renamed.

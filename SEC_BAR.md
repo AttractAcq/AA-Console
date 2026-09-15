@@ -11,4 +11,6 @@
 9. Design note must name the exact +5 tools and call MEDIUM vs gateway reviewer gate for any newly-real former-HIGH/approval tools (esp. create/update sales agent config).
 10. Architecture lock: Sales Ops = control/factory layer only — not prospect chat; generated agents are per-client execution objects, not a new global Bot identity/token.
 
-No merge / mig 77 / Railway / token rotate until Sec APPROVE + Alex cutover CLEAR. No other-bot rotate.
+No merge / mig 84 / Railway / token rotate until Sec APPROVE + Alex cutover CLEAR. No other-bot rotate.
+
+2026-09-15 Alex CLEAR: code merge is authorized after green CI for the revived Factory PR (migration 84), including the Sec P1 digest-only ledger fix. This supersedes the earlier merge hold above only. No production migration apply, Railway deploy, token rotation, connector change or Gate 11b cutover is authorized. Harbour-only cutover remains a separate gate.

@@ -90,7 +90,7 @@ beforeAll(async () => {
     '20260909010000_71_mcp_client_delivery.sql',
     '20260909020100_72_mcp_cos_orchestration.sql',
     '20260911210000_78_mcp_admin_calendar.sql',
-    '20260910100000_77_mcp_sales_agent_factory.sql',
+    '20260915120000_84_mcp_sales_agent_factory.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -1351,7 +1351,7 @@ describe('Phase 11 Sales Ops isolation', () => {
       `select count(*)::int as n from mcp_internal.mcp_bot_permissions
         where bot_id = 'bot_sales_ops'`,
     )).rows;
-    // 17 (Phase 11) + 5 (Phase 11b factory writes) = 22, since migration 77
+    // 17 (Phase 11) + 5 (Phase 11b factory writes) = 22, since migration 84
     // is loaded in the same fixture as migration 76.
     expect(exact[0]?.n).toBe(22);
     const wildcardsOrProof = (await db.query<{ n: number }>(

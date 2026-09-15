@@ -73,7 +73,7 @@ beforeAll(async () => {
     '20260909040000_74_mcp_production_bot_decide.sql',
     '20260909050000_75_mcp_distribution_manager.sql',
     '20260910000000_76_mcp_sales_ops.sql',
-    '20260910100000_77_mcp_sales_agent_factory.sql',
+    '20260915120000_84_mcp_sales_agent_factory.sql',
   ]) await db.exec(await migration(file));
 }, 60_000);
 afterAll(async () => { await db?.close(); });
