@@ -529,6 +529,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         delete fields.title;
       }
       if (name === "campaign.plan" || name === "campaign.launch") {
+        // launch marks client_campaigns.status=live only; no ad spend / paid channels.
         fields.campaign_id = id;
         delete fields.title;
         delete fields.summary;

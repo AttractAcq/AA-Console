@@ -5,9 +5,15 @@
 -- mcp_campaign_read.get_campaign_performance only.
 -- DO NOT APPLY TO STAGING OR PRODUCTION without Alex via Chief of Staff.
 --
+-- Grants are ADDITIVE (PR #48 / mig 89): delete+insert the 17 names this
+-- phase owns. Post-#48 Marketing count is 40 (Gate 9's 23 + 17). This is
+-- NOT the final 45. After #48 then #46 then #47: Marketing 45, Sales Ops 28.
+-- Sibling PRs must APPEND, not replace all bot_marketing rows.
+--
 -- Every Bot RPC: require_active_bot + require_bot_client_grant; never
 -- can_access_client. Isolation tests must stay green before registry unstub.
 -- Production does not get page publish (sites.* is a later batch).
+-- campaign.launch sets client_campaigns.status=live only; no ad spend.
 
 begin;
 
@@ -957,6 +963,9 @@ begin
       'replayed', false
     );
   elsif p_action = 'launch' then
+    -- Marks Execution OS client_campaigns.status='live' only. Does not write
+    -- public.campaigns (ad tracker), spend, Meta/TikTok, or paid-channel
+    -- credentials. Stays MEDIUM with no gateway approval.
     select * into c from public.client_campaigns where id = c.id for update;
     if c.status is distinct from 'live' then
       reqs := mcp_internal.campaign_readiness_rows(c.id);
@@ -1083,40 +1092,42 @@ grant execute on function public.mcp_campaign_execution(text, uuid, text, uuid, 
   to service_role;
 
 -- ---------------------------------------------------------------------------
--- Grants: Marketing exact allowlist (Phase 9 + conversion + campaign writes)
--- CoS already holds campaign.* (covers new campaign execution names).
+-- Grants: additive Phase 16 names only (PR #48 / mig 89).
+-- Delete+insert the 17 tools this phase owns. Do NOT replace all
+-- bot_marketing rows — Gate 9 (mig 73) already set 23 exact names.
+-- Post-#48 Marketing count: 40 (23 + 17). This is NOT the final 45.
+-- Final after #48 then #46 then #47: Marketing 45, Sales Ops 28.
+-- Sibling PRs MUST APPEND (delete+insert only names they own).
+-- brand.*, sites.*, remaining attribution are not granted here.
+-- CoS already holds campaign.* (covers new execution names).
 -- CDM keeps campaign.get / campaign.get_status only (now Execution OS).
 -- ---------------------------------------------------------------------------
 
-delete from mcp_internal.mcp_bot_permissions where bot_id = 'bot_marketing';
+delete from mcp_internal.mcp_bot_permissions
+ where bot_id = 'bot_marketing'
+   and permission_pattern in (
+     'conversion.list_pages',
+     'conversion.get_page',
+     'conversion.get_performance',
+     'conversion.create_page',
+     'conversion.generate_structure',
+     'conversion.generate_copy',
+     'conversion.request_approval',
+     'conversion.audit_page',
+     'conversion.revise_page',
+     'conversion.revert_page',
+     'campaign.get_readiness',
+     'campaign.create',
+     'campaign.update',
+     'campaign.request_approval',
+     'campaign.plan',
+     'campaign.provision',
+     'campaign.launch'
+   );
 insert into mcp_internal.mcp_bot_permissions (bot_id, permission_pattern, granted_by) values
-  ('bot_marketing', 'campaign.list', 'alex-locked:phase-16'),
-  ('bot_marketing', 'campaign.get', 'alex-locked:phase-16'),
-  ('bot_marketing', 'campaign.get_status', 'alex-locked:phase-16'),
-  ('bot_marketing', 'campaign.get_readiness', 'alex-locked:phase-16'),
-  ('bot_marketing', 'content.list_ideas', 'alex-locked:phase-16'),
-  ('bot_marketing', 'content.get_idea', 'alex-locked:phase-16'),
-  ('bot_marketing', 'content.get_brief', 'alex-locked:phase-16'),
-  ('bot_marketing', 'content.get_production_status', 'alex-locked:phase-16'),
-  ('bot_marketing', 'attribution.get_campaign_performance', 'alex-locked:phase-16'),
-  ('bot_marketing', 'delivery.get_client', 'alex-locked:phase-16'),
-  ('bot_marketing', 'delivery.get_status', 'alex-locked:phase-16'),
-  ('bot_marketing', 'delivery.get_client_health', 'alex-locked:phase-16'),
-  ('bot_marketing', 'workflow.get_pending_approvals', 'alex-locked:phase-16'),
-  ('bot_marketing', 'workflow.get_activity', 'alex-locked:phase-16'),
-  ('bot_marketing', 'workflow.list_tasks', 'alex-locked:phase-16'),
-  ('bot_marketing', 'workflow.get_task', 'alex-locked:phase-16'),
   ('bot_marketing', 'conversion.list_pages', 'alex-locked:phase-16'),
   ('bot_marketing', 'conversion.get_page', 'alex-locked:phase-16'),
   ('bot_marketing', 'conversion.get_performance', 'alex-locked:phase-16'),
-  ('bot_marketing', 'content.generate_brief', 'alex-locked:phase-16'),
-  ('bot_marketing', 'content.request_revision', 'alex-locked:phase-16'),
-  ('bot_marketing', 'content.request_approval', 'alex-locked:phase-16'),
-  ('bot_marketing', 'content.create_repurpose_plan', 'alex-locked:phase-16'),
-  ('bot_marketing', 'workflow.create_task', 'alex-locked:phase-16'),
-  ('bot_marketing', 'workflow.assign_task', 'alex-locked:phase-16'),
-  ('bot_marketing', 'workflow.complete_task', 'alex-locked:phase-16'),
-  ('bot_marketing', 'workflow.create_approval', 'alex-locked:phase-16'),
   ('bot_marketing', 'conversion.create_page', 'alex-locked:phase-16'),
   ('bot_marketing', 'conversion.generate_structure', 'alex-locked:phase-16'),
   ('bot_marketing', 'conversion.generate_copy', 'alex-locked:phase-16'),
@@ -1124,6 +1135,7 @@ insert into mcp_internal.mcp_bot_permissions (bot_id, permission_pattern, grante
   ('bot_marketing', 'conversion.audit_page', 'alex-locked:phase-16'),
   ('bot_marketing', 'conversion.revise_page', 'alex-locked:phase-16'),
   ('bot_marketing', 'conversion.revert_page', 'alex-locked:phase-16'),
+  ('bot_marketing', 'campaign.get_readiness', 'alex-locked:phase-16'),
   ('bot_marketing', 'campaign.create', 'alex-locked:phase-16'),
   ('bot_marketing', 'campaign.update', 'alex-locked:phase-16'),
   ('bot_marketing', 'campaign.request_approval', 'alex-locked:phase-16'),
@@ -1388,10 +1400,49 @@ grant execute on function mcp_internal.bot_touched_rls_status() to service_role;
 
 do $$
 declare n integer;
+declare missing text;
 begin
   select count(*) into n from mcp_internal.mcp_bot_permissions where bot_id = 'bot_marketing';
+  -- Post-#48 only: Gate 9's 23 + this phase's 17. Not the final 45.
   if n is distinct from 40 then
-    raise exception 'Phase 16: bot_marketing must have exactly 40 permission rows, found %', n;
+    raise exception 'Phase 16 / PR #48: bot_marketing must have exactly 40 permission rows after this additive grant (post-#48, not final 45), found %', n;
+  end if;
+  select string_agg(required.name, ', ' order by required.name) into missing
+    from unnest(array[
+      'campaign.list', 'campaign.get', 'campaign.get_status',
+      'content.list_ideas', 'content.get_idea', 'content.get_brief',
+      'content.get_production_status', 'attribution.get_campaign_performance',
+      'delivery.get_client', 'delivery.get_status', 'delivery.get_client_health',
+      'workflow.get_pending_approvals', 'workflow.get_activity',
+      'workflow.list_tasks', 'workflow.get_task',
+      'content.generate_brief', 'content.request_revision',
+      'content.request_approval', 'content.create_repurpose_plan',
+      'workflow.create_task', 'workflow.assign_task',
+      'workflow.complete_task', 'workflow.create_approval'
+    ]) as required(name)
+   where not exists (
+     select 1 from mcp_internal.mcp_bot_permissions p
+      where p.bot_id = 'bot_marketing' and p.permission_pattern = required.name
+   );
+  if missing is not null then
+    raise exception 'Phase 16 / PR #48: Gate 9 Marketing grants missing (mig 73 must land first; this phase is additive): %', missing;
+  end if;
+  select string_agg(required.name, ', ' order by required.name) into missing
+    from unnest(array[
+      'conversion.list_pages', 'conversion.get_page', 'conversion.get_performance',
+      'conversion.create_page', 'conversion.generate_structure',
+      'conversion.generate_copy', 'conversion.request_approval',
+      'conversion.audit_page', 'conversion.revise_page', 'conversion.revert_page',
+      'campaign.get_readiness', 'campaign.create', 'campaign.update',
+      'campaign.request_approval', 'campaign.plan', 'campaign.provision',
+      'campaign.launch'
+    ]) as required(name)
+   where not exists (
+     select 1 from mcp_internal.mcp_bot_permissions p
+      where p.bot_id = 'bot_marketing' and p.permission_pattern = required.name
+   );
+  if missing is not null then
+    raise exception 'Phase 16 / PR #48: missing additive Phase 16 Marketing grants: %', missing;
   end if;
   if exists (
     select 1 from mcp_internal.mcp_bot_permissions

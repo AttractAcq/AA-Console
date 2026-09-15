@@ -85,6 +85,7 @@ beforeAll(async () => {
     '20260908230000_68_mcp_production_manager.sql',
     '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
     '20260909000000_70_mcp_approval_engine.sql',
+    '20260909030000_73_mcp_marketing_director.sql',
     '20260909040000_74_mcp_production_bot_decide.sql',
     '20260909050000_75_mcp_distribution_manager.sql',
     '20260910000000_76_mcp_sales_ops.sql',
@@ -2586,11 +2587,21 @@ describe('Phase 16 Conversion + Campaign Execution isolation', () => {
     ).rejects.toThrow(/CoS: bot_production must not have finance, security, deploy or conversion grants/);
   });
 
-  it('Marketing permission rows are the exact 40-name allowlist', async () => {
+  it('Marketing permission rows are the post-#48 additive 40-name allowlist, not final 45', async () => {
     const grants = await db.query<{ n: number }>(
       `select count(*)::int n from mcp_internal.mcp_bot_permissions where bot_id='bot_marketing'`,
     );
     expect(grants.rows[0]?.n).toBe(40);
+    const phase9 = await db.query<{ n: number }>(
+      `select count(*)::int n from mcp_internal.mcp_bot_permissions
+        where bot_id='bot_marketing' and granted_by='alex-locked:phase-9'`,
+    );
+    expect(phase9.rows[0]?.n).toBe(23);
+    const phase16 = await db.query<{ n: number }>(
+      `select count(*)::int n from mcp_internal.mcp_bot_permissions
+        where bot_id='bot_marketing' and granted_by='alex-locked:phase-16'`,
+    );
+    expect(phase16.rows[0]?.n).toBe(17);
     const wild = await db.query<{ n: number }>(
       `select count(*)::int n from mcp_internal.mcp_bot_permissions
         where bot_id='bot_marketing' and permission_pattern in ('conversion.*','campaign.*','content.*')`,

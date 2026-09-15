@@ -22,6 +22,8 @@ const queued = new Set([
 ]);
 test("locked 19 reads / 21 writes; exact discovery rejects missing and unexpected tools", () => {
   assert.equal(config.reads.length, 19); assert.equal(config.writes.length, 21);
+  assert.equal(config.grants.length, 40);
+  assert.equal(config.phase16Owned.length, 17);
   assert.deepEqual(grants.bot_marketing, [...config.grants]);
   assertMarketingDiscovery(config.grants);
   assert.throws(() => assertMarketingDiscovery(config.grants.slice(1)));

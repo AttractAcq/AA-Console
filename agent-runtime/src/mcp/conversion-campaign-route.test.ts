@@ -83,6 +83,7 @@ beforeAll(async () => {
     "20260908230000_68_mcp_production_manager.sql",
     "20260908240000_69_mcp_phase5_read_rpc_volatile.sql",
     "20260909000000_70_mcp_approval_engine.sql",
+    "20260909030000_73_mcp_marketing_director.sql",
     "20260909040000_74_mcp_production_bot_decide.sql",
     "20260909050000_75_mcp_distribution_manager.sql",
     "20260910000000_76_mcp_sales_ops.sql",

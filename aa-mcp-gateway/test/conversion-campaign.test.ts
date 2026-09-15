@@ -54,7 +54,11 @@ async function mockAa(
 }
 
 test("Phase 16 registry: conversion and campaign execution tools are real", () => {
+  // Catalog size after #48 only. Sibling PRs #46/#47 may add names and must
+  // update their own registry.length asserts; do not treat 97 as a final ceiling.
   assert.equal(registry.length, 97);
+  assert.equal(marketingDirector.grants.length, 40);
+  assert.equal(marketingDirector.phase16Owned.length, 17);
   for (const name of [
     ...marketingDirector.grants.filter((n) => n.startsWith("conversion.") || n.startsWith("campaign.")),
     "campaign.list",
@@ -65,6 +69,13 @@ test("Phase 16 registry: conversion and campaign execution tools are real", () =
   }
   assert.equal(registry.find((t) => t.name.startsWith("sites."))?.implementation, undefined);
   assert.equal(registry.find((t) => t.name === "pipeline.record_sale")?.implementation, "stub");
+});
+
+test("campaign.launch cannot spend ad budget; stays MEDIUM without approval", () => {
+  const launch = registry.find((t) => t.name === "campaign.launch")!;
+  assert.equal(launch.implementation, "real");
+  assert.equal(launch.risk, "MEDIUM");
+  assert.equal(launch.approval, false);
 });
 
 test("conversion tools are Marketing-only even with stale wildcards", () => {

@@ -111,7 +111,7 @@ async function mockAa(
 test("Security exact discovery equality is 14 and related stubs stay stub", (t) => {
   const e = engine(t);
   assertSecurityDiscovery(e.discover(identity).map((x) => x.name));
-  assert.equal(registry.length, 97);
+  assert.equal(registry.length, 97); // catalog after PR #48 only; #46/#47 update theirs
   for (const name of securityDevops.grants)
     assert.equal(registry.find((x) => x.name === name)?.implementation, "real");
   for (const name of ["sales_agents.deploy", "pipeline.record_sale"])
