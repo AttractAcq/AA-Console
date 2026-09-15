@@ -63,10 +63,10 @@ export function PaidReportingPanel() {
         </Panel>
       </div>
 
-      <h2 className="mb-3 text-sm font-semibold text-foreground">By campaign</h2>
+      <h2 className="mb-3 text-sm font-semibold text-foreground">By ad platform campaign</h2>
       <DataTable
-        columns={["Campaign", "Spend", "Impressions", "Clicks", "Conversions", "Cost per conv.", "Days"]}
-        emptyLabel="No campaigns in this period"
+        columns={["Ad platform campaign", "Spend", "Impressions", "Clicks", "Conversions", "Cost per conv.", "Days"]}
+        emptyLabel="No ad platform campaigns in this period"
         rows={campaigns.map((c) => [
           c.campaign_ref ? (
             <span key="n">

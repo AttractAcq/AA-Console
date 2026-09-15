@@ -198,3 +198,50 @@ describe("building what the campaign needs", () => {
     );
   });
 });
+
+describe("campaign visibility", () => {
+  it("renders all 15 planning campaigns for Attract Acquisition", async () => {
+    useParams.mockReturnValue({ clientId: "e4b4b001-81f6-4997-8429-ff21f4ee1fbe" });
+    show(Array.from({ length: 15 }, (_, i) => planned({ id: `camp-${i}`, name: `Planning ${i}` })));
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(await screen.findAllByRole("heading", { level: 3 })).toHaveLength(15);
+    expect(from).toHaveBeenCalledWith("client_campaigns");
+  });
+  it("distinguishes a successful empty query", async () => {
+    show([]);
+    expect(await screen.findByText("No campaigns yet")).toBeInTheDocument();
+  });
+  it("surfaces query errors rather than an empty state", async () => {
+    const initial = show();
+    initial.unmount();
+    from.mockImplementation(() => {
+      const chain = { select: () => chain, eq: () => chain, order: () => chain,
+        limit: () => Promise.resolve({ data: [] }),
+        then: (r: (v: unknown) => unknown) => Promise.resolve({ data: null, error: { message: "RLS query denied" } }).then(r) };
+      return chain;
+    });
+    // A fresh mount starts the failing request.
+    const { unmount } = render(<CampaignExecutionPanel />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load campaigns: RLS query denied");
+    expect(screen.queryByText("No campaigns yet")).not.toBeInTheDocument();
+    unmount();
+  });
+  it("shows readiness failure and disables launch", async () => {
+    show();
+    rpc.mockResolvedValue({ data: null, error: { message: "Not permitted" } });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load readiness");
+    expect(screen.getByRole("button", { name: "Launch" })).toBeDisabled();
+  });
+  it("reports a missing route client instead of pretending there are no campaigns", async () => {
+    useParams.mockReturnValue({});
+    show([]);
+    expect(await screen.findByRole("alert")).toHaveTextContent("No client selected");
+    expect(screen.queryByText("No campaigns yet")).not.toBeInTheDocument();
+  });
+  it("launches a ready campaign through the existing RPC", async () => {
+    show([planned()], READY);
+    await userEvent.click(await screen.findByRole("button", { name: "Launch" }));
+    expect(rpc).toHaveBeenCalledWith("launch_campaign", { p_campaign_id: "camp-1" });
+    expect(await screen.findByText(/is live\./)).toBeInTheDocument();
+  });
+});
