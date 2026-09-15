@@ -142,41 +142,61 @@ describe("readiness", () => {
   });
 });
 
+// "Build what it needs" could not say what it was about to do, and built a
+// sales agent nobody had asked for as a side effect of wanting a page. Each
+// build is now named, and asked for separately.
 describe("building what the campaign needs", () => {
-  it("calls provision and reports how many builds were queued", async () => {
+  const buildReturns = (created: string) => {
     rpc.mockImplementation((name: string) => {
       if (name === "campaign_readiness") return Promise.resolve({ data: NOT_READY, error: null });
-      return Promise.resolve({
-        data: [
-          { created: "landing_page", artifact_id: "p1" },
-          { created: "sales_agent", artifact_id: "s1" },
-        ],
-        error: null,
-      });
+      return Promise.resolve({ data: [{ created, artifact_id: "a1" }], error: null });
     });
-    from.mockImplementation(() => {
-      const chain = {
-        select: () => chain,
-        eq: () => chain,
-        order: () => chain,
-        limit: () => Promise.resolve({ data: [] }),
-        then: (r: (v: { data: unknown }) => unknown) =>
-          Promise.resolve({ data: [planned()] }).then(r),
-      };
-      return chain;
-    });
-    render(<CampaignExecutionPanel />);
+  };
 
-    await userEvent.click(await screen.findByRole("button", { name: /build what it needs/i }));
-    expect(rpc).toHaveBeenCalledWith("provision_campaign", { p_campaign_id: "camp-1" });
-    expect(await screen.findByText(/queued 2 builds/i)).toBeInTheDocument();
+  it("builds only the landing page when that is what was asked for", async () => {
+    show();
+    buildReturns("landing_page");
+    await userEvent.click(await screen.findByRole("button", { name: "Build landing page" }));
+    expect(rpc).toHaveBeenCalledWith("provision_campaign_artifact", {
+      p_campaign_id: "camp-1",
+      p_kind: "landing_page",
+    });
+    expect(await screen.findByText(/building the landing page/i)).toBeInTheDocument();
+  });
+
+  it("builds only the sales agent when that is what was asked for", async () => {
+    show();
+    buildReturns("sales_agent");
+    await userEvent.click(await screen.findByRole("button", { name: "Build sales agent" }));
+    expect(rpc).toHaveBeenCalledWith("provision_campaign_artifact", {
+      p_campaign_id: "camp-1",
+      p_kind: "sales_agent",
+    });
+    expect(await screen.findByText(/building the sales agent/i)).toBeInTheDocument();
+  });
+
+  it("offers a sales agent even when the plan did not ask for one", async () => {
+    // Deciding later that a campaign should have an agent is ordinary; the
+    // alternative is re-planning, which rewrites numbers already acted on.
+    show([planned({ needs_sales_agent: false, needs_landing_page: false })]);
+    expect(await screen.findByRole("button", { name: "Build sales agent" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Build landing page" })).toBeEnabled();
+  });
+
+  it("offers neither until the planner has written the campaign", async () => {
+    show([planned({ built_at: null, objective: null })]);
+    await screen.findByText(/waiting for the planner/i);
+    expect(screen.queryByRole("button", { name: "Build landing page" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Build sales agent" })).not.toBeInTheDocument();
   });
 
   it("says plainly when there was nothing left to create", async () => {
     show();
-    await userEvent.click(await screen.findByRole("button", { name: /build what it needs/i }));
-    // Pressing it twice is the common case, and silence would read as failure.
-    expect(await screen.findByText(/already exists/i)).toBeInTheDocument();
+    buildReturns("already_exists");
+    // Pressing it twice is the common case — an agent takes minutes and the
+    // page looks unchanged while it runs. Silence would read as failure.
+    await userEvent.click(await screen.findByRole("button", { name: "Build landing page" }));
+    expect(await screen.findByText(/already has a landing page/i)).toBeInTheDocument();
   });
 
   it("shows the database's refusal verbatim, because it names what is missing", async () => {
