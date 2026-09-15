@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { from, rpc, update, filters, build } = vi.hoisted(() => ({
   from: vi.fn(),
@@ -152,4 +152,62 @@ it("requires a rejection reason and surfaces review failures", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Confirm rejection" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Review refused");
   expect(rpc).toHaveBeenCalledWith("review_media_asset", { p_asset_id: "asset-1", p_decision: "rejected", p_reason: "Wrong logo" });
+});
+
+
+// The whole chain for one piece of content — idea, the brief written from it,
+// the assets produced from that brief — has to be visible in one place. Listed
+// as three flat lists, a campaign with twelve ideas buried its single brief
+// below all of them, and a briefed idea gave no sign its brief existed.
+describe("the content chain, grouped by piece", () => {
+  it("shows a brief underneath the idea it was written from", async () => {
+    show();
+    const ideaCard = (await screen.findByText("WhatsApp photo triage")).closest("div.rounded-md");
+    expect(ideaCard).not.toBeNull();
+    expect(within(ideaCard as HTMLElement).getByText("Campaign piece")).toBeInTheDocument();
+  });
+
+  it("shows the asset underneath the brief that produced it", async () => {
+    show();
+    const ideaCard = (await screen.findByText("WhatsApp photo triage")).closest("div.rounded-md");
+    expect(within(ideaCard as HTMLElement).getByText(/Preview Finished piece/)).toBeInTheDocument();
+    expect(within(ideaCard as HTMLElement).getByText("Awaiting approval")).toBeInTheDocument();
+  });
+
+  it("says a brief is being written, so a briefed idea does not look failed", async () => {
+    // Identical on screen to one whose brief agent died, unless it says so.
+    ideas = [{ ...idea, status: "briefed" }];
+    links = [];
+    show();
+    expect(await screen.findByText(/Brief being written/i)).toBeInTheDocument();
+  });
+
+  it("does not offer to brief an idea that already has one", async () => {
+    ideas = [{ ...idea, status: "briefed" }];
+    show();
+    await screen.findByText("Campaign piece");
+    expect(screen.queryByRole("button", { name: "Brief" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve & brief" })).not.toBeInTheDocument();
+  });
+
+  it("still shows a brief whose idea has gone, because it is still work done", async () => {
+    // Orphans are dropped silently by a strict grouping, and somebody paid for
+    // that brief.
+    ideas = [];
+    show();
+    expect(await screen.findByText("Campaign piece")).toBeInTheDocument();
+  });
+
+  it("makes the brief a way in, not just a label", async () => {
+    // The panel's job is to offer the brief for reading; what the viewer then
+    // renders is BriefDetailModal's own business and is covered there.
+    show();
+    expect(await screen.findByRole("button", { name: "Campaign piece" })).toBeInTheDocument();
+  });
+
+  it("offers production from the brief in place", async () => {
+    show();
+    await screen.findByText("Campaign piece");
+    expect(screen.getByRole("button", { name: /Approve & Build/ })).toBeInTheDocument();
+  });
 });
