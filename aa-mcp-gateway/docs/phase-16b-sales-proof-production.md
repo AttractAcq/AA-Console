@@ -32,7 +32,7 @@ All six catalog names are real against `client_proof_assets`:
 | `proof.create` | Forces `usage_rights='not_cleared'`. There is no `usage_rights` input field. |
 | `proof.attach_asset` | Updates `storage_path` only. Never writes clearance. |
 
-Production already held the four proof **read** grants; this phase makes them discoverable (`implementation: real`) and adds `proof.create` / `proof.attach_asset`. Proof tools are not granted outside `bot_production` (`assert_cos_prohibitions`). Migration 89 deletes the leftover seed `proof.*` wildcard on `bot_marketing` (mig 65; Marketing's onboarding already listed proof as future-only).
+Production already held the four proof **read** grants; this phase makes them discoverable (`implementation: real`) and adds `proof.create` / `proof.attach_asset`. Proof tools are not granted outside `bot_production` (`assert_cos_prohibitions`). Migration 90 deletes the leftover seed `proof.*` wildcard on `bot_marketing` (mig 65; Marketing's onboarding already listed proof as future-only).
 
 ### Production content (`bot_production` only)
 
@@ -54,7 +54,7 @@ Production already held the four proof **read** grants; this phase makes them di
 
 ## Database
 
-Migration `supabase/migrations/20260916120000_89_mcp_sales_proof_production.sql` (next after main HEAD 88). Additive. Do not apply to production without Alex.
+Migration `supabase/migrations/20260916140000_90_mcp_sales_proof_production.sql` (number **90** — merges second after #48). Additive. Do not apply to production without Alex.
 
 - Expands sales-agent and content ledger `tool` checks.
 - Creates `mcp_internal.mcp_proof_requests` + `take_proof_request`.
@@ -74,14 +74,14 @@ Migration `supabase/migrations/20260916120000_89_mcp_sales_proof_production.sql`
 ## Tests / smoke
 
 - Gateway: discovery 25, factory writes + attach/enable/build through the mock AA, deploy never reaches AA, other-client deny-before-AA, Gate 16b attach cycle.
-- Isolation: migration 89 on the partial PGlite fixture (80 is not loaded; deployments are stubbed without `extensions.gen_random_bytes`). Source assertions, same-client/cross-client, `usage_rights` forced `not_cleared`, AI video refuse, permission count 25.
+- Isolation: migration 90 on the partial PGlite fixture (80 is not loaded; deployments are stubbed without `extensions.gen_random_bytes`). Source assertions, same-client/cross-client, `usage_rights` forced `not_cleared`, AI video refuse, permission count 25.
 - HTTP: attach origin, kill-switch, build enqueue, proof create rejects `usage_rights`, assign/submit.
 - Live `smoke:sales-agent-factory` still runs Gate 11 + 11b (draft-only; **does not enqueue build**). `runSalesOpsDeploymentGate` runs only when fixtures include `page_id`.
 
 ## Rollback
 
 1. Gateway: remove the three sales names from `realSalesAgents` / `salesOps.writes`, remove `realProof`, remove assign/submit from `realContent` and `PRODUCTION_ONLY_TOOLS`.
-2. Do not apply migration 89. If already applied on a non-prod database, leave tables in place (additive) and stop granting the new names.
+2. Do not apply migration 90. If already applied on a non-prod database, leave tables in place (additive) and stop granting the new names.
 
 ## Sec questions
 

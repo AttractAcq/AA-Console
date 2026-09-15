@@ -105,7 +105,7 @@ beforeAll(async () => {
     '20260916130000_89_mcp_conversion_campaign.sql',
   ]) await db.exec(await migration(file));
   // Phase 16b: do not load migration 80 (extensions.gen_random_bytes) or 39/57/81.
-  // Stub the columns and tables the new RPCs touch, then load 89.
+  // Stub the columns and tables the new RPCs touch, then load 90.
   await db.exec(`
     alter table client_sales_agents add column approved_at timestamptz;
     alter table client_pages add column if not exists publish_status text not null default 'unpublished';
@@ -177,7 +177,7 @@ beforeAll(async () => {
       ('brief_dispatch', 'Brief Dispatch', 'BD', 'content', 'Phase 16b fixture', '{}')
     on conflict (agent_key) do nothing;
   `);
-  await db.exec(await migration('20260916120000_89_mcp_sales_proof_production.sql'));
+  await db.exec(await migration('20260916140000_90_mcp_sales_proof_production.sql'));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
       client_leads, client_billing, finance_entries to authenticated;
