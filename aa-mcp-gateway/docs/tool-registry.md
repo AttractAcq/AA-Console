@@ -86,10 +86,10 @@
 | workflow.get_pending_approvals | real | read | LOW | no | true | Gateway control store |
 | workflow.record_decision | stub | write | HIGH | required | true | Scoped AA workflow business API |
 | workflow.get_activity | real | read | LOW | no | true | Gateway control store |
-| engineering.create_issue | stub | write | MEDIUM | no | true | Scoped AA engineering business API |
-| engineering.get_issue | stub | read | LOW | no | true | Scoped AA engineering business API |
-| engineering.get_release_status | stub | read | LOW | no | true | Scoped AA engineering business API |
-| engineering.get_deployment_status | stub | read | LOW | no | true | Scoped AA engineering business API |
+| engineering.create_issue | real (bot_engineering only) | write | MEDIUM | no | true | Scoped AA engineering business API |
+| engineering.get_issue | real (bot_engineering only) | read | LOW | no | true | Scoped AA engineering business API |
+| engineering.get_release_status | real (bot_engineering; status also bot_security_devops) | read | LOW | no | true | Scoped AA engineering business API |
+| engineering.get_deployment_status | real (bot_engineering; status also bot_security_devops) | read | LOW | no | true | Scoped AA engineering business API |
 | security.get_system_status | stub | read | LOW | no | true | Scoped AA security business API |
 | security.get_open_findings | stub | read | LOW | no | true | Scoped AA security business API |
 | security.create_finding | stub | write | MEDIUM | no | true | Scoped AA security business API |
@@ -104,3 +104,5 @@ Phase 12: `bot_admin` has an exact 15-tool ceiling (nine reads/six writes), incl
 
 
 Phase 13: `bot_finance` has an exact 14-tool ceiling (ten reads/four writes): five named `economics.*` Client Economics OS reads, `attribution.get_revenue_attribution`, and the eight-tool workflow suite. The seeded `economics.*` wildcard is replaced with exact rows. Other Bots cannot invoke `economics.*` even with stale wildcards. Money writes (`pipeline.record_sale`, payments, bank/Stripe/Xero) are not granted and stay stub. See [Phase 13](phase-13-finance-controller.md) for guarded RPCs and `smoke:finance`. Gate 13 is NOT YET CLOSED.
+
+Phase 14: `bot_engineering` has an exact 12-tool ceiling (seven reads/five writes). The seeded `engineering.*` wildcard is replaced with four named engineering tools plus the eight workflow names. Issue create/get are bot_engineering only. Release and deployment status reads project client-scoped `client_pages` / `agent_jobs` (no HTML, params, costs or secrets) and remain callable by `bot_security_devops` via its existing exact grants. No Railway write, secret rotation or unrestricted deploy tools. See [Phase 14](phase-14-engineering-ops.md). Gate 14 is NOT YET CLOSED.

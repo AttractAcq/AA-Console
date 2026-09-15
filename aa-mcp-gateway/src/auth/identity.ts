@@ -217,7 +217,14 @@ export class BotAuthenticator {
 
   private async lookupAa(hashHex: string): Promise<AaResolveResult | null> {
     const hit = this.cache.get(hashHex);
-    if (hit && hit.value?.bot_id !== "bot_admin" && hit.expires > this.now())
+    // Admin and Engineering must re-resolve every request so revoked tokens
+    // and removed client grants take effect immediately (no cached success).
+    if (
+      hit &&
+      hit.value?.bot_id !== "bot_admin" &&
+      hit.value?.bot_id !== "bot_engineering" &&
+      hit.expires > this.now()
+    )
       return hit.value;
     if (!this.resolveAa) return null;
     const value = await this.resolveAa(hashHex);

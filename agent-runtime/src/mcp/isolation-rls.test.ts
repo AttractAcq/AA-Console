@@ -105,6 +105,7 @@ beforeAll(async () => {
   for (const file of [
     '20260911205529_79_client_marketing_spend.sql',
     '20260915180000_85_mcp_finance_controller.sql',
+    '20260915200000_86_mcp_engineering_ops.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -2026,5 +2027,204 @@ describe('Phase 13 Finance Controller isolation', () => {
     expect(rows.rows.map((r) => r.permission_pattern)).not.toContain('economics.*');
     expect(rows.rows.some((r) => r.permission_pattern === 'economics.get_client_economics')).toBe(true);
     expect(rows.rows.some((r) => r.permission_pattern === 'pipeline.record_sale')).toBe(false);
+  });
+});
+
+describe('Phase 14 Engineering Ops isolation', () => {
+  const PAGE_A = 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  const PAGE_B = 'bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+  const JOB_A = 'aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+  const JOB_B = 'bbbbbbb2-bbbb-4bbb-8bbb-bbbbbbbbbbb2';
+  const create = async (
+    client = CLIENT_A,
+    execution = 'eng-create',
+    bot = 'bot_engineering',
+    title = 'Broken publish',
+  ) => {
+    const q = await db.query<{ result: any }>(
+      `select public.mcp_engineering_create_issue($1,$2,'request-14',$3,$4,null) result`,
+      [bot, client, execution, title],
+    );
+    return q.rows[0]!.result;
+  };
+  beforeEach(async () => {
+    await db.exec(`
+      insert into mcp_bot_clients(bot_id,client_id) values
+        ('bot_engineering','${CLIENT_A}'),
+        ('bot_security_devops','${CLIENT_A}');
+      insert into client_pages (id,client_id,page_type,title,status,published_url,body) values
+        ('${PAGE_A}','${CLIENT_A}','landing','Harbour Home','approved','https://example.test/h','SECRET BODY'),
+        ('${PAGE_B}','${CLIENT_B}','landing','Other Home','draft',null,'OTHER SECRET');
+      insert into agent_jobs (id,agent_key,client_id,status,params,cost_usd,error) values
+        ('${JOB_A}','landing_page','${CLIENT_A}','completed','{"token":"SECRET"}',9.99,'SECRET ERR'),
+        ('${JOB_B}','landing_page','${CLIENT_B}','queued','{"token":"SECRET"}',1.00,'OTHER ERR');
+      insert into agent_jobs (id,agent_key,client_id,status) values
+        ('ccccccc2-cccc-4ccc-8ccc-ccccccccccc2','landing_page',null,'queued');
+    `);
+  });
+
+  it('same-client issue create/get and status reads omit secrets', async () => {
+    const made = await create();
+    expect(made.issue.created_by_bot).toBe('bot_engineering');
+    expect((await db.query('select * from mcp_internal.mcp_engineering_issues')).rows).toHaveLength(1);
+    const got = await db.query<{ result: any }>(
+      `select mcp_engineering_get_issue('bot_engineering',$1,$2) result`,
+      [CLIENT_A, made.issue.id],
+    );
+    expect(got.rows[0]!.result.issue.id).toBe(made.issue.id);
+    const pages = (await db.query<{ result: any }>(
+      `select mcp_engineering_get_release_status('bot_engineering',$1) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(pages.pages).toHaveLength(1);
+    expect(pages.pages[0].id).toBe(PAGE_A);
+    expect(JSON.stringify(pages)).not.toMatch(/SECRET/);
+    const jobs = (await db.query<{ result: any }>(
+      `select mcp_engineering_get_deployment_status('bot_engineering',$1) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(jobs.jobs).toHaveLength(1);
+    expect(jobs.jobs[0].id).toBe(JOB_A);
+    expect(JSON.stringify(jobs)).not.toMatch(/SECRET|9\.99/);
+  });
+
+  it('replay returns the saved issue; changed payload conflicts', async () => {
+    const first = await create();
+    const again = await create();
+    expect(again.issue).toEqual(first.issue);
+    expect(again.replayed).toBe(true);
+    await expect(create(CLIENT_A, 'eng-create', 'bot_engineering', 'Different')).rejects.toThrow(
+      'idempotency_conflict',
+    );
+  });
+
+  it('ungranted client, suspended bot and revoked grant deny', async () => {
+    await expect(
+      db.query(`select mcp_engineering_get_release_status('bot_engineering',$1)`, [CLIENT_B]),
+    ).rejects.toThrow('client_forbidden');
+    await db.exec(`update mcp_internal.mcp_bots set status='suspended' where bot_id='bot_engineering'`);
+    await expect(
+      db.query(`select mcp_engineering_get_release_status('bot_engineering',$1)`, [CLIENT_A]),
+    ).rejects.toThrow('bot_not_active');
+    await db.exec(`update mcp_internal.mcp_bots set status='active' where bot_id='bot_engineering'`);
+    await db.exec(`delete from mcp_bot_clients where bot_id='bot_engineering'`);
+    await expect(create()).rejects.toThrow('client_forbidden');
+  });
+
+  it('missing and foreign issue/page/job ids are indistinguishable', async () => {
+    const first = await create();
+    await db.exec(`insert into mcp_bot_clients(bot_id,client_id) values('bot_engineering','${CLIENT_B}')`);
+    await expect(
+      db.query(`select mcp_engineering_get_issue('bot_engineering',$1,$2)`, [CLIENT_B, first.issue.id]),
+    ).rejects.toThrow('issue_not_found');
+    await expect(
+      db.query(`select mcp_engineering_get_issue('bot_engineering',$1,$2)`, [CLIENT_A, CLIENT_B]),
+    ).rejects.toThrow('issue_not_found');
+    await expect(
+      db.query(`select mcp_engineering_get_release_status('bot_engineering',$1,25,null,$2)`, [CLIENT_A, PAGE_B]),
+    ).rejects.toThrow('page_not_found');
+    await expect(
+      db.query(`select mcp_engineering_get_deployment_status('bot_engineering',$1,25,null,$2)`, [CLIENT_A, JOB_B]),
+    ).rejects.toThrow('job_not_found');
+  });
+
+  it('other bots cannot create or get issues; Security can read status', async () => {
+    // bot_production already has CLIENT_A from the shared fixture; extra insert would PK-conflict.
+    await expect(create(CLIENT_A, 'prod-create', 'bot_production')).rejects.toThrow('bot_forbidden');
+    const pages = (await db.query<{ result: any }>(
+      `select mcp_engineering_get_release_status('bot_security_devops',$1) result`,
+      [CLIENT_A],
+    )).rows[0]!.result;
+    expect(pages.pages).toHaveLength(1);
+    await expect(
+      db.query(`select mcp_engineering_create_issue('bot_security_devops',$1,'r','e','Nope',null)`, [CLIENT_A]),
+    ).rejects.toThrow('bot_forbidden');
+  });
+
+  it('removed exact permission denies even with engineering wildcard attempt', async () => {
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_engineering','engineering.*','test')`,
+      ),
+    ).rejects.toThrow(/Phase 14: engineering\.\* wildcard is forbidden/);
+    await db.exec(
+      `delete from mcp_internal.mcp_bot_permissions where bot_id='bot_engineering' and permission_pattern='engineering.create_issue'`,
+    );
+    await expect(create()).rejects.toThrow('bot_forbidden');
+    await db.exec(
+      `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+       values('bot_engineering','engineering.create_issue','phase-14:engineering-ops-allowlist')`,
+    );
+  });
+
+  it('issue tools cannot be granted outside bot_engineering', async () => {
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_production','engineering.create_issue','test')`,
+      ),
+    ).rejects.toThrow(/Phase 14: issue tools must not be granted outside bot_engineering/);
+  });
+
+  it('anon and authenticated cannot execute public wrappers; tables deny including service_role', async () => {
+    const first = await create();
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      for (const sql of [
+        `select mcp_engineering_get_release_status('bot_engineering','${CLIENT_A}')`,
+        `select mcp_engineering_get_issue('bot_engineering','${CLIENT_A}','${first.issue.id}')`,
+        `select mcp_engineering_create_issue('bot_engineering','${CLIENT_A}','req','exec','Title',null)`,
+        `select mcp_engineering_get_deployment_status('bot_engineering','${CLIENT_A}')`,
+      ]) {
+        await expect(db.query(sql)).rejects.toThrow(/permission denied/);
+      }
+      await db.exec('reset role');
+    }
+    await db.exec(`reset role`);
+    await db.exec(`set role service_role`);
+    for (const table of ['mcp_engineering_issues', 'mcp_engineering_requests']) {
+      await expect(db.query(`select * from mcp_internal.${table}`)).rejects.toThrow(/permission denied/);
+    }
+    await db.exec('reset role');
+    await db.exec(`select set_config('request.jwt.claim.role','service_role',false)`);
+  });
+
+  it('RLS is forced and permission rows are the exact 12-name allowlist', async () => {
+    const tables = await db.query<{ relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+      `select relrowsecurity, relforcerowsecurity from pg_class where relname in ('mcp_engineering_issues','mcp_engineering_requests')`,
+    );
+    expect(tables.rows.every((r) => r.relrowsecurity && r.relforcerowsecurity)).toBe(true);
+    const grants = await db.query<{ permission_pattern: string }>(
+      `select permission_pattern from mcp_internal.mcp_bot_permissions where bot_id='bot_engineering' order by 1`,
+    );
+    expect(grants.rows.map((r) => r.permission_pattern)).toEqual([
+      'engineering.create_issue',
+      'engineering.get_deployment_status',
+      'engineering.get_issue',
+      'engineering.get_release_status',
+      'workflow.assign_task',
+      'workflow.complete_task',
+      'workflow.create_approval',
+      'workflow.create_task',
+      'workflow.get_activity',
+      'workflow.get_pending_approvals',
+      'workflow.get_task',
+      'workflow.list_tasks',
+    ]);
+  });
+
+  it('Bot RPC sources require active bot + client grant and never can_access_client', async () => {
+    const functions = await db.query<{ def: string }>(
+      `select pg_get_functiondef(p.oid) def from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+        where (n.nspname='public' and p.proname like 'mcp_engineering_%')
+           or (n.nspname='mcp_internal' and p.proname like 'engineering_%')`,
+    );
+    expect(functions.rows.length).toBeGreaterThan(0);
+    for (const row of functions.rows) {
+      expect(row.def).toContain('require_active_bot');
+      expect(row.def).toContain('require_bot_client_grant');
+      expect(row.def).not.toContain('can_access_client');
+    }
   });
 });

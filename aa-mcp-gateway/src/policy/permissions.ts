@@ -1,4 +1,5 @@
 import { adminCalendar } from "../onboarding/admin-calendar.js";
+import { engineeringOps } from "../onboarding/engineering-ops.js";
 import { marketingDirector } from "../onboarding/marketing-director.js";
 import { distributionManager } from "../onboarding/distribution-manager.js";
 import { salesOps } from "../onboarding/sales-ops.js";
@@ -41,7 +42,7 @@ export const grants: Record<Bot, string[]> = {
   bot_sales_ops: [...salesOps.grants],
   bot_admin: [...adminCalendar.grants],
   bot_finance: [...financeController.grants],
-  bot_engineering: ["engineering.*", ...workflow],
+  bot_engineering: [...engineeringOps.grants],
   bot_security_devops: [
     "security.*",
     "engineering.get_release_status",
@@ -89,6 +90,19 @@ export const DISTRIBUTION_ONLY_TOOLS = new Set([
   "content.queue_distribution",
   "content.record_publication",
 ]);
+/**
+ * Phase 14: issue create/get are bot_engineering only. Status reads stay
+ * callable by bot_security_devops via its existing exact grants. A blanket
+ * engineering-domain deny would hide those two status tools from Security.
+ */
+export const ENGINEERING_ISSUE_TOOLS = new Set([
+  "engineering.create_issue",
+  "engineering.get_issue",
+]);
+export const ENGINEERING_STATUS_TOOLS = new Set([
+  "engineering.get_release_status",
+  "engineering.get_deployment_status",
+]);
 export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
   // Sec Phase 5 #5 / Phase 3–4 locked: hard-deny stays in gateway code forever.
   if (tool.name === "workflow.record_decision") return false; // human-only API, never discoverable by Bots
@@ -135,6 +149,25 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
     identity.bot === "bot_finance" &&
     !financeController.grants.some((name) => name === tool.name)
   )
+    return false;
+  if (tool.domain === "engineering") {
+    if (identity.bot === "bot_engineering") {
+      // Exact ceiling below.
+    } else if (
+      identity.bot === "bot_security_devops" &&
+      ENGINEERING_STATUS_TOOLS.has(tool.name)
+    ) {
+      // Existing exact grants; Phase 15 may tighten this.
+    } else {
+      return false;
+    }
+  }
+  if (
+    identity.bot === "bot_engineering" &&
+    !engineeringOps.grants.some((name) => name === tool.name)
+  )
+    return false;
+  if (ENGINEERING_ISSUE_TOOLS.has(tool.name) && identity.bot !== "bot_engineering")
     return false;
   const patterns = grantPatterns(identity);
   return tool.permissions.every((permission) =>
