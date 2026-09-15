@@ -11,9 +11,11 @@ import { supabase } from "../../lib/supabase";
 import { useGitHubStatus, provisionBlockerFromStatus } from "../../lib/useGitHubStatus";
 import { callRuntime } from "../../lib/callRuntime";
 import { PublishButton } from "../../components/sites/PublishButton";
+import { AttachAgentControl } from "../../components/sites/AttachAgentControl";
 import { cn } from "../../lib/cn";
 import {
   repoStateLabel,
+  type ApprovableAgent,
   type SiteRepo,
 } from "./readiness";
 
@@ -35,7 +37,6 @@ type PageRow = {
   publish_status: string;
   site_repository_id: string | null;
 };
-type AgentRow = { id: string; name: string };
 
 const STATE_TONE: Record<string, string> = {
   ready: "bg-primary/10 text-brand-strong",
@@ -49,7 +50,7 @@ export function SitesPanel() {
   const [repos, setRepos] = useState<SiteRepo[]>([]);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [pages, setPages] = useState<PageRow[]>([]);
-  const [agents, setAgents] = useState<AgentRow[]>([]);
+  const [agents, setAgents] = useState<ApprovableAgent[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -76,12 +77,15 @@ export function SitesPanel() {
         .from("client_pages")
         .select("id, title, html, published_url, publish_status, site_repository_id")
         .eq("client_id", clientId),
-      supabase.from("client_sales_agents").select("id, name").eq("client_id", clientId),
+      supabase
+        .from("client_sales_agents")
+        .select("id, name, status, built_at, approved_at")
+        .eq("client_id", clientId),
     ]);
     setRepos((repoRes.data as SiteRepo[] | null) ?? []);
     setDeployments((depRes.data as Deployment[] | null) ?? []);
     setPages((pageRes.data as PageRow[] | null) ?? []);
-    setAgents((agentRes.data as AgentRow[] | null) ?? []);
+    setAgents((agentRes.data as ApprovableAgent[] | null) ?? []);
     setLoading(false);
   }, [clientId]);
 
@@ -219,6 +223,17 @@ export function SitesPanel() {
                     <div className="mt-2">
                       <PublishButton page={p} repos={repos} onPublished={() => void refresh()} />
                     </div>
+                    {p.publish_status === "published" && p.published_url && clientId && (
+                      <AttachAgentControl
+                        clientId={clientId}
+                        page={p}
+                        agents={agents}
+                        attachedAgentIds={deployments
+                          .filter((d) => d.page_id === p.id)
+                          .map((d) => d.sales_agent_id)}
+                        onAttached={() => void refresh()}
+                      />
+                    )}
                   </div>
                 ))}
               </div>

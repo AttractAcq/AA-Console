@@ -13,6 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   InstallationRecord,
   PageRecord,
+  PageDeploymentRecord,
   SiteRepoRecord,
   SiteStore,
 } from "./provision.js";
@@ -131,6 +132,20 @@ export function supabaseSiteStore(sb: SupabaseClient): SiteStore {
         siteRepositoryId: row.site_repository_id ? String(row.site_repository_id) : null,
         sitePath: row.site_path ? String(row.site_path) : null,
       };
+    },
+
+    async deploymentsForPage(pageId): Promise<PageDeploymentRecord[]> {
+      const { data, error } = await sb
+        .from("client_sales_agent_deployments")
+        .select("public_id, enabled, created_at")
+        .eq("page_id", pageId)
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(`Could not load deployments for the page: ${error.message}`);
+      return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+        publicId: String(row.public_id),
+        enabled: Boolean(row.enabled),
+        createdAt: String(row.created_at),
+      }));
     },
 
     async markPublishing(pageId, repoId, path) {

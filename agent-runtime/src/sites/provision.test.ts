@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { generateKeyPairSync } from "node:crypto";
-import { provisionSite, publishPage, syncInstallation, type SiteStore, type SiteRepoRecord, type PageRecord, type InstallationRecord } from "./provision.js";
+import { provisionSite, publishPage, syncInstallation, publicIdToEmbed, type SiteStore, type SiteRepoRecord, type PageRecord, type PageDeploymentRecord, type InstallationRecord } from "./provision.js";
 
 const { privateKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -27,6 +27,7 @@ function store() {
     pageStatus: "unpublished",
     pageError: null as string | null,
     published: null as { commit: string; url: string } | null,
+    deployments: [] as PageDeploymentRecord[],
   };
 
   const impl: SiteStore = {
@@ -63,6 +64,9 @@ function store() {
     },
     async loadPage() {
       return state.page;
+    },
+    async deploymentsForPage() {
+      return state.deployments;
     },
     async markPublishing(_pageId, repoId, path) {
       writes.push("markPublishing");
@@ -336,5 +340,129 @@ describe("publishing a page", () => {
     const tree = calls.find((c) => c.path.endsWith("/git/trees"))?.body as { tree: { path: string }[] };
     expect(tree.tree.map((t) => t.path)).toEqual(["original-path/index.html"]);
     expect(result.url).toBe(`${PAGES_URL}/original-path/`);
+  });
+});
+
+function committedHtml(calls: { method: string; path: string; body: unknown }[]): string {
+  const blob = calls.find((c) => c.method === "POST" && c.path.endsWith("/git/blobs"));
+  const encoded = (blob?.body as { content?: string } | undefined)?.content;
+  if (!encoded) throw new Error("publish committed no blob");
+  return Buffer.from(encoded, "base64").toString("utf8");
+}
+
+describe("publicIdToEmbed", () => {
+  it("prefers the enabled deployment over a newer disabled one", () => {
+    expect(
+      publicIdToEmbed([
+        { publicId: "newer-off", enabled: false, createdAt: "2026-09-15T00:00:00Z" },
+        { publicId: "older-on", enabled: true, createdAt: "2026-09-01T00:00:00Z" },
+      ]),
+    ).toBe("older-on");
+  });
+
+  it("falls back to the most recent attachment when none is enabled", () => {
+    // Attach-then-republish while still disabled still embeds the public_id.
+    // The runtime refuses until Enable.
+    expect(
+      publicIdToEmbed([
+        { publicId: "old", enabled: false, createdAt: "2026-09-01T00:00:00Z" },
+        { publicId: "new", enabled: false, createdAt: "2026-09-15T00:00:00Z" },
+      ]),
+    ).toBe("new");
+  });
+
+  it("returns nothing when the page has no deployment", () => {
+    expect(publicIdToEmbed([])).toBeNull();
+  });
+});
+
+describe("publishing injects the sales-agent widget", () => {
+  function provisioned(s: ReturnType<typeof store>) {
+    s.state.repos = [{
+      id: "repo-1", clientId: "client-1", owner: "AttractAcq-Sites",
+      repo: "attract-acquisition-site", defaultBranch: "main", pagesUrl: PAGES_URL, status: "ready",
+    }];
+    s.state.page = {
+      ...s.state.page,
+      html: "<!doctype html><html><body><h1>Grow</h1></body></html>",
+    };
+  }
+
+  it("does not invent a widget when the page has no deployment", async () => {
+    const s = store();
+    provisioned(s);
+    const { fetchImpl, calls } = github(baseRoutes());
+    await publishPage(s.impl, APP, SITE, "page-1", { fetchImpl, sleep: noSleep });
+    const html = committedHtml(calls);
+    expect(html).toBe("<!doctype html><html><body><h1>Grow</h1></body></html>");
+    expect(html).not.toContain("widget.js");
+    expect(html).not.toContain("data-agent");
+  });
+
+  it("embeds the canonical runtime widget when a disabled deployment exists", async () => {
+    // Attach ≠ go live. The snippet still goes on the page so Enable can take
+    // effect without another code change; the runtime refuses until enabled.
+    const s = store();
+    provisioned(s);
+    s.state.deployments = [
+      { publicId: "abc123def456", enabled: false, createdAt: "2026-09-15T00:00:00Z" },
+    ];
+    const { fetchImpl, calls } = github(baseRoutes());
+    await publishPage(s.impl, APP, SITE, "page-1", { fetchImpl, sleep: noSleep });
+    const html = committedHtml(calls);
+    expect(html).toContain("https://runtime.attractacq.com/public/sales/v1/widget.js");
+    expect(html).toContain('data-agent="abc123def456"');
+    expect(html.indexOf("widget.js")).toBeLessThan(html.indexOf("</body>"));
+    expect(html).toContain("<h1>Grow</h1>");
+  });
+
+  it("prefers the enabled deployment's public_id when several exist", async () => {
+    const s = store();
+    provisioned(s);
+    s.state.deployments = [
+      { publicId: "newer-off", enabled: false, createdAt: "2026-09-15T00:00:00Z" },
+      { publicId: "older-on", enabled: true, createdAt: "2026-09-01T00:00:00Z" },
+    ];
+    const { fetchImpl, calls } = github(baseRoutes());
+    await publishPage(s.impl, APP, SITE, "page-1", { fetchImpl, sleep: noSleep });
+    const html = committedHtml(calls);
+    expect(html).toContain('data-agent="older-on"');
+    expect(html).not.toContain('data-agent="newer-off"');
+  });
+
+  it("replaces an older public_id on republish rather than stacking a second widget", async () => {
+    const s = store();
+    provisioned(s);
+    s.state.page = {
+      ...s.state.page,
+      html: `<!doctype html><html><body><h1>Grow</h1><!-- aa-sales-agent -->
+<script src="https://runtime.attractacq.com/public/sales/v1/widget.js" data-agent="old" defer></script>
+</body></html>`,
+    };
+    s.state.deployments = [
+      { publicId: "new", enabled: true, createdAt: "2026-09-15T00:00:00Z" },
+    ];
+    const { fetchImpl, calls } = github(baseRoutes());
+    await publishPage(s.impl, APP, SITE, "page-1", { fetchImpl, sleep: noSleep });
+    const html = committedHtml(calls);
+    expect(html).toContain('data-agent="new"');
+    expect(html).not.toContain('data-agent="old"');
+    expect(html.match(/data-agent=/g)).toHaveLength(1);
+  });
+
+  it("normalises a trailing slash on the runtime base", async () => {
+    const s = store();
+    provisioned(s);
+    s.state.deployments = [
+      { publicId: "dep1", enabled: true, createdAt: "2026-09-15T00:00:00Z" },
+    ];
+    const { fetchImpl, calls } = github(baseRoutes());
+    await publishPage(
+      s.impl, APP, { ...SITE, runtimeBase: "https://runtime.attractacq.com/" }, "page-1",
+      { fetchImpl, sleep: noSleep },
+    );
+    const html = committedHtml(calls);
+    expect(html).toContain("https://runtime.attractacq.com/public/sales/v1/widget.js");
+    expect(html).not.toContain("attractacq.com//public");
   });
 });
