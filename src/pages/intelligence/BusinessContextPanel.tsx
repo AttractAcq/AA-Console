@@ -46,15 +46,22 @@ export function BusinessContextPanel() {
   const [inputOpen, setInputOpen] = useState(false);
   const { clientId } = useParams<{ clientId: string }>();
   const [row, setRow] = useState<ContextRow | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
-    const { data } = await supabase
-      .from("client_business_context")
-      .select("*")
-      .eq("client_id", clientId)
-      .maybeSingle();
-    setRow((data as ContextRow) ?? null);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("client_business_context")
+        .select("*")
+        .eq("client_id", clientId)
+        .maybeSingle();
+      if (error) throw error;
+      setRow((data as ContextRow) ?? null);
+    } catch (error) {
+      setLoadError("Failed to load business context: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -64,6 +71,8 @@ export function BusinessContextPanel() {
   const initialValues: FormValues = Object.fromEntries(
     FIELDS.map((f) => [f.name, row?.[f.name] ?? ""]),
   );
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

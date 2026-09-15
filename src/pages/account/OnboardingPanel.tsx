@@ -12,15 +12,22 @@ export function OnboardingPanel() {
   const [startOpen, setStartOpen] = useState(false);
   const { clientId } = useParams<{ clientId: string }>();
   const [steps, setSteps] = useState<Step[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
-    const { data } = await supabase
-      .from("client_onboarding_steps")
-      .select("id, title, status, completed_at")
-      .eq("client_id", clientId)
-      .order("display_order");
-    setSteps((data ?? []) as Step[]);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("client_onboarding_steps")
+        .select("id, title, status, completed_at")
+        .eq("client_id", clientId)
+        .order("display_order");
+      if (error) throw error;
+      setSteps((data ?? []) as Step[]);
+    } catch (error) {
+      setLoadError("Failed to load onboarding steps: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -35,6 +42,8 @@ export function OnboardingPanel() {
       .eq("id", step.id);
     void refresh();
   }
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

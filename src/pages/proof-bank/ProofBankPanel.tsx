@@ -28,7 +28,11 @@ export function ProofBankPanel() {
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
+    setLoadError(null);
+    try {
     if (!clientId) {
       setLoading(false);
       return;
@@ -42,6 +46,11 @@ export function ProofBankPanel() {
       ),
     );
     setLoading(false);
+    } catch (error) {
+      setLoadError("Failed to load proof: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
+      setLoading(false);
+    }
   }, [clientId, activeFilter]);
 
   useEffect(() => {
@@ -55,6 +64,8 @@ export function ProofBankPanel() {
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
   const cleared = proof.filter((p) => p.usage_rights === "approved").length;
   const unstructured = proof.filter((p) => !p.claim).length;
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

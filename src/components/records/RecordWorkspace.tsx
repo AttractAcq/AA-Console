@@ -76,34 +76,37 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   const [records, setRecords] = useState<Record_[]>([]);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [runOpen, setRunOpen] = useState(false);
   const [editing, setEditing] = useState<{ itemKey: string; title: string; body: string } | null>(
     null,
   );
 
   const loadTemplates = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("record_templates")
       .select("item_key, item_type, title, description, display_order")
       .eq("domain", domain)
       .order("display_order");
+    if (error) throw error;
     setTemplates((data ?? []) as Template[]);
   }, [domain]);
 
   const loadRecords = useCallback(async () => {
     if (!clientId) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("client_agent_records")
       .select("id, item_key, item_type, title, body, period, display_order, status, edited_at")
       .eq("client_id", clientId)
       .eq("domain", domain)
       .order("display_order");
+    if (error) throw error;
     setRecords((data ?? []) as Record_[]);
   }, [clientId, domain]);
 
   const loadJob = useCallback(async () => {
     if (!clientId) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("agent_jobs")
       .select("id, status, error, created_at, completed_at")
       .eq("client_id", clientId)
@@ -111,15 +114,24 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+    if (error) throw error;
     setJob((data as Job) ?? null);
   }, [clientId, config.agentKey]);
 
-  useEffect(() => {
-    void (async () => {
+  const loadAll = useCallback(async () => {
+    setLoadError(null);
+    try {
       await Promise.all([loadTemplates(), loadRecords(), loadJob()]);
+    } catch (error) {
+      setLoadError("Failed to load: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    } finally {
       setLoading(false);
-    })();
+    }
   }, [loadTemplates, loadRecords, loadJob]);
+
+  useEffect(() => {
+    void loadAll();
+  }, [loadAll]);
 
   // The queue is the source of truth for progress, so watch it rather than
   // polling. A finished job also means new records to pull.
@@ -196,6 +208,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
   ];
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void loadAll()}>Retry</button></div>;
 
   return (
     <div>

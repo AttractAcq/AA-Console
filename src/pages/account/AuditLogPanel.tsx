@@ -21,14 +21,22 @@ export function AuditLogPanel() {
   const [notes, setNotes] = useState<Note[]>([]);
   const memberOptions = useOptions(loadTeamMembers, addOpen);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    if (!clientId) return;
-    const { data } = await supabase
-      .from("client_audit_notes")
-      .select("id, note, noted_on, team_members(name)")
-      .eq("client_id", clientId)
-      .order("noted_on", { ascending: false });
-    setNotes((data ?? []) as unknown as Note[]);
+    setLoadError(null);
+    try {
+      if (!clientId) return;
+      const { data, error } = await supabase
+        .from("client_audit_notes")
+        .select("id, note, noted_on, team_members(name)")
+        .eq("client_id", clientId)
+        .order("noted_on", { ascending: false });
+      if (error) throw error;
+      setNotes((data ?? []) as unknown as Note[]);
+    } catch (error) {
+      setLoadError("Failed to load audit notes: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [clientId]);
 
   useEffect(() => {
@@ -40,6 +48,8 @@ export function AuditLogPanel() {
     { name: "member_id", label: "Member", kind: "select", options: memberOptions },
     { name: "noted_on", label: "Date", kind: "date" },
   ];
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>

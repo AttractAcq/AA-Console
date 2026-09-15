@@ -28,19 +28,29 @@ export function ContractsLegalPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [contracts, setContracts] = useState<Contract[]>([]);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const refresh = useCallback(async () => {
-    if (!clientId) return;
-    const { data } = await supabase
-      .from("client_contracts")
-      .select("id, title, created_at")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
-    setContracts((data ?? []) as Contract[]);
+    setLoadError(null);
+    try {
+      if (!clientId) return;
+      const { data, error } = await supabase
+        .from("client_contracts")
+        .select("id, title, created_at")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setContracts((data ?? []) as Contract[]);
+    } catch (error) {
+      setLoadError("Failed to load contracts: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+    }
   }, [clientId]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
     <div>
