@@ -51,6 +51,7 @@ beforeAll(async () => {
     '20260904080405_14_campaigns.sql',
     '20260904083559_15_brief_refs_and_job_link.sql',
     '20260907170000_55_structured_briefs.sql',
+    '20260908010000_59_page_html.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     alter table agents add column archived_at timestamptz;
@@ -84,29 +85,24 @@ beforeAll(async () => {
     '20260908230000_68_mcp_production_manager.sql',
     '20260908240000_69_mcp_phase5_read_rpc_volatile.sql',
     '20260909000000_70_mcp_approval_engine.sql',
+    '20260909030000_73_mcp_marketing_director.sql',
     '20260909040000_74_mcp_production_bot_decide.sql',
     '20260909050000_75_mcp_distribution_manager.sql',
     '20260910000000_76_mcp_sales_ops.sql',
     '20260909010000_71_mcp_client_delivery.sql',
+    '20260909020000_72_campaign_execution.sql',
     '20260909020100_72_mcp_cos_orchestration.sql',
     '20260911210000_78_mcp_admin_calendar.sql',
     '20260915120000_84_mcp_sales_agent_factory.sql',
   ]) await db.exec(await migration(file));
-  // Migration 79 FKs client_marketing_spend.client_campaign_id to
-  // client_campaigns (created in 20260909020000_72_campaign_execution.sql).
-  // That file also needs client_pages / campaign_artifacts / scheduled_posts
-  // columns this partial fixture does not load, so stub the table only.
-  await db.exec(`
-    create table if not exists client_campaigns (
-      id uuid primary key default gen_random_uuid(),
-      client_id uuid not null references clients (id) on delete cascade
-    );
-  `);
   for (const file of [
     '20260911205529_79_client_marketing_spend.sql',
     '20260915180000_85_mcp_finance_controller.sql',
     '20260915200000_86_mcp_engineering_ops.sql',
     '20260915220000_87_mcp_security_devops.sql',
+    '20260913000000_82_page_revisions.sql',
+    '20260913010000_83_page_polish_agents.sql',
+    '20260916130000_89_mcp_conversion_campaign.sql',
   ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
@@ -115,7 +111,7 @@ beforeAll(async () => {
     grant execute on function current_role_of() to authenticated;
     grant execute on function can_access_client(uuid) to authenticated;
   `);
-}, 60_000);
+}, 90_000);
 
 afterAll(async () => { await db?.close(); });
 
@@ -123,7 +119,8 @@ beforeEach(async () => {
   await db.exec(`reset role;
     truncate mcp_brief_requests, mcp_bot_clients, mcp_internal.mcp_bot_token_audit,
       mcp_internal.mcp_bot_tokens, mcp_internal.mcp_content_requests,
-      mcp_internal.mcp_pipeline_requests, mcp_internal.mcp_sales_agent_requests, scheduled_posts,
+      mcp_internal.mcp_pipeline_requests, mcp_internal.mcp_sales_agent_requests,
+      mcp_internal.mcp_conversion_requests, mcp_internal.mcp_campaign_requests, scheduled_posts,
       client_media_assets, client_ideas, agent_job_events, agent_jobs,
       campaigns, lead_events, client_leads, sales_agent_conversations, client_sales_agents,
       finance_entries, finance_periods, client_billing,
@@ -166,7 +163,7 @@ describe('Phase 4 RLS inventory (relrowsecurity must be on)', () => {
     }
     for (const name of [
       'mcp_bots', 'mcp_bot_tokens', 'mcp_bot_clients', 'mcp_brief_requests', 'mcp_content_requests',
-      'mcp_pipeline_requests',
+      'mcp_pipeline_requests', 'mcp_conversion_requests', 'mcp_campaign_requests',
     ]) {
       expect(present.find((r) => r.rel === name)?.rls_forced).toBe(true);
     }
@@ -2444,6 +2441,180 @@ describe('Phase 15 Security DevOps isolation', () => {
       `select pg_get_functiondef(p.oid) def from pg_proc p join pg_namespace n on n.oid=p.pronamespace
         where (n.nspname='public' and p.proname like 'mcp_security_%')
            or (n.nspname='mcp_internal' and (p.proname like 'security_%' or p.proname = 'require_security_permission'))`,
+    );
+    expect(functions.rows.length).toBeGreaterThan(0);
+    for (const row of functions.rows) {
+      expect(row.def).toContain('require_active_bot');
+      expect(row.def).toContain('require_bot_client_grant');
+      expect(row.def).not.toContain('can_access_client');
+    }
+  });
+});
+
+describe('Phase 16 Conversion + Campaign Execution isolation', () => {
+  const PAGE_A = 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  const CAMP_A = 'aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+  const FINDING_A = 'aaaaaaa4-aaaa-4aaa-8aaa-aaaaaaaaaaa4';
+
+  beforeEach(async () => {
+    await db.exec(`
+      insert into mcp_bot_clients(bot_id,client_id) values
+        ('bot_marketing','${CLIENT_A}'),
+        ('bot_chief_of_staff','${CLIENT_A}'),
+        ('bot_client_delivery','${CLIENT_A}');
+      insert into client_pages (id,client_id,page_type,title,status,html,body,current_revision) values
+        ('${PAGE_A}','${CLIENT_A}','landing','Harbour Home','approved','<html>SECRET</html>','SECRET BODY',1);
+      insert into client_page_revisions (client_id,page_id,revision_number,html,body,source,summary) values
+        ('${CLIENT_A}','${PAGE_A}',1,'<html>SECRET</html>','SECRET BODY','initial_generation','Original');
+      insert into client_page_findings (id,client_id,page_id,revision_number,category,severity,title,explanation,classification,status) values
+        ('${FINDING_A}','${CLIENT_A}','${PAGE_A}',1,'copy','medium','Headline','Fix','FIXABLE','open');
+      insert into client_campaigns (id,client_id,name,brief,status,built_at,needs_landing_page) values
+        ('${CAMP_A}','${CLIENT_A}','Harbour launch','Win winter','planning',now(),true);
+    `);
+  });
+
+  const conversion = (
+    bot: string,
+    client: string,
+    action: string,
+    extra: unknown[] = [],
+  ) =>
+    db.query<{ result: any }>(
+      `select public.mcp_conversion($1,$2,$3,$4,25,null,$5,$6,$7,$8,$9,$10,$11,$12,$13) result`,
+      [
+        bot,
+        client,
+        action,
+        extra[0] ?? null,
+        extra[1] ?? null,
+        extra[2] ?? null,
+        extra[3] ?? null,
+        extra[4] ?? null,
+        extra[5] ?? null,
+        extra[6] ?? null,
+        extra[7] ?? null,
+        extra[8] ?? null,
+        extra[9] ?? null,
+      ],
+    );
+
+  const campaign = (
+    bot: string,
+    client: string,
+    action: string,
+    extra: unknown[] = [],
+  ) =>
+    db.query<{ result: any }>(
+      `select public.mcp_campaign_execution($1,$2,$3,$4,25,null,$5,$6,$7,$8,$9,$10,$11) result`,
+      [
+        bot,
+        client,
+        action,
+        extra[0] ?? null,
+        extra[1] ?? null,
+        extra[2] ?? null,
+        extra[3] ?? null,
+        extra[4] ?? null,
+        extra[5] ?? null,
+        extra[6] ?? null,
+        extra[7] ?? null,
+      ],
+    );
+
+  it('Marketing lists pages without HTML; CoS is forbidden on conversion', async () => {
+    const listed = (await conversion('bot_marketing', CLIENT_A, 'list_pages')).rows[0]!.result;
+    expect(listed.pages).toHaveLength(1);
+    expect(listed.pages[0].id).toBe(PAGE_A);
+    expect(JSON.stringify(listed)).not.toMatch(/SECRET|<html>/);
+    await expect(conversion('bot_chief_of_staff', CLIENT_A, 'list_pages')).rejects.toThrow(
+      'bot_forbidden',
+    );
+    await expect(conversion('bot_marketing', CLIENT_B, 'list_pages')).rejects.toThrow(
+      'client_forbidden',
+    );
+  });
+
+  it('create_page queues landing_page and replays; changed payload conflicts', async () => {
+    const args = [
+      null, null, 'Winter', 'Sell the plan', null, null, null, null, 'req-16', 'exec-16',
+    ];
+    const first = (await conversion('bot_marketing', CLIENT_A, 'create_page', args)).rows[0]!.result;
+    expect(first.job_id).toBeTruthy();
+    const again = (await conversion('bot_marketing', CLIENT_A, 'create_page', args)).rows[0]!.result;
+    expect(again.replayed).toBe(true);
+    expect(again.page.id).toBe(first.page.id);
+    await expect(
+      conversion('bot_marketing', CLIENT_A, 'create_page', [
+        null, null, 'Different', 'Sell the plan', null, null, null, null, 'req-16', 'exec-16',
+      ]),
+    ).rejects.toThrow('idempotency_conflict');
+  });
+
+  it('campaign list/get bind to client_campaigns; CoS and Marketing can read', async () => {
+    const listed = (await campaign('bot_chief_of_staff', CLIENT_A, 'list')).rows[0]!.result;
+    expect(listed.projection).toBe('client_campaigns_execution_v1');
+    expect(listed.campaigns[0].id).toBe(CAMP_A);
+    const got = (await campaign('bot_marketing', CLIENT_A, 'get', [CAMP_A])).rows[0]!.result;
+    expect(got.campaign.name).toBe('Harbour launch');
+    await expect(campaign('bot_chief_of_staff', CLIENT_A, 'get', [CLIENT_B])).rejects.toThrow(
+      'campaign_not_found',
+    );
+  });
+
+  it('CDM cannot write campaigns; conversion wildcard inserts deny', async () => {
+    await expect(
+      campaign('bot_client_delivery', CLIENT_A, 'create', [
+        null, 'Nope', 'Forbidden', null, null, null, 'req-cdm', 'exec-cdm',
+      ]),
+    ).rejects.toThrow('bot_forbidden');
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_marketing','conversion.*','test')`,
+      ),
+    ).rejects.toThrow(/Phase 16: conversion\.\* wildcard is forbidden/);
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_engineering','conversion.list_pages','test')`,
+      ),
+    ).rejects.toThrow(/Phase 16: conversion tools must not be granted outside bot_marketing/);
+    await expect(
+      db.exec(
+        `insert into mcp_internal.mcp_bot_permissions(bot_id,permission_pattern,granted_by)
+         values('bot_production','conversion.list_pages','test')`,
+      ),
+    ).rejects.toThrow(/CoS: bot_production must not have finance, security, deploy or conversion grants/);
+  });
+
+  it('Marketing permission rows are the post-#48 additive 40-name allowlist, not final 45', async () => {
+    const grants = await db.query<{ n: number }>(
+      `select count(*)::int n from mcp_internal.mcp_bot_permissions where bot_id='bot_marketing'`,
+    );
+    expect(grants.rows[0]?.n).toBe(40);
+    const phase9 = await db.query<{ n: number }>(
+      `select count(*)::int n from mcp_internal.mcp_bot_permissions
+        where bot_id='bot_marketing' and granted_by='alex-locked:phase-9'`,
+    );
+    expect(phase9.rows[0]?.n).toBe(23);
+    const phase16 = await db.query<{ n: number }>(
+      `select count(*)::int n from mcp_internal.mcp_bot_permissions
+        where bot_id='bot_marketing' and granted_by='alex-locked:phase-16'`,
+    );
+    expect(phase16.rows[0]?.n).toBe(17);
+    const wild = await db.query<{ n: number }>(
+      `select count(*)::int n from mcp_internal.mcp_bot_permissions
+        where bot_id='bot_marketing' and permission_pattern in ('conversion.*','campaign.*','content.*')`,
+    );
+    expect(wild.rows[0]?.n).toBe(0);
+  });
+
+  it('Bot RPC sources require active bot + client grant and never can_access_client', async () => {
+    const functions = await db.query<{ def: string }>(
+      `select pg_get_functiondef(p.oid) def from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+        where (n.nspname='public' and p.proname in ('mcp_conversion','mcp_campaign_execution'))
+           or (n.nspname='mcp_internal' and p.proname in
+             ('require_conversion_permission','require_campaign_execution_permission'))`,
     );
     expect(functions.rows.length).toBeGreaterThan(0);
     for (const row of functions.rows) {

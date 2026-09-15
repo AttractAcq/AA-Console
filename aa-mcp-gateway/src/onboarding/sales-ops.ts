@@ -6,6 +6,8 @@ import { chiefOfStaff } from "./chief-of-staff.js";
  * factory writes (generate_config/create/update_knowledge/
  * update_qualification_rules/test) join the write set; sales_agents.deploy
  * stays forbidden/deferred to Phase 11c or Eng. 17 -> 22.
+ * Final target after PR #48 then #46 then #47 is Sales Ops 28; this file
+ * stays at 22 until a later PR APPENDS (does not replace) those grants.
  */
 const reads = ["pipeline.list_leads", "pipeline.get_lead", "pipeline.get_stalled_leads", "pipeline.get_pipeline_summary", "sales_agents.list", "sales_agents.get", "sales_agents.get_conversations", "workflow.get_pending_approvals", "workflow.get_activity", "workflow.list_tasks", "workflow.get_task"] as const;
 const writes = ["pipeline.update_stage", "pipeline.create_followup", "sales_agents.generate_config", "sales_agents.create", "sales_agents.update_knowledge", "sales_agents.update_qualification_rules", "sales_agents.test", "workflow.create_task", "workflow.assign_task", "workflow.complete_task", "workflow.create_approval"] as const;

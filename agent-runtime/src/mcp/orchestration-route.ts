@@ -11,7 +11,6 @@ const workflow = [
 ];
 for (const [domain, actions] of Object.entries({
   workflow,
-  campaign: ["list", "get", "get_status"],
   attribution: ["get_campaign_performance"],
 })) {
   for (const action of actions) {

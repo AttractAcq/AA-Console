@@ -27,10 +27,10 @@ try {
     calls++;
     return (await client.callTool({ name, arguments: args })).structuredContent;
   }, fixtures);
-  console.log(JSON.stringify({ bot_id: config.bot_id, gate: 9, calls, discovery: names.length,
+  console.log(JSON.stringify({ bot_id: config.bot_id, gate: 16, calls, discovery: names.length,
     status: "PASS", at: new Date().toISOString() }));
 } catch {
-  console.error(JSON.stringify({ bot_id: config.bot_id, gate: 9, calls, status: "FAIL",
+  console.error(JSON.stringify({ bot_id: config.bot_id, gate: 16, calls, status: "FAIL",
     message: "Inspect locally; no secret-bearing error output emitted." }));
   process.exitCode = 1;
 } finally { await client.close(); }

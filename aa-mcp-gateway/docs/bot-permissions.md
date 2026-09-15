@@ -6,7 +6,7 @@ Default deny. Both discovery and calls use the same permission matrix. Default M
 
 Configured grants: `delivery.*`, `campaign.*`, `workflow.*`, `attribution.*`.
 
-Effective tools (27):
+Effective tools (31):
 
 - `delivery.list_clients`
 - `delivery.get_client`
@@ -22,6 +22,10 @@ Effective tools (27):
 - `campaign.update`
 - `campaign.get_status`
 - `campaign.request_approval`
+- `campaign.plan`
+- `campaign.provision`
+- `campaign.launch`
+- `campaign.get_readiness`
 - `attribution.get_campaign_performance`
 - `attribution.get_content_performance`
 - `attribution.get_revenue_attribution`
@@ -64,16 +68,23 @@ Effective tools (19):
 
 ## bot_marketing
 
-Configured grants: `campaign.list`, `campaign.get`, `campaign.get_status`, `content.list_ideas`, `content.get_idea`, `content.get_brief`, `content.get_production_status`, `attribution.get_campaign_performance`, `delivery.get_client`, `delivery.get_status`, `delivery.get_client_health`, `workflow.get_pending_approvals`, `workflow.get_activity`, `workflow.list_tasks`, `workflow.get_task`, `content.generate_brief`, `content.request_revision`, `content.request_approval`, `content.create_repurpose_plan`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`.
+Configured grants: `campaign.list`, `campaign.get`, `campaign.get_status`, `content.list_ideas`, `content.get_idea`, `content.get_brief`, `content.get_production_status`, `attribution.get_campaign_performance`, `delivery.get_client`, `delivery.get_status`, `delivery.get_client_health`, `workflow.get_pending_approvals`, `workflow.get_activity`, `workflow.list_tasks`, `workflow.get_task`, `campaign.get_readiness`, `conversion.list_pages`, `conversion.get_page`, `conversion.get_performance`, `content.generate_brief`, `content.request_revision`, `content.request_approval`, `content.create_repurpose_plan`, `workflow.create_task`, `workflow.assign_task`, `workflow.complete_task`, `workflow.create_approval`, `conversion.create_page`, `conversion.generate_structure`, `conversion.generate_copy`, `conversion.request_approval`, `conversion.audit_page`, `conversion.revise_page`, `conversion.revert_page`, `campaign.create`, `campaign.update`, `campaign.request_approval`, `campaign.plan`, `campaign.provision`, `campaign.launch`.
 
-Effective tools (23):
+Effective tools (40):
 
 - `delivery.get_client`
 - `delivery.get_status`
 - `delivery.get_client_health`
 - `campaign.list`
 - `campaign.get`
+- `campaign.create`
+- `campaign.update`
 - `campaign.get_status`
+- `campaign.request_approval`
+- `campaign.plan`
+- `campaign.provision`
+- `campaign.launch`
+- `campaign.get_readiness`
 - `content.list_ideas`
 - `content.get_idea`
 - `content.generate_brief`
@@ -82,6 +93,16 @@ Effective tools (23):
 - `content.request_revision`
 - `content.request_approval`
 - `content.create_repurpose_plan`
+- `conversion.list_pages`
+- `conversion.get_page`
+- `conversion.create_page`
+- `conversion.generate_structure`
+- `conversion.generate_copy`
+- `conversion.request_approval`
+- `conversion.get_performance`
+- `conversion.audit_page`
+- `conversion.revise_page`
+- `conversion.revert_page`
 - `attribution.get_campaign_performance`
 - `workflow.create_task`
 - `workflow.assign_task`
@@ -275,3 +296,6 @@ Phase 14: `bot_engineering` has an exact 12-tool ceiling (seven reads/five write
 
 
 Phase 15: `bot_security_devops` has an exact 14-tool ceiling (nine reads/five writes). The seeded `security.*` wildcard is replaced with four named security tools, two engineering status reads, and the eight workflow names. Security tools are bot_security_devops only. System status is client-scoped counts (no HTML, params, costs, tokens or env). Findings/incidents are AA-native tracking records. No destroy, secret rotation, Railway write, unrestricted deploy or global/unscoped client tools. See [Phase 15](phase-15-security-devops.md). Gate 15 is NOT YET CLOSED.
+
+
+Phase 16 (PR #48 / mig 89): `bot_marketing` post-#48 ceiling is **40** exact tools (19 reads/21 writes) via **additive** grants — Gate 9's 23 rows stay; this phase insert-only-owns 17 conversion + campaign execution names. This is **not** the final 45 (`brand.*` / `sites.*` / remaining attribution are out). After #48 then #46 then #47 the target is Marketing **45** / Sales Ops **28**; those PRs must APPEND, not replace. Registry length **97** is catalog size after #48 only. Ten `conversion.*` Page Builder tools are real against `client_pages` / polish jobs (no page publish). `campaign.launch` marks Execution OS `client_campaigns.status=live` only — no ad spend, Meta, or paid channels — so it stays MEDIUM without approval. CoS keeps `campaign.*` and is denied conversion. Production does not get conversion. See [Phase 16](phase-16-conversion-campaign.md). Gate 16 is NOT YET CLOSED.

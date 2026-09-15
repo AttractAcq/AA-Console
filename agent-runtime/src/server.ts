@@ -10,6 +10,8 @@
 import http from "node:http";
 import { handleMcpBrief } from "./mcp/brief-route.js";
 import { handleMcpOrchestration } from "./mcp/orchestration-route.js";
+import { handleMcpCampaign } from "./mcp/campaign-route.js";
+import { handleMcpConversion } from "./mcp/conversion-route.js";
 import { handleMcpDelivery } from "./mcp/delivery-route.js";
 import { handleMcpContent } from "./mcp/content-route.js";
 import { handleMcpAdmin } from "./mcp/admin-route.js";
@@ -70,7 +72,15 @@ const server = http.createServer((req, res) => {
     void handleMcpEconomics(req, res, sb, config.mcpServiceSecret);
     return;
   }
-  if (/^\/internal\/mcp\/(workflow|campaign|attribution)\//.test(req.url ?? '')) {
+  if (req.url?.startsWith("/internal/mcp/conversion/")) {
+    void handleMcpConversion(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+  if (req.url?.startsWith("/internal/mcp/campaign/")) {
+    void handleMcpCampaign(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+  if (/^\/internal\/mcp\/(workflow|attribution)\//.test(req.url ?? '')) {
     void handleMcpOrchestration(req, res, sb, config.mcpServiceSecret);
     return;
   }

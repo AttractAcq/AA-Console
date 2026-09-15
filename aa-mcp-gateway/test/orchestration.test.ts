@@ -101,8 +101,13 @@ test("contract 4/8: CoS reference matches existing grants and discovers only all
     "campaign.create",
     "campaign.update",
     "campaign.request_approval",
-    "attribution.generate_report",
+    "campaign.plan",
+    "campaign.provision",
+    "campaign.launch",
+    "campaign.get_readiness",
   ])
+    assert.ok(names.includes(name), name);
+  for (const name of ["attribution.generate_report", "conversion.list_pages"])
     assert.ok(!names.includes(name));
   assert.equal(calls, 0);
 });

@@ -202,9 +202,6 @@ const task = (
 const readCases = [
   ["workflow/list-tasks", {}],
   ["workflow/get-task", { task_id: ASSET }],
-  ["campaign/list", {}],
-  ["campaign/get", { campaign_id: IDEA }],
-  ["campaign/get-status", { campaign_id: IDEA }],
   ["attribution/get-campaign-performance", { campaign_id: IDEA }],
 ] as const;
 beforeEach(async () => {
@@ -319,18 +316,16 @@ it("denies cross-client resources for every resource path", async () => {
       ).body.error.code,
     ).toBe("client_mismatch");
   }
-  for (const route of [
-    "campaign/get",
-    "campaign/get-status",
-    "attribution/get-campaign-performance",
-  ]) {
-    expect(
-      (await call(path(route), { client_id: CLIENT, campaign_id: IDEA_B })).body
-        .error.code,
-    ).toBe("client_mismatch");
-  }
+  expect(
+    (
+      await call(path("attribution/get-campaign-performance"), {
+        client_id: CLIENT,
+        campaign_id: IDEA_B,
+      })
+    ).body.error.code,
+  ).toBe("client_mismatch");
 });
-it("paginates tasks and campaigns; only granted client rows", async () => {
+it("paginates tasks; only granted client rows", async () => {
   await task("create-task", { title: "Second" });
   const first = await task("list-tasks", { limit: 1 });
   expect(first.body.tasks).toHaveLength(1);
@@ -341,11 +336,6 @@ it("paginates tasks and campaigns; only granted client rows", async () => {
   });
   expect(second.body.tasks).toHaveLength(1);
   expect(second.body.next_cursor).toBeNull();
-  expect(
-    (
-      await call(path("campaign/list"), { client_id: CLIENT })
-    ).body.campaigns.map((c: any) => c.id),
-  ).toEqual([IDEA]);
 });
 it("honest metrics exclude other-client mapped rows, account/post rows, organic and raw/spend", async () => {
   const read = () =>
@@ -381,7 +371,6 @@ it("validates malformed requests before RPC and assignees against AA records", a
       "workflow/assign-task",
       { task_id: ASSET, assignee: "someone@example.com" },
     ],
-    ["campaign/get", {}],
     [
       "attribution/get-campaign-performance",
       { campaign_id: IDEA, start_date: "2026-02-30" },
@@ -399,7 +388,7 @@ it("validates malformed requests before RPC and assignees against AA records", a
       .body.error.code,
   ).toBe("invalid_assignee");
   const r = await call(
-    path("campaign/list"),
+    path("workflow/list-tasks"),
     { client_id: CLIENT },
     { secret: null },
   );
@@ -492,22 +481,7 @@ it("CoS rollup enumerates grants only and reuses Phase 7 operational reads", asy
   await db.exec(`delete from mcp_bot_clients where client_id='${OTHER}'`);
   expect((await list()).body.clients.map((c: any) => c.id)).toEqual([CLIENT]);
 });
-it("campaign cursor pages and attribution range reject unbounded scans", async () => {
-  await db.exec(
-    `insert into campaigns(id,client_id,campaign_ref,target_role) values ('${BRIEF}','${CLIENT}','C','lead')`,
-  );
-  const first = await call(path("campaign/list"), {
-    client_id: CLIENT,
-    limit: 1,
-  });
-  expect(first.body.next_cursor).toBe(IDEA);
-  const second = await call(path("campaign/list"), {
-    client_id: CLIENT,
-    limit: 1,
-    after: IDEA,
-  });
-  expect(second.body.campaigns.map((c: any) => c.id)).toEqual([BRIEF]);
-  expect(second.body.next_cursor).toBeNull();
+it("attribution range rejects unbounded scans", async () => {
   const r = await call(path("attribution/get-campaign-performance"), {
     client_id: CLIENT,
     campaign_id: IDEA,
