@@ -3,13 +3,19 @@ import { useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
-import { FormModal } from "../../components/forms/FormModal";
+import { FormModal, ConfirmModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
 import { liveStateOf, sinceLabel, STATE_TONE } from "./liveState";
+import {
+  approvalConfirmBody,
+  approveFields,
+  revokeConfirmBody,
+  revokeFields,
+} from "./approval";
 
 type QualificationStep = {
   question: string;
@@ -43,6 +49,8 @@ type SalesAgent = {
   escalation_rule: string | null;
   guardrails: string | null;
   built_at: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
   created_at: string;
 };
 
@@ -69,6 +77,9 @@ export function SalesOverviewPanel() {
   const [builds, setBuilds] = useState<Record<string, { status: string }>>({});
   const [buildOpen, setBuildOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<{ kind: "approve" | "revoke"; agent: SalesAgent } | null>(
+    null,
+  );
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -82,7 +93,7 @@ export function SalesOverviewPanel() {
       supabase
         .from("client_sales_agents")
         .select(
-          "id, name, purpose, status, role, page_id, greeting, system_prompt, qualification, objections, booking_rule, escalation_rule, guardrails, built_at, created_at",
+          "id, name, purpose, status, role, page_id, greeting, system_prompt, qualification, objections, booking_rule, escalation_rule, guardrails, built_at, approved_at, approved_by, created_at",
         )
         .eq("client_id", clientId)
         .order("created_at", { ascending: false }),
@@ -144,10 +155,38 @@ export function SalesOverviewPanel() {
     }
     setNotice(
       status === "live"
-        ? `"${agent.name}" is live. It will answer visitors on the page it is attached to.`
+        ? agent.approved_at
+          ? `"${agent.name}" is live. It will answer visitors on the page it is attached to.`
+          : `"${agent.name}" is live. Approve it for public use before it can be put on a site.`
         : `"${agent.name}" is ${status}.`,
     );
     void refresh();
+  };
+
+  const applyApproval = async (agent: SalesAgent, kind: "approve" | "revoke") => {
+    if (!clientId) throw new Error("No client selected.");
+    if (kind === "approve") {
+      const { data, error: authError } = await supabase.auth.getUser();
+      const uid = data.user?.id;
+      if (authError || !uid) throw new Error("Could not confirm who you are.");
+      const { error } = await supabase
+        .from("client_sales_agents")
+        .update(approveFields(uid))
+        .eq("id", agent.id)
+        .eq("client_id", clientId);
+      if (error) throw new Error(error.message);
+      setNotice(`"${agent.name}" is approved for public use.`);
+      return;
+    }
+    const { error } = await supabase
+      .from("client_sales_agents")
+      .update(revokeFields())
+      .eq("id", agent.id)
+      .eq("client_id", clientId);
+    if (error) throw new Error(error.message);
+    setNotice(
+      `Public approval for "${agent.name}" has been revoked. Status is unchanged.`,
+    );
   };
 
   const fields: FieldDef[] = [
@@ -266,6 +305,12 @@ export function SalesOverviewPanel() {
                       {(a.objections?.length ?? 0) === 1 ? "" : "s"}
                     </p>
 
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {a.approved_at
+                        ? "Approved for public use"
+                        : "Not approved for public use"}
+                    </p>
+
                     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
                       <button
                         type="button"
@@ -291,6 +336,25 @@ export function SalesOverviewPanel() {
                           className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           Retire
+                        </button>
+                      )}
+                      {a.approved_at ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setConfirm({ kind: "revoke", agent: a })}
+                          className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          Revoke approval
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setConfirm({ kind: "approve", agent: a })}
+                          className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          Approve for public use
                         </button>
                       )}
                     </div>
@@ -374,6 +438,44 @@ export function SalesOverviewPanel() {
             </div>
 
             <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4">
+              <section>
+                <h3 className="text-sm font-semibold text-foreground">Public use</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {open.approved_at
+                    ? "Approved for public use."
+                    : "Not approved for public use. Site deployment will wait until a person has read what this agent will say."}
+                </p>
+                {open.built_at && (
+                  <div className="mt-2">
+                    {open.approved_at ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setOpenId(null);
+                          setConfirm({ kind: "revoke", agent: open });
+                        }}
+                        className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Revoke approval
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setOpenId(null);
+                          setConfirm({ kind: "approve", agent: open });
+                        }}
+                        className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Approve for public use
+                      </button>
+                    )}
+                  </div>
+                )}
+              </section>
+
               <section>
                 <h3 className="text-sm font-semibold text-foreground">Opens with</h3>
                 <p className="mt-1 text-sm text-muted-foreground">{open.greeting}</p>
@@ -479,6 +581,29 @@ export function SalesOverviewPanel() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirm !== null}
+        onClose={() => setConfirm(null)}
+        title={
+          confirm?.kind === "revoke" ? "Revoke approval" : "Approve for public use"
+        }
+        body={
+          confirm?.kind === "revoke"
+            ? revokeConfirmBody(confirm.agent)
+            : confirm
+              ? approvalConfirmBody(confirm.agent)
+              : ""
+        }
+        confirmLabel={
+          confirm?.kind === "revoke" ? "Revoke approval" : "Approve for public use"
+        }
+        onConfirm={async () => {
+          if (!confirm) return;
+          await applyApproval(confirm.agent, confirm.kind);
+        }}
+        onDone={refresh}
+      />
     </div>
   );
 }

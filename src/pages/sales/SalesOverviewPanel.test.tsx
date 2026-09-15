@@ -2,15 +2,17 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, useParams } = vi.hoisted(() => ({
+const { from, rpc, useParams, getUser } = vi.hoisted(() => ({
   from: vi.fn(),
   rpc: vi.fn(),
   useParams: vi.fn(),
+  getUser: vi.fn(),
 }));
 vi.mock("../../lib/supabase", () => ({
   supabase: {
     from,
     rpc,
+    auth: { getUser },
     // The activity bar subscribes to job changes; nothing here tests realtime.
     channel: () => ({ on: () => ({ subscribe: () => ({}) }) }),
     removeChannel: vi.fn(),
@@ -54,6 +56,8 @@ const built = (over: Record<string, unknown> = {}) => ({
   escalation_rule: "Hand over on any clinical question or complaint.",
   guardrails: "Never quote a price. Never promise it is painless.",
   built_at: "2026-09-08T10:00:00Z",
+  approved_at: null,
+  approved_by: null,
   created_at: "2026-09-08T09:00:00Z",
   ...over,
 });
@@ -72,9 +76,15 @@ const conv = (over: Conv = {}): Conv => ({
 });
 
 const update = vi.fn();
+const eq = vi.fn();
 
 function show(agents: unknown[] = [built()], convs: Conv[] = [], jobs: Job[] = []) {
-  update.mockReturnValue({ eq: () => Promise.resolve({ error: null }) });
+  const chain = {
+    eq,
+    then: (r: (v: { error: null }) => unknown) => Promise.resolve({ error: null }).then(r),
+  };
+  eq.mockReturnValue(chain);
+  update.mockReturnValue(chain);
   from.mockImplementation((table: string) => {
     // agent_jobs is read twice with different column sets: this panel asks for
     // input_id so a build maps to its own agent, while the activity bar asks
@@ -106,6 +116,7 @@ function show(agents: unknown[] = [built()], convs: Conv[] = [], jobs: Job[] = [
 beforeEach(() => {
   vi.clearAllMocks();
   useParams.mockReturnValue({ clientId: "client-1" });
+  getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
 });
 
 describe("liveStateOf", () => {
@@ -127,10 +138,28 @@ describe("liveStateOf", () => {
 
   it("distinguishes a draft from a live agent once it is built", () => {
     expect(liveStateOf({ status: "live", built_at: "x" }, undefined).kind).toBe("live");
+    expect(liveStateOf({ status: "live", built_at: "x" }, undefined).label).toMatch(
+      /not approved/i,
+    );
     expect(liveStateOf({ status: "draft", built_at: "x" }, undefined).label).toMatch(
       /not answering anyone/i,
     );
     expect(liveStateOf({ status: "retired", built_at: "x" }, undefined).kind).toBe("retired");
+  });
+
+  it("splits live from live-and-approved, because approval is a signature not a status", () => {
+    expect(
+      liveStateOf({ status: "live", built_at: "x", approved_at: "2026-09-15T12:00:00Z" }, undefined),
+    ).toEqual({ kind: "approved", label: "Live — approved" });
+    expect(liveStateOf({ status: "live", built_at: "x", approved_at: null }, undefined)).toEqual({
+      kind: "live",
+      label: "Live — not approved",
+    });
+    // A draft can be approved without going live; the badge stays draft.
+    expect(
+      liveStateOf({ status: "draft", built_at: "x", approved_at: "2026-09-15T12:00:00Z" }, undefined)
+        .kind,
+    ).toBe("draft");
   });
 
   it("keeps a completed job from being read as still building", () => {
@@ -186,7 +215,7 @@ describe("the overview grid", () => {
     expect(await screen.findByText("Building…")).toBeInTheDocument();
     // Exactly one card claims to be building.
     expect(screen.getAllByText("Building…")).toHaveLength(1);
-    expect(screen.getByText("Live")).toBeInTheDocument();
+    expect(screen.getByText("Live — not approved")).toBeInTheDocument();
   });
 
   it("shows an empty state when nothing has been built", async () => {
@@ -206,6 +235,7 @@ describe("putting an agent live", () => {
     show([built({ status: "draft" })]);
     await userEvent.click(await screen.findByRole("button", { name: "Go live" }));
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: "live" }));
+    expect(update.mock.calls[0]?.[0]).not.toHaveProperty("approved_at");
     expect(await screen.findByText(/is live/i)).toBeInTheDocument();
   });
 });
@@ -244,5 +274,90 @@ describe("opening an agent", () => {
     expect(
       within(screen.getByRole("dialog")).getByText(/once this agent is answering visitors/i),
     ).toBeInTheDocument();
+  });
+});
+
+describe("approving an agent for public use", () => {
+  it("shows approval state on a built card, and not on an unbuilt one", async () => {
+    show([
+      built({ id: "sa-1", name: "Ready" }),
+      built({ id: "sa-2", name: "Still writing", built_at: null, status: "draft" }),
+    ]);
+    expect(await screen.findByText("Ready")).toBeInTheDocument();
+    expect(screen.getByText("Not approved for public use")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Approve for public use" })).toHaveLength(1);
+  });
+
+  it("distinguishes live-unapproved from live-approved on the card", async () => {
+    show([
+      built({ id: "sa-1", name: "Waiting", approved_at: null }),
+      built({
+        id: "sa-2",
+        name: "Signed off",
+        approved_at: "2026-09-15T12:00:00Z",
+        approved_by: "user-1",
+      }),
+    ]);
+    expect(await screen.findByText("Live — not approved")).toBeInTheDocument();
+    expect(screen.getByText("Live — approved")).toBeInTheDocument();
+    expect(screen.getByText("Approved for public use")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Revoke approval" })).toBeInTheDocument();
+  });
+
+  it("does not write approval until the operator confirms, and the confirm shows the script", async () => {
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Approve for public use" }));
+    expect(update).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole("dialog", { name: "Approve for public use" });
+    expect(dialog).toHaveTextContent("Consult Qualifier");
+    expect(dialog).toHaveTextContent("Are you looking into replacing several teeth, or just one?");
+    expect(dialog).toHaveTextContent("How long has this been bothering you?");
+    expect(dialog).toHaveTextContent("It is too expensive");
+    expect(dialog).toHaveTextContent("Never quote a price");
+  });
+
+  it("writes approved_at and approved_by, scoped to the client, and does not change status", async () => {
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Approve for public use" }));
+    const dialog = await screen.findByRole("dialog", { name: "Approve for public use" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Approve for public use" }));
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        approved_by: "user-1",
+        approved_at: expect.any(String),
+      }),
+    );
+    expect(update.mock.calls[0]?.[0]).not.toHaveProperty("status");
+    expect(eq).toHaveBeenCalledWith("id", "sa-1");
+    expect(eq).toHaveBeenCalledWith("client_id", "client-1");
+    expect(await screen.findByText(/is approved for public use/i)).toBeInTheDocument();
+  });
+
+  it("offers approve from the detail drawer as well as the card", async () => {
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+    const drawer = within(screen.getByRole("dialog", { name: "Consult Qualifier" }));
+    expect(drawer.getByText(/not approved for public use/i)).toBeInTheDocument();
+    expect(drawer.getByRole("button", { name: "Approve for public use" })).toBeInTheDocument();
+  });
+});
+
+describe("revoking approval", () => {
+  it("clears the signature after confirm and does not write status", async () => {
+    show([
+      built({
+        approved_at: "2026-09-15T12:00:00Z",
+        approved_by: "user-1",
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole("button", { name: "Revoke approval" }));
+    const dialog = await screen.findByRole("dialog", { name: "Revoke approval" });
+    expect(dialog).toHaveTextContent(/does not change its status \(live\)/);
+    await userEvent.click(within(dialog).getByRole("button", { name: "Revoke approval" }));
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ approved_at: null, approved_by: null }),
+    );
+    expect(update.mock.calls[0]?.[0]).not.toHaveProperty("status");
+    expect(await screen.findByText(/has been revoked/i)).toBeInTheDocument();
   });
 });
