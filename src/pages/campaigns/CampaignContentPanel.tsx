@@ -97,6 +97,33 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 
   const briefById = new Map(briefs.map((brief) => [brief.id, brief]));
   const ideaById = new Map(ideas.map((idea) => [idea.id, idea]));
+
+  // One piece of content is an idea, the brief written from it, and the assets
+  // produced from that brief. Listed separately, a campaign with twelve ideas
+  // buried its one brief below all of them, and a briefed idea showed no sign
+  // that its brief existed at all. Grouped, the chain is the unit of work.
+  const briefsByIdea = new Map<string, Brief[]>();
+  for (const brief of briefs) {
+    if (!brief.source_idea_id) continue;
+    const list = briefsByIdea.get(brief.source_idea_id) ?? [];
+    list.push(brief);
+    briefsByIdea.set(brief.source_idea_id, list);
+  }
+  const assetsByBrief = new Map<string, MediaAsset[]>();
+  for (const asset of assets) {
+    if (!asset.brief_id) continue;
+    const list = assetsByBrief.get(asset.brief_id) ?? [];
+    list.push(asset);
+    assetsByBrief.set(asset.brief_id, list);
+  }
+  // Anything whose brief or idea has gone is still work somebody did, so it is
+  // shown rather than silently dropped.
+  const looseAssets = assets.filter(
+    (asset) => !asset.brief_id || !briefById.has(asset.brief_id),
+  );
+  const looseBriefs = briefs.filter(
+    (brief) => !brief.source_idea_id || !ideaById.has(brief.source_idea_id),
+  );
   const ready = new Set(
     assets.filter((asset) => asset.review_status === "approved" && asset.storage_path).map((asset) => {
       const brief = asset.brief_id ? briefById.get(asset.brief_id) : null;
@@ -105,6 +132,28 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
     }),
   ).size;
   const busyFor = (id: string, action: BusyAction) => busy?.id === id && busy.action === action;
+
+  /**
+   * An asset and what can be done about it, wherever it is shown.
+   *
+   * A function rather than a component: a component declared inside render is a
+   * new type on every render, so React unmounts and remounts its subtree each
+   * time — which throws away focus and any in-flight interaction.
+   */
+  const assetRow = (asset: MediaAsset) => (
+    <div key={asset.id} className="flex flex-wrap items-center gap-2">
+      <button type="button" className="text-sm text-brand-strong hover:underline" onClick={() => setPreview(asset)}>
+        Preview {asset.title ?? "asset"}
+      </button>
+      <span className="text-xs text-muted-foreground">
+        {asset.review_status === "approved" ? "Ready to distribute" : asset.review_status === "pending" ? "Awaiting approval" : "Rejected"}
+      </span>
+      {asset.review_status === "pending" && <>
+        <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("review_media_asset", { p_asset_id: asset.id, p_decision: "approved" }), "Asset approved. Ready to distribute.", { id: asset.id, action: "approve" })}>Approve asset</button>
+        <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => { setRejecting(asset); setReason(""); }}>Reject asset</button>
+      </>}
+    </div>
+  );
 
   return <section className="mt-4 space-y-3 border-t border-border pt-4" aria-label="Campaign content production">
     <h4 className="text-sm font-semibold">Content production</h4>
@@ -126,35 +175,51 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
     <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void refresh()}>Refresh content</button>
     {loading ? <p className="text-xs text-muted-foreground">Loading content…</p> : <>
       {contentCount > 0 && builtAt && ideas.length === 0 && <p className="text-xs text-muted-foreground">No campaign ideas yet.</p>}
-      {ideas.map((idea) => <div key={idea.id} className="space-y-2 rounded-md border border-border p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-card-foreground">{idea.title}</span>
-          <span className="text-xs text-muted-foreground">{idea.media_type}</span>
-          <span className="text-xs text-muted-foreground">{idea.source_question}</span>
-          <span className="text-xs text-muted-foreground">{idea.status.replace(/_/g, " ")}</span>
-        </div>
-        {idea.body && <p className="text-xs text-muted-foreground">{idea.body}</p>}
-        <div className="flex flex-wrap items-center gap-2">
-          {idea.status === "draft" && <>
-            <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.from("client_ideas").update({ status: "approved" }).eq("id", idea.id).eq("client_id", clientId).eq("campaign_id", campaignId).eq("status", "draft"), "Idea approved.", { id: idea.id, action: "approve" })}>{busyFor(idea.id, "approve") ? "Approving…" : "Approve"}</button>
-            <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: idea.id }), "Approved. The brief agent is writing it now — this takes a couple of minutes and the Briefs tab will fill in on its own.", { id: idea.id, action: "brief" })}>{busyFor(idea.id, "brief") ? "Queueing brief…" : "Approve & brief"}</button>
-          </>}
-          {idea.status === "approved" && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: idea.id }), "Brief queued. The brief agent is writing it now — this takes a couple of minutes and the Briefs tab will fill in on its own.", { id: idea.id, action: "brief" })}>{busyFor(idea.id, "brief") ? "Queueing brief…" : "Brief"}</button>}
-        </div>
-      </div>)}
-      {briefs.map((brief) => <div key={brief.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-3">
+      {ideas.map((idea) => {
+        const ideaBriefs = briefsByIdea.get(idea.id) ?? [];
+        return <div key={idea.id} className="space-y-2 rounded-md border border-border p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-card-foreground">{idea.title}</span>
+            <span className="text-xs text-muted-foreground">{idea.media_type}</span>
+            <span className="text-xs text-muted-foreground">{idea.source_question}</span>
+            <span className="text-xs text-muted-foreground">{idea.status.replace(/_/g, " ")}</span>
+          </div>
+          {idea.body && <p className="text-xs text-muted-foreground">{idea.body}</p>}
+          <div className="flex flex-wrap items-center gap-2">
+            {idea.status === "draft" && <>
+              <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.from("client_ideas").update({ status: "approved" }).eq("id", idea.id).eq("client_id", clientId).eq("campaign_id", campaignId).eq("status", "draft"), "Idea approved.", { id: idea.id, action: "approve" })}>{busyFor(idea.id, "approve") ? "Approving…" : "Approve"}</button>
+              <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: idea.id }), "Approved. The brief agent is writing it now — it appears under this idea in a couple of minutes.", { id: idea.id, action: "brief" })}>{busyFor(idea.id, "brief") ? "Queueing brief…" : "Approve & brief"}</button>
+            </>}
+            {idea.status === "approved" && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: idea.id }), "Brief queued. The brief agent is writing it now — it appears under this idea in a couple of minutes.", { id: idea.id, action: "brief" })}>{busyFor(idea.id, "brief") ? "Queueing brief…" : "Brief"}</button>}
+            {/* A briefed idea whose brief has not arrived looks identical to one
+                that failed, unless it says which it is. */}
+            {idea.status === "briefed" && ideaBriefs.length === 0 && <span className="text-xs text-muted-foreground">Brief being written — this takes a couple of minutes.</span>}
+          </div>
+
+          {ideaBriefs.map((brief) => {
+            const briefAssets = assetsByBrief.get(brief.id) ?? [];
+            return <div key={brief.id} className="ml-3 space-y-2 border-l border-border pl-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground">Brief</span>
+                <button type="button" className="text-sm text-brand-strong hover:underline" onClick={() => setViewing(brief)}>{brief.title}</button>
+                <span className="text-xs text-muted-foreground">{brief.status.replace(/_/g, " ")}</span>
+                {(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}
+              </div>
+              {briefAssets.length === 0 && brief.status === "in_production" && <p className="text-xs text-muted-foreground">Asset being produced — it appears here when it is done.</p>}
+              {briefAssets.map((asset) => assetRow(asset))}
+            </div>;
+          })}
+        </div>;
+      })}
+
+      {/* Work whose idea has gone. Still work somebody did. */}
+      {looseBriefs.map((brief) => <div key={brief.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-3">
+        <span className="text-xs text-muted-foreground">Brief</span>
         <button type="button" className="text-sm text-brand-strong hover:underline" onClick={() => setViewing(brief)}>{brief.title}</button>
         <span className="text-xs text-muted-foreground">{brief.status.replace(/_/g, " ")}</span>
         {(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}
       </div>)}
-      {assets.map((asset) => <div key={asset.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-3">
-        <button type="button" className="text-sm text-brand-strong hover:underline" onClick={() => setPreview(asset)}>Preview {asset.title ?? "asset"}</button>
-        <span className="text-xs text-muted-foreground">{asset.review_status === "approved" ? "Ready to distribute" : asset.review_status === "pending" ? "Awaiting approval" : "Rejected"}</span>
-        {asset.review_status === "pending" && <>
-          <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("review_media_asset", { p_asset_id: asset.id, p_decision: "approved" }), "Asset approved. Ready to distribute.", { id: asset.id, action: "approve" })}>Approve asset</button>
-          <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => { setRejecting(asset); setReason(""); }}>Reject asset</button>
-        </>}
-      </div>)}
+      {looseAssets.map((asset) => <div key={asset.id} className="rounded-md border border-border p-3">{assetRow(asset)}</div>)}
     </>}
     {rejecting && <div className="rounded-md border border-border p-3">
       <label className="text-sm">Reason for rejecting {rejecting.title ?? "asset"}

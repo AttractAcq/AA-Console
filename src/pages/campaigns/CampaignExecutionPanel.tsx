@@ -169,6 +169,34 @@ export function CampaignExecutionPanel() {
     void refresh();
   };
 
+  /**
+   * Build one named thing this campaign needs.
+   *
+   * "Build what it needs" could not say what it was about to do, and built a
+   * sales agent nobody had asked for as a side effect of wanting a page.
+   */
+  const build = async (campaign: Campaign, kind: "landing_page" | "sales_agent") => {
+    setBusy(true);
+    setProblem(null);
+    const { data, error } = await supabase.rpc("provision_campaign_artifact", {
+      p_campaign_id: campaign.id,
+      p_kind: kind,
+    });
+    setBusy(false);
+    if (error) {
+      setProblem(error.message);
+      return;
+    }
+    const created = Array.isArray(data) ? (data[0] as { created?: string } | undefined)?.created : undefined;
+    const label = kind === "landing_page" ? "landing page" : "sales agent";
+    setNotice(
+      created === "already_exists"
+        ? `This campaign already has a ${label}. Nothing new was created.`
+        : `Building the ${label}. It appears under ${kind === "landing_page" ? "Page Builder" : "Sales Agents"} when the agent finishes.`,
+    );
+    void refresh();
+  };
+
   const act = async (
     rpc: "provision_campaign" | "launch_campaign",
     campaign: Campaign,
@@ -314,20 +342,26 @@ export function CampaignExecutionPanel() {
                     onClick={() => setContentCampaignId(contentCampaignId === c.id ? null : c.id)}
                     className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-card-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >Content production</button>
-                  {c.built_at && (c.needs_landing_page || c.needs_sales_agent) && (
+                  {c.built_at && (
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() =>
-                        void act("provision_campaign", c, (n) =>
-                          n === 0
-                            ? "Everything this campaign needs already exists — nothing new was created."
-                            : `Queued ${n} build${n === 1 ? "" : "s"}. They appear under Conversion and Sales as they finish.`,
-                        )
-                      }
+                      onClick={() => void build(c, "landing_page")}
                       className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-card-foreground hover:bg-accent disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                      Build what it needs
+                      Build landing page
+                    </button>
+                  )}
+                  {/* Optional on purpose: a campaign can be given an agent after
+                      planning without re-planning it. */}
+                  {c.built_at && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void build(c, "sales_agent")}
+                      className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-card-foreground hover:bg-accent disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      Build sales agent
                     </button>
                   )}
                   {c.status !== "live" && (

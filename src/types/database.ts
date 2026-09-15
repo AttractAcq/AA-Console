@@ -4919,6 +4919,13 @@ export type Database = {
           created: string
         }[]
       }
+      provision_campaign_artifact: {
+        Args: { p_campaign_id: string; p_kind: string }
+        Returns: {
+          artifact_id: string
+          created: string
+        }[]
+      }
       record_page_revision: {
         Args: {
           p_body?: string
