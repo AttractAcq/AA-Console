@@ -507,6 +507,91 @@ $$;
 revoke all on function mcp_internal.assert_cos_prohibitions() from public, anon, authenticated;
 grant execute on function mcp_internal.assert_cos_prohibitions() to service_role;
 
+-- Last-writer: mig 90 REPLACE'd bot_touched_rls_status() and dropped #48's
+-- conversion/campaign (and page revision) inventory rows. Restore the union of
+-- #48 + #47 so Phase 4 still reports FORCE RLS after merge 89 → 90 → 91.
+create or replace function mcp_internal.bot_touched_rls_status()
+returns table (
+  nsp name,
+  rel name,
+  present boolean,
+  rls_enabled boolean,
+  rls_forced boolean,
+  policy_count integer
+)
+language plpgsql
+stable
+security definer
+set search_path = mcp_internal, public, pg_catalog
+as $$
+begin
+  perform mcp_internal.require_service_role();
+  return query
+  select
+    t.nsp,
+    t.rel,
+    (c.oid is not null) as present,
+    coalesce(c.relrowsecurity, false) as rls_enabled,
+    coalesce(c.relforcerowsecurity, false) as rls_forced,
+    coalesce((select count(*)::int from pg_policy p where p.polrelid = c.oid), 0) as policy_count
+  from (values
+    ('public'::name, 'clients'::name),
+    ('public', 'client_assignments'),
+    ('public', 'job_assignments'),
+    ('public', 'client_onboarding_steps'),
+    ('public', 'agent_jobs'),
+    ('public', 'agent_job_events'),
+    ('public', 'campaigns'),
+    ('public', 'client_campaigns'),
+    ('public', 'campaign_artifacts'),
+    ('public', 'client_ideas'),
+    ('public', 'client_briefs'),
+    ('public', 'client_media_assets'),
+    ('public', 'client_asset_reviews'),
+    ('public', 'creative_generations'),
+    ('public', 'creative_renders'),
+    ('public', 'brief_dispatches'),
+    ('public', 'mcp_brief_requests'),
+    ('public', 'mcp_bot_clients'),
+    ('public', 'client_pages'),
+    ('public', 'client_page_revisions'),
+    ('public', 'client_page_findings'),
+    ('public', 'client_brand_profiles'),
+    ('public', 'client_leads'),
+    ('public', 'lead_events'),
+    ('public', 'client_contact_details'),
+    ('public', 'client_proof_assets'),
+    ('public', 'client_sales_agents'),
+    ('public', 'sales_agent_conversations'),
+    ('public', 'client_sales_agent_deployments'),
+    ('public', 'metrics_daily'),
+    ('public', 'scheduled_posts'),
+    ('public', 'client_billing'),
+    ('public', 'finance_entries'),
+    ('public', 'finance_periods'),
+    ('mcp_internal', 'mcp_bots'),
+    ('mcp_internal', 'mcp_bot_tokens'),
+    ('mcp_internal', 'mcp_bot_permissions'),
+    ('mcp_internal', 'mcp_bot_token_audit'),
+    ('mcp_internal', 'mcp_content_requests'),
+    ('mcp_internal', 'mcp_pipeline_requests'),
+    ('mcp_internal', 'mcp_sales_agent_requests'),
+    ('mcp_internal', 'mcp_proof_requests'),
+    ('mcp_internal', 'mcp_engineering_issues'),
+    ('mcp_internal', 'mcp_engineering_requests'),
+    ('mcp_internal', 'mcp_security_findings'),
+    ('mcp_internal', 'mcp_security_requests'),
+    ('mcp_internal', 'mcp_conversion_requests'),
+    ('mcp_internal', 'mcp_campaign_requests')
+  ) as t(nsp, rel)
+  left join pg_class c
+    on c.relname = t.rel
+   and c.relnamespace = (select n.oid from pg_namespace n where n.nspname = t.nsp);
+end;
+$$;
+revoke all on function mcp_internal.bot_touched_rls_status() from public, anon, authenticated;
+grant execute on function mcp_internal.bot_touched_rls_status() to service_role;
+
 -- Additive only. Includes #48's Marketing 40 names so this migration can assert
 -- the post-#48+#46 ceiling of 45 even on a Gate-9-only fixture; after #48 those
 -- rows already exist and the insert is a no-op. Same for #47's Sales Ops 25.
