@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Panel } from "../../components/Panel";
 import { EmptyState } from "../../components/EmptyState";
@@ -32,12 +32,22 @@ type CampaignOption = {
   status: string;
 };
 
+type PageCampaignLink = {
+  id: string;
+  page_id: string;
+  campaign_id: string;
+};
+
 export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing" | "offer" }) {
   const [buildOpen, setBuildOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const { clientId } = useParams<{ clientId: string }>();
   const [pages, setPages] = useState<Page[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
+  const [pageLinks, setPageLinks] = useState<PageCampaignLink[]>([]);
+  const [campaignSelections, setCampaignSelections] = useState<Record<string, string>>({});
+  const [busyPageId, setBusyPageId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -46,7 +56,7 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
     setLoadError(null);
     try {
       if (!clientId) return;
-      const [pageRows, campaignRows] = await Promise.all([
+      const [pageRows, campaignRows, linkRows] = await Promise.all([
         supabase
           .from("client_pages")
           .select(
@@ -60,11 +70,26 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
           .select("id, name, status")
           .eq("client_id", clientId)
           .order("created_at", { ascending: false }),
+        supabase
+          .from("campaign_artifacts")
+          .select("id, page_id, campaign_id")
+          .eq("client_id", clientId)
+          .eq("kind", "landing_page"),
       ]);
       if (pageRows.error) throw pageRows.error;
       if (campaignRows.error) throw campaignRows.error;
+      if (linkRows.error) throw linkRows.error;
       setPages((pageRows.data ?? []) as Page[]);
       setCampaigns((campaignRows.data ?? []) as CampaignOption[]);
+      const links = (linkRows.data ?? []) as PageCampaignLink[];
+      setPageLinks(links);
+      setCampaignSelections((previous) => {
+        const selections: Record<string, string> = {};
+        for (const page of (pageRows.data ?? []) as Page[]) {
+          selections[page.id] = previous[page.id] ?? links.find((link) => link.page_id === page.id)?.campaign_id ?? "";
+        }
+        return selections;
+      });
     } catch (error) {
       setLoadError("Failed to load pages: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
     }
@@ -79,6 +104,80 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
   const open = pages.find((p) => p.id === openId);
+  const saveCampaign = async (page: Page) => {
+    if (!clientId || busyPageId) return;
+    setBusyPageId(page.id);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const campaignId = campaignSelections[page.id] ?? "";
+      if (campaignId && !campaigns.some((campaign) => campaign.id === campaignId)) {
+        throw new Error("That campaign is not available for this client.");
+      }
+      const existing = pageLinks.filter((link) => link.page_id === page.id);
+      if (campaignId && !existing.some((link) => link.campaign_id === campaignId)) {
+        const { error } = await supabase.from("campaign_artifacts").insert({
+          campaign_id: campaignId,
+          client_id: clientId,
+          kind: "landing_page",
+          page_id: page.id,
+        });
+        if (error) throw error;
+      }
+      const removeIds = existing.filter((link) => link.campaign_id !== campaignId).map((link) => link.id);
+      if (removeIds.length) {
+        const { data, error } = await supabase.from("campaign_artifacts")
+          .delete()
+          .in("id", removeIds)
+          .eq("client_id", clientId)
+          .eq("kind", "landing_page")
+          .eq("page_id", page.id)
+          .select("id");
+        if (error) throw error;
+        if (data?.length !== removeIds.length) throw new Error("The previous campaign link could not be removed.");
+      }
+      await refresh();
+      setNotice(campaignId ? "Page linked to the campaign." : "Campaign link removed.");
+    } catch (error) {
+      setActionError("Failed to save campaign: " + (error instanceof Error ? error.message : "Unknown error"));
+      setCampaignSelections((previous) => {
+        const next = { ...previous };
+        delete next[page.id];
+        return next;
+      });
+      await refresh();
+    } finally {
+      setBusyPageId(null);
+    }
+  };
+
+  const deletePage = async (page: Page) => {
+    if (!clientId || busyPageId) return;
+    const message = page.published_url
+      ? `Delete “${page.title}” from Page Builder? Its published URL may remain live until it is unpublished separately.`
+      : `Delete “${page.title}” from Page Builder? This also removes its campaign link and cannot be undone.`;
+    if (!window.confirm(message)) return;
+    setBusyPageId(page.id);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const { data, error } = await supabase.from("client_pages")
+        .delete()
+        .eq("id", page.id)
+        .eq("client_id", clientId)
+        .eq("page_type", pageType)
+        .select("id");
+      if (error) throw error;
+      if (!data?.length) throw new Error("The page could not be deleted.");
+      if (openId === page.id) setOpenId(null);
+      await refresh();
+      setNotice("Page deleted.");
+    } catch (error) {
+      setActionError("Failed to delete page: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setBusyPageId(null);
+    }
+  };
   const fields: FieldDef[] = useMemo(() => [
     { name: "title", label: "Page title", kind: "text", required: true },
     {
@@ -127,6 +226,7 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
           {notice}
         </p>
       )}
+      {actionError && <p role="alert" className="mb-4 text-sm text-destructive">{actionError}</p>}
 
       {pages.length === 0 ? (
         <EmptyState label="No pages built yet" />
@@ -161,6 +261,42 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
               {p.published_url && (
                 <p className="mt-1 truncate text-xs text-muted-foreground">{p.published_url}</p>
               )}
+              <div className="mt-4 border-t border-border pt-3">
+                <label htmlFor={`page-campaign-${p.id}`} className="mb-1 block text-xs text-muted-foreground">
+                  Campaign for {p.title}
+                </label>
+                <select
+                  id={`page-campaign-${p.id}`}
+                  value={campaignSelections[p.id] ?? pageLinks.find((link) => link.page_id === p.id)?.campaign_id ?? ""}
+                  onChange={(event) => setCampaignSelections((previous) => ({ ...previous, [p.id]: event.target.value }))}
+                  disabled={busyPageId !== null}
+                  className="w-full rounded-md border border-border bg-card px-2 py-2 text-sm text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                >
+                  <option value="">Not linked to a campaign</option>
+                  {campaigns.map((campaign) => (
+                    <option key={campaign.id} value={campaign.id}>{campaign.name} · {campaign.status}</option>
+                  ))}
+                </select>
+                <div className="mt-2 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void saveCampaign(p)}
+                    disabled={busyPageId !== null || (campaignSelections[p.id] ?? "") === (pageLinks.find((link) => link.page_id === p.id)?.campaign_id ?? "")}
+                    className="rounded text-sm font-medium text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {busyPageId === p.id ? "Saving…" : "Save campaign"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void deletePage(p)}
+                    disabled={busyPageId !== null}
+                    className="inline-flex items-center gap-1 rounded text-sm text-destructive hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Delete page
+                  </button>
+                </div>
+              </div>
             </Panel>
           ))}
         </div>
