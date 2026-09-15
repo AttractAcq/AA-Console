@@ -44,6 +44,8 @@ export const securityDevops = {
     "sales_agents.deploy",
     "engineering.create_issue",
     "engineering.get_issue",
+    "sites.provision",
+    "sites.publish_page",
   ],
   future: [
     "sales_agents.deploy",

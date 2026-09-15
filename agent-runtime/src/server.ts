@@ -21,6 +21,9 @@ import { handleMcpPipeline } from "./mcp/pipeline-route.js";
 import { handleMcpSalesAgents } from "./mcp/sales-agents-route.js";
 import { handleMcpProof } from "./mcp/proof-route.js";
 import { handleMcpEconomics } from "./mcp/economics-route.js";
+import { handleMcpAttribution } from "./mcp/attribution-route.js";
+import { handleMcpBrand } from "./mcp/brand-route.js";
+import { handleMcpSites } from "./mcp/sites-mcp-route.js";
 import { handleMcpAuth } from "./mcp/auth-route.js";
 import { handlePublicSales, isPublicSalesRequest } from "./public/sales-route.js";
 import { loadConfig } from "./config.js";
@@ -71,6 +74,20 @@ const server = http.createServer((req, res) => {
   if (req.url === "/internal/mcp/attribution/get-revenue-attribution"
       || req.url?.startsWith("/internal/mcp/economics/")) {
     void handleMcpEconomics(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+  if (req.url === "/internal/mcp/attribution/get-conversion-funnel"
+      || req.url === "/internal/mcp/attribution/get-content-performance") {
+    void handleMcpAttribution(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+  if (req.url === "/internal/mcp/brand/get-profile") {
+    void handleMcpBrand(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+  if (req.url === "/internal/mcp/sites/provision"
+      || req.url === "/internal/mcp/sites/publish-page") {
+    void handleMcpSites(req, res, sb, config.mcpServiceSecret, config);
     return;
   }
   if (req.url?.startsWith("/internal/mcp/conversion/")) {

@@ -99,6 +99,17 @@ export class ActionEngine {
         ].includes(result.error?.code ?? "")
       )
         authorization = "denied";
+      if (
+        (tool?.domain === "brand" || tool?.domain === "sites") &&
+        [
+          "client_forbidden",
+          "bot_not_active",
+          "bot_forbidden",
+          "page_not_found",
+          "github_unconfigured",
+        ].includes(result.error?.code ?? "")
+      )
+        authorization = "denied";
       this.store.transaction(() => {
         this.store.audit({
           request_id,
@@ -207,6 +218,7 @@ export class ActionEngine {
           tool.domain !== "admin" &&
           tool.domain !== "engineering" &&
           tool.domain !== "security" &&
+          tool.domain !== "sites" &&
           !(
             (identity.bot === "bot_admin" ||
               identity.bot === "bot_engineering" ||

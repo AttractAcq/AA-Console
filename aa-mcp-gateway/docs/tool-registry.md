@@ -1,6 +1,6 @@
 # Tool registry
 
-100 initial business contracts. Status is adapter availability, not evidence of live deployment. Brief generation is implemented and requires AA_INTERNAL_API_URL and AA_MCP_SERVICE_SECRET. Stub schemas reserve bounded business fields and must be versioned/refined before their adapters are enabled. All calls require an authorized client UUID; all writes require an idempotency key. HIGH/CRITICAL policy always requires human approval.
+103 initial business contracts. Status is adapter availability, not evidence of live deployment. Brief generation is implemented and requires AA_INTERNAL_API_URL and AA_MCP_SERVICE_SECRET. Stub schemas reserve bounded business fields and must be versioned/refined before their adapters are enabled. All calls require an authorized client UUID; all writes require an idempotency key. HIGH/CRITICAL policy always requires human approval.
 
 | Tool | Status | Action | Risk | Approval | Reversible | Dependency |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -78,9 +78,9 @@
 | proof.get_for_avatar | real | read | LOW | no | true | Scoped AA proof business API |
 | proof.get_for_claim | real | read | LOW | no | true | Scoped AA proof business API |
 | attribution.get_campaign_performance | real | read | LOW | no | true | Scoped AA orchestration business API |
-| attribution.get_content_performance | stub | read | LOW | no | true | Scoped AA attribution business API |
+| attribution.get_content_performance | real | read | LOW | no | true | Scoped AA attribution business API |
 | attribution.get_revenue_attribution | real | read | LOW | no | true | Scoped AA attribution business API |
-| attribution.get_conversion_funnel | stub | read | LOW | no | true | Scoped AA attribution business API |
+| attribution.get_conversion_funnel | real | read | LOW | no | true | Scoped AA attribution business API |
 | attribution.generate_report | stub | write | MEDIUM | no | true | Scoped AA attribution business API |
 | economics.get_client_economics | real (bot_finance only) | read | LOW | no | true | Scoped AA economics business API |
 | economics.get_campaign_economics | real (bot_finance only) | read | LOW | no | true | Scoped AA economics business API |
@@ -104,6 +104,9 @@
 | security.get_open_findings | real (bot_security_devops only) | read | LOW | no | true | Scoped AA security business API |
 | security.create_finding | real (bot_security_devops only) | write | MEDIUM | no | true | Scoped AA security business API |
 | security.get_incident_status | real (bot_security_devops only) | read | LOW | no | true | Scoped AA security business API |
+| brand.get_profile | real | read | LOW | no | true | Scoped AA brand business API |
+| sites.provision | real | write | HIGH | required | false | Scoped AA sites business API |
+| sites.publish_page | real | write | HIGH | required | false | Scoped AA sites business API |
 
 `workflow.record_decision` is reserved, denied to every Bot; human decisions use the reviewer API. Exact machine-readable input/output schemas and required permissions are in `src/registry/tools.ts`. Default MCP discovery and `call` expose only permitted tools with `implementation: real` (or `partial`). Stub contracts remain catalogued here and appear in `tools/list` only when `MCP_DISCOVER_STUBS=true`.
 
@@ -126,3 +129,6 @@ Phase 16 (PR #48 / mig 89): `bot_marketing` post-#48 ceiling is **40** exact too
 
 
 Phase 16b: `bot_sales_ops` has an exact 25-tool ceiling after this PR (Phase 11b's 22 plus `sales_agents.attach_to_page`, `sales_agents.set_deployment_enabled`, `sales_agents.build`). Phase 16c (PR #46) additively grants `brand.get_profile`, `sites.provision`, `sites.publish_page` → final 28; it must append, not overwrite from the 22-tool baseline. `sales_agents.create` stays draft-only; `build` enqueues the Console `sales_agent` job. Attach inserts `client_sales_agent_deployments` with `enabled:false` and origin from the published URL. Enable is a kill-switch (one enabled deployment per page). `sales_agents.deploy` stays CRITICAL stub + ungranted. `approved_at` remains human-only. All six `proof.*` tools are real for `bot_production`; bots cannot set `usage_rights` clearance. `content.assign_production` and `content.submit_asset` are real for `bot_production` only; `content.approve_asset` stays Production-only. Catalog after #48 (97) + this PR's 3 sales_agents names: **100**. See [Phase 16b](phase-16b-sales-proof-production.md). Gate 16b is NOT YET CLOSED.
+
+
+Phase 16c: Attribution funnel and content-performance reads are real (empty data returns zeros/null ratios or `items: []`, never invented numbers). `attribution.generate_report` stays stub. `attribution.get_revenue_attribution` remains Finance/CoS. `brand.get_profile` is read-only for Marketing, Sales Ops and Production. `sites.provision` / `sites.publish_page` call the same runtime orchestration as Console admin routes; GitHub App keys stay on the agent-runtime. Owners are `bot_marketing` and `bot_sales_ops` — not Engineering. Both sites writes require gateway approval (HIGH, irreversible GitHub write). Conversion and campaign execution tools stay **real** after this last-writer PR (merge order #48→#47→#46). Marketing ceiling is **45**; Sales Ops is **28**. Catalog after A+B+C: **103**. See [Phase 16c](phase-16c-attribution-brand-sites.md). Gate 16c is NOT YET CLOSED.

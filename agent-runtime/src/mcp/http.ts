@@ -48,6 +48,8 @@ export const MCP_ERRORS: Record<string, [number, string]> = {
   campaign_agent_unavailable: [503, 'Campaign planner is unavailable.'],
   not_ready: [409, 'Campaign is not ready to launch.'],
   no_plan: [409, 'Campaign has no plan yet.'],
+  github_unconfigured: [503, 'Runtime GitHub App is not configured.'],
+  site_failed: [422, 'Site provision or publish failed.'],
   agent_not_ready: [409, 'Sales agent is not live, approved, and built.'],
   page_not_published: [409, 'Page is not published with a usable URL.'],
   origin_unavailable: [409, 'Published URL has no usable origin.'],

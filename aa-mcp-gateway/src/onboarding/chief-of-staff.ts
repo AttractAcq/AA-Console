@@ -8,6 +8,8 @@ export const chiefOfStaff = {
     "engineering",
     "pipeline",
     "sales_agents",
+    "sites",
+    "brand",
     "workflow.record_decision",
   ],
   reads: [
@@ -24,6 +26,8 @@ export const chiefOfStaff = {
     "campaign.get_status",
     "campaign.get_readiness",
     "attribution.get_campaign_performance",
+    "attribution.get_conversion_funnel",
+    "attribution.get_content_performance",
   ],
   writes: [
     "workflow.create_task",

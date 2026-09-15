@@ -59,6 +59,8 @@ export async function runDistributionGate(invoke: Invoke, f: DistributionFixture
 
   await call("content.get_brief", { brief_id: f.brief_id });
   await call("content.get_production_status", { asset_id: f.approved_asset_id });
+  const contentPerf = await call("attribution.get_content_performance", {});
+  assert.ok(Array.isArray(contentPerf.data.items), "content performance must return items, empty ok");
 
   // Approved-asset happy path: schedule, then record publication (Alex CLEAR
   // #2: record_publication stands in for live platform publish).
@@ -112,11 +114,8 @@ export async function runDistributionGate(invoke: Invoke, f: DistributionFixture
     ["workflow.get_task", { task_id: f.denied_task_id }],
     ["content.get_production_status", { asset_id: f.denied_asset_id }],
   ] as const) await deny(name, args, "foreign_resource");
-  // Granted-but-stub (content.get_performance, attribution.get_content_performance,
-  // migration 65/75): documents the honest Phase 10 gap (no live Meta/etc.
-  // publish or performance read yet). Behind MCP_DISCOVER_STUBS=false (the
-  // default), a granted stub is indistinguishable from an ungranted tool —
-  // same forbidden_tool denial as everything else in this loop.
+  // content.get_performance remains the granted stub (no live Meta/TikTok read).
+  // attribution.get_content_performance is real as of Phase 16c and is smoked above.
   for (const name of ["economics.get_client_economics", "security.get_system_status",
     "engineering.get_deployment_status", "pipeline.list_leads", "sales_agents.list",
     "finance.read", "deploy.run", "infra.read", "secrets.read", "admin.read",

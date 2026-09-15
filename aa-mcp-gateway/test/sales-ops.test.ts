@@ -49,29 +49,27 @@ async function mockAa(
   return { adapter, received };
 }
 
-test("Phase 16b: exact discovery set equality for bot_sales_ops (25 = Phase 11b's 22 + attach/enable/build)", () => {
+test("Phase 16c: exact discovery set equality for bot_sales_ops (28 = #47's 25 + brand/sites)", () => {
   const engine = new ActionEngine(new Store(":memory:"), registry, new AAApiAdapter());
   const discovered = engine.discover(identity).map((t) => t.name);
   assert.deepEqual(
     [...new Set(discovered)].sort(),
     [...salesOps.expectedDiscovery].sort(),
   );
-  assert.equal(salesOps.reads.length + salesOps.writes.length, 25);
-  assert.equal(salesOps.grants.length, 25);
-  assert.equal(discovered.length, 25);
-  // Catalog after #48 (97) + this PR's 3 sales_agents names. Phase 16c (#46)
-  // appends brand/sites; do not expect those names here, and do not drop
-  // attach/enable/build.
-  assert.equal(registry.length, 100);
+  assert.equal(salesOps.reads.length + salesOps.writes.length, 28);
+  assert.equal(salesOps.grants.length, 28);
+  assert.equal(discovered.length, 28);
+  // Catalog after #48+#47+#46 (90+7+3+3). Keep attach/enable/build.
+  assert.equal(registry.length, 103);
   for (const name of [
     "sales_agents.attach_to_page",
     "sales_agents.set_deployment_enabled",
     "sales_agents.build",
+    "brand.get_profile",
+    "sites.provision",
+    "sites.publish_page",
   ] as const)
     assert.ok(salesOps.grants.includes(name), name);
-  const later = ["brand.get_profile", "sites.provision", "sites.publish_page"];
-  for (const name of later)
-    assert.ok(!(salesOps.grants as readonly string[]).includes(name), `${name} is Phase 16c (#46), not this PR`);
   engine.store.close();
 });
 
@@ -327,6 +325,9 @@ test("gateway denies other-client before AA for every real Sales Ops tool", asyn
       deployment_id: agent, enabled: true, idempotency_key: "scope-enable",
     },
     "sales_agents.build": { sales_agent_id: agent, idempotency_key: "scope-build" },
+    "brand.get_profile": {},
+    "sites.provision": { repo: "harbour-site", idempotency_key: "scope-provision" },
+    "sites.publish_page": { page_id: lead, idempotency_key: "scope-publish" },
   };
   for (const [name, extra] of Object.entries(inputs)) {
     const result = await engine.call(identity, name, { client_id: other, ...extra });
@@ -376,7 +377,7 @@ test("forbidden/deferred tools are absent from discovery and denied if called", 
   assert.equal(hits, 0);
 });
 
-test("Gate 16b fixtures exercise the exact 25-tool discovery set", () => {
+test("Gate 16c fixtures exercise the exact 28-tool discovery set", () => {
   assertSalesOpsDiscovery(salesOps.expectedDiscovery);
   assert.throws(() => assertSalesOpsDiscovery(salesOps.expectedDiscovery.slice(1)));
   assert.throws(() => assertSalesOpsDiscovery([...salesOps.expectedDiscovery, "pipeline.record_sale"]));
@@ -425,6 +426,8 @@ test("Gate 11 runs the lead-read -> stage-move -> follow-up -> workflow-task cyc
         return { status: "completed", capability: tool.name, data: { client_id: f.client_id, id: input.sales_agent_id, name: "Closer" } };
       if (tool.name === "sales_agents.get_conversations")
         return { status: "completed", capability: tool.name, data: { client_id: f.client_id, conversations: [], count: 0 } };
+      if (tool.name === "brand.get_profile")
+        return { status: "completed", capability: tool.name, data: { client_id: f.client_id, found: false, profile: null } };
       if (tool.name === "workflow.get_task" && input.task_id === f.denied_task_id)
         return { status: "failed", capability: tool.name, error: { code: "client_mismatch" } };
       if (tool.name === "workflow.assign_task") task.assignee = String(input.assignee);
@@ -436,8 +439,12 @@ test("Gate 11 runs the lead-read -> stage-move -> follow-up -> workflow-task cyc
   for (const name of ["pipeline.update_stage", "pipeline.create_followup",
     "workflow.create_task", "workflow.assign_task", "workflow.complete_task"])
     assert.ok(hits.includes(name), `${name}: must execute at least once`);
-  assert.equal(store.approvals().length, 1);
-  assert.equal(store.approvals()[0].status, "pending");
+  assert.equal(store.approvals().length, 3);
+  assert.ok(store.approvals().every((a) => a.status === "pending"));
+  assert.ok(store.approvals().some((a) => a.tool === "sites.publish_page"));
+  assert.ok(store.approvals().some((a) => a.tool === "sites.provision"));
+  assert.ok(!hits.includes("sites.publish_page"));
+  assert.ok(!hits.includes("sites.provision"));
   assert.ok(!hits.includes("workflow.record_decision"));
   assert.ok(!hits.includes("pipeline.record_sale"));
 });

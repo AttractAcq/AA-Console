@@ -1,9 +1,13 @@
 import { chiefOfStaff } from "./chief-of-staff.js";
-/** Alex-locked 2026-09-09. Declaration only; provisions no credentials or grants. */
-const reads = ["content.get_brief", "content.get_production_status", "workflow.get_task", "workflow.list_tasks", "workflow.get_pending_approvals", "workflow.get_activity"] as const;
+/**
+ * Alex-locked 2026-09-09. Declaration only; provisions no credentials or grants.
+ * Phase 16c: attribution.get_content_performance is real (empty items, never fake
+ * numbers). content.get_performance remains the sole granted stub.
+ */
+const reads = ["content.get_brief", "content.get_production_status", "attribution.get_content_performance", "workflow.get_task", "workflow.list_tasks", "workflow.get_pending_approvals", "workflow.get_activity"] as const;
 const writes = ["content.queue_distribution", "content.record_publication", "workflow.create_task", "workflow.assign_task", "workflow.complete_task", "workflow.create_approval"] as const;
 /** Granted (migration 65/75) but not yet realized; hidden from default discovery. Not "future" (ungranted) — see design note §7. */
-const stubs = ["content.get_performance", "attribution.get_content_performance"] as const;
+const stubs = ["content.get_performance"] as const;
 export const distributionManager = {
   bot_id: "bot_distribution", reads, writes, stubs,
   grants: [...reads, ...writes, ...stubs],

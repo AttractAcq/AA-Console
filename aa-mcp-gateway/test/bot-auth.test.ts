@@ -306,6 +306,7 @@ test("HTTP dual-read match, mismatch 401, and reviewer path stay on REVIEWER_CRE
     assert.equal(ok.status, 200);
     const list: { result: { tools: { name: string }[] } } = await ok.json();
     const allowed = new Set([
+      "brand.get_profile",
       "content.approve_asset",
       "content.assign_production",
       "content.create_repurpose_plan",

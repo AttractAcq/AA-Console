@@ -62,6 +62,9 @@ export async function runEngineeringGate(invoke: Invoke, raw: EngineeringFixture
     "sales_agents.create",
     "delivery.list_clients",
     "workflow.record_decision",
+    "sites.provision",
+    "sites.publish_page",
+    "brand.get_profile",
   ]) {
     assertAuthorizationDenial(
       {

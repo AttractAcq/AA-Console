@@ -7,6 +7,9 @@ import {
   securityTools,
   conversionTools,
   campaignExecutionTools,
+  attributionReportingTools,
+  brandTools,
+  sitesTools,
 } from "../registry/tools.js";
 import { z } from "zod";
 import type { Adapter, Context, Tool, Result } from "../shared/types.js";
@@ -304,7 +307,10 @@ for (const tool of registry.filter(
     engineeringTools.has(t.name) ||
     securityTools.has(t.name) ||
     conversionTools.has(t.name) ||
-    campaignExecutionTools.has(t.name),
+    campaignExecutionTools.has(t.name) ||
+    attributionReportingTools.has(t.name) ||
+    brandTools.has(t.name) ||
+    sitesTools.has(t.name),
 )) {
   const [domain, action] = tool.name.split(".");
   ROUTES[tool.name] = {
@@ -378,6 +384,8 @@ const codes = new Set([
   "campaign_agent_unavailable",
   "not_ready",
   "no_plan",
+  "github_unconfigured",
+  "site_failed",
 ]);
 const fallback: Record<number, string> = {
   400: "invalid_request",
@@ -419,7 +427,7 @@ function aaBody(
   input: Record<string, unknown>,
 ): Record<string, unknown> {
   if (
-    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents|proof|economics|engineering|security|conversion)\./.test(
+    /^(admin|delivery|workflow|campaign|attribution|pipeline|sales_agents|proof|economics|engineering|security|conversion|brand|sites)\./.test(
       tool,
     )
   )

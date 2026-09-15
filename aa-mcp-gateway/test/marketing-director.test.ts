@@ -20,10 +20,12 @@ const queued = new Set([
   "conversion.create_page", "conversion.generate_structure", "conversion.generate_copy",
   "conversion.audit_page", "conversion.revise_page", "campaign.create", "campaign.plan",
 ]);
-test("locked 19 reads / 21 writes; exact discovery rejects missing and unexpected tools", () => {
-  assert.equal(config.reads.length, 19); assert.equal(config.writes.length, 21);
-  assert.equal(config.grants.length, 40);
+test("locked 22 reads / 23 writes; exact discovery rejects missing and unexpected tools", () => {
+  assert.equal(config.reads.length, 22); assert.equal(config.writes.length, 23);
+  assert.equal(config.grants.length, 45);
   assert.equal(config.phase16Owned.length, 17);
+  assert.equal(config.expectedDiscovery.length, 45);
+  assert.deepEqual([...config.expectedDiscovery].sort(), [...config.grants].sort());
   assert.deepEqual(grants.bot_marketing, [...config.grants]);
   assertMarketingDiscovery(config.grants);
   assert.throws(() => assertMarketingDiscovery(config.grants.slice(1)));
@@ -56,7 +58,7 @@ test("all Marketing tools deny other-client before adapter or approval creation"
       page_id: f.page_id, finding_ids: f.finding_ids, revision_number: f.revision_number,
       name: "fixture", brief: "fixture",
       task_id: id(11), title: "fixture", summary: "fixture", assignee: f.assignee,
-      formats: ["text_post"], idempotency_key: "isolation-fixture" };
+      formats: ["text_post"], repo: "harbour-site", idempotency_key: "isolation-fixture" };
     const shape = (registry.find(t => t.name === name)!.input as any).shape;
     const r = await engine.call(identity, name, Object.fromEntries(Object.entries(raw).filter(([key]) => key in shape)));
     assert.equal(r.message, "Client scope denied.", name);
@@ -72,6 +74,12 @@ test("Gate 16 runs all writes through engine, verifies replay, Marketing audit i
       return { status: "failed", capability: tool.name, error: { code: "client_mismatch" } };
     if (tool.name === "workflow.assign_task") task.assignee = String(input.assignee);
     if (tool.name === "workflow.complete_task") task.status = "complete";
+    if (tool.name === "attribution.get_content_performance")
+      return { status: "completed", capability: tool.name, data: { client_id: f.client_id, projection: "content_attribution_v1", items: [] } };
+    if (tool.name === "attribution.get_conversion_funnel")
+      return { status: "completed", capability: tool.name, data: { client_id: f.client_id, projection: "acquisition_funnel_v1", days: 30, funnel: { leads: 0, conversations: 0, appointments: 0, sales: 0, lost: 0, pipeline_value: 0, sale_value: 0, cash_collected: 0, spend: 0, lead_to_sale_pct: null, cost_per_lead: null, return_on_spend: null } } };
+    if (tool.name === "brand.get_profile")
+      return { status: "completed", capability: tool.name, data: { client_id: f.client_id, found: false, profile: null } };
     const queue = tool.name === "conversion.request_approval" ? "console_page_review"
       : tool.name === "campaign.request_approval" ? "console_campaign_launch"
       : "console_approvals";
@@ -81,9 +89,13 @@ test("Gate 16 runs all writes through engine, verifies replay, Marketing audit i
         status: "draft", brief_status: "draft", queue, next_cursor: null } };
   } });
   await runMarketingGate((name, input) => engine.call(identity, name, input), f);
-  for (const name of config.writes.filter(n => n !== "workflow.create_approval"))
+  for (const name of config.writes.filter(n => n !== "workflow.create_approval" && n !== "sites.provision" && n !== "sites.publish_page"))
     assert.equal(hits.filter(n => n === name).length, 1, `${name}: replay must not re-execute`);
-  assert.equal(store.approvals().length, 1);
-  assert.equal(store.approvals()[0].status, "pending");
+  assert.equal(store.approvals().length, 3);
+  assert.ok(store.approvals().every(a => a.status === "pending"));
+  assert.ok(store.approvals().some(a => a.tool === "sites.publish_page"));
+  assert.ok(store.approvals().some(a => a.tool === "sites.provision"));
+  assert.ok(!hits.includes("sites.publish_page"));
+  assert.ok(!hits.includes("sites.provision"));
   assert.ok(!hits.includes("workflow.record_decision"));
 });

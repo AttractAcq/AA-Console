@@ -70,6 +70,9 @@ export async function runSalesOpsGate(invoke: Invoke, f: SalesOpsFixtures) {
   const agent = await call("sales_agents.get", { sales_agent_id: f.sales_agent_id });
   assert.equal(agent.data.id, f.sales_agent_id);
   await call("sales_agents.get_conversations", { sales_agent_id: f.sales_agent_id });
+  const brand = await call("brand.get_profile", {});
+  assert.equal(typeof brand.data.found, "boolean");
+  if (brand.data.found === false) assert.equal(brand.data.profile, null);
 
   // Safe writes: durable stage move + follow-up, both with audit + replay.
   const staged = await write("pipeline.update_stage", { lead_id: f.lead_id, stage: "conversation" });
@@ -102,6 +105,14 @@ export async function runSalesOpsGate(invoke: Invoke, f: SalesOpsFixtures) {
   const approvals = (await call("workflow.get_pending_approvals", { limit: 100 })).data.approvals;
   assert.ok(approvals.some((a: any) => a.approval_id === pending.approval_id &&
     a.requested_by_bot === config.bot_id && a.status === "pending" && a.execution_status === "not_started"));
+  const provision = await invoke("sites.provision", {
+    client_id, repo: "harbour-site", idempotency_key: randomUUID(),
+  });
+  assert.equal(provision.status, "approval_required", "sites.provision must require gateway approval; GitHub is not called");
+  const publish = await invoke("sites.publish_page", {
+    client_id, page_id: f.lead_id, idempotency_key: randomUUID(),
+  });
+  assert.equal(publish.status, "approval_required", "sites.publish_page must require gateway approval; GitHub is not called");
 
   const deny = async (name: string, args: Record<string, unknown>, expected: Parameters<typeof assertAuthorizationDenial>[1]) =>
     assertAuthorizationDenial({ structuredContent: await invoke(name, { client_id, ...args }) }, expected);

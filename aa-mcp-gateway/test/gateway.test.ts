@@ -64,6 +64,7 @@ test("production discovery and execution enforce role and client scope", async (
   const discovered = engine.discover(identity);
   const names = discovered.map((t) => t.name);
   assert.deepEqual(names.sort(), [
+    "brand.get_profile",
     "content.approve_asset",
     "content.assign_production",
     "content.create_repurpose_plan",
@@ -434,6 +435,7 @@ test("HTTP MCP discovery/call and human-only approval boundary", async () => {
     const list: any = await response.json();
     const listed = list.result.tools.map((t: any) => t.name).sort();
     assert.deepEqual(listed, [
+      "brand.get_profile",
       "content.approve_asset",
       "content.assign_production",
       "content.create_repurpose_plan",

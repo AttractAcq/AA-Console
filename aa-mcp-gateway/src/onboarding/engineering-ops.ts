@@ -36,6 +36,8 @@ export const engineeringOps = {
     "infra",
     "secrets",
     "railway",
+    "sites",
+    "brand",
     "workflow.record_decision",
     "pipeline.record_sale",
     "sales_agents.deploy",

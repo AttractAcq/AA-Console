@@ -80,6 +80,12 @@ export async function runMarketingGate(invoke: Invoke, f: MarketingFixtures) {
   for (const name of ["campaign.get", "campaign.get_status", "campaign.get_readiness"])
     await call(name, { campaign_id: f.campaign_id });
   await call("attribution.get_campaign_performance", { campaign_id: f.ad_campaign_id });
+  await call("attribution.get_conversion_funnel", {});
+  const contentPerf = await call("attribution.get_content_performance", {});
+  assert.ok(Array.isArray(contentPerf.data.items), "content performance must return items, empty ok");
+  const brand = await call("brand.get_profile", {});
+  assert.equal(typeof brand.data.found, "boolean");
+  if (brand.data.found === false) assert.equal(brand.data.profile, null);
   await call("conversion.get_page", { page_id: f.page_id });
   await call("conversion.get_performance", { page_id: f.page_id });
   await call("content.get_idea", { idea_id: f.generation_idea_id });
@@ -140,6 +146,14 @@ export async function runMarketingGate(invoke: Invoke, f: MarketingFixtures) {
   const approvals = (await call("workflow.get_pending_approvals", { limit: 100 })).data.approvals;
   assert.ok(approvals.some((a: any) => a.approval_id === pending.approval_id &&
     a.requested_by_bot === config.bot_id && a.status === "pending" && a.execution_status === "not_started"));
+  const provision = await invoke("sites.provision", {
+    client_id, repo: "harbour-site", idempotency_key: randomUUID(),
+  });
+  assert.equal(provision.status, "approval_required", "sites.provision must require gateway approval; GitHub is not called");
+  const publish = await invoke("sites.publish_page", {
+    client_id, page_id: f.pending_asset_id, idempotency_key: randomUUID(),
+  });
+  assert.equal(publish.status, "approval_required", "sites.publish_page must require gateway approval; GitHub is not called");
   const deny = async (name: string, args: Record<string, unknown>, expected: Parameters<typeof assertAuthorizationDenial>[1]) =>
     assertAuthorizationDenial({ structuredContent: await invoke(name, { client_id, ...args }) }, expected);
   await deny("delivery.get_status", { client_id: f.denied_client_id }, "client_scope");
