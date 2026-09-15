@@ -26,6 +26,15 @@ export interface RuntimeConfig {
   githubAppId: string | null;
   githubAppPrivateKey: string | null;
   githubInstallationId: string | null;
+  /** The organisation client site repositories are created in. */
+  githubSitesOrg: string;
+  /**
+   * Canonical public runtime host, written into every site's shell.
+   *
+   * Never the implementation host: a page published today must keep working
+   * when the runtime moves to its own service.
+   */
+  publicRuntimeBase: string;
   /** Dedicated MCP gateway credential. Missing disables the MCP endpoint. */
   mcpServiceSecret?: string | null;
   /** Ceiling on Master AI spend across every conversation in one UTC day. */
@@ -154,6 +163,9 @@ export function loadConfig(): RuntimeConfig {
     githubAppId: optionalEnv("GITHUB_APP_ID") ?? null,
     githubAppPrivateKey: optionalEnv("GITHUB_APP_PRIVATE_KEY") ?? null,
     githubInstallationId: optionalEnv("GITHUB_APP_INSTALLATION_ID") ?? null,
+    githubSitesOrg: optionalEnv("GITHUB_SITES_ORG") ?? "AttractAcq-Sites",
+    publicRuntimeBase:
+      (optionalEnv("PUBLIC_RUNTIME_BASE") ?? "https://runtime.attractacq.com").replace(/\/+$/, ""),
     mcpServiceSecret: optionalEnv("AA_MCP_SERVICE_SECRET") ?? null,
     // Calibrated against real use rather than guessed: 13 turns had cost
     // $1.15 in total, the dearest single turn $0.16, and the busiest day

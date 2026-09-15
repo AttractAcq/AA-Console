@@ -3,7 +3,6 @@ import {
   deployBlocker,
   deployableAgents,
   originForPage,
-  provisionBlocker,
   publishBlocker,
   repoStateLabel,
   type ApprovableAgent,
@@ -25,19 +24,6 @@ const page = (over: Partial<PublishablePage> = {}): PublishablePage => ({
 const agent = (over: Partial<ApprovableAgent> = {}): ApprovableAgent => ({
   id: "a1", name: "Consult Qualifier", status: "live",
   built_at: "2026-09-10T00:00:00Z", approved_at: "2026-09-11T00:00:00Z", ...over,
-});
-
-describe("provisionBlocker", () => {
-  it("blocks until the GitHub App is connected, and says why", () => {
-    expect(provisionBlocker([])).toMatch(/connect the aa github app/i);
-  });
-  it("does not count a suspended or revoked installation", () => {
-    expect(provisionBlocker([{ id: "i", account_login: "AttractAcq", status: "suspended" }])).not.toBeNull();
-    expect(provisionBlocker([{ id: "i", account_login: "AttractAcq", status: "revoked" }])).not.toBeNull();
-  });
-  it("clears once an active installation exists", () => {
-    expect(provisionBlocker([{ id: "i", account_login: "AttractAcq", status: "active" }])).toBeNull();
-  });
 });
 
 describe("publishBlocker", () => {

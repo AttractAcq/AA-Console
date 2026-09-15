@@ -27,6 +27,7 @@ import { startHeartbeat } from "./heartbeat.js";
 import { registeredAgentKeys } from "./orchestration/dispatch.js";
 import { handleMasterChat } from "./master/route.js";
 import { handleGitHubStatus } from "./github/status-route.js";
+import { handleSitesRoute } from "./github/sites-route.js";
 import { logger } from "./logging/logger.js";
 
 const config = loadConfig();
@@ -135,6 +136,16 @@ const server = http.createServer((req, res) => {
 
   if (req.url === "/admin/github/status") {
     void handleGitHubStatus(req, res, sb, config);
+    return;
+  }
+
+  if (req.url === "/admin/sites/provision" || req.url === "/admin/sites/publish") {
+    if (req.method !== "POST") {
+      json(405, { ok: false, error: "POST only" });
+      return;
+    }
+    const action = req.url.endsWith("provision") ? "provision" : "publish";
+    void handleSitesRoute(req, res, sb, config, action);
     return;
   }
 

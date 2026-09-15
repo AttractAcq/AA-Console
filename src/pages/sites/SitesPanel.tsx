@@ -8,11 +8,11 @@ import { DataTable } from "../../components/DataTable";
 import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
+import { useGitHubStatus, provisionBlockerFromStatus } from "../../lib/useGitHubStatus";
+import { callRuntime } from "../../lib/callRuntime";
 import { cn } from "../../lib/cn";
 import {
-  provisionBlocker,
   repoStateLabel,
-  type Installation,
   type SiteRepo,
 } from "./readiness";
 
@@ -38,7 +38,6 @@ const STATE_TONE: Record<string, string> = {
 
 export function SitesPanel() {
   const { clientId } = useParams<{ clientId: string }>();
-  const [installs, setInstalls] = useState<Installation[]>([]);
   const [repos, setRepos] = useState<SiteRepo[]>([]);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [pages, setPages] = useState<PageRow[]>([]);
@@ -54,8 +53,7 @@ export function SitesPanel() {
       setLoading(false);
       return;
     }
-    const [inst, repoRes, depRes, pageRes, agentRes] = await Promise.all([
-      supabase.from("github_app_installations").select("id, account_login, status"),
+    const [repoRes, depRes, pageRes, agentRes] = await Promise.all([
       supabase
         .from("client_site_repositories")
         .select("id, owner, repo, status, pages_url")
@@ -72,7 +70,6 @@ export function SitesPanel() {
         .eq("client_id", clientId),
       supabase.from("client_sales_agents").select("id, name").eq("client_id", clientId),
     ]);
-    setInstalls((inst.data as Installation[] | null) ?? []);
     setRepos((repoRes.data as SiteRepo[] | null) ?? []);
     setDeployments((depRes.data as Deployment[] | null) ?? []);
     setPages((pageRes.data as PageRow[] | null) ?? []);
@@ -84,7 +81,11 @@ export function SitesPanel() {
     void refresh();
   }, [refresh]);
 
-  const blocker = provisionBlocker(installs);
+  // Asked of GitHub, not of a table. The installations row is written by the
+  // provisioner now, but it is a record of what happened — not the question
+  // "is GitHub connected", which only GitHub can answer.
+  const { status: githubStatus, loading: githubLoading } = useGitHubStatus();
+  const blocker = provisionBlockerFromStatus(githubStatus, githubLoading);
   const pageTitle = (id: string) => pages.find((p) => p.id === id)?.title ?? "(page removed)";
   const agentName = (id: string) => agents.find((a) => a.id === id)?.name ?? "(agent removed)";
 
@@ -234,17 +235,18 @@ export function SitesPanel() {
         submitLabel="Create"
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
-          const install = installs.find((i) => i.status === "active");
-          if (!install) throw new Error("No active GitHub installation.");
-          const { error } = await supabase.from("client_site_repositories").insert({
-            client_id: clientId,
-            installation_id: install.id,
-            owner: install.account_login,
-            repo: (v.repo as string).trim().toLowerCase(),
-            status: "provisioning",
-          });
-          if (error) throw new Error(error.message);
-          setNotice("Website queued for creation.");
+          // The runtime does the work: it creates or adopts the repository,
+          // commits the shell and turns on Pages. Writing a row here would
+          // record a website that does not exist.
+          const result = await callRuntime<{ created: boolean; owner: string; repo: string; pagesUrl: string | null }>(
+            "/admin/sites/provision",
+            { clientId, repo: (v.repo as string).trim().toLowerCase() },
+          );
+          setNotice(
+            result.created
+              ? `Created ${result.owner}/${result.repo}. Pages is on; publishing is available from the Conversion tab.`
+              : `${result.owner}/${result.repo} already existed and is now set up. Publishing is available from the Conversion tab.`,
+          );
         }}
         onSaved={refresh}
       />
