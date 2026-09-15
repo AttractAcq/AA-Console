@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
@@ -24,36 +24,39 @@ type Page = {
   built_at: string | null;
 };
 
-const FIELDS: FieldDef[] = [
-  { name: "title", label: "Page title", kind: "text", required: true },
-  {
-    name: "brief",
-    label: "What this page is for",
-    kind: "textarea",
-    rows: 4,
-    required: true,
-    hint: "The agent writes the page from this, your offer strategy, your ICP and whatever proof is on file.",
-  },
-];
+type CampaignOption = {
+  id: string;
+  name: string;
+  status: string;
+};
 
 export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing" | "offer" }) {
   const [buildOpen, setBuildOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const { clientId } = useParams<{ clientId: string }>();
   const [pages, setPages] = useState<Page[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
-    const { data } = await supabase
-      .from("client_pages")
-      .select(
-        "id, title, status, body, published_url, created_at, html, meta_title, meta_description, built_at",
-      )
-      .eq("client_id", clientId)
-      .eq("page_type", pageType)
-      .order("created_at", { ascending: false });
-    setPages((data ?? []) as Page[]);
+    const [pageRows, campaignRows] = await Promise.all([
+      supabase
+        .from("client_pages")
+        .select(
+          "id, title, status, body, published_url, created_at, html, meta_title, meta_description, built_at",
+        )
+        .eq("client_id", clientId)
+        .eq("page_type", pageType)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("client_campaigns")
+        .select("id, name, status")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false }),
+    ]);
+    setPages((pageRows.data ?? []) as Page[]);
+    setCampaigns((campaignRows.data ?? []) as CampaignOption[]);
   }, [clientId, pageType]);
 
   useEffect(() => {
@@ -65,6 +68,36 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
   const open = pages.find((p) => p.id === openId);
+  const fields: FieldDef[] = useMemo(() => [
+    { name: "title", label: "Page title", kind: "text", required: true },
+    {
+      name: "campaign_id",
+      label: "Campaign",
+      kind: "select",
+      options: [
+        { value: "", label: "Not linked to a campaign" },
+        ...campaigns.map((campaign) => ({
+          value: campaign.id,
+          label: `${campaign.name} · ${campaign.status}`,
+        })),
+      ],
+      hint: "Optional. Linked pages count toward that campaign's landing page requirement.",
+    },
+    {
+      name: "html_file",
+      label: "Built HTML file",
+      kind: "file",
+      accept: ".html,.htm,text/html",
+      hint: "Optional. Upload this when the page is already built; no page agent will be queued.",
+    },
+    {
+      name: "brief",
+      label: "What this page is for",
+      kind: "textarea",
+      rows: 4,
+      hint: "Required if no HTML file is uploaded. The agent writes the page from this, your offer strategy, your ICP and whatever proof is on file.",
+    },
+  ], [campaigns]);
 
   return (
     <div>
@@ -125,22 +158,54 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
         onClose={() => setBuildOpen(false)}
         title="Build Page"
         draftKey={`page:${pageType}:${clientId}`}
-        intro="Queues the page agent. It needs your offer strategy, takes a couple of minutes, and this page fills in on its own when it finishes."
-        fields={FIELDS}
-        submitLabel="Build"
+        intro="Upload finished HTML when the page already exists, or leave the file empty to queue the page agent."
+        fields={fields}
+        submitLabel="Save page"
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
+          const title = (v.title as string).trim();
+          const brief = typeof v.brief === "string" ? v.brief.trim() : "";
+          const campaignId = typeof v.campaign_id === "string" ? v.campaign_id : "";
+          const htmlFile = v.html_file instanceof File ? v.html_file : null;
+          const html = htmlFile ? await htmlFile.text() : "";
+          if (!htmlFile && !brief) {
+            throw new Error("What this page is for is required unless you upload a built HTML file.");
+          }
+          if (htmlFile && !html.trim()) {
+            throw new Error("That HTML file is empty.");
+          }
+
           const { data, error } = await supabase
             .from("client_pages")
             .insert({
               client_id: clientId,
               page_type: pageType,
-              title: (v.title as string).trim(),
-              brief: (v.brief as string).trim(),
+              title,
+              brief: brief || null,
+              html: htmlFile ? html : null,
+              body: htmlFile ? `# ${title}\n\nImported from ${htmlFile.name}.` : null,
+              meta_title: htmlFile ? title : null,
+              meta_description: htmlFile && brief ? brief : null,
+              built_at: htmlFile ? new Date().toISOString() : null,
             })
             .select("id")
             .single();
           if (error) throw error;
+
+          if (campaignId) {
+            const { error: linkError } = await supabase.from("campaign_artifacts").insert({
+              campaign_id: campaignId,
+              client_id: clientId,
+              kind: "landing_page",
+              page_id: data.id,
+            });
+            if (linkError) throw new Error(linkError.message);
+          }
+
+          if (htmlFile) {
+            setNotice(campaignId ? "Page uploaded and linked to the campaign." : "Page uploaded.");
+            return;
+          }
 
           const { error: jobError } = await supabase.rpc("enqueue_agent_job", {
             p_agent_key: "landing_page",
@@ -149,7 +214,7 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
             p_input_id: data.id,
           });
           if (jobError) throw new Error(jobError.message);
-          setNotice("Queued. The agent is writing the page now.");
+          setNotice(campaignId ? "Queued. The agent is writing the campaign page now." : "Queued. The agent is writing the page now.");
         }}
         onSaved={refresh}
       />
