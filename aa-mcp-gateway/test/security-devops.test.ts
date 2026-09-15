@@ -385,6 +385,50 @@ test("DB and dual Security auth refresh each request and deny revoked token/gran
     assert.equal(calls, 3);
   }
 });
+test("hosted Security env credentials are refused except loopback HTTP", async () => {
+  const token = "security-test-only-credential".repeat(2);
+  const bots = [{ ...identity, token }];
+  for (const origin of [
+    "https://gateway.example.test",
+    "http://localhost.evil.test",
+    "https://localhost",
+    "http://127.0.0.2",
+  ]) {
+    const auth = BotAuthenticator.fromConfig({
+      BOT_AUTH_MODE: "env",
+      PUBLIC_ORIGIN: origin,
+      bots,
+    });
+    await assert.rejects(auth.authenticate(`Bearer ${token}`), /unauthorized/);
+  }
+  for (const origin of ["http://localhost", "http://127.0.0.1"]) {
+    const auth = BotAuthenticator.fromConfig({
+      BOT_AUTH_MODE: "env",
+      PUBLIC_ORIGIN: origin,
+      bots,
+    });
+    assert.equal(
+      (await auth.authenticate(`Bearer ${token}`)).bot,
+      "bot_security_devops",
+    );
+  }
+});
+test("dual Security never uses environment fallback on miss or resolver outage", async () => {
+  const token = "security-test-only-credential".repeat(2);
+  const envCreds = [{ ...identity, token }];
+  await assert.rejects(
+    new BotAuthenticator("dual", envCreds, async () => ({ found: false })).authenticate(
+      `Bearer ${token}`,
+    ),
+    /unauthorized/,
+  );
+  await assert.rejects(
+    new BotAuthenticator("dual", envCreds, async () => {
+      throw Error("offline");
+    }).authenticate(`Bearer ${token}`),
+    /unauthorized/,
+  );
+});
 test("MCP HTTP discovery is 14, bad/revoked credentials return 401 immediately", async (t) => {
   const e = engine(t);
   const token = "security-test-only-credential".repeat(2);

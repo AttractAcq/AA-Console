@@ -43,7 +43,7 @@ All runtime routes use POST. Finding create requires an 8–128-character idempo
 | `workflow.complete_task` | Write | existing | `mcp_workflow_task` | Gateway + durable task receipt | None | Close work |
 | `workflow.create_approval` | Write | Gateway WorkflowService | SQLite | Gateway receipt | Returns approval_required | Informational |
 
-`get_open_findings` / `get_incident_status` accept optional `limit` (1–100, default 25), UUID `after` keyset pagination, or a single `finding_id` / `incident_id`. Missing, foreign, and wrong-kind IDs return the same `finding_not_found` / `incident_not_found`. `create_finding` accepts `kind` `finding` (default) or `incident`, and required `severity` `low|medium|high|critical`. Title 1–200; notes nullable ≤2000. No evidence dump, token, env, or secret fields exist on the contract.
+`get_open_findings` / `get_incident_status` accept optional `limit` (1–100, default 25), UUID `after` keyset pagination, or a single `finding_id` / `incident_id`. Missing, foreign, and wrong-kind IDs return the same `finding_not_found` / `incident_not_found`. `create_finding` accepts `kind` `finding` (default) or `incident`, and required `severity` `low|medium|high|critical`. Title 1–200; notes nullable ≤2000. No evidence dump, token, env, or secret fields exist on the contract. **Never put secrets or tokens in `create_finding` notes** — notes are operator-visible free text and are not a secret store; the API does not redact them.
 
 ## Exact bot allowlist
 
@@ -74,7 +74,7 @@ Gateway: `src/onboarding/security-devops.ts`, registry, permissions ceiling, AA 
 
 Security matches Admin/Engineering for **identity refresh**: db/dual auth skips the token cache for `bot_security_devops`, so a revoked token is 401 on the next request and a removed client grant is re-checked on write replay (`client_forbidden`, not a cached success). Gateway receipts still bind the execution key; they do not short-circuit the AA call.
 
-Security does **not** copy Admin's hosted-env denial / dual-mode no-fallback. Gate 15 is read-heavy plus one tracking write; env credentials remain valid for non-Admin bots when AA is unavailable. Flagged as a Sec question.
+Security matches Admin for **hosted-env denial / dual-mode no-fallback** (Sec P1). Hosted env credentials for `bot_security_devops` are refused; only loopback HTTP (`http://localhost` / `http://127.0.0.1`) fixtures may use env. In dual mode Security never falls back to env on AA miss, resolver outage, or stale grants — `BOT_AUTH_MODE=db` alone is not this posture. Other bots keep their existing dual env fallback. Admin's special-case is unchanged.
 
 ## Tests
 
@@ -137,8 +137,8 @@ Authorized operator disables Security access/revokes only its new credential and
 
 ## Sec questions
 
-1. **Hosted-env denial.** Admin requires DB identity on hosted origins and never falls back in dual mode. Security is the highest-risk Bot but Gate 15 is read-heavy tracking. Should hosted Security env credentials be refused the same way as Admin?
-2. **System status projection.** Gate 15 returns job/page **counts by status** plus open finding/incident counts, not row-level job/page lists (those remain on Engineering status tools). Confirm counts-only is the Gate 15 contract versus exposing the same page/job rows Security can already read via `engineering.get_*_status`.
-3. **create_finding is MEDIUM, no gateway reviewer gate.** Same posture as Engineering issues and Admin events. Confirm vs requiring HIGH/approval for incident-kind writes (`kind=incident`).
-4. **Incident vs finding.** One table, `kind` discriminator, so Gate 15 does not add a separate create-incident tool. Confirm vs splitting incidents into their own table/RPC before CLEAR.
-5. **No destroy / secret / Railway / global tools.** Gate 15 excludes them. A later phase that lets Security rotate secrets, dump env, destroy infra, or read agency-global (null-client) rows would need CRITICAL/HIGH approval and a separate CLEAR.
+1. **Hosted-env denial.** **REQUIRED / implemented.** Security matches Admin: hosted env credentials refused; dual never falls back to env; loopback HTTP fixtures may still use env. Prod db mode alone is not this posture.
+2. **System status projection.** **CONFIRMED.** Counts-only Gate 15 contract.
+3. **create_finding is MEDIUM, no gateway reviewer gate.** **ACCEPT.** Same posture as Engineering issues and Admin events, including `kind=incident`.
+4. **Incident vs finding.** **CONFIRM.** One findings table + `kind`.
+5. **No destroy / secret / Railway / global tools.** **CONFIRM.** Gate 15 excludes them.

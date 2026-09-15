@@ -64,3 +64,15 @@ for(const mode of ['dual','db'] as const)for(const change of ['revoked','suspend
 test('Admin dual rejects both env/DB mismatch directions',async()=>{
  for(const [env,db] of [['bot_admin','bot_production'],['bot_production','bot_admin']] as [Bot,Bot][])await assert.rejects(new BotAuthenticator('dual',credentials(env),async()=>active(db)).authenticate(header),/unauthorized/);
 });
+for(const origin of ['https://gateway.example.test','http://localhost.evil.test','https://localhost','http://127.0.0.2','http://localhost','http://127.0.0.1'])test(`Security env origin: ${origin}`,async()=>{
+ const auth=BotAuthenticator.fromConfig({BOT_AUTH_MODE:'env',PUBLIC_ORIGIN:origin,bots:credentials('bot_security_devops')});
+ if(['http://localhost','http://127.0.0.1'].includes(origin))assert.equal((await auth.authenticate(header)).bot,'bot_security_devops');
+ else await assert.rejects(auth.authenticate(header),/unauthorized/);
+});
+test('Security dual never falls back to env on miss or outage',async()=>{
+ await assert.rejects(new BotAuthenticator('dual',credentials('bot_security_devops'),async()=>({found:false})).authenticate(header),/unauthorized/);
+ await assert.rejects(new BotAuthenticator('dual',credentials('bot_security_devops'),async()=>{throw Error('fixture outage');}).authenticate(header),/unauthorized/);
+});
+test('Security dual rejects both env/DB mismatch directions',async()=>{
+ for(const [env,db] of [['bot_security_devops','bot_production'],['bot_production','bot_security_devops']] as [Bot,Bot][])await assert.rejects(new BotAuthenticator('dual',credentials(env),async()=>active(db)).authenticate(header),/unauthorized/);
+});
