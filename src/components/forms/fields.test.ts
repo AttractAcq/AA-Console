@@ -73,4 +73,9 @@ describe("isVisible", () => {
     expect(isVisible(field, {})).toBe(false);
     expect(isVisible(field, { kind: true })).toBe(false);
   });
+
+  it("treats a heading as visible unless a showIf hides it", () => {
+    const heading: FieldDef = { name: "_personal", label: "Personal", kind: "heading" };
+    expect(isVisible(heading, {})).toBe(true);
+  });
 });

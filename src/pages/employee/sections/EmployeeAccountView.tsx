@@ -1,18 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
 import { Panel } from "../../../components/Panel";
 import { DataTable } from "../../../components/DataTable";
+import { ProfileDefinitionList } from "../../../components/ProfileDefinitionList";
 import { useAuth } from "../../../context/auth";
 import { supabase } from "../../../lib/supabase";
 import { EMPLOYEE_CATEGORY_LABEL } from "../../../lib/identity";
 import type { EmployeeCategory } from "../../../lib/identity";
+import {
+  TEAM_MEMBER_PROFILE_SELECT,
+  contactEntries,
+  personalEntries,
+  profileHasContact,
+  profileHasPersonal,
+  resolveTeamMemberProfile,
+  type TeamMemberProfileRow,
+} from "../../../lib/teamMemberProfile";
 
-type Member = {
+type Member = TeamMemberProfileRow & {
   name: string;
   initials: string | null;
   category: EmployeeCategory;
   engagement: string | null;
-  personal_info: string | null;
-  contact_info: string | null;
   active: boolean;
   created_at: string;
 };
@@ -35,7 +43,7 @@ type Job = { id: string; compensation: number | null; completed_at: string | nul
  * person and nobody else, whatever the query asks for.
  */
 export function EmployeeAccountView({ memberId }: { memberId: string }) {
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
   const [member, setMember] = useState<Member | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -45,7 +53,7 @@ export function EmployeeAccountView({ memberId }: { memberId: string }) {
     const [m, p, j] = await Promise.all([
       supabase
         .from("team_members")
-        .select("name, initials, category, engagement, personal_info, contact_info, active, created_at")
+        .select(`name, initials, category, engagement, active, created_at, ${TEAM_MEMBER_PROFILE_SELECT}`)
         .eq("id", memberId)
         .maybeSingle(),
       supabase
@@ -78,6 +86,9 @@ export function EmployeeAccountView({ memberId }: { memberId: string }) {
   const paidTotal = paid.reduce((s, p) => s + Number(p.compensation ?? 0), 0);
   const outstandingTotal = outstanding.reduce((s, p) => s + Number(p.compensation ?? 0), 0);
   const jobsDone = jobs.filter((j) => j.completed_at).length;
+  const profile = resolveTeamMemberProfile(member);
+  const personal = personalEntries(profile);
+  const contact = contactEntries(profile);
 
   return (
     <div className="space-y-6">
@@ -117,21 +128,25 @@ export function EmployeeAccountView({ memberId }: { memberId: string }) {
               ) : null,
             )}
           </dl>
+          {profileHasPersonal(profile) && (
+            <div className="mt-3 border-t border-border/60 pt-3">
+              <ProfileDefinitionList entries={personal} />
+            </div>
+          )}
         </Panel>
 
         <Panel title="Contact">
           <dl className="space-y-1.5 text-sm">
             <div className="flex min-w-0 gap-2">
               <dt className="w-28 shrink-0 text-muted-foreground">Login email</dt>
-              <dd className="truncate text-card-foreground">{profile?.email ?? "—"}</dd>
+              <dd className="truncate text-card-foreground">{authProfile?.email ?? "—"}</dd>
             </div>
-            {member?.contact_info && (
-              <div className="flex gap-2">
-                <dt className="w-28 shrink-0 text-muted-foreground">On file</dt>
-                <dd className="whitespace-pre-wrap text-card-foreground">{member.contact_info}</dd>
-              </div>
-            )}
           </dl>
+          {profileHasContact(profile) && (
+            <div className="mt-3 border-t border-border/60 pt-3">
+              <ProfileDefinitionList entries={contact} />
+            </div>
+          )}
           <p className="mt-3 text-xs text-muted-foreground">
             Ask an admin to update your details or reset your password.
           </p>
