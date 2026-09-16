@@ -123,6 +123,17 @@ beforeAll(async () => {
       error text,
       created_at timestamptz not null default now()
     );
+    create table if not exists creative_renders (
+      id uuid primary key default gen_random_uuid(),
+      generation_id uuid not null references creative_generations (id) on delete cascade,
+      client_id uuid not null references clients (id) on delete cascade,
+      job_id uuid references agent_jobs (id) on delete set null,
+      quality text not null default 'medium',
+      size text not null default '1024x1536',
+      reference_path text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
     create table if not exists brief_dispatches (
       id uuid primary key default gen_random_uuid(),
       client_id uuid not null references clients (id) on delete cascade,
@@ -149,6 +160,7 @@ beforeAll(async () => {
      where permission_pattern in ('economics.*', 'engineering.*', 'security.*', 'proof.*', 'conversion.*');
   `);
   await db.exec(await migration('20260916140000_90_mcp_sales_proof_production.sql'));
+  await db.exec(await migration('20260916180000_93_assign_production_ai_render.sql'));
 }, 60_000);
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => {
@@ -157,7 +169,7 @@ beforeEach(async () => {
       mcp_internal.mcp_proof_requests, mcp_internal.mcp_content_requests, mcp_bot_clients,
       lead_events, client_leads, sales_agent_conversations, client_sales_agent_deployments,
       client_sales_agents, client_pages, client_proof_assets, client_briefs, client_ideas,
-      creative_generations, brief_dispatches, agent_job_events, agent_jobs,
+      creative_generations, creative_renders, brief_dispatches, agent_job_events, agent_jobs,
       ref_counters, clients, profiles, auth.users cascade;
     update mcp_internal.mcp_bots set status = 'active';
     update agents set paused = false, archived_at = null, requires_upstream = '{}';
@@ -464,6 +476,9 @@ describe('Phase 16b sales attach/enable/build + proof + assign/submit routes', (
     });
     expect(assigned.status).toBe(200);
     expect(assigned.body.route).toBe('ai');
+    expect(assigned.body.generation_id).toBeTruthy();
+    expect(assigned.body.render_id).toBeTruthy();
+    expect(assigned.body.job_id).toBeTruthy();
     const submitted = await content('submit-asset', {
       client_id: CLIENT, storage_path: 'clients/out.png', media_type: 'image', brief_id: BRIEF,
     }, { headers: { 'idempotency-key': 'sub-1' } });

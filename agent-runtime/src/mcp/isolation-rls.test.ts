@@ -105,7 +105,7 @@ beforeAll(async () => {
     '20260916130000_89_mcp_conversion_campaign.sql',
   ]) await db.exec(await migration(file));
   // Phase 16b: do not load migration 80 (extensions.gen_random_bytes) or 39/57/81.
-  // Stub the columns and tables the new RPCs touch, then load 90.
+  // Stub the columns and tables the new RPCs touch, then load 90 and 93.
   await db.exec(`
     alter table client_sales_agents add column approved_at timestamptz;
     alter table client_pages add column if not exists publish_status text not null default 'unpublished';
@@ -153,6 +153,17 @@ beforeAll(async () => {
       created_at timestamptz not null default now(),
       constraint creative_generations_no_ai_video check (media_type <> 'video')
     );
+    create table if not exists creative_renders (
+      id uuid primary key default gen_random_uuid(),
+      generation_id uuid not null references creative_generations (id) on delete cascade,
+      client_id uuid not null references clients (id) on delete cascade,
+      job_id uuid references agent_jobs (id) on delete set null,
+      quality text not null default 'medium',
+      size text not null default '1024x1536',
+      reference_path text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
     create table if not exists brief_dispatches (
       id uuid primary key default gen_random_uuid(),
       client_id uuid not null references clients (id) on delete cascade,
@@ -169,6 +180,8 @@ beforeAll(async () => {
     );
     alter table creative_generations enable row level security;
     alter table creative_generations force row level security;
+    alter table creative_renders enable row level security;
+    alter table creative_renders force row level security;
     alter table brief_dispatches enable row level security;
     alter table brief_dispatches force row level security;
     insert into agents (agent_key, name, initials, domain, description, requires_upstream)
@@ -192,6 +205,7 @@ beforeAll(async () => {
     alter table client_ideas add column if not exists content_territory text;
   `);
   await db.exec(await migration('20260916150000_91_mcp_attribution_brand_sites.sql'));
+  await db.exec(await migration('20260916180000_93_assign_production_ai_render.sql'));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
       client_leads, client_billing, finance_entries to authenticated;
@@ -211,7 +225,7 @@ beforeEach(async () => {
       mcp_internal.mcp_conversion_requests, mcp_internal.mcp_campaign_requests,
       mcp_internal.mcp_proof_requests, scheduled_posts,
       client_media_assets, client_ideas, client_briefs, client_proof_assets,
-      creative_generations, brief_dispatches, job_assignments,
+      creative_generations, creative_renders, brief_dispatches, job_assignments,
       client_sales_agent_deployments, client_pages,
       agent_job_events, agent_jobs,
       campaigns, lead_events, client_leads, sales_agent_conversations, client_sales_agents,
@@ -2879,6 +2893,20 @@ describe('Phase 16b Sales attach/enable/build + Proof Bank + production assign/s
     )).rows[0]!.result;
     expect(assigned.route).toBe('ai');
     expect(assigned.job_id).toBeTruthy();
+    expect(assigned.generation_id).toBeTruthy();
+    expect(assigned.render_id).toBeTruthy();
+    const job = (await db.query<{ params: any; input_table: string; input_id: string }>(
+      `select params, input_table, input_id from agent_jobs where id = '${assigned.job_id}'`,
+    )).rows[0]!;
+    expect(job.params).toEqual({ render_id: assigned.render_id });
+    expect(job.input_table).toBe('creative_renders');
+    expect(job.input_id).toBe(assigned.render_id);
+    const renders = (await db.query<{ n: number; job_id: string }>(
+      `select count(*)::int as n, min(job_id::text) as job_id from creative_renders
+        where generation_id = '${assigned.generation_id}'`,
+    )).rows[0]!;
+    expect(renders.n).toBe(1);
+    expect(renders.job_id).toBe(assigned.job_id);
     const submitted = (await db.query<{ result: any }>(
       `select mcp_submit_asset('bot_production','req-sub','exec-sub','${CLIENT_A}','clients/out.png','image','${BRIEF_A}',null,'Cut') as result`,
     )).rows[0]!.result;
