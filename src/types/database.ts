@@ -3759,40 +3759,85 @@ export type Database = {
       team_members: {
         Row: {
           active: boolean
+          address_city: string | null
+          address_country: string | null
+          address_line1: string | null
+          address_line2: string | null
+          address_postal_code: string | null
+          address_region: string | null
           category: Database["public"]["Enums"]["team_category"]
+          company_name: string | null
           contact_info: string | null
           created_at: string
+          email: string | null
           engagement: Database["public"]["Enums"]["engagement_type"]
+          family_name: string | null
+          given_name: string | null
           id: string
           initials: string
+          legal_name: string | null
           name: string
           personal_info: string | null
+          phone: string | null
+          preferred_name: string | null
+          profile_notes: string | null
+          tax_id: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
           active?: boolean
+          address_city?: string | null
+          address_country?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
+          address_postal_code?: string | null
+          address_region?: string | null
           category: Database["public"]["Enums"]["team_category"]
+          company_name?: string | null
           contact_info?: string | null
           created_at?: string
+          email?: string | null
           engagement?: Database["public"]["Enums"]["engagement_type"]
+          family_name?: string | null
+          given_name?: string | null
           id?: string
           initials: string
+          legal_name?: string | null
           name: string
           personal_info?: string | null
+          phone?: string | null
+          preferred_name?: string | null
+          profile_notes?: string | null
+          tax_id?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
           active?: boolean
+          address_city?: string | null
+          address_country?: string | null
+          address_line1?: string | null
+          address_line2?: string | null
+          address_postal_code?: string | null
+          address_region?: string | null
           category?: Database["public"]["Enums"]["team_category"]
+          company_name?: string | null
           contact_info?: string | null
           created_at?: string
+          email?: string | null
           engagement?: Database["public"]["Enums"]["engagement_type"]
+          family_name?: string | null
+          given_name?: string | null
           id?: string
           initials?: string
+          legal_name?: string | null
           name?: string
           personal_info?: string | null
+          phone?: string | null
+          preferred_name?: string | null
+          profile_notes?: string | null
+          tax_id?: string | null
           updated_at?: string
           user_id?: string | null
         }

@@ -5,13 +5,16 @@ export type Option = { value: string; label: string };
 export type FieldDef = {
   name: string;
   label: string;
-  kind: "text" | "textarea" | "number" | "date" | "select" | "toggle" | "file" | "password";
+  kind: "text" | "textarea" | "number" | "date" | "select" | "toggle" | "file" | "password" | "heading";
   required?: boolean;
   placeholder?: string;
   hint?: string;
   rows?: number;
   accept?: string;
   options?: Option[];
+  autoComplete?: string;
+  /** Native input type for kind "text" — email/tel bring up the right keyboard. */
+  inputType?: "text" | "email" | "tel";
   /** Render only when another field currently holds one of these values. */
   showIf?: { field: string; equals: string[] };
   /** Recomputed from another field until the user edits this one directly. */
@@ -43,6 +46,15 @@ export function FieldControl({
 
   function handle(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     onChange(e.target.value);
+  }
+
+  if (field.kind === "heading") {
+    return (
+      <div className="space-y-1 pt-2 first:pt-0">
+        <h3 className="text-sm font-semibold text-foreground">{field.label}</h3>
+        {field.hint && <p className="text-xs text-muted-foreground">{field.hint}</p>}
+      </div>
+    );
   }
 
   return (
@@ -103,12 +115,14 @@ export function FieldControl({
                 ? "date"
                 : field.kind === "password"
                   ? "password"
-                  : "text"
+                  : (field.inputType ?? "text")
           }
           value={text}
           onChange={handle}
           placeholder={field.placeholder}
-          autoComplete={field.kind === "password" ? "new-password" : "off"}
+          autoComplete={
+            field.autoComplete ?? (field.kind === "password" ? "new-password" : "off")
+          }
           className={inputClass}
         />
       )}

@@ -41,6 +41,7 @@ function clearDraft(key: string | undefined) {
 function blankValues(fields: FieldDef[], initial?: FormValues): FormValues {
   const out: FormValues = {};
   for (const f of fields) {
+    if (f.kind === "heading") continue;
     const seed = initial?.[f.name];
     if (seed !== undefined && seed !== null) out[f.name] = seed;
     else out[f.name] = f.kind === "toggle" ? false : f.kind === "file" ? null : "";
@@ -130,7 +131,7 @@ export function FormModal({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const missing = visible.filter((f) => {
-      if (!f.required) return false;
+      if (!f.required || f.kind === "heading") return false;
       const v = values[f.name];
       if (f.kind === "file") return !(v instanceof File);
       if (f.kind === "toggle") return false;
