@@ -4,7 +4,8 @@ import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
-import { FormModal } from "../../components/forms/FormModal";
+import { FormModal, clearDraft } from "../../components/forms/FormModal";
+import { GenerateBriefDialog, type GeneratedBrief } from "../../components/forms/GenerateBriefDialog";
 import type { FieldDef } from "../../components/forms/fields";
 import { MediaCard, StatusBadge } from "../../components/MediaCard";
 import { cn } from "../../lib/cn";
@@ -12,7 +13,6 @@ import { REVIEW_TONE, signPaths, type MediaAsset } from "../../lib/media";
 import {
   RECRUITMENT_ROLES,
   RECRUITMENT_ROLE_LABEL,
-  RECRUITMENT_TEMPLATES,
   buildRecruitmentCopyPack,
   downloadRecruitmentCopyPack,
   type RecruitmentRole,
@@ -45,7 +45,6 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 function briefFields(role: RecruitmentRole): FieldDef[] {
-  const t = RECRUITMENT_TEMPLATES[role];
   return [
     {
       name: "heading",
@@ -53,10 +52,10 @@ function briefFields(role: RecruitmentRole): FieldDef[] {
       kind: "heading",
       hint: "Headline, primary text and CTA become the ad copy. Apply is a URL only — there is no in-app apply flow.",
     },
-    { name: "title", label: "Title", kind: "text", required: true, placeholder: t.title },
-    { name: "hook", label: "Headline", kind: "text", required: true, placeholder: t.hook },
-    { name: "script", label: "Primary text", kind: "textarea", required: true, rows: 4, placeholder: t.script },
-    { name: "call_to_action", label: "Call to action", kind: "text", required: true, placeholder: t.call_to_action },
+    { name: "title", label: "Title", kind: "text", required: true, placeholder: "Internal title for this brief" },
+    { name: "hook", label: "Headline", kind: "text", required: true, placeholder: "The largest words on the ad" },
+    { name: "script", label: "Primary text", kind: "textarea", required: true, rows: 4, placeholder: "What the role actually involves" },
+    { name: "call_to_action", label: "Call to action", kind: "text", required: true, placeholder: "Apply now" },
     {
       name: "apply_url",
       label: "Apply URL",
@@ -64,22 +63,23 @@ function briefFields(role: RecruitmentRole): FieldDef[] {
       required: true,
       inputType: "text",
       placeholder: "https://",
-      hint: "Candidates leave the ad through this link.",
+      hint: "Candidates leave the ad through this link. Never generated — you fill this in.",
     },
     {
       name: "compensation_text",
       label: "Compensation on the ad",
       kind: "text",
       placeholder: "Optional — e.g. a day rate",
+      hint: "Never generated: this is money AA is promising to pay.",
     },
     {
       name: "visual_direction",
       label: "Visual direction",
       kind: "textarea",
       rows: 3,
-      placeholder: t.visual_direction,
+      placeholder: "What the still should show",
     },
-    { name: "premise", label: "Premise", kind: "textarea", rows: 2, placeholder: t.premise },
+    { name: "premise", label: "Premise", kind: "textarea", rows: 2, placeholder: "Who this ad is trying to attract, and why" },
   ];
 }
 
@@ -98,6 +98,10 @@ export function RecruitmentPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [pickingRole, setPickingRole] = useState(false);
   const [draftRole, setDraftRole] = useState<RecruitmentRole | null>(null);
+  const [generating, setGenerating] = useState(false);
+  // The generated brief, and a nonce so re-generating re-seeds a form that is
+  // already open — FormModal only reseeds when initialValues changes identity.
+  const [aiDraft, setAiDraft] = useState<GeneratedBrief | null>(null);
   const [rejecting, setRejecting] = useState<MediaAsset | null>(null);
   const [reason, setReason] = useState("");
 
@@ -481,23 +485,28 @@ export function RecruitmentPanel() {
 
       <FormModal
         open={draftRole !== null}
-        onClose={() => setDraftRole(null)}
+        onClose={() => {
+          setDraftRole(null);
+          setAiDraft(null);
+        }}
         title={draftRole ? `Brief · ${RECRUITMENT_ROLE_LABEL[draftRole]}` : "Brief"}
         fields={draftRole ? briefFields(draftRole) : []}
         submitLabel="Save draft"
         draftKey={draftRole ? `recruitment-brief:${draftRole}` : undefined}
+        actions={
+          draftRole ? (
+            <button
+              type="button"
+              onClick={() => setGenerating(true)}
+              className="rounded-md border border-border px-3 py-2 text-sm font-medium text-card-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Generate with AI
+            </button>
+          ) : undefined
+        }
         initialValues={
-          draftRole
-            ? {
-                title: RECRUITMENT_TEMPLATES[draftRole].title,
-                hook: RECRUITMENT_TEMPLATES[draftRole].hook,
-                script: RECRUITMENT_TEMPLATES[draftRole].script,
-                call_to_action: RECRUITMENT_TEMPLATES[draftRole].call_to_action,
-                visual_direction: RECRUITMENT_TEMPLATES[draftRole].visual_direction,
-                premise: RECRUITMENT_TEMPLATES[draftRole].premise,
-                apply_url: "",
-                compensation_text: "",
-              }
+          aiDraft
+            ? { ...aiDraft, apply_url: "", compensation_text: "" }
             : undefined
         }
         onSubmit={async (v) => {
@@ -516,10 +525,26 @@ export function RecruitmentPanel() {
           if (rpcError) throw new Error(rpcError.message);
         }}
         onSaved={() => {
+          setAiDraft(null);
           setNotice("Draft saved. Approve it when the brief is right.");
           void refresh();
         }}
       />
+
+      {draftRole && (
+        <GenerateBriefDialog
+          open={generating}
+          role={draftRole}
+          roleLabel={RECRUITMENT_ROLE_LABEL[draftRole]}
+          onClose={() => setGenerating(false)}
+          onGenerated={(draft) => {
+            // A saved draft wins over initialValues inside FormModal, so a
+            // half-typed form would silently swallow what was just generated.
+            clearDraft(`recruitment-brief:${draftRole}`);
+            setAiDraft(draft);
+          }}
+        />
+      )}
 
       {rejecting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

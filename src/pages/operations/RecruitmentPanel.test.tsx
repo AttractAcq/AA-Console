@@ -2,13 +2,15 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, download } = vi.hoisted(() => ({
+const { from, rpc, download, callRuntime } = vi.hoisted(() => ({
   from: vi.fn(),
   rpc: vi.fn(),
   download: vi.fn(),
+  callRuntime: vi.fn(),
 }));
 
 vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
+vi.mock("../../lib/callRuntime", () => ({ callRuntime }));
 vi.mock("../../lib/useAgentJobs", () => ({ useAgentJobs: () => ({ inFlight: [], recentFailures: [] }) }));
 vi.mock("../../lib/media", async (original) => {
   const actual = await original<typeof import("../../lib/media")>();
@@ -108,25 +110,105 @@ describe("RecruitmentPanel — role pick and brief", () => {
     expect(screen.queryByRole("button", { name: /producer/i })).not.toBeInTheDocument();
   });
 
-  it("loads the editor template and creates a recruitment brief", async () => {
+  it("opens a blank form and creates a brief from what was typed", async () => {
+    // The form used to arrive pre-filled with one of three canned briefs. It
+    // now starts empty, so typing your own ad is the ordinary path.
     const user = userEvent.setup();
     render(<RecruitmentPanel />);
     await user.click(await screen.findByRole("button", { name: "New recruitment ad" }));
     await user.click(screen.getByRole("button", { name: "Editor" }));
-    expect(screen.getByDisplayValue("Editor — Attract Acquisition")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Cut the work that actually ships")).toBeInTheDocument();
+
+    expect(screen.queryByDisplayValue("Editor — Attract Acquisition")).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Cut the work that actually ships")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/^Title/), "Editor — vertical cutdowns");
+    await user.type(screen.getByLabelText(/^Headline/), "Cut the work that ships");
+    await user.type(screen.getByLabelText(/Primary text/), "You take an approved brief and finish it.");
+    await user.type(screen.getByLabelText(/Call to action/), "Apply now");
     await user.type(screen.getByLabelText(/Apply URL/), "https://attractacq.com/careers/editor");
     await user.click(screen.getByRole("button", { name: "Save draft" }));
+
     await waitFor(() =>
       expect(rpc).toHaveBeenCalledWith(
         "create_recruitment_brief",
         expect.objectContaining({
           p_role: "editor",
-          p_title: "Editor — Attract Acquisition",
+          p_title: "Editor — vertical cutdowns",
           p_apply_url: "https://attractacq.com/careers/editor",
         }),
       ),
     );
+  });
+});
+
+describe("RecruitmentPanel — writing the ad with AI", () => {
+  const GENERATED = {
+    title: "Editor — vertical cutdowns for dental practices",
+    hook: "Cut the work that actually ships",
+    script: "You take an approved brief and turn it into a still that looks like the practice.",
+    call_to_action: "Apply now",
+    visual_direction: "A quiet editing desk, documentary light, a real timeline on screen.",
+    premise: "We hire editors who finish assets.",
+  };
+
+  async function openGenerator() {
+    const user = userEvent.setup();
+    render(<RecruitmentPanel />);
+    await user.click(await screen.findByRole("button", { name: "New recruitment ad" }));
+    await user.click(screen.getByRole("button", { name: "Editor" }));
+    await user.click(screen.getByRole("button", { name: "Generate with AI" }));
+    return user;
+  }
+
+  it("sends the role and the operator's notes, and fills the form", async () => {
+    callRuntime.mockResolvedValue({ draft: GENERATED });
+    const user = await openGenerator();
+
+    await user.type(screen.getByLabelText(/About this role/), "Must cut vertical. Durban hours.");
+    await user.click(screen.getByRole("button", { name: "Generate" }));
+
+    await waitFor(() =>
+      expect(callRuntime).toHaveBeenCalledWith("/admin/recruitment/draft", {
+        role: "editor",
+        notes: "Must cut vertical. Durban hours.",
+      }),
+    );
+    expect(await screen.findByDisplayValue(GENERATED.title)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(GENERATED.hook)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(GENERATED.script)).toBeInTheDocument();
+  });
+
+  it("leaves the apply URL and compensation empty for a person to fill in", async () => {
+    // A generated apply link sends a real applicant somewhere invented, and a
+    // generated rate is money AA did not agree to pay.
+    callRuntime.mockResolvedValue({
+      draft: { ...GENERATED, apply_url: "https://invented.example/apply", compensation_text: "R900/day" },
+    });
+    const user = await openGenerator();
+    await user.type(screen.getByLabelText(/About this role/), "Durban hours.");
+    await user.click(screen.getByRole("button", { name: "Generate" }));
+
+    await screen.findByDisplayValue(GENERATED.title);
+    expect(screen.getByLabelText(/Apply URL/)).toHaveValue("");
+    expect(screen.getByLabelText(/Compensation/)).toHaveValue("");
+    expect(screen.queryByDisplayValue("R900/day")).not.toBeInTheDocument();
+  });
+
+  it("will not generate from an empty box", async () => {
+    const user = await openGenerator();
+    expect(screen.getByRole("button", { name: "Generate" })).toBeDisabled();
+    await user.type(screen.getByLabelText(/About this role/), "x");
+    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+  });
+
+  it("shows the runtime's refusal and keeps the dialog open to try again", async () => {
+    callRuntime.mockRejectedValue(new Error("The primary text is too thin to be an ad."));
+    const user = await openGenerator();
+    await user.type(screen.getByLabelText(/About this role/), "Durban hours.");
+    await user.click(screen.getByRole("button", { name: "Generate" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/too thin to be an ad/);
+    expect(screen.getByLabelText(/About this role/)).toBeInTheDocument();
   });
 });
 

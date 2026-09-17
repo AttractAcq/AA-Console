@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { Modal } from "../Modal";
 import { FieldControl, isVisible, titleFromFile } from "./fields";
 import type { FieldDef, FormValues } from "./fields";
@@ -29,7 +29,7 @@ function writeDraft(key: string | undefined, values: FormValues) {
   }
 }
 
-function clearDraft(key: string | undefined) {
+export function clearDraft(key: string | undefined) {
   if (!key) return;
   try {
     localStorage.removeItem(DRAFT_PREFIX + key);
@@ -61,6 +61,7 @@ export function FormModal({
   fields,
   submitLabel = "Save",
   intro,
+  actions,
   initialValues,
   draftKey,
   onSubmit,
@@ -72,6 +73,8 @@ export function FormModal({
   fields: FieldDef[];
   submitLabel?: string;
   intro?: string;
+  /** Extra controls in the footer, beside Cancel — e.g. "Generate with AI". */
+  actions?: ReactNode;
   /** Seed values for an edit/upsert form. */
   initialValues?: FormValues;
   /**
@@ -176,7 +179,9 @@ export function FormModal({
           </p>
         )}
 
-        <div className="flex justify-end gap-2 pt-1">
+        <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+          {/* Left of Cancel, because it acts on the form rather than closing it. */}
+          {actions && <div className="mr-auto">{actions}</div>}
           <button
             type="button"
             onClick={onClose}

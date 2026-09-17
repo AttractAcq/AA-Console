@@ -23,59 +23,10 @@ export function isRecruitmentRole(value: string | null | undefined): value is Re
   return value === "editor" || value === "smm" || value === "avatar";
 }
 
-export type RecruitmentBriefTemplate = {
-  role: RecruitmentRole;
-  title: string;
-  hook: string;
-  premise: string;
-  script: string;
-  call_to_action: string;
-  visual_direction: string;
-  channel_intent: typeof RECRUITMENT_CHANNEL;
-};
-
-/**
- * Role-aware subset of the structured brief: headline, primary text, CTA,
- * visual direction. No video fields, no LinkedIn pack.
- */
-export const RECRUITMENT_TEMPLATES: Record<RecruitmentRole, RecruitmentBriefTemplate> = {
-  editor: {
-    role: "editor",
-    title: "Editor — Attract Acquisition",
-    hook: "Cut the work that actually ships",
-    premise: "We hire editors who finish on-brand assets, not decorate a brief.",
-    script:
-      "Attract Acquisition is hiring an editor. You take an approved brief and turn it into a still that looks like the client — dental and healthcare, tight turnaround, no stock-photo filler.",
-    call_to_action: "Apply now",
-    visual_direction:
-      "Quiet studio desk, documentary light, real tools in frame. Attract Acquisition palette. No handshake stock, no floating laptops.",
-    channel_intent: RECRUITMENT_CHANNEL,
-  },
-  smm: {
-    role: "smm",
-    title: "Social Media Manager — Attract Acquisition",
-    hook: "Run the feed like an operator, not a poster",
-    premise: "SMM here means owning the calendar, the voice, and the next asset — not collecting likes.",
-    script:
-      "Attract Acquisition is hiring a social media manager. You run organic and paid stills for healthcare clients: briefs, approvals, captions, and the Meta static that has to look like the practice.",
-    call_to_action: "Apply now",
-    visual_direction:
-      "Phone in a calm hand, a real practice feed on screen, natural window light. Attract Acquisition palette. No influencer posing, no sparkle overlays.",
-    channel_intent: RECRUITMENT_CHANNEL,
-  },
-  avatar: {
-    role: "avatar",
-    title: "Avatar — Attract Acquisition",
-    hook: "On camera for practices that would rather not be",
-    premise: "Avatars here are the face of the work — on-brief, on-brand, no ad-libbed clinical claims.",
-    script:
-      "Attract Acquisition is hiring an avatar. You appear in stills for dental and healthcare clients: the face in frame, the line on the brief, nothing invented about the medicine.",
-    call_to_action: "Apply now",
-    visual_direction:
-      "One person, mid-conversation, natural window light from camera left. Attract Acquisition palette. No hard-hat hero shot, no stock smile.",
-    channel_intent: RECRUITMENT_CHANNEL,
-  },
-};
+// The three canned briefs that used to pre-fill this form are gone. They made
+// every editor ad AA ran open with the same sentence, and they sat exactly
+// where the operator's real knowledge of the opening needed to go. Briefs are
+// now written per opening by /admin/recruitment/draft, or typed by hand.
 
 export type RecruitmentCopyPack = {
   purpose: typeof RECRUITMENT_PURPOSE;
