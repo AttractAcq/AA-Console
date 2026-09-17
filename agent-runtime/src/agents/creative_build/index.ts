@@ -68,7 +68,7 @@ const IMAGE_CONCEPT_TOOL = {
       avoid: { type: "string", description: "What must not appear: cliches for this sector, anything off-brand, anything unprovable." },
       rationale: { type: "string", description: "Why this concept serves the brief. For the operator, not the renderer." },
     },
-    required: ["headline", "subhead", "call_to_action", "subject", "composition", "art_direction", "avoid", "rationale"],
+    required: ["headline", "subhead", "call_to_action", "subject", "background", "visual_treatment", "composition", "art_direction", "avoid", "rationale"],
     additionalProperties: false,
   },
 };
