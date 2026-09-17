@@ -2,8 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const { from } = vi.hoisted(() => ({ from: vi.fn() }));
-vi.mock("../lib/supabase", () => ({ supabase: { from } }));
+const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
+vi.mock("../lib/supabase", () => ({ supabase: { from, rpc } }));
 vi.mock("react-router-dom", async (original) => ({
   ...await original<typeof import("react-router-dom")>(),
   useParams: () => ({ clientId: "client-1", category: "production" }),
@@ -27,6 +27,7 @@ import { MediaLibrary } from "../components/MediaLibrary";
 import { ProofBankPanel } from "./proof-bank/ProofBankPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { TeamCategoryPanel } from "./operations/TeamCategoryPanel";
+import { RecruitmentPanel } from "./operations/RecruitmentPanel";
 import { ActiveOrganicView, ActiveConversionView } from "./client/ClientViews";
 import { BusinessContextPanel } from "./intelligence/BusinessContextPanel";
 import { OnboardingPanel } from "./account/OnboardingPanel";
@@ -36,17 +37,21 @@ import { BrandPanel } from "./account/BrandPanel";
 const OrganicDistribution = () => <DistributionBoard channel="organic" />;
 const ImageLibrary = () => <MediaLibrary mediaType="image" />;
 const EditorsTeam = () => <TeamCategoryPanel category="editors" />;
+const Recruitment = () => <RecruitmentPanel />;
 const ActiveOrganic = () => <ActiveOrganicView clientId="client-1" />;
 const ActiveConversion = () => <ActiveConversionView clientId="client-1" />;
 
 beforeEach(() => vi.clearAllMocks());
-const panels = [OrganicDistribution, ImageLibrary, ProofBankPanel, ApprovalsPanel, EditorsTeam, ClientsPage, PageBuilderPanel, GenerationPanel, BriefsPanel, AgentsPanel, CalendarPanel, SopsPanel, CommentaryPanel, ContractsLegalPanel, AuditLogPanel, ActiveOrganic, ActiveConversion, BusinessContextPanel, OnboardingPanel, IntegrationsPanel, BillingSubscriptionPanel, BrandPanel];
+const panels = [OrganicDistribution, ImageLibrary, ProofBankPanel, ApprovalsPanel, EditorsTeam, Recruitment, ClientsPage, PageBuilderPanel, GenerationPanel, BriefsPanel, AgentsPanel, CalendarPanel, SopsPanel, CommentaryPanel, ContractsLegalPanel, AuditLogPanel, ActiveOrganic, ActiveConversion, BusinessContextPanel, OnboardingPanel, IntegrationsPanel, BillingSubscriptionPanel, BrandPanel];
 for (const Component of panels) {
   it(`${Component.name} surfaces database errors and recovers on retry`, async () => {
     let fail = true;
+    rpc.mockImplementation(() =>
+      Promise.resolve(fail ? { data: null, error: { message: "column missing in schema cache" } } : { data: "house-1", error: null }),
+    );
     from.mockImplementation(() => {
       const chain: Record<string, unknown> = {};
-      for (const method of ["select", "eq", "order", "limit", "maybeSingle"]) chain[method] = () => chain;
+      for (const method of ["select", "eq", "neq", "in", "order", "limit", "maybeSingle"]) chain[method] = () => chain;
       chain.then = (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
         Promise.resolve(fail ? { data: null, error: { message: "column missing in schema cache" } } : { data: [], error: null }).then(resolve, reject);
       return chain;

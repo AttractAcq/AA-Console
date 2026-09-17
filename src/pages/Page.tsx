@@ -45,6 +45,7 @@ import { ContractsLegalPanel } from "./account/ContractsLegalPanel";
 import { BillingSubscriptionPanel } from "./account/BillingSubscriptionPanel";
 import { AuditLogPanel } from "./account/AuditLogPanel";
 import { TeamCategoryPanel } from "./operations/TeamCategoryPanel";
+import { RecruitmentPanel } from "./operations/RecruitmentPanel";
 import { CampaignsPanel } from "./operations/CampaignsPanel";
 import { CalendarPanel } from "./operations/CalendarPanel";
 import { ChatPanel } from "./team/ChatPanel";
@@ -64,6 +65,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   team: {
     chat: () => <ChatPanel />,
     agents: () => <AgentsPanel />,
+    recruitment: () => <RecruitmentPanel />,
     avatars: () => <TeamCategoryPanel category="avatars" />,
     editors: () => <TeamCategoryPanel category="editors" />,
     smm: () => <TeamCategoryPanel category="smm" />,
