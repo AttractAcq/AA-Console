@@ -26,6 +26,7 @@ import { OpenAiError, runStructuredCompletion } from "../../tools/openai.js";
 import { estimateCostUsd } from "../../usage/cost.js";
 import { renderContext, renderUpstream } from "../shared.js";
 import { loadConceptContext } from "./context.js";
+import { conceptProblem } from "./concept.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { placeLogo } from "./logo.js";
@@ -51,8 +52,18 @@ const IMAGE_CONCEPT_TOOL = {
       headline: { type: "string", description: "The largest words on the asset. Empty string if it carries no text." },
       subhead: { type: "string", description: "Supporting line, or an empty string." },
       call_to_action: { type: "string", description: "The action asked for, or an empty string." },
-      subject: { type: "string", description: "Who or what is literally in frame." },
-      composition: { type: "string", description: "Layout, crop, where the text sits, where the eye goes first." },
+      subject: { type: "string", description: "Who or what is literally in frame. A depicted subject — a person, a place, an object, a scene. Not a document, a card or a block of type." },
+      background: {
+        type: "string",
+        description:
+          "What fills the frame behind and around any text: the setting, scene or texture. Describe a real place or environment drawn from the ICP, the location or the topic. A flat colour, a gradient or blank paper is not a background.",
+      },
+      visual_treatment: {
+        type: "string",
+        enum: ["photographic", "illustrated", "rendered_3d", "textured_graphic"],
+        description: "How the imagery is made. There is deliberately no typography-only option: a post with no imagery is a text post, not an image post.",
+      },
+      composition: { type: "string", description: "Layout, crop, where the text sits over the imagery, where the eye goes first." },
       art_direction: { type: "string", description: "Palette, lighting, mood, texture, photographic or graphic treatment." },
       avoid: { type: "string", description: "What must not appear: cliches for this sector, anything off-brand, anything unprovable." },
       rationale: { type: "string", description: "Why this concept serves the brief. For the operator, not the renderer." },
@@ -85,8 +96,16 @@ You are given an approved brief and the client's own intelligence. You decide wh
 WHAT YOU ARE DOING
 A brief states what the business needs. A renderer needs to be told what to make. Your job is that translation, and it is the whole reason this step exists — an image model handed a business brief produces a stock photo of the industry, because that is all it was given.
 
+THIS IS AN IMAGE, SO IT MUST CONTAIN AN IMAGE
+The frame has to show something: a person, a place, an object, a scene — photographed, illustrated or rendered. Text sits ON that imagery, it does not replace it.
+
+A typeset document, a quote card, a page of terms, a headline on a flat brand colour: those are text posts. They go out through the text route, which exists for exactly that. If you produce one here the asset is wrong no matter how well it is set, because what was asked for was a picture.
+
+Draw the imagery from something real in the material you were given — where the buyer is, what their problem physically looks like, the place the work happens, the object at the centre of it. The ICP and the location are the two richest sources and are usually ignored.
+
 RULES
 - Be specific and literal about what is in frame. "Professional imagery" is not a concept. "A dentist in her forties, mid-conversation with a patient, natural window light from camera left" is.
+- The rules below are about what you must not INVENT. They are not a reason to show nothing: an empty frame is not the safe answer, it is the wrong deliverable.
 - Only reference proof or claims that appear in what you were given. Never invent a statistic, a testimonial, or a credential — this asset goes in front of the public.
 - Respect the brand voice. If it says never to say something, never say it.
 - Say what to avoid, including the visual cliche this sector is drowning in.
@@ -144,6 +163,12 @@ function composePrompt(
     ``,
     `SUBJECT`,
     s("subject"),
+    ``,
+    `BACKGROUND — THE FRAME MUST NOT BE EMPTY`,
+    s("background"),
+    ``,
+    `TREATMENT`,
+    s("visual_treatment").replace(/_/g, " "),
     ``,
     `COMPOSITION`,
     s("composition"),
@@ -429,6 +454,16 @@ Call ${submitTool.name} once when you are done.`;
       return { ok: false, retryable: error.retryable, failureMessage: error.message };
     }
     throw error;
+  }
+
+  // Checked before anything is rendered or stored: a text card costs the same
+  // to make as a picture and is discovered much later, in the approval queue.
+  if (isImage) {
+    const problem = conceptProblem(concept);
+    if (problem) {
+      await fail(problem);
+      return { ok: false, retryable: true, failureMessage: problem, usage };
+    }
   }
 
   await sb
