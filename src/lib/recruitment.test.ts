@@ -3,11 +3,11 @@ import {
   RECRUITMENT_ROLES,
   RECRUITMENT_PURPOSE,
   RECRUITMENT_FORMAT,
-  RECRUITMENT_TEMPLATES,
   buildRecruitmentCopyPack,
   formatRecruitmentCopyPack,
   isRecruitmentRole,
 } from "./recruitment";
+import * as recruitment from "./recruitment";
 
 describe("recruitment roles", () => {
   it("locks P0 to editor, smm and avatar", () => {
@@ -17,15 +17,12 @@ describe("recruitment roles", () => {
     expect(isRecruitmentRole("editor")).toBe(true);
   });
 
-  it("has a Meta-static template for each role", () => {
-    for (const role of RECRUITMENT_ROLES) {
-      const t = RECRUITMENT_TEMPLATES[role];
-      expect(t.role).toBe(role);
-      expect(t.channel_intent).toBe("Meta static");
-      expect(t.hook.length).toBeGreaterThan(0);
-      expect(t.script.length).toBeGreaterThan(0);
-      expect(t.call_to_action.length).toBeGreaterThan(0);
-    }
+  it("no longer ships canned briefs to pre-fill the form", () => {
+    // Three hard-coded briefs meant every editor ad AA ran opened with the
+    // same sentence, and they occupied exactly the space the operator's own
+    // knowledge of the opening needed. Briefs are written per opening now.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((recruitment as any).RECRUITMENT_TEMPLATES).toBeUndefined();
   });
 });
 
