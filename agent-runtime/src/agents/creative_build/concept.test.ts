@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { unsupportedStrictKeywords, missingStrictRequired } from "../../tools/schema.js";
+import { IMAGE_CONCEPT_TOOL, TEXT_CONCEPT_TOOL } from "./index.js";
 import { conceptProblem, TREATMENTS } from "./concept.js";
 
 const good = (over: Record<string, unknown> = {}) => ({
@@ -95,5 +97,56 @@ describe("what the check does not do", () => {
   it("does not require text on the image", () => {
     // A picture with no words is a legitimate post; an empty frame is not.
     expect(conceptProblem(good({ headline: "", subhead: "", call_to_action: "" }))).toBeNull();
+  });
+});
+
+// OpenAI 400 after PR #51 on every image rebuild:
+//   Invalid schema for response_format 'submit_concept' ... Missing 'background'.
+// background and visual_treatment were added to properties; required was not.
+// Strict json_schema demands every property appear in required.
+describe("the submit_concept schema OpenAI actually receives", () => {
+  const schema = IMAGE_CONCEPT_TOOL.inputSchema;
+
+  it("is named submit_concept, which is the name in the production 400", () => {
+    expect(IMAGE_CONCEPT_TOOL.name).toBe("submit_concept");
+  });
+
+  it("uses only what a strict schema may contain", () => {
+    expect(unsupportedStrictKeywords(schema)).toEqual([]);
+    expect(missingStrictRequired(schema)).toEqual([]);
+  });
+
+  it("requires every property it offers, including background and visual_treatment", () => {
+    const props = Object.keys(schema.properties);
+    for (const name of props) expect(schema.required).toContain(name);
+    expect(schema.required).toContain("background");
+    expect(schema.required).toContain("visual_treatment");
+  });
+
+  it("still asks for a real background and a non-typography treatment", () => {
+    // The fix must not have been to delete the fields PR #51 added.
+    const props = schema.properties as Record<string, Record<string, unknown>>;
+    expect(props.background?.type).toBe("string");
+    expect(props.visual_treatment?.enum).toEqual([...TREATMENTS]);
+    expect(props.visual_treatment?.enum).not.toContain("typographic");
+    expect(props.visual_treatment?.enum).not.toContain("typography");
+  });
+
+  it("refuses fields it did not ask for", () => {
+    expect(schema.additionalProperties).toBe(false);
+  });
+});
+
+describe("the text route schema", () => {
+  it("is untouched — still submit_copy, still no imagery fields", () => {
+    expect(TEXT_CONCEPT_TOOL.name).toBe("submit_copy");
+    const schema = TEXT_CONCEPT_TOOL.inputSchema;
+    const props = Object.keys(schema.properties);
+    expect(props).not.toContain("background");
+    expect(props).not.toContain("visual_treatment");
+    expect(props).not.toContain("subject");
+    expect(schema.required).toEqual(["headline", "body", "call_to_action", "rationale"]);
+    expect(unsupportedStrictKeywords(schema)).toEqual([]);
+    expect(missingStrictRequired(schema)).toEqual([]);
   });
 });

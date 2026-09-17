@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { unsupportedStrictKeywords, UNSUPPORTED_STRICT_KEYWORDS } from "./schema.js";
+import {
+  unsupportedStrictKeywords,
+  missingStrictRequired,
+  UNSUPPORTED_STRICT_KEYWORDS,
+} from "./schema.js";
 
 describe("unsupportedStrictKeywords", () => {
   it("passes a schema built from the supported subset", () => {
@@ -100,5 +104,67 @@ describe("unsupportedStrictKeywords", () => {
       const found = unsupportedStrictKeywords({ type: "object", [keyword]: 1 });
       expect(found, `${keyword} should be reported`).toEqual([keyword]);
     }
+  });
+});
+
+// OpenAI 400 after PR #51: Invalid schema for response_format 'submit_concept'
+// ... Missing 'background'. The properties were added; required was not.
+describe("missingStrictRequired", () => {
+  it("passes when every property is required", () => {
+    expect(
+      missingStrictRequired({
+        type: "object",
+        properties: { subject: { type: "string" }, background: { type: "string" } },
+        required: ["subject", "background"],
+        additionalProperties: false,
+      }),
+    ).toEqual([]);
+  });
+
+  it("names the keys PR #51 left off required", () => {
+    expect(
+      missingStrictRequired({
+        type: "object",
+        properties: {
+          headline: { type: "string" },
+          subject: { type: "string" },
+          background: { type: "string" },
+          visual_treatment: { type: "string" },
+        },
+        required: ["headline", "subject"],
+        additionalProperties: false,
+      }),
+    ).toEqual(["background", "visual_treatment"]);
+  });
+
+  it("reaches keys buried inside array items", () => {
+    expect(
+      missingStrictRequired({
+        type: "object",
+        properties: {
+          ideas: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { title: { type: "string" }, body: { type: "string" } },
+              required: ["title"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["ideas"],
+        additionalProperties: false,
+      }),
+    ).toEqual(["properties.ideas.items.body"]);
+  });
+
+  it("treats a missing required array as every property missing", () => {
+    expect(
+      missingStrictRequired({
+        type: "object",
+        properties: { background: { type: "string" } },
+        additionalProperties: false,
+      }),
+    ).toEqual(["background"]);
   });
 });

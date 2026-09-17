@@ -70,3 +70,42 @@ export function unsupportedStrictKeywords(schema: unknown, path = ""): string[] 
   }
   return found;
 }
+
+/**
+ * Properties declared on an object but omitted from `required`.
+ *
+ * OpenAI `strict: true` json_schema refuses that shape outright:
+ *
+ *   Invalid schema for response_format 'submit_concept' ... Missing 'background'.
+ *
+ * PR #51 added `background` and `visual_treatment` to properties and left
+ * `required` as it was. Every image concept then 400'd before a token was
+ * spent. Anthropic is looser about optional keys; OpenAI is not — every key
+ * in `properties` must also appear in `required`.
+ */
+export function missingStrictRequired(schema: unknown, path = ""): string[] {
+  if (Array.isArray(schema)) {
+    return schema.flatMap((item, i) => missingStrictRequired(item, `${path}[${i}]`));
+  }
+  if (!schema || typeof schema !== "object") return [];
+
+  const obj = schema as Record<string, unknown>;
+  const found: string[] = [];
+  const properties = obj.properties;
+  if (properties && typeof properties === "object" && !Array.isArray(properties)) {
+    const required = Array.isArray(obj.required)
+      ? new Set(obj.required.filter((key): key is string => typeof key === "string"))
+      : new Set<string>();
+    for (const key of Object.keys(properties as Record<string, unknown>)) {
+      if (!required.has(key)) {
+        found.push(path ? `${path}.${key}` : key);
+      }
+    }
+  }
+
+  for (const [key, value] of Object.entries(obj)) {
+    const here = path ? `${path}.${key}` : key;
+    found.push(...missingStrictRequired(value, here));
+  }
+  return found;
+}

@@ -10,6 +10,7 @@
 
 import { logger } from "../logging/logger.js";
 import type { TokenUsage } from "../usage/cost.js";
+import { missingStrictRequired, unsupportedStrictKeywords } from "./schema.js";
 
 const ENDPOINT = "https://api.openai.com/v1/responses";
 const TIMEOUT_MS = 300_000;
@@ -60,6 +61,24 @@ export async function runStructuredCompletion(opts: {
   schema: Record<string, unknown>;
   reasoningEffort?: "low" | "medium" | "high";
 }): Promise<StructuredResult> {
+  // Checked before the request: OpenAI names a keyword or a missing required
+  // key, not the agent, and retrying sends the same schema. Failing here says
+  // which schema, which property, and what to do.
+  const unsupported = unsupportedStrictKeywords(opts.schema);
+  if (unsupported.length > 0) {
+    throw new OpenAiError(
+      `The ${opts.schemaName} schema uses ${unsupported.join(", ")}, which OpenAI rejects for strict structured output. Enforce the constraint in code after the model answers instead.`,
+      false,
+    );
+  }
+  const missing = missingStrictRequired(opts.schema);
+  if (missing.length > 0) {
+    throw new OpenAiError(
+      `Invalid schema for response_format '${opts.schemaName}': 'required' must include every key in properties. Missing '${missing.join("', '")}'.`,
+      false,
+    );
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
