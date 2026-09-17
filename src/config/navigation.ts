@@ -72,6 +72,7 @@ export const agencyNav: NavNode[] = [
     tabs: [
       { id: "chat", label: "Chat" },
       { id: "agents", label: "Agents" },
+      { id: "recruitment", label: "Recruitment" },
       { id: "avatars", label: "Avatars" },
       { id: "editors", label: "Editors" },
       { id: "smm", label: "SMM" },

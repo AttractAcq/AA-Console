@@ -948,6 +948,10 @@ export type Database = {
           production_method: string | null
           proof: string | null
           proof_asset_id: string | null
+          apply_url: string | null
+          compensation_text: string | null
+          purpose: Database["public"]["Enums"]["content_purpose"]
+          recruitment_role: Database["public"]["Enums"]["recruitment_role"] | null
           repurpose_format: string | null
           script: string | null
           shot_requirements: string | null
@@ -975,6 +979,10 @@ export type Database = {
           production_method?: string | null
           proof?: string | null
           proof_asset_id?: string | null
+          apply_url?: string | null
+          compensation_text?: string | null
+          purpose?: Database["public"]["Enums"]["content_purpose"]
+          recruitment_role?: Database["public"]["Enums"]["recruitment_role"] | null
           repurpose_format?: string | null
           script?: string | null
           shot_requirements?: string | null
@@ -1002,6 +1010,10 @@ export type Database = {
           production_method?: string | null
           proof?: string | null
           proof_asset_id?: string | null
+          apply_url?: string | null
+          compensation_text?: string | null
+          purpose?: Database["public"]["Enums"]["content_purpose"]
+          recruitment_role?: Database["public"]["Enums"]["recruitment_role"] | null
           repurpose_format?: string | null
           script?: string | null
           shot_requirements?: string | null
@@ -1758,6 +1770,7 @@ export type Database = {
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
           member_id: string | null
+          purpose: Database["public"]["Enums"]["content_purpose"]
           ref_number: string | null
           review_status: Database["public"]["Enums"]["review_status"]
           storage_path: string
@@ -1772,6 +1785,7 @@ export type Database = {
           id?: string
           media_type: Database["public"]["Enums"]["media_type"]
           member_id?: string | null
+          purpose?: Database["public"]["Enums"]["content_purpose"]
           ref_number?: string | null
           review_status?: Database["public"]["Enums"]["review_status"]
           storage_path: string
@@ -1786,6 +1800,7 @@ export type Database = {
           id?: string
           media_type?: Database["public"]["Enums"]["media_type"]
           member_id?: string | null
+          purpose?: Database["public"]["Enums"]["content_purpose"]
           ref_number?: string | null
           review_status?: Database["public"]["Enums"]["review_status"]
           storage_path?: string
@@ -4283,6 +4298,7 @@ export type Database = {
       }
     }
     Functions: {
+      aa_house_client_id: { Args: never; Returns: string }
       accessible_client_ids: { Args: never; Returns: string[] }
       acquisition_funnel: {
         Args: { p_client_id: string; p_days?: number }
@@ -4334,6 +4350,7 @@ export type Database = {
         Args: { p_idea_id: string }
         Returns: string
       }
+      approve_recruitment_brief: { Args: { p_brief_id: string }; Returns: undefined }
       build_brief_with_ai: {
         Args: {
           p_brief_id: string
@@ -4466,6 +4483,20 @@ export type Database = {
         }
         Returns: string
       }
+      create_recruitment_brief: {
+        Args: {
+          p_apply_url: string
+          p_call_to_action: string
+          p_compensation_text?: string
+          p_hook: string
+          p_premise?: string
+          p_role: Database["public"]["Enums"]["recruitment_role"]
+          p_script: string
+          p_title: string
+          p_visual_direction?: string
+        }
+        Returns: string
+      }
       current_member_id: { Args: never; Returns: string }
       current_role_of: {
         Args: never
@@ -4510,6 +4541,10 @@ export type Database = {
           p_params?: Json
         }
         Returns: string
+      }
+      generate_recruitment_ad: {
+        Args: { p_brief_id: string; p_quality?: string; p_size?: string }
+        Returns: Json
       }
       enqueue_mcp_brief: {
         Args: {
@@ -5145,6 +5180,7 @@ export type Database = {
         | "complete"
       build_route: "ai" | "human"
       campaign_status: "active" | "past"
+      content_purpose: "client" | "recruitment"
       creative_stage: "concept" | "render" | "done" | "failed"
       engagement_type: "employee" | "contractor"
       idea_source: "manual" | "auto" | "proof"
@@ -5186,6 +5222,7 @@ export type Database = {
         | "money_model"
         | "reporting"
       record_status: "draft" | "approved" | "superseded"
+      recruitment_role: "editor" | "smm" | "avatar"
       render_status: "queued" | "rendering" | "done" | "failed"
       review_status: "pending" | "approved" | "rejected"
       step_status: "pending" | "in_progress" | "complete"
@@ -5327,6 +5364,7 @@ export const Constants = {
       ],
       build_route: ["ai", "human"],
       campaign_status: ["active", "past"],
+      content_purpose: ["client", "recruitment"],
       creative_stage: ["concept", "render", "done", "failed"],
       engagement_type: ["employee", "contractor"],
       idea_source: ["manual", "auto", "proof"],
@@ -5371,6 +5409,7 @@ export const Constants = {
         "reporting",
       ],
       record_status: ["draft", "approved", "superseded"],
+      recruitment_role: ["editor", "smm", "avatar"],
       render_status: ["queued", "rendering", "done", "failed"],
       review_status: ["pending", "approved", "rejected"],
       step_status: ["pending", "in_progress", "complete"],

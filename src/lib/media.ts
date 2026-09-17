@@ -43,7 +43,13 @@ export const REVIEW_TONE: Record<MediaAsset["review_status"], string> = {
 
 export async function fetchClientAssets(
   clientId: string,
-  opts: { mediaType?: MediaAsset["media_type"]; reviewStatus?: MediaAsset["review_status"]; ascending?: boolean } = {},
+  opts: {
+    mediaType?: MediaAsset["media_type"];
+    reviewStatus?: MediaAsset["review_status"];
+    ascending?: boolean;
+    /** Default client so hiring ads never appear in campaign Media / Dist / Approvals. */
+    purpose?: "client" | "recruitment" | "all";
+  } = {},
 ): Promise<MediaAsset[]> {
   let query = supabase
     .from("client_media_assets")
@@ -52,6 +58,10 @@ export async function fetchClientAssets(
 
   if (opts.mediaType) query = query.eq("media_type", opts.mediaType);
   if (opts.reviewStatus) query = query.eq("review_status", opts.reviewStatus);
+  const purpose = opts.purpose ?? "client";
+  if (purpose !== "all") {
+    query = query.eq("purpose", purpose);
+  }
 
   const { data, error } = await query.order("created_at", { ascending: opts.ascending ?? false });
   if (error) throw error;
