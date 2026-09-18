@@ -26,7 +26,7 @@ import { OpenAiError, runStructuredCompletion } from "../../tools/openai.js";
 import { estimateCostUsd } from "../../usage/cost.js";
 import { renderContext, renderUpstream } from "../shared.js";
 import { loadConceptContext } from "./context.js";
-import { conceptProblem, TREATMENTS } from "./concept.js";
+import { conceptProblem, recruitmentConceptProblem, TREATMENTS } from "./concept.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { placeLogo } from "./logo.js";
@@ -41,6 +41,9 @@ interface BriefRow {
   body: string | null;
   media_type: "image" | "text" | "video";
   brief_ref: string | null;
+  /** 'client' or 'recruitment'. A hiring ad is a different deliverable. */
+  purpose: string | null;
+  recruitment_role: string | null;
 }
 
 /**
@@ -221,6 +224,32 @@ function composePrompt(
   ].join("\n");
 }
 
+const RECRUITMENT_ROLE_LABEL: Record<string, string> = {
+  editor: "Editor",
+  smm: "Social Media Manager",
+  avatar: "Avatar — the face in front of camera",
+};
+
+/**
+ * What a hiring ad has to do that a client ad does not.
+ *
+ * The first three AA generated read as advertising for AA's services: good
+ * lines, aimed at the wrong reader, with nothing anywhere saying a job was
+ * open. The agent had never been told which kind of asset it was making.
+ */
+function recruitmentBlock(roleLabel: string): string {
+  return `THIS IS A JOB AD, NOT A CLIENT AD
+Attract Acquisition is hiring. The role is: ${roleLabel}.
+
+The reader is a person deciding whether to apply for a job, not a business deciding whether to buy. An ad that could be mistaken for AA selling its services has failed, however well written it is.
+
+So the words on the image must say, plainly and early, that a job is open and which one. "We're hiring an editor" is the shape of it. Put that in the headline or immediately under it — not in the small print, and not implied.
+
+Everything else still applies: no invented rate, no invented start date, no contact details. The apply route is a button, not words on the image.
+
+`;
+}
+
 export async function runCreativeBuildJob(
   sb: SupabaseClient,
   config: RuntimeConfig,
@@ -270,7 +299,7 @@ export async function runCreativeBuildJob(
 
   const { data: brief, error: briefError } = await sb
     .from("client_briefs")
-    .select("id, client_id, title, body, media_type, brief_ref")
+    .select("id, client_id, title, body, media_type, brief_ref, purpose, recruitment_role")
     .eq("id", generation.brief_id)
     .maybeSingle();
   if (briefError) throw new Error(`Could not load the brief: ${briefError.message}`);
@@ -286,6 +315,10 @@ export async function runCreativeBuildJob(
   }
 
   const isImage = typed.media_type === "image";
+  // A recruitment brief used to arrive looking exactly like a client campaign
+  // brief, so the agent wrote a good ad for the wrong job.
+  const isRecruitment = typed.purpose === "recruitment";
+  const roleLabel = RECRUITMENT_ROLE_LABEL[String(typed.recruitment_role ?? "")] ?? "this role";
 
   // Check the renderer before writing a concept. An image build that cannot
   // render is worth failing for free rather than after paying for the
@@ -390,6 +423,7 @@ ${
     : ""
 }
 
+${isRecruitment ? recruitmentBlock(roleLabel) : ""}
 THE BRIEF
 ${typed.title}
 
@@ -480,6 +514,16 @@ Call ${submitTool.name} once when you are done.`;
   // to make as a picture and is discovered much later, in the approval queue.
   if (isImage) {
     const problem = conceptProblem(concept);
+    if (problem) {
+      await fail(problem);
+      return { ok: false, retryable: true, failureMessage: problem, usage };
+    }
+  }
+
+  // Checked for every recruitment asset, image or text: a hiring ad that does
+  // not say it is hiring is the wrong deliverable in any format.
+  if (isRecruitment) {
+    const problem = recruitmentConceptProblem(concept, String(typed.recruitment_role ?? ""));
     if (problem) {
       await fail(problem);
       return { ok: false, retryable: true, failureMessage: problem, usage };

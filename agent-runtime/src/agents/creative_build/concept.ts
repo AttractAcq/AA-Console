@@ -79,3 +79,62 @@ export function conceptProblem(concept: Record<string, unknown>): string | null 
 
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Recruitment: the ad has to say it is a job ad.
+//
+// The first three hiring ads AA generated read as advertising for AA's
+// services. "Six practices. Six voices. Not yours." is a good line and, on a
+// dental practice's feed, it sells social media management. Nothing on any of
+// them said the agency was hiring.
+//
+// The cause was upstream of the copy: creative_build selected title, body and
+// media_type from the brief and nothing else, so a recruitment brief arrived
+// looking exactly like a client campaign brief. The agent wrote a good ad for
+// the wrong job because it was never told which job it had.
+//
+// A hiring ad has one thing it cannot leave out, and this is the check for it.
+
+/** How each role may be named on the ad. Generous, because the words vary. */
+const ROLE_TERMS: Record<string, string[]> = {
+  editor: ["editor", "editing"],
+  smm: ["social media manager", "social media", "smm"],
+  avatar: ["avatar", "on camera", "on-camera", "face of"],
+};
+
+/** Plain statements that this is a job. "Apply" alone is not one — a CTA says that. */
+const HIRING_SIGNAL =
+  /\b(hiring|we'?re hiring|now hiring|recruiting|vacancy|vacancies|join the team|join our team|this role|the role|position)\b/i;
+
+/**
+ * Why this concept would not read as a hiring ad, or null.
+ *
+ * Checks the words that actually get set as type on the image — headline,
+ * subhead and call to action — because that is all a reader sees while
+ * scrolling. Reasoning in the rationale does not reach them.
+ */
+export function recruitmentConceptProblem(
+  concept: Record<string, unknown>,
+  role: string,
+): string | null {
+  const text = (key: string) => {
+    const raw = concept[key];
+    return typeof raw === "string" ? raw.trim() : "";
+  };
+  const rendered = [text("headline"), text("subhead"), text("call_to_action")]
+    .filter(Boolean)
+    .join(" ");
+
+  if (!rendered) return "The ad carries no text, so nothing on it says a job is open.";
+
+  if (!HIRING_SIGNAL.test(rendered)) {
+    return "Nothing on this ad says anybody is hiring. Put it in the headline or the subhead — a reader scrolling past must see that a job is open, not an agency advertising its services.";
+  }
+
+  const terms = ROLE_TERMS[role] ?? [];
+  if (terms.length > 0 && !terms.some((term) => rendered.toLowerCase().includes(term))) {
+    return `The ad never names the role. Say which job is open, in words an applicant would recognise (${terms.join(", ")}).`;
+  }
+
+  return null;
+}
