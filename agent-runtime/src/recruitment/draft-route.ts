@@ -38,29 +38,29 @@ const SUBMIT_TOOL = {
     properties: {
       title: {
         type: "string",
-        description: "Internal title for this brief, naming the role and what makes this opening specific. Under 200 characters.",
+        description: "A short internal label for this brief — the role and the one thing that makes this opening specific. A dozen words, not a restatement of the notes.",
       },
       hook: {
         type: "string",
-        description: "The headline — the largest words on the ad. One line, and it must be under 80 characters or the ad will not run.",
+        description: "The headline — the largest words on the ad. Meta truncates around 40 characters, so aim for under 40 and never exceed 80. Short is the whole job here.",
       },
       script: {
         type: "string",
         description:
-          "The primary text of the ad. What the role actually involves, who it suits, and what is true about working here. A short paragraph, under 900 characters.",
+          "The primary text of the ad. What the role actually involves, who it suits, and what is true about working here. Meta shows roughly the first 125 characters before 'See more', so lead with the sharpest thing. Aim for 400-600 characters and never exceed 900.",
       },
       call_to_action: {
         type: "string",
-        description: "The action asked for. A few words, and it must be under 30 characters.",
+        description: "The action asked for. Two or three words, under 30 characters.",
       },
       visual_direction: {
         type: "string",
         description:
-          "What the still should show: subject, setting, light, treatment. Specific enough to brief an image from, and never a stock cliche. This is an internal brief rather than ad copy, so detail is welcome — aim for a short paragraph and stay under 2000 characters.",
+          "What the still should show: subject, setting, light, treatment. Specific enough to brief an image from, and never a stock cliche. Two to four sentences — an image model needs a clear picture, not an exhaustive one.",
       },
       premise: {
         type: "string",
-        description: "The internal one-line framing: what kind of person this ad is trying to attract, and why. Under 600 characters.",
+        description: "The internal framing in one or two sentences: what kind of person this ad is trying to attract, and who it is meant to put off.",
       },
     },
     required: ["title", "hook", "script", "call_to_action", "visual_direction", "premise"],
@@ -82,7 +82,10 @@ ABSOLUTE RULES
 - Never invent a rate, a salary, a benefit, a location, a start date or a team size. If the operator did not tell you, do not state it.
 - Never write a URL, an email address or a phone number. Candidates leave through an Apply link a person fills in separately.
 - Never write a bracketed placeholder. If you do not have the words, leave the element out.
-- Take the voice from the brand strategy. If it says never to say something, never say it.`;
+- Take the voice from the brand strategy. If it says never to say something, never say it.
+
+LENGTH IS PART OF THE CRAFT
+This runs as a Meta static. The headline is truncated around 40 characters and the primary text around 125 before a reader has to tap. Writing to the maximum is not thoroughness, it is a draft nobody finished — cut it until every line is load-bearing.`;
 
 export async function handleRecruitmentDraft(
   req: IncomingMessage,

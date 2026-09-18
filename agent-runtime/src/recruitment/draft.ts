@@ -51,14 +51,41 @@ const META_LIMITS = {
   call_to_action: 30,
 } as const;
 
-// Internal. The title names the brief in a list, the premise is framing for
-// whoever reads it, and the visual direction is a brief for the image model —
-// which wants detail. These are sanity caps against a runaway, not shapes.
+// Internal, and CLAMPED RATHER THAN REFUSED.
+//
+// Smoke testing all three roles found three of five generations thrown away
+// for overshooting one of these by a handful of characters — a visual
+// direction at 2029 against 2000, a premise at 617 against 600. Each rejection
+// costs a fresh sixty-second model call, and every one of those drafts was
+// good. Refusing a whole hiring ad because an internal note ran seventeen
+// characters long is not a standard, it is a tax.
+//
+// Meta's limits are facts about the world: copy past them breaks a real
+// placement, so those still fail. These are our own tidiness, nobody outside
+// AA ever sees them, and tidiness is something we can simply do.
 const INTERNAL_LIMITS = {
   title: 200,
   visual_direction: 2000,
   premise: 600,
 } as const;
+
+/** A last line of defence against something pathological, not a shape. */
+const RUNAWAY = 20_000;
+
+/**
+ * Trim to the last sentence that fits, rather than cutting mid-word.
+ *
+ * The visual direction is handed to an image model. A brief ending
+ * "...palette restrained and institu" is worse than one sentence shorter.
+ */
+export function clampToSentence(value: string, limit: number): string {
+  if (value.length <= limit) return value;
+  const head = value.slice(0, limit);
+  const lastStop = Math.max(head.lastIndexOf(". "), head.lastIndexOf("! "), head.lastIndexOf("? "));
+  if (lastStop > limit * 0.5) return head.slice(0, lastStop + 1).trim();
+  const lastSpace = head.lastIndexOf(" ");
+  return (lastSpace > 0 ? head.slice(0, lastSpace) : head).trim();
+}
 
 const MIN_SCRIPT = 80;
 const MIN_VISUAL = 30;
@@ -113,12 +140,11 @@ export function draftProblem(draft: Record<string, unknown>): string | null {
     }
   }
 
-  for (const [field, limit] of Object.entries(INTERNAL_LIMITS)) {
-    const value = text(draft[field]);
-    if (value.length > limit) {
-      // Not a Meta limit, and saying so would send somebody looking at the
-      // wrong thing. This one is only guarding against a runaway.
-      return `The ${field.replace(/_/g, " ")} is ${value.length} characters; keep it under ${limit}.`;
+  // Internal fields are not checked for length here — normaliseDraft clamps
+  // them. Only something pathological is worth losing a whole draft over.
+  for (const field of DRAFT_FIELDS) {
+    if (text(draft[field]).length > RUNAWAY) {
+      return `The ${field.replace(/_/g, " ")} came back implausibly long.`;
     }
   }
 
@@ -143,11 +169,11 @@ export function draftProblem(draft: Record<string, unknown>): string | null {
 /** The draft, with only the fields the form takes and nothing else. */
 export function normaliseDraft(draft: Record<string, unknown>): RecruitmentDraft {
   return {
-    title: text(draft.title),
+    title: clampToSentence(text(draft.title), INTERNAL_LIMITS.title),
     hook: text(draft.hook),
     script: text(draft.script),
     call_to_action: text(draft.call_to_action),
-    visual_direction: text(draft.visual_direction),
-    premise: text(draft.premise),
+    visual_direction: clampToSentence(text(draft.visual_direction), INTERNAL_LIMITS.visual_direction),
+    premise: clampToSentence(text(draft.premise), INTERNAL_LIMITS.premise),
   };
 }
