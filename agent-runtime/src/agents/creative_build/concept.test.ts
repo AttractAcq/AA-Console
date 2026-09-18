@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { unsupportedStrictKeywords, missingStrictRequired } from "../../tools/schema.js";
 import { IMAGE_CONCEPT_TOOL, TEXT_CONCEPT_TOOL } from "./index.js";
-import { conceptProblem, TREATMENTS } from "./concept.js";
+import { conceptProblem, recruitmentConceptProblem, TREATMENTS } from "./concept.js";
 
 const good = (over: Record<string, unknown> = {}) => ({
   headline: "CHEWING IS NOT A COSMETIC PROBLEM",
@@ -148,5 +148,77 @@ describe("the text route schema", () => {
     expect(schema.required).toEqual(["headline", "body", "call_to_action", "rationale"]);
     expect(unsupportedStrictKeywords(schema)).toEqual([]);
     expect(missingStrictRequired(schema)).toEqual([]);
+  });
+});
+
+// The first three hiring ads AA generated read as advertising for AA's
+// services. "Six practices. Six voices. Not yours." is a good line and, on a
+// dental practice's feed, it sells social media management. Nothing on any of
+// them said the agency was hiring — because creative_build was never told it
+// was making a job ad.
+describe("a recruitment ad has to say a job is open", () => {
+  const ad = (over: Record<string, unknown> = {}) => ({
+    headline: "We're hiring an editor",
+    subhead: "48 hours. Durban hours.",
+    call_to_action: "Apply now",
+    ...over,
+  });
+
+  it("accepts an ad that plainly says it", () => {
+    expect(recruitmentConceptProblem(ad(), "editor")).toBeNull();
+  });
+
+  it("rejects the ad that actually shipped", () => {
+    const problem = recruitmentConceptProblem(
+      { headline: "Six practices. Six voices. Not yours.", subhead: "Calendar and approvals. Not community management.", call_to_action: "Apply now" },
+      "smm",
+    );
+    expect(problem).toMatch(/nothing on this ad says anybody is hiring/i);
+  });
+
+  it("rejects the editor ad that actually shipped", () => {
+    expect(
+      recruitmentConceptProblem(
+        { headline: "Your cut should look like the clinic", subhead: "48 hours. Durban hours.", call_to_action: "Apply with your reel" },
+        "editor",
+      ),
+    ).toMatch(/nothing on this ad says anybody is hiring/i);
+  });
+
+  it("does not accept a call to action as the signal", () => {
+    // "Apply now" is on every ad AA runs. It is the button, not the news.
+    expect(
+      recruitmentConceptProblem({ headline: "A real face, over 35.", subhead: "", call_to_action: "Apply now" }, "avatar"),
+    ).toMatch(/nothing on this ad says anybody is hiring/i);
+  });
+
+  it("takes the signal from the subhead as well as the headline", () => {
+    expect(
+      recruitmentConceptProblem(
+        { headline: "Your cut should look like the clinic", subhead: "We're hiring an editor. 48 hours.", call_to_action: "Apply now" },
+        "editor",
+      ),
+    ).toBeNull();
+  });
+
+  it("insists the role is named, in words an applicant would recognise", () => {
+    const problem = recruitmentConceptProblem(
+      { headline: "We're hiring", subhead: "Durban hours, remote.", call_to_action: "Apply now" },
+      "smm",
+    );
+    expect(problem).toMatch(/never names the role/i);
+    expect(problem).toContain("social media manager");
+  });
+
+  it("accepts the ways each role actually gets named", () => {
+    expect(recruitmentConceptProblem(ad({ headline: "Now hiring: SMM" }), "smm")).toBeNull();
+    expect(recruitmentConceptProblem(ad({ headline: "We're hiring a social media manager" }), "smm")).toBeNull();
+    expect(recruitmentConceptProblem(ad({ headline: "Hiring: on-camera, over 35" }), "avatar")).toBeNull();
+  });
+
+  it("rejects an ad with no words at all", () => {
+    expect(recruitmentConceptProblem({ headline: "", subhead: "", call_to_action: "" }, "editor")).toMatch(
+      /carries no text/i,
+    );
   });
 });
