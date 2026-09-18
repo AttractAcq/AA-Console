@@ -26,7 +26,7 @@ import { OpenAiError, runStructuredCompletion } from "../../tools/openai.js";
 import { estimateCostUsd } from "../../usage/cost.js";
 import { renderContext, renderUpstream } from "../shared.js";
 import { loadConceptContext } from "./context.js";
-import { conceptProblem } from "./concept.js";
+import { conceptProblem, TREATMENTS } from "./concept.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { placeLogo } from "./logo.js";
@@ -43,7 +43,16 @@ interface BriefRow {
   brief_ref: string | null;
 }
 
-const IMAGE_CONCEPT_TOOL = {
+/**
+ * The image-concept tool, at module scope so the schema can be tested.
+ *
+ * Sent to OpenAI as `strict: true` json_schema. Every key in `properties`
+ * must also appear in `required` — OpenAI 400s otherwise, naming the first
+ * missing key. PR #51 added `background` and `visual_treatment` to
+ * properties and left this list as it was; every Bot image rebuild then
+ * failed with Missing 'background'.
+ */
+export const IMAGE_CONCEPT_TOOL = {
   name: "submit_concept",
   description: "Submit the creative concept for this asset. Call once.",
   inputSchema: {
@@ -60,7 +69,7 @@ const IMAGE_CONCEPT_TOOL = {
       },
       visual_treatment: {
         type: "string",
-        enum: ["photographic", "illustrated", "rendered_3d", "textured_graphic"],
+        enum: [...TREATMENTS],
         description: "How the imagery is made. There is deliberately no typography-only option: a post with no imagery is a text post, not an image post.",
       },
       composition: { type: "string", description: "Layout, crop, where the text sits over the imagery, where the eye goes first." },
@@ -68,12 +77,23 @@ const IMAGE_CONCEPT_TOOL = {
       avoid: { type: "string", description: "What must not appear: cliches for this sector, anything off-brand, anything unprovable." },
       rationale: { type: "string", description: "Why this concept serves the brief. For the operator, not the renderer." },
     },
-    required: ["headline", "subhead", "call_to_action", "subject", "composition", "art_direction", "avoid", "rationale"],
+    required: [
+      "headline",
+      "subhead",
+      "call_to_action",
+      "subject",
+      "background",
+      "visual_treatment",
+      "composition",
+      "art_direction",
+      "avoid",
+      "rationale",
+    ],
     additionalProperties: false,
   },
 };
 
-const TEXT_CONCEPT_TOOL = {
+export const TEXT_CONCEPT_TOOL = {
   name: "submit_copy",
   description: "Submit the finished copy for this brief. Call once.",
   inputSchema: {
