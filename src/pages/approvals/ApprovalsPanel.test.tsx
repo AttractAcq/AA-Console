@@ -34,7 +34,7 @@ vi.mock("../../lib/supabase", () => ({
 
 import { ApprovalsPanel } from "./ApprovalsPanel";
 
-const COPY_BODY = "Book the shade guide consult this week.\nMention the April offer.";
+const COPY_BODY = "Book the shade guide consult this week. Mention the April offer.";
 
 function textAsset(over: Partial<MediaAsset> = {}): MediaAsset {
   return {
@@ -84,7 +84,7 @@ describe("ApprovalsPanel — text preview", () => {
 
     await user.click(await screen.findByRole("button", { name: "Text" }));
     expect(await screen.findByText("Shade guide follow-up")).toBeInTheDocument();
-    expect(screen.getByText(/Book the shade guide consult this week/)).toBeInTheDocument();
+    expect(screen.getByText(COPY_BODY)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Preview Shade guide follow-up/ }));
 
