@@ -13,6 +13,36 @@ export const RECRUITMENT_PURPOSE = "recruitment" as const;
 export const RECRUITMENT_FORMAT = "meta_static" as const;
 export const RECRUITMENT_CHANNEL = "Meta static";
 
+/**
+ * The call-to-action buttons Meta offers on a link ad.
+ *
+ * The CTA is a button chosen from Meta's fixed list, not a line somebody
+ * writes. Four of the set make sense for a hiring ad pointing at an apply URL.
+ *
+ * Kept in step with META_CTAS in agent-runtime/src/recruitment/draft.ts, which
+ * validates what the generator returns. Separate packages, so it exists twice.
+ */
+export const META_CTAS = [
+  { value: "APPLY_NOW", label: "Apply now" },
+  { value: "LEARN_MORE", label: "Learn more" },
+  { value: "SIGN_UP", label: "Sign up" },
+  { value: "CONTACT_US", label: "Contact us" },
+] as const;
+
+export const DEFAULT_CTA = "APPLY_NOW";
+
+/**
+ * The button's label, for a screen.
+ *
+ * Falls back to whatever is stored, because briefs written before the CTA was
+ * a fixed value hold prose like "Apply now" and must keep rendering.
+ */
+export function ctaLabel(value: string | null | undefined): string {
+  const raw = (value ?? "").trim();
+  const known = META_CTAS.find((c) => c.value === raw);
+  return known ? known.label : raw;
+}
+
 export const RECRUITMENT_ROLE_LABEL: Record<RecruitmentRole, string> = {
   editor: "Editor",
   smm: "Social Media Manager",
@@ -84,7 +114,10 @@ export function buildRecruitmentCopyPack(source: RecruitmentPackSource): Recruit
   const headline = line(concept?.headline) || line(source.hook);
   const primary =
     line(concept?.subhead) || line(concept?.body) || line(source.script);
-  const cta = line(concept?.call_to_action) || line(source.call_to_action);
+  // The brief wins here, unlike headline and primary text. The button is an
+  // ad-level setting chosen from Meta's list; the creative concept has no say
+  // in it, and its free-text call_to_action is copy for the image.
+  const cta = line(source.call_to_action) || line(concept?.call_to_action);
   if (!headline || !primary || !cta) {
     throw new Error("Copy pack needs a headline, primary text and CTA.");
   }
@@ -112,7 +145,7 @@ export function formatRecruitmentCopyPack(pack: RecruitmentCopyPack): string {
     `ROLE: ${pack.role}`,
     `HEADLINE: ${pack.headline}`,
     `PRIMARY TEXT: ${pack.primary_text}`,
-    `CTA: ${pack.cta}`,
+    `CTA BUTTON: ${ctaLabel(pack.cta)} (${pack.cta})`,
     `APPLY URL: ${pack.apply_url}`,
   ];
   if (pack.compensation) lines.push(`COMPENSATION: ${pack.compensation}`);

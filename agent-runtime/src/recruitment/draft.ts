@@ -18,6 +18,23 @@
 // finished and is false — the same failure that put a fabricated phone number
 // on a practice's advertising. Both stay human-entered.
 
+/**
+ * The call-to-action buttons Meta actually offers on a link ad.
+ *
+ * The generator was writing prose — "Apply with three cutdowns", "Apply to run
+ * the calendar". Good copy, and unusable: the CTA on a Meta static is a button
+ * chosen from a fixed list, not a line somebody writes. Whoever built the ad
+ * would have had to pick a real one and quietly discard the words.
+ *
+ * Four of Meta's set make sense for a hiring ad pointing at an apply URL.
+ * SEND_MESSAGE and the commerce ones need a different destination.
+ *
+ * Kept in step with META_CTAS in src/lib/recruitment.ts, which renders the
+ * labels. Separate packages, so the list exists twice on purpose.
+ */
+export const META_CTAS = ["APPLY_NOW", "LEARN_MORE", "SIGN_UP", "CONTACT_US"] as const;
+export type MetaCta = (typeof META_CTAS)[number];
+
 /** What the model fills in. The rest of the form is the operator's. */
 export interface RecruitmentDraft {
   title: string;
@@ -124,6 +141,11 @@ export function draftProblem(draft: Record<string, unknown>): string | null {
   if (!hook) return "The draft has no headline, which is the largest words on the ad.";
   if (!script) return "The draft has no primary text.";
   if (!cta) return "The draft has no call to action.";
+  if (!(META_CTAS as readonly string[]).includes(cta)) {
+    // A button, not a sentence. Prose here reaches whoever builds the ad and
+    // has to be thrown away, because Meta will not render it.
+    return `"${cta}" is not a Meta call-to-action button. Choose one of: ${META_CTAS.join(", ")}.`;
+  }
   if (!visual) return "The draft says nothing about what the image should show.";
 
   if (script.length < MIN_SCRIPT) {
@@ -150,7 +172,7 @@ export function draftProblem(draft: Record<string, unknown>): string | null {
 
   // The copy fields only. Visual direction may legitimately describe a screen
   // with a feed on it, and the premise is internal framing.
-  for (const field of ["title", "hook", "script", "call_to_action"] as const) {
+  for (const field of ["title", "hook", "script"] as const) {
     const value = text(draft[field]);
     if (PLACEHOLDER.test(value)) {
       return `The ${field.replace(/_/g, " ")} contains a placeholder. Write the real words or leave the element out.`;
