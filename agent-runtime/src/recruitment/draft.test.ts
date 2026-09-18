@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { draftProblem, normaliseDraft, DRAFT_FIELDS } from "./draft.js";
+import { clampToSentence, draftProblem, normaliseDraft, DRAFT_FIELDS } from "./draft.js";
 
 const good = (over: Record<string, unknown> = {}) => ({
   title: "Editor — vertical cutdowns for dental practices",
@@ -47,21 +47,66 @@ describe("what makes a draft unusable", () => {
   });
 
   it("accepts a rich visual direction, which is a brief and not ad copy", () => {
-    // The first version capped all six fields at ad-copy lengths and refused
-    // real drafts for it: the generator wrote 653 and 853 character visual
-    // directions and both were rejected for exceeding a Meta limit belonging
-    // to a placement they are never part of.
     expect(draftProblem(good({ visual_direction: "A quiet editing desk. ".repeat(40) }))).toBeNull();
     expect(draftProblem(good({ premise: "x".repeat(600) }))).toBeNull();
     expect(draftProblem(good({ title: "x".repeat(200) }))).toBeNull();
   });
 
-  it("still guards against a runaway, without blaming Meta for it", () => {
-    const problem = draftProblem(good({ visual_direction: "x".repeat(2001) }));
-    expect(problem).toMatch(/2001 characters/);
-    expect(problem).toMatch(/keep it under 2000/);
-    // Saying "Meta allows" here would send somebody looking at the wrong thing.
-    expect(problem).not.toMatch(/Meta/);
+  // Smoke testing all three roles threw away three of five generations for
+  // overshooting an internal cap by a handful of characters: a visual
+  // direction at 2029 against 2000, a premise at 617 against 600. Every one of
+  // those drafts was good, and each rejection cost a fresh model call.
+  it("does not throw away a whole draft over an internal field running long", () => {
+    expect(draftProblem(good({ visual_direction: "A quiet desk. ".repeat(200) }))).toBeNull();
+    expect(draftProblem(good({ premise: "x".repeat(617) }))).toBeNull();
+    expect(draftProblem(good({ title: "x".repeat(900) }))).toBeNull();
+  });
+
+  it("still refuses something pathological", () => {
+    expect(draftProblem(good({ premise: "x".repeat(20_001) }))).toMatch(/implausibly long/i);
+  });
+
+});
+
+describe("clamping the internal fields", () => {
+  it("trims a long visual direction to the last whole sentence", () => {
+    const value = "A quiet desk in daylight. A monitor at three-quarters. A brand card by the mug.";
+    expect(clampToSentence(value, 30)).toBe("A quiet desk in daylight.");
+    expect(clampToSentence(value, 60)).toBe("A quiet desk in daylight. A monitor at three-quarters.");
+  });
+
+  it("does not clamp to a fragment when the only sentence break is very early", () => {
+    // "Yes. " followed by four hundred words of direction should not become
+    // the word "Yes."
+    const value = "Yes. " + "a detailed description without punctuation ".repeat(10);
+    const out = clampToSentence(value, 200);
+    expect(out).not.toBe("Yes.");
+    expect(out.length).toBeGreaterThan(100);
+  });
+
+  it("falls back to a word boundary rather than cutting mid-word", () => {
+    // An image brief ending "...palette restrained and institu" is worse than
+    // one sentence shorter.
+    const out = clampToSentence("palette restrained and institutional throughout", 20);
+    expect(out).toBe("palette restrained");
+    expect(out).not.toMatch(/institu$/);
+  });
+
+  it("leaves anything already short enough exactly alone", () => {
+    expect(clampToSentence("Short enough.", 500)).toBe("Short enough.");
+  });
+
+  it("clamps through normaliseDraft, so the real 2029 case now lands", () => {
+    const out = normaliseDraft(good({ visual_direction: "A quiet desk in daylight. ".repeat(100) }));
+    expect(out.visual_direction.length).toBeLessThanOrEqual(2000);
+    expect(out.visual_direction.endsWith(".")).toBe(true);
+  });
+
+  it("never clamps the Meta copy, which must fail loudly instead", () => {
+    // Silently trimming a headline would ship a half-sentence to a placement.
+    const out = normaliseDraft(good({ hook: "x".repeat(200) }));
+    expect(out.hook).toHaveLength(200);
+    expect(draftProblem(good({ hook: "x".repeat(200) }))).toMatch(/Meta static allows 80/);
   });
 });
 
