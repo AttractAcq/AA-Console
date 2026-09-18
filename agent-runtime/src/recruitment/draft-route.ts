@@ -38,29 +38,29 @@ const SUBMIT_TOOL = {
     properties: {
       title: {
         type: "string",
-        description: "Internal title for this brief, naming the role and what makes this opening specific.",
+        description: "Internal title for this brief, naming the role and what makes this opening specific. Under 200 characters.",
       },
       hook: {
         type: "string",
-        description: "The headline — the largest words on the ad. One line, under 80 characters.",
+        description: "The headline — the largest words on the ad. One line, and it must be under 80 characters or the ad will not run.",
       },
       script: {
         type: "string",
         description:
-          "The primary text of the ad. What the role actually involves, who it suits, and what is true about working here. A short paragraph.",
+          "The primary text of the ad. What the role actually involves, who it suits, and what is true about working here. A short paragraph, under 900 characters.",
       },
       call_to_action: {
         type: "string",
-        description: "The action asked for. A few words, under 30 characters.",
+        description: "The action asked for. A few words, and it must be under 30 characters.",
       },
       visual_direction: {
         type: "string",
         description:
-          "What the still should show: subject, setting, light, treatment. Specific enough to brief an image from, and never a stock cliche.",
+          "What the still should show: subject, setting, light, treatment. Specific enough to brief an image from, and never a stock cliche. This is an internal brief rather than ad copy, so detail is welcome — aim for a short paragraph and stay under 2000 characters.",
       },
       premise: {
         type: "string",
-        description: "The internal one-line framing: what kind of person this ad is trying to attract, and why.",
+        description: "The internal one-line framing: what kind of person this ad is trying to attract, and why. Under 600 characters.",
       },
     },
     required: ["title", "hook", "script", "call_to_action", "visual_direction", "premise"],

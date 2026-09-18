@@ -43,7 +43,25 @@ describe("what makes a draft unusable", () => {
   it("rejects copy that will not fit the placement, and says by how much", () => {
     const problem = draftProblem(good({ hook: "x".repeat(81) }));
     expect(problem).toMatch(/81 characters/);
-    expect(problem).toMatch(/80/);
+    expect(problem).toMatch(/Meta static allows 80/);
+  });
+
+  it("accepts a rich visual direction, which is a brief and not ad copy", () => {
+    // The first version capped all six fields at ad-copy lengths and refused
+    // real drafts for it: the generator wrote 653 and 853 character visual
+    // directions and both were rejected for exceeding a Meta limit belonging
+    // to a placement they are never part of.
+    expect(draftProblem(good({ visual_direction: "A quiet editing desk. ".repeat(40) }))).toBeNull();
+    expect(draftProblem(good({ premise: "x".repeat(600) }))).toBeNull();
+    expect(draftProblem(good({ title: "x".repeat(200) }))).toBeNull();
+  });
+
+  it("still guards against a runaway, without blaming Meta for it", () => {
+    const problem = draftProblem(good({ visual_direction: "x".repeat(2001) }));
+    expect(problem).toMatch(/2001 characters/);
+    expect(problem).toMatch(/keep it under 2000/);
+    // Saying "Meta allows" here would send somebody looking at the wrong thing.
+    expect(problem).not.toMatch(/Meta/);
   });
 });
 

@@ -37,15 +37,27 @@ export const DRAFT_FIELDS = [
   "premise",
 ] as const;
 
-// Meta static: the headline is a line, the primary text is a short paragraph.
-// These are the shapes the ad has room for, not stylistic preferences.
-const LIMITS = {
-  title: 120,
+// Only three of these fields are ever seen by Meta, and only those three carry
+// a placement limit. The first version of this capped all six at ad-copy
+// lengths and rejected real drafts for it: the generator wrote 650 and 850
+// character visual directions — good ones — and they were refused for
+// exceeding a limit belonging to a placement they are never part of.
+//
+// The headline is a line and the primary text is a short paragraph because Meta
+// has room for that much. That is a fact about the placement.
+const META_LIMITS = {
   hook: 80,
   script: 900,
   call_to_action: 30,
-  visual_direction: 600,
-  premise: 400,
+} as const;
+
+// Internal. The title names the brief in a list, the premise is framing for
+// whoever reads it, and the visual direction is a brief for the image model —
+// which wants detail. These are sanity caps against a runaway, not shapes.
+const INTERNAL_LIMITS = {
+  title: 200,
+  visual_direction: 2000,
+  premise: 600,
 } as const;
 
 const MIN_SCRIPT = 80;
@@ -94,11 +106,19 @@ export function draftProblem(draft: Record<string, unknown>): string | null {
     return "The visual direction is too thin to brief an image from.";
   }
 
-  for (const field of DRAFT_FIELDS) {
+  for (const [field, limit] of Object.entries(META_LIMITS)) {
     const value = text(draft[field]);
-    const limit = LIMITS[field];
     if (value.length > limit) {
       return `The ${field.replace(/_/g, " ")} is ${value.length} characters; Meta static allows ${limit}.`;
+    }
+  }
+
+  for (const [field, limit] of Object.entries(INTERNAL_LIMITS)) {
+    const value = text(draft[field]);
+    if (value.length > limit) {
+      // Not a Meta limit, and saying so would send somebody looking at the
+      // wrong thing. This one is only guarding against a runaway.
+      return `The ${field.replace(/_/g, " ")} is ${value.length} characters; keep it under ${limit}.`;
     }
   }
 
