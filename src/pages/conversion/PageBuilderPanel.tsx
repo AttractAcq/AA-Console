@@ -42,10 +42,27 @@ type PageCampaignLink = {
   campaign_id: string;
 };
 
-export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing" | "offer" }) {
+export type PageBuilderType = "landing" | "offer" | "recruitment";
+
+/**
+ * @param clientId Overrides the route's client. Recruitment pages live on the
+ *   Attract Acquisition house client and are reached from Team, which has no
+ *   client in its URL at all.
+ */
+export function PageBuilderPanel({
+  pageType = "landing",
+  clientId: clientIdProp,
+}: {
+  pageType?: PageBuilderType;
+  clientId?: string;
+}) {
   const [buildOpen, setBuildOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const { clientId } = useParams<{ clientId: string }>();
+  const { clientId: routeClientId } = useParams<{ clientId: string }>();
+  const clientId = clientIdProp ?? routeClientId;
+  // A hiring page has no campaign to belong to. AA is not running a campaign
+  // for itself; it is filling a role.
+  const isRecruitment = pageType === "recruitment";
   const [pages, setPages] = useState<Page[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [pageLinks, setPageLinks] = useState<PageCampaignLink[]>([]);
@@ -70,12 +87,16 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
           .eq("client_id", clientId)
           .eq("page_type", pageType)
           .order("created_at", { ascending: false }),
-        supabase
+        isRecruitment
+          ? Promise.resolve({ data: [], error: null })
+          : supabase
           .from("client_campaigns")
           .select("id, name, status")
           .eq("client_id", clientId)
           .order("created_at", { ascending: false }),
-        supabase
+        isRecruitment
+          ? Promise.resolve({ data: [], error: null })
+          : supabase
           .from("campaign_artifacts")
           .select("id, page_id, campaign_id")
           .eq("client_id", clientId)
@@ -105,7 +126,7 @@ export function PageBuilderPanel({ pageType = "landing" }: { pageType?: "landing
     } catch (error) {
       setLoadError("Failed to load pages: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
     }
-  }, [clientId, pageType]);
+  }, [clientId, pageType, isRecruitment]);
 
   useEffect(() => {
     void refresh();

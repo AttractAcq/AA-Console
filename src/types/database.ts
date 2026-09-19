@@ -5207,7 +5207,7 @@ export type Database = {
       metric_basis: "daily" | "cumulative"
       metric_entity: "account" | "campaign" | "post" | "page"
       metric_surface: "paid" | "organic" | "landing" | "offer"
-      page_type: "landing" | "offer"
+      page_type: "landing" | "offer" | "recruitment"
       pipeline_stage: "first_touch" | "second_touch" | "call_booked"
       post_channel: "organic" | "paid"
       record_domain:

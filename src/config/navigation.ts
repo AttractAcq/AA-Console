@@ -72,10 +72,13 @@ export const agencyNav: NavNode[] = [
     tabs: [
       { id: "chat", label: "Chat" },
       { id: "agents", label: "Agents" },
-      { id: "recruitment", label: "Recruitment" },
       { id: "avatars", label: "Avatars" },
       { id: "editors", label: "Editors" },
       { id: "smm", label: "SMM" },
+      // Hiring sits after the people already here: the ads, then the pages
+      // those ads point at.
+      { id: "recruitment", label: "Recruitment" },
+      { id: "recruitment-pages", label: "Recruitment Landing Pages" },
     ],
   },
   {
@@ -189,16 +192,6 @@ export const clientNavGroups: NavNode[] = [
         ],
       },
       {
-        id: "sites",
-        label: "Sites",
-        path: "sites",
-        icon: Globe,
-        tabs: [
-          { id: "overview", label: "Overview" },
-          { id: "settings", label: "Settings" },
-        ],
-      },
-      {
         id: "sales",
         label: "Sales Agents",
         path: "sales",
@@ -251,6 +244,18 @@ export const clientNavGroups: NavNode[] = [
         label: "Onboarding",
         path: "onboarding",
         icon: ClipboardList,
+      },
+      {
+        // Where this client's site lives and which GitHub account publishes
+        // it. Account-level configuration, not a step in delivery.
+        id: "sites",
+        label: "Sites",
+        path: "sites",
+        icon: Globe,
+        tabs: [
+          { id: "overview", label: "Overview" },
+          { id: "settings", label: "Settings" },
+        ],
       },
       {
         id: "contact",
