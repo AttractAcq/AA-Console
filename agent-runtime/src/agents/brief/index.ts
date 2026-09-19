@@ -17,7 +17,7 @@ import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords } from "../shared.js";
-import { briefSubmitTool, composeBody, briefColumns, fieldsFor } from "./fields.js";
+import { briefSubmitTool, composeBody, composeAvatarBody, composeEditorBody, briefColumns, fieldsFor } from "./fields.js";
 import { loadIdentity, identityWriterBlock } from "../identity.js";
 import { loadUsableProof, renderProof, proofIdForRef } from "../proof.js";
 
@@ -209,6 +209,8 @@ Call ${submitTool.name} once when you are done.`;
     source_idea_id: idea.id,
     title: title.slice(0, 300),
     body,
+    avatar_brief: idea.media_type === "video" ? composeAvatarBody(result.submitted) : null,
+    editor_brief: idea.media_type === "video" ? composeEditorBody(result.submitted) : null,
     ...briefColumns(idea.media_type, result.submitted),
     // The record, not just the prose. A brief that names its proof in words
     // cannot later answer "which proof produced revenue"; a foreign key can.

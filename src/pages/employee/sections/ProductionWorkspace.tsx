@@ -18,7 +18,8 @@ type Job = {
   // an editor or avatar had ever delivered.
   brief_id: string | null;
   clients: { name: string } | null;
-  client_briefs: { title: string; brief_ref: string | null; body: string | null } | null;
+  client_briefs: { title: string; brief_ref: string | null; body: string | null; avatar_brief?: string | null; editor_brief?: string | null } | null;
+  brief_role?: string | null;
 };
 
 type Submission = {
@@ -84,7 +85,7 @@ export function ProductionWorkspace({
       supabase
         .from("job_assignments")
         .select(
-          "id, title, due_date, compensation, completed_at, client_id, brief_id, clients(name), client_briefs(title, brief_ref, body)",
+          "id, title, due_date, compensation, completed_at, client_id, brief_id, clients(name), client_briefs(title, brief_ref, body, avatar_brief, editor_brief)",
         )
         .eq("member_id", memberId)
         .order("due_date", { nullsFirst: false }),
@@ -290,7 +291,19 @@ export function ProductionWorkspace({
                 {selected.client_briefs.title}
               </summary>
               <p className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground">
-                {selected.client_briefs.body ?? "This brief has no detail beyond its title."}
+                {(() => {
+                  const cb = selected.client_briefs as {
+                    body: string | null;
+                    avatar_brief?: string | null;
+                    editor_brief?: string | null;
+                  };
+                  // Prefer role body when the assignment was a dual-brief send.
+                  // Fall back to master body for legacy / full dispatches.
+                  const role = (selected as { brief_role?: string }).brief_role;
+                  if (role === "avatar" && cb.avatar_brief) return cb.avatar_brief;
+                  if (role === "editor" && cb.editor_brief) return cb.editor_brief;
+                  return cb.body ?? "This brief has no detail beyond its title.";
+                })()}
               </p>
             </details>
           )}

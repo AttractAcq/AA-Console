@@ -120,3 +120,66 @@ export function briefColumns(
   }
   return out;
 }
+
+
+/** Field subsets that belong on the avatar (talent) brief for video. */
+const AVATAR_FIELDS: BriefField[] = [
+  "hook",
+  "premise",
+  "script",
+  "shot_requirements",
+  "call_to_action",
+  "production_notes",
+];
+
+/** Field subsets that belong on the editor brief for video. */
+const EDITOR_FIELDS: BriefField[] = [
+  "hook",
+  "argument",
+  "proof",
+  "script",
+  "visual_direction",
+  "shot_requirements",
+  "b_roll",
+  "call_to_action",
+  "channel_intent",
+  "production_notes",
+];
+
+function composeRoleBody(
+  fieldNames: readonly BriefField[],
+  submitted: Record<string, unknown>,
+  intro: string,
+): string {
+  const parts: string[] = [intro];
+  for (const name of fieldNames) {
+    const value = String(submitted[name] ?? "").trim();
+    if (!value) continue;
+    parts.push(`## ${LABELS[name] ?? name}\n\n${value}`);
+  }
+  return parts.join("\n\n");
+}
+
+/**
+ * Talent-facing video brief. Performance, wardrobe/location, spoken lines,
+ * framing for the person on camera — not captions, crops, or assembly rules.
+ */
+export function composeAvatarBody(submitted: Record<string, unknown>): string {
+  return composeRoleBody(
+    AVATAR_FIELDS,
+    submitted,
+    "# Avatar brief\n\nWhat you need to perform and shoot. Ignore edit, caption, and export notes — those go to the editor.",
+  );
+}
+
+/**
+ * Editor-facing video brief. Assembly, captions, crops, audio, delivery —
+ * not wardrobe or "what not to say" performance constraints.
+ */
+export function composeEditorBody(submitted: Record<string, unknown>): string {
+  return composeRoleBody(
+    EDITOR_FIELDS,
+    submitted,
+    "# Editor brief\n\nWhat you need to cut, caption, and deliver. Include 9:16 / 4:5 / 1:1 crops unless the channel intent says otherwise. Do not invent music, graphics, or b-roll the brief forbids.",
+  );
+}

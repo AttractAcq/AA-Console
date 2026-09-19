@@ -238,6 +238,7 @@ export type Database = {
         Row: {
           assignment_id: string | null
           brief_id: string
+          brief_role: string
           client_id: string
           created_at: string
           email_error: string | null
@@ -251,6 +252,7 @@ export type Database = {
         Insert: {
           assignment_id?: string | null
           brief_id: string
+          brief_role?: string
           client_id: string
           created_at?: string
           email_error?: string | null
@@ -264,6 +266,7 @@ export type Database = {
         Update: {
           assignment_id?: string | null
           brief_id?: string
+          brief_role?: string
           client_id?: string
           created_at?: string
           email_error?: string | null
@@ -932,8 +935,10 @@ export type Database = {
       client_briefs: {
         Row: {
           argument: string | null
+          avatar_brief: string | null
           b_roll: string | null
           body: string | null
+          editor_brief: string | null
           brief_ref: string | null
           call_to_action: string | null
           channel_intent: string | null
@@ -963,8 +968,10 @@ export type Database = {
         }
         Insert: {
           argument?: string | null
+          avatar_brief?: string | null
           b_roll?: string | null
           body?: string | null
+          editor_brief?: string | null
           brief_ref?: string | null
           call_to_action?: string | null
           channel_intent?: string | null
@@ -994,8 +1001,10 @@ export type Database = {
         }
         Update: {
           argument?: string | null
+          avatar_brief?: string | null
           b_roll?: string | null
           body?: string | null
+          editor_brief?: string | null
           brief_ref?: string | null
           call_to_action?: string | null
           channel_intent?: string | null

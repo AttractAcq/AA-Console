@@ -9,6 +9,8 @@ type Brief = {
   client_id?: string;
   title: string;
   body: string | null;
+  avatar_brief?: string | null;
+  editor_brief?: string | null;
   media_type: "image" | "text" | "video";
   brief_ref: string | null;
   status: string;
@@ -281,6 +283,33 @@ export function BriefDetailModal({
               </div>
             )}
           </section>
+
+          {brief.media_type === "video" && (brief.avatar_brief || brief.editor_brief) && (
+            <section className="space-y-4">
+              {brief.avatar_brief ? (
+                <div>
+                  <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Avatar brief
+                  </h3>
+                  <div className="max-h-56 overflow-y-auto rounded-md border border-border bg-muted/40 p-3">
+                    <RichText text={brief.avatar_brief} />
+                  </div>
+                </div>
+              ) : null}
+              {brief.editor_brief ? (
+                <div>
+                  <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Editor brief
+                  </h3>
+                  <div className="max-h-56 overflow-y-auto rounded-md border border-border bg-muted/40 p-3">
+                    <RichText text={brief.editor_brief} />
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          )}
+
+
 
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading history…</p>
