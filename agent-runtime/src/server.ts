@@ -32,6 +32,7 @@ import { startWorker, type WorkerHandle } from "./worker.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { registeredAgentKeys } from "./orchestration/dispatch.js";
 import { handleMasterChat } from "./master/route.js";
+import { handleBriefDraft } from "./briefs/draft-route.js";
 import { handleCampaignDraft } from "./campaigns/draft-route.js";
 import { handleContextDraft } from "./context/draft-route.js";
 import { handleRecruitmentDraft } from "./recruitment/draft-route.js";
@@ -171,6 +172,15 @@ const server = http.createServer((req, res) => {
 
   if (req.url === "/admin/github/status") {
     void handleGitHubStatus(req, res, sb, config);
+    return;
+  }
+
+  if (req.url === "/admin/briefs/draft") {
+    if (req.method !== "POST") {
+      json(405, { ok: false, error: "POST only" });
+      return;
+    }
+    void handleBriefDraft(req, res, sb, config);
     return;
   }
 

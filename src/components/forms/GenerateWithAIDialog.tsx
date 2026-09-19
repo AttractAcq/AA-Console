@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { callRuntime } from "../../lib/callRuntime";
 
 /**
@@ -27,6 +28,7 @@ export function GenerateWithAIDialog<T>({
   payload,
   requireNotes = true,
   footnote,
+  extra,
   onClose,
   onGenerated,
 }: {
@@ -40,6 +42,8 @@ export function GenerateWithAIDialog<T>({
   payload: Record<string, unknown>;
   requireNotes?: boolean;
   footnote?: string;
+  /** Rendered above the notes box — a choice the generator needs first. */
+  extra?: ReactNode;
   onClose: () => void;
   onGenerated: (draft: T, sources?: string) => void;
 }) {
@@ -89,6 +93,8 @@ export function GenerateWithAIDialog<T>({
           {title}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">{intro}</p>
+
+        {extra && <div className="mt-4">{extra}</div>}
 
         <label htmlFor="generate-with-ai-notes" className="mt-4 block text-sm font-medium text-card-foreground">
           {label}
