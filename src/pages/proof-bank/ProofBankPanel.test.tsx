@@ -135,7 +135,10 @@ describe("finding proof that is already online", () => {
     const user = userEvent.setup();
     show([]);
     await user.click(await screen.findByRole("button", { name: /Find Proof Online/ }));
-    expect(screen.getByText(/roughly \$0\.40/)).toBeInTheDocument();
+    // The figure is the one production run's actual cost, not a guess. It
+    // moved when the search budget was tightened, and this test is what
+    // stopped the old number quietly surviving the change.
+    expect(screen.getByText(/roughly \$0\.35/)).toBeInTheDocument();
   });
 
   it("queues the Proof Finder for this client", async () => {
