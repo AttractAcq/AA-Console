@@ -8,6 +8,8 @@ import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
+import { clearDraft } from "../../components/forms/FormModal";
+import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import { CampaignContentPanel } from "./CampaignContentPanel";
 import { cn } from "../../lib/cn";
 
@@ -71,6 +73,8 @@ export function CampaignExecutionPanel() {
   // page of fifteen full cards; nobody scrolls that to find one.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
+  const [proposing, setProposing] = useState(false);
+  const [aiDraft, setAiDraft] = useState<{ name: string; brief: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -445,12 +449,25 @@ export function CampaignExecutionPanel() {
 
       <FormModal
         open={newOpen}
-        onClose={() => setNewOpen(false)}
+        onClose={() => {
+          setNewOpen(false);
+          setAiDraft(null);
+        }}
         title="New Campaign"
         draftKey={`campaign:${clientId}`}
         intro="Queues the Campaign Planner. It needs your offer strategy and ICP, and writes the plan — including what has to be built before this can run."
         fields={FIELDS}
         submitLabel="Plan it"
+        initialValues={aiDraft ?? undefined}
+        actions={
+          <button
+            type="button"
+            onClick={() => setProposing(true)}
+            className="rounded-md border border-border px-3 py-2 text-sm font-medium text-card-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Generate with AI
+          </button>
+        }
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
           const { data, error } = await supabase
@@ -473,8 +490,32 @@ export function CampaignExecutionPanel() {
           if (jobError) throw new Error(jobError.message);
           setNotice("Queued. The planner is writing the campaign now.");
         }}
-        onSaved={refresh}
+        onSaved={() => {
+          setAiDraft(null);
+          void refresh();
+        }}
       />
+
+      {clientId && (
+        <GenerateWithAIDialog<{ name: string; brief: string }>
+          open={proposing}
+          title="Propose a campaign"
+          intro="Everything this business has told us and everything we have worked out about it — the offer, the ICP, the money model, the market and competitor work — is already on file and will be read for you."
+          label="Anything to steer it (optional)"
+          placeholder="A season, a service to push, a number you are chasing, something a competitor just did. Leave it blank and it will propose whatever the records say is most worth doing."
+          footnote="It will not invent a budget, a date or a target. Campaigns you already have are excluded."
+          endpoint="/admin/campaigns/draft"
+          payload={{ clientId }}
+          requireNotes={false}
+          onClose={() => setProposing(false)}
+          onGenerated={(draft) => {
+            // A saved draft wins over initialValues inside FormModal, so a
+            // half-typed form would silently swallow the proposal.
+            clearDraft(`campaign:${clientId}`);
+            setAiDraft(draft);
+          }}
+        />
+      )}
     </div>
   );
 }

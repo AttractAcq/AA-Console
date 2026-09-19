@@ -5,7 +5,8 @@ import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
 import { FormModal, clearDraft } from "../../components/forms/FormModal";
-import { GenerateBriefDialog, type GeneratedBrief } from "../../components/forms/GenerateBriefDialog";
+import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
+import type { GeneratedBrief } from "../../components/forms/generatedBrief";
 import type { FieldDef } from "../../components/forms/fields";
 import { MediaCard, StatusBadge } from "../../components/MediaCard";
 import { MediaDetailModal } from "../../components/MediaDetailModal";
@@ -639,10 +640,15 @@ export function RecruitmentPanel() {
       />
 
       {draftRole && (
-        <GenerateBriefDialog
+        <GenerateWithAIDialog<GeneratedBrief>
           open={generating}
-          role={draftRole}
-          roleLabel={RECRUITMENT_ROLE_LABEL[draftRole]}
+          title={`Write the ${RECRUITMENT_ROLE_LABEL[draftRole]} ad`}
+          intro="Say what is specific about this opening. Everything else — what AA does, how it sounds, what it can prove — is already on file and will be read for you."
+          label="About this role"
+          placeholder="What the person will actually do, the hours, where they work, what you will not compromise on, anything that would put the wrong applicant off."
+          footnote="The rate and the apply link are never written for you — you fill those in yourself."
+          endpoint="/admin/recruitment/draft"
+          payload={{ role: draftRole }}
           onClose={() => setGenerating(false)}
           onGenerated={(draft) => {
             // A saved draft wins over initialValues inside FormModal, so a
