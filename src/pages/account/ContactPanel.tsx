@@ -22,6 +22,7 @@ import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef, FormValues } from "../../components/forms/fields";
 import { signPaths } from "../../lib/media";
 import { supabase } from "../../lib/supabase";
+import { OnboardingSource } from "../../components/OnboardingSource";
 import { cn } from "../../lib/cn";
 
 /**
@@ -234,6 +235,7 @@ export function ContactPanel() {
 
   return (
     <div className="space-y-4">
+      <OnboardingSource what="Contact and identity" />
       {/* Identity as it will actually appear, not as a list of columns. */}
       <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5 sm:flex-row sm:items-center">
         <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-cool-surface">

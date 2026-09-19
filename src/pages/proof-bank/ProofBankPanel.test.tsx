@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,7 +13,12 @@ vi.mock("../../lib/media", async () => {
   const actual = await vi.importActual<typeof import("../../lib/media")>("../../lib/media");
   return { ...actual, fetchProofAssets, signPaths };
 });
-vi.mock("react-router-dom", () => ({ useParams }));
+vi.mock("react-router-dom", () => ({
+  useParams,
+  // Link renders as an anchor so tests can still find navigation by role.
+  Link: ({ to, children, ...rest }: { to: string; children?: unknown }) =>
+    createElement("a", { href: to, ...rest }, children as never),
+}));
 const { enqueueAgentJob } = vi.hoisted(() => ({ enqueueAgentJob: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({
   supabase: { from: () => ({ select: () => ({ eq: () => ({ order: () => ({ limit: () => Promise.resolve({ data: [] }) }) }) }) }), channel: () => ({ on: () => ({ subscribe: () => ({}) }) }), removeChannel: vi.fn() },

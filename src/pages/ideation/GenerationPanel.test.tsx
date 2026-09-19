@@ -1,8 +1,14 @@
+import { createElement } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 const { from, rpc, update, eq, single, order } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), update: vi.fn(), eq: vi.fn(), single: vi.fn(), order: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
-vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: "client-1" }) }));
+vi.mock("react-router-dom", () => ({
+  useParams: () => ({ clientId: "client-1" }),
+  // Link renders as an anchor so tests can still find navigation by role.
+  Link: ({ to, children, ...rest }: { to: string; children?: unknown }) =>
+    createElement("a", { href: to, ...rest }, children as never),
+}));
 vi.mock("../../lib/useAgentJobs", () => ({ useAgentJobs: () => ({ inFlight: [], recentFailures: [] }) }));
 import { GenerationPanel } from "./GenerationPanel";
 beforeEach(() => {
