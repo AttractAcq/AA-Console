@@ -212,6 +212,53 @@ describe("RecruitmentPanel — writing the ad with AI", () => {
   });
 });
 
+describe("RecruitmentPanel — deleting an ad", () => {
+  beforeEach(() => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  it("deletes the ad and its generated images together", async () => {
+    // client_media_assets.brief_id is ON DELETE SET NULL, so deleting only the
+    // brief would leave its image in Asset review with nothing to say what it
+    // was for. One RPC removes both.
+    briefs = [draft];
+    rpc.mockImplementation((name: string) => {
+      if (name === "aa_house_client_id") return Promise.resolve({ data: HOUSE, error: null });
+      return Promise.resolve({ data: [{ deleted_assets: 1 }], error: null });
+    });
+    render(<RecruitmentPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: /Delete Editor/i }));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("delete_recruitment_ad", { p_brief_id: "brief-1" }),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(/1 generated image/i);
+  });
+
+  it("asks first, and does nothing if the answer is no", async () => {
+    briefs = [draft];
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<RecruitmentPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: /Delete Editor/i }));
+    await waitFor(() => expect(rpc).not.toHaveBeenCalledWith("delete_recruitment_ad", expect.anything()));
+  });
+
+  it("shows the database's refusal rather than pretending it worked", async () => {
+    briefs = [draft];
+    // Selective: a blanket mock would also break the house-client lookup the
+    // panel does on load, and the test would pass for the wrong reason.
+    rpc.mockImplementation((name: string) => {
+      if (name === "aa_house_client_id") return Promise.resolve({ data: HOUSE, error: null });
+      return Promise.resolve({ data: null, error: { message: "That is not a recruitment ad." } });
+    });
+    render(<RecruitmentPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: /Delete Editor/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/not a recruitment ad/i);
+    // A refusal that also announces success is worse than a silent one: the
+    // ad is still there and the screen says it is gone.
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+});
+
 describe("RecruitmentPanel — approve, generate, review, export", () => {
   it("approves a draft through the admin-only RPC", async () => {
     briefs = [draft];

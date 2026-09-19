@@ -4350,6 +4350,10 @@ export type Database = {
         Args: { p_idea_id: string }
         Returns: string
       }
+      delete_recruitment_ad: {
+        Args: { p_brief_id: string }
+        Returns: { deleted_assets: number }[]
+      }
       approve_recruitment_brief: { Args: { p_brief_id: string }; Returns: undefined }
       build_brief_with_ai: {
         Args: {

@@ -91,6 +91,11 @@ function show(campaigns: unknown[] = [planned()], reqs: Requirement[] = NOT_READ
   return render(<CampaignExecutionPanel />);
 }
 
+/** Cards arrive collapsed, so anything inside one has to be opened first. */
+async function open(name = "Winter full-arch push") {
+  await userEvent.click(await screen.findByRole("button", { name: new RegExp(name, "i") }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   useParams.mockReturnValue({ clientId: "client-1" });
@@ -101,6 +106,7 @@ describe("the plan", () => {
   it("shows what the planner decided, not the raw brief", async () => {
     show();
     expect(await screen.findByText("Winter full-arch push")).toBeInTheDocument();
+    await open();
     expect(screen.getByText("Book 40 consultations in January")).toBeInTheDocument();
     expect(screen.getByText("instagram, facebook")).toBeInTheDocument();
     expect(screen.getByText(/consultations booked · target 40/)).toBeInTheDocument();
@@ -108,13 +114,61 @@ describe("the plan", () => {
 
   it("says a campaign is still being planned rather than showing empty fields", async () => {
     show([planned({ built_at: null, objective: null })]);
+    // Visible collapsed, because triaging a list must not need fifteen clicks.
     expect(await screen.findByText(/waiting for the planner/i)).toBeInTheDocument();
+  });
+});
+
+describe("collapsing", () => {
+  it("opens collapsed, so fifteen campaigns are a list and not a wall", async () => {
+    show();
+    await screen.findByText("Winter full-arch push");
+    // The objective stays visible — it is the card's one-line summary. What
+    // goes away is the detail: channels, requirements, and every action.
+    expect(screen.queryByText("instagram, facebook")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Launch" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Before this can launch")).not.toBeInTheDocument();
+  });
+
+  it("still says where a campaign stands while collapsed", async () => {
+    // Otherwise triaging a list means opening every card in it.
+    show();
+    expect(await screen.findByText(/Planned\. · 2 things still missing/)).toBeInTheDocument();
+  });
+
+  it("opens and closes on the heading", async () => {
+    show();
+    const toggle = await screen.findByRole("button", { name: /Winter full-arch push/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("instagram, facebook")).toBeInTheDocument();
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("instagram, facebook")).not.toBeInTheDocument();
+  });
+
+  it("opens one card without opening the rest", async () => {
+    show([planned(), planned({ id: "camp-2", name: "Spring whitening" })]);
+    await userEvent.click(await screen.findByRole("button", { name: /Winter full-arch push/i }));
+    expect(screen.getByRole("button", { name: /Spring whitening/i })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it("keeps the campaign name a heading, so the list is still navigable", async () => {
+    show();
+    expect(await screen.findAllByRole("heading", { level: 3 })).toHaveLength(1);
   });
 });
 
 describe("readiness", () => {
   it("lists every requirement with the reason it is or is not met", async () => {
     show();
+    await open();
     expect(
       await screen.findByText("No page with any HTML in it is attached to this campaign."),
     ).toBeInTheDocument();
@@ -123,6 +177,7 @@ describe("readiness", () => {
 
   it("will not let an unready campaign be launched", async () => {
     show();
+    await open();
     const launch = await screen.findByRole("button", { name: "Launch" });
     expect(launch).toBeDisabled();
     expect(screen.getByText("2 things still missing")).toBeInTheDocument();
@@ -130,6 +185,7 @@ describe("readiness", () => {
 
   it("enables launch only when every requirement is met", async () => {
     show([planned()], READY);
+    await open();
     expect(await screen.findByRole("button", { name: "Launch" })).toBeEnabled();
     expect(screen.queryByText(/still missing/)).not.toBeInTheDocument();
   });
@@ -138,6 +194,7 @@ describe("readiness", () => {
     // No requirements returned means nothing has been verified, which is not
     // the same as everything passing.
     show([planned()], []);
+    await open();
     expect(await screen.findByRole("button", { name: "Launch" })).toBeDisabled();
   });
 });
@@ -155,6 +212,7 @@ describe("building what the campaign needs", () => {
 
   it("builds only the landing page when that is what was asked for", async () => {
     show();
+    await open();
     buildReturns("landing_page");
     await userEvent.click(await screen.findByRole("button", { name: "Build landing page" }));
     expect(rpc).toHaveBeenCalledWith("provision_campaign_artifact", {
@@ -166,6 +224,7 @@ describe("building what the campaign needs", () => {
 
   it("builds only the sales agent when that is what was asked for", async () => {
     show();
+    await open();
     buildReturns("sales_agent");
     await userEvent.click(await screen.findByRole("button", { name: "Build sales agent" }));
     expect(rpc).toHaveBeenCalledWith("provision_campaign_artifact", {
@@ -179,6 +238,7 @@ describe("building what the campaign needs", () => {
     // Deciding later that a campaign should have an agent is ordinary; the
     // alternative is re-planning, which rewrites numbers already acted on.
     show([planned({ needs_sales_agent: false, needs_landing_page: false })]);
+    await open();
     expect(await screen.findByRole("button", { name: "Build sales agent" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Build landing page" })).toBeEnabled();
   });
@@ -186,12 +246,14 @@ describe("building what the campaign needs", () => {
   it("offers neither until the planner has written the campaign", async () => {
     show([planned({ built_at: null, objective: null })]);
     await screen.findByText(/waiting for the planner/i);
+    await open("Winter full-arch push");
     expect(screen.queryByRole("button", { name: "Build landing page" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Build sales agent" })).not.toBeInTheDocument();
   });
 
   it("says plainly when there was nothing left to create", async () => {
     show();
+    await open();
     buildReturns("already_exists");
     // Pressing it twice is the common case — an agent takes minutes and the
     // page looks unchanged while it runs. Silence would read as failure.
@@ -220,6 +282,7 @@ describe("building what the campaign needs", () => {
     });
     render(<CampaignExecutionPanel />);
 
+    await open();
     await userEvent.click(await screen.findByRole("button", { name: "Launch" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Not ready to launch: 0 of 2 pieces ready to distribute.",
@@ -255,9 +318,11 @@ describe("campaign visibility", () => {
     unmount();
   });
   it("shows readiness failure and disables launch", async () => {
+    // show() installs its own rpc mock, so the failure has to be set after it.
     show();
     rpc.mockResolvedValue({ data: null, error: { message: "Not permitted" } });
     expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load readiness");
+    await open();
     expect(screen.getByRole("button", { name: "Launch" })).toBeDisabled();
   });
   it("reports a missing route client instead of pretending there are no campaigns", async () => {
@@ -268,6 +333,7 @@ describe("campaign visibility", () => {
   });
   it("launches a ready campaign through the existing RPC", async () => {
     show([planned()], READY);
+    await open();
     await userEvent.click(await screen.findByRole("button", { name: "Launch" }));
     expect(rpc).toHaveBeenCalledWith("launch_campaign", { p_campaign_id: "camp-1" });
     expect(await screen.findByText(/is live\./)).toBeInTheDocument();
@@ -285,11 +351,13 @@ describe("starting the planner on a campaign that has none", () => {
 
   it("offers to run the planner", async () => {
     show([unplanned()]);
+    await open();
     expect(await screen.findByRole("button", { name: "Run the planner" })).toBeEnabled();
   });
 
   it("queues the planner against that campaign", async () => {
     show([unplanned()]);
+    await open();
     await userEvent.click(await screen.findByRole("button", { name: "Run the planner" }));
     expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", {
       p_agent_key: "campaign_plan",
@@ -302,6 +370,7 @@ describe("starting the planner on a campaign that has none", () => {
 
   it("shows the database's refusal, because it names the missing upstream work", async () => {
     show([unplanned()]);
+    await open();
     const button = await screen.findByRole("button", { name: "Run the planner" });
     // Set after render: show() installs its own rpc implementation.
     rpc.mockImplementation((name: string) => {
@@ -340,6 +409,7 @@ describe("while the planner is running", () => {
   it("will not queue a second paid run of the same planner", async () => {
     useAgentJobs.mockReturnValue({ inFlight: [running("camp-1")], recentFailures: [] });
     show([planned({ built_at: null, objective: null })]);
+    await open();
     const button = await screen.findByRole("button", { name: "Planning…" });
     expect(button).toBeDisabled();
   });
@@ -347,6 +417,7 @@ describe("while the planner is running", () => {
   it("says the planner is working rather than that nobody is", async () => {
     useAgentJobs.mockReturnValue({ inFlight: [running("camp-1")], recentFailures: [] });
     show([planned({ built_at: null, objective: null })]);
+    await open("Winter full-arch push");
     expect(await screen.findByText(/planner is writing this now/i)).toBeInTheDocument();
   });
 
@@ -354,6 +425,7 @@ describe("while the planner is running", () => {
     // A job in flight for a different campaign must not lock this one.
     useAgentJobs.mockReturnValue({ inFlight: [running("camp-OTHER")], recentFailures: [] });
     show([planned({ built_at: null, objective: null })]);
+    await open();
     expect(await screen.findByRole("button", { name: "Run the planner" })).toBeEnabled();
   });
 
@@ -363,6 +435,7 @@ describe("while the planner is running", () => {
       recentFailures: [],
     });
     show([planned({ built_at: null, objective: null })]);
+    await open();
     expect(await screen.findByRole("button", { name: "Run the planner" })).toBeEnabled();
   });
 });

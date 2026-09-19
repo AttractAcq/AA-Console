@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
@@ -200,6 +200,40 @@ export function RecruitmentPanel() {
 
   const { inFlight, recentFailures } = useAgentJobs(houseClientId ?? undefined, refresh);
 
+  /**
+   * Remove an ad and the images made for it.
+   *
+   * The RPC deletes both together: client_media_assets.brief_id is ON DELETE
+   * SET NULL, so deleting only the brief would leave its image in Asset
+   * review with nothing to say what it was for.
+   */
+  async function deleteAd(brief: Brief) {
+    const warning =
+      brief.status === "complete"
+        ? `Delete "${brief.title}"? This also deletes the Meta static generated for it. It cannot be undone.`
+        : `Delete "${brief.title}"? This cannot be undone.`;
+    if (!window.confirm(warning)) return;
+
+    setBusyId(brief.id);
+    setError(null);
+    setNotice(null);
+    const { data, error: rpcError } = await supabase.rpc("delete_recruitment_ad", {
+      p_brief_id: brief.id,
+    });
+    setBusyId(null);
+    if (rpcError) {
+      setError(rpcError.message);
+      return;
+    }
+    const removed = Array.isArray(data) ? (data[0]?.deleted_assets ?? 0) : 0;
+    setNotice(
+      removed > 0
+        ? `Deleted, along with ${removed} generated image${removed === 1 ? "" : "s"}.`
+        : "Deleted.",
+    );
+    void refresh();
+  }
+
   async function approveBrief(id: string) {
     setBusyId(id);
     setError(null);
@@ -330,7 +364,7 @@ export function RecruitmentPanel() {
         <EmptyState label="No recruitment ads yet — pick a role to draft one" />
       ) : (
         <DataTable
-          columns={["Role", "Brief", "Status", ""]}
+          columns={["Role", "Brief", "Status", "", ""]}
           emptyLabel="No recruitment ads yet — pick a role to draft one"
           rows={briefs.map((b) => [
             <span key="r" className="capitalize">
@@ -374,6 +408,19 @@ export function RecruitmentPanel() {
                 {b.status === "in_production" ? "Generating…" : "Actioned"}
               </span>
             ),
+            // Available at every stage. An ad is most often deleted precisely
+            // because it came out wrong, which is after it was generated.
+            <button
+              key="d"
+              type="button"
+              disabled={busyId === b.id}
+              onClick={() => void deleteAd(b)}
+              aria-label={`Delete ${b.title}`}
+              className="inline-flex items-center gap-1 rounded text-xs text-destructive hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Delete
+            </button>,
           ])}
         />
       )}
