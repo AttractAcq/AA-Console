@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { FormModal } from "../../components/forms/FormModal";
@@ -67,6 +67,9 @@ export function CampaignExecutionPanel() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [readiness, setReadiness] = useState<Record<string, Requirement[]>>({});
   const [contentCampaignId, setContentCampaignId] = useState<string | null>(null);
+  // Collapsed on load, every time. A client with fifteen campaigns opened a
+  // page of fifteen full cards; nobody scrolls that to find one.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -255,12 +258,39 @@ export function CampaignExecutionPanel() {
             return (
               <div key={c.id} className="rounded-lg border border-border bg-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-semibold text-card-foreground">{c.name}</h3>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {c.objective ?? c.brief}
-                    </p>
-                  </div>
+                  {/* The whole heading toggles, not a chevron nobody can hit. */}
+                  {/* h3 wraps the button so the campaign name stays a
+                      heading. A heading inside a button would be invalid: a
+                      button may only contain phrasing content. */}
+                  <h3 className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    aria-expanded={expanded.has(c.id)}
+                    onClick={() =>
+                      setExpanded((previous) => {
+                        const next = new Set(previous);
+                        if (next.has(c.id)) next.delete(c.id);
+                        else next.add(c.id);
+                        return next;
+                      })
+                    }
+                    className="flex w-full items-start gap-2 rounded text-left text-sm font-semibold text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <ChevronRight
+                      aria-hidden="true"
+                      className={cn(
+                        "mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                        expanded.has(c.id) && "rotate-90",
+                      )}
+                    />
+                    <span className="min-w-0">
+                      <span className="block">{c.name}</span>
+                      <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
+                        {c.objective ?? c.brief}
+                      </span>
+                    </span>
+                  </button>
+                  </h3>
                   <span
                     className={cn(
                       "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize",
@@ -271,7 +301,7 @@ export function CampaignExecutionPanel() {
                   </span>
                 </div>
 
-                {c.built_at ? (
+                {!expanded.has(c.id) ? null : c.built_at ? (
                   <dl className="mt-3 grid gap-3 border-t border-border pt-3 text-xs sm:grid-cols-4">
                     <div>
                       <dt className="text-muted-foreground">Audience</dt>
@@ -303,6 +333,29 @@ export function CampaignExecutionPanel() {
                   </p>
                 )}
 
+                {/* Collapsed still says where the campaign stands. Triaging a
+                    list of fifteen must not require opening all fifteen.
+                    Built as one string: two expressions in one element become
+                    two text nodes, which no text matcher can see as a
+                    sentence. */}
+                {!expanded.has(c.id) && (
+                  <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+                    {[
+                      c.built_at
+                        ? "Planned."
+                        : isPlanning
+                          ? "The planner is writing this now."
+                          : "Waiting for the planner to write this.",
+                      unmet.length > 0
+                        ? `${unmet.length} thing${unmet.length === 1 ? "" : "s"} still missing`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
+
+                {expanded.has(c.id) && (
                 <div className="mt-3 border-t border-border pt-3">
                   <h4 className="text-xs font-semibold text-foreground">Before this can launch</h4>
                   {reqs.length === 0 ? (
@@ -325,7 +378,9 @@ export function CampaignExecutionPanel() {
                     </ul>
                   )}
                 </div>
+                )}
 
+                {expanded.has(c.id) && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
                   {!c.built_at && (
                     <button
@@ -380,6 +435,7 @@ export function CampaignExecutionPanel() {
                     </span>
                   )}
                 </div>
+                )}
                 {contentCampaignId === c.id && clientId && <CampaignContentPanel key={`${clientId}:${c.id}`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} onChanged={refresh} refreshToken={campaigns} />}
               </div>
             );

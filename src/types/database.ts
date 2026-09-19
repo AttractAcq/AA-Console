@@ -4350,6 +4350,10 @@ export type Database = {
         Args: { p_idea_id: string }
         Returns: string
       }
+      delete_recruitment_ad: {
+        Args: { p_brief_id: string }
+        Returns: { deleted_assets: number }[]
+      }
       approve_recruitment_brief: { Args: { p_brief_id: string }; Returns: undefined }
       build_brief_with_ai: {
         Args: {
@@ -5207,7 +5211,7 @@ export type Database = {
       metric_basis: "daily" | "cumulative"
       metric_entity: "account" | "campaign" | "post" | "page"
       metric_surface: "paid" | "organic" | "landing" | "offer"
-      page_type: "landing" | "offer"
+      page_type: "landing" | "offer" | "recruitment"
       pipeline_stage: "first_touch" | "second_touch" | "call_booked"
       post_channel: "organic" | "paid"
       record_domain:
