@@ -8,6 +8,8 @@ type Brief = {
   id: string;
   title: string;
   body: string | null;
+  avatar_brief?: string | null;
+  editor_brief?: string | null;
   media_type: "image" | "text" | "video";
   brief_ref: string | null;
   status: string;
@@ -53,6 +55,7 @@ export function ApproveAndBuildModal({
   const [members, setMembers] = useState<Member[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [kinds, setKinds] = useState<Set<"editors" | "avatars">>(new Set());
+  const [briefRole, setBriefRole] = useState<"avatar" | "editor" | "full">("full");
   const [dueDate, setDueDate] = useState("");
   const [compensation, setCompensation] = useState("");
   const [busy, setBusy] = useState(false);
@@ -70,7 +73,8 @@ export function ApproveAndBuildModal({
     setQuality("medium");
     setSize("1024x1536");
     setPicked(new Set());
-    setKinds(new Set());
+    setKinds(isVideo ? new Set(["avatars"]) : new Set());
+    setBriefRole(isVideo ? "avatar" : "full");
     setDueDate("");
     setCompensation("");
     setReference(null);
@@ -160,6 +164,7 @@ export function ApproveAndBuildModal({
           // rather than null for the generated types to accept it.
           p_due_date: dueDate || undefined,
           p_compensation: compensation ? Number(compensation) : undefined,
+          p_brief_role: isVideo ? briefRole : "full",
         });
         if (rpcError) throw new Error(rpcError.message);
       }
@@ -358,6 +363,42 @@ export function ApproveAndBuildModal({
 
           {route === "human" && (
             <section className="space-y-4">
+
+              {isVideo && (
+                <div>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Which brief
+                  </h3>
+                  <div className="flex gap-2">
+                    {([
+                      ["avatar", "Send to avatar", "avatars"],
+                      ["editor", "Send to editor", "editors"],
+                    ] as const).map(([role, label, kind]) => (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => {
+                          setBriefRole(role);
+                          setKinds(new Set([kind]));
+                          setPicked(new Set());
+                        }}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          briefRole === role
+                            ? "border-primary bg-primary/5 text-foreground"
+                            : "border-border text-muted-foreground hover:border-primary/50",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Each role gets its own brief. Sending one does not send the other.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Send to</h3>
                 <div className="flex gap-2">

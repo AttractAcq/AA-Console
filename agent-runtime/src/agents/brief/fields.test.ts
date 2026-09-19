@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { briefSubmitTool, composeBody, briefColumns, fieldsFor } from "./fields.js";
+import { briefSubmitTool, composeBody, composeAvatarBody, composeEditorBody, briefColumns, fieldsFor } from "./fields.js";
 
 const full = {
   title: "Spring whitening",
@@ -152,5 +152,33 @@ describe("the proof reference the brief may cite", () => {
 
   it("is not stored as a brief column, since it resolves to a foreign key", () => {
     expect(briefColumns("image", { proof_ref: "HD-0019" })).not.toHaveProperty("proof_ref");
+  });
+});
+
+
+describe("video dual role bodies", () => {
+  it("builds an avatar brief without editor assembly fields", () => {
+    const body = composeAvatarBody(full);
+    expect(body).toContain("# Avatar brief");
+    expect(body).toContain("## Script");
+    expect(body).toContain(full.script);
+    expect(body).not.toContain("## B-roll");
+    expect(body).not.toContain("## Argument");
+    expect(body).not.toContain("## Channel");
+  });
+
+  it("builds an editor brief without wardrobe-only production framing as the lead", () => {
+    const body = composeEditorBody(full);
+    expect(body).toContain("# Editor brief");
+    expect(body).toContain("## B-roll");
+    expect(body).toContain("## Channel");
+    expect(body).toContain(full.b_roll);
+    // Premise/wardrobe notes are avatar-side; editor still gets script for captions.
+    expect(body).not.toContain("## Premise");
+  });
+
+  it("leaves role bodies unused for image — caller keeps columns null", () => {
+    // compose helpers are video-oriented; image/text persistence skips them.
+    expect(fieldsFor("image").map(([n]) => n)).not.toContain("b_roll");
   });
 });

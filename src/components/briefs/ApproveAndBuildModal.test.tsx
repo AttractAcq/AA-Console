@@ -232,6 +232,7 @@ describe("ApproveAndBuildModal — the human route", () => {
       p_member_ids: ["ed-1"],
       p_due_date: "2026-09-30",
       p_compensation: 120.5,
+      p_brief_role: "full",
     });
     expect(onDone).toHaveBeenCalled();
   });
@@ -246,6 +247,7 @@ describe("ApproveAndBuildModal — the human route", () => {
 
     await waitFor(() => expect(rpc).toHaveBeenCalledOnce());
     expect(rpc.mock.calls[0][1]).toMatchObject({
+      p_brief_role: "full",
       p_due_date: undefined,
       p_compensation: undefined,
     });
@@ -275,7 +277,25 @@ describe("ApproveAndBuildModal — the human route", () => {
     await user.click(screen.getByRole("button", { name: /editors/i }));
     expect(screen.getByText(/No active people in that group/i)).toBeInTheDocument();
   });
+
+  it("video send passes p_brief_role avatar", async () => {
+    const user = userEvent.setup();
+    show({
+      media_type: "video",
+      avatar_brief: "Say the line.",
+      editor_brief: "Cut on the blink.",
+    });
+    await user.click(await screen.findByRole("button", { name: /send to avatar/i }));
+    await user.click(await screen.findByLabelText(/Ava Avatar/));
+    await user.click(screen.getByRole("button", { name: /Send to 1/ }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledOnce());
+    expect(rpc.mock.calls[0][1]).toMatchObject({
+      p_brief_role: "avatar",
+      p_member_ids: ["av-1"],
+    });
+  });
 });
+
 
 describe("ApproveAndBuildModal — reopening", () => {
   // A modal that remembers the last brief's choices is how the wrong

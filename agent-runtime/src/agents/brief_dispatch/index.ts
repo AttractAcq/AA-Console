@@ -60,7 +60,7 @@ export async function runBriefDispatchJob(
 
   const { data: dispatch, error } = await sb
     .from("brief_dispatches")
-    .select("id, brief_id, member_id, client_id, assignment_id, email_status")
+    .select("id, brief_id, member_id, client_id, assignment_id, email_status, brief_role")
     .eq("id", dispatchId)
     .maybeSingle();
   if (error) throw new Error(`Could not load the dispatch: ${error.message}`);
@@ -94,7 +94,7 @@ export async function runBriefDispatchJob(
 
   const [{ data: member }, { data: brief }, { data: client }, { data: assignment }] = await Promise.all([
     sb.from("team_members").select("name, user_id").eq("id", dispatch.member_id).maybeSingle(),
-    sb.from("client_briefs").select("title, body, media_type").eq("id", dispatch.brief_id).maybeSingle(),
+    sb.from("client_briefs").select("title, body, media_type, avatar_brief, editor_brief").eq("id", dispatch.brief_id).maybeSingle(),
     sb.from("clients").select("name").eq("id", dispatch.client_id).maybeSingle(),
     dispatch.assignment_id
       ? sb.from("job_assignments").select("due_date").eq("id", dispatch.assignment_id).maybeSingle()
@@ -109,6 +109,14 @@ export async function runBriefDispatchJob(
   const { data: profile } = member.user_id
     ? await sb.from("profiles").select("email").eq("id", member.user_id).maybeSingle()
     : { data: null };
+  const role = (dispatch as { brief_role?: string }).brief_role ?? "full";
+  const roleBody =
+    role === "avatar"
+      ? (brief.avatar_brief ?? brief.body ?? "")
+      : role === "editor"
+        ? (brief.editor_brief ?? brief.body ?? "")
+        : (brief.body ?? "");
+
   const to = profile?.email;
   if (!to) {
     const message = `${member.name} has no email address on their account, so nothing could be sent.`;
@@ -124,12 +132,12 @@ export async function runBriefDispatchJob(
     body: JSON.stringify({
       from: config.resendFrom,
       to: [to],
-      subject: `New ${brief.media_type} brief — ${brief.title}`,
+      subject: `New ${brief.media_type}${role === "full" ? "" : ` (${role})`} brief — ${brief.title}`,
       html: body({
         memberName: member.name,
         clientName: client?.name ?? "a client",
         briefTitle: brief.title,
-        briefBody: brief.body ?? "",
+        briefBody: roleBody,
         mediaType: brief.media_type,
         dueDate: (assignment as { due_date?: string } | null)?.due_date ?? null,
         consoleUrl: config.consoleUrl,

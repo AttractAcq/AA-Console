@@ -258,7 +258,9 @@ const ROUTES: Record<string, Route> = {
       const compensation = body.compensation;
       const quality = body.quality === undefined ? undefined : str(body, 'quality');
       const size = body.size === undefined ? undefined : str(body, 'size');
+      const brief_role = body.brief_role === undefined ? undefined : str(body, 'brief_role');
       if (!client_id || !brief_id || (route !== 'ai' && route !== 'human')
+          || (brief_role !== undefined && brief_role !== 'avatar' && brief_role !== 'editor' && brief_role !== 'full')
           || (due_date !== undefined && !DATE.test(due_date))
           || (compensation !== undefined && (typeof compensation !== 'number' || compensation < 0 || compensation > 1_000_000))
           || (quality !== undefined && quality !== 'low' && quality !== 'medium' && quality !== 'high')
@@ -266,7 +268,7 @@ const ROUTES: Record<string, Route> = {
           || (member_ids !== undefined && (!Array.isArray(member_ids) || member_ids.length < 1 || member_ids.length > 20
             || member_ids.some((m) => typeof m !== 'string' || !UUID.test(m))))
           || (route === 'human' && (!Array.isArray(member_ids) || member_ids.length < 1))
-          || !subset(body, ['client_id', 'brief_id', 'route', 'member_ids', 'due_date', 'compensation', 'quality', 'size'])) {
+          || !subset(body, ['client_id', 'brief_id', 'route', 'member_ids', 'due_date', 'compensation', 'quality', 'size', 'brief_role'])) {
         return undefined;
       }
       return {
@@ -276,6 +278,7 @@ const ROUTES: Record<string, Route> = {
         ...(compensation === undefined ? {} : { p_compensation: compensation }),
         ...(quality === undefined ? {} : { p_quality: quality }),
         ...(size === undefined ? {} : { p_size: size }),
+        ...(brief_role === undefined ? {} : { p_brief_role: brief_role }),
       };
     },
   },
