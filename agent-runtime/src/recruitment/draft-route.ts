@@ -19,7 +19,7 @@ import { logger } from "../logging/logger.js";
 import { ProviderError, runAgentLoop } from "../tools/anthropic.js";
 import { loadUpstreamRecords, renderContext, renderUpstream } from "../agents/shared.js";
 import type { BusinessContext } from "../agents/shared.js";
-import { draftProblem, normaliseDraft } from "./draft.js";
+import { draftProblem, normaliseDraft, META_CTAS } from "./draft.js";
 
 const ROLES = ["editor", "smm", "avatar"] as const;
 const ROLE_LABEL: Record<string, string> = {
@@ -51,7 +51,9 @@ const SUBMIT_TOOL = {
       },
       call_to_action: {
         type: "string",
-        description: "The action asked for. Two or three words, under 30 characters.",
+        enum: [...META_CTAS],
+        description:
+          "The Meta call-to-action BUTTON. This is chosen from Meta's fixed list, not written — APPLY_NOW unless the ad is deliberately asking for something else.",
       },
       visual_direction: {
         type: "string",

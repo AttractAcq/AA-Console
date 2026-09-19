@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { clampToSentence, draftProblem, normaliseDraft, DRAFT_FIELDS } from "./draft.js";
+import { clampToSentence, draftProblem, normaliseDraft, DRAFT_FIELDS, META_CTAS } from "./draft.js";
 
 const good = (over: Record<string, unknown> = {}) => ({
   title: "Editor — vertical cutdowns for dental practices",
   hook: "Cut the work that actually ships",
   script:
     "Attract Acquisition is hiring an editor for vertical cutdowns. You take an approved brief and turn it into a still that looks like the practice it belongs to. Durban hours, start in January.",
-  call_to_action: "Apply now",
+  call_to_action: "APPLY_NOW",
   visual_direction:
     "A quiet editing desk, documentary light, a real timeline on screen. No stock handshakes.",
   premise: "We hire editors who finish assets, not decorate briefs.",
@@ -119,7 +119,7 @@ describe("things a model must never put in a hiring ad", () => {
   });
 
   it("rejects an invented link, because Apply URL is a person's job", () => {
-    expect(draftProblem(good({ call_to_action: "Apply at attractacq.com/jobs" }))).toMatch(/link/i);
+    expect(draftProblem(good({ hook: "Apply at attractacq.com/jobs" }))).toMatch(/link/i);
     expect(
       draftProblem(good({ script: good().script + " Apply at https://example.com/apply" })),
     ).toMatch(/link/i);
@@ -156,5 +156,34 @@ describe("normaliseDraft", () => {
     const out = normaliseDraft({ ...good(), title: "  Editor  ", premise: 42 });
     expect(out.title).toBe("Editor");
     expect(out.premise).toBe("");
+  });
+});
+
+
+// The generator was writing prose — "Apply with three cutdowns", "Apply to run
+// the calendar". Good copy, and unusable: the CTA on a Meta static is a button
+// from a fixed list, so whoever built the ad would have had to pick a real one
+// and discard the words.
+describe("the call to action is a Meta button, not a sentence", () => {
+  it("accepts every button Meta offers for a link ad", () => {
+    for (const cta of META_CTAS) {
+      expect(draftProblem(good({ call_to_action: cta })), cta).toBeNull();
+    }
+  });
+
+  it("rejects the prose the generator actually produced, and lists the real options", () => {
+    const problem = draftProblem(good({ call_to_action: "Apply with three cutdowns" }));
+    expect(problem).toMatch(/not a Meta call-to-action button/i);
+    expect(problem).toContain("APPLY_NOW");
+  });
+
+  it("rejects a label that merely looks right", () => {
+    // "Apply now" is the label; APPLY_NOW is the value Meta takes.
+    expect(draftProblem(good({ call_to_action: "Apply now" }))).toMatch(/not a Meta call-to-action/i);
+    expect(draftProblem(good({ call_to_action: "apply_now" }))).toMatch(/not a Meta call-to-action/i);
+  });
+
+  it("still requires one at all", () => {
+    expect(draftProblem(good({ call_to_action: "" }))).toMatch(/no call to action/i);
   });
 });

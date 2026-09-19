@@ -15,6 +15,8 @@ import { REVIEW_TONE, signPaths, type MediaAsset } from "../../lib/media";
 import {
   RECRUITMENT_ROLES,
   RECRUITMENT_ROLE_LABEL,
+  META_CTAS,
+  DEFAULT_CTA,
   buildRecruitmentCopyPack,
   downloadRecruitmentCopyPack,
   type RecruitmentRole,
@@ -57,7 +59,14 @@ function briefFields(role: RecruitmentRole): FieldDef[] {
     { name: "title", label: "Title", kind: "text", required: true, placeholder: "Internal title for this brief" },
     { name: "hook", label: "Headline", kind: "text", required: true, placeholder: "The largest words on the ad" },
     { name: "script", label: "Primary text", kind: "textarea", required: true, rows: 4, placeholder: "What the role actually involves" },
-    { name: "call_to_action", label: "Call to action", kind: "text", required: true, placeholder: "Apply now" },
+    {
+      name: "call_to_action",
+      label: "Call to action",
+      kind: "select",
+      required: true,
+      options: META_CTAS.map((c) => ({ value: c.value, label: c.label })),
+      hint: "Meta renders this as a button from its own fixed list — it is chosen, not written.",
+    },
     {
       name: "apply_url",
       label: "Apply URL",
@@ -615,7 +624,7 @@ export function RecruitmentPanel() {
         initialValues={
           aiDraft
             ? { ...aiDraft, apply_url: "", compensation_text: "" }
-            : undefined
+            : { call_to_action: DEFAULT_CTA }
         }
         onSubmit={async (v) => {
           if (!draftRole) return;

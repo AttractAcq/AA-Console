@@ -6,6 +6,8 @@ import {
   buildRecruitmentCopyPack,
   formatRecruitmentCopyPack,
   isRecruitmentRole,
+  META_CTAS,
+  ctaLabel,
 } from "./recruitment";
 import * as recruitment from "./recruitment";
 
@@ -96,5 +98,60 @@ describe("export pack shape", () => {
 
   it("refuses a pack for a role that is not in the P0 enum", () => {
     expect(() => buildRecruitmentCopyPack({ ...base, role: "producer" })).toThrow(/editor, smm or avatar/);
+  });
+});
+
+
+// The generator was writing prose CTAs — "Apply with three cutdowns". Good
+// copy, and unusable: Meta renders a button from its own fixed list, so
+// whoever built the ad had to pick a real one and discard the words.
+describe("the Meta call-to-action button", () => {
+  it("offers only buttons that work on a link ad to an apply URL", () => {
+    expect(META_CTAS.map((c) => c.value)).toEqual([
+      "APPLY_NOW", "LEARN_MORE", "SIGN_UP", "CONTACT_US",
+    ]);
+  });
+
+  it("renders the label a person reads, not the API value", () => {
+    expect(ctaLabel("APPLY_NOW")).toBe("Apply now");
+    expect(ctaLabel("CONTACT_US")).toBe("Contact us");
+  });
+
+  it("still renders briefs written before the CTA was a fixed value", () => {
+    // One production brief holds the prose "Apply now". It must keep showing.
+    expect(ctaLabel("Apply now")).toBe("Apply now");
+    expect(ctaLabel("Apply with three cutdowns")).toBe("Apply with three cutdowns");
+    expect(ctaLabel(null)).toBe("");
+  });
+});
+
+describe("the copy pack names the button", () => {
+  const source = {
+    role: "editor",
+    hook: "Cut the work that ships",
+    script: "You take an approved brief and finish it.",
+    call_to_action: "APPLY_NOW",
+    apply_url: "https://attractacq.com/careers/editor",
+    compensation_text: null,
+    asset: { id: "a1", ref_number: "AA-0029", storage_path: "house/ad.png" },
+  };
+
+  it("prints the label and the value, because the person setting up the ad needs both", () => {
+    const text = formatRecruitmentCopyPack(buildRecruitmentCopyPack(source));
+    expect(text).toContain("CTA BUTTON: Apply now (APPLY_NOW)");
+  });
+
+  it("takes the button from the brief, not the creative concept", () => {
+    // Headline and primary text come from the concept, but the button is an
+    // ad-level setting — the image copy has no say in it.
+    const text = formatRecruitmentCopyPack(
+      buildRecruitmentCopyPack({
+        ...source,
+        concept: { headline: "A better headline", call_to_action: "Swipe up now" },
+      }),
+    );
+    expect(text).toContain("CTA BUTTON: Apply now (APPLY_NOW)");
+    expect(text).not.toContain("Swipe up now");
+    expect(text).toContain("A better headline");
   });
 });
