@@ -91,6 +91,11 @@ beforeEach(() => {
       captured.push(String(args[1] ?? args[0]));
       return chain;
     };
+    // MediaDetailModal reads team_members and creative_renders through this
+    // same fallback and ends each with maybeSingle. Without it the modal's
+    // effect rejects, which passes locally as an unhandled rejection and fails
+    // in CI — correctly, because a component that throws on open is broken.
+    chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
     chain.then = (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
       Promise.resolve({
         data: captured.includes("approved") ? approved : pending,
