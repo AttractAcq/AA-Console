@@ -7,6 +7,8 @@ import { EmptyState } from "../../components/EmptyState";
 import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef, FormValues } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
+import { clearDraft } from "../../components/forms/FormModal";
+import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 
 /**
  * The root of the whole application. Every agent reads this, and the four
@@ -44,6 +46,10 @@ type ContextRow = Record<string, string | null>;
 
 export function BusinessContextPanel() {
   const [inputOpen, setInputOpen] = useState(false);
+  const [researching, setResearching] = useState(false);
+  const [aiDraft, setAiDraft] = useState<Record<string, string> | null>(null);
+  // Shown, not saved: a researched draft is only useful if it can be checked.
+  const [sources, setSources] = useState<string | null>(null);
   const { clientId } = useParams<{ clientId: string }>();
   const [row, setRow] = useState<ContextRow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -105,12 +111,25 @@ export function BusinessContextPanel() {
 
       <FormModal
         open={inputOpen}
-        onClose={() => setInputOpen(false)}
+        onClose={() => {
+          setInputOpen(false);
+          setAiDraft(null);
+          setSources(null);
+        }}
         title="Business Input"
         draftKey={`business-context:${clientId}`}
         intro="The four required fields are what every downstream agent reads. Partial saves are fine."
         fields={FIELDS}
-        initialValues={initialValues}
+        initialValues={aiDraft ?? initialValues}
+        actions={
+          <button
+            type="button"
+            onClick={() => setResearching(true)}
+            className="rounded-md border border-border px-3 py-2 text-sm font-medium text-card-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Generate with AI
+          </button>
+        }
         onSubmit={async (values) => {
           if (!clientId) throw new Error("No client selected.");
           const payload = Object.fromEntries(
@@ -121,8 +140,43 @@ export function BusinessContextPanel() {
             .upsert({ client_id: clientId, ...payload }, { onConflict: "client_id" });
           if (error) throw error;
         }}
-        onSaved={refresh}
+        onSaved={() => {
+          setAiDraft(null);
+          setSources(null);
+          void refresh();
+        }}
       />
+
+      {sources && (
+        <p className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          {/* Where it came from, so the draft can be checked before it is
+              saved. Not stored: an agent reading it back would treat a list
+              of URLs as business context. */}
+          <span className="font-medium text-foreground">Drafted from:</span> {sources}
+        </p>
+      )}
+
+      {clientId && (
+        <GenerateWithAIDialog<Record<string, string>>
+          open={researching}
+          title="Draft the business context"
+          intro="Reads the client's website and what they have published, and fills the form from it. Everything comes back as a draft for you to correct — nothing is saved until you press Save."
+          label="What you know from talking to them (optional)"
+          placeholder="Anything the website will not say: what they actually sell, who walks in, what they will not do, what the last agency got wrong. This is trusted over anything found online."
+          footnote="Revenue is never researched — you type those two fields or they stay empty. Anything it could not find is left blank rather than guessed."
+          endpoint="/admin/business-context/draft"
+          payload={{ clientId }}
+          requireNotes={false}
+          onClose={() => setResearching(false)}
+          onGenerated={(draft, drafted) => {
+            // A saved draft wins over initialValues inside FormModal, so a
+            // half-typed form would silently swallow the research.
+            clearDraft(`business-context:${clientId}`);
+            setAiDraft(draft);
+            setSources(drafted ?? null);
+          }}
+        />
+      )}
     </div>
   );
 }

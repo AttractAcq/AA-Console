@@ -41,7 +41,7 @@ export function GenerateWithAIDialog<T>({
   requireNotes?: boolean;
   footnote?: string;
   onClose: () => void;
-  onGenerated: (draft: T) => void;
+  onGenerated: (draft: T, sources?: string) => void;
 }) {
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
@@ -53,8 +53,11 @@ export function GenerateWithAIDialog<T>({
     setBusy(true);
     setProblem(null);
     try {
-      const result = await callRuntime<{ draft: T }>(endpoint, { ...payload, notes: notes.trim() });
-      onGenerated(result.draft);
+      const result = await callRuntime<{ draft: T; sources?: string }>(endpoint, {
+        ...payload,
+        notes: notes.trim(),
+      });
+      onGenerated(result.draft, result.sources);
       setNotes("");
       onClose();
     } catch (error) {
