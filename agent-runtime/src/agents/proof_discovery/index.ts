@@ -17,6 +17,7 @@ import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
+import { SEARCH_BUDGET, coveredPlatforms, platformsToSearch } from "./plan.js";
 
 const PROOF_TYPES = [
   "customer_result", "testimonial", "review", "case_study", "before_after",
@@ -187,6 +188,8 @@ export async function runProofDiscoveryJob(
     .join("\n");
 
   const already = (existing ?? []) as Array<{ source: string | null; claim: string | null }>;
+  // Where the last run actually got to, read from the URLs it filed.
+  const covered = coveredPlatforms(already.map((e) => e.source));
   const alreadyText = already.length
     ? already.map((e) => `- ${e.claim ?? "(no claim)"}${e.source ? ` — ${e.source}` : ""}`).join("\n")
     : "(nothing on file yet)";
@@ -201,7 +204,14 @@ ${context?.main_offer ? `Main offer: ${context.main_offer}` : ""}
 ALREADY ON FILE — do not submit these again
 ${alreadyText}
 
-Search thoroughly, then call ${submitTool.name} once. Submit only finds you can point at with a URL.`;
+WHERE TO LOOK FIRST
+${platformsToSearch(client.sector as string | null, covered).map((platform: string) => `- ${platform}`).join("\n")}
+${covered.length > 0 ? `\nA previous run already found things on: ${covered.join(", ")}. Look there last, and only for what is new.` : ""}
+
+YOU HAVE ${SEARCH_BUDGET} SEARCHES
+Spend them on the platforms above rather than on finding out which platforms exist. Stop when a platform is exhausted — a business with little published is a finding, and burning the budget to confirm it costs money and changes nothing.
+
+Then call ${submitTool.name} once. Submit only finds you can point at with a URL.`;
 
   await appendEvent(sb, job.id, `Searching for published proof for ${client.name}.`);
 
@@ -216,6 +226,10 @@ Search thoroughly, then call ${submitTool.name} once. Submit only finds you can 
       prompt,
       submitTool,
       enableWebSearch: true,
+      // Chosen rather than inherited: the library default is 12, and nobody
+      // had picked it. Most of a run's cost is result tokens re-entering
+      // context, so this is the lever that matters.
+      maxSearches: SEARCH_BUDGET,
       onProgress: (note) => void appendEvent(sb, job.id, note),
     });
   } catch (error) {

@@ -169,7 +169,7 @@ export function ProofBankPanel() {
         open={findOpen}
         onClose={() => setFindOpen(false)}
         title="Find proof online"
-        body="Searches the web for proof this business has already published — reviews and ratings, directory listings, press, awards, registrations, case studies on their own site. Each find is filed with the URL it came from so you can check it. Nothing is cleared for use: finding a review is not permission to advertise with it, so everything lands awaiting your decision. Takes a few minutes and costs roughly $0.40."
+        body="Searches the web for proof this business has already published — reviews and ratings, directory listings, press, awards, registrations, case studies on their own site. Each find is filed with the URL it came from so you can check it. Nothing is cleared for use: finding a review is not permission to advertise with it, so everything lands awaiting your decision. Takes a few minutes. The one production run so far cost $0.53; the search budget has since been tightened, so expect roughly $0.35."
         confirmLabel="Search"
         onConfirm={async () => {
           if (!clientId) throw new Error("No client selected.");
