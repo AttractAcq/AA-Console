@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, useParams, useAgentJobs } = vi.hoisted(() => ({
+const { from, rpc, useParams, useAgentJobs, callRuntime } = vi.hoisted(() => ({
+  callRuntime: vi.fn(),
   from: vi.fn(),
   rpc: vi.fn(),
   useParams: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("../../lib/supabase", () => ({
   },
 }));
 vi.mock("react-router-dom", () => ({ useParams }));
+vi.mock("../../lib/callRuntime", () => ({ callRuntime }));
 // Only the hook is faked; agentLabel and elapsedLabel are real, because the
 // activity bar renders them.
 vi.mock("../../lib/useAgentJobs", async (importOriginal) => ({
@@ -437,5 +439,67 @@ describe("while the planner is running", () => {
     show([planned({ built_at: null, objective: null })]);
     await open();
     expect(await screen.findByRole("button", { name: "Run the planner" })).toBeEnabled();
+  });
+});
+
+// New Campaign asks for a name and a one-line ask. The answer to "which
+// campaign is worth running" is sitting in the client's own records — the
+// offer strategy, the ICP, the money model, the competitor work — and nobody
+// reads all of it before typing a campaign name.
+describe("proposing a campaign", () => {
+  const PROPOSAL = {
+    name: "January full-arch diary fill",
+    brief:
+      "Fill the January consultation diary with full-arch patients, using the written plan assessment the offer strategy says nobody is using.",
+  };
+
+  async function openProposer() {
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Generate with AI" }));
+  }
+
+  it("asks the runtime for a proposal and fills the form", async () => {
+    callRuntime.mockResolvedValue({ draft: PROPOSAL });
+    await openProposer();
+
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+    await waitFor(() =>
+      expect(callRuntime).toHaveBeenCalledWith("/admin/campaigns/draft", {
+        clientId: "client-1",
+        notes: "",
+      }),
+    );
+    expect(await screen.findByDisplayValue(PROPOSAL.name)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(PROPOSAL.brief)).toBeInTheDocument();
+  });
+
+  it("generates from a blank box, because the strategy is already on file", async () => {
+    // Unlike a hiring brief, where the operator knows things written down
+    // nowhere, a campaign proposal has the records to work from.
+    callRuntime.mockResolvedValue({ draft: PROPOSAL });
+    await openProposer();
+    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+  });
+
+  it("sends the steer when there is one", async () => {
+    callRuntime.mockResolvedValue({ draft: PROPOSAL });
+    await openProposer();
+    await userEvent.type(screen.getByLabelText(/Anything to steer it/i), "Push the January diary.");
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+    await waitFor(() =>
+      expect(callRuntime).toHaveBeenCalledWith("/admin/campaigns/draft", {
+        clientId: "client-1",
+        notes: "Push the January diary.",
+      }),
+    );
+  });
+
+  it("shows the runtime's refusal and stays open to try again", async () => {
+    callRuntime.mockRejectedValue(new Error("The ask names a budget."));
+    await openProposer();
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/names a budget/i);
+    expect(screen.getByLabelText(/Anything to steer it/i)).toBeInTheDocument();
   });
 });
