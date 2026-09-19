@@ -20,6 +20,7 @@ type Page = {
   status: string;
   body: string | null;
   published_url: string | null;
+  reference_asset_id: string | null;
   publish_status: string;
   site_repository_id: string | null;
   created_at: string;
@@ -67,6 +68,8 @@ export function PageBuilderPanel({
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [pageLinks, setPageLinks] = useState<PageCampaignLink[]>([]);
   const [repos, setRepos] = useState<SiteRepo[]>([]);
+  // The approved ads a recruitment page can be the destination for.
+  const [ads, setAds] = useState<{ id: string; title: string | null; ref_number: string | null }[]>([]);
   const [campaignSelections, setCampaignSelections] = useState<Record<string, string>>({});
   const [busyPageId, setBusyPageId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -78,11 +81,11 @@ export function PageBuilderPanel({
     setLoadError(null);
     try {
       if (!clientId) return;
-      const [pageRows, campaignRows, linkRows, repoRows] = await Promise.all([
+      const [pageRows, campaignRows, linkRows, adRows, repoRows] = await Promise.all([
         supabase
           .from("client_pages")
           .select(
-            "id, title, status, body, published_url, publish_status, site_repository_id, created_at, html, current_revision, meta_title, meta_description, built_at",
+            "id, title, status, body, published_url, publish_status, site_repository_id, reference_asset_id, created_at, html, current_revision, meta_title, meta_description, built_at",
           )
           .eq("client_id", clientId)
           .eq("page_type", pageType)
@@ -103,6 +106,15 @@ export function PageBuilderPanel({
           .eq("kind", "landing_page"),
         // The site this client's pages publish onto. One site holds many
         // pages, each at its own path.
+        isRecruitment
+          ? supabase
+              .from("client_media_assets")
+              .select("id, title, ref_number")
+              .eq("client_id", clientId)
+              .eq("purpose", "recruitment")
+              .eq("review_status", "approved")
+              .order("created_at", { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
         supabase
           .from("client_site_repositories")
           .select("id, owner, repo, status, pages_url")
@@ -116,6 +128,7 @@ export function PageBuilderPanel({
       const links = (linkRows.data ?? []) as PageCampaignLink[];
       setPageLinks(links);
       setRepos((repoRows.data ?? []) as SiteRepo[]);
+      setAds((adRows.data ?? []) as { id: string; title: string | null; ref_number: string | null }[]);
       setCampaignSelections((previous) => {
         const selections: Record<string, string> = {};
         for (const page of (pageRows.data ?? []) as Page[]) {
@@ -184,6 +197,31 @@ export function PageBuilderPanel({
     }
   };
 
+  /**
+   * Tie a page to the ad it is the destination for, after the fact.
+   *
+   * The pairing is often decided later — the ad gets approved, and only then
+   * does anyone decide which page it should point at.
+   */
+  const setReferenceAsset = async (page: Page, assetId: string) => {
+    if (!clientId || busyPageId) return;
+    setBusyPageId(page.id);
+    setActionError(null);
+    setNotice(null);
+    const { error } = await supabase
+      .from("client_pages")
+      .update({ reference_asset_id: assetId || null })
+      .eq("id", page.id)
+      .eq("client_id", clientId);
+    setBusyPageId(null);
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
+    setNotice(assetId ? "Linked to that ad." : "No longer tied to an ad.");
+    void refresh();
+  };
+
   const deletePage = async (page: Page) => {
     if (!clientId || busyPageId) return;
     const message = page.published_url
@@ -213,19 +251,37 @@ export function PageBuilderPanel({
   };
   const fields: FieldDef[] = useMemo(() => [
     { name: "title", label: "Page title", kind: "text", required: true },
-    {
-      name: "campaign_id",
-      label: "Campaign",
-      kind: "select",
-      options: [
-        { value: "", label: "Not linked to a campaign" },
-        ...campaigns.map((campaign) => ({
-          value: campaign.id,
-          label: `${campaign.name} · ${campaign.status}`,
-        })),
-      ],
-      hint: "Optional. Linked pages count toward that campaign's landing page requirement.",
-    },
+    ...(isRecruitment
+      ? [
+          {
+            name: "reference_asset_id",
+            label: "The ad this page is for",
+            kind: "select" as const,
+            options: [
+              { value: "", label: "Not tied to an ad" },
+              ...ads.map((ad) => ({
+                value: ad.id,
+                label: `${ad.title ?? "Untitled"}${ad.ref_number ? ` · ${ad.ref_number}` : ""}`,
+              })),
+            ],
+            hint: "Optional. The agent is given that ad's headline and body so the page continues what the reader just clicked.",
+          },
+        ]
+      : [
+          {
+            name: "campaign_id",
+            label: "Campaign",
+            kind: "select" as const,
+            options: [
+              { value: "", label: "Not linked to a campaign" },
+              ...campaigns.map((campaign) => ({
+                value: campaign.id,
+                label: `${campaign.name} · ${campaign.status}`,
+              })),
+            ],
+            hint: "Optional. Linked pages count toward that campaign's landing page requirement.",
+          },
+        ]),
     {
       name: "html_file",
       label: "Built HTML file",
@@ -240,7 +296,7 @@ export function PageBuilderPanel({
       rows: 4,
       hint: "Required if no HTML file is uploaded. The agent writes the page from this, your offer strategy, your ICP and whatever proof is on file.",
     },
-  ], [campaigns]);
+  ], [campaigns, ads, isRecruitment]);
 
   if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
@@ -309,10 +365,39 @@ export function PageBuilderPanel({
                 />
               </div>
 
+              {isRecruitment && (
+                <div className="mt-4 border-t border-border pt-3">
+                  <label htmlFor={`page-ad-${p.id}`} className="mb-1 block text-xs text-muted-foreground">
+                    The ad this page is for
+                  </label>
+                  {/* Saves on change rather than behind a button: there is one
+                      field, and a second click to confirm one choice is a
+                      click nobody thanks you for. */}
+                  <select
+                    id={`page-ad-${p.id}`}
+                    value={p.reference_asset_id ?? ""}
+                    onChange={(event) => void setReferenceAsset(p, event.target.value)}
+                    disabled={busyPageId !== null}
+                    className="w-full rounded-md border border-border bg-card px-2 py-2 text-sm text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                  >
+                    <option value="">Not tied to an ad</option>
+                    {ads.map((ad) => (
+                      <option key={ad.id} value={ad.id}>
+                        {ad.title ?? "Untitled"}
+                        {ad.ref_number ? ` · ${ad.ref_number}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="mt-4 border-t border-border pt-3">
+                {!isRecruitment && (
                 <label htmlFor={`page-campaign-${p.id}`} className="mb-1 block text-xs text-muted-foreground">
                   Campaign for {p.title}
                 </label>
+                )}
+                {!isRecruitment && (
                 <select
                   id={`page-campaign-${p.id}`}
                   value={campaignSelections[p.id] ?? pageLinks.find((link) => link.page_id === p.id)?.campaign_id ?? ""}
@@ -325,7 +410,9 @@ export function PageBuilderPanel({
                     <option key={campaign.id} value={campaign.id}>{campaign.name} · {campaign.status}</option>
                   ))}
                 </select>
+                )}
                 <div className="mt-2 flex items-center gap-3">
+                  {!isRecruitment && (
                   <button
                     type="button"
                     onClick={() => void saveCampaign(p)}
@@ -334,6 +421,7 @@ export function PageBuilderPanel({
                   >
                     {busyPageId === p.id ? "Saving…" : "Save campaign"}
                   </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => void deletePage(p)}
@@ -363,6 +451,10 @@ export function PageBuilderPanel({
           const title = (v.title as string).trim();
           const brief = typeof v.brief === "string" ? v.brief.trim() : "";
           const campaignId = typeof v.campaign_id === "string" ? v.campaign_id : "";
+          const referenceAssetId =
+            typeof v.reference_asset_id === "string" && v.reference_asset_id
+              ? v.reference_asset_id
+              : null;
           const htmlFile = v.html_file instanceof File ? v.html_file : null;
           const html = htmlFile ? await htmlFile.text() : "";
           if (!htmlFile && !brief) {
@@ -384,6 +476,7 @@ export function PageBuilderPanel({
               meta_title: htmlFile ? title : null,
               meta_description: htmlFile && brief ? brief : null,
               built_at: htmlFile ? new Date().toISOString() : null,
+              reference_asset_id: referenceAssetId,
             })
             .select("id")
             .single();

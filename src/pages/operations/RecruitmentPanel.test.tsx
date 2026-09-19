@@ -212,6 +212,54 @@ describe("RecruitmentPanel — writing the ad with AI", () => {
   });
 });
 
+describe("RecruitmentPanel — reviewing the packs", () => {
+  it("separates the three roles, because they are three different packs", async () => {
+    briefs = [draft, { ...draft, id: "brief-2", recruitment_role: "smm", title: "SMM — AA" }];
+    pending = [
+      pendingAsset,
+      { ...pendingAsset, id: "asset-2", brief_id: "brief-2", title: "SMM still" },
+    ];
+    render(<RecruitmentPanel />);
+
+    expect(await screen.findByRole("tab", { name: /All \(2\)/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Editor \(1\)/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Social Media Manager \(1\)/ })).toBeInTheDocument();
+  });
+
+  it("shows only the chosen role's assets", async () => {
+    briefs = [draft, { ...draft, id: "brief-2", recruitment_role: "smm", title: "SMM — AA" }];
+    pending = [
+      pendingAsset,
+      { ...pendingAsset, id: "asset-2", brief_id: "brief-2", title: "SMM still" },
+    ];
+    render(<RecruitmentPanel />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: /Social Media Manager/ }));
+    expect(screen.getByText("SMM still")).toBeInTheDocument();
+    // The fixture's editor asset is titled "Editor ad" — asserting on a title
+    // that never existed is how this test passed with the filter removed.
+    expect(screen.queryByText("Editor ad")).not.toBeInTheDocument();
+  });
+
+  it("says the role is empty rather than that nothing needs review", async () => {
+    // "Nothing waiting for review" while five assets sit under another tab is
+    // a lie the filter would otherwise tell.
+    briefs = [draft];
+    pending = [pendingAsset];
+    render(<RecruitmentPanel />);
+    await userEvent.click(await screen.findByRole("tab", { name: /Avatar/ }));
+    expect(screen.getByText(/Nothing waiting for review in this role/i)).toBeInTheDocument();
+  });
+
+  it("opens an asset full size when its preview is clicked", async () => {
+    briefs = [draft];
+    pending = [pendingAsset];
+    render(<RecruitmentPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /Open Editor ad/i }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+});
+
 describe("RecruitmentPanel — deleting an ad", () => {
   beforeEach(() => {
     vi.spyOn(window, "confirm").mockReturnValue(true);

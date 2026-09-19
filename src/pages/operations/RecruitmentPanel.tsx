@@ -8,6 +8,7 @@ import { FormModal, clearDraft } from "../../components/forms/FormModal";
 import { GenerateBriefDialog, type GeneratedBrief } from "../../components/forms/GenerateBriefDialog";
 import type { FieldDef } from "../../components/forms/fields";
 import { MediaCard, StatusBadge } from "../../components/MediaCard";
+import { MediaDetailModal } from "../../components/MediaDetailModal";
 import { cn } from "../../lib/cn";
 import { REVIEW_TONE, signPaths, type MediaAsset } from "../../lib/media";
 import {
@@ -103,6 +104,9 @@ export function RecruitmentPanel() {
   // already open — FormModal only reseeds when initialValues changes identity.
   const [aiDraft, setAiDraft] = useState<GeneratedBrief | null>(null);
   const [rejecting, setRejecting] = useState<MediaAsset | null>(null);
+  const [viewing, setViewing] = useState<MediaAsset | null>(null);
+  // An asset carries no role of its own — it lives on the brief it came from.
+  const [roleFilter, setRoleFilter] = useState<RecruitmentRole | "all">("all");
   const [reason, setReason] = useState("");
 
   const refresh = useCallback(async () => {
@@ -199,6 +203,15 @@ export function RecruitmentPanel() {
   }, [refresh]);
 
   const { inFlight, recentFailures } = useAgentJobs(houseClientId ?? undefined, refresh);
+
+  /** An asset's role, via the brief it was generated from. */
+  const roleOf = (asset: MediaAsset): RecruitmentRole | null => {
+    const brief = briefs.find((b) => b.id === asset.brief_id);
+    return brief?.recruitment_role ?? null;
+  };
+  const inFilter = (asset: MediaAsset) => roleFilter === "all" || roleOf(asset) === roleFilter;
+  const visiblePending = pending.filter(inFilter);
+  const visibleApproved = approved.filter(inFilter);
 
   /**
    * Remove an ad and the images made for it.
@@ -426,17 +439,52 @@ export function RecruitmentPanel() {
       )}
 
       <h2 className="mb-3 mt-8 text-sm font-semibold text-foreground">Asset review</h2>
-      {pending.length === 0 ? (
-        <p className="mb-6 text-sm text-muted-foreground">Nothing waiting for review.</p>
+
+      {/* Three roles produce three packs of creative that look nothing alike
+          and are reviewed for different things. One undifferentiated grid made
+          you read every card to find the ones you came for. */}
+      <div role="tablist" aria-label="Filter assets by role" className="mb-3 flex flex-wrap gap-1">
+        {([["all", "All"], ...RECRUITMENT_ROLES.map((r) => [r, RECRUITMENT_ROLE_LABEL[r]] as const)] as const).map(
+          ([value, label]) => {
+            const count =
+              value === "all"
+                ? pending.length + approved.length
+                : pending.filter((a) => roleOf(a) === value).length +
+                  approved.filter((a) => roleOf(a) === value).length;
+            return (
+              <button
+                key={value}
+                role="tab"
+                type="button"
+                aria-selected={roleFilter === value}
+                onClick={() => setRoleFilter(value as RecruitmentRole | "all")}
+                className={cn(
+                  "rounded-md px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  roleFilter === value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                )}
+              >
+                {label} ({count})
+              </button>
+            );
+          },
+        )}
+      </div>
+      {visiblePending.length === 0 ? (
+        <p className="mb-6 text-sm text-muted-foreground">
+          {pending.length === 0 ? "Nothing waiting for review." : "Nothing waiting for review in this role."}
+        </p>
       ) : (
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {pending.map((asset) => (
+          {visiblePending.map((asset) => (
             <MediaCard
               key={asset.id}
               mediaType={asset.media_type}
               url={urls.get(asset.storage_path)}
               title={asset.title ?? "Untitled"}
               meta={`${asset.ref_number ?? "—"}`}
+              onOpen={() => setViewing(asset)}
               badge={<StatusBadge status={asset.review_status} tone={REVIEW_TONE[asset.review_status]} />}
               actions={
                 <>
@@ -467,17 +515,22 @@ export function RecruitmentPanel() {
       )}
 
       <h2 className="mb-3 text-sm font-semibold text-foreground">Export copy pack</h2>
-      {approved.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Approved ads appear here for download.</p>
+      {visibleApproved.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {approved.length === 0
+            ? "Approved ads appear here for download."
+            : "No approved ads in this role."}
+        </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {approved.map((asset) => (
+          {visibleApproved.map((asset) => (
             <MediaCard
               key={asset.id}
               mediaType={asset.media_type}
               url={urls.get(asset.storage_path)}
               title={asset.title ?? "Untitled"}
               meta={`${asset.ref_number ?? "—"}`}
+              onOpen={() => setViewing(asset)}
               badge={<StatusBadge status={asset.review_status} tone={REVIEW_TONE[asset.review_status]} />}
               actions={
                 <button
@@ -492,6 +545,13 @@ export function RecruitmentPanel() {
           ))}
         </div>
       )}
+
+      <MediaDetailModal
+        asset={viewing}
+        url={viewing ? urls.get(viewing.storage_path) : undefined}
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+      />
 
       {pickingRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
