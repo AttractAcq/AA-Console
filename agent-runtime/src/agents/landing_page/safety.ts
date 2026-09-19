@@ -49,3 +49,35 @@ export function pageProblem(headline: string, html: string): string | null {
   if (!headline) return "The page came back with no headline.";
   return htmlSafetyProblem(html);
 }
+
+
+/**
+ * Whether a hiring page reads as one.
+ *
+ * The same check the hiring ADS needed: a page that never says a job is open
+ * is a page somebody clicked a job advert to reach and then could not place.
+ * Read against the rendered text, because that is all a visitor sees.
+ *
+ * Deliberately generous about HOW it says it — "we're hiring", "this role",
+ * "apply" in a heading — and strict only that it says it somewhere near the
+ * top. A hiring page that buries the fact in a footer has the same problem.
+ */
+const HIRING_SIGNAL =
+  /\b(hiring|we'?re hiring|now hiring|recruiting|vacancy|vacancies|this role|the role|join (?:the|our) team|apply (?:now|for|to))\b/i;
+
+/** Roughly the first screen: enough to judge what the page announces itself as. */
+const FIRST_SCREEN = 2500;
+
+export function recruitmentPageProblem(headline: string, html: string): string | null {
+  const safety = pageProblem(headline, html);
+  if (safety) return safety;
+
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  if (!HIRING_SIGNAL.test(text)) {
+    return "Nothing on this page says a job is open. A visitor arriving from a hiring ad has to be able to tell within a screen that this is a job advert.";
+  }
+  if (!HIRING_SIGNAL.test(`${headline} ${text.slice(0, FIRST_SCREEN)}`)) {
+    return "The page only mentions the job further down. Say it in the headline or the opening, where somebody who just clicked an ad will look.";
+  }
+  return null;
+}
