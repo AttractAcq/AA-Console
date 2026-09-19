@@ -2069,6 +2069,7 @@ export type Database = {
           publish_status: string
           published_at: string | null
           published_commit: string | null
+          reference_asset_id: string | null
           published_url: string | null
           site_path: string | null
           site_repository_id: string | null
@@ -2095,6 +2096,7 @@ export type Database = {
           publish_status?: string
           published_at?: string | null
           published_commit?: string | null
+          reference_asset_id?: string | null
           published_url?: string | null
           site_path?: string | null
           site_repository_id?: string | null
@@ -2121,6 +2123,7 @@ export type Database = {
           publish_status?: string
           published_at?: string | null
           published_commit?: string | null
+          reference_asset_id?: string | null
           published_url?: string | null
           site_path?: string | null
           site_repository_id?: string | null

@@ -14,6 +14,7 @@ export function MediaCard({
   body,
   badge,
   actions,
+  onOpen,
 }: {
   title: string;
   meta?: string;
@@ -23,33 +24,55 @@ export function MediaCard({
   body?: string | null;
   badge?: ReactNode;
   actions?: ReactNode;
+  /**
+   * Opens the asset full size. The preview becomes a button when given — a
+   * thumbnail you cannot open is one you have to squint at.
+   */
+  onOpen?: () => void;
 }) {
-  return (
-    <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-card">
-      <div className="flex min-h-[150px] items-center justify-center bg-cool-surface">
-        {mediaType === "text" ? (
-          <div className="max-h-[150px] w-full overflow-y-auto p-4">
-            {body ? (
-              <p className="whitespace-pre-wrap text-sm text-muted-foreground">{body}</p>
-            ) : (
-              <FileText className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" />
-            )}
-          </div>
-        ) : url && mediaType === "image" ? (
-          <img src={url} alt={title} className="max-h-[180px] w-full object-cover" />
-        ) : url && mediaType === "video" ? (
-          <video src={url} controls className="max-h-[180px] w-full" />
+  const preview =
+    mediaType === "text" ? (
+      <div className="max-h-[150px] w-full overflow-y-auto p-4">
+        {body ? (
+          <p className="whitespace-pre-wrap text-sm text-muted-foreground">{body}</p>
         ) : (
-          <div className="flex flex-col items-center gap-1.5 py-8 text-muted-foreground">
-            {mediaType === "video" ? (
-              <Film className="h-6 w-6" aria-hidden="true" />
-            ) : (
-              <ImageOff className="h-6 w-6" aria-hidden="true" />
-            )}
-            <span className="text-xs">Preview unavailable</span>
-          </div>
+          <FileText className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" />
         )}
       </div>
+    ) : url && mediaType === "image" ? (
+      <img src={url} alt={title} className="max-h-[180px] w-full object-cover" />
+    ) : url && mediaType === "video" ? (
+      <video src={url} controls className="max-h-[180px] w-full" />
+    ) : (
+      <div className="flex flex-col items-center gap-1.5 py-8 text-muted-foreground">
+        {mediaType === "video" ? (
+          <Film className="h-6 w-6" aria-hidden="true" />
+        ) : (
+          <ImageOff className="h-6 w-6" aria-hidden="true" />
+        )}
+        <span className="text-xs">Preview unavailable</span>
+      </div>
+    );
+
+  const frame = "flex min-h-[150px] w-full items-center justify-center bg-cool-surface";
+
+  return (
+    <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-card">
+      {onOpen ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={`Open ${title}`}
+          className={cn(
+            frame,
+            "overflow-hidden transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+          )}
+        >
+          {preview}
+        </button>
+      ) : (
+        <div className={frame}>{preview}</div>
+      )}
 
       <div className="flex flex-1 flex-col gap-2 border-t border-border p-3.5">
         <div className="flex items-start justify-between gap-2">

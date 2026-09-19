@@ -19,12 +19,39 @@ import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js";
 import type { BusinessContext } from "../shared.js";
 import { loadPagePackage, renderPackage } from "./aggregate.js";
-import { pageProblem } from "./safety.js";
+import { pageProblem, recruitmentPageProblem } from "./safety.js";
 
 const PAGE_KIND: Record<string, string> = {
   landing: "a primary landing page — the main page traffic is sent to, carrying the core offer",
   offer: "a secondary offer page — a focused page for one specific offer, usually reached from elsewhere",
+  recruitment:
+    "a hiring page — where a recruitment ad sends somebody who is deciding whether to apply for a job at Attract Acquisition",
 };
+
+/**
+ * What a hiring page has to do that a selling page does not.
+ *
+ * Without this the agent writes a conversion page: it takes the offer strategy
+ * and the ICP it is handed, and produces marketing aimed at the businesses AA
+ * sells to. That is exactly what happened to the hiring ADS before the same
+ * fix landed in creative_build — a good page for the wrong reader.
+ */
+const RECRUITMENT_BLOCK = `THIS IS A HIRING PAGE, NOT A SELLING PAGE
+
+The reader is a person deciding whether to apply for a job. They are not a business deciding whether to buy, and nothing on this page is being sold to them.
+
+So the page must say, at the top and in plain words, that Attract Acquisition is hiring and for what. A visitor who cannot tell within one screen that this is a job advert has been sent to the wrong page.
+
+WHAT IT HAS TO COVER
+- What the work actually is, day to day. Not "join our dynamic team".
+- Who it suits, and — just as usefully — who it does not. A page that puts off the wrong applicant has done half the job.
+- What happens next: how to apply, and what to expect after applying.
+
+THE OFFER STRATEGY AND ICP BELOW DESCRIBE WHO AA SELLS TO
+They are context for what the work involves — whose accounts this person would handle — and they are NOT the audience for this page. Do not write to them.
+
+NEVER INVENT ANY OF THIS
+A salary, a day rate, a benefit, a start date, an office location, a team size, or how many people applied. If the brief does not state it, the page does not mention it. A candidate who accepts on the strength of an invented number finds out at the offer stage, and that is AA's problem to have caused.`;
 
 export async function runLandingPageJob(
   sb: SupabaseClient,
@@ -46,7 +73,7 @@ export async function runLandingPageJob(
 
   const { data: page, error: pageError } = await sb
     .from("client_pages")
-    .select("id, page_type, title, brief")
+    .select("id, page_type, title, brief, reference_asset_id")
     .eq("id", job.input_id)
     .maybeSingle();
   if (pageError) throw new Error(`Failed to load page: ${pageError.message}`);
@@ -126,10 +153,45 @@ export async function runLandingPageJob(
   };
 
   const kind = PAGE_KIND[page.page_type] ?? PAGE_KIND.landing;
+  const isRecruitment = page.page_type === "recruitment";
+
+  // The ad somebody clicked to get here. A page whose headline argues
+  // something different from the creative that sent them reads as the wrong
+  // page, however good it is on its own.
+  let adBlock = "";
+  if (page.reference_asset_id) {
+    const { data: asset } = await sb
+      .from("client_media_assets")
+      .select("title, ref_number, brief_id")
+      .eq("id", page.reference_asset_id)
+      .maybeSingle();
+    if (asset) {
+      const { data: adBrief } = asset.brief_id
+        ? await sb
+            .from("client_briefs")
+            .select("hook, script, call_to_action")
+            .eq("id", asset.brief_id)
+            .maybeSingle()
+        : { data: null };
+      adBlock = [
+        "",
+        "THE AD THIS PAGE IS THE DESTINATION FOR",
+        "Somebody reaching this page has just read the words below. Continue that argument — do not restate it, and do not contradict it.",
+        `Creative: ${String(asset.title ?? asset.ref_number ?? "untitled")}`,
+        adBrief?.hook ? `Headline they saw: ${adBrief.hook}` : null,
+        adBrief?.script ? `Body they saw: ${adBrief.script}` : null,
+        adBrief?.call_to_action ? `Button they pressed: ${adBrief.call_to_action}` : null,
+        "",
+      ]
+        .filter((line) => line !== null)
+        .join("\n");
+    }
+  }
 
   const system = `You write conversion pages for Attract Acquisition, a marketing agency.
 
 You are writing ${kind}.
+${isRecruitment ? `\n${RECRUITMENT_BLOCK}\n` : ""}
 
 WHAT MAKES THIS PAGE WORK
 - The headline earns the next line, and every line earns the one after it. A visitor who stops reading has been failed by the previous sentence, not by their attention span.
@@ -166,7 +228,7 @@ ICP AND BRAND STRATEGY — who is reading, and the voice to hold
 ${renderUpstream(records.filter((r) => r.domain !== "offer_strategy"))}
 
 ${packageBlock}
-
+${adBlock}
 Call ${submitTool.name} once when you are done.`;
 
   await appendEvent(sb, job.id, `Writing ${page.page_type} page "${page.title}".`);
@@ -211,7 +273,9 @@ Call ${submitTool.name} once when you are done.`;
   const headline = s("headline");
   const html = s("html");
 
-  const problem = pageProblem(headline, html);
+  const problem = isRecruitment
+    ? recruitmentPageProblem(headline, html)
+    : pageProblem(headline, html);
   if (problem) {
     return { ok: false, retryable: true, failureMessage: problem, usage };
   }
