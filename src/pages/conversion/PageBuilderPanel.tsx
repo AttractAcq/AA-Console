@@ -4,7 +4,8 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Panel } from "../../components/Panel";
 import { EmptyState } from "../../components/EmptyState";
-import { FormModal } from "../../components/forms/FormModal";
+import { FormModal, clearDraft } from "../../components/forms/FormModal";
+import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
@@ -58,6 +59,8 @@ export function PageBuilderPanel({
   clientId?: string;
 }) {
   const [buildOpen, setBuildOpen] = useState(false);
+  const [briefing, setBriefing] = useState(false);
+  const [aiBrief, setAiBrief] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const { clientId: routeClientId } = useParams<{ clientId: string }>();
   const clientId = clientIdProp ?? routeClientId;
@@ -440,12 +443,25 @@ export function PageBuilderPanel({
 
       <FormModal
         open={buildOpen}
-        onClose={() => setBuildOpen(false)}
+        onClose={() => {
+          setBuildOpen(false);
+          setAiBrief(null);
+        }}
         title="Build Page"
         draftKey={`page:${pageType}:${clientId}`}
         intro="Upload finished HTML when the page already exists, or leave the file empty to queue the page agent."
         fields={fields}
         submitLabel="Save page"
+        initialValues={aiBrief ? { brief: aiBrief } : undefined}
+        actions={
+          <button
+            type="button"
+            onClick={() => setBriefing(true)}
+            className="rounded-md border border-border px-3 py-2 text-sm font-medium text-card-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Generate with AI
+          </button>
+        }
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
           const title = (v.title as string).trim();
@@ -506,8 +522,30 @@ export function PageBuilderPanel({
           if (jobError) throw new Error(jobError.message);
           setNotice(campaignId ? "Queued. The agent is writing the campaign page now." : "Queued. The agent is writing the page now.");
         }}
-        onSaved={refresh}
+        onSaved={() => {
+          setAiBrief(null);
+          void refresh();
+        }}
       />
+
+      {clientId && (
+        <GenerateWithAIDialog<{ ask: string }>
+          open={briefing}
+          title="Brief the page"
+          intro="The page agent already reads your offer strategy, ICP, brand voice and cleared proof. This writes the ask it starts from — what this page is doing that your other pages are not."
+          label="Anything to steer it (optional)"
+          placeholder="What this page is for, the one action it should ask for, anything it must not promise. Leave it blank and it will propose what the records say this page should do."
+          footnote="It will not name a price or a guarantee. Pages you already have are read, so this one is briefed to do something they do not."
+          endpoint="/admin/briefs/draft"
+          payload={{ clientId, kind: "page", variant: pageType }}
+          requireNotes={false}
+          onClose={() => setBriefing(false)}
+          onGenerated={(draft) => {
+            clearDraft(`page:${pageType}:${clientId}`);
+            setAiBrief(draft.ask);
+          }}
+        />
+      )}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

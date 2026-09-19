@@ -1,8 +1,9 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, useParams, getUser } = vi.hoisted(() => ({
+const { from, rpc, useParams, getUser, callRuntime } = vi.hoisted(() => ({
+  callRuntime: vi.fn(),
   from: vi.fn(),
   rpc: vi.fn(),
   useParams: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock("../../lib/supabase", () => ({
   },
 }));
 vi.mock("react-router-dom", () => ({ useParams }));
+vi.mock("../../lib/callRuntime", () => ({ callRuntime }));
 
 import { SalesOverviewPanel } from "./SalesOverviewPanel";
 import { liveStateOf, sinceLabel } from "./liveState";
@@ -359,5 +361,51 @@ describe("revoking approval", () => {
     );
     expect(update.mock.calls[0]?.[0]).not.toHaveProperty("status");
     expect(await screen.findByText(/has been revoked/i)).toBeInTheDocument();
+  });
+});
+
+// The builder already reads the offer strategy, the ICP, the brand voice and
+// the cleared proof. The purpose field is what it starts from — the moment
+// this agent works in and where it has to stop.
+describe("briefing a sales agent", () => {
+  const ASK = {
+    ask: "Meets somebody who has just read the full-arch page and is deciding whether to phone. Gets a time in the diary for a paid assessment. Never discusses price — the practice prices after imaging.",
+  };
+
+  async function openBriefer() {
+    render(<SalesOverviewPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /Build Sales Agent/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Generate with AI" }));
+  }
+
+  it("asks the runtime for the surface it was told to brief", async () => {
+    callRuntime.mockResolvedValue({ draft: ASK });
+    await openBriefer();
+
+    await userEvent.selectOptions(screen.getByLabelText(/Which surface/i), "appointment_setter");
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    await waitFor(() =>
+      expect(callRuntime).toHaveBeenCalledWith("/admin/briefs/draft", {
+        clientId: "client-1",
+        kind: "sales_agent",
+        variant: "appointment_setter",
+        notes: "",
+      }),
+    );
+  });
+
+  it("puts the ask into the purpose field", async () => {
+    callRuntime.mockResolvedValue({ draft: ASK });
+    await openBriefer();
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(await screen.findByDisplayValue(ASK.ask)).toBeInTheDocument();
+  });
+
+  it("shows the runtime's refusal and stays open", async () => {
+    callRuntime.mockRejectedValue(new Error("The ask is written in marketing register rather than saying anything."));
+    await openBriefer();
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/marketing register/i);
   });
 });

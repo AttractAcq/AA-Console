@@ -8,6 +8,8 @@ import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
+import { clearDraft } from "../../components/forms/FormModal";
+import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import { cn } from "../../lib/cn";
 import { liveStateOf, sinceLabel, STATE_TONE } from "./liveState";
 import {
@@ -76,6 +78,11 @@ export function SalesOverviewPanel() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [builds, setBuilds] = useState<Record<string, { status: string }>>({});
   const [buildOpen, setBuildOpen] = useState(false);
+  const [briefing, setBriefing] = useState(false);
+  const [aiPurpose, setAiPurpose] = useState<string | null>(null);
+  // Which surface the brief is for — the generator writes a different ask for
+  // a setter than for a nurture agent.
+  const [briefRole, setBriefRole] = useState("inbound_qualifier");
   const [openId, setOpenId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ kind: "approve" | "revoke"; agent: SalesAgent } | null>(
     null,
@@ -374,12 +381,25 @@ export function SalesOverviewPanel() {
 
       <FormModal
         open={buildOpen}
-        onClose={() => setBuildOpen(false)}
+        onClose={() => {
+          setBuildOpen(false);
+          setAiPurpose(null);
+        }}
         title="Build Sales Agent"
         draftKey={`sales-agent:${clientId}`}
         intro="Queues the Sales Agent Builder. It needs your offer strategy and ICP, takes a couple of minutes, and this page fills in on its own when it finishes."
         fields={fields}
         submitLabel="Build"
+        initialValues={aiPurpose ? { purpose: aiPurpose, role: briefRole } : undefined}
+        actions={
+          <button
+            type="button"
+            onClick={() => setBriefing(true)}
+            className="rounded-md border border-border px-3 py-2 text-sm font-medium text-card-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Generate with AI
+          </button>
+        }
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
           const { data, error } = await supabase
@@ -404,8 +424,51 @@ export function SalesOverviewPanel() {
           if (jobError) throw new Error(jobError.message);
           setNotice("Queued. The builder is writing the agent now.");
         }}
-        onSaved={refresh}
+        onSaved={() => {
+          setAiPurpose(null);
+          void refresh();
+        }}
       />
+
+      {clientId && (
+        <GenerateWithAIDialog<{ ask: string }>
+          open={briefing}
+          title="Brief the sales agent"
+          intro="The builder already reads your offer strategy, ICP, brand voice and cleared proof. This writes the ask it starts from — the moment this agent works in and where it has to stop."
+          label="Anything to steer it (optional)"
+          placeholder="What this one is for, what it must never say, what counts as a win. Leave it blank and it will propose what the records say this surface should do."
+          footnote="It will not name a price or a timeframe. Agents you already have are read, so this one is briefed to do something they do not."
+          endpoint="/admin/briefs/draft"
+          payload={{ clientId, kind: "sales_agent", variant: briefRole }}
+          requireNotes={false}
+          extra={
+            <>
+              {/* Which surface first: the ask for a setter is a different ask
+                  from the one for a nurture agent. */}
+              <label htmlFor="brief-role" className="mb-1 block text-sm font-medium text-card-foreground">
+                Which surface
+              </label>
+              <select
+                id="brief-role"
+                value={briefRole}
+                onChange={(e) => setBriefRole(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {Object.entries(ROLE_LABEL).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </>
+          }
+          onClose={() => setBriefing(false)}
+          onGenerated={(draft) => {
+            clearDraft(`sales-agent:${clientId}`);
+            setAiPurpose(draft.ask);
+          }}
+        />
+      )}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
