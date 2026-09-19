@@ -6,6 +6,7 @@ import { Panel } from "../../components/Panel";
 import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef, FormValues } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
+import { OnboardingSource } from "../../components/OnboardingSource";
 import { cn } from "../../lib/cn";
 
 /**
@@ -132,6 +133,7 @@ export function BrandPanel() {
 
   return (
     <div className="space-y-4">
+      <OnboardingSource what="Brand and design" />
       <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5 sm:flex-row sm:items-center">
         <div className="flex shrink-0 items-center gap-1.5">
           {COLOURS.map(([key]) =>

@@ -7,6 +7,7 @@ import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
 import { ACCESS_LEVEL_OPTIONS } from "../../lib/options";
 import { supabase } from "../../lib/supabase";
+import { SYNCING_PROVIDERS } from "../../lib/onboarding";
 import { cn } from "../../lib/cn";
 
 type Integration = {
@@ -117,9 +118,31 @@ export function IntegrationsPanel() {
 
   if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
+  // The credentials onboarding asks for, and whether they have arrived. Read
+  // from the same list onboarding scores itself against, so the two cannot
+  // disagree about what "credentials collected" means.
+  const connected = new Set(rows.map((r) => r.provider));
+  const outstanding = SYNCING_PROVIDERS.filter((p) => !connected.has(p));
+
   return (
     <div>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          {outstanding.length === 0 ? (
+            <>
+              Both credentials onboarding asks for are connected. Reporting and attribution have
+              numbers to pull.
+            </>
+          ) : (
+            <>
+              Onboarding is waiting on:{" "}
+              <span className="font-medium capitalize text-foreground">
+                {outstanding.join(", ")}
+              </span>
+              . Until these are here, reporting and attribution have nothing to read.
+            </>
+          )}
+        </p>
         <Button icon={Plus} onClick={() => setAddOpen(true)}>
           Add
         </Button>
