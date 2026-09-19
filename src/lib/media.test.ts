@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 // lib/supabase.ts creates a real client (and hits import.meta.env) at
 // import time, so anything that pulls in ./media must have this mocked
@@ -13,7 +13,7 @@ vi.mock("./supabase", () => ({
   },
 }));
 
-const { REVIEW_TONE, shortDate, signPaths } = await import("./media");
+const { REVIEW_TONE, fetchTextBodies, shortDate, signPaths } = await import("./media");
 
 describe("shortDate", () => {
   it("renders an ISO timestamp as just the date", () => {
@@ -57,5 +57,47 @@ describe("signPaths", () => {
     createSignedUrls.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
     const result = await signPaths("client-media", ["a.png"]);
     expect(result.size).toBe(0);
+  });
+});
+
+describe("fetchTextBodies", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("loads markdown from each signed URL", async () => {
+    const fetchMock = vi.fn(async () => new Response("# Hello\nCopy body", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await fetchTextBodies(
+      [{ id: "asset-1", storage_path: "c/generated/a.md" }],
+      new Map([["c/generated/a.md", "https://signed/a.md"]]),
+    );
+    expect(result.get("asset-1")).toBe("# Hello\nCopy body");
+    expect(fetchMock).toHaveBeenCalledWith("https://signed/a.md");
+  });
+
+  it("omits files that fail to fetch rather than throwing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network");
+      }),
+    );
+    const result = await fetchTextBodies(
+      [{ id: "asset-1", storage_path: "c/generated/a.md" }],
+      new Map([["c/generated/a.md", "https://signed/a.md"]]),
+    );
+    expect(result.size).toBe(0);
+  });
+
+  it("skips rows with no signed URL", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await fetchTextBodies(
+      [{ id: "asset-1", storage_path: "c/generated/a.md" }],
+      new Map(),
+    );
+    expect(result.size).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

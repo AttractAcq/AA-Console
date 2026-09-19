@@ -6,7 +6,7 @@ import { MediaCard, StatusBadge } from "./MediaCard";
 import { MediaDetailModal } from "./MediaDetailModal";
 import { dateSortOptions } from "../data/sortOptions";
 import type { SortOptionId } from "../data/sortOptions";
-import { REVIEW_TONE, fetchClientAssets, shortDate, signPaths } from "../lib/media";
+import { REVIEW_TONE, fetchClientAssets, fetchTextBodies, shortDate, signPaths } from "../lib/media";
 import type { MediaAsset } from "../lib/media";
 
 const SOURCE_NOTE: Record<string, string> = {
@@ -50,20 +50,7 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
     // A text asset's file IS the content, so fetch it. Capped and
     // best-effort: one unreadable file must not blank the whole library.
     if (mediaType === "text") {
-      const fetched = new Map<string, string>();
-      await Promise.all(
-        rows.slice(0, 30).map(async (row) => {
-          const url = signed.get(row.storage_path);
-          if (!url) return;
-          try {
-            const response = await fetch(url);
-            if (response.ok) fetched.set(row.id, (await response.text()).slice(0, 4000));
-          } catch {
-            // leave it out; the card falls back to its icon
-          }
-        }),
-      );
-      setBodies(fetched);
+      setBodies(await fetchTextBodies(rows, signed));
     }
     setLoading(false);
     } catch (error) {

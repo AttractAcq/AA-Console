@@ -7,7 +7,7 @@ import { MediaCard, StatusBadge } from "../../components/MediaCard";
 import { MediaDetailModal } from "../../components/MediaDetailModal";
 import { mediaFilters } from "../../data/mediaFilters";
 import type { MediaFilterId } from "../../data/mediaFilters";
-import { REVIEW_TONE, fetchClientAssets, shortDate, signPaths } from "../../lib/media";
+import { REVIEW_TONE, fetchClientAssets, fetchTextBodies, shortDate, signPaths } from "../../lib/media";
 import type { MediaAsset } from "../../lib/media";
 import { supabase } from "../../lib/supabase";
 
@@ -20,6 +20,7 @@ export function ApprovalsPanel() {
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const [bodies, setBodies] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +44,11 @@ export function ApprovalsPanel() {
       reviewStatus: "pending",
     });
     setAssets(rows);
-    setUrls(await signPaths("client-media", rows.map((r) => r.storage_path)));
+    const signed = await signPaths("client-media", rows.map((r) => r.storage_path));
+    setUrls(signed);
+    // Same as Copy library: a text asset's file IS the content. Without this
+    // the preview modal only has a signed URL and shows "could not be loaded".
+    setBodies(await fetchTextBodies(rows.filter((r) => r.media_type === "text"), signed));
     setLoading(false);
     } catch (error) {
       setLoadError("Failed to load approvals: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
@@ -103,6 +108,7 @@ export function ApprovalsPanel() {
               key={asset.id}
               mediaType={asset.media_type}
               url={urls.get(asset.storage_path)}
+              body={bodies.get(asset.id)}
               title={asset.title ?? "Untitled"}
               meta={`${asset.ref_number ?? "—"} · ${shortDate(asset.created_at)}`}
               badge={
@@ -204,6 +210,7 @@ export function ApprovalsPanel() {
       <MediaDetailModal
         asset={preview}
         url={preview ? urls.get(preview.storage_path) : undefined}
+        body={preview ? bodies.get(preview.id) : undefined}
         open={preview !== null}
         onClose={() => setPreview(null)}
       />

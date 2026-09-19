@@ -22,6 +22,31 @@ export async function signPaths(
   );
 }
 
+/**
+ * A text asset's file IS the content, so fetch it from the signed URL.
+ * Capped and best-effort: one unreadable file must not blank the whole list.
+ */
+export async function fetchTextBodies(
+  rows: Array<{ id: string; storage_path: string }>,
+  signed: Map<string, string>,
+  limit = 30,
+): Promise<Map<string, string>> {
+  const fetched = new Map<string, string>();
+  await Promise.all(
+    rows.slice(0, limit).map(async (row) => {
+      const url = signed.get(row.storage_path);
+      if (!url) return;
+      try {
+        const response = await fetch(url);
+        if (response.ok) fetched.set(row.id, (await response.text()).slice(0, 4000));
+      } catch {
+        // leave it out; the card falls back to its icon
+      }
+    }),
+  );
+  return fetched;
+}
+
 export type MediaAsset = {
   id: string;
   client_id: string;
