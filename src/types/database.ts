@@ -934,17 +934,19 @@ export type Database = {
       }
       client_briefs: {
         Row: {
+          apply_url: string | null
           argument: string | null
           avatar_brief: string | null
           b_roll: string | null
           body: string | null
-          editor_brief: string | null
           brief_ref: string | null
           call_to_action: string | null
           channel_intent: string | null
           client_id: string
+          compensation_text: string | null
           created_at: string
           derived_from_asset_id: string | null
+          editor_brief: string | null
           hook: string | null
           id: string
           job_id: string | null
@@ -953,10 +955,10 @@ export type Database = {
           production_method: string | null
           proof: string | null
           proof_asset_id: string | null
-          apply_url: string | null
-          compensation_text: string | null
           purpose: Database["public"]["Enums"]["content_purpose"]
-          recruitment_role: Database["public"]["Enums"]["recruitment_role"] | null
+          recruitment_role:
+            | Database["public"]["Enums"]["recruitment_role"]
+            | null
           repurpose_format: string | null
           script: string | null
           shot_requirements: string | null
@@ -967,17 +969,19 @@ export type Database = {
           visual_direction: string | null
         }
         Insert: {
+          apply_url?: string | null
           argument?: string | null
           avatar_brief?: string | null
           b_roll?: string | null
           body?: string | null
-          editor_brief?: string | null
           brief_ref?: string | null
           call_to_action?: string | null
           channel_intent?: string | null
           client_id: string
+          compensation_text?: string | null
           created_at?: string
           derived_from_asset_id?: string | null
+          editor_brief?: string | null
           hook?: string | null
           id?: string
           job_id?: string | null
@@ -986,10 +990,10 @@ export type Database = {
           production_method?: string | null
           proof?: string | null
           proof_asset_id?: string | null
-          apply_url?: string | null
-          compensation_text?: string | null
           purpose?: Database["public"]["Enums"]["content_purpose"]
-          recruitment_role?: Database["public"]["Enums"]["recruitment_role"] | null
+          recruitment_role?:
+            | Database["public"]["Enums"]["recruitment_role"]
+            | null
           repurpose_format?: string | null
           script?: string | null
           shot_requirements?: string | null
@@ -1000,17 +1004,19 @@ export type Database = {
           visual_direction?: string | null
         }
         Update: {
+          apply_url?: string | null
           argument?: string | null
           avatar_brief?: string | null
           b_roll?: string | null
           body?: string | null
-          editor_brief?: string | null
           brief_ref?: string | null
           call_to_action?: string | null
           channel_intent?: string | null
           client_id?: string
+          compensation_text?: string | null
           created_at?: string
           derived_from_asset_id?: string | null
+          editor_brief?: string | null
           hook?: string | null
           id?: string
           job_id?: string | null
@@ -1019,10 +1025,10 @@ export type Database = {
           production_method?: string | null
           proof?: string | null
           proof_asset_id?: string | null
-          apply_url?: string | null
-          compensation_text?: string | null
           purpose?: Database["public"]["Enums"]["content_purpose"]
-          recruitment_role?: Database["public"]["Enums"]["recruitment_role"] | null
+          recruitment_role?:
+            | Database["public"]["Enums"]["recruitment_role"]
+            | null
           repurpose_format?: string | null
           script?: string | null
           shot_requirements?: string | null
@@ -1178,19 +1184,29 @@ export type Database = {
           core_message: string | null
           created_at: string
           ends_on: string | null
+          entry_state: Database["public"]["Enums"]["audience_state"] | null
+          exit_state: Database["public"]["Enums"]["audience_state"] | null
           feeds_from_campaign_id: string | null
           id: string
           job_id: string | null
           kpi_metric: string | null
           kpi_target: number | null
           launched_at: string | null
+          meta_ad_set_id: string | null
+          meta_built_at: string | null
+          meta_campaign_id: string | null
+          mirrors_template:
+            | Database["public"]["Enums"]["campaign_template"]
+            | null
           name: string
           needs_landing_page: boolean
           needs_sales_agent: boolean
           objective: string | null
           offer_summary: string | null
+          optimisation_event: string | null
           starts_on: string | null
           status: string
+          template: Database["public"]["Enums"]["campaign_template"] | null
           updated_at: string
         }
         Insert: {
@@ -1206,19 +1222,29 @@ export type Database = {
           core_message?: string | null
           created_at?: string
           ends_on?: string | null
+          entry_state?: Database["public"]["Enums"]["audience_state"] | null
+          exit_state?: Database["public"]["Enums"]["audience_state"] | null
           feeds_from_campaign_id?: string | null
           id?: string
           job_id?: string | null
           kpi_metric?: string | null
           kpi_target?: number | null
           launched_at?: string | null
+          meta_ad_set_id?: string | null
+          meta_built_at?: string | null
+          meta_campaign_id?: string | null
+          mirrors_template?:
+            | Database["public"]["Enums"]["campaign_template"]
+            | null
           name: string
           needs_landing_page?: boolean
           needs_sales_agent?: boolean
           objective?: string | null
           offer_summary?: string | null
+          optimisation_event?: string | null
           starts_on?: string | null
           status?: string
+          template?: Database["public"]["Enums"]["campaign_template"] | null
           updated_at?: string
         }
         Update: {
@@ -1234,19 +1260,29 @@ export type Database = {
           core_message?: string | null
           created_at?: string
           ends_on?: string | null
+          entry_state?: Database["public"]["Enums"]["audience_state"] | null
+          exit_state?: Database["public"]["Enums"]["audience_state"] | null
           feeds_from_campaign_id?: string | null
           id?: string
           job_id?: string | null
           kpi_metric?: string | null
           kpi_target?: number | null
           launched_at?: string | null
+          meta_ad_set_id?: string | null
+          meta_built_at?: string | null
+          meta_campaign_id?: string | null
+          mirrors_template?:
+            | Database["public"]["Enums"]["campaign_template"]
+            | null
           name?: string
           needs_landing_page?: boolean
           needs_sales_agent?: boolean
           objective?: string | null
           offer_summary?: string | null
+          optimisation_event?: string | null
           starts_on?: string | null
           status?: string
+          template?: Database["public"]["Enums"]["campaign_template"] | null
           updated_at?: string
         }
         Relationships: [
@@ -1262,6 +1298,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_feeds_from_campaign_id_fkey"
+            columns: ["feeds_from_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
             referencedColumns: ["id"]
           },
           {
@@ -1779,12 +1822,20 @@ export type Database = {
       }
       client_media_assets: {
         Row: {
+          ad_cta: string | null
+          ad_description: string | null
+          ad_headline: string | null
+          ad_link_url: string | null
+          ad_primary_text: string | null
           brief_id: string | null
           client_id: string
           created_at: string
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
           member_id: string | null
+          meta_ad_id: string | null
+          meta_creative_id: string | null
+          meta_image_hash: string | null
           purpose: Database["public"]["Enums"]["content_purpose"]
           ref_number: string | null
           review_status: Database["public"]["Enums"]["review_status"]
@@ -1794,12 +1845,20 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
+          ad_cta?: string | null
+          ad_description?: string | null
+          ad_headline?: string | null
+          ad_link_url?: string | null
+          ad_primary_text?: string | null
           brief_id?: string | null
           client_id: string
           created_at?: string
           id?: string
           media_type: Database["public"]["Enums"]["media_type"]
           member_id?: string | null
+          meta_ad_id?: string | null
+          meta_creative_id?: string | null
+          meta_image_hash?: string | null
           purpose?: Database["public"]["Enums"]["content_purpose"]
           ref_number?: string | null
           review_status?: Database["public"]["Enums"]["review_status"]
@@ -1809,12 +1868,20 @@ export type Database = {
           uploaded_by?: string | null
         }
         Update: {
+          ad_cta?: string | null
+          ad_description?: string | null
+          ad_headline?: string | null
+          ad_link_url?: string | null
+          ad_primary_text?: string | null
           brief_id?: string | null
           client_id?: string
           created_at?: string
           id?: string
           media_type?: Database["public"]["Enums"]["media_type"]
           member_id?: string | null
+          meta_ad_id?: string | null
+          meta_creative_id?: string | null
+          meta_image_hash?: string | null
           purpose?: Database["public"]["Enums"]["content_purpose"]
           ref_number?: string | null
           review_status?: Database["public"]["Enums"]["review_status"]
@@ -2084,8 +2151,8 @@ export type Database = {
           publish_status: string
           published_at: string | null
           published_commit: string | null
-          reference_asset_id: string | null
           published_url: string | null
+          reference_asset_id: string | null
           site_path: string | null
           site_repository_id: string | null
           status: Database["public"]["Enums"]["record_status"]
@@ -2111,8 +2178,8 @@ export type Database = {
           publish_status?: string
           published_at?: string | null
           published_commit?: string | null
-          reference_asset_id?: string | null
           published_url?: string | null
+          reference_asset_id?: string | null
           site_path?: string | null
           site_repository_id?: string | null
           status?: Database["public"]["Enums"]["record_status"]
@@ -2138,8 +2205,8 @@ export type Database = {
           publish_status?: string
           published_at?: string | null
           published_commit?: string | null
-          reference_asset_id?: string | null
           published_url?: string | null
+          reference_asset_id?: string | null
           site_path?: string | null
           site_repository_id?: string | null
           status?: Database["public"]["Enums"]["record_status"]
@@ -2167,6 +2234,34 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_pages_reference_asset_id_fkey"
+            columns: ["reference_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_pages_reference_asset_id_fkey"
+            columns: ["reference_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_pages_reference_asset_id_fkey"
+            columns: ["reference_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_pages_reference_asset_id_fkey"
+            columns: ["reference_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
           {
@@ -4371,11 +4466,10 @@ export type Database = {
         Args: { p_idea_id: string }
         Returns: string
       }
-      delete_recruitment_ad: {
+      approve_recruitment_brief: {
         Args: { p_brief_id: string }
-        Returns: { deleted_assets: number }[]
+        Returns: undefined
       }
-      approve_recruitment_brief: { Args: { p_brief_id: string }; Returns: undefined }
       build_brief_with_ai: {
         Args: {
           p_brief_id: string
@@ -4498,6 +4592,18 @@ export type Database = {
           spend: number
         }[]
       }
+      compose_recruitment_body: {
+        Args: {
+          p_apply_url: string
+          p_call_to_action: string
+          p_compensation_text: string
+          p_hook: string
+          p_premise: string
+          p_script: string
+          p_visual_direction: string
+        }
+        Returns: string
+      }
       create_console_user: {
         Args: {
           p_category?: Database["public"]["Enums"]["team_category"]
@@ -4527,9 +4633,16 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      delete_recruitment_ad: {
+        Args: { p_brief_id: string }
+        Returns: {
+          deleted_assets: number
+        }[]
+      }
       dispatch_brief_to_members: {
         Args: {
           p_brief_id: string
+          p_brief_role?: string
           p_compensation?: number
           p_due_date?: string
           p_member_ids: string[]
@@ -4567,10 +4680,6 @@ export type Database = {
         }
         Returns: string
       }
-      generate_recruitment_ad: {
-        Args: { p_brief_id: string; p_quality?: string; p_size?: string }
-        Returns: Json
-      }
       enqueue_mcp_brief: {
         Args: {
           p_bot_id: string
@@ -4584,6 +4693,10 @@ export type Database = {
       enqueue_metrics_ingest_jobs: {
         Args: { p_days?: number }
         Returns: number
+      }
+      generate_recruitment_ad: {
+        Args: { p_brief_id: string; p_quality?: string; p_size?: string }
+        Returns: Json
       }
       integration_secret: {
         Args: { p_client_id: string; p_provider: string }
@@ -4692,6 +4805,85 @@ export type Database = {
         }
         Returns: Json
       }
+      mcp_assign_production: {
+        Args: {
+          p_bot_id: string
+          p_brief_id: string
+          p_brief_role?: string
+          p_client_id: string
+          p_compensation?: number
+          p_due_date?: string
+          p_execution_id: string
+          p_member_ids?: string[]
+          p_quality?: string
+          p_request_id: string
+          p_route: string
+          p_size?: string
+        }
+        Returns: Json
+      }
+      mcp_attach_sales_agent_to_page: {
+        Args: {
+          p_bot_id: string
+          p_client_id: string
+          p_execution_id: string
+          p_page_id: string
+          p_request_id: string
+          p_sales_agent_id: string
+        }
+        Returns: Json
+      }
+      mcp_attribution_content_performance: {
+        Args: { p_bot_id: string; p_client_id: string; p_limit?: number }
+        Returns: Json
+      }
+      mcp_attribution_conversion_funnel: {
+        Args: { p_bot_id: string; p_client_id: string; p_days?: number }
+        Returns: Json
+      }
+      mcp_attribution_revenue: {
+        Args: {
+          p_bot_id: string
+          p_campaign_id?: string
+          p_client_id: string
+          p_end_date?: string
+          p_limit?: number
+          p_start_date?: string
+        }
+        Returns: Json
+      }
+      mcp_brand_get_profile: {
+        Args: { p_bot_id: string; p_client_id: string }
+        Returns: Json
+      }
+      mcp_build_sales_agent: {
+        Args: {
+          p_bot_id: string
+          p_client_id: string
+          p_execution_id: string
+          p_request_id: string
+          p_sales_agent_id: string
+        }
+        Returns: Json
+      }
+      mcp_campaign_execution: {
+        Args: {
+          p_action: string
+          p_after?: string
+          p_bot_id: string
+          p_brief?: string
+          p_campaign_id?: string
+          p_client_id: string
+          p_execution_id?: string
+          p_kind?: string
+          p_limit?: number
+          p_name?: string
+          p_request_id?: string
+          p_status?: string
+          p_summary?: string
+        }
+        Returns: Json
+      }
       mcp_campaign_read: {
         Args: {
           p_action: string
@@ -4702,6 +4894,26 @@ export type Database = {
           p_end_date?: string
           p_limit?: number
           p_start_date?: string
+        }
+        Returns: Json
+      }
+      mcp_conversion: {
+        Args: {
+          p_action: string
+          p_after?: string
+          p_bot_id: string
+          p_brief?: string
+          p_campaign_id?: string
+          p_client_id: string
+          p_execution_id?: string
+          p_finding_ids?: string[]
+          p_limit?: number
+          p_page_id?: string
+          p_page_type?: string
+          p_request_id?: string
+          p_revision_number?: number
+          p_summary?: string
+          p_title?: string
         }
         Returns: Json
       }
@@ -4759,6 +4971,53 @@ export type Database = {
       }
       mcp_delivery_read: {
         Args: { p_bot_id: string; p_client_id: string; p_view: string }
+        Returns: Json
+      }
+      mcp_economics_read: {
+        Args: {
+          p_action: string
+          p_bot_id: string
+          p_campaign_id?: string
+          p_client_id: string
+          p_end_date?: string
+          p_limit?: number
+          p_start_date?: string
+        }
+        Returns: Json
+      }
+      mcp_engineering_create_issue: {
+        Args: {
+          p_bot_id: string
+          p_client_id: string
+          p_execution_id: string
+          p_notes: string
+          p_request_id: string
+          p_title: string
+        }
+        Returns: Json
+      }
+      mcp_engineering_get_deployment_status: {
+        Args: {
+          p_after?: string
+          p_bot_id: string
+          p_client_id: string
+          p_job_id?: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      mcp_engineering_get_issue: {
+        Args: { p_bot_id: string; p_client_id: string; p_issue_id: string }
+        Returns: Json
+      }
+      mcp_engineering_get_release_status: {
+        Args: {
+          p_after?: string
+          p_bot_id: string
+          p_client_id: string
+          p_limit?: number
+          p_page_id?: string
+        }
         Returns: Json
       }
       mcp_generate_sales_agent_config: {
@@ -4861,6 +5120,70 @@ export type Database = {
         Args: { p_bot_id: string; p_client_id: string; p_limit?: number }
         Returns: Json
       }
+      mcp_proof_attach_asset: {
+        Args: {
+          p_bot_id: string
+          p_brief_id?: string
+          p_client_id: string
+          p_execution_id: string
+          p_proof_id: string
+          p_request_id: string
+          p_storage_path: string
+        }
+        Returns: Json
+      }
+      mcp_proof_create: {
+        Args: {
+          p_avatar_relevance?: string
+          p_body?: string
+          p_bot_id: string
+          p_claim?: string
+          p_client_id: string
+          p_evidence?: string
+          p_execution_id: string
+          p_media_type: string
+          p_proof_type?: string
+          p_request_id: string
+          p_source?: string
+          p_storage_path?: string
+          p_strength?: string
+          p_title?: string
+        }
+        Returns: Json
+      }
+      mcp_proof_get: {
+        Args: { p_bot_id: string; p_client_id: string; p_proof_id: string }
+        Returns: Json
+      }
+      mcp_proof_get_for_avatar: {
+        Args: {
+          p_avatar: string
+          p_bot_id: string
+          p_client_id: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      mcp_proof_get_for_claim: {
+        Args: {
+          p_bot_id: string
+          p_claim: string
+          p_client_id: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      mcp_proof_search: {
+        Args: {
+          p_bot_id: string
+          p_client_id: string
+          p_limit?: number
+          p_media_type?: string
+          p_proof_type?: string
+          p_q?: string
+        }
+        Returns: Json
+      }
       mcp_queue_distribution: {
         Args: {
           p_asset_id: string
@@ -4935,6 +5258,77 @@ export type Database = {
           p_label?: string
           p_new_token_hash: string
           p_old_token_hash: string
+        }
+        Returns: Json
+      }
+      mcp_security_create_finding: {
+        Args: {
+          p_bot_id: string
+          p_client_id: string
+          p_execution_id: string
+          p_kind: string
+          p_notes: string
+          p_request_id: string
+          p_severity: string
+          p_title: string
+        }
+        Returns: Json
+      }
+      mcp_security_get_incident_status: {
+        Args: {
+          p_after?: string
+          p_bot_id: string
+          p_client_id: string
+          p_incident_id?: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      mcp_security_get_open_findings: {
+        Args: {
+          p_after?: string
+          p_bot_id: string
+          p_client_id: string
+          p_finding_id?: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      mcp_security_get_system_status: {
+        Args: { p_bot_id: string; p_client_id: string }
+        Returns: Json
+      }
+      mcp_set_sales_agent_deployment_enabled: {
+        Args: {
+          p_bot_id: string
+          p_client_id: string
+          p_deployment_id: string
+          p_enabled: boolean
+          p_execution_id: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      mcp_sites_authorize: {
+        Args: {
+          p_bot_id: string
+          p_client_id: string
+          p_page_id?: string
+          p_tool: string
+        }
+        Returns: Json
+      }
+      mcp_submit_asset: {
+        Args: {
+          p_assignment_id?: string
+          p_bot_id: string
+          p_brief_id?: string
+          p_client_id: string
+          p_execution_id: string
+          p_media_type: string
+          p_request_id: string
+          p_storage_path: string
+          p_title?: string
         }
         Returns: Json
       }
@@ -5119,7 +5513,7 @@ export type Database = {
           p_asset_id: string
           p_channel?: Database["public"]["Enums"]["post_channel"]
           p_date: string
-          p_platform?: Database["public"]["Enums"]["post_platform"] | null
+          p_platform?: Database["public"]["Enums"]["post_platform"]
         }
         Returns: string
       }
@@ -5198,6 +5592,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "employee" | "client"
+      audience_state: "S0" | "S1" | "S2" | "S3" | "S4" | "S5" | "S6"
       brief_status:
         | "draft"
         | "approved"
@@ -5206,6 +5601,23 @@ export type Database = {
         | "complete"
       build_route: "ai" | "human"
       campaign_status: "active" | "past"
+      campaign_template:
+        | "P1"
+        | "P2"
+        | "P3"
+        | "P4"
+        | "P5"
+        | "R1"
+        | "R2"
+        | "R3"
+        | "R4"
+        | "C1"
+        | "C2"
+        | "C3"
+        | "O1"
+        | "O2"
+        | "X1"
+        | "X2"
       content_purpose: "client" | "recruitment"
       creative_stage: "concept" | "render" | "done" | "failed"
       engagement_type: "employee" | "contractor"
@@ -5387,6 +5799,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "employee", "client"],
+      audience_state: ["S0", "S1", "S2", "S3", "S4", "S5", "S6"],
       brief_status: [
         "draft",
         "approved",
@@ -5396,6 +5809,24 @@ export const Constants = {
       ],
       build_route: ["ai", "human"],
       campaign_status: ["active", "past"],
+      campaign_template: [
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5",
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "C1",
+        "C2",
+        "C3",
+        "O1",
+        "O2",
+        "X1",
+        "X2",
+      ],
       content_purpose: ["client", "recruitment"],
       creative_stage: ["concept", "render", "done", "failed"],
       engagement_type: ["employee", "contractor"],
@@ -5425,7 +5856,7 @@ export const Constants = {
       metric_basis: ["daily", "cumulative"],
       metric_entity: ["account", "campaign", "post", "page"],
       metric_surface: ["paid", "organic", "landing", "offer"],
-      page_type: ["landing", "offer"],
+      page_type: ["landing", "offer", "recruitment"],
       pipeline_stage: ["first_touch", "second_touch", "call_booked"],
       post_channel: ["organic", "paid"],
       post_platform: ["facebook", "instagram", "tiktok", "linkedin", "youtube"],
