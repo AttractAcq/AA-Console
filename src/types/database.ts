@@ -1178,6 +1178,7 @@ export type Database = {
           core_message: string | null
           created_at: string
           ends_on: string | null
+          feeds_from_campaign_id: string | null
           id: string
           job_id: string | null
           kpi_metric: string | null
@@ -1205,6 +1206,7 @@ export type Database = {
           core_message?: string | null
           created_at?: string
           ends_on?: string | null
+          feeds_from_campaign_id?: string | null
           id?: string
           job_id?: string | null
           kpi_metric?: string | null
@@ -1232,6 +1234,7 @@ export type Database = {
           core_message?: string | null
           created_at?: string
           ends_on?: string | null
+          feeds_from_campaign_id?: string | null
           id?: string
           job_id?: string | null
           kpi_metric?: string | null
