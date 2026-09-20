@@ -5571,8 +5571,13 @@ export type Database = {
         Args: { p_page_id: string; p_revision_number: number }
         Returns: number
       }
-      remake_rejected_asset: {
-        Args: { p_asset_id: string; p_quality?: string; p_size?: string }
+      regenerate_asset: {
+        Args: {
+          p_asset_id: string
+          p_feedback?: string
+          p_quality?: string
+          p_size?: string
+        }
         Returns: string
       }
       review_media_asset: {

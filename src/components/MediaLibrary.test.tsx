@@ -108,55 +108,76 @@ describe("approving from the library", () => {
 });
 
 
-describe("remaking a rejected asset", () => {
-  const rejected = (over: Record<string, unknown> = {}) =>
-    asset({ review_status: "rejected", brief_id: "b1", ...over });
+describe("regenerating an asset", () => {
+  const withStatus = (status: string, over: Record<string, unknown> = {}) =>
+    asset({ review_status: status, brief_id: "b1", ...over });
 
-  it("offers a remake on a rejected asset, and not on a pending one", async () => {
-    fetchClientAssets.mockResolvedValue([rejected()]);
-    render(<MediaLibrary mediaType="image" />);
-    expect(await screen.findByRole("button", { name: /Remake/i })).toBeInTheDocument();
+  // Not only rejections. An approved asset that is nearly right is the
+  // common case, and there was no way to act on it at all.
+  it("offers a rebuild on an approved asset as well as a rejected one", async () => {
+    for (const status of ["approved", "rejected"]) {
+      fetchClientAssets.mockResolvedValue([withStatus(status)]);
+      const view = render(<MediaLibrary mediaType="image" />);
+      expect(await screen.findByRole("button", { name: /Regenerate/i })).toBeInTheDocument();
+      view.unmount();
+    }
+  });
 
-    fetchClientAssets.mockResolvedValue([asset()]);
+  it("offers approve and reject instead while it is still pending", async () => {
+    fetchClientAssets.mockResolvedValue([withStatus("pending")]);
     render(<MediaLibrary mediaType="image" />);
-    await waitFor(() => expect(screen.queryAllByRole("button", { name: /Remake/i })).toHaveLength(1));
+    expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Regenerate/i })).not.toBeInTheDocument();
   });
 
   // The RPC refuses an asset with no brief, so the button would be a
   // guaranteed failure.
-  it("offers nothing when the asset has no brief to rebuild from", async () => {
-    fetchClientAssets.mockResolvedValue([rejected({ brief_id: null })]);
+  it("offers nothing when there is no brief to rebuild from", async () => {
+    fetchClientAssets.mockResolvedValue([withStatus("approved", { brief_id: null })]);
     render(<MediaLibrary mediaType="image" />);
     await screen.findByText("Chair shot");
-    expect(screen.queryByRole("button", { name: /Remake/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Regenerate/i })).not.toBeInTheDocument();
   });
 
-  it("shows the reason the build will be given before spending anything", async () => {
-    fetchClientAssets.mockResolvedValue([rejected()]);
+  it("will not rebuild with nothing said", async () => {
+    fetchClientAssets.mockResolvedValue([withStatus("approved")]);
     render(<MediaLibrary mediaType="image" />);
-    await userEvent.click(await screen.findByRole("button", { name: /Remake/i }));
-    expect(await screen.findByText("Wrong logo lockup.")).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: /Regenerate/i }));
+    const dialog = within(await screen.findByRole("dialog"));
+    expect(dialog.getByRole("button", { name: "Regenerate" })).toBeDisabled();
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("queues the remake against the asset", async () => {
-    fetchClientAssets.mockResolvedValue([rejected()]);
+  it("sends what the operator typed", async () => {
+    fetchClientAssets.mockResolvedValue([withStatus("approved")]);
     render(<MediaLibrary mediaType="image" />);
-    await userEvent.click(await screen.findByRole("button", { name: /Remake/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /Regenerate/i }));
     const dialog = within(await screen.findByRole("dialog"));
-    await userEvent.click(dialog.getByRole("button", { name: "Remake" }));
+    await userEvent.type(dialog.getByLabelText(/What is wrong/i), "Headline unreadable.");
+    await userEvent.click(dialog.getByRole("button", { name: "Regenerate" }));
+
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("remake_rejected_asset", { p_asset_id: "a1" }),
+      expect(rpc).toHaveBeenCalledWith("regenerate_asset", {
+        p_asset_id: "a1",
+        p_feedback: "Headline unreadable.",
+      }),
     );
   });
 
-  it("will not remake a rejection with no reason recorded", async () => {
-    const empty = { select: () => empty, eq: () => empty, order: () => empty, limit: () => Promise.resolve({ data: [], error: null }) };
-    from.mockReturnValue(empty);
-    fetchClientAssets.mockResolvedValue([rejected()]);
+  // The rejection reason already answers this question; asking again is
+  // asking twice.
+  it("starts a rejected asset from its recorded reason", async () => {
+    fetchClientAssets.mockResolvedValue([withStatus("rejected")]);
     render(<MediaLibrary mediaType="image" />);
-    await userEvent.click(await screen.findByRole("button", { name: /Remake/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /Regenerate/i }));
+    expect(await screen.findByDisplayValue("Wrong logo lockup.")).toBeInTheDocument();
+  });
+
+  it("starts an approved asset from an empty box", async () => {
+    fetchClientAssets.mockResolvedValue([withStatus("approved")]);
+    render(<MediaLibrary mediaType="image" />);
+    await userEvent.click(await screen.findByRole("button", { name: /Regenerate/i }));
     const dialog = within(await screen.findByRole("dialog"));
-    expect(dialog.getByRole("button", { name: "Remake" })).toBeDisabled();
+    expect((dialog.getByLabelText(/What is wrong/i) as HTMLTextAreaElement).value).toBe("");
   });
 });
