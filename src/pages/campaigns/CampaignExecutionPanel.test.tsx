@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -473,6 +473,7 @@ describe("proposing a campaign", () => {
     await waitFor(() =>
       expect(callRuntime).toHaveBeenCalledWith("/admin/campaigns/draft", {
         clientId: "client-1",
+        template: "",
         notes: "",
       }),
     );
@@ -488,6 +489,44 @@ describe("proposing a campaign", () => {
     expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
   });
 
+  it("sends the template the operator picked, and shows what it means", async () => {
+    callRuntime.mockResolvedValue({ draft: PROPOSAL });
+    await openProposer();
+
+    // Both pickers are mounted: the form behind, the dialog in front.
+    const dialog = within(screen.getByRole("dialog", { name: "Propose a campaign" }));
+    await userEvent.selectOptions(dialog.getByLabelText(/Campaign template/i), "P3");
+    // The choice explains itself rather than leaving a bare code on screen.
+    expect(dialog.getByText(/Needs a sales agent/i)).toBeInTheDocument();
+    expect(dialog.getByText(/Stranger → Identified/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+    await waitFor(() =>
+      expect(callRuntime).toHaveBeenCalledWith("/admin/campaigns/draft", {
+        clientId: "client-1",
+        template: "P3",
+        notes: "",
+      }),
+    );
+  });
+
+  it("carries the template into the form, so the brief and the template agree", async () => {
+    callRuntime.mockResolvedValue({ draft: PROPOSAL });
+    await openProposer();
+    await userEvent.selectOptions(
+      within(screen.getByRole("dialog", { name: "Propose a campaign" })).getByLabelText(
+        /Campaign template/i,
+      ),
+      "P3",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    // The dialog closes; the form behind it is now on the same template.
+    expect(await screen.findByDisplayValue(PROPOSAL.name)).toBeInTheDocument();
+    const picker = screen.getByLabelText(/Campaign template \(optional\)/i) as HTMLSelectElement;
+    expect(picker.value).toBe("P3");
+  });
+
   it("sends the steer when there is one", async () => {
     callRuntime.mockResolvedValue({ draft: PROPOSAL });
     await openProposer();
@@ -496,6 +535,7 @@ describe("proposing a campaign", () => {
     await waitFor(() =>
       expect(callRuntime).toHaveBeenCalledWith("/admin/campaigns/draft", {
         clientId: "client-1",
+        template: "",
         notes: "Push the January diary.",
       }),
     );

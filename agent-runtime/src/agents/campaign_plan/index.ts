@@ -11,6 +11,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { anthropicKeyForAgent, type RuntimeConfig } from "../../config.js";
+import { templateFor } from "../../campaigns/templates.js";
 import type { AgentRow } from "../../orchestration/registry.js";
 import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
@@ -26,6 +27,7 @@ import {
   normaliseChannels,
   planProblem,
   planSummary,
+  resolveNeeds,
   MAX_CONTENT,
   type CampaignPlan,
 } from "./plan.js";
@@ -246,6 +248,13 @@ Call ${submitTool.name} once when you are done.`;
     costUsd: result.usage.costUsd,
   };
 
+  // The template, when the campaign has one, outranks the model on the two
+  // booleans. P3 sends people into a message thread, so it needs something
+  // answering — that is what its destination is, not an opinion about it.
+  // Absent on a campaign planned before the library existed, and absent
+  // entirely until migration 96 is applied, which select("*") makes harmless.
+  const template = templateFor(String(campaign.template ?? ""));
+
   const s = (key: string) => String(result.submitted[key] ?? "").trim();
   const submittedPlan: CampaignPlan = {
     objective: s("objective"),
@@ -259,8 +268,10 @@ Call ${submitTool.name} once when you are done.`;
     kpi_metric: s("kpi_metric"),
     kpi_target: asAmount(result.submitted.kpi_target),
     content_count: asCount(result.submitted.content_count),
-    needs_landing_page: result.submitted.needs_landing_page === true,
-    needs_sales_agent: result.submitted.needs_sales_agent === true,
+    ...resolveNeeds(template, {
+      needs_landing_page: result.submitted.needs_landing_page,
+      needs_sales_agent: result.submitted.needs_sales_agent,
+    }),
   };
 
   const plan: CampaignPlan = campaign.built_at ? {

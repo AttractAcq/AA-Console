@@ -9,6 +9,7 @@
 // already been told to plan; this is deciding WHICH campaign, and that needs
 // the competitor and market work, the money model and the proof on file too.
 
+import { AUDIENCE_STATE_LABEL, templateFor } from "./templates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
@@ -100,6 +101,13 @@ export async function handleCampaignDraft(
   // Optional, unlike a hiring brief: the business's own strategy is already on
   // file, so a blank box should still produce a real proposal.
   const notes = String(body.notes ?? "").trim().slice(0, MAX_NOTES);
+  // The operator may have picked a template. It fixes the objective, the
+  // audience it aims at and what has to be built, so the proposal is written
+  // for that shape rather than for a shape the model chooses and the form
+  // then contradicts. An unknown code is treated as no template, not an
+  // error: the picker cannot produce one, and a proposal is not worth
+  // failing over a value nothing downstream will read.
+  const template = templateFor(String(body.template ?? ""));
 
   try {
     const { data: client } = await sb.from("clients").select("name").eq("id", clientId).maybeSingle();
@@ -145,7 +153,12 @@ export async function handleCampaignDraft(
 
     const prompt = `Propose the next campaign worth running for ${clientName}.
 
-${notes ? `WHAT THE OPERATOR WANTS FROM THIS ONE — steer by this\n${notes}\n` : "The operator has not steered this. Propose what the records say is most worth doing.\n"}
+${notes ? `WHAT THE OPERATOR WANTS FROM THIS ONE — steer by this\n${notes}\n` : "The operator has not steered this. Propose what the records say is most worth doing.\n"}${template ? `THE CAMPAIGN TEMPLATE THE OPERATOR CHOSE — write the proposal for this shape
+${template.code} ${template.name}. ${template.purpose}
+It aims at people in state ${template.entry} (${AUDIENCE_STATE_LABEL[template.entry]}) and moves them to ${template.exit} (${AUDIENCE_STATE_LABEL[template.exit]}).
+Write the brief for that audience specifically. Somebody who has never heard of this business reads nothing like somebody who watched half a video last week, and a brief that ignores which one it is aimed at produces copy that works on neither.
+${template.prerequisite ? `This template needs something in place first: ${template.prerequisite} Say in the brief how that is covered, or that it is not.` : ""}
+` : ""}
 BUSINESS CONTEXT
 ${renderContext(context as BusinessContext | null)}
 

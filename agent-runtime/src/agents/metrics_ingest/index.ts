@@ -18,6 +18,7 @@ import { appendEvent } from "../../queue.js";
 import { metaGraphSource } from "./graph.js";
 import { normaliseOrganicAccount, normaliseOrganicPosts, normalisePaid } from "./normalise.js";
 import { SourceError, type MetricRow, type MetricsSource, type Surface, type Window } from "./types.js";
+import { adAccountFor } from "../../meta/account.js";
 
 const UPSERT_CHUNK = 500;
 
@@ -61,7 +62,7 @@ async function loadCredentials(sb: SupabaseClient, clientId: string, surface: Su
 
   const { data: integration, error } = await sb
     .from("client_integrations")
-    .select("credential_label, status")
+    .select("credential_label, ad_account_id, status")
     .eq("client_id", clientId)
     .eq("provider", provider)
     .eq("status", "active")
@@ -74,8 +75,17 @@ async function loadCredentials(sb: SupabaseClient, clientId: string, surface: Su
     p_provider: provider,
   });
   if (secretError) throw new Error(`Could not read the credential: ${secretError.message}`);
-  if (!token || !integration.credential_label) return null;
+  if (!token) return null;
 
+  // Paid runs against an ad account and must be sure which one. Organic is
+  // an Instagram user id in credential_label and is left exactly as it was.
+  if (surface === "paid") {
+    const account = adAccountFor(integration);
+    if ("problem" in account) throw new Error(account.problem);
+    return { provider, accessToken: String(token), accountId: account.id };
+  }
+
+  if (!integration.credential_label) return null;
   return {
     provider,
     accessToken: String(token),

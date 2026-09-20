@@ -29,3 +29,6 @@ aa-mcp-gateway/*.sqlite*
 
 # Database dumps taken around cutovers. Never in git.
 .cutover-backups/
+
+# tsc -b incremental build state, not source
+*.tsbuildinfo

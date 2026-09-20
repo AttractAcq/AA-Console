@@ -134,6 +134,15 @@ export async function createAdSet(
   return post(account, "adsets", payload);
 }
 
+export async function createAdCreative(
+  account: AdAccount,
+  payload: Record<string, unknown>,
+): Promise<{ id: string }> {
+  // No paused guard: a creative is words and a picture, not something that
+  // can spend. The ad that carries it is where the guard belongs.
+  return post(account, "adcreatives", payload);
+}
+
 export async function createAd(
   account: AdAccount,
   payload: Record<string, unknown>,
