@@ -3616,6 +3616,7 @@ export type Database = {
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
           notes: string | null
+          platform: Database["public"]["Enums"]["post_platform"] | null
           publication_status: string
           published_at: string | null
           published_by_bot: string | null
@@ -3635,6 +3636,7 @@ export type Database = {
           id?: string
           media_type?: Database["public"]["Enums"]["media_type"]
           notes?: string | null
+          platform?: Database["public"]["Enums"]["post_platform"] | null
           publication_status?: string
           published_at?: string | null
           published_by_bot?: string | null
@@ -3654,6 +3656,7 @@ export type Database = {
           id?: string
           media_type?: Database["public"]["Enums"]["media_type"]
           notes?: string | null
+          platform?: Database["public"]["Enums"]["post_platform"] | null
           publication_status?: string
           published_at?: string | null
           published_by_bot?: string | null
@@ -5110,6 +5113,7 @@ export type Database = {
           p_asset_id: string
           p_channel?: Database["public"]["Enums"]["post_channel"]
           p_date: string
+          p_platform?: Database["public"]["Enums"]["post_platform"] | null
         }
         Returns: string
       }
@@ -5226,6 +5230,12 @@ export type Database = {
       page_type: "landing" | "offer" | "recruitment"
       pipeline_stage: "first_touch" | "second_touch" | "call_booked"
       post_channel: "organic" | "paid"
+      post_platform:
+        | "facebook"
+        | "instagram"
+        | "tiktok"
+        | "linkedin"
+        | "youtube"
       record_domain:
         | "icp"
         | "competitor"
@@ -5412,6 +5422,7 @@ export const Constants = {
       page_type: ["landing", "offer"],
       pipeline_stage: ["first_touch", "second_touch", "call_booked"],
       post_channel: ["organic", "paid"],
+      post_platform: ["facebook", "instagram", "tiktok", "linkedin", "youtube"],
       record_domain: [
         "icp",
         "competitor",

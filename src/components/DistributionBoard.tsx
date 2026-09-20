@@ -12,12 +12,15 @@ import { mediaFilters } from "../data/mediaFilters";
 import type { MediaFilterId } from "../data/mediaFilters";
 import { fetchClientAssets } from "../lib/media";
 import { supabase } from "../lib/supabase";
+import { POST_PLATFORMS, platformLabel } from "../lib/postPlatform";
+import type { Database } from "../types/database";
 
 type Post = {
   id: string;
   scheduled_for: string;
   ref_number: string | null;
   media_type: MediaFilterId;
+  platform: string | null;
   published_at: string | null;
 };
 
@@ -41,7 +44,7 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
     if (!clientId) return;
     const { data, error } = await supabase
       .from("scheduled_posts")
-      .select("id, scheduled_for, ref_number, media_type, published_at")
+      .select("id, scheduled_for, ref_number, media_type, platform, published_at")
       .eq("client_id", clientId)
       .eq("channel", channel)
       .order("scheduled_for");
@@ -94,6 +97,13 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
       hint: "Only approved assets can be scheduled.",
     },
     { name: "scheduled_for", label: "Date", kind: "date", required: true },
+    {
+      name: "platform",
+      label: "Platform (optional)",
+      kind: "select",
+      options: [...POST_PLATFORMS],
+      hint: "Where the post lands. A post can be planned before its feed is decided.",
+    },
   ];
 
   if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
@@ -113,12 +123,13 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
           <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
         </div>
         <DataTable
-          columns={["Date", "Ref Number", "Type", "Status"]}
+          columns={["Date", "Ref Number", "Type", "Platform", "Status"]}
           emptyLabel={`No ${activeLabel.toLowerCase()} assets scheduled`}
           rows={shown.map((p) => [
             p.scheduled_for,
             p.ref_number ?? "—",
             p.media_type,
+            platformLabel(p.platform),
             p.published_at ? "Published" : "Scheduled",
           ])}
         />
@@ -136,6 +147,12 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
             p_asset_id: v.asset_id as string,
             p_date: v.scheduled_for as string,
             p_channel: channel,
+            // Empty means undecided, which is a real answer. Sending "" would
+            // fail the enum; null records that nobody has chosen yet.
+            //
+            p_platform: (v.platform as string || null) as
+              | Database["public"]["Enums"]["post_platform"]
+              | null,
           });
           if (error) throw new Error(error.message);
         }}
