@@ -175,6 +175,7 @@ export const clientNavGroups: NavNode[] = [
         path: "distribution",
         icon: Share2,
         tabs: [
+          { id: "distribution-assets", label: "Assets" },
           { id: "organic", label: "Organic" },
           { id: "paid", label: "Paid" },
         ],
