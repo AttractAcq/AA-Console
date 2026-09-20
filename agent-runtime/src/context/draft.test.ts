@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { contextDraftProblem, normaliseContextDraft, CONTEXT_FIELDS } from "./draft.js";
+import { reviewContextDraft, normaliseContextDraft, CONTEXT_FIELDS } from "./draft.js";
 
-const long = (s: string) => s.padEnd(80, " ").trim().padEnd(80, ".");
+const long = (s: string) => s.padEnd(80, ".");
 
 const good = (over: Record<string, unknown> = {}) => ({
-  business_overview: long("Implant and veneer dentistry in Durban, two chairs, one dentist who plans and places every case"),
+  business_overview: long("Implant and veneer dentistry in Durban, two chairs, one dentist who plans every case"),
   ideal_customer: long("Somebody whose bridge has failed twice and who has stopped eating on one side"),
   main_offer: long("Full-arch implant work, priced after imaging and a written plan assessment"),
   competitors: long("Named: Umhlanga Dental Studio, and doing nothing, which is the real alternative"),
@@ -16,46 +16,79 @@ const good = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-describe("a draft worth putting in front of the operator", () => {
-  it("accepts one that is specific and sourced", () => {
-    expect(contextDraftProblem(good())).toBeNull();
+describe("a clean draft", () => {
+  it("passes everything through untouched", () => {
+    const review = reviewContextDraft(good());
+    expect(review.problem).toBeNull();
+    expect(review.dropped).toEqual([]);
+    expect(review.draft.business_overview).toContain("Implant and veneer dentistry");
   });
 
-  it("accepts empty optional fields, because empty gets asked about", () => {
-    expect(
-      contextDraftProblem(good({ brand_voice: "", current_marketing: "", sales_process: "" })),
-    ).toBeNull();
-  });
-});
-
-describe("the four every agent reads", () => {
-  it("refuses to leave one empty", () => {
-    for (const field of ["business_overview", "ideal_customer", "main_offer", "competitors"]) {
-      expect(contextDraftProblem(good({ [field]: "" })), field).toMatch(/says nothing about/i);
-    }
-  });
-
-  it("refuses one too thin to act on", () => {
-    // "Various local providers" is not competitor research.
-    expect(contextDraftProblem(good({ competitors: "Various local providers." }))).toMatch(/too thin/i);
+  it("leaves optional fields empty without complaint", () => {
+    const review = reviewContextDraft(good({ brand_voice: "", current_marketing: "" }));
+    expect(review.problem).toBeNull();
+    expect(review.dropped).toEqual([]);
   });
 });
 
-// A model researching a real company reads a lot of other companies' pages.
-describe("guessing, politely", () => {
-  it("rejects hedged prose, which reads as fact once an agent quotes it", () => {
-    for (const hedge of [
-      "The practice likely serves the north coast.",
-      "They appear to be positioned as a premium provider.",
-      "Presumably they take referrals.",
-      "We can assume the buyer is price-sensitive.",
-    ]) {
-      expect(contextDraftProblem(good({ brand_voice: hedge })), hedge).toMatch(/hedging rather than reporting/i);
-    }
+// Two production runs were thrown away over a single field — one for a length
+// cap set below real data, one for a hedged competitors line — both after all
+// the searching was done. Eight good fields and one empty one the operator
+// fills is a far better outcome than nothing.
+describe("one bad field does not bin the run", () => {
+  it("blanks the hedged field and keeps the rest", () => {
+    const review = reviewContextDraft(
+      good({ competitors: "They appear to be positioned as the premium option locally." }),
+    );
+    expect(review.problem).toBeNull();
+    expect(review.draft.competitors).toBe("");
+    expect(review.draft.business_overview).toContain("Implant and veneer dentistry");
+    expect(review.draft.main_offer).toContain("Full-arch");
   });
 
-  it("rejects a placeholder", () => {
-    expect(contextDraftProblem(good({ current_marketing: "Active on [platform]." }))).toMatch(/placeholder/i);
+  it("names the field and says why, so nobody is left guessing", () => {
+    const review = reviewContextDraft(good({ competitors: "Presumably they take referrals." }));
+    expect(review.dropped).toHaveLength(1);
+    expect(review.dropped[0]!.field).toBe("competitors");
+    expect(review.dropped[0]!.reason).toMatch(/hedging rather than reporting/i);
+  });
+
+  it("drops a placeholder the same way", () => {
+    const review = reviewContextDraft(good({ current_marketing: "Active on [platform]." }));
+    expect(review.draft.current_marketing).toBe("");
+    expect(review.dropped[0]!.reason).toMatch(/placeholder/i);
+    expect(review.problem).toBeNull();
+  });
+
+  it("drops runaway output and says how long it was", () => {
+    const review = reviewContextDraft(good({ brand_voice: "x".repeat(12001) }));
+    expect(review.draft.brand_voice).toBe("");
+    expect(review.dropped[0]!.reason).toMatch(/12001 characters/);
+    expect(review.problem).toBeNull();
+  });
+
+  it("accepts an overview longer than the largest real record", () => {
+    // AA's own business_overview is 2954 characters. A cap set just above
+    // real data forbids improving it, and costs a searching run to learn.
+    const review = reviewContextDraft(good({ business_overview: "x".repeat(5019) }));
+    expect(review.dropped).toEqual([]);
+    expect(review.draft.business_overview).toHaveLength(5019);
+  });
+});
+
+describe("when nothing usable survives", () => {
+  it("refuses outright rather than showing an empty form", () => {
+    const review = reviewContextDraft({
+      business_overview: "Presumably dentistry.",
+      ideal_customer: "They appear to be adults.",
+      main_offer: "[the offer]",
+      competitors: "Probably several.",
+    });
+    expect(review.problem).toMatch(/none of the four fields every agent reads survived/i);
+  });
+
+  it("still refuses when the four are simply absent", () => {
+    expect(reviewContextDraft({}).problem).toMatch(/nothing usable/i);
   });
 });
 
@@ -63,48 +96,18 @@ describe("guessing, politely", () => {
 // is worse than being empty, because empty gets asked about.
 describe("revenue is never researched", () => {
   it("drops both figures even when the model returns them", () => {
-    const out = normaliseContextDraft({
-      ...good(),
-      current_revenue: "R4.2m",
-      target_revenue: "R10m by 2028",
-    });
+    const out = normaliseContextDraft({ ...good(), current_revenue: "R4.2m", target_revenue: "R10m" });
     expect(out.current_revenue).toBe("");
     expect(out.target_revenue).toBe("");
     expect(JSON.stringify(out)).not.toContain("4.2m");
-    expect(JSON.stringify(out)).not.toContain("R10m");
   });
 
-  it("keeps every other field it was given", () => {
-    const out = normaliseContextDraft(good());
-    expect(out.business_overview).toContain("Implant and veneer dentistry");
-    expect(out.competitors).toContain("Umhlanga Dental Studio");
-  });
-});
-
-describe("normaliseContextDraft", () => {
   it("returns exactly the form's fields and nothing else", () => {
-    const out = normaliseContextDraft({ ...good(), sources: "homepage", made_up: true });
+    const out = normaliseContextDraft({ ...good(), made_up: true });
     expect(Object.keys(out).sort()).toEqual([...CONTEXT_FIELDS].sort());
   });
 
   it("does not carry the sources note into a saved field", () => {
-    // Sources are for the operator to check, not for an agent to read back.
-    const out = normaliseContextDraft(good());
-    expect(JSON.stringify(out)).not.toContain("Read their homepage");
-  });
-});
-
-
-// The first production run was rejected for a 5019-character overview, on a
-// client whose existing overview is 2954. A cap set just above real data
-// forbids improving it, and this one costs a full web-searching run to learn.
-describe("the field cap is a sanity bound, not a brevity rule", () => {
-  it("accepts an overview longer than the largest real record", () => {
-    expect(contextDraftProblem(good({ business_overview: "x".repeat(5019) }))).toBeNull();
-  });
-
-  it("still stops runaway output", () => {
-    const problem = contextDraftProblem(good({ business_overview: "x".repeat(12001) }));
-    expect(problem).toMatch(/12001 characters/);
+    expect(JSON.stringify(normaliseContextDraft(good()))).not.toContain("Read their homepage");
   });
 });

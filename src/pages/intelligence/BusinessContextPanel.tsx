@@ -51,6 +51,9 @@ export function BusinessContextPanel() {
   const [aiDraft, setAiDraft] = useState<Record<string, string> | null>(null);
   // Shown, not saved: a researched draft is only useful if it can be checked.
   const [sources, setSources] = useState<string | null>(null);
+  // Fields the runtime threw away, so a blank one explains itself rather than
+  // looking like the researcher simply found nothing.
+  const [dropped, setDropped] = useState<{ field: string; reason: string }[]>([]);
   const { clientId } = useParams<{ clientId: string }>();
   const [row, setRow] = useState<ContextRow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -117,6 +120,7 @@ export function BusinessContextPanel() {
           setInputOpen(false);
           setAiDraft(null);
           setSources(null);
+          setDropped([]);
         }}
         title="Business Input"
         draftKey={`business-context:${clientId}`}
@@ -145,9 +149,23 @@ export function BusinessContextPanel() {
         onSaved={() => {
           setAiDraft(null);
           setSources(null);
+          setDropped([]);
           void refresh();
         }}
       />
+
+      {dropped.length > 0 && (
+        <div className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">Left blank for you to fill in</p>
+          <ul className="mt-1 space-y-0.5">
+            {dropped.map((d) => (
+              <li key={d.field}>
+                <span className="capitalize">{d.field.replace(/_/g, " ")}</span> — {d.reason}.
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {sources && (
         <p className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
@@ -170,12 +188,13 @@ export function BusinessContextPanel() {
           payload={{ clientId }}
           requireNotes={false}
           onClose={() => setResearching(false)}
-          onGenerated={(draft, drafted) => {
+          onGenerated={(draft, drafted, droppedFields) => {
             // A saved draft wins over initialValues inside FormModal, so a
             // half-typed form would silently swallow the research.
             clearDraft(`business-context:${clientId}`);
             setAiDraft(draft);
             setSources(drafted ?? null);
+            setDropped(droppedFields ?? []);
           }}
         />
       )}

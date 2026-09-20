@@ -44,7 +44,7 @@ export const CONTEXT_FIELDS = [
 ] as const;
 
 /** The four the form marks required, because every agent reads them. */
-const REQUIRED = ["business_overview", "ideal_customer", "main_offer", "competitors"] as const;
+const REQUIRED_FIELDS = ["business_overview", "ideal_customer", "main_offer", "competitors"] as const;
 
 const MIN_REQUIRED = 60;
 
@@ -86,33 +86,71 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-/** Why this draft should not be put in front of the operator, or null. */
-export function contextDraftProblem(draft: Record<string, unknown>): string | null {
-  for (const field of REQUIRED) {
-    const value = text(draft[field]);
-    if (!value) {
-      return `The draft says nothing about ${field.replace(/_/g, " ")}, which every downstream agent reads.`;
-    }
-    if (value.length < MIN_REQUIRED) {
-      return `The ${field.replace(/_/g, " ")} is too thin to be useful. An agent reading it would learn nothing it could act on.`;
-    }
+/** A field that was thrown away, and why, so the operator is not left guessing. */
+export interface DroppedField {
+  field: string;
+  reason: string;
+}
+
+export interface DraftReview {
+  draft: ContextDraft;
+  dropped: DroppedField[];
+  /** Set only when nothing usable survived. */
+  problem: string | null;
+}
+
+/** Why this single field cannot be shown, or null. */
+function fieldProblem(field: string, value: string): string | null {
+  if (!value) return null;
+  if (value.length > MAX_FIELD) {
+    return `${value.length} characters, over the ${MAX_FIELD} limit`;
   }
+  if (PLACEHOLDER.test(value)) return "contained a placeholder";
+  if (SPECULATION.test(value)) {
+    return "was hedging rather than reporting, and a hedged sentence reads as fact once an agent quotes it";
+  }
+  return null;
+}
+
+/**
+ * Review a draft field by field.
+ *
+ * The first version rejected the WHOLE draft over one bad field, and a
+ * researching run costs real money and several minutes. Two production runs
+ * were thrown away that way: one for a length cap set below real data, one
+ * for a hedged competitors line, both after all the searching was done.
+ *
+ * So a bad field is blanked and named instead. Eight good fields and one
+ * empty one the operator fills is a far better outcome than nothing, and the
+ * empty one carries its reason.
+ *
+ * Only a draft with none of the four required fields left is refused outright
+ * — at that point there is nothing worth putting on screen.
+ */
+export function reviewContextDraft(raw: Record<string, unknown>): DraftReview {
+  const draft = normaliseContextDraft(raw);
+  const dropped: DroppedField[] = [];
 
   for (const field of CONTEXT_FIELDS) {
-    const value = text(draft[field]);
-    if (value.length > MAX_FIELD) {
-      return `The ${field.replace(/_/g, " ")} is ${value.length} characters; keep it under ${MAX_FIELD}.`;
-    }
-    if (PLACEHOLDER.test(value)) {
-      return `The ${field.replace(/_/g, " ")} contains a placeholder. Write what you actually found or leave it blank.`;
-    }
-    if (SPECULATION.test(value)) {
-      // A hedged guess reads as fact once it is saved and an agent quotes it.
-      return `The ${field.replace(/_/g, " ")} is hedging rather than reporting. Write what the sources actually say, or leave the field blank for a person to fill in.`;
+    const value = draft[field];
+    const reason = fieldProblem(field, value);
+    if (reason) {
+      draft[field] = "";
+      dropped.push({ field, reason });
     }
   }
 
-  return null;
+  const requiredLeft = REQUIRED_FIELDS.filter((f) => draft[f].trim().length >= MIN_REQUIRED);
+  if (requiredLeft.length === 0) {
+    return {
+      draft,
+      dropped,
+      problem:
+        "Nothing usable came back — none of the four fields every agent reads survived. Try again, or write them yourself.",
+    };
+  }
+
+  return { draft, dropped, problem: null };
 }
 
 /**

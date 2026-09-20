@@ -17,7 +17,7 @@ import { AuthError, requireAdmin } from "../master/auth.js";
 import { readJsonBody } from "../mcp/http.js";
 import { logger } from "../logging/logger.js";
 import { ProviderError, runAgentLoop } from "../tools/anthropic.js";
-import { contextDraftProblem, normaliseContextDraft } from "./draft.js";
+import { reviewContextDraft } from "./draft.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_NOTES = 6000;
@@ -203,16 +203,23 @@ Call ${SUBMIT_TOOL.name} once when you are done.`;
       maxSearches: 10,
     });
 
-    const problem = contextDraftProblem(result.submitted);
-    if (problem) {
-      logger.warn("context_draft_rejected", { clientId, problem });
-      json(200, { ok: false, error: problem });
+    const review = reviewContextDraft(result.submitted);
+    if (review.problem) {
+      logger.warn("context_draft_rejected", { clientId, problem: review.problem });
+      json(200, { ok: false, error: review.problem });
       return;
+    }
+    if (review.dropped.length > 0) {
+      logger.warn("context_draft_fields_dropped", {
+        clientId,
+        dropped: review.dropped.map((d) => d.field).join(","),
+      });
     }
 
     json(200, {
       ok: true,
-      draft: normaliseContextDraft(result.submitted),
+      draft: review.draft,
+      dropped: review.dropped,
       sources: String(result.submitted.sources ?? ""),
       costUsd: result.usage.costUsd,
     });
