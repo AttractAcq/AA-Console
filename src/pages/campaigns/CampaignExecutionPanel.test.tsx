@@ -81,17 +81,26 @@ const NOT_READY: Requirement[] = [
   req("Sales agent", true, "Built and live."),
 ];
 
+/** A thenable query chain resolving to whatever rows it is given. */
+function rows(data: unknown[], error: unknown = null) {
+  const chain: Record<string, unknown> = {
+    select: () => chain,
+    eq: () => chain,
+    order: () => chain,
+    limit: () => Promise.resolve({ data, error }),
+    then: (r: (v: { data: unknown; error: unknown }) => unknown) =>
+      Promise.resolve({ data, error }).then(r),
+  };
+  return chain;
+}
+
 function show(campaigns: unknown[] = [planned()], reqs: Requirement[] = NOT_READY) {
-  from.mockImplementation(() => {
-    const chain = {
-      select: () => chain,
-      eq: () => chain,
-      order: () => chain,
-      limit: () => Promise.resolve({ data: [] }),
-      then: (r: (v: { data: unknown }) => unknown) => Promise.resolve({ data: campaigns }).then(r),
-    };
-    return chain;
-  });
+  // Keyed by table: one chain for everything meant pillars were being
+  // populated with campaign rows, which is mock pollution that would hide a
+  // real bug rather than catch one.
+  from.mockImplementation((table: string) =>
+    table === "client_content_pillars" ? rows([]) : rows(campaigns),
+  );
   rpc.mockImplementation((name: string) => {
     if (name === "campaign_readiness") return Promise.resolve({ data: reqs, error: null });
     return Promise.resolve({ data: [], error: null });
@@ -525,6 +534,67 @@ describe("proposing a campaign", () => {
     expect(await screen.findByDisplayValue(PROPOSAL.name)).toBeInTheDocument();
     const picker = screen.getByLabelText(/Campaign template \(optional\)/i) as HTMLSelectElement;
     expect(picker.value).toBe("P3");
+  });
+
+  it("does not offer pillars to a client that has none", async () => {
+    from.mockImplementation((table: string) =>
+      table === "client_content_pillars"
+        ? { select: () => ({ eq: () => ({ eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }) }) }) }
+        : rows([planned()]),
+    );
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    expect(await screen.findByLabelText(/Campaign name/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Content pillars \(optional\)/i)).not.toBeInTheDocument();
+  });
+
+  // Without this the campaign is created, the pillars silently are not, and
+  // the planner runs without them while the operator believes they were set.
+  it("refuses to queue the planner when the pillars cannot be attached", async () => {
+    const pillarInsert = vi.fn().mockResolvedValue({ error: { message: "pillar write failed" } });
+    from.mockImplementation((table: string) => {
+      if (table === "client_content_pillars") {
+        return rows([{ id: "pil-1", name: "Honest proof", target_share: 100 }]);
+      }
+      if (table === "campaign_content_pillars") return { insert: pillarInsert };
+      if (table === "client_campaigns") {
+        return {
+          ...rows([planned()]),
+          insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "new-1" }, error: null }) }) }),
+        };
+      }
+      return rows([planned()]);
+    });
+
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.type(await screen.findByLabelText(/Campaign name/i), "Winter push");
+    await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Fill the diary");
+    await userEvent.click(screen.getByRole("checkbox", { name: /Honest proof/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+
+    await waitFor(() => expect(pillarInsert).toHaveBeenCalled());
+    expect(rpc).not.toHaveBeenCalledWith("enqueue_agent_job", expect.anything());
+    expect(await screen.findByText(/pillar write failed/i)).toBeInTheDocument();
+  });
+
+  // A failed load must not look like "this client has no pillars": somebody
+  // would plan without them believing there were none to pick.
+  it("says so when the pillars could not be loaded", async () => {
+    from.mockImplementation((table: string) =>
+      table === "client_content_pillars"
+        ? {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({ order: () => Promise.resolve({ data: null, error: { message: "boom" } }) }),
+              }),
+            }),
+          }
+        : rows([planned()]),
+    );
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    expect(await screen.findByText(/Could not load this client/i)).toBeInTheDocument();
   });
 
   it("sends the steer when there is one", async () => {

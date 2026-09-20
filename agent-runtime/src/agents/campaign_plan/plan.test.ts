@@ -1,6 +1,6 @@
 import { templateFor } from "../../campaigns/templates.js";
 import { describe, expect, it } from "vitest";
-import { SUBMIT_TOOL } from "./index.js";
+import { SUBMIT_TOOL, submitToolFor } from "./index.js";
 import { unsupportedStrictKeywords } from "../../tools/schema.js";
 import {
   asAmount,
@@ -160,9 +160,11 @@ describe("campaignIdeas", () => {
   });
 
   it("accepts exactly the promised number of complete ideas", () => {
+    // pillar_id is null on a campaign that runs no pillars, which is every
+    // campaign planned before they existed.
     expect(campaignIdeas([idea("Photo triage"), idea("Written total")], 2)).toEqual([
-      idea("Photo triage"),
-      idea("Written total"),
+      { ...idea("Photo triage"), pillar_id: null },
+      { ...idea("Written total"), pillar_id: null },
     ]);
   });
 
@@ -267,5 +269,88 @@ describe("resolveNeeds", () => {
       needs_landing_page: true,
       needs_sales_agent: false,
     });
+  });
+});
+
+describe("campaign ideas inside pillars", () => {
+  const idea = (over: Record<string, unknown> = {}) => ({
+    title: "A",
+    body: "An angle",
+    channel: "instagram",
+    strategic_reason: "Because",
+    media_type: "image",
+    ...over,
+  });
+
+  it("files nothing when the campaign runs no pillars, exactly as before", () => {
+    const out = campaignIdeas([idea()], 1);
+    expect(out[0]!.pillar_id).toBeNull();
+  });
+
+  it("ignores a pillar the model volunteered when the campaign has none", () => {
+    expect(campaignIdeas([idea({ pillar_id: "pil-9" })], 1)[0]!.pillar_id).toBeNull();
+  });
+
+  it("files each idea under one of the campaign's pillars", () => {
+    const out = campaignIdeas(
+      [idea({ title: "A", pillar_id: "pil-1" }), idea({ title: "B", pillar_id: "pil-2" })],
+      2,
+      ["pil-1", "pil-2"],
+    );
+    expect(out.map((i) => i.pillar_id)).toEqual(["pil-1", "pil-2"]);
+  });
+
+  it("refuses an idea left unfiled when the campaign runs pillars", () => {
+    expect(() => campaignIdeas([idea()], 1, ["pil-1"])).toThrow(/not assigned to a content pillar/);
+  });
+
+  // Worse than unfiled: it lands in somebody else's calendar share and
+  // nothing flags it.
+  it("refuses a pillar this campaign is not running", () => {
+    expect(() => campaignIdeas([idea({ pillar_id: "pil-9" })], 1, ["pil-1"])).toThrow(
+      /a pillar this campaign is not running/,
+    );
+  });
+
+  it("names the offending idea, so the failure is actionable", () => {
+    expect(() => campaignIdeas([idea({ title: "The veneer door" })], 1, ["pil-1"])).toThrow(
+      /"The veneer door"/,
+    );
+  });
+});
+
+describe("the submit tool when a campaign runs pillars", () => {
+  const pillars = [
+    { id: "11111111-1111-1111-1111-111111111111", name: "Honest proof" },
+    { id: "22222222-2222-2222-2222-222222222222", name: "The veneer door" },
+  ];
+
+  const ideaProps = (tool: ReturnType<typeof submitToolFor>) =>
+    (tool.inputSchema.properties.ideas as { items: { properties: Record<string, unknown>; required: string[] } })
+      .items;
+
+  it("adds no pillar field when there are none, so old campaigns are untouched", () => {
+    const items = ideaProps(submitToolFor());
+    expect(items.properties).not.toHaveProperty("pillar_id");
+    expect(items.required).not.toContain("pillar_id");
+  });
+
+  // An enum makes an invented or borrowed pillar impossible to submit, where
+  // free text would let the model file a piece in somebody else's share.
+  it("offers exactly this campaign's pillars, as an enum", () => {
+    const items = ideaProps(submitToolFor(pillars));
+    expect(items.properties.pillar_id).toMatchObject({ type: "string", enum: pillars.map((p) => p.id) });
+    expect(items.required).toContain("pillar_id");
+  });
+
+  it("names the pillars in the description, so the ids mean something", () => {
+    const items = ideaProps(submitToolFor(pillars));
+    const description = (items.properties.pillar_id as { description: string }).description;
+    expect(description).toContain("Honest proof");
+    expect(description).toContain("The veneer door");
+  });
+
+  it("stays free of the keywords a strict schema rejects", () => {
+    expect(unsupportedStrictKeywords(submitToolFor(pillars).inputSchema)).toEqual([]);
   });
 });
