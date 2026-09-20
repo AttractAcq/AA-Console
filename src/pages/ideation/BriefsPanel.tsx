@@ -10,12 +10,15 @@ import { supabase } from "../../lib/supabase";
 import { ApproveAndBuildModal } from "../../components/briefs/ApproveAndBuildModal";
 import { BriefDetailModal } from "../../components/briefs/BriefDetailModal";
 import { cn } from "../../lib/cn";
+import { formatFilters, formatLabel } from "../../lib/contentFormat";
+import type { FormatFilterId } from "../../lib/contentFormat";
 
 type Brief = {
   id: string;
   title: string;
   body: string | null;
   media_type: "image" | "text" | "video";
+  content_format: string;
   brief_ref: string | null;
   status: string;
   source_idea_id: string | null;
@@ -33,6 +36,7 @@ const STATUS_TONE: Record<string, string> = {
 export function BriefsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
+  const [activeFormat, setActiveFormat] = useState<FormatFilterId>("all");
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [loading, setLoading] = useState(true);
   const [building, setBuilding] = useState<Brief | null>(null);
@@ -51,7 +55,7 @@ export function BriefsPanel() {
       const { data, error } = await supabase
         .from("client_briefs")
         .select(
-          "id, title, body, avatar_brief, editor_brief, media_type, brief_ref, status, source_idea_id, created_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
+          "id, title, body, avatar_brief, editor_brief, media_type, content_format, brief_ref, status, source_idea_id, created_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
         )
         .eq("client_id", clientId)
         .neq("purpose", "recruitment")
@@ -76,7 +80,9 @@ export function BriefsPanel() {
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
-  const shown = briefs.filter((b) => b.media_type === activeFilter);
+  const shown = briefs.filter(
+    (b) => b.media_type === activeFilter && (activeFormat === "all" || b.content_format === activeFormat),
+  );
   const elsewhere = briefs.length - shown.length;
 
   if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
@@ -85,8 +91,9 @@ export function BriefsPanel() {
     <div>
       <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-col gap-2">
         <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
+        <FilterPills options={formatFilters} activeId={activeFormat} onChange={setActiveFormat} />
       </div>
       {notice && (
         <p role="status" className="mb-4 text-sm text-brand-strong">
@@ -95,7 +102,7 @@ export function BriefsPanel() {
       )}
 
       <DataTable
-        columns={["Brief", "Type", "Status", ""]}
+        columns={["Brief", "Format", "Type", "Status", ""]}
         emptyLabel={
           loading
             ? "Loading briefs…"
@@ -115,6 +122,7 @@ export function BriefsPanel() {
             {b.title}
             {b.brief_ref && <span className="block text-xs text-muted-foreground">{b.brief_ref}</span>}
           </button>,
+          <span key="f">{formatLabel(b.content_format)}</span>,
           <span key="m" className="capitalize">{b.media_type}</span>,
           <span
             key="s"

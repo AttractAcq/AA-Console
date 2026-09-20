@@ -29,6 +29,8 @@ import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords, type UpstreamRecord } from "../shared.js";
 import { logger } from "../../logging/logger.js";
 import { ideaSource, pillarBrief, pillarFields, type PillarScope } from "../../pillars/scope.js";
+import { coerceFormat } from "../../content/format.js";
+import type { ContentFormat } from "../../content/format.js";
 
 const DEFAULT_IDEA_COUNT = 25;
 
@@ -39,6 +41,26 @@ interface IdeaPayload {
   source_question: string;
   strategic_reason: string;
   media_type: "image" | "text" | "video";
+  content_format: ContentFormat;
+}
+
+/**
+ * The two shape fields, decided together.
+ *
+ * Together because they constrain each other: a carousel of video and a
+ * story made of text are both contradictions, and the insert is a single
+ * statement — one refused pairing would take the whole batch down with it
+ * on the check constraint added in 112. An idea that contradicts itself is
+ * filed as a single, which loses that idea's shape and keeps the rest.
+ */
+export function mediaAndFormat(entry: Record<string, unknown>): {
+  media_type: IdeaPayload["media_type"];
+  content_format: IdeaPayload["content_format"];
+} {
+  const media = (["image", "text", "video"] as const).includes(entry.media_type as never)
+    ? (entry.media_type as IdeaPayload["media_type"])
+    : "video";
+  return { media_type: media, content_format: coerceFormat(entry.content_format, media) };
 }
 
 /**
@@ -211,8 +233,9 @@ export async function runIdeationJob(
               source_question: { type: "string", description: "The ICP question or tension this answers, taken from the question universe." },
               strategic_reason: { type: "string", description: "Why this is worth saying for this business specifically." },
               media_type: { type: "string", description: "One of: image, text, video." },
+              content_format: { type: "string", description: "The shape it runs in: single, carousel or story. A carousel is an image set only; a story is an image or a video; text is always single. Most ideas are single — choose carousel only when the idea is genuinely a sequence of points, and story only when it is made for a full-screen vertical slot." },
             },
-            required: ["title", "core_idea", "content_territory", "source_question", "strategic_reason", "media_type"],
+            required: ["title", "core_idea", "content_territory", "source_question", "strategic_reason", "media_type", "content_format"],
             additionalProperties: false,
           },
         },
@@ -309,9 +332,7 @@ Call ${submitTool.name} once when you are done.`;
       content_territory: String(entry.content_territory ?? "").trim(),
       source_question: String(entry.source_question ?? "").trim(),
       strategic_reason: String(entry.strategic_reason ?? "").trim(),
-      media_type: (["image", "text", "video"] as const).includes(entry.media_type as never)
-        ? (entry.media_type as IdeaPayload["media_type"])
-        : "video",
+      ...mediaAndFormat(entry),
     }))
     // An idea with no title or no source question is not an idea by this
     // architecture's definition, so it is dropped rather than stored.
@@ -336,6 +357,7 @@ Call ${submitTool.name} once when you are done.`;
       source_question: idea.source_question,
       strategic_reason: idea.strategic_reason || null,
       media_type: idea.media_type,
+      content_format: idea.content_format,
       source,
       job_id: job.id,
       proof_id: job.input_table === "client_proof_assets" ? job.input_id : null,
