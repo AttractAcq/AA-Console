@@ -418,3 +418,24 @@ export function templateProblem(
 
   return null;
 }
+
+/**
+ * What a template's destination means must exist before the campaign can run.
+ *
+ * The planner used to decide these by asking the model, which is a judgement
+ * call the template has already made: P3 sends people into a message thread,
+ * so it needs something answering — that is what its destination *is*, not an
+ * opinion about it. R1 points at a page, so a page has to exist.
+ *
+ * "Needs" means the campaign requires one, not that one must be built fresh.
+ * Provisioning already recognises a page that is there and creates nothing.
+ */
+export function derivedNeeds(template: CampaignTemplate): {
+  needsLandingPage: boolean;
+  needsSalesAgent: boolean;
+} {
+  return {
+    needsLandingPage: template.destination === "page",
+    needsSalesAgent: template.destination === "message",
+  };
+}

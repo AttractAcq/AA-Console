@@ -82,6 +82,25 @@ const REVENUE_FIELDS: readonly string[] = ["current_revenue", "target_revenue"];
 const SPECULATION =
   /\b(?:likely|presumably|probably|appears? to be|seems? to be|we can assume|it is assumed|typically would|may well)\b/i;
 
+/**
+ * Fields where hedging is honest rather than lazy.
+ *
+ * Competitor POSITIONING is an inference by nature. You read a rival's site
+ * and conclude they lead on price, or on convenience; "they appear to be the
+ * premium option locally" is an accurate account of what reading their pages
+ * supports, and demanding certainty there produces either a blank field or a
+ * false confidence — both worse than the hedge.
+ *
+ * This is the one field the guard fired on in production, and it fired on a
+ * sentence that was doing its job.
+ *
+ * The exemption is only from hedging. A placeholder or runaway output is
+ * still dropped here, and the prompt carries the weight instead: competitors
+ * must be NAMED, so the freedom to hedge about positioning cannot become
+ * freedom to write "probably several local providers".
+ */
+const HEDGING_ALLOWED: readonly string[] = ["competitors"];
+
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -106,7 +125,7 @@ function fieldProblem(field: string, value: string): string | null {
     return `${value.length} characters, over the ${MAX_FIELD} limit`;
   }
   if (PLACEHOLDER.test(value)) return "contained a placeholder";
-  if (SPECULATION.test(value)) {
+  if (!HEDGING_ALLOWED.includes(field) && SPECULATION.test(value)) {
     return "was hedging rather than reporting, and a hedged sentence reads as fact once an agent quotes it";
   }
   return null;

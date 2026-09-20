@@ -10,6 +10,13 @@ import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
 import { clearDraft } from "../../components/forms/FormModal";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
+import {
+  NO_TEMPLATE,
+  templateColumns,
+  templateFor,
+  templateOptions,
+  templateSummary,
+} from "../../lib/campaignTemplates";
 import { CampaignContentPanel } from "./CampaignContentPanel";
 import { cn } from "../../lib/cn";
 
@@ -48,6 +55,13 @@ export type Requirement = {
 const FIELDS: FieldDef[] = [
   { name: "name", label: "Campaign name", kind: "text", required: true },
   {
+    name: "template",
+    label: "Campaign template (optional)",
+    kind: "select",
+    options: templateOptions(),
+    hint: "Fixes the objective, the audience state it aims at and what has to be built, so the planner decides none of those. Leave it blank and the campaign is planned from the brief exactly as before.",
+  },
+  {
     name: "brief",
     label: "What this campaign is for",
     kind: "textarea",
@@ -74,7 +88,15 @@ export function CampaignExecutionPanel() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
   const [proposing, setProposing] = useState(false);
-  const [aiDraft, setAiDraft] = useState<{ name: string; brief: string } | null>(null);
+  // The dialog's own pick, kept here so the generated draft can carry it into
+  // the form. The endpoint steers by it but does not echo it back.
+  const [proposeTemplate, setProposeTemplate] = useState("");
+  const chosenTemplate = templateFor(proposeTemplate);
+  // template is not part of what the endpoint returns — it is the operator's
+  // own pick, carried through so the form opens on it.
+  const [aiDraft, setAiDraft] = useState<
+    { name: string; brief: string; template?: string } | null
+  >(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -476,6 +498,10 @@ export function CampaignExecutionPanel() {
               client_id: clientId,
               name: (v.name as string).trim(),
               brief: (v.brief as string).trim(),
+              // Spread only when a template was picked. The columns arrive in
+              // migration 96, and a campaign planned without a template must
+              // keep working on a database that does not have them yet.
+              ...(templateColumns(v.template as string) ?? {}),
             })
             .select("id")
             .single();
@@ -505,14 +531,44 @@ export function CampaignExecutionPanel() {
           placeholder="A season, a service to push, a number you are chasing, something a competitor just did. Leave it blank and it will propose whatever the records say is most worth doing."
           footnote="It will not invent a budget, a date or a target. Campaigns you already have are excluded."
           endpoint="/admin/campaigns/draft"
-          payload={{ clientId }}
+          payload={{ clientId, template: proposeTemplate }}
           requireNotes={false}
+          extra={
+            <div>
+              <label
+                htmlFor="propose-template"
+                className="block text-sm font-medium text-card-foreground"
+              >
+                Campaign template (optional)
+              </label>
+              <select
+                id="propose-template"
+                value={proposeTemplate}
+                onChange={(e) => setProposeTemplate(e.target.value)}
+                className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {[NO_TEMPLATE, ...templateOptions()].map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              {chosenTemplate && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {templateSummary(chosenTemplate)}
+                </p>
+              )}
+            </div>
+          }
           onClose={() => setProposing(false)}
           onGenerated={(draft) => {
             // A saved draft wins over initialValues inside FormModal, so a
             // half-typed form would silently swallow the proposal.
             clearDraft(`campaign:${clientId}`);
-            setAiDraft(draft);
+            // The template rides along so the form opens on the same choice
+            // the proposal was written for. Losing it here would leave a
+            // brief aimed at S1 sitting in a campaign with no template.
+            setAiDraft({ ...draft, template: proposeTemplate });
           }}
         />
       )}

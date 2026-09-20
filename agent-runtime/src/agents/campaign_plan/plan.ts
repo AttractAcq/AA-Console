@@ -1,3 +1,5 @@
+import { derivedNeeds, type CampaignTemplate } from "../../campaigns/templates.js";
+
 // What a campaign plan has to contain before anything is built from it.
 //
 // In its own module because these are the rules that decide whether real rows
@@ -136,4 +138,32 @@ export function campaignIdeas(raw: unknown, expected: number): CampaignIdea[] {
     titles.add(title.toLowerCase());
     return { title, body, channel, strategic_reason, media_type: media_type as CampaignIdea["media_type"] };
   });
+}
+
+/**
+ * What the campaign needs built, with a template outranking the model.
+ *
+ * P3 sends people into a message thread, so it needs something answering —
+ * that is what its destination is, not an opinion the model should be asked
+ * for. Where there is no template, the model's answer stands, which is how
+ * every campaign planned before the library existed still works.
+ *
+ * Here rather than inline in the job function, because a rule living there
+ * can be deleted without a test failing.
+ */
+export function resolveNeeds(
+  template: CampaignTemplate | null,
+  submitted: { needs_landing_page: unknown; needs_sales_agent: unknown },
+): { needs_landing_page: boolean; needs_sales_agent: boolean } {
+  if (template) {
+    const needs = derivedNeeds(template);
+    return {
+      needs_landing_page: needs.needsLandingPage,
+      needs_sales_agent: needs.needsSalesAgent,
+    };
+  }
+  return {
+    needs_landing_page: submitted.needs_landing_page === true,
+    needs_sales_agent: submitted.needs_sales_agent === true,
+  };
 }

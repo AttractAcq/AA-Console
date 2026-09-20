@@ -1,3 +1,4 @@
+import { templateFor } from "../../campaigns/templates.js";
 import { describe, expect, it } from "vitest";
 import { SUBMIT_TOOL } from "./index.js";
 import { unsupportedStrictKeywords } from "../../tools/schema.js";
@@ -9,6 +10,7 @@ import {
   normaliseChannels,
   planProblem,
   planSummary,
+  resolveNeeds,
   MAX_CONTENT,
   type CampaignPlan,
 } from "./plan.js";
@@ -223,3 +225,47 @@ function idea(over: Record<string, unknown> = {}) {
     ...over,
   };
 }
+
+describe("resolveNeeds", () => {
+  const model = { needs_landing_page: true, needs_sales_agent: true };
+
+  it("lets the model decide when there is no template", () => {
+    expect(resolveNeeds(null, model)).toEqual({
+      needs_landing_page: true,
+      needs_sales_agent: true,
+    });
+    expect(resolveNeeds(null, { needs_landing_page: false, needs_sales_agent: false })).toEqual({
+      needs_landing_page: false,
+      needs_sales_agent: false,
+    });
+  });
+
+  it("treats anything but true from the model as false", () => {
+    expect(resolveNeeds(null, { needs_landing_page: "yes", needs_sales_agent: 1 })).toEqual({
+      needs_landing_page: false,
+      needs_sales_agent: false,
+    });
+  });
+
+  it("overrules the model where a template has already decided", () => {
+    // P2 uses an instant form and needs neither, whatever the model said.
+    expect(resolveNeeds(templateFor("P2"), model)).toEqual({
+      needs_landing_page: false,
+      needs_sales_agent: false,
+    });
+  });
+
+  it("requires a sales agent for the template that opens a DM", () => {
+    expect(resolveNeeds(templateFor("P3"), { needs_landing_page: true, needs_sales_agent: false })).toEqual({
+      needs_landing_page: false,
+      needs_sales_agent: true,
+    });
+  });
+
+  it("requires a landing page where the ad points at one", () => {
+    expect(resolveNeeds(templateFor("R1"), { needs_landing_page: false, needs_sales_agent: false })).toEqual({
+      needs_landing_page: true,
+      needs_sales_agent: false,
+    });
+  });
+});
