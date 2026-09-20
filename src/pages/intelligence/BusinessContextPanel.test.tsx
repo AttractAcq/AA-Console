@@ -95,6 +95,19 @@ describe("drafting the business context", () => {
     expect(await screen.findByText(/Read their homepage and treatments page/)).toBeInTheDocument();
   });
 
+  it("explains a field the runtime threw away, rather than leaving it blank and silent", async () => {
+    // A blanked field that says nothing looks like the researcher found
+    // nothing, which is a different and much less useful fact.
+    callRuntime.mockResolvedValue({
+      draft: { ...DRAFT, competitors: "" },
+      dropped: [{ field: "competitors", reason: "was hedging rather than reporting" }],
+    });
+    await openResearcher();
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(await screen.findByText(/Left blank for you to fill in/i)).toBeInTheDocument();
+    expect(screen.getByText(/hedging rather than reporting/i)).toBeInTheDocument();
+  });
+
   it("shows the runtime's refusal and stays open to try again", async () => {
     callRuntime.mockRejectedValue(
       new Error("There is no website on file for this client and nothing typed in the box."),
