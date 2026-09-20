@@ -1470,6 +1470,7 @@ export type Database = {
       client_integrations: {
         Row: {
           access_level: string | null
+          ad_account_id: string | null
           client_id: string
           created_at: string
           credential_label: string | null
@@ -1483,6 +1484,7 @@ export type Database = {
         }
         Insert: {
           access_level?: string | null
+          ad_account_id?: string | null
           client_id: string
           created_at?: string
           credential_label?: string | null
@@ -1496,6 +1498,7 @@ export type Database = {
         }
         Update: {
           access_level?: string | null
+          ad_account_id?: string | null
           client_id?: string
           created_at?: string
           credential_label?: string | null
