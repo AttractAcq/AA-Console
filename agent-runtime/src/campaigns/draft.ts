@@ -20,7 +20,19 @@ export interface CampaignDraft {
   brief: string;
 }
 
-const LIMITS = { name: 120, brief: 2000 } as const;
+/**
+ * Runaway bounds, not style rules.
+ *
+ * The brief was 2000. Nothing outside AA ever reads it, and a campaign ask
+ * that runs long is a thing to edit rather than a thing to throw a paid run
+ * away over — which is what a tight cap does, three times over in this
+ * feature before the lesson stuck.
+ *
+ * Length is taste, and taste belongs in the prompt, which already asks for a
+ * short paragraph. Validation is for correctness: an invented budget makes
+ * the output unusable, a long paragraph does not.
+ */
+const LIMITS = { name: 200, brief: 8000 } as const;
 const MIN_BRIEF = 60;
 
 /** A bracketed gap somebody was supposed to fill in. */
@@ -53,10 +65,10 @@ export function campaignDraftProblem(draft: Record<string, unknown>): string | n
     return "The ask is too thin for the planner to work from. Say what the campaign is trying to achieve and for whom.";
   }
   if (name.length > LIMITS.name) {
-    return `The campaign name is ${name.length} characters; keep it under ${LIMITS.name}.`;
+    return `The campaign name is ${name.length} characters, past the ${LIMITS.name} limit. Something has run away.`;
   }
   if (brief.length > LIMITS.brief) {
-    return `The ask is ${brief.length} characters; keep it under ${LIMITS.brief}.`;
+    return `The ask is ${brief.length} characters, past the ${LIMITS.brief} limit. Something has run away.`;
   }
 
   for (const [field, value] of [["name", name], ["brief", brief]] as const) {
