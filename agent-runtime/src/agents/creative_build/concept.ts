@@ -138,3 +138,23 @@ export function recruitmentConceptProblem(
 
   return null;
 }
+
+/**
+ * What the last attempt got wrong, for a build that replaces a rejected one.
+ *
+ * Empty for a first build, so the caller interpolates it unconditionally.
+ *
+ * It is worded as an instruction rather than as background because the brief
+ * has not changed: a concept handed the same brief and a note about the
+ * rejection will otherwise write the same concept and soften one phrase.
+ */
+export function remakeBlock(feedback: string): string {
+  const said = feedback.trim();
+  if (!said) return "";
+  return `THIS IS A REMAKE — the last attempt at this brief was rejected
+What was wrong with it: ${said}
+
+Fix that specifically. The brief has not changed, so a concept that does not differ on the point above is the same rejection again. Do not merely soften the thing that was objected to.
+
+`;
+}

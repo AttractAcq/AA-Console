@@ -2,14 +2,15 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { rpc, useParams, fetchClientAssets, signPaths, fetchTextBodies } = vi.hoisted(() => ({
+const { rpc, from, useParams, fetchClientAssets, signPaths, fetchTextBodies } = vi.hoisted(() => ({
   rpc: vi.fn(),
+  from: vi.fn(),
   useParams: vi.fn(),
   fetchClientAssets: vi.fn(),
   signPaths: vi.fn(),
   fetchTextBodies: vi.fn(),
 }));
-vi.mock("../lib/supabase", () => ({ supabase: { rpc } }));
+vi.mock("../lib/supabase", () => ({ supabase: { rpc, from } }));
 vi.mock("react-router-dom", () => ({ useParams }));
 vi.mock("../lib/media", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/media")>()),
@@ -38,6 +39,13 @@ beforeEach(() => {
   fetchTextBodies.mockResolvedValue(new Map());
   rpc.mockResolvedValue({ error: null });
   fetchClientAssets.mockResolvedValue([asset()]);
+  const reviews = {
+    select: () => reviews,
+    eq: () => reviews,
+    order: () => reviews,
+    limit: () => Promise.resolve({ data: [{ reason: "Wrong logo lockup." }], error: null }),
+  };
+  from.mockReturnValue(reviews);
 });
 
 describe("approving from the library", () => {
@@ -96,5 +104,59 @@ describe("approving from the library", () => {
     render(<MediaLibrary mediaType="image" />);
     await userEvent.click(await screen.findByRole("button", { name: "Approve" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/Not permitted/i);
+  });
+});
+
+
+describe("remaking a rejected asset", () => {
+  const rejected = (over: Record<string, unknown> = {}) =>
+    asset({ review_status: "rejected", brief_id: "b1", ...over });
+
+  it("offers a remake on a rejected asset, and not on a pending one", async () => {
+    fetchClientAssets.mockResolvedValue([rejected()]);
+    render(<MediaLibrary mediaType="image" />);
+    expect(await screen.findByRole("button", { name: /Remake/i })).toBeInTheDocument();
+
+    fetchClientAssets.mockResolvedValue([asset()]);
+    render(<MediaLibrary mediaType="image" />);
+    await waitFor(() => expect(screen.queryAllByRole("button", { name: /Remake/i })).toHaveLength(1));
+  });
+
+  // The RPC refuses an asset with no brief, so the button would be a
+  // guaranteed failure.
+  it("offers nothing when the asset has no brief to rebuild from", async () => {
+    fetchClientAssets.mockResolvedValue([rejected({ brief_id: null })]);
+    render(<MediaLibrary mediaType="image" />);
+    await screen.findByText("Chair shot");
+    expect(screen.queryByRole("button", { name: /Remake/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the reason the build will be given before spending anything", async () => {
+    fetchClientAssets.mockResolvedValue([rejected()]);
+    render(<MediaLibrary mediaType="image" />);
+    await userEvent.click(await screen.findByRole("button", { name: /Remake/i }));
+    expect(await screen.findByText("Wrong logo lockup.")).toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("queues the remake against the asset", async () => {
+    fetchClientAssets.mockResolvedValue([rejected()]);
+    render(<MediaLibrary mediaType="image" />);
+    await userEvent.click(await screen.findByRole("button", { name: /Remake/i }));
+    const dialog = within(await screen.findByRole("dialog"));
+    await userEvent.click(dialog.getByRole("button", { name: "Remake" }));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("remake_rejected_asset", { p_asset_id: "a1" }),
+    );
+  });
+
+  it("will not remake a rejection with no reason recorded", async () => {
+    const empty = { select: () => empty, eq: () => empty, order: () => empty, limit: () => Promise.resolve({ data: [], error: null }) };
+    from.mockReturnValue(empty);
+    fetchClientAssets.mockResolvedValue([rejected()]);
+    render(<MediaLibrary mediaType="image" />);
+    await userEvent.click(await screen.findByRole("button", { name: /Remake/i }));
+    const dialog = within(await screen.findByRole("dialog"));
+    expect(dialog.getByRole("button", { name: "Remake" })).toBeDisabled();
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { unsupportedStrictKeywords, missingStrictRequired } from "../../tools/schema.js";
 import { IMAGE_CONCEPT_TOOL, TEXT_CONCEPT_TOOL } from "./index.js";
-import { conceptProblem, recruitmentConceptProblem, TREATMENTS } from "./concept.js";
+import { remakeBlock, conceptProblem, recruitmentConceptProblem, TREATMENTS } from "./concept.js";
 
 const good = (over: Record<string, unknown> = {}) => ({
   headline: "CHEWING IS NOT A COSMETIC PROBLEM",
@@ -220,5 +220,31 @@ describe("a recruitment ad has to say a job is open", () => {
     expect(recruitmentConceptProblem({ headline: "", subhead: "", call_to_action: "" }, "editor")).toMatch(
       /carries no text/i,
     );
+  });
+});
+
+describe("remakeBlock", () => {
+  it("says nothing on a first build", () => {
+    expect(remakeBlock("")).toBe("");
+    expect(remakeBlock("   ")).toBe("");
+  });
+
+  it("names what went wrong, in the rejector's words", () => {
+    const block = remakeBlock("Wrong logo lockup and the headline is unreadable.");
+    expect(block).toContain("Wrong logo lockup and the headline is unreadable.");
+    expect(block).toContain("THIS IS A REMAKE");
+  });
+
+  // The brief has not changed, so a concept given only the note will write
+  // the same concept and soften one phrase.
+  it("instructs rather than informs", () => {
+    const block = remakeBlock("The claim is unprovable.");
+    expect(block).toContain("Fix that specifically");
+    expect(block).toContain("is the same rejection again");
+    expect(block).toContain("not merely soften");
+  });
+
+  it("trims what it was handed", () => {
+    expect(remakeBlock("  Too busy.  ")).toContain("What was wrong with it: Too busy.");
   });
 });

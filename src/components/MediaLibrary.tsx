@@ -5,6 +5,7 @@ import { EmptyState } from "./EmptyState";
 import { MediaCard, StatusBadge } from "./MediaCard";
 import { MediaDetailModal } from "./MediaDetailModal";
 import { ApprovalActions } from "./ApprovalActions";
+import { RemakeAction } from "./RemakeAction";
 import { dateSortOptions } from "../data/sortOptions";
 import type { SortOptionId } from "../data/sortOptions";
 import { REVIEW_TONE, fetchClientAssets, fetchTextBodies, shortDate, signPaths } from "../lib/media";
@@ -31,6 +32,7 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<MediaAsset | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -80,6 +82,8 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
         </p>
       )}
 
+      {notice && <p className="mb-3 text-sm text-brand-strong">{notice}</p>}
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading {mediaType}s…</p>
       ) : assets.length === 0 ? (
@@ -107,6 +111,14 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
                     title={asset.title ?? "Untitled"}
                     onDone={() => void refresh()}
                     onError={setActionError}
+                  />
+                ) : asset.review_status === "rejected" ? (
+                  <RemakeAction
+                    assetId={asset.id}
+                    hasBrief={Boolean(asset.brief_id)}
+                    onDone={() => void refresh()}
+                    onError={setActionError}
+                    onNotice={setNotice}
                   />
                 ) : undefined
               }

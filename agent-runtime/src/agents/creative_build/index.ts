@@ -26,7 +26,7 @@ import { OpenAiError, runStructuredCompletion } from "../../tools/openai.js";
 import { estimateCostUsd } from "../../usage/cost.js";
 import { renderContext, renderUpstream } from "../shared.js";
 import { loadConceptContext } from "./context.js";
-import { conceptProblem, recruitmentConceptProblem, TREATMENTS } from "./concept.js";
+import { remakeBlock, conceptProblem, recruitmentConceptProblem, TREATMENTS } from "./concept.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { placeLogo } from "./logo.js";
@@ -279,7 +279,7 @@ export async function runCreativeBuildJob(
   const generationId = render.generation_id as string;
   const { data: generation, error: genError } = await sb
     .from("creative_generations")
-    .select("id, brief_id, media_type, quality, size, concept, stage, reference_path")
+    .select("id, brief_id, media_type, quality, size, concept, stage, reference_path, remake_feedback")
     .eq("id", generationId)
     .maybeSingle();
   if (genError) throw new Error(`Could not load the generation: ${genError.message}`);
@@ -416,6 +416,11 @@ export async function runCreativeBuildJob(
 
   const hasReference = Boolean(renderReference);
   const submitTool = isImage ? IMAGE_CONCEPT_TOOL : TEXT_CONCEPT_TOOL;
+  // What was wrong with the attempt this one replaces. Placed before the
+  // brief because it is the thing that has to change — a remake given the
+  // same brief and no account of the rejection writes the same concept.
+  const remakeFeedback = String(generation.remake_feedback ?? "").trim();
+
   const prompt = `Turn this approved brief into ${isImage ? "a creative concept for a single image" : "finished copy"}.
 ${
   hasReference
@@ -423,7 +428,7 @@ ${
     : ""
 }
 
-${isRecruitment ? recruitmentBlock(roleLabel) : ""}
+${remakeBlock(remakeFeedback)}${isRecruitment ? recruitmentBlock(roleLabel) : ""}
 THE BRIEF
 ${typed.title}
 

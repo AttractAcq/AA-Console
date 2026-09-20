@@ -2792,6 +2792,7 @@ export type Database = {
           media_type: Database["public"]["Enums"]["media_type"]
           quality: string
           reference_path: string | null
+          remake_feedback: string | null
           size: string
           stage: Database["public"]["Enums"]["creative_stage"]
           updated_at: string
@@ -2814,6 +2815,7 @@ export type Database = {
           media_type: Database["public"]["Enums"]["media_type"]
           quality?: string
           reference_path?: string | null
+          remake_feedback?: string | null
           size?: string
           stage?: Database["public"]["Enums"]["creative_stage"]
           updated_at?: string
@@ -2836,6 +2838,7 @@ export type Database = {
           media_type?: Database["public"]["Enums"]["media_type"]
           quality?: string
           reference_path?: string | null
+          remake_feedback?: string | null
           size?: string
           stage?: Database["public"]["Enums"]["creative_stage"]
           updated_at?: string
@@ -5567,6 +5570,10 @@ export type Database = {
       revert_page_to_revision: {
         Args: { p_page_id: string; p_revision_number: number }
         Returns: number
+      }
+      remake_rejected_asset: {
+        Args: { p_asset_id: string; p_quality?: string; p_size?: string }
+        Returns: string
       }
       review_media_asset: {
         Args: {
