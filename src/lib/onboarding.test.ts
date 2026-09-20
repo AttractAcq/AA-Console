@@ -121,7 +121,10 @@ describe("every step says where its data lives", () => {
   it("names a real tab, so the answer can be edited later", () => {
     // Onboarding is where information is collected, not where it is kept.
     for (const step of ONBOARDING_STEPS) {
-      expect(step.livesAt.tab, step.key).toMatch(/^[a-z-]+$/);
+      // A path after /clients/:id/, not a bare tab name — Business Context
+      // lives under delivery/, not account/, and the first version linked to
+      // a route that did not exist.
+      expect(step.livesAt.path, step.key).toMatch(/^(account|delivery)\//);
       expect(step.livesAt.label.length, step.key).toBeGreaterThan(0);
       expect(step.why.length, step.key).toBeGreaterThan(40);
     }

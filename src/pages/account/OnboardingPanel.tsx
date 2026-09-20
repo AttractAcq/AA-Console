@@ -272,7 +272,7 @@ export function OnboardingPanel() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       Lives in{" "}
                       <Link
-                        to={`/clients/${clientId}/account/${step.livesAt.tab}`}
+                        to={`/clients/${clientId}/${step.livesAt.path}`}
                         className="text-brand-strong hover:underline"
                       >
                         {step.livesAt.label}

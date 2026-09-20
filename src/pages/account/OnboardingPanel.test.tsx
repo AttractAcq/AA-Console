@@ -109,6 +109,11 @@ describe("onboarding collects, the panel keeps", () => {
       "href",
       "/clients/client-1/account/integrations",
     );
+    // Business Context is under delivery/, not account/. The first version
+    // linked to /account/business-context, which is not a route.
+    expect(
+      screen.getByRole("link", { name: "Intelligence → Business Context" }),
+    ).toHaveAttribute("href", "/clients/client-1/delivery/intelligence?tab=business-context");
   });
 
   it("writes a step straight into the table that owns it", async () => {
