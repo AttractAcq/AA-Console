@@ -23,6 +23,7 @@ import { ProviderError, runAgentLoop } from "../tools/anthropic.js";
 import { loadUpstreamRecords, renderContext, renderUpstream } from "../agents/shared.js";
 import type { BusinessContext } from "../agents/shared.js";
 import { MAX_PILLARS, MIN_PILLARS, normalisePillars, pillarSetProblem } from "./draft.js";
+import { pillarContextPack } from "./pack.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_NOTES = 4000;
@@ -180,8 +181,8 @@ ${notes ? `WHAT THE STRATEGIST WANTS FROM THIS SET — steer by this\n${notes}\n
 BUSINESS CONTEXT
 ${renderContext(context as BusinessContext | null)}
 
-BRAND STRATEGY, ICP AND OFFER
-${renderUpstream(records)}
+BRAND STRATEGY, AND THE PARTS OF THE ICP AND OFFER THAT BEAR ON WHAT TO SAY
+${renderUpstream(pillarContextPack(records))}
 
 ${
   inUse
@@ -195,7 +196,11 @@ Call ${SUBMIT_TOOL.name} once when you are done.`;
       apiKey: anthropicKeyForAgent(config, "pillar_draft"),
       model: config.model,
       timeoutMs: config.providerTimeoutMs,
-      deadlineAt: Date.now() + 120_000,
+      // 300s, matching the context route rather than the campaign proposer.
+      // Copying the proposer's 120s was wrong: this reads a brand's whole
+      // strategy and returns six pillars of five fields each, which is a
+      // different shape of work from writing one short brief.
+      deadlineAt: Date.now() + 300_000,
       maxTurns: 4,
       system: SYSTEM,
       prompt,
