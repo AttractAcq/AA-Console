@@ -163,8 +163,8 @@ describe("campaignIdeas", () => {
     // pillar_id is null on a campaign that runs no pillars, which is every
     // campaign planned before they existed.
     expect(campaignIdeas([idea("Photo triage"), idea("Written total")], 2)).toEqual([
-      { ...idea("Photo triage"), pillar_id: null },
-      { ...idea("Written total"), pillar_id: null },
+      { ...idea("Photo triage"), pillar_id: null, content_format: "single" },
+      { ...idea("Written total"), pillar_id: null, content_format: "single" },
     ]);
   });
 
@@ -352,5 +352,92 @@ describe("the submit tool when a campaign runs pillars", () => {
 
   it("stays free of the keywords a strict schema rejects", () => {
     expect(unsupportedStrictKeywords(submitToolFor(pillars).inputSchema)).toEqual([]);
+  });
+});
+
+describe("the format a campaign piece runs in", () => {
+  const piece = (over: Record<string, unknown> = {}) => ({
+    title: "A",
+    body: "An angle",
+    channel: "instagram",
+    strategic_reason: "Because",
+    media_type: "image",
+    ...over,
+  });
+
+  it("defaults to single, which is every campaign planned before formats", () => {
+    expect(campaignIdeas([piece()], 1)[0]!.content_format).toBe("single");
+    expect(campaignIdeas([piece({ content_format: "" })], 1)[0]!.content_format).toBe("single");
+  });
+
+  it("takes a carousel of images and a story of either", () => {
+    expect(campaignIdeas([piece({ content_format: "carousel" })], 1)[0]!.content_format).toBe("carousel");
+    expect(campaignIdeas([piece({ content_format: "story" })], 1)[0]!.content_format).toBe("story");
+    expect(
+      campaignIdeas([piece({ content_format: "story", media_type: "video" })], 1)[0]!.content_format,
+    ).toBe("story");
+  });
+
+  // Correcting the pair silently is how a campaign produces something
+  // nobody asked for.
+  it("refuses a carousel of anything but images", () => {
+    expect(() => campaignIdeas([piece({ content_format: "carousel", media_type: "video" })], 1)).toThrow(
+      /a carousel is images, and a set of clips is a story/,
+    );
+    expect(() => campaignIdeas([piece({ content_format: "carousel", media_type: "text" })], 1)).toThrow(
+      /carousel of text/,
+    );
+  });
+
+  it("refuses a text story, because a story is a still or a clip", () => {
+    expect(() => campaignIdeas([piece({ content_format: "story", media_type: "text" })], 1)).toThrow(
+      /a story is a still or a clip/,
+    );
+  });
+
+  it("refuses a format that does not exist", () => {
+    expect(() => campaignIdeas([piece({ content_format: "reel" })], 1)).toThrow(
+      /a format that does not exist: reel/,
+    );
+  });
+
+  it("names the piece, so the failure is actionable", () => {
+    expect(() =>
+      campaignIdeas([piece({ title: "The veneer door", content_format: "carousel", media_type: "video" })], 1),
+    ).toThrow(/"The veneer door"/);
+  });
+});
+
+describe("the submit tool asks for a format", () => {
+  const items = (tool: ReturnType<typeof submitToolFor>) =>
+    (tool.inputSchema.properties.ideas as {
+      items: { properties: Record<string, unknown>; required: string[] };
+    }).items;
+
+  it("offers exactly the three formats, as an enum", () => {
+    expect(items(submitToolFor()).properties.content_format).toMatchObject({
+      type: "string",
+      enum: ["single", "carousel", "story"],
+    });
+  });
+
+  // Optional would mean the planner could omit it and every piece would
+  // silently default to a single image.
+  it("requires it on every piece, with or without pillars", () => {
+    expect(items(submitToolFor()).required).toContain("content_format");
+    expect(
+      items(submitToolFor([{ id: "11111111-1111-1111-1111-111111111111", name: "P" }])).required,
+    ).toContain("content_format");
+  });
+
+  it("tells the planner when not to reach for a carousel", () => {
+    const description = String(
+      (items(submitToolFor()).properties.content_format as { description: string }).description,
+    );
+    expect(description).toContain("restates one point five times");
+  });
+
+  it("stays free of the keywords a strict schema rejects", () => {
+    expect(unsupportedStrictKeywords(submitToolFor().inputSchema)).toEqual([]);
   });
 });

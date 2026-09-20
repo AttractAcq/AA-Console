@@ -90,6 +90,12 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
             media_type: { type: "string", enum: ["image", "text", "video"] },
             channel: { type: "string", description: "Which of the campaign's channels this piece is for." },
             strategic_reason: { type: "string", description: "Why this distinct piece helps achieve the campaign objective." },
+            content_format: {
+              type: "string",
+              enum: ["single", "carousel", "story"],
+              description:
+                "The shape this piece runs in. single is one image, one video or one piece of copy. carousel is images only, a swipeable set where frame one earns the swipe. story is a still or a clip, tapped through. Choose single unless the argument genuinely needs more than one frame — a carousel that restates one point five times is worse than the single image it should have been.",
+            },
             ...(ids.length
               ? {
                   pillar_id: {
@@ -103,7 +109,7 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
               : {}),
           },
           required: [
-            "title", "body", "media_type", "channel", "strategic_reason",
+            "title", "body", "media_type", "channel", "strategic_reason", "content_format",
             ...(ids.length ? ["pillar_id"] : []),
           ],
           additionalProperties: false,
