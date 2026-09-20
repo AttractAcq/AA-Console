@@ -5265,6 +5265,21 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      delete_client_campaign: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          deleted_assets: number
+          deleted_briefs: number
+          deleted_ideas: number
+        }[]
+      }
+      delete_client_idea: {
+        Args: { p_idea_id: string }
+        Returns: {
+          deleted_assets: number
+          deleted_briefs: number
+        }[]
+      }
       delete_recruitment_ad: {
         Args: { p_brief_id: string }
         Returns: {

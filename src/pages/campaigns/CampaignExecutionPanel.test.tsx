@@ -621,3 +621,65 @@ describe("proposing a campaign", () => {
     expect(screen.getByLabelText(/Anything to steer it/i)).toBeInTheDocument();
   });
 });
+
+describe("deleting a campaign", () => {
+  beforeEach(() => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  it("deletes through delete_client_campaign and names the cascade in confirm", async () => {
+    // Pattern A: intentional RPC delete. Confirm copy must make cascade
+    // consequences obvious — ideas, briefs and assets go; pages/agents stay.
+    show([planned()], READY);
+    await open();
+    const confirmSpy = vi.mocked(window.confirm);
+    rpc.mockImplementation((name: string) => {
+      if (name === "campaign_readiness") return Promise.resolve({ data: READY, error: null });
+      if (name === "delete_client_campaign") {
+        return Promise.resolve({
+          data: [{ deleted_ideas: 2, deleted_briefs: 1, deleted_assets: 1 }],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: [], error: null });
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete Winter full-arch push" }));
+    expect(confirmSpy).toHaveBeenCalled();
+    const message = String(confirmSpy.mock.calls[0]?.[0] ?? "");
+    expect(message).toMatch(/campaign ideas/i);
+    expect(message).toMatch(/content briefs/i);
+    expect(message).toMatch(/generated assets/i);
+    expect(message).toMatch(/Landing pages and sales agents stay/i);
+
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("delete_client_campaign", { p_campaign_id: "camp-1" }),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(/Deleted "Winter full-arch push"/i);
+  });
+
+  it("asks first, and does nothing if the answer is no", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    show([planned()], READY);
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Delete Winter full-arch push" }));
+    await waitFor(() =>
+      expect(rpc).not.toHaveBeenCalledWith("delete_client_campaign", expect.anything()),
+    );
+  });
+
+  it("surfaces a permission refusal rather than pretending it worked", async () => {
+    show([planned()], READY);
+    await open();
+    rpc.mockImplementation((name: string) => {
+      if (name === "campaign_readiness") return Promise.resolve({ data: READY, error: null });
+      return Promise.resolve({
+        data: null,
+        error: { message: "Only an admin can delete a campaign." },
+      });
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Delete Winter full-arch push" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Only an admin can delete a campaign/i);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+});
