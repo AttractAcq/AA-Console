@@ -117,6 +117,8 @@ export interface CampaignIdea {
   strategic_reason: string;
   /** The content pillar this piece sits in, when the campaign has any. */
   pillar_id: string | null;
+  /** 'single', 'carousel' or 'story'. Decides how it is briefed and produced. */
+  content_format: "single" | "carousel" | "story";
 }
 
 /** Reject incomplete batches rather than silently saving fewer ideas than promised. */
@@ -141,6 +143,41 @@ function assignedPillar(raw: unknown, allowed: readonly string[], title: string)
     throw new Error(`"${title}" was assigned to a pillar this campaign is not running.`);
   }
   return chosen;
+}
+
+
+/** What a format can be made of. A carousel is images; a story is either. */
+export const FORMAT_MEDIA: Record<string, readonly string[]> = {
+  single: ["image", "text", "video"],
+  carousel: ["image"],
+  story: ["image", "video"],
+};
+
+/**
+ * The format this piece is produced in, checked against what it is made of.
+ *
+ * A carousel of video is a story, and a text story is nothing. Correcting
+ * the pair silently is how a campaign ends up producing something nobody
+ * asked for, so an impossible pair is refused and the planner writes the
+ * batch again.
+ *
+ * Absent means single, which is every campaign planned before formats
+ * existed and most pieces after.
+ */
+function chosenFormat(raw: unknown, mediaType: string, title: string): CampaignIdea["content_format"] {
+  const asked = str(raw) || "single";
+  const allowed = FORMAT_MEDIA[asked];
+  if (!allowed) {
+    throw new Error(`"${title}" asks for a format that does not exist: ${asked}.`);
+  }
+  if (!allowed.includes(mediaType)) {
+    const advice =
+      asked === "carousel"
+        ? "a carousel is images, and a set of clips is a story"
+        : "a story is a still or a clip";
+    throw new Error(`"${title}" asks for a ${asked} of ${mediaType}; ${advice}.`);
+  }
+  return asked as CampaignIdea["content_format"];
 }
 
 export function campaignIdeas(
@@ -172,6 +209,7 @@ export function campaignIdeas(
       strategic_reason,
       media_type: media_type as CampaignIdea["media_type"],
       pillar_id: assignedPillar(item?.pillar_id, pillarIds, title),
+      content_format: chosenFormat(item?.content_format, String(media_type), title),
     };
   });
 }

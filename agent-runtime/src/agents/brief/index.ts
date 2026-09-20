@@ -57,7 +57,7 @@ export async function runBriefJob(
 
   const { data: idea, error: ideaError } = await sb
     .from("client_ideas")
-    .select("id, title, body, media_type, content_territory, source_question, strategic_reason")
+    .select("id, title, body, media_type, content_territory, source_question, strategic_reason, content_format")
     .eq("id", job.input_id)
     .maybeSingle();
   if (ideaError) throw new Error(`Failed to load idea: ${ideaError.message}`);
@@ -134,7 +134,7 @@ Core idea: ${idea.body ?? ""}
 ${idea.source_question ? `Answers this buyer question: ${idea.source_question}` : ""}
 ${idea.strategic_reason ? `Why it matters: ${idea.strategic_reason}` : ""}
 ${idea.content_territory ? `Content territory: ${idea.content_territory}` : ""}
-Format: ${idea.media_type}
+Format: ${idea.media_type}${idea.content_format && idea.content_format !== "single" ? ` — produced as a ${idea.content_format}, which is an ordered set of frames rather than one picture` : ""}
 
 BRAND STRATEGY — hold this point of view, respect what it says to avoid
 ${strategy || "(none on file)"}
@@ -216,6 +216,10 @@ Call ${submitTool.name} once when you are done.`;
     // cannot later answer "which proof produced revenue"; a foreign key can.
     proof_asset_id: proofIdForRef(usable, result.submitted.proof_ref),
     media_type: idea.media_type,
+    // Carried from the idea rather than decided here. The campaign chose the
+    // shape when it planned the piece; a brief that forgets it produces a
+    // single image for something planned as a carousel.
+    content_format: idea.content_format ?? "single",
     status: "draft",
     job_id: job.id,
   });

@@ -1476,6 +1476,7 @@ export type Database = {
           campaign_id: string | null
           campaign_position: number | null
           client_id: string
+          content_format: Database["public"]["Enums"]["content_format"]
           content_territory: string | null
           created_at: string
           created_by: string | null
@@ -1496,6 +1497,7 @@ export type Database = {
           campaign_id?: string | null
           campaign_position?: number | null
           client_id: string
+          content_format?: Database["public"]["Enums"]["content_format"]
           content_territory?: string | null
           created_at?: string
           created_by?: string | null
@@ -1516,6 +1518,7 @@ export type Database = {
           campaign_id?: string | null
           campaign_position?: number | null
           client_id?: string
+          content_format?: Database["public"]["Enums"]["content_format"]
           content_territory?: string | null
           created_at?: string
           created_by?: string | null
