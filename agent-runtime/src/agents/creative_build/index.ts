@@ -27,6 +27,19 @@ import { estimateCostUsd } from "../../usage/cost.js";
 import { renderContext, renderUpstream } from "../shared.js";
 import { loadConceptContext } from "./context.js";
 import { remakeBlock, conceptProblem, recruitmentConceptProblem, TREATMENTS } from "./concept.js";
+import {
+  framePrompt,
+  renderFrames,
+  MAX_FRAMES,
+  MIN_FRAMES,
+  framePath,
+  framePlanProblem,
+  framesConceptProblem,
+  buildRoute,
+  normaliseFrames,
+  positionFromPath,
+  type FrameConcept,
+} from "./frames.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { placeLogo } from "./logo.js";
@@ -44,6 +57,8 @@ interface BriefRow {
   /** 'client' or 'recruitment'. A hiring ad is a different deliverable. */
   purpose: string | null;
   recruitment_role: string | null;
+  /** 'single', 'carousel' or 'story'. The last two are made of frames. */
+  content_format: "single" | "carousel" | "story";
 }
 
 /**
@@ -95,6 +110,56 @@ export const IMAGE_CONCEPT_TOOL = {
     additionalProperties: false,
   },
 };
+
+
+/**
+ * The concept tool for a carousel or a story.
+ *
+ * Built per run so the frame count can be stated in the description, and
+ * the per-frame shape is the single-image shape plus the one field that
+ * decides whether a frame set is any good: what job this frame does. Five
+ * frames each restating the same point is the commonest way these fail, and
+ * a plan that never says what each frame is for invites exactly that.
+ *
+ * No maxItems on the array — a strict schema rejects it. The count is
+ * checked in framePlanProblem instead, the same way campaignIdeas does.
+ */
+export function framesConceptTool(format: string) {
+  return {
+    name: "submit_frames",
+    description: `Submit the ${format} as an ordered set of frames. Call once. Between ${MIN_FRAMES} and ${MAX_FRAMES} frames, numbered from 1 with no gaps.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        frames: {
+          type: "array",
+          description: `The frames in the order they run. Frame 1 earns the swipe or the tap.`,
+          items: {
+            type: "object",
+            properties: {
+              position: { type: "number", description: "1 for the first frame, counting up with no gaps." },
+              purpose: { type: "string", description: "What this frame does that no other frame does. If two frames share a purpose, one of them should not exist." },
+              headline: { type: "string", description: "The largest words on this frame. Empty string if it carries no text." },
+              subhead: { type: "string", description: "Supporting line on this frame, or an empty string." },
+              call_to_action: { type: "string", description: "The action asked for. Usually empty except on the last frame." },
+              subject: { type: "string", description: "Who or what is literally in this frame. A depicted subject, not a block of type." },
+              background: { type: "string", description: "What fills the frame behind the text. A real place or environment, not a flat colour." },
+              visual_treatment: { type: "string", enum: [...TREATMENTS], description: "How this frame's imagery is made. The same across the set unless there is a reason." },
+              composition: { type: "string", description: "Layout and crop for this frame." },
+              art_direction: { type: "string", description: "Palette, lighting, texture. Consistent across the set: these run together." },
+              avoid: { type: "string", description: "What must not appear in this frame." },
+            },
+            required: ["position", "purpose", "headline", "subhead", "call_to_action", "subject", "background", "visual_treatment", "composition", "art_direction", "avoid"],
+            additionalProperties: false,
+          },
+        },
+        rationale: { type: "string", description: "Why this set and this order. For the operator, not the renderer." },
+      },
+      required: ["frames", "rationale"],
+      additionalProperties: false,
+    },
+  };
+}
 
 export const TEXT_CONCEPT_TOOL = {
   name: "submit_copy",
@@ -299,7 +364,7 @@ export async function runCreativeBuildJob(
 
   const { data: brief, error: briefError } = await sb
     .from("client_briefs")
-    .select("id, client_id, title, body, media_type, brief_ref, purpose, recruitment_role")
+    .select("id, client_id, title, body, media_type, brief_ref, purpose, recruitment_role, content_format")
     .eq("id", generation.brief_id)
     .maybeSingle();
   if (briefError) throw new Error(`Could not load the brief: ${briefError.message}`);
@@ -315,6 +380,9 @@ export async function runCreativeBuildJob(
   }
 
   const isImage = typed.media_type === "image";
+  // A carousel or story is rendered as an ordered set. Only the image route
+  // builds them; a video story is a person's job, same as any other video.
+  const isFramed = buildRoute(typed.media_type, typed.content_format) === "frames";
   // A recruitment brief used to arrive looking exactly like a client campaign
   // brief, so the agent wrote a good ad for the wrong job.
   const isRecruitment = typed.purpose === "recruitment";
@@ -415,13 +483,23 @@ export async function runCreativeBuildJob(
     .join("\n");
 
   const hasReference = Boolean(renderReference);
-  const submitTool = isImage ? IMAGE_CONCEPT_TOOL : TEXT_CONCEPT_TOOL;
+  const submitTool = isFramed
+    ? framesConceptTool(typed.content_format)
+    : isImage
+      ? IMAGE_CONCEPT_TOOL
+      : TEXT_CONCEPT_TOOL;
   // What was wrong with the attempt this one replaces. Placed before the
   // brief because it is the thing that has to change — a remake given the
   // same brief and no account of the rejection writes the same concept.
   const remakeFeedback = String(generation.remake_feedback ?? "").trim();
 
-  const prompt = `Turn this approved brief into ${isImage ? "a creative concept for a single image" : "finished copy"}.
+  const prompt = `Turn this approved brief into ${
+    isFramed
+      ? `an ordered set of frames for a ${typed.content_format}`
+      : isImage
+        ? "a creative concept for a single image"
+        : "finished copy"
+  }.
 ${
   hasReference
     ? `\nA REFERENCE IMAGE HAS BEEN SUPPLIED and the render will start from it. Write the concept as DIRECTION ON THAT IMAGE — what to keep, what to change, what to add, how to treat it — not as a description of a picture to build from nothing. Do not describe a subject that would replace it.\n`
@@ -517,7 +595,15 @@ Call ${submitTool.name} once when you are done.`;
 
   // Checked before anything is rendered or stored: a text card costs the same
   // to make as a picture and is discovered much later, in the approval queue.
-  if (isImage) {
+  let plannedFrames: FrameConcept[] = [];
+  if (isFramed) {
+    plannedFrames = normaliseFrames(concept.frames);
+    const problem = framesConceptProblem(plannedFrames, conceptProblem);
+    if (problem) {
+      await fail(problem);
+      return { ok: false, retryable: true, failureMessage: problem, usage };
+    }
+  } else if (isImage) {
     const problem = conceptProblem(concept);
     if (problem) {
       await fail(problem);
@@ -583,6 +669,105 @@ Call ${submitTool.name} once when you are done.`;
 
     await markBriefComplete(sb, typed.id);
     await appendEvent(sb, job.id, "Copy written and filed under the client's assets.");
+    return { ok: true, retryable: false, usage };
+  }
+
+  // ---- a carousel or story: render the set, one frame at a time ---------
+  if (isFramed) {
+    await sb
+      .from("creative_generations")
+      .update({
+        stage: "render",
+        concept,
+        concept_model: conceptModel,
+        image_model: config.imageModel,
+        cost_usd: usage.costUsd,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", generationId);
+
+    // Storage is the progress record. A retry after a rate limit renders
+    // only what is missing, so frame four costs frame four rather than
+    // frames one to four.
+    const prefix = `${job.client_id}/generated/${renderId}`;
+    const { data: existing } = await sb.storage.from(BUCKET).list(prefix);
+    const done = new Set<number>();
+    for (const file of existing ?? []) {
+      const position = positionFromPath(`${prefix}/${file.name}`);
+      if (position !== null) done.add(position);
+    }
+
+    let frames;
+    try {
+      frames = await renderFrames({
+        planned: plannedFrames,
+        done,
+        pathFor: (frame) => framePath(String(job.client_id), renderId, frame.position, "png"),
+        onProgress: (note) => void appendEvent(sb, job.id, note),
+        renderOne: async (frame, total) => {
+          const composed = composePrompt(
+            frame as unknown as Record<string, unknown>,
+            typed,
+            clientName,
+            identity,
+            brand,
+          );
+          const out = await renderImage(config, framePrompt(frame, total, composed), {
+            size: renderSize,
+            quality: renderQuality,
+            reference: null,
+          });
+          return { bytes: out.bytes, contentType: out.contentType, extension: out.extension };
+        },
+        store: async (frame, out) => {
+          const path = framePath(String(job.client_id), renderId, frame.position, out.extension);
+          const { error: upErr } = await sb.storage
+            .from(BUCKET)
+            .upload(path, out.bytes, { contentType: out.contentType, upsert: true });
+          if (upErr) throw new Error(`Could not store frame ${frame.position}: ${upErr.message}`);
+          return path;
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Retryable: the frames already stored survive, and the next attempt
+      // starts from the one that failed.
+      await fail(message);
+      return { ok: false, retryable: true, failureMessage: message, usage };
+    }
+
+    const { data: framedId, error: saveError } = await sb.rpc("save_framed_asset", {
+      p_client_id: job.client_id,
+      p_brief_id: typed.id,
+      p_format: typed.content_format,
+      p_media_type: "image",
+      p_title: typed.title,
+      p_frames: frames,
+    });
+    if (saveError) throw new Error(`Could not file the ${typed.content_format}: ${saveError.message}`);
+
+    await sb
+      .from("creative_renders")
+      .update({
+        status: "done",
+        asset_id: framedId as string,
+        model: config.imageModel,
+        cost_usd: usage.costUsd + estimateImageCostUsd(renderQuality) * frames.length,
+        error: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", renderId);
+    await sb
+      .from("creative_generations")
+      .update({ stage: "done", cost_usd: usage.costUsd, updated_at: new Date().toISOString() })
+      .eq("id", generationId);
+
+    await markBriefComplete(sb, typed.id);
+    await appendEvent(
+      sb,
+      job.id,
+      `Filed a ${typed.content_format} of ${frames.length} frames, awaiting approval.`,
+    );
     return { ok: true, retryable: false, usage };
   }
 
