@@ -4,6 +4,7 @@ import { FilterPills } from "./FilterPills";
 import { EmptyState } from "./EmptyState";
 import { MediaCard, StatusBadge } from "./MediaCard";
 import { MediaDetailModal } from "./MediaDetailModal";
+import { ApprovalActions } from "./ApprovalActions";
 import { dateSortOptions } from "../data/sortOptions";
 import type { SortOptionId } from "../data/sortOptions";
 import { REVIEW_TONE, fetchClientAssets, fetchTextBodies, shortDate, signPaths } from "../lib/media";
@@ -29,6 +30,7 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
   const [bodies, setBodies] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<MediaAsset | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -72,6 +74,12 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
         <FilterPills options={dateSortOptions} activeId={sort} onChange={setSort} />
       </div>
 
+      {actionError && (
+        <p role="alert" className="mb-3 text-sm text-destructive">
+          {actionError}
+        </p>
+      )}
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading {mediaType}s…</p>
       ) : assets.length === 0 ? (
@@ -81,23 +89,28 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {assets.map((asset) => (
-            <button
-              key={asset.id}
-              type="button"
-              onClick={() => setOpen(asset)}
-              className="rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
             <MediaCard
+              key={asset.id}
               mediaType={asset.media_type}
               url={urls.get(asset.storage_path)}
               body={bodies.get(asset.id)}
               title={asset.title ?? "Untitled"}
               meta={`${asset.ref_number ?? "—"} · ${shortDate(asset.created_at)}`}
+              onOpen={() => setOpen(asset)}
               badge={
                 <StatusBadge status={asset.review_status} tone={REVIEW_TONE[asset.review_status]} />
               }
+              actions={
+                asset.review_status === "pending" ? (
+                  <ApprovalActions
+                    assetId={asset.id}
+                    title={asset.title ?? "Untitled"}
+                    onDone={() => void refresh()}
+                    onError={setActionError}
+                  />
+                ) : undefined
+              }
             />
-            </button>
           ))}
         </div>
       )}

@@ -24,6 +24,7 @@ import { ImageLibraryPanel } from "./media/ImageLibraryPanel";
 import { VideoLibraryPanel } from "./media/VideoLibraryPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { OrganicPanel } from "./distribution/OrganicPanel";
+import { AssetsPanel } from "./distribution/AssetsPanel";
 import { PaidPanel } from "./distribution/PaidPanel";
 import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "./sales/SalesOverviewPanel";
@@ -98,6 +99,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "copy-library": () => <CopyLibraryPanel />,
   },
   distribution: {
+    "distribution-assets": () => <AssetsPanel />,
     organic: () => <OrganicPanel />,
     paid: () => <PaidPanel />,
   },
