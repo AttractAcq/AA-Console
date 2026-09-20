@@ -52,7 +52,13 @@ export function AssetsPanel() {
     }
     setLoadError(null);
     try {
-      const rows = await fetchClientAssets(clientId, { reviewStatus: "approved" });
+      // humanApproved, not just approved: schedule_asset refuses anything only
+      // a bot signed off, so listing those here would offer an action that
+      // always fails.
+      const rows = await fetchClientAssets(clientId, {
+        reviewStatus: "approved",
+        humanApproved: true,
+      });
       setAssets(rows);
 
       const { data: posts, error: postError } = await supabase

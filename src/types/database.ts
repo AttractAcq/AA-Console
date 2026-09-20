@@ -1883,6 +1883,7 @@ export type Database = {
           brief_id: string | null
           client_id: string
           created_at: string
+          human_approved_at: string | null
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
           member_id: string | null
@@ -1906,6 +1907,7 @@ export type Database = {
           brief_id?: string | null
           client_id: string
           created_at?: string
+          human_approved_at?: string | null
           id?: string
           media_type: Database["public"]["Enums"]["media_type"]
           member_id?: string | null
@@ -1929,6 +1931,7 @@ export type Database = {
           brief_id?: string | null
           client_id?: string
           created_at?: string
+          human_approved_at?: string | null
           id?: string
           media_type?: Database["public"]["Enums"]["media_type"]
           member_id?: string | null

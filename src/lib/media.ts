@@ -56,6 +56,8 @@ export type MediaAsset = {
   title: string | null;
   storage_path: string;
   review_status: "pending" | "approved" | "rejected";
+  /** Null unless a person approved it. A bot approval never sets this. */
+  human_approved_at?: string | null;
   member_id: string | null;
   created_at: string;
 };
@@ -74,15 +76,24 @@ export async function fetchClientAssets(
     ascending?: boolean;
     /** Default client so hiring ads never appear in campaign Media / Dist / Approvals. */
     purpose?: "client" | "recruitment" | "all";
+    /**
+     * true  — only what a person signed off, which is what schedule_asset takes
+     * false — still needs a person, including anything only a bot approved
+     *
+     * review_status alone cannot tell these apart: a bot approval sets it too.
+     */
+    humanApproved?: boolean;
   } = {},
 ): Promise<MediaAsset[]> {
   let query = supabase
     .from("client_media_assets")
-    .select("id, client_id, brief_id, ref_number, media_type, title, storage_path, review_status, member_id, created_at")
+    .select("id, client_id, brief_id, ref_number, media_type, title, storage_path, review_status, human_approved_at, member_id, created_at")
     .eq("client_id", clientId);
 
   if (opts.mediaType) query = query.eq("media_type", opts.mediaType);
   if (opts.reviewStatus) query = query.eq("review_status", opts.reviewStatus);
+  if (opts.humanApproved === true) query = query.not("human_approved_at", "is", null);
+  if (opts.humanApproved === false) query = query.is("human_approved_at", null);
   const purpose = opts.purpose ?? "client";
   if (purpose !== "all") {
     query = query.eq("purpose", purpose);

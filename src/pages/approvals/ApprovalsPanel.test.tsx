@@ -55,10 +55,16 @@ function textAsset(over: Partial<MediaAsset> = {}): MediaAsset {
 beforeEach(() => {
   vi.clearAllMocks();
   useParams.mockReturnValue({ clientId: "client-1" });
-  fetchClientAssets.mockImplementation(async (_clientId: string, opts?: { mediaType?: string }) => {
-    if (opts?.mediaType === "text") return [textAsset()];
-    return [];
-  });
+  // Two calls now: pending, and approved-without-a-human. They are mutually
+  // exclusive in the database, so the mock answers only the pending one —
+  // returning the same rows for both would list every asset twice.
+  fetchClientAssets.mockImplementation(
+    async (_clientId: string, opts?: { mediaType?: string; reviewStatus?: string }) => {
+      if (opts?.reviewStatus !== "pending") return [];
+      if (opts?.mediaType === "text") return [textAsset()];
+      return [];
+    },
+  );
   signPaths.mockImplementation(async (_bucket: string, paths: string[]) => {
     return new Map(paths.map((path) => [path, `https://signed/${path.split("/").pop()}`]));
   });

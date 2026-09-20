@@ -51,7 +51,11 @@ for (const Component of panels) {
     );
     from.mockImplementation(() => {
       const chain: Record<string, unknown> = {};
-      for (const method of ["select", "eq", "neq", "in", "order", "limit", "maybeSingle"]) chain[method] = () => chain;
+      // "is" and "not" are used for nullable filters such as
+      // human_approved_at. A chain missing a builder method fails with
+      // "query.is is not a function" instead of the error under test, which
+      // hides the thing this file exists to check.
+      for (const method of ["select", "eq", "neq", "in", "is", "not", "order", "limit", "maybeSingle"]) chain[method] = () => chain;
       chain.then = (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
         Promise.resolve(fail ? { data: null, error: { message: "column missing in schema cache" } } : { data: [], error: null }).then(resolve, reject);
       return chain;
