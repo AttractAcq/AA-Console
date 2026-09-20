@@ -141,6 +141,7 @@ export async function runIdeationJob(
   // seeded from one proof item. An unscoped run fills a bank; a scoped run
   // fills a pillar, which is a different job with a different shape.
   let pillar: PillarScope | null = null;
+  let siblings: PillarScope[] = [];
   if (job.input_table === "client_content_pillars" && job.input_id) {
     const { data } = await sb
       .from("client_content_pillars")
@@ -170,6 +171,23 @@ export async function runIdeationJob(
       belongs: String(data.belongs),
       does_not_belong: String(data.does_not_belong),
     };
+
+    // The brand's other active pillars. Without them the instruction to leave
+    // out an idea that belongs elsewhere names no elsewhere, and the model
+    // cannot act on it.
+    const { data: others } = await sb
+      .from("client_content_pillars")
+      .select("id, name, premise, belongs, does_not_belong")
+      .eq("client_id", job.client_id)
+      .eq("active", true)
+      .neq("id", pillar.id);
+    siblings = (others ?? []).map((o) => ({
+      id: String(o.id),
+      name: String(o.name),
+      premise: String(o.premise),
+      belongs: String(o.belongs),
+      does_not_belong: String(o.does_not_belong),
+    }));
   }
 
   const configured = Number((agent.config as { idea_count?: unknown })?.idea_count);
@@ -235,7 +253,7 @@ ${pack.icpSummary}
 ${pack.offer ? `\nOFFER — what is ultimately being sold\n${pack.offer}` : ""}
 ${proof ? `\nPROOF ON FILE — the only proof you may reference\n${proof}` : "\nPROOF ON FILE\nNone. Do not reference any proof, results or figures."}
 ${seededProof ? `\nSEED THIS RUN FROM THIS PROOF ITEM SPECIFICALLY\n${seededProof}\nAt least half the ideas should build on it.` : ""}
-${pillar ? `\n${pillarBrief(pillar)}` : ""}
+${pillar ? `\n${pillarBrief(pillar, siblings)}` : ""}
 
 Call ${submitTool.name} once when you are done.`;
 

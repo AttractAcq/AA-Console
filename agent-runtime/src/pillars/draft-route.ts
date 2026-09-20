@@ -92,6 +92,10 @@ WHAT MAKES THIS SET GOOD
 THE BOUNDARY MATTERS MOST
 Every pillar says what does NOT belong in it. This is the half that gets skipped and the half that does the work: a pillar defined only by what belongs will absorb anything, and an agent sorting ideas into pillars needs the edge to sort against. "Not X" where X is obviously outside the business is not a boundary. Name the thing that looks like it belongs and does not.
 
+A boundary must exclude SUBJECTS, not only formats. Ruling out stock photography or showcase cases says what a piece may not look like; it does not say what a piece may not be about. Every does_not_belong names at least one subject that goes to a named sibling pillar instead — "arguments about price belong in <pillar>", "who does the work belongs in <pillar>" — using that pillar's exact name from this same set. Without it, a run inside this pillar will produce its neighbours' content wearing its own method, which is the failure this field exists to prevent.
+
+Watch for a pillar defined by METHOD rather than subject — "peer evidence", "behind the scenes", "founder voice". A method cuts across every other pillar instead of taking a slice beside them, so its share of the calendar is not comparable to theirs and its boundary is the hardest to draw. Prefer subjects. If a method genuinely earns a pillar, its boundary must be unusually explicit about which subjects it still hands over.
+
 ABSOLUTE RULES
 - Never invent proof, results, figures or customers.
 - Shares must total 100.

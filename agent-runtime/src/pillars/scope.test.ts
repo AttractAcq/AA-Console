@@ -31,6 +31,53 @@ describe("pillarBrief", () => {
   });
 });
 
+describe("pillarBrief names the other pillars", () => {
+  const sibling = (id: string, name: string, premise: string): PillarScope => ({
+    id,
+    name,
+    premise,
+    belongs: "b",
+    does_not_belong: "d",
+  });
+
+  const others = [
+    sibling("p2", "In Writing, Before You Say Yes", "Everything decided before treatment starts."),
+    sibling("p3", "The Same Hands", "One clinician plans it and fits it."),
+  ];
+
+  it("says nothing about siblings when there are none", () => {
+    const brief = pillarBrief(pillar, []);
+    expect(brief).not.toContain("OTHER PILLARS");
+  });
+
+  // The first version gave this instruction with no list of other pillars,
+  // so the model could not act on it. A third of the first real run came
+  // back carrying a neighbour's subject in this pillar's method.
+  it("lists the other pillars, so the instruction can be followed", () => {
+    const brief = pillarBrief(pillar, others);
+    expect(brief).toContain("In Writing, Before You Say Yes");
+    expect(brief).toContain("The Same Hands");
+    expect(brief).toContain("Everything decided before treatment starts.");
+  });
+
+  it("says a subject stays with its pillar even when this method suits it", () => {
+    const brief = pillarBrief(pillar, others);
+    expect(brief).toContain("even when this pillar's method fits it perfectly");
+  });
+
+  it("never lists the chosen pillar among its own siblings", () => {
+    const brief = pillarBrief(pillar, [...others, pillar]);
+    const listed = brief.slice(brief.indexOf("OTHER PILLARS"));
+    expect(listed).not.toContain(pillar.premise);
+  });
+
+  it("still confines the run when the brand has only one pillar", () => {
+    const brief = pillarBrief(pillar, [pillar]);
+    expect(brief).not.toContain("OTHER PILLARS");
+    expect(brief).toContain("Every idea in this run sits in this pillar");
+  });
+});
+
 describe("pillarFields", () => {
   it("files a scoped idea under the pillar, and names the territory after it", () => {
     expect(pillarFields(pillar, "whatever the model said")).toEqual({
