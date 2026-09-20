@@ -171,6 +171,20 @@ describe("the call to action is a Meta button, not a sentence", () => {
     }
   });
 
+  // The list is a subset of Meta's full set now rather than its own literal,
+  // so widening the shared list must not quietly widen this one. A hiring ad
+  // points at an apply URL: SEND_MESSAGE has no thread to open and the
+  // commerce buttons have nothing to sell.
+  it("offers exactly the four a hiring ad can use", () => {
+    expect([...META_CTAS]).toEqual(["APPLY_NOW", "LEARN_MORE", "SIGN_UP", "CONTACT_US"]);
+  });
+
+  it("rejects the buttons that need a destination a hiring ad does not have", () => {
+    for (const cta of ["SEND_MESSAGE", "SHOP_NOW", "BOOK_NOW", "GET_OFFER", "GET_QUOTE", "DOWNLOAD", "SUBSCRIBE"]) {
+      expect(draftProblem(good({ call_to_action: cta })), cta).toMatch(/not a Meta call-to-action button/i);
+    }
+  });
+
   it("rejects the prose the generator actually produced, and lists the real options", () => {
     const problem = draftProblem(good({ call_to_action: "Apply with three cutdowns" }));
     expect(problem).toMatch(/not a Meta call-to-action button/i);

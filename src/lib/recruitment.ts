@@ -3,6 +3,15 @@
  * tagged purpose=recruitment, attached to the house client, Meta static only.
  */
 
+import { META_CTAS as ALL_META_CTAS } from "./metaCta";
+
+/** One of Meta's buttons, by value, so the label is never retyped. */
+function metaCta(value: (typeof ALL_META_CTAS)[number]["value"]) {
+  const found = ALL_META_CTAS.find((c) => c.value === value);
+  if (!found) throw new Error(`${value} is not a Meta call-to-action button.`);
+  return found;
+}
+
 export const RECRUITMENT_ROLES = ["editor", "smm", "avatar"] as const;
 export type RecruitmentRole = (typeof RECRUITMENT_ROLES)[number];
 
@@ -23,10 +32,10 @@ export const RECRUITMENT_CHANNEL = "Meta static";
  * validates what the generator returns. Separate packages, so it exists twice.
  */
 export const META_CTAS = [
-  { value: "APPLY_NOW", label: "Apply now" },
-  { value: "LEARN_MORE", label: "Learn more" },
-  { value: "SIGN_UP", label: "Sign up" },
-  { value: "CONTACT_US", label: "Contact us" },
+  metaCta("APPLY_NOW"),
+  metaCta("LEARN_MORE"),
+  metaCta("SIGN_UP"),
+  metaCta("CONTACT_US"),
 ] as const;
 
 export const DEFAULT_CTA = "APPLY_NOW";

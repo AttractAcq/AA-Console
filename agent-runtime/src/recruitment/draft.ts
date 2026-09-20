@@ -18,21 +18,23 @@
 // finished and is false — the same failure that put a fabricated phone number
 // on a practice's advertising. Both stay human-entered.
 
+import { RECRUITMENT_CTAS } from "../meta/cta.js";
+
 /**
- * The call-to-action buttons Meta actually offers on a link ad.
+ * The call-to-action buttons a hiring ad may use.
  *
  * The generator was writing prose — "Apply with three cutdowns", "Apply to run
  * the calendar". Good copy, and unusable: the CTA on a Meta static is a button
- * chosen from a fixed list, not a line somebody writes. Whoever built the ad
- * would have had to pick a real one and quietly discard the words.
+ * chosen from a fixed list, not a line somebody writes.
  *
  * Four of Meta's set make sense for a hiring ad pointing at an apply URL.
- * SEND_MESSAGE and the commerce ones need a different destination.
+ * SEND_MESSAGE and the commerce ones need a different destination, so they are
+ * absent here rather than merely discouraged.
  *
- * Kept in step with META_CTAS in src/lib/recruitment.ts, which renders the
- * labels. Separate packages, so the list exists twice on purpose.
+ * A subset of the shared list now, not a second copy of it: a button added to
+ * Meta's set cannot become valid for a hiring ad without this naming it.
  */
-export const META_CTAS = ["APPLY_NOW", "LEARN_MORE", "SIGN_UP", "CONTACT_US"] as const;
+export const META_CTAS = RECRUITMENT_CTAS;
 export type MetaCta = (typeof META_CTAS)[number];
 
 /** What the model fills in. The rest of the form is the operator's. */
