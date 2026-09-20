@@ -5,7 +5,7 @@ import { EmptyState } from "./EmptyState";
 import { MediaCard, StatusBadge } from "./MediaCard";
 import { MediaDetailModal } from "./MediaDetailModal";
 import { ApprovalActions } from "./ApprovalActions";
-import { RemakeAction } from "./RemakeAction";
+import { RegenerateAction } from "./RegenerateAction";
 import { dateSortOptions } from "../data/sortOptions";
 import type { SortOptionId } from "../data/sortOptions";
 import { REVIEW_TONE, fetchClientAssets, fetchTextBodies, shortDate, signPaths } from "../lib/media";
@@ -112,15 +112,19 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
                     onDone={() => void refresh()}
                     onError={setActionError}
                   />
-                ) : asset.review_status === "rejected" ? (
-                  <RemakeAction
+                ) : (
+                  // Any decided asset can be built again. A rejected one is
+                  // the obvious case; an approved one that is nearly right is
+                  // the common one.
+                  <RegenerateAction
                     assetId={asset.id}
                     hasBrief={Boolean(asset.brief_id)}
+                    isRejected={asset.review_status === "rejected"}
                     onDone={() => void refresh()}
                     onError={setActionError}
                     onNotice={setNotice}
                   />
-                ) : undefined
+                )
               }
             />
           ))}
