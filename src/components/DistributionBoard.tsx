@@ -147,12 +147,13 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
             p_asset_id: v.asset_id as string,
             p_date: v.scheduled_for as string,
             p_channel: channel,
-            // Empty means undecided, which is a real answer. Sending "" would
-            // fail the enum; null records that nobody has chosen yet.
-            //
-            p_platform: (v.platform as string || null) as
-              | Database["public"]["Enums"]["post_platform"]
-              | null,
+            // Empty means undecided, which is a real answer. "" would fail
+            // the enum, so the key is left out entirely and the function's
+            // own default null applies — which is what an optional argument
+            // means, and what the generated type says it takes.
+            ...(v.platform
+              ? { p_platform: v.platform as Database["public"]["Enums"]["post_platform"] }
+              : {}),
           });
           if (error) throw new Error(error.message);
         }}

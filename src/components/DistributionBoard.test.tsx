@@ -88,19 +88,19 @@ describe("scheduling", () => {
     );
   });
 
-  // Undecided is a real answer. "" would fail the enum; null records that
-  // nobody has chosen yet.
-  it("sends null rather than an empty string when no platform is picked", async () => {
+  // Undecided is a real answer. "" would fail the enum, so the key is left
+  // out and the function's own default applies.
+  it("omits the platform entirely when none is picked", async () => {
     const dialog = await openScheduler();
     await userEvent.selectOptions(dialog.getByLabelText(/^Asset/), "asset-1");
     await userEvent.type(dialog.getByLabelText(/^Date/), "2026-10-09");
     await userEvent.click(dialog.getByRole("button", { name: "Schedule" }));
 
-    await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith(
-        "schedule_asset",
-        expect.objectContaining({ p_platform: null }),
-      ),
-    );
+    await waitFor(() => expect(rpc).toHaveBeenCalled());
+    expect(rpc).toHaveBeenCalledWith("schedule_asset", {
+      p_asset_id: "asset-1",
+      p_date: "2026-10-09",
+      p_channel: "organic",
+    });
   });
 });
