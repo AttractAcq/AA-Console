@@ -7,6 +7,7 @@ import {
   OPTIMISATION_GOALS,
   TEMPLATE_CODES,
   availableFromStart,
+  derivedNeeds,
   templateFor,
   templateProblem,
 } from "./templates.js";
@@ -149,5 +150,27 @@ describe("templateProblem", () => {
 
   it("refuses a mirror of a template that has no objective to inherit", () => {
     expect(templateProblem(x1, { mirrorOf: "X2" })).toContain("no objective of its own");
+  });
+});
+
+describe("derivedNeeds", () => {
+  it("requires a landing page wherever the destination is one", () => {
+    for (const code of ["P5", "R1", "R2", "R3", "C1", "C2", "C3", "O1", "O2"]) {
+      expect(derivedNeeds(templateFor(code)!).needsLandingPage, code).toBe(true);
+    }
+  });
+
+  it("requires a sales agent exactly where the destination is a message thread", () => {
+    const needing = CAMPAIGN_TEMPLATES.filter((t) => derivedNeeds(t).needsSalesAgent);
+    expect(needing.map((t) => t.code)).toEqual(["P3"]);
+  });
+
+  it("requires neither where the ad does not send anyone to one", () => {
+    for (const code of ["P1", "P2", "P4", "R4"]) {
+      expect(derivedNeeds(templateFor(code)!), code).toEqual({
+        needsLandingPage: false,
+        needsSalesAgent: false,
+      });
+    }
   });
 });
