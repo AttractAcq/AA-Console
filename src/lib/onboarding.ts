@@ -29,8 +29,8 @@ export interface OnboardingStep {
   title: string;
   /** What this unlocks, in the operator's terms — why it is worth filling in. */
   why: string;
-  /** Where in the app the same data lives, so it can be edited later. */
-  livesAt: { label: string; tab: string };
+  /** Where the same data lives, so it can be edited later. Path after /clients/:id/. */
+  livesAt: { label: string; path: string };
   /** A step with no data behind it is ticked by hand. Only the call is. */
   manual?: boolean;
 }
@@ -40,31 +40,33 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     key: "contact",
     title: "Contact & identity",
     why: "Who we speak to, and the website and handles every other step reads. The Proof Finder and the business researcher cannot start without the website.",
-    livesAt: { label: "Contact & Identity", tab: "contact" },
+    livesAt: { label: "Contact & Identity", path: "account/contact" },
   },
   {
     key: "business",
     title: "The business",
     why: "What they do, who for, what they sell and who else the buyer considers. Every agent reads this — thin answers here make cautious output everywhere.",
-    livesAt: { label: "Intelligence → Business Context", tab: "business-context" },
+    // Not under /account like the others — Business Context lives in the
+    // Delivery section, so the whole path is given rather than a tab name.
+    livesAt: { label: "Intelligence → Business Context", path: "delivery/intelligence?tab=business-context" },
   },
   {
     key: "brand",
     title: "Brand & design",
     why: "Colours, type and what the imagery must never do. Creative builds read this, and without it every asset comes back in a default palette.",
-    livesAt: { label: "Brand & Design", tab: "brand" },
+    livesAt: { label: "Brand & Design", path: "account/brand" },
   },
   {
     key: "credentials",
     title: "Credentials",
     why: "Meta and Instagram access, so reporting and attribution have numbers to pull rather than a blank dashboard.",
-    livesAt: { label: "Integrations", tab: "integrations" },
+    livesAt: { label: "Integrations", path: "account/integrations" },
   },
   {
     key: "call",
     title: "Onboarding call",
     why: "The conversation that fills the gaps the forms cannot. Ticked by hand — there is no record of it to read.",
-    livesAt: { label: "Onboarding", tab: "onboarding" },
+    livesAt: { label: "Onboarding", path: "account/onboarding" },
     manual: true,
   },
 ];

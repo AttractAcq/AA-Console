@@ -93,3 +93,18 @@ describe("normaliseContextDraft", () => {
     expect(JSON.stringify(out)).not.toContain("Read their homepage");
   });
 });
+
+
+// The first production run was rejected for a 5019-character overview, on a
+// client whose existing overview is 2954. A cap set just above real data
+// forbids improving it, and this one costs a full web-searching run to learn.
+describe("the field cap is a sanity bound, not a brevity rule", () => {
+  it("accepts an overview longer than the largest real record", () => {
+    expect(contextDraftProblem(good({ business_overview: "x".repeat(5019) }))).toBeNull();
+  });
+
+  it("still stops runaway output", () => {
+    const problem = contextDraftProblem(good({ business_overview: "x".repeat(12001) }));
+    expect(problem).toMatch(/12001 characters/);
+  });
+});

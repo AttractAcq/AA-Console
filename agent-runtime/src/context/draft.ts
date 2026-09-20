@@ -47,7 +47,19 @@ export const CONTEXT_FIELDS = [
 const REQUIRED = ["business_overview", "ideal_customer", "main_offer", "competitors"] as const;
 
 const MIN_REQUIRED = 60;
-const MAX_FIELD = 3000;
+
+/**
+ * A sanity bound, not a brevity rule.
+ *
+ * The first version was 3000, chosen without looking at the data. Attract
+ * Acquisition's own business_overview is 2954 characters — so the cap
+ * forbade improving the largest real record in the system, and the first
+ * production run was rejected after doing all its searching.
+ *
+ * The job of this number is to stop runaway output, so it sits well clear of
+ * anything real rather than just above it.
+ */
+const MAX_FIELD = 12000;
 
 const PLACEHOLDER = /\[[^\]]{2,}\]|\{\{[^}]+\}\}/;
 
