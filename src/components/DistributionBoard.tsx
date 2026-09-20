@@ -13,6 +13,7 @@ import type { MediaFilterId } from "../data/mediaFilters";
 import { fetchClientAssets } from "../lib/media";
 import { supabase } from "../lib/supabase";
 import { POST_PLATFORMS, platformLabel } from "../lib/postPlatform";
+import type { Database } from "../types/database";
 
 type Post = {
   id: string;
@@ -149,11 +150,10 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
             // Empty means undecided, which is a real answer. Sending "" would
             // fail the enum; null records that nobody has chosen yet.
             //
-            // Cast because database.ts is generated from the applied schema
-            // and migration 99 is not applied yet. It goes when the types are
-            // regenerated.
-            p_platform: ((v.platform as string) || null),
-          } as Parameters<typeof supabase.rpc>[1]);
+            p_platform: (v.platform as string || null) as
+              | Database["public"]["Enums"]["post_platform"]
+              | null,
+          });
           if (error) throw new Error(error.message);
         }}
         onSaved={refresh}
