@@ -1316,6 +1316,56 @@ export type Database = {
           },
         ]
       }
+      client_content_pillars: {
+        Row: {
+          active: boolean
+          belongs: string
+          client_id: string
+          created_at: string
+          does_not_belong: string
+          id: string
+          name: string
+          premise: string
+          slug: string
+          target_share: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          belongs: string
+          client_id: string
+          created_at?: string
+          does_not_belong: string
+          id?: string
+          name: string
+          premise: string
+          slug: string
+          target_share?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          belongs?: string
+          client_id?: string
+          created_at?: string
+          does_not_belong?: string
+          id?: string
+          name?: string
+          premise?: string
+          slug?: string
+          target_share?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_content_pillars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_contact_details: {
         Row: {
           address: string | null
@@ -1429,6 +1479,7 @@ export type Database = {
           id: string
           job_id: string | null
           media_type: Database["public"]["Enums"]["media_type"]
+          pillar_id: string | null
           proof_id: string | null
           source: Database["public"]["Enums"]["idea_source"]
           source_question: string | null
@@ -1448,6 +1499,7 @@ export type Database = {
           id?: string
           job_id?: string | null
           media_type?: Database["public"]["Enums"]["media_type"]
+          pillar_id?: string | null
           proof_id?: string | null
           source: Database["public"]["Enums"]["idea_source"]
           source_question?: string | null
@@ -1467,6 +1519,7 @@ export type Database = {
           id?: string
           job_id?: string | null
           media_type?: Database["public"]["Enums"]["media_type"]
+          pillar_id?: string | null
           proof_id?: string | null
           source?: Database["public"]["Enums"]["idea_source"]
           source_question?: string | null

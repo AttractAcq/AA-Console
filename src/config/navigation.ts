@@ -131,6 +131,7 @@ export const clientNavGroups: NavNode[] = [
         icon: Target,
         tabs: [
           { id: "branding-strategy", label: "Branding Strategy" },
+          { id: "content-pillars", label: "Content Pillars" },
           { id: "offer-strategy", label: "Offer Strategy" },
           { id: "money-model-strategy", label: "Money Model Strategy" },
         ],

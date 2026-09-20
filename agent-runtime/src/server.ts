@@ -34,6 +34,7 @@ import { registeredAgentKeys } from "./orchestration/dispatch.js";
 import { handleMasterChat } from "./master/route.js";
 import { handleBriefDraft } from "./briefs/draft-route.js";
 import { handleCampaignDraft } from "./campaigns/draft-route.js";
+import { handlePillarDraft } from "./pillars/draft-route.js";
 import { handleContextDraft } from "./context/draft-route.js";
 import { handleRecruitmentDraft } from "./recruitment/draft-route.js";
 import { handleGitHubStatus } from "./github/status-route.js";
@@ -199,6 +200,15 @@ const server = http.createServer((req, res) => {
       return;
     }
     void handleCampaignDraft(req, res, sb, config);
+    return;
+  }
+
+  if (req.url === "/admin/pillars/draft") {
+    if (req.method !== "POST") {
+      json(405, { ok: false, error: "POST only" });
+      return;
+    }
+    void handlePillarDraft(req, res, sb, config);
     return;
   }
 
