@@ -22,17 +22,40 @@ export interface PillarScope {
 /**
  * The prompt section that confines a run to one pillar.
  *
+ * `siblings` are the brand's other active pillars, and they are not context —
+ * they are the instruction's other half. The first version of this told the
+ * model that "an idea better suited to another pillar is the wrong idea for
+ * this run" and never said what the other pillars were, so it had no way to
+ * comply. A third of the first real run came back carrying another pillar's
+ * subject in this pillar's method: peer evidence about price, about
+ * sequencing, about continuity.
+ *
+ * Naming them turns an unfollowable rule into a routing decision.
+ *
  * Returns empty for an unscoped run, so the caller interpolates it
  * unconditionally rather than branching around it.
  */
-export function pillarBrief(pillar: PillarScope | null): string {
+export function pillarBrief(
+  pillar: PillarScope | null,
+  siblings: readonly PillarScope[] = [],
+): string {
   if (!pillar) return "";
+  const others = siblings.filter((s) => s.id !== pillar.id);
   return `THE PILLAR THIS RUN IS CONFINED TO — every idea must sit inside it
 **${pillar.name}**
 What it argues: ${pillar.premise}
 What belongs in it: ${pillar.belongs}
 What does NOT belong in it, however much it looks like it might: ${pillar.does_not_belong}
+${
+  others.length
+    ? `
+THE BRAND'S OTHER PILLARS — these subjects are spoken for, and not by this run
+${others.map((o) => `- **${o.name}**: ${o.premise}`).join("\n")}
 
+Check every idea against that list before you keep it. If its subject belongs to one of those pillars, it is out of scope here even when this pillar's method fits it perfectly — a piece about price, or about who does the work, is that pillar's piece whichever angle it arrives from. Write a different idea instead.
+`
+    : ""
+}
 Every idea in this run sits in this pillar. An idea that would be better in another pillar is not a better idea, it is the wrong idea for this run — leave it out. Vary the angle within the pillar rather than widening the pillar to fit a good idea you thought of.`;
 }
 
