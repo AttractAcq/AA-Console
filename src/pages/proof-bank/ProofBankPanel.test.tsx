@@ -141,10 +141,10 @@ describe("finding proof that is already online", () => {
     const user = userEvent.setup();
     show([]);
     await user.click(await screen.findByRole("button", { name: /Find Proof Online/ }));
-    // The figure is the one production run's actual cost, not a guess. It
-    // moved when the search budget was tightened, and this test is what
-    // stopped the old number quietly surviving the change.
-    expect(screen.getByText(/roughly \$0\.35/)).toBeInTheDocument();
+    // Two real runs, not a projection. The first estimate after tightening
+    // the budget guessed $0.35 and the next run came in at $0.48 — most of
+    // the cost is the size of the results, not the number of searches.
+    expect(screen.getByText(/cost \$0\.53 and \$0\.48/)).toBeInTheDocument();
   });
 
   it("queues the Proof Finder for this client", async () => {

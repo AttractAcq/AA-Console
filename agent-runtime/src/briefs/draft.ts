@@ -18,7 +18,22 @@ export interface GeneratedAsk {
 }
 
 const MIN_ASK = 80;
-const MAX_ASK = 1500;
+
+/**
+ * A runaway bound, not a style rule.
+ *
+ * This was 1500, and it binned a page brief at 2342 characters — the third
+ * time in this feature that a length I picked by intuition destroyed a whole
+ * paid run. The same generator's sales brief passed at a similar size, which
+ * is what a borderline number looks like from the inside.
+ *
+ * The lesson is narrower than "the number was wrong". Length is TASTE, and
+ * taste belongs in the prompt, which already says this is a brief and not the
+ * thing itself. Validation is for correctness — an invented price, a
+ * placeholder, marketing register in place of content — where being wrong
+ * makes the output unusable rather than merely long.
+ */
+const MAX_ASK = 6000;
 
 const PLACEHOLDER = /\[[^\]]{2,}\]|\{\{[^}]+\}\}/;
 
@@ -50,7 +65,7 @@ export function askProblem(draft: Record<string, unknown>, kind: BriefKind): str
     return `The ask is too thin to build a ${subject} from. Say what it is doing that nothing else is.`;
   }
   if (ask.length > MAX_ASK) {
-    return `The ask is ${ask.length} characters; keep it under ${MAX_ASK}. It is a brief, not the thing itself.`;
+    return `The ask is ${ask.length} characters, past the ${MAX_ASK} limit. Something has run away.`;
   }
   if (PLACEHOLDER.test(ask)) {
     return "The ask contains a placeholder. Write the real words or leave the detail out.";

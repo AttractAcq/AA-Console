@@ -70,3 +70,17 @@ describe("normaliseCampaignDraft", () => {
     expect(normaliseCampaignDraft({ name: "  x  ", brief: 42 })).toEqual({ name: "x", brief: "" });
   });
 });
+
+
+// Three paid runs in this feature were thrown away by length caps chosen from
+// intuition. Nothing outside AA reads a campaign ask; a long one is a thing
+// to edit, not a reason to discard the work.
+describe("length is taste, not correctness", () => {
+  it("accepts an ask well past the old 2000 cap", () => {
+    expect(campaignDraftProblem(good({ brief: "x".repeat(2342) }))).toBeNull();
+  });
+
+  it("still stops runaway output", () => {
+    expect(campaignDraftProblem(good({ brief: "x".repeat(8001) }))).toMatch(/run away/i);
+  });
+});

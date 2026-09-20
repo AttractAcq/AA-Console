@@ -22,8 +22,14 @@ describe("an ask the builder can work from", () => {
     expect(askProblem(good({ ask: "Qualify leads." }), "sales_agent")).toMatch(/too thin to build a agent/i);
   });
 
-  it("rejects a brief that has become the thing itself", () => {
-    expect(askProblem(good({ ask: "x".repeat(1501) }), "page")).toMatch(/1501 characters/);
+  it("accepts a brief longer than the first cap allowed", () => {
+    // 1500 binned a real page brief at 2342 characters. Length is taste and
+    // belongs in the prompt; validation is for correctness.
+    expect(askProblem(good({ ask: "x".repeat(2342) }), "page")).toBeNull();
+  });
+
+  it("still stops runaway output", () => {
+    expect(askProblem(good({ ask: "x".repeat(6001) }), "page")).toMatch(/6001 characters/);
   });
 });
 
