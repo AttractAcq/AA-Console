@@ -28,6 +28,7 @@ import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords, type UpstreamRecord } from "../shared.js";
 import { logger } from "../../logging/logger.js";
+import { ideaSource, pillarBrief, pillarFields, type PillarScope } from "../../pillars/scope.js";
 
 const DEFAULT_IDEA_COUNT = 25;
 
@@ -136,6 +137,41 @@ export async function runIdeationJob(
     }
   }
 
+  // A run can be confined to one content pillar, the same way it can be
+  // seeded from one proof item. An unscoped run fills a bank; a scoped run
+  // fills a pillar, which is a different job with a different shape.
+  let pillar: PillarScope | null = null;
+  if (job.input_table === "client_content_pillars" && job.input_id) {
+    const { data } = await sb
+      .from("client_content_pillars")
+      .select("id, name, premise, belongs, does_not_belong, active")
+      .eq("id", job.input_id)
+      .maybeSingle();
+    if (!data) {
+      return {
+        ok: false,
+        retryable: false,
+        failureMessage: "That content pillar no longer exists.",
+      };
+    }
+    // A retired pillar is a decision somebody made. Generating into it would
+    // quietly undo that, so it fails loudly instead.
+    if (!data.active) {
+      return {
+        ok: false,
+        retryable: false,
+        failureMessage: `"${String(data.name)}" has been retired. Reinstate it before generating into it.`,
+      };
+    }
+    pillar = {
+      id: String(data.id),
+      name: String(data.name),
+      premise: String(data.premise),
+      belongs: String(data.belongs),
+      does_not_belong: String(data.does_not_belong),
+    };
+  }
+
   const configured = Number((agent.config as { idea_count?: unknown })?.idea_count);
   const ideaCount = Number.isFinite(configured) && configured > 0 ? Math.min(configured, 60) : DEFAULT_IDEA_COUNT;
 
@@ -199,13 +235,14 @@ ${pack.icpSummary}
 ${pack.offer ? `\nOFFER — what is ultimately being sold\n${pack.offer}` : ""}
 ${proof ? `\nPROOF ON FILE — the only proof you may reference\n${proof}` : "\nPROOF ON FILE\nNone. Do not reference any proof, results or figures."}
 ${seededProof ? `\nSEED THIS RUN FROM THIS PROOF ITEM SPECIFICALLY\n${seededProof}\nAt least half the ideas should build on it.` : ""}
+${pillar ? `\n${pillarBrief(pillar)}` : ""}
 
 Call ${submitTool.name} once when you are done.`;
 
   await appendEvent(
     sb,
     job.id,
-    `Generating ${ideaCount} ideas from the question universe${seededProof ? ", seeded from one proof item" : ""}.`,
+    `Generating ${ideaCount} ideas from the question universe${pillar ? ` within "${pillar.name}"` : ""}${seededProof ? ", seeded from one proof item" : ""}.`,
   );
 
   let result;
@@ -271,13 +308,13 @@ Call ${submitTool.name} once when you are done.`;
     };
   }
 
-  const source = job.input_table === "client_proof_assets" ? "proof" : "auto";
+  const source = ideaSource(job.input_table);
   const { error } = await sb.from("client_ideas").insert(
     valid.map((idea) => ({
       client_id: job.client_id,
       title: idea.title.slice(0, 300),
       body: idea.core_idea,
-      content_territory: idea.content_territory || null,
+      ...pillarFields(pillar, idea.content_territory),
       source_question: idea.source_question,
       strategic_reason: idea.strategic_reason || null,
       media_type: idea.media_type,
