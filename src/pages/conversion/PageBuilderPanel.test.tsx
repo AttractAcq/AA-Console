@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 
@@ -17,7 +18,12 @@ const { from, rpc, useParams, useAgentJobs, inserts, deletes, rows } = vi.hoiste
 vi.mock("../../lib/supabase", () => ({
   supabase: { from, rpc },
 }));
-vi.mock("react-router-dom", () => ({ useParams }));
+vi.mock("react-router-dom", () => ({
+  useParams,
+  // Link renders as an anchor so tests can still find navigation by role.
+  Link: ({ to, children, ...rest }: { to: string; children?: unknown }) =>
+    createElement("a", { href: to, ...rest }, children as never),
+}));
 vi.mock("../../lib/useAgentJobs", () => ({ useAgentJobs }));
 vi.mock("../../components/pages/PagePreview", () => ({ PagePreview: () => null }));
 

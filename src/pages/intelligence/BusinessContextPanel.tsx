@@ -7,6 +7,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef, FormValues } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
+import { OnboardingSource } from "../../components/OnboardingSource";
 import { clearDraft } from "../../components/forms/FormModal";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 
@@ -82,6 +83,7 @@ export function BusinessContextPanel() {
 
   return (
     <div>
+      <OnboardingSource what="Business context" />
       <div className="mb-4 flex justify-end">
         <Button icon={Plus} onClick={() => setInputOpen(true)}>
           Business Input

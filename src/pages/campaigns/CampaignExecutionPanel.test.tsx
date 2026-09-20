@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,7 +18,12 @@ vi.mock("../../lib/supabase", () => ({
     removeChannel: vi.fn(),
   },
 }));
-vi.mock("react-router-dom", () => ({ useParams }));
+vi.mock("react-router-dom", () => ({
+  useParams,
+  // Link renders as an anchor so tests can still find navigation by role.
+  Link: ({ to, children, ...rest }: { to: string; children?: unknown }) =>
+    createElement("a", { href: to, ...rest }, children as never),
+}));
 vi.mock("../../lib/callRuntime", () => ({ callRuntime }));
 // Only the hook is faked; agentLabel and elapsedLabel are real, because the
 // activity bar renders them.

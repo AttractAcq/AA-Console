@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,7 +12,12 @@ vi.mock("../../lib/supabase", () => ({
     rpc,
   },
 }));
-vi.mock("react-router-dom", () => ({ useParams }));
+vi.mock("react-router-dom", () => ({
+  useParams,
+  // Link renders as an anchor so tests can still find navigation by role.
+  Link: ({ to, children, ...rest }: { to: string; children?: unknown }) =>
+    createElement("a", { href: to, ...rest }, children as never),
+}));
 
 import { ProspectsLeadsPanel } from "./ProspectsLeadsPanel";
 

@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +10,12 @@ const { from, rpc, useParams, insert } = vi.hoisted(() => ({
   insert: vi.fn(),
 }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
-vi.mock("react-router-dom", () => ({ useParams }));
+vi.mock("react-router-dom", () => ({
+  useParams,
+  // Link renders as an anchor so tests can still find navigation by role.
+  Link: ({ to, children, ...rest }: { to: string; children?: unknown }) =>
+    createElement("a", { href: to, ...rest }, children as never),
+}));
 
 import { ClientEconomicsPanel } from "./ClientEconomicsPanel";
 
