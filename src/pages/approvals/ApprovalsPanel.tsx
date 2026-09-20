@@ -39,10 +39,18 @@ export function ApprovalsPanel() {
       setLoading(false);
       return;
     }
-    const rows = await fetchClientAssets(clientId, {
-      mediaType: activeFilter,
-      reviewStatus: "pending",
-    });
+    // Anything still waiting on a person. An asset a bot approved is not
+    // pending, and without this it would sit in neither queue: Approvals
+    // shows pending, Distribution shows human-approved, and it is neither.
+    const [pending, botApproved] = await Promise.all([
+      fetchClientAssets(clientId, { mediaType: activeFilter, reviewStatus: "pending" }),
+      fetchClientAssets(clientId, {
+        mediaType: activeFilter,
+        reviewStatus: "approved",
+        humanApproved: false,
+      }),
+    ]);
+    const rows = [...botApproved, ...pending];
     setAssets(rows);
     const signed = await signPaths("client-media", rows.map((r) => r.storage_path));
     setUrls(signed);

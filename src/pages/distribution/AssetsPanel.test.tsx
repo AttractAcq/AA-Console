@@ -51,7 +51,12 @@ describe("what the tab is for", () => {
   it("asks only for approved assets", async () => {
     render(<AssetsPanel />);
     await screen.findByText("Chair shot");
-    expect(fetchClientAssets).toHaveBeenCalledWith("client-1", { reviewStatus: "approved" });
+    // humanApproved matters: schedule_asset refuses anything only a bot
+    // signed off, so listing those would offer an action that always fails.
+    expect(fetchClientAssets).toHaveBeenCalledWith("client-1", {
+      reviewStatus: "approved",
+      humanApproved: true,
+    });
   });
 
   it("counts what still has no date", async () => {
