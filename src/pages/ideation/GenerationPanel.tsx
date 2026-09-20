@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PenLine, Sparkles, BadgeCheck } from "lucide-react";
+import { PenLine, Sparkles, BadgeCheck, Columns3 } from "lucide-react";
 import { ActionCard } from "../../components/ActionCard";
 import { FilterPills } from "../../components/FilterPills";
 import { DataTable } from "../../components/DataTable";
 import { FormModal, ConfirmModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
-import { MEDIA_TYPE_OPTIONS, loadProofAssets, useOptions } from "../../lib/options";
+import { MEDIA_TYPE_OPTIONS, loadContentPillars, loadProofAssets, useOptions } from "../../lib/options";
 import { mediaFilters } from "../../data/mediaFilters";
 import type { MediaFilterId } from "../../data/mediaFilters";
 import { supabase } from "../../lib/supabase";
@@ -41,6 +41,11 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
   const proofOptions = useOptions(
     () => loadProofAssets(clientId ?? ""),
     openCardId === "proof-idea" && Boolean(clientId),
+    [clientId],
+  );
+  const pillarOptions = useOptions(
+    () => loadContentPillars(clientId ?? ""),
+    openCardId === "pillar-idea" && Boolean(clientId),
     [clientId],
   );
 
@@ -106,6 +111,20 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
     }
   }
 
+  const pillarFields: FieldDef[] = [
+    {
+      name: "pillar_id",
+      label: "Pillar",
+      kind: "select",
+      required: true,
+      options: pillarOptions,
+      hint:
+        pillarOptions.length === 0
+          ? "This client has no active content pillars yet. Define them under Strategy first."
+          : "Every idea in the run will sit inside this pillar, including the ones that would be better somewhere else.",
+    },
+  ];
+
   const proofFields: FieldDef[] = [
     {
       name: "proof_id",
@@ -136,6 +155,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
         <ActionCard title="Manual Idea" icon={PenLine} onClick={() => setOpenCardId("manual-idea")} />
         <ActionCard title="Auto Idea" icon={Sparkles} onClick={() => setOpenCardId("auto-idea")} />
         <ActionCard title="Proof Idea" icon={BadgeCheck} onClick={() => setOpenCardId("proof-idea")} />
+        <ActionCard title="Pillar Idea" icon={Columns3} onClick={() => setOpenCardId("pillar-idea")} />
       </div>
 
       <div className="mb-4">
@@ -212,6 +232,27 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
           if (error) throw new Error(error.message);
         }}
         onDone={refresh}
+      />
+
+      <FormModal
+        open={openCardId === "pillar-idea"}
+        onClose={() => setOpenCardId(null)}
+        title="Pillar Idea"
+        draftKey={`idea-pillar:${clientId}`}
+        intro="Queues the Ideation agent confined to one content pillar. An unscoped run fills the bank; this one fills a pillar."
+        fields={pillarFields}
+        submitLabel="Run agent"
+        onSubmit={async (v) => {
+          if (!clientId) throw new Error("No client selected.");
+          const { error } = await supabase.rpc("enqueue_agent_job", {
+            p_agent_key: "ideation",
+            p_client_id: clientId,
+            p_input_table: "client_content_pillars",
+            p_input_id: v.pillar_id as string,
+          });
+          if (error) throw new Error(error.message);
+        }}
+        onSaved={refresh}
       />
 
       <FormModal

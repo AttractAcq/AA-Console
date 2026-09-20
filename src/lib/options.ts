@@ -82,6 +82,23 @@ export async function loadProofAssets(clientId: string): Promise<Option[]> {
   }));
 }
 
+/**
+ * Active pillars only. A retired pillar is a decision somebody made, and
+ * offering it here would invite generating into something already closed.
+ */
+export async function loadContentPillars(clientId: string): Promise<Option[]> {
+  const { data } = await supabase
+    .from("client_content_pillars")
+    .select("id, name, target_share")
+    .eq("client_id", clientId)
+    .eq("active", true)
+    .order("target_share", { ascending: false });
+  return (data ?? []).map((p) => ({
+    value: p.id,
+    label: `${p.name} · ${p.target_share}% of the calendar`,
+  }));
+}
+
 export const MEDIA_TYPE_OPTIONS: Option[] = [
   { value: "image", label: "Image" },
   { value: "text", label: "Text" },

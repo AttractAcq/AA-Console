@@ -1,7 +1,15 @@
 import { createElement } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
-const { from, rpc, update, eq, single, order } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), update: vi.fn(), eq: vi.fn(), single: vi.fn(), order: vi.fn() }));
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+const { from, rpc, update, eq, single, order, loadContentPillars } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), update: vi.fn(), eq: vi.fn(), single: vi.fn(), order: vi.fn(), loadContentPillars: vi.fn() }));
+// Only the loaders are faked; MEDIA_TYPE_OPTIONS and useOptions are real,
+// because the form renders through them.
+vi.mock("../../lib/options", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/options")>()),
+  loadProofAssets: vi.fn().mockResolvedValue([]),
+  loadContentPillars,
+}));
 vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ clientId: "client-1" }),
@@ -17,6 +25,7 @@ beforeEach(() => {
   from.mockReturnValue(chain); eq.mockReturnValue(chain); update.mockReturnValue(chain);
   single.mockResolvedValue({ data: { id: "draft-1" }, error: null });
   rpc.mockResolvedValue({ error: null });
+  loadContentPillars.mockResolvedValue([{ value: "pil-1", label: "Honest proof · 25% of the calendar" }]);
   order.mockResolvedValue({ data: ["draft", "approved", "briefed", "rejected"].map((status, i) => ({ id: `${status}-${i + 1}`, title: status + " idea", source: "manual", media_type: "image", status })) });
 });
 it("scopes manual approval to the selected draft and client, then refreshes", async () => {
@@ -52,4 +61,31 @@ it("offers no actions for completed or rejected ideas", async () => {
   render(<GenerationPanel />);
   await screen.findByText("briefed idea");
   expect(screen.getAllByText("—")).toHaveLength(2);
+});
+
+describe("running ideation inside one pillar", () => {
+  it("enqueues against the pillar, the same way proof seeds a run", async () => {
+    render(<GenerationPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /Pillar Idea/i }));
+    const dialog = within(screen.getByRole("dialog"));
+    await userEvent.selectOptions(dialog.getByLabelText(/^Pillar/), "pil-1");
+    await userEvent.click(dialog.getByRole("button", { name: "Run agent" }));
+
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", {
+        p_agent_key: "ideation",
+        p_client_id: "client-1",
+        p_input_table: "client_content_pillars",
+        p_input_id: "pil-1",
+      }),
+    );
+  });
+
+  it("says where to define pillars when there are none", async () => {
+    loadContentPillars.mockResolvedValue([]);
+    render(<GenerationPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /Pillar Idea/i }));
+    expect(await screen.findByText(/no active content pillars yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Strategy first/i)).toBeInTheDocument();
+  });
 });
