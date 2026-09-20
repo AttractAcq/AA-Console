@@ -115,10 +115,39 @@ export interface CampaignIdea {
   media_type: "image" | "text" | "video";
   channel: string;
   strategic_reason: string;
+  /** The content pillar this piece sits in, when the campaign has any. */
+  pillar_id: string | null;
 }
 
 /** Reject incomplete batches rather than silently saving fewer ideas than promised. */
-export function campaignIdeas(raw: unknown, expected: number): CampaignIdea[] {
+/**
+ * Assigns an idea to one of the campaign's pillars.
+ *
+ * A campaign that names pillars is a campaign whose content sits inside
+ * them, so every idea must name one — and it must be one of ITS pillars,
+ * not any pillar the client happens to have. An idea filed under a pillar
+ * the campaign is not running is worse than an unfiled one: it lands in
+ * somebody else's calendar share and nothing flags it.
+ *
+ * A campaign with no pillars is the existing behaviour, unchanged.
+ */
+function assignedPillar(raw: unknown, allowed: readonly string[], title: string): string | null {
+  if (allowed.length === 0) return null;
+  const chosen = str(raw);
+  if (!chosen) {
+    throw new Error(`"${title}" was not assigned to a content pillar, and this campaign runs within pillars.`);
+  }
+  if (!allowed.includes(chosen)) {
+    throw new Error(`"${title}" was assigned to a pillar this campaign is not running.`);
+  }
+  return chosen;
+}
+
+export function campaignIdeas(
+  raw: unknown,
+  expected: number,
+  pillarIds: readonly string[] = [],
+): CampaignIdea[] {
   if (!Number.isInteger(expected) || expected < 0 || expected > MAX_CONTENT ||
       !Array.isArray(raw) || raw.length !== expected) {
     throw new Error(`The campaign needs exactly ${expected} distinct ideas.`);
@@ -136,7 +165,14 @@ export function campaignIdeas(raw: unknown, expected: number): CampaignIdea[] {
       throw new Error("Each campaign idea needs a distinct title, angle, channel, media type and reason.");
     }
     titles.add(title.toLowerCase());
-    return { title, body, channel, strategic_reason, media_type: media_type as CampaignIdea["media_type"] };
+    return {
+      title,
+      body,
+      channel,
+      strategic_reason,
+      media_type: media_type as CampaignIdea["media_type"],
+      pillar_id: assignedPillar(item?.pillar_id, pillarIds, title),
+    };
   });
 }
 

@@ -4224,6 +4224,39 @@ export type Database = {
           },
         ]
       }
+      campaign_content_pillars: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          pillar_id: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          pillar_id: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          pillar_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_content_pillars_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_content_pillars_pillar_id_fkey"
+            columns: ["pillar_id"]
+            isOneToOne: false
+            referencedRelation: "client_content_pillars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_totals: {
         Row: {
           active_campaigns: number | null

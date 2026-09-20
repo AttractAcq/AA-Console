@@ -91,6 +91,11 @@ export function CampaignExecutionPanel() {
   // The dialog's own pick, kept here so the generated draft can carry it into
   // the form. The endpoint steers by it but does not echo it back.
   const [proposeTemplate, setProposeTemplate] = useState("");
+  // Organic scoping. Separate from the paid template on purpose: a campaign
+  // can have both, because the same asset runs as an ad and sits on the feed.
+  const [pillars, setPillars] = useState<{ id: string; name: string; target_share: number }[]>([]);
+  const [pillarsFailed, setPillarsFailed] = useState(false);
+  const [chosenPillars, setChosenPillars] = useState<string[]>([]);
   const chosenTemplate = templateFor(proposeTemplate);
   // template is not part of what the endpoint returns — it is the operator's
   // own pick, carried through so the form opens on it.
@@ -157,6 +162,41 @@ export function CampaignExecutionPanel() {
     void refresh();
     return () => { request.current++; };
   }, [refresh]);
+
+  // Active pillars, loaded when the form opens rather than on every render.
+  useEffect(() => {
+    if (!newOpen || !clientId) return;
+    let cancelled = false;
+    setPillarsFailed(false);
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("client_content_pillars")
+          .select("id, name, target_share")
+          .eq("client_id", clientId)
+          .eq("active", true)
+          .order("target_share", { ascending: false });
+        if (cancelled) return;
+        // A failed load must not render as "this client has no pillars".
+        // Somebody would plan a campaign without them believing there were
+        // none to pick, and nothing would ever say otherwise.
+        if (error) {
+          setPillarsFailed(true);
+          setPillars([]);
+          return;
+        }
+        setPillars(data ?? []);
+      } catch {
+        if (!cancelled) {
+          setPillarsFailed(true);
+          setPillars([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [newOpen, clientId]);
 
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
@@ -479,6 +519,45 @@ export function CampaignExecutionPanel() {
         draftKey={`campaign:${clientId}`}
         intro="Queues the Campaign Planner. It needs your offer strategy and ICP, and writes the plan — including what has to be built before this can run."
         fields={FIELDS}
+        extra={
+          pillarsFailed ? (
+            <p role="alert" className="rounded-md border border-border p-3 text-sm text-destructive">
+              Could not load this client&apos;s content pillars, so none can be picked. The campaign can
+              still be planned without them.
+            </p>
+          ) : pillars.length > 0 ? (
+            <fieldset className="rounded-md border border-border p-3">
+              <legend className="px-1 text-sm font-medium text-card-foreground">
+                Content pillars (optional)
+              </legend>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Every piece this campaign plans will sit in one of the pillars you pick. Leave them all
+                unticked and it plans without pillars, as before.
+              </p>
+              <div className="space-y-1.5">
+                {pillars.map((p) => (
+                  <label key={p.id} className="flex items-center gap-2 text-sm text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={chosenPillars.includes(p.id)}
+                      onChange={(e) =>
+                        setChosenPillars((current) =>
+                          e.target.checked
+                            ? [...current, p.id]
+                            : current.filter((id) => id !== p.id),
+                        )
+                      }
+                    />
+                    <span>
+                      {p.name}{" "}
+                      <span className="text-muted-foreground">· {p.target_share}% of the calendar</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : null
+        }
         submitLabel="Plan it"
         initialValues={aiDraft ?? undefined}
         actions={
@@ -507,6 +586,15 @@ export function CampaignExecutionPanel() {
             .single();
           if (error) throw error;
 
+          if (chosenPillars.length > 0) {
+            const { error: pillarError } = await supabase.from("campaign_content_pillars").insert(
+              chosenPillars.map((pillar_id) => ({ campaign_id: data.id, pillar_id })),
+            );
+            // Fail before queueing. A campaign planned without the pillars
+            // somebody chose would generate the wrong content and look right.
+            if (pillarError) throw new Error(pillarError.message);
+          }
+
           const { error: jobError } = await supabase.rpc("enqueue_agent_job", {
             p_agent_key: "campaign_plan",
             p_client_id: clientId,
@@ -518,6 +606,7 @@ export function CampaignExecutionPanel() {
         }}
         onSaved={() => {
           setAiDraft(null);
+          setChosenPillars([]);
           void refresh();
         }}
       />

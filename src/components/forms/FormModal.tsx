@@ -61,6 +61,7 @@ export function FormModal({
   fields,
   submitLabel = "Save",
   intro,
+  extra,
   actions,
   initialValues,
   draftKey,
@@ -73,6 +74,8 @@ export function FormModal({
   fields: FieldDef[];
   submitLabel?: string;
   intro?: string;
+  /** Rendered under the fields — a choice the form needs that is not a field. */
+  extra?: ReactNode;
   /** Extra controls in the footer, beside Cancel — e.g. "Generate with AI". */
   actions?: ReactNode;
   /** Seed values for an edit/upsert form. */
@@ -172,6 +175,8 @@ export function FormModal({
             onChange={(next) => setValue(field, next)}
           />
         ))}
+
+        {extra}
 
         {error && (
           <p role="alert" className="text-sm text-destructive">

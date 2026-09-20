@@ -39,7 +39,19 @@ import {
  * Schema the API accepts — see tools/schema.ts. Constraints that do not
  * survive that subset are enforced in plan.ts after the model answers.
  */
-export const SUBMIT_TOOL = {
+/**
+ * The submit tool, built per campaign.
+ *
+ * When the campaign runs content pillars, `pillar_id` becomes an enum of
+ * exactly those pillars. That is the guard that matters: an enum makes an
+ * invented or borrowed pillar impossible to submit, where a free-text field
+ * would let the model file a piece under a pillar the campaign is not
+ * running — which lands in somebody else's calendar share with nothing to
+ * flag it. Same discipline as proof_ref on a brief.
+ */
+export function submitToolFor(pillars: readonly { id: string; name: string }[] = []) {
+  const ids = pillars.map((p) => p.id);
+  return {
   name: "submit_campaign_plan",
   description: "Submit the finished campaign plan. Call this exactly once.",
   inputSchema: {
@@ -78,8 +90,22 @@ export const SUBMIT_TOOL = {
             media_type: { type: "string", enum: ["image", "text", "video"] },
             channel: { type: "string", description: "Which of the campaign's channels this piece is for." },
             strategic_reason: { type: "string", description: "Why this distinct piece helps achieve the campaign objective." },
+            ...(ids.length
+              ? {
+                  pillar_id: {
+                    type: "string",
+                    enum: ids,
+                    description: `Which of this campaign's content pillars this piece sits in: ${pillars
+                      .map((p) => `${p.id} = ${p.name}`)
+                      .join("; ")}.`,
+                  },
+                }
+              : {}),
           },
-          required: ["title", "body", "media_type", "channel", "strategic_reason"],
+          required: [
+            "title", "body", "media_type", "channel", "strategic_reason",
+            ...(ids.length ? ["pillar_id"] : []),
+          ],
           additionalProperties: false,
         },
       },
@@ -93,7 +119,11 @@ export const SUBMIT_TOOL = {
     ],
     additionalProperties: false,
   },
-};
+  };
+}
+
+/** The shape with no pillars, which is every campaign planned before them. */
+export const SUBMIT_TOOL = submitToolFor();
 
 export async function runCampaignPlanJob(
   sb: SupabaseClient,
@@ -169,7 +199,20 @@ export async function runCampaignPlanJob(
     };
   }
 
-  const submitTool = SUBMIT_TOOL;
+  // The pillars this campaign runs within, if any. They become an enum on
+  // the submit tool, so a piece cannot be filed under a pillar the campaign
+  // is not running.
+  const { data: pillarRows } = await sb
+    .from("campaign_content_pillars")
+    .select("pillar_id, client_content_pillars(id, name, premise, belongs, does_not_belong)")
+    .eq("campaign_id", campaign.id);
+  const pillars = (pillarRows ?? [])
+    .map((r) => (r as { client_content_pillars?: unknown }).client_content_pillars)
+    .filter((p): p is { id: string; name: string; premise: string; belongs: string; does_not_belong: string } =>
+      Boolean(p) && typeof p === "object",
+    );
+
+  const submitTool = submitToolFor(pillars);
 
   const system = `You plan marketing campaigns for Attract Acquisition, a marketing agency.
 
@@ -193,6 +236,14 @@ ABSOLUTE RULES
 WHAT THIS CAMPAIGN IS FOR — the operator's brief
 ${campaign.brief}
 
+${pillars.length ? `THE CONTENT PILLARS THIS CAMPAIGN RUNS WITHIN — every idea sits in one of these
+${pillars.map((p) => `**${p.name}** (${p.id})
+  Argues: ${p.premise}
+  Belongs: ${p.belongs}
+  Does NOT belong, however much it looks like it might: ${p.does_not_belong}`).join("\n")}
+
+Assign every idea to one of these pillars by its id. An idea that would be better in a pillar this campaign is not running is the wrong idea for this campaign — write a different one rather than stretching a pillar to fit it. Spread the ideas across the pillars rather than filling one and touching the others once.
+` : ""}
 ${campaign.built_at ? `EXISTING APPROVED CAMPAIGN PLAN — preserve these decisions. Generate exactly ${campaign.content_count} ideas for it; do not replan it.
 ${JSON.stringify({ objective: campaign.objective, audience: campaign.audience, offer_summary: campaign.offer_summary, core_message: campaign.core_message, channels: campaign.channels, starts_on: campaign.starts_on, ends_on: campaign.ends_on, kpi_metric: campaign.kpi_metric, content_count: campaign.content_count })}` : ""}
 
@@ -288,7 +339,7 @@ Call ${submitTool.name} once when you are done.`;
 
   let ideas;
   try {
-    ideas = campaignIdeas(result.submitted.ideas, plan.content_count);
+    ideas = campaignIdeas(result.submitted.ideas, plan.content_count, pillars.map((p) => p.id));
   } catch (error) {
     return { ok: false, retryable: true, failureMessage: (error as Error).message, usage };
   }
