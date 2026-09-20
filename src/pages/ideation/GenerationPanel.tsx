@@ -6,20 +6,24 @@ import { FilterPills } from "../../components/FilterPills";
 import { DataTable } from "../../components/DataTable";
 import { FormModal, ConfirmModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
-import { MEDIA_TYPE_OPTIONS, loadContentPillars, loadProofAssets, useOptions } from "../../lib/options";
+import { CONTENT_FORMAT_OPTIONS, MEDIA_TYPE_OPTIONS, loadContentPillars, loadProofAssets, useOptions } from "../../lib/options";
 import { mediaFilters } from "../../data/mediaFilters";
 import type { MediaFilterId } from "../../data/mediaFilters";
+import { formatFilters, formatAllows, formatLabel } from "../../lib/contentFormat";
+import type { FormatFilterId } from "../../lib/contentFormat";
 import { supabase } from "../../lib/supabase";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import type { Database } from "../../types/database";
 
 type MediaType = Database["public"]["Enums"]["media_type"];
+type ContentFormatValue = Database["public"]["Enums"]["content_format"];
 
 type Idea = {
   id: string;
   title: string;
   media_type: string;
+  content_format: string;
   source: string;
   status: string;
 };
@@ -27,6 +31,17 @@ type Idea = {
 const MANUAL_FIELDS: FieldDef[] = [
   { name: "title", label: "Idea", kind: "text", required: true },
   { name: "media_type", label: "Media type", kind: "select", options: MEDIA_TYPE_OPTIONS },
+  // Hidden for text, which has no shape other than single. Shown for image
+  // and video, where the options differ — a carousel is images only — so the
+  // pairing is checked on submit rather than by narrowing the list here.
+  {
+    name: "content_format",
+    label: "Format",
+    kind: "select",
+    options: CONTENT_FORMAT_OPTIONS,
+    showIf: { field: "media_type", equals: ["image", "video"] },
+    hint: "Carousel and story are made of ordered frames. A carousel is images only.",
+  },
   { name: "body", label: "Detail", kind: "textarea", rows: 3 },
 ];
 
@@ -34,6 +49,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
   const { clientId } = useParams<{ clientId: string }>();
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
+  const [activeFormat, setActiveFormat] = useState<FormatFilterId>("all");
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [busyAction, setBusyAction] = useState<{ ideaId: string; action: "approve" | "brief" | "approve-and-brief" } | null>(null);
   const actionInFlight = useRef(false);
@@ -57,7 +73,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
       if (!clientId) return;
       const { data, error } = await supabase
         .from("client_ideas")
-        .select("id, title, media_type, source, status")
+        .select("id, title, media_type, content_format, source, status")
         .eq("client_id", clientId)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -74,7 +90,9 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
   const { inFlight, recentFailures } = useAgentJobs(watchJobs ? clientId : undefined, refresh);
 
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
-  const shown = ideas.filter((i) => i.media_type === activeFilter);
+  const shown = ideas.filter(
+    (i) => i.media_type === activeFilter && (activeFormat === "all" || i.content_format === activeFormat),
+  );
 
   async function actOnIdea(ideaId: string, action: "approve" | "brief" | "approve-and-brief") {
     if (!clientId || actionInFlight.current) return;
@@ -158,14 +176,19 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
         <ActionCard title="Pillar Idea" icon={Columns3} onClick={() => setOpenCardId("pillar-idea")} />
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-col gap-2">
         <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
+        {/* A second axis, not more of the first: an idea is an image AND a
+            carousel. Pills rather than a column alone so "show me the
+            carousels" is one click. */}
+        <FilterPills options={formatFilters} activeId={activeFormat} onChange={setActiveFormat} />
       </div>
       <DataTable
-        columns={["Idea", "Type", "Status", ""]}
+        columns={["Idea", "Format", "Type", "Status", ""]}
         emptyLabel={`No ${activeLabel.toLowerCase()} ideas yet`}
         rows={shown.map((i) => [
           i.title,
+          formatLabel(i.content_format),
           i.source,
           i.status,
           i.status === "draft" || i.status === "approved" ? (
@@ -205,11 +228,21 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
         submitLabel="Add idea"
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
+          const mediaType = ((v.media_type as string) || "image") as MediaType;
+          // Text has no format field on the form, so it arrives blank and is
+          // a single. The check is here as well as in the database because
+          // the message a person reads should say which pairing is wrong,
+          // not quote a constraint name at them.
+          const format = (mediaType === "text" ? "single" : (v.content_format as string) || "single") as ContentFormatValue;
+          if (!formatAllows(format, mediaType)) {
+            throw new Error(`A ${formatLabel(format).toLowerCase()} cannot be ${mediaType}. Change one of the two.`);
+          }
           const { error } = await supabase.from("client_ideas").insert({
             client_id: clientId,
             title: (v.title as string).trim(),
             body: (v.body as string)?.trim() || null,
-            media_type: ((v.media_type as string) || "image") as MediaType,
+            media_type: mediaType,
+            content_format: format,
             source: "manual",
           });
           if (error) throw error;

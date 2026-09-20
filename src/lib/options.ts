@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
 import type { Option } from "../components/forms/fields";
+import { CONTENT_FORMATS } from "./contentFormat";
 
 /** Loads select options once, when the modal that needs them opens. */
 export function useOptions(
@@ -98,6 +99,12 @@ export async function loadContentPillars(clientId: string): Promise<Option[]> {
     label: `${p.name} · ${p.target_share}% of the calendar`,
   }));
 }
+
+/** Built from CONTENT_FORMATS so the form and the filters cannot drift apart. */
+export const CONTENT_FORMAT_OPTIONS: Option[] = CONTENT_FORMATS.map((f) => ({
+  value: f.value,
+  label: f.label,
+}));
 
 export const MEDIA_TYPE_OPTIONS: Option[] = [
   { value: "image", label: "Image" },

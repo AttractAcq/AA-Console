@@ -72,3 +72,17 @@ export function frameCountProblem(format: string, frames: number): string | null
   }
   return null;
 }
+
+/**
+ * The format filter, as pills.
+ *
+ * "All" first, because format is the second axis and most of the time you
+ * are not filtering on it — an idea is an image AND a carousel, so a pill
+ * row that forced a choice would hide two thirds of the bank by default.
+ */
+export type FormatFilterId = "all" | ContentFormat;
+
+export const formatFilters: Array<{ id: FormatFilterId; label: string }> = [
+  { id: "all", label: "All formats" },
+  ...CONTENT_FORMATS.map((f) => ({ id: f.value as FormatFilterId, label: f.label })),
+];
