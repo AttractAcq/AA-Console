@@ -38,18 +38,18 @@ describe("a clean draft", () => {
 describe("one bad field does not bin the run", () => {
   it("blanks the hedged field and keeps the rest", () => {
     const review = reviewContextDraft(
-      good({ competitors: "They appear to be positioned as the premium option locally." }),
+      good({ brand_voice: "They appear to be positioned as the premium option locally." }),
     );
     expect(review.problem).toBeNull();
-    expect(review.draft.competitors).toBe("");
+    expect(review.draft.brand_voice).toBe("");
     expect(review.draft.business_overview).toContain("Implant and veneer dentistry");
     expect(review.draft.main_offer).toContain("Full-arch");
   });
 
   it("names the field and says why, so nobody is left guessing", () => {
-    const review = reviewContextDraft(good({ competitors: "Presumably they take referrals." }));
+    const review = reviewContextDraft(good({ brand_voice: "Presumably they are informal." }));
     expect(review.dropped).toHaveLength(1);
-    expect(review.dropped[0]!.field).toBe("competitors");
+    expect(review.dropped[0]!.field).toBe("brand_voice");
     expect(review.dropped[0]!.reason).toMatch(/hedging rather than reporting/i);
   });
 
@@ -109,5 +109,41 @@ describe("revenue is never researched", () => {
 
   it("does not carry the sources note into a saved field", () => {
     expect(JSON.stringify(normaliseContextDraft(good()))).not.toContain("Read their homepage");
+  });
+});
+
+
+// Competitor POSITIONING is an inference by nature: you read a rival's site
+// and conclude they lead on price. This is the one field the guard fired on
+// in production, and it fired on a sentence doing its job.
+describe("hedging about a competitor's positioning is honest", () => {
+  it("keeps a hedged reading of how a rival is positioned", () => {
+    const review = reviewContextDraft(
+      good({
+        competitors: "Umhlanga Dental Studio, who appear to be positioned as the premium option locally, and doing nothing.",
+      }),
+    );
+    expect(review.dropped).toEqual([]);
+    expect(review.draft.competitors).toContain("Umhlanga Dental Studio");
+  });
+
+  it("does not extend the exemption to any other field", () => {
+    // Business overview hedged is still a guess dressed as a fact.
+    const review = reviewContextDraft(
+      good({ business_overview: "They appear to be a dental practice serving the north coast." }),
+    );
+    expect(review.dropped.map((d) => d.field)).toEqual(["business_overview"]);
+  });
+
+  it("still drops a placeholder in competitors", () => {
+    // The exemption is from hedging only. "[competitor]" is nobody.
+    const review = reviewContextDraft(good({ competitors: "The main one is [competitor name]." }));
+    expect(review.dropped[0]!.field).toBe("competitors");
+    expect(review.dropped[0]!.reason).toMatch(/placeholder/i);
+  });
+
+  it("still drops runaway output in competitors", () => {
+    const review = reviewContextDraft(good({ competitors: "x".repeat(12001) }));
+    expect(review.dropped[0]!.reason).toMatch(/12001 characters/);
   });
 });

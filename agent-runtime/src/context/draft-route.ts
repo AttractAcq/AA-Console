@@ -42,7 +42,8 @@ const SUBMIT_TOOL = {
       },
       competitors: {
         type: "string",
-        description: "Who else this buyer would consider, named, and how each is positioned differently. Include doing nothing if that is the real alternative.",
+        description:
+          "Who else this buyer would consider — NAMED — and how each is positioned differently. Include doing nothing if that is the real alternative. You may say how a competitor appears to be positioned, since that is a reading of their own material; you may not leave them unnamed. 'Various local providers' is not competitor research.",
       },
       brand_voice: {
         type: "string",
@@ -81,6 +82,7 @@ A PERSON WILL CHECK THIS, SO MAKE IT CHECKABLE
 - Write what the sources actually say. Say where it came from in the sources field.
 - If you did not find something, LEAVE THAT FIELD EMPTY. An empty field gets asked about at the next call. A plausible guess gets quoted back to the client as though they said it.
 - Never hedge. "Likely", "presumably", "appears to be" mean you are guessing and saying so politely. A hedged sentence reads as fact once it is saved and an agent quotes it.
+- The one exception is how a COMPETITOR is positioned. That is a reading of their own published material, and saying "they appear to lead on price" is an honest account of what their pages support. Name the competitor regardless — the hedge is allowed about positioning, never about who exists.
 
 NEVER INVENT
 - A testimonial, a review, a case study, a client name, a result or a statistic. If you cannot attribute it to this business's own published material, it does not go in.
