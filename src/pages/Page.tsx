@@ -21,6 +21,8 @@ import { ProofBankPanel } from "./proof-bank/ProofBankPanel";
 import { GenerationPanel } from "./ideation/GenerationPanel";
 import { BriefsPanel } from "./ideation/BriefsPanel";
 import { ImageLibraryPanel } from "./media/ImageLibraryPanel";
+import { StoryLibraryPanel } from "./media/StoryLibraryPanel";
+import { CarouselLibraryPanel } from "./media/CarouselLibraryPanel";
 import { VideoLibraryPanel } from "./media/VideoLibraryPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { OrganicPanel } from "./distribution/OrganicPanel";
@@ -95,6 +97,8 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   },
   media: {
     "image-library": () => <ImageLibraryPanel />,
+    "story-library": () => <StoryLibraryPanel />,
+    "carousel-library": () => <CarouselLibraryPanel />,
     "video-library": () => <VideoLibraryPanel />,
     "copy-library": () => <CopyLibraryPanel />,
   },
