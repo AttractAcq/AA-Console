@@ -5,11 +5,43 @@ import { EmptyState } from "./EmptyState";
 import { MediaCard, StatusBadge } from "./MediaCard";
 import { MediaDetailModal } from "./MediaDetailModal";
 import { ApprovalActions } from "./ApprovalActions";
+import { countFrames } from "../lib/frames";
+import { isMultiFrame } from "../lib/contentFormat";
 import { RegenerateAction } from "./RegenerateAction";
 import { dateSortOptions } from "../data/sortOptions";
 import type { SortOptionId } from "../data/sortOptions";
 import { REVIEW_TONE, fetchClientAssets, fetchTextBodies, shortDate, signPaths } from "../lib/media";
 import type { MediaAsset } from "../lib/media";
+
+/** What this library holds, for a sentence. */
+function libraryNoun(
+  mediaType: "image" | "text" | "video" | undefined,
+  format: "single" | "carousel" | "story",
+): string {
+  if (format !== "single") return `${format}s`;
+  return mediaType === "text" ? "copy" : `${mediaType}s`;
+}
+
+function emptyLabel(
+  mediaType: "image" | "text" | "video" | undefined,
+  format: "single" | "carousel" | "story",
+): string {
+  const noun = libraryNoun(mediaType, format);
+  const note = format !== "single" ? FORMAT_NOTE[format] : SOURCE_NOTE[mediaType ?? "image"];
+  return `No ${noun} yet — ${note}`;
+}
+
+const FORMAT_NOTE: Record<string, string> = {
+  carousel: "these arrive when a carousel brief is built, and hold their frames in order",
+  story: "these arrive when a story brief is built, as stills or clips",
+};
+
+/** A frame format says how many it has; a single asset says nothing extra. */
+function frameMeta(asset: MediaAsset, frames: number | undefined): string {
+  const base = `${asset.ref_number ?? "—"} · ${shortDate(asset.created_at)}`;
+  if (!isMultiFrame(asset.content_format)) return base;
+  return `${base} · ${frames ?? 0} frame${frames === 1 ? "" : "s"}`;
+}
 
 const SOURCE_NOTE: Record<string, string> = {
   image: "these arrive when an editor or avatar uploads against a job, or when a brief is built by AI",
@@ -23,7 +55,14 @@ const SOURCE_NOTE: Record<string, string> = {
  * fetched and rendered, otherwise every copy asset would be a filename with
  * no way to read it.
  */
-export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "video" }) {
+export function MediaLibrary({
+  mediaType,
+  contentFormat = "single",
+}: {
+  mediaType?: "image" | "text" | "video";
+  /** Frame formats have their own libraries; the plain ones ask for single. */
+  contentFormat?: "single" | "carousel" | "story";
+}) {
   const { clientId } = useParams<{ clientId: string }>();
   const [sort, setSort] = useState<SortOptionId>(dateSortOptions[0].id);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
@@ -33,6 +72,7 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
   const [open, setOpen] = useState<MediaAsset | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [frameCounts, setFrameCounts] = useState<Map<string, number>>(new Map());
 
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -44,7 +84,8 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
       return;
     }
     const rows = await fetchClientAssets(clientId, {
-      mediaType,
+      ...(mediaType ? { mediaType } : {}),
+      contentFormat,
       ascending: sort === "oldest",
     });
     setAssets(rows);
@@ -56,13 +97,14 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
     if (mediaType === "text") {
       setBodies(await fetchTextBodies(rows, signed));
     }
+    setFrameCounts(await countFrames(rows.map((r) => r.id)));
     setLoading(false);
     } catch (error) {
       setLoadError("Failed to load media: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
     } finally {
       setLoading(false);
     }
-  }, [clientId, mediaType, sort]);
+  }, [clientId, mediaType, contentFormat, sort]);
 
   useEffect(() => {
     void refresh();
@@ -85,11 +127,9 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
       {notice && <p className="mb-3 text-sm text-brand-strong">{notice}</p>}
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading {mediaType}s…</p>
+        <p className="text-sm text-muted-foreground">Loading {libraryNoun(mediaType, contentFormat)}…</p>
       ) : assets.length === 0 ? (
-        <EmptyState
-          label={`No ${mediaType === "text" ? "copy" : `${mediaType}s`} yet — ${SOURCE_NOTE[mediaType]}`}
-        />
+        <EmptyState label={emptyLabel(mediaType, contentFormat)} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {assets.map((asset) => (
@@ -99,7 +139,7 @@ export function MediaLibrary({ mediaType }: { mediaType: "image" | "text" | "vid
               url={urls.get(asset.storage_path)}
               body={bodies.get(asset.id)}
               title={asset.title ?? "Untitled"}
-              meta={`${asset.ref_number ?? "—"} · ${shortDate(asset.created_at)}`}
+              meta={frameMeta(asset, frameCounts.get(asset.id))}
               onOpen={() => setOpen(asset)}
               badge={
                 <StatusBadge status={asset.review_status} tone={REVIEW_TONE[asset.review_status]} />

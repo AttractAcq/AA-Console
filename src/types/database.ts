@@ -944,6 +944,7 @@ export type Database = {
           channel_intent: string | null
           client_id: string
           compensation_text: string | null
+          content_format: Database["public"]["Enums"]["content_format"]
           created_at: string
           derived_from_asset_id: string | null
           editor_brief: string | null
@@ -979,6 +980,7 @@ export type Database = {
           channel_intent?: string | null
           client_id: string
           compensation_text?: string | null
+          content_format?: Database["public"]["Enums"]["content_format"]
           created_at?: string
           derived_from_asset_id?: string | null
           editor_brief?: string | null
@@ -1014,6 +1016,7 @@ export type Database = {
           channel_intent?: string | null
           client_id?: string
           compensation_text?: string | null
+          content_format?: Database["public"]["Enums"]["content_format"]
           created_at?: string
           derived_from_asset_id?: string | null
           editor_brief?: string | null
@@ -1882,6 +1885,7 @@ export type Database = {
           ad_primary_text: string | null
           brief_id: string | null
           client_id: string
+          content_format: Database["public"]["Enums"]["content_format"]
           created_at: string
           human_approved_at: string | null
           id: string
@@ -1906,6 +1910,7 @@ export type Database = {
           ad_primary_text?: string | null
           brief_id?: string | null
           client_id: string
+          content_format?: Database["public"]["Enums"]["content_format"]
           created_at?: string
           human_approved_at?: string | null
           id?: string
@@ -1930,6 +1935,7 @@ export type Database = {
           ad_primary_text?: string | null
           brief_id?: string | null
           client_id?: string
+          content_format?: Database["public"]["Enums"]["content_format"]
           created_at?: string
           human_approved_at?: string | null
           id?: string
@@ -1980,6 +1986,62 @@ export type Database = {
             columns: ["uploaded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_media_frames: {
+        Row: {
+          asset_id: string
+          caption: string | null
+          created_at: string
+          id: string
+          position: number
+          storage_path: string
+        }
+        Insert: {
+          asset_id: string
+          caption?: string | null
+          created_at?: string
+          id?: string
+          position: number
+          storage_path: string
+        }
+        Update: {
+          asset_id?: string
+          caption?: string | null
+          created_at?: string
+          id?: string
+          position?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_media_frames_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_frames_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_frames_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_frames_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
         ]
@@ -5719,6 +5781,7 @@ export type Database = {
         | "O2"
         | "X1"
         | "X2"
+      content_format: "single" | "carousel" | "story"
       content_purpose: "client" | "recruitment"
       creative_stage: "concept" | "render" | "done" | "failed"
       engagement_type: "employee" | "contractor"
@@ -5928,6 +5991,7 @@ export const Constants = {
         "X1",
         "X2",
       ],
+      content_format: ["single", "carousel", "story"],
       content_purpose: ["client", "recruitment"],
       creative_stage: ["concept", "render", "done", "failed"],
       engagement_type: ["employee", "contractor"],

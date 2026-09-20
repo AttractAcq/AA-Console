@@ -58,6 +58,7 @@ export type MediaAsset = {
   review_status: "pending" | "approved" | "rejected";
   /** Null unless a person approved it. A bot approval never sets this. */
   human_approved_at?: string | null;
+  content_format?: "single" | "carousel" | "story";
   member_id: string | null;
   created_at: string;
 };
@@ -83,17 +84,20 @@ export async function fetchClientAssets(
      * review_status alone cannot tell these apart: a bot approval sets it too.
      */
     humanApproved?: boolean;
+    /** "single" for the plain libraries; "carousel"/"story" for the frame ones. */
+    contentFormat?: "single" | "carousel" | "story";
   } = {},
 ): Promise<MediaAsset[]> {
   let query = supabase
     .from("client_media_assets")
-    .select("id, client_id, brief_id, ref_number, media_type, title, storage_path, review_status, human_approved_at, member_id, created_at")
+    .select("id, client_id, brief_id, ref_number, media_type, title, storage_path, review_status, human_approved_at, content_format, member_id, created_at")
     .eq("client_id", clientId);
 
   if (opts.mediaType) query = query.eq("media_type", opts.mediaType);
   if (opts.reviewStatus) query = query.eq("review_status", opts.reviewStatus);
   if (opts.humanApproved === true) query = query.not("human_approved_at", "is", null);
   if (opts.humanApproved === false) query = query.is("human_approved_at", null);
+  if (opts.contentFormat) query = query.eq("content_format", opts.contentFormat);
   const purpose = opts.purpose ?? "client";
   if (purpose !== "all") {
     query = query.eq("purpose", purpose);

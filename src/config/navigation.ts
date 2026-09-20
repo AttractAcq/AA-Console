@@ -161,6 +161,8 @@ export const clientNavGroups: NavNode[] = [
           { id: "image-library", label: "Image Library" },
           { id: "video-library", label: "Video Library" },
           { id: "copy-library", label: "Copy Library" },
+          { id: "story-library", label: "Story Library" },
+          { id: "carousel-library", label: "Carousel Library" },
         ],
       },
       {

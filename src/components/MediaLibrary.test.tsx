@@ -45,7 +45,13 @@ beforeEach(() => {
     order: () => reviews,
     limit: () => Promise.resolve({ data: [{ reason: "Wrong logo lockup." }], error: null }),
   };
-  from.mockReturnValue(reviews);
+  const frames = {
+    select: () => frames,
+    in: () => Promise.resolve({ data: [], error: null }),
+  };
+  from.mockImplementation((table: string) =>
+    table === "client_media_frames" ? frames : reviews,
+  );
 });
 
 describe("approving from the library", () => {
@@ -179,5 +185,62 @@ describe("regenerating an asset", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Regenerate/i }));
     const dialog = within(await screen.findByRole("dialog"));
     expect((dialog.getByLabelText(/What is wrong/i) as HTMLTextAreaElement).value).toBe("");
+  });
+});
+
+describe("the frame libraries", () => {
+  it("asks for one format at a time", async () => {
+    fetchClientAssets.mockResolvedValue([]);
+    render(<MediaLibrary contentFormat="carousel" />);
+    await waitFor(() =>
+      expect(fetchClientAssets).toHaveBeenCalledWith("client-1", {
+        contentFormat: "carousel",
+        ascending: false,
+      }),
+    );
+  });
+
+  // A story is a shape, not a media type — it holds stills or clips, so the
+  // library must not filter on one.
+  it("does not narrow a story library to one media type", async () => {
+    fetchClientAssets.mockResolvedValue([]);
+    render(<MediaLibrary contentFormat="story" />);
+    await waitFor(() => expect(fetchClientAssets).toHaveBeenCalled());
+    const args = fetchClientAssets.mock.calls.at(-1)![1] as Record<string, unknown>;
+    expect(args).not.toHaveProperty("mediaType");
+  });
+
+  it("keeps the plain libraries to single assets", async () => {
+    fetchClientAssets.mockResolvedValue([]);
+    render(<MediaLibrary mediaType="image" />);
+    await waitFor(() =>
+      expect(fetchClientAssets).toHaveBeenCalledWith("client-1", {
+        mediaType: "image",
+        contentFormat: "single",
+        ascending: false,
+      }),
+    );
+  });
+
+  it("says how many frames a carousel has", async () => {
+    const frames = { select: () => frames, in: () => Promise.resolve({ data: [{ asset_id: "a1" }, { asset_id: "a1" }, { asset_id: "a1" }], error: null }) };
+    from.mockImplementation((table: string) => (table === "client_media_frames" ? frames : frames));
+    fetchClientAssets.mockResolvedValue([
+      asset({ review_status: "approved", content_format: "carousel" }),
+    ]);
+    render(<MediaLibrary contentFormat="carousel" />);
+    expect(await screen.findByText(/3 frames/)).toBeInTheDocument();
+  });
+
+  // Losing the count must not blank the library behind an alert.
+  it("still renders when the frame count cannot be loaded", async () => {
+    const broken = { select: () => broken, in: () => Promise.reject(new Error("boom")) };
+    from.mockImplementation(() => broken);
+    fetchClientAssets.mockResolvedValue([
+      asset({ review_status: "approved", content_format: "carousel" }),
+    ]);
+    render(<MediaLibrary contentFormat="carousel" />);
+    expect(await screen.findByText("Chair shot")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
