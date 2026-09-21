@@ -3,6 +3,8 @@ import { useParams } from "react-router-dom";
 import { Bot, ImagePlus, Users, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
+import { MAX_FRAMES, MIN_FRAMES, formatLabel, isMultiFrame } from "../../lib/contentFormat";
+import { framePlanLines } from "../../lib/framePlan";
 
 type Brief = {
   id: string;
@@ -11,6 +13,7 @@ type Brief = {
   avatar_brief?: string | null;
   editor_brief?: string | null;
   media_type: "image" | "text" | "video";
+  content_format?: string | null;
   brief_ref: string | null;
   status: string;
 };
@@ -62,8 +65,13 @@ export function ApproveAndBuildModal({
   const [error, setError] = useState<string | null>(null);
   const [reference, setReference] = useState<{ path: string; name: string; preview: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [frameCount, setFrameCount] = useState("");
+  const [framePlan, setFramePlan] = useState("");
 
   const isVideo = brief?.media_type === "video";
+  // Only a carousel or a story has frames to ask about. A single brief never
+  // sees these fields, and the RPC refuses them if it somehow does.
+  const isFramed = isMultiFrame(brief?.content_format);
 
   // Reset every time it opens: a modal that remembers the last brief's
   // choices is how the wrong person gets sent the wrong work.
@@ -78,6 +86,8 @@ export function ApproveAndBuildModal({
     setDueDate("");
     setCompensation("");
     setReference(null);
+    setFrameCount("");
+    setFramePlan("");
     setError(null);
   }, [open, brief?.id, isVideo]);
 
@@ -149,11 +159,19 @@ export function ApproveAndBuildModal({
     setError(null);
     try {
       if (route === "ai") {
+        const lines = framePlanLines(framePlan);
+        const typedCount = Number(frameCount);
         const { error: rpcError } = await supabase.rpc("build_brief_with_ai", {
           p_brief_id: brief.id,
           p_quality: quality,
           p_size: brief.media_type === "image" ? size : "1024x1536",
           p_reference_path: reference?.path ?? undefined,
+          // Omitted rather than sent as null: the generated Args type has
+          // these as optional, and null is not the same as absent to it.
+          ...(isFramed && lines.length > 0 ? { p_frame_plan: lines } : {}),
+          ...(isFramed && lines.length === 0 && Number.isFinite(typedCount) && typedCount > 0
+            ? { p_frame_count: typedCount }
+            : {}),
         });
         if (rpcError) throw new Error(rpcError.message);
       } else {
@@ -177,7 +195,14 @@ export function ApproveAndBuildModal({
     }
   };
 
-  const canSubmit = route === "ai" ? true : picked.size > 0;
+  const planLines = framePlanLines(framePlan);
+  // The same bounds the RPC and the check constraint apply, said here so the
+  // button is dead before the round trip rather than after it.
+  const planProblem =
+    isFramed && planLines.length > 0 && (planLines.length < MIN_FRAMES || planLines.length > MAX_FRAMES)
+      ? `A ${formatLabel(brief.content_format).toLowerCase()} runs from ${MIN_FRAMES} to ${MAX_FRAMES} frames; this plan has ${planLines.length}.`
+      : null;
+  const canSubmit = route === "ai" ? planProblem === null : picked.size > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -348,6 +373,49 @@ export function ApproveAndBuildModal({
                     <p className="mt-1.5 text-xs text-muted-foreground">
                       The concept will be written as direction on this image — what to keep, change and
                       add — rather than describing a picture to build from nothing.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {isFramed && (
+                <div>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    The set <span className="font-normal normal-case">(optional)</span>
+                  </h3>
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-xs text-muted-foreground">How many frames</span>
+                    <input
+                      type="number"
+                      min={MIN_FRAMES}
+                      max={MAX_FRAMES}
+                      value={frameCount}
+                      disabled={planLines.length > 0}
+                      onChange={(e) => setFrameCount(e.target.value)}
+                      placeholder="Leave blank and the agent decides"
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                    />
+                  </label>
+                  <label className="mt-3 block text-sm">
+                    <span className="mb-1 block text-xs text-muted-foreground">
+                      What each frame does — one line per frame
+                    </span>
+                    <textarea
+                      value={framePlan}
+                      onChange={(e) => setFramePlan(e.target.value)}
+                      rows={5}
+                      placeholder={"Hook: the claim they will argue with\nThe objection they are already thinking\nThe proof that answers it\nWhat to do next"}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                  </label>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {planLines.length > 0
+                      ? `${planLines.length} frame${planLines.length === 1 ? "" : "s"} — the plan sets the count, so the number above is ignored.`
+                      : "Blank leaves both to the agent. A plan is the only way to fix the order the argument runs in."}
+                  </p>
+                  {planProblem && (
+                    <p role="alert" className="mt-1.5 text-xs text-destructive">
+                      {planProblem}
                     </p>
                   )}
                 </div>

@@ -34,12 +34,16 @@ import {
   MIN_FRAMES,
   framePath,
   framePlanProblem,
+  frameAskInstruction,
+  requiredFrameCount,
+  NO_FRAME_ASK,
   framesConceptProblem,
   buildRoute,
   normaliseFrames,
   positionFromPath,
   type FrameConcept,
 } from "./frames.js";
+import type { FrameAsk } from "./frames.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { placeLogo } from "./logo.js";
@@ -59,6 +63,10 @@ interface BriefRow {
   recruitment_role: string | null;
   /** 'single', 'carousel' or 'story'. The last two are made of frames. */
   content_format: "single" | "carousel" | "story";
+  /** How many frames the brief asks for, or null to leave it to the agent. */
+  frame_count: number | null;
+  /** An ordered line per frame saying what it is for, or null. */
+  frame_plan: string[] | null;
 }
 
 /**
@@ -124,10 +132,15 @@ export const IMAGE_CONCEPT_TOOL = {
  * No maxItems on the array — a strict schema rejects it. The count is
  * checked in framePlanProblem instead, the same way campaignIdeas does.
  */
-export function framesConceptTool(format: string) {
+export function framesConceptTool(format: string, ask: FrameAsk = NO_FRAME_ASK) {
+  const required = requiredFrameCount(ask);
+  const howMany =
+    required === null
+      ? `Between ${MIN_FRAMES} and ${MAX_FRAMES} frames`
+      : `Exactly ${required} frames`;
   return {
     name: "submit_frames",
-    description: `Submit the ${format} as an ordered set of frames. Call once. Between ${MIN_FRAMES} and ${MAX_FRAMES} frames, numbered from 1 with no gaps.`,
+    description: `Submit the ${format} as an ordered set of frames. Call once. ${howMany}, numbered from 1 with no gaps.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -364,7 +377,7 @@ export async function runCreativeBuildJob(
 
   const { data: brief, error: briefError } = await sb
     .from("client_briefs")
-    .select("id, client_id, title, body, media_type, brief_ref, purpose, recruitment_role, content_format")
+    .select("id, client_id, title, body, media_type, brief_ref, purpose, recruitment_role, content_format, frame_count, frame_plan")
     .eq("id", generation.brief_id)
     .maybeSingle();
   if (briefError) throw new Error(`Could not load the brief: ${briefError.message}`);
@@ -383,6 +396,10 @@ export async function runCreativeBuildJob(
   // A carousel or story is rendered as an ordered set. Only the image route
   // builds them; a video story is a person's job, same as any other video.
   const isFramed = buildRoute(typed.media_type, typed.content_format) === "frames";
+  // What the operator asked of the set. Null in both halves is the state
+  // every brief written before 113 is in, and it means what it always meant:
+  // the agent decides.
+  const frameAsk: FrameAsk = { count: typed.frame_count, plan: typed.frame_plan };
   // A recruitment brief used to arrive looking exactly like a client campaign
   // brief, so the agent wrote a good ad for the wrong job.
   const isRecruitment = typed.purpose === "recruitment";
@@ -484,7 +501,7 @@ export async function runCreativeBuildJob(
 
   const hasReference = Boolean(renderReference);
   const submitTool = isFramed
-    ? framesConceptTool(typed.content_format)
+    ? framesConceptTool(typed.content_format, frameAsk)
     : isImage
       ? IMAGE_CONCEPT_TOOL
       : TEXT_CONCEPT_TOOL;
@@ -506,7 +523,7 @@ ${
     : ""
 }
 
-${remakeBlock(remakeFeedback)}${isRecruitment ? recruitmentBlock(roleLabel) : ""}
+${remakeBlock(remakeFeedback)}${isRecruitment ? recruitmentBlock(roleLabel) : ""}${isFramed ? `\nTHE SET\n${frameAskInstruction(frameAsk)}\n` : ""}
 THE BRIEF
 ${typed.title}
 
@@ -598,7 +615,7 @@ Call ${submitTool.name} once when you are done.`;
   let plannedFrames: FrameConcept[] = [];
   if (isFramed) {
     plannedFrames = normaliseFrames(concept.frames);
-    const problem = framesConceptProblem(plannedFrames, conceptProblem);
+    const problem = framesConceptProblem(plannedFrames, conceptProblem, requiredFrameCount(frameAsk));
     if (problem) {
       await fail(problem);
       return { ok: false, retryable: true, failureMessage: problem, usage };

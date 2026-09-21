@@ -2,14 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_FRAMES,
   MIN_FRAMES,
+  NO_FRAME_ASK,
+  buildRoute,
+  frameAskInstruction,
   framePath,
   framePlanProblem,
+  framesConceptProblem,
   framesToRender,
   normaliseFrames,
   positionFromPath,
   renderFrames,
-  buildRoute,
-  framesConceptProblem,
+  requiredFrameCount,
   type FrameConcept,
 } from "./frames.js";
 
@@ -268,5 +271,103 @@ describe("framesConceptProblem", () => {
       return null;
     });
     expect(seen).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe("what the brief asks of the set", () => {
+  const frames = (n: number): FrameConcept[] =>
+    Array.from({ length: n }, (_, i) => ({
+      position: i + 1,
+      purpose: `job ${i + 1}`,
+      headline: "h",
+      subhead: "s",
+      call_to_action: "",
+      subject: "a dentist at a chair",
+      background: "a surgery with window light",
+      visual_treatment: "photographic",
+      composition: "centred",
+      art_direction: "warm",
+      avoid: "stock cliche",
+    }));
+
+  describe("requiredFrameCount", () => {
+    it("is null when the brief asks for nothing, as every brief before 113 does", () => {
+      expect(requiredFrameCount(NO_FRAME_ASK)).toBeNull();
+    });
+
+    it("is the count when only a count is given", () => {
+      expect(requiredFrameCount({ count: 5, plan: null })).toBe(5);
+    });
+
+    // The database refuses a count and a plan that disagree, so this only
+    // has to pick a side for the halves that can legally arrive together.
+    it("is the plan's length, which is the count when both are set", () => {
+      expect(requiredFrameCount({ count: null, plan: ["a", "b", "c"] })).toBe(3);
+      expect(requiredFrameCount({ count: 3, plan: ["a", "b", "c"] })).toBe(3);
+    });
+
+    it("ignores a count that asks for nothing", () => {
+      expect(requiredFrameCount({ count: 0, plan: null })).toBeNull();
+      expect(requiredFrameCount({ count: null, plan: [] })).toBeNull();
+    });
+  });
+
+  describe("frameAskInstruction", () => {
+    it("leaves the choice open when the brief made none", () => {
+      const text = frameAskInstruction(NO_FRAME_ASK);
+      expect(text).toContain("Choose how many");
+      expect(text).toContain(String(MIN_FRAMES));
+      expect(text).toContain(String(MAX_FRAMES));
+    });
+
+    it("names the exact count when the brief set one", () => {
+      expect(frameAskInstruction({ count: 5, plan: null })).toContain("exactly 5 frames");
+    });
+
+    // An instruction the model cannot follow line by line is one it
+    // approximates — the pillar brief made exactly this mistake.
+    it("lists the plan frame by frame rather than summarising it", () => {
+      const text = frameAskInstruction({ count: null, plan: ["hook", "the objection", "proof"] });
+      expect(text).toContain("Frame 1: hook");
+      expect(text).toContain("Frame 2: the objection");
+      expect(text).toContain("Frame 3: proof");
+      expect(text).toContain("exactly 3 frames");
+    });
+  });
+
+  describe("framePlanProblem against the brief's count", () => {
+    it("accepts a set that matches what was asked for", () => {
+      expect(framePlanProblem(frames(5), 5)).toBeNull();
+    });
+
+    // Four frames for a five-frame brief is not a smaller carousel, it is a
+    // dropped beat of an argument somebody wrote down.
+    it("refuses a set short of what the brief asked for", () => {
+      expect(framePlanProblem(frames(4), 5)).toBe("The brief asks for 5 frames; this set has 4.");
+    });
+
+    it("refuses a set longer than what the brief asked for", () => {
+      expect(framePlanProblem(frames(6), 5)).toBe("The brief asks for 5 frames; this set has 6.");
+    });
+
+    it("still applies the floor and ceiling when the brief asked for nothing", () => {
+      expect(framePlanProblem(frames(1), null)).toContain("at least");
+      expect(framePlanProblem(frames(11), null)).toContain("limit");
+      expect(framePlanProblem(frames(4), null)).toBeNull();
+    });
+  });
+
+  describe("framesConceptProblem", () => {
+    it("carries the brief's count through to the plan check", () => {
+      expect(framesConceptProblem(frames(3), () => null, 5)).toBe(
+        "The brief asks for 5 frames; this set has 3.",
+      );
+    });
+
+    it("still checks each frame is renderable", () => {
+      expect(
+        framesConceptProblem(frames(3), (c) => (c.headline === "h" ? "no good" : null), 3),
+      ).toBe("Frame 1: no good");
+    });
   });
 });

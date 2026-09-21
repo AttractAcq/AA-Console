@@ -439,6 +439,39 @@ export type Database = {
           },
         ]
       }
+      campaign_content_pillars: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          pillar_id: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          pillar_id: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          pillar_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_content_pillars_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_content_pillars_pillar_id_fkey"
+            columns: ["pillar_id"]
+            isOneToOne: false
+            referencedRelation: "client_content_pillars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           campaign_ref: string
@@ -948,6 +981,8 @@ export type Database = {
           created_at: string
           derived_from_asset_id: string | null
           editor_brief: string | null
+          frame_count: number | null
+          frame_plan: string[] | null
           hook: string | null
           id: string
           job_id: string | null
@@ -984,6 +1019,8 @@ export type Database = {
           created_at?: string
           derived_from_asset_id?: string | null
           editor_brief?: string | null
+          frame_count?: number | null
+          frame_plan?: string[] | null
           hook?: string | null
           id?: string
           job_id?: string | null
@@ -1020,6 +1057,8 @@ export type Database = {
           created_at?: string
           derived_from_asset_id?: string | null
           editor_brief?: string | null
+          frame_count?: number | null
+          frame_plan?: string[] | null
           hook?: string | null
           id?: string
           job_id?: string | null
@@ -1319,56 +1358,6 @@ export type Database = {
           },
         ]
       }
-      client_content_pillars: {
-        Row: {
-          active: boolean
-          belongs: string
-          client_id: string
-          created_at: string
-          does_not_belong: string
-          id: string
-          name: string
-          premise: string
-          slug: string
-          target_share: number
-          updated_at: string
-        }
-        Insert: {
-          active?: boolean
-          belongs: string
-          client_id: string
-          created_at?: string
-          does_not_belong: string
-          id?: string
-          name: string
-          premise: string
-          slug: string
-          target_share?: number
-          updated_at?: string
-        }
-        Update: {
-          active?: boolean
-          belongs?: string
-          client_id?: string
-          created_at?: string
-          does_not_belong?: string
-          id?: string
-          name?: string
-          premise?: string
-          slug?: string
-          target_share?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "client_content_pillars_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       client_contact_details: {
         Row: {
           address: string | null
@@ -1420,6 +1409,56 @@ export type Database = {
             foreignKeyName: "client_contact_details_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_content_pillars: {
+        Row: {
+          active: boolean
+          belongs: string
+          client_id: string
+          created_at: string
+          does_not_belong: string
+          id: string
+          name: string
+          premise: string
+          slug: string
+          target_share: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          belongs: string
+          client_id: string
+          created_at?: string
+          does_not_belong: string
+          id?: string
+          name: string
+          premise: string
+          slug: string
+          target_share?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          belongs?: string
+          client_id?: string
+          created_at?: string
+          does_not_belong?: string
+          id?: string
+          name?: string
+          premise?: string
+          slug?: string
+          target_share?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_content_pillars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
@@ -1561,6 +1600,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_ideas_pillar_id_fkey"
+            columns: ["pillar_id"]
+            isOneToOne: false
+            referencedRelation: "client_content_pillars"
             referencedColumns: ["id"]
           },
           {
@@ -4242,14 +4288,24 @@ export type Database = {
       }
       approvals_queue: {
         Row: {
+          ad_cta: string | null
+          ad_description: string | null
+          ad_headline: string | null
+          ad_link_url: string | null
+          ad_primary_text: string | null
           brief_id: string | null
           brief_title: string | null
           client_id: string | null
           client_name: string | null
           created_at: string | null
+          human_approved_at: string | null
           id: string | null
           media_type: Database["public"]["Enums"]["media_type"] | null
           member_id: string | null
+          meta_ad_id: string | null
+          meta_creative_id: string | null
+          meta_image_hash: string | null
+          purpose: Database["public"]["Enums"]["content_purpose"] | null
           ref_number: string | null
           review_status: Database["public"]["Enums"]["review_status"] | null
           storage_path: string | null
@@ -4291,39 +4347,6 @@ export type Database = {
             columns: ["uploaded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      campaign_content_pillars: {
-        Row: {
-          campaign_id: string
-          created_at: string
-          pillar_id: string
-        }
-        Insert: {
-          campaign_id: string
-          created_at?: string
-          pillar_id: string
-        }
-        Update: {
-          campaign_id?: string
-          created_at?: string
-          pillar_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "campaign_content_pillars_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "client_campaigns"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "campaign_content_pillars_pillar_id_fkey"
-            columns: ["pillar_id"]
-            isOneToOne: false
-            referencedRelation: "client_content_pillars"
             referencedColumns: ["id"]
           },
         ]
@@ -4630,6 +4653,8 @@ export type Database = {
       build_brief_with_ai: {
         Args: {
           p_brief_id: string
+          p_frame_count?: number
+          p_frame_plan?: string[]
           p_quality?: string
           p_reference_path?: string
           p_size?: string
@@ -4851,6 +4876,14 @@ export type Database = {
         Args: { p_days?: number }
         Returns: number
       }
+      format_fits_media: {
+        Args: {
+          p_format: Database["public"]["Enums"]["content_format"]
+          p_media: Database["public"]["Enums"]["media_type"]
+        }
+        Returns: boolean
+      }
+      frame_plan_is_usable: { Args: { p_plan: string[] }; Returns: boolean }
       generate_recruitment_ad: {
         Args: { p_brief_id: string; p_quality?: string; p_size?: string }
         Returns: Json
@@ -5596,6 +5629,15 @@ export type Database = {
         }
         Returns: number
       }
+      regenerate_asset: {
+        Args: {
+          p_asset_id: string
+          p_feedback?: string
+          p_quality?: string
+          p_size?: string
+        }
+        Returns: string
+      }
       renew_agent_job_lease: {
         Args: {
           p_job_id: string
@@ -5636,15 +5678,6 @@ export type Database = {
         Args: { p_page_id: string; p_revision_number: number }
         Returns: number
       }
-      regenerate_asset: {
-        Args: {
-          p_asset_id: string
-          p_feedback?: string
-          p_quality?: string
-          p_size?: string
-        }
-        Returns: string
-      }
       review_media_asset: {
         Args: {
           p_asset_id: string
@@ -5673,6 +5706,17 @@ export type Database = {
           p_plan: Json
         }
         Returns: number
+      }
+      save_framed_asset: {
+        Args: {
+          p_brief_id: string
+          p_client_id: string
+          p_format: Database["public"]["Enums"]["content_format"]
+          p_frames: Json
+          p_media_type: Database["public"]["Enums"]["media_type"]
+          p_title: string
+        }
+        Returns: string
       }
       schedule_asset: {
         Args: {
@@ -5788,7 +5832,7 @@ export type Database = {
       content_purpose: "client" | "recruitment"
       creative_stage: "concept" | "render" | "done" | "failed"
       engagement_type: "employee" | "contractor"
-      idea_source: "manual" | "auto" | "proof"
+      idea_source: "manual" | "auto" | "proof" | "pillar"
       idea_status: "draft" | "approved" | "rejected" | "briefed"
       job_status:
         | "queued"
@@ -5998,7 +6042,7 @@ export const Constants = {
       content_purpose: ["client", "recruitment"],
       creative_stage: ["concept", "render", "done", "failed"],
       engagement_type: ["employee", "contractor"],
-      idea_source: ["manual", "auto", "proof"],
+      idea_source: ["manual", "auto", "proof", "pillar"],
       idea_status: ["draft", "approved", "rejected", "briefed"],
       job_status: [
         "queued",
