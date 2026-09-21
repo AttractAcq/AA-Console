@@ -296,6 +296,13 @@ export type Database = {
             foreignKeyName: "brief_dispatches_brief_id_fkey"
             columns: ["brief_id"]
             isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["brief_id"]
           },
@@ -394,6 +401,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_briefs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id"]
           },
           {
             foreignKeyName: "campaign_artifacts_brief_id_fkey"
@@ -968,6 +982,7 @@ export type Database = {
       client_briefs: {
         Row: {
           apply_url: string | null
+          archived_at: string | null
           argument: string | null
           avatar_brief: string | null
           b_roll: string | null
@@ -1006,6 +1021,7 @@ export type Database = {
         }
         Insert: {
           apply_url?: string | null
+          archived_at?: string | null
           argument?: string | null
           avatar_brief?: string | null
           b_roll?: string | null
@@ -1044,6 +1060,7 @@ export type Database = {
         }
         Update: {
           apply_url?: string | null
+          archived_at?: string | null
           argument?: string | null
           avatar_brief?: string | null
           b_roll?: string | null
@@ -1511,6 +1528,7 @@ export type Database = {
       }
       client_ideas: {
         Row: {
+          archived_at: string | null
           body: string | null
           campaign_id: string | null
           campaign_position: number | null
@@ -1532,6 +1550,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
           campaign_position?: number | null
@@ -1553,6 +1572,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
           campaign_position?: number | null
@@ -2008,6 +2028,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_briefs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id"]
           },
           {
             foreignKeyName: "client_media_assets_brief_id_fkey"
@@ -2994,6 +3021,13 @@ export type Database = {
             foreignKeyName: "creative_generations_brief_id_fkey"
             columns: ["brief_id"]
             isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "creative_generations_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["brief_id"]
           },
@@ -3285,6 +3319,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_briefs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id"]
           },
           {
             foreignKeyName: "job_assignments_brief_id_fkey"
@@ -4325,6 +4366,13 @@ export type Database = {
             foreignKeyName: "client_media_assets_brief_id_fkey"
             columns: ["brief_id"]
             isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["brief_id"]
           },
@@ -4376,6 +4424,59 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_archive: {
+        Row: {
+          approved_assets: number | null
+          archived_at: string | null
+          assets: number | null
+          brief_id: string | null
+          brief_ref: string | null
+          client_id: string | null
+          content_format: Database["public"]["Enums"]["content_format"] | null
+          content_territory: string | null
+          first_published: string | null
+          frame_count: number | null
+          idea_id: string | null
+          idea_title: string | null
+          iterations: number | null
+          media_type: Database["public"]["Enums"]["media_type"] | null
+          pillar_id: string | null
+          pillar_name: string | null
+          published: number | null
+          scheduled: number | null
+          title: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_briefs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_briefs_source_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "client_ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_briefs_source_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["idea_id"]
+          },
+          {
+            foreignKeyName: "client_ideas_pillar_id_fkey"
+            columns: ["pillar_id"]
+            isOneToOne: false
+            referencedRelation: "client_content_pillars"
             referencedColumns: ["id"]
           },
         ]
@@ -5732,6 +5833,13 @@ export type Database = {
         Returns: string
       }
       select_render: { Args: { p_render_id: string }; Returns: undefined }
+      size_fits_format: {
+        Args: {
+          p_format: Database["public"]["Enums"]["content_format"]
+          p_size: string
+        }
+        Returns: boolean
+      }
       stalled_leads: {
         Args: { p_client_id: string; p_days?: number }
         Returns: {
