@@ -18,6 +18,7 @@ import {
   templateSummary,
 } from "../../lib/campaignTemplates";
 import { CampaignContentPanel } from "./CampaignContentPanel";
+import { ArchiveAction } from "../../components/ArchiveAction";
 import { cn } from "../../lib/cn";
 
 type Campaign = {
@@ -127,6 +128,8 @@ export function CampaignExecutionPanel() {
           "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, launched_at, created_at",
         )
         .eq("client_id", clientId)
+        // A campaign somebody archived is over. It reads from the archive.
+        .is("archived_at", null)
         .order("created_at", { ascending: false });
 
       if (version !== request.current) return;
@@ -500,6 +503,17 @@ export function CampaignExecutionPanel() {
                       {unmet.length} thing{unmet.length === 1 ? "" : "s"} still missing
                     </span>
                   )}
+                  {/* Nothing infers that a campaign is over — an end date
+                      that passed while it was paused is not a finished
+                      campaign — so the person who knows says so here. */}
+                  <ArchiveAction
+                    table="client_campaigns"
+                    id={c.id}
+                    archived={false}
+                    noun="campaign"
+                    onDone={() => void refresh()}
+                    onError={setProblem}
+                  />
                 </div>
                 )}
                 {contentCampaignId === c.id && clientId && <CampaignContentPanel key={`${clientId}:${c.id}`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} onChanged={refresh} refreshToken={campaigns} />}

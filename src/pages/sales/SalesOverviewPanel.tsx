@@ -8,6 +8,7 @@ import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
+import { ArchiveAction } from "../../components/ArchiveAction";
 import { clearDraft } from "../../components/forms/FormModal";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import { cn } from "../../lib/cn";
@@ -103,6 +104,8 @@ export function SalesOverviewPanel() {
           "id, name, purpose, status, role, page_id, greeting, system_prompt, qualification, objections, booking_rule, escalation_rule, guardrails, built_at, approved_at, approved_by, created_at",
         )
         .eq("client_id", clientId)
+        // A retired agent is archived, not listed.
+        .is("archived_at", null)
         .order("created_at", { ascending: false }),
       supabase
         .from("client_pages")
@@ -364,6 +367,17 @@ export function SalesOverviewPanel() {
                           Approve for public use
                         </button>
                       )}
+                      {/* Retiring an agent takes it off live; it is usually
+                          being edited. Archiving is the separate decision
+                          that it is finished with for good. */}
+                      <ArchiveAction
+                        table="client_sales_agents"
+                        id={a.id}
+                        archived={false}
+                        noun="sales agent"
+                        onDone={() => void refresh()}
+                        onError={setNotice}
+                      />
                     </div>
                   </>
                 ) : (

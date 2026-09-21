@@ -86,6 +86,7 @@ function rows(data: unknown[], error: unknown = null) {
   const chain: Record<string, unknown> = {
     select: () => chain,
     eq: () => chain,
+    is: () => chain,
     order: () => chain,
     limit: () => Promise.resolve({ data, error }),
     then: (r: (v: { data: unknown; error: unknown }) => unknown) =>
@@ -290,6 +291,7 @@ describe("building what the campaign needs", () => {
       const chain = {
         select: () => chain,
         eq: () => chain,
+        is: () => chain,
         order: () => chain,
         limit: () => Promise.resolve({ data: [] }),
         then: (r: (v: { data: unknown }) => unknown) =>
@@ -323,7 +325,7 @@ describe("campaign visibility", () => {
     const initial = show();
     initial.unmount();
     from.mockImplementation(() => {
-      const chain = { select: () => chain, eq: () => chain, order: () => chain,
+      const chain = { select: () => chain, eq: () => chain, is: () => chain, order: () => chain,
         limit: () => Promise.resolve({ data: [] }),
         then: (r: (v: unknown) => unknown) => Promise.resolve({ data: null, error: { message } }).then(r) };
       return chain;

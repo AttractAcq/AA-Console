@@ -47,6 +47,7 @@ beforeEach(() => {
       select: () => chain,
       eq: (field: string, value: unknown) => { filters.push([field, value]); return chain; },
       in: (field: string, value: unknown) => { filters.push([field, value]); return chain; },
+      is: (field: string, value: unknown) => { filters.push([field, value]); return chain; },
       order: () => chain,
       single: () => Promise.resolve({ data: { id: "page-1" }, error: null }),
       delete: () => { deleting = true; deletes.push({ table, filters }); return chain; },

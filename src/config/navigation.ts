@@ -231,7 +231,12 @@ export const clientNavGroups: NavNode[] = [
         label: "Archive",
         path: "archive",
         icon: Archive,
-        tabs: [{ id: "content-production", label: "Content Production" }],
+        tabs: [
+          { id: "content-production", label: "Content Production" },
+          { id: "pages", label: "Pages" },
+          { id: "campaigns", label: "Campaigns" },
+          { id: "sales-agents", label: "Sales Agents" },
+        ],
       },
       {
         id: "reporting",

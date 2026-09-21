@@ -111,6 +111,7 @@ function show(agents: unknown[] = [built()], convs: Conv[] = [], jobs: Job[] = [
         return chain;
       },
       eq: () => chain,
+      is: () => chain,
       order: () => chain,
       limit: () => Promise.resolve({ data: data() }),
       update,
