@@ -101,3 +101,37 @@ describe("the frame ask on Approve & Build", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("the shape a story can be", () => {
+  it("offers a story only portrait, because 116 refuses the rest", () => {
+    open("story");
+    chooseAI();
+    expect(screen.getByText("Portrait")).toBeTruthy();
+    expect(screen.queryByText("Landscape")).toBeNull();
+    expect(screen.queryByText("Square")).toBeNull();
+  });
+
+  it("leaves a carousel free to be any of them", () => {
+    open("carousel");
+    chooseAI();
+    for (const shape of ["Portrait", "Square", "Landscape"]) {
+      expect(screen.getByText(shape)).toBeTruthy();
+    }
+  });
+
+  it("leaves a single free to be any of them", () => {
+    open("single");
+    chooseAI();
+    for (const shape of ["Portrait", "Square", "Landscape"]) {
+      expect(screen.getByText(shape)).toBeTruthy();
+    }
+  });
+
+  it("sends portrait for a story", async () => {
+    open("story");
+    chooseAI();
+    fireEvent.click(screen.getByText("Generate"));
+    await waitFor(() => expect(rpc).toHaveBeenCalled());
+    expect((rpc.mock.calls[0][1] as Record<string, unknown>).p_size).toBe("1024x1536");
+  });
+});

@@ -5,6 +5,7 @@ import { ApproveAndBuildModal } from "../../components/briefs/ApproveAndBuildMod
 import { BriefDetailModal } from "../../components/briefs/BriefDetailModal";
 import { MediaDetailModal } from "../../components/MediaDetailModal";
 import { signPaths, type MediaAsset } from "../../lib/media";
+import { formatLabel } from "../../lib/contentFormat";
 
 type Idea = Database["public"]["Tables"]["client_ideas"]["Row"];
 type Brief = Database["public"]["Tables"]["client_briefs"]["Row"];
@@ -181,6 +182,14 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium text-card-foreground">{idea.title}</span>
             <span className="text-xs text-muted-foreground">{idea.media_type}</span>
+            {/* The campaign chose the shape when it planned the piece. Showing
+                the media type alone made a carousel indistinguishable from a
+                single image on the page where you review the plan. */}
+            {idea.content_format && idea.content_format !== "single" && (
+              <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                {formatLabel(idea.content_format)}
+              </span>
+            )}
             <span className="text-xs text-muted-foreground">{idea.source_question}</span>
             <span className="text-xs text-muted-foreground">{idea.status.replace(/_/g, " ")}</span>
           </div>

@@ -17,7 +17,8 @@ import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords } from "../shared.js";
-import { briefSubmitTool, composeBody, composeAvatarBody, composeEditorBody, briefColumns, fieldsFor } from "./fields.js";
+import { briefSubmitTool, composeBody, composeAvatarBody, composeEditorBody, briefColumns, fieldsFor, framePlanColumns } from "./fields.js";
+import { isMultiFrame } from "../../content/format.js";
 import { loadIdentity, identityWriterBlock } from "../identity.js";
 import { loadUsableProof, renderProof, proofIdForRef } from "../proof.js";
 
@@ -105,9 +106,13 @@ export async function runBriefJob(
     (client?.name as string | undefined) ?? "this business",
   );
 
+  // The shape the campaign or the ideation chose for this piece. A carousel
+  // brief is a different brief, not an image brief with a note on it.
+  const contentFormat = idea.content_format ?? "single";
   const submitTool = briefSubmitTool(
     idea.media_type,
     usable.map((p) => p.ref_number ?? "").filter(Boolean),
+    contentFormat,
   );
 
   const system = `You work for Attract Acquisition, a marketing agency. You write production briefs.
@@ -148,7 +153,11 @@ ${proof}
 ${identityWriterBlock(identity)}
 
 THE FIELDS
-${fieldsFor(idea.media_type).map(([name, description]) => `- ${name}: ${description}`).join("\n")}
+${fieldsFor(idea.media_type, contentFormat).map(([name, description]) => `- ${name}: ${description}`).join("\n")}${
+  isMultiFrame(contentFormat)
+    ? `\n- frames: ${submitTool.inputSchema.properties.frames?.description ?? ""}`
+    : ""
+}
 
 Call ${submitTool.name} once when you are done.`;
 
@@ -194,7 +203,15 @@ Call ${submitTool.name} once when you are done.`;
   // Composed from the fields rather than written separately: two outputs would
   // be free to disagree, and the one an editor reads would be the unvalidated
   // one. The markdown is a view of the structure.
-  const body = composeBody(idea.media_type, result.submitted);
+  const frames = framePlanColumns(result.submitted, contentFormat);
+  if (frames.problem) {
+    // Retryable: the plan is the whole difference between a carousel brief
+    // and an image brief. Filing one without it produces exactly the brief
+    // this is here to stop, and nothing downstream would notice.
+    return { ok: false, retryable: true, failureMessage: frames.problem, usage };
+  }
+
+  const body = composeBody(idea.media_type, result.submitted, contentFormat);
   if (body.length < 200) {
     return {
       ok: false,
@@ -211,7 +228,8 @@ Call ${submitTool.name} once when you are done.`;
     body,
     avatar_brief: idea.media_type === "video" ? composeAvatarBody(result.submitted) : null,
     editor_brief: idea.media_type === "video" ? composeEditorBody(result.submitted) : null,
-    ...briefColumns(idea.media_type, result.submitted),
+    ...briefColumns(idea.media_type, result.submitted, contentFormat),
+    ...frames.columns,
     // The record, not just the prose. A brief that names its proof in words
     // cannot later answer "which proof produced revenue"; a foreign key can.
     proof_asset_id: proofIdForRef(usable, result.submitted.proof_ref),
@@ -219,7 +237,7 @@ Call ${submitTool.name} once when you are done.`;
     // Carried from the idea rather than decided here. The campaign chose the
     // shape when it planned the piece; a brief that forgets it produces a
     // single image for something planned as a carousel.
-    content_format: idea.content_format ?? "single",
+    content_format: contentFormat,
     status: "draft",
     job_id: job.id,
   });

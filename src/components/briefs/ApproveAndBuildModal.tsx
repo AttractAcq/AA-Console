@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { Bot, ImagePlus, Users, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
-import { MAX_FRAMES, MIN_FRAMES, formatLabel, isMultiFrame } from "../../lib/contentFormat";
+import { MAX_FRAMES, MIN_FRAMES, STORY_SIZE, formatLabel, isMultiFrame, sizeFitsFormat } from "../../lib/contentFormat";
 import { framePlanLines } from "../../lib/framePlan";
 
 type Brief = {
@@ -72,6 +72,10 @@ export function ApproveAndBuildModal({
   // Only a carousel or a story has frames to ask about. A single brief never
   // sees these fields, and the RPC refuses them if it somehow does.
   const isFramed = isMultiFrame(brief?.content_format);
+  // A story is full-screen vertical. Offering Landscape beside Portrait and
+  // letting the trigger added in 116 refuse it afterwards is a worse way to
+  // say so than not offering it.
+  const shapes = SIZE.filter((s) => sizeFitsFormat(brief?.content_format, s.id));
 
   // Reset every time it opens: a modal that remembers the last brief's
   // choices is how the wrong person gets sent the wrong work.
@@ -79,7 +83,7 @@ export function ApproveAndBuildModal({
     if (!open) return;
     setRoute(isVideo ? "human" : null);
     setQuality("medium");
-    setSize("1024x1536");
+    setSize(STORY_SIZE);
     setPicked(new Set());
     setKinds(isVideo ? new Set(["avatars"]) : new Set());
     setBriefRole(isVideo ? "avatar" : "full");
@@ -164,7 +168,7 @@ export function ApproveAndBuildModal({
         const { error: rpcError } = await supabase.rpc("build_brief_with_ai", {
           p_brief_id: brief.id,
           p_quality: quality,
-          p_size: brief.media_type === "image" ? size : "1024x1536",
+          p_size: brief.media_type === "image" ? size : STORY_SIZE,
           p_reference_path: reference?.path ?? undefined,
           // Omitted rather than sent as null: the generated Args type has
           // these as optional, and null is not the same as absent to it.
@@ -305,7 +309,7 @@ export function ApproveAndBuildModal({
                 <div>
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shape</h3>
                   <div className="grid gap-2 sm:grid-cols-3">
-                    {SIZE.map((s) => (
+                    {shapes.map((s) => (
                       <button
                         key={s.id}
                         type="button"

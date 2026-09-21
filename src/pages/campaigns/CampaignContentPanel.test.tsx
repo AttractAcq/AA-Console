@@ -211,3 +211,28 @@ describe("the content chain, grouped by piece", () => {
     expect(screen.getByRole("button", { name: /Approve & Build/ })).toBeInTheDocument();
   });
 });
+
+// The campaign chose the shape when it planned the piece. Showing the media
+// type alone made a carousel indistinguishable from a single image on the
+// page where you review that plan.
+it("shows the format of a piece planned as a carousel", async () => {
+  ideas = [{ ...idea, content_format: "carousel" }];
+  show();
+  expect(await screen.findByText("WhatsApp photo triage")).toBeInTheDocument();
+  expect(screen.getByText("Carousel")).toBeInTheDocument();
+});
+
+it("shows the format of a piece planned as a story", async () => {
+  ideas = [{ ...idea, content_format: "story" }];
+  show();
+  expect(await screen.findByText("WhatsApp photo triage")).toBeInTheDocument();
+  expect(screen.getByText("Story")).toBeInTheDocument();
+});
+
+// Every piece on file is a single. A badge on all of them is decoration.
+it("adds no badge to a single", async () => {
+  ideas = [{ ...idea, content_format: "single" }];
+  show();
+  expect(await screen.findByText("WhatsApp photo triage")).toBeInTheDocument();
+  expect(screen.queryByText("Single")).not.toBeInTheDocument();
+});

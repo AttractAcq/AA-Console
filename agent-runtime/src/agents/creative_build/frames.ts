@@ -13,10 +13,10 @@
  * recorded". Both are operations that cost money and can fail halfway.
  */
 
-/** Fewer than this is not a carousel, it is two posts. */
-export const MIN_FRAMES = 2;
-/** Meta caps a carousel at ten, and nobody swipes that far anyway. */
-export const MAX_FRAMES = 10;
+// One definition, in the module the brief agent also reads: the count the
+// brief asks for and the count the render builds to must be the same bound.
+export { MIN_FRAMES, MAX_FRAMES } from "../../content/format.js";
+import { MIN_FRAMES, MAX_FRAMES } from "../../content/format.js";
 
 /**
  * A pause between frames.
