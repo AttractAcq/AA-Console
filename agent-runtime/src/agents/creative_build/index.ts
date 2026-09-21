@@ -33,7 +33,6 @@ import {
   MAX_FRAMES,
   MIN_FRAMES,
   framePath,
-  framePlanProblem,
   frameAskInstruction,
   requiredFrameCount,
   NO_FRAME_ASK,
@@ -44,6 +43,14 @@ import {
   type FrameConcept,
 } from "./frames.js";
 import type { FrameAsk } from "./frames.js";
+import {
+  carriedFrameDestination,
+  frameRemakeBrief,
+  frameRemakeFromParams,
+  frameRemakeProblem,
+  framesToCarry,
+  remadeSet,
+} from "./frameRemake.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { placeLogo } from "./logo.js";
@@ -169,6 +176,33 @@ export function framesConceptTool(format: string, ask: FrameAsk = NO_FRAME_ASK) 
         rationale: { type: "string", description: "Why this set and this order. For the operator, not the renderer." },
       },
       required: ["frames", "rationale"],
+      additionalProperties: false,
+    },
+  };
+}
+
+/**
+ * The concept tool for replacing one frame of an existing set.
+ *
+ * One frame, not a set: asking for the whole thing back and using a single
+ * element of it would pay reasoning cost for nine frames nobody asked to
+ * change, and invite the model to quietly rewrite them.
+ *
+ * The shape is the per-frame shape of submit_frames, so the result drops
+ * into the same render path and faces the same conceptProblem check.
+ */
+export function frameRemakeTool(position: number, total: number) {
+  const frameProps = framesConceptTool("carousel").inputSchema.properties.frames.items;
+  return {
+    name: "submit_frame",
+    description: `Submit the replacement for frame ${position} of ${total}. Call once, with that one frame.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        frame: { ...frameProps, description: `The replacement frame. Its position is ${position}.` },
+        rationale: { type: "string", description: "Why this replacement answers what was wrong. For the operator." },
+      },
+      required: ["frame", "rationale"],
       additionalProperties: false,
     },
   };
@@ -340,6 +374,10 @@ export async function runCreativeBuildJob(
   }
   const params = (job.params ?? {}) as Record<string, unknown>;
   const renderId = typeof params.render_id === "string" ? params.render_id : null;
+  // A rebuild of one frame of an existing set, rather than a build of a new
+  // one. It carries the old set's concept, so it has to be detected before
+  // anything decides the concept is already written and re-renders all of it.
+  const remake = frameRemakeFromParams(params);
   if (!renderId) {
     return { ok: false, retryable: false, failureMessage: "No render to produce." };
   }
@@ -373,7 +411,11 @@ export async function runCreativeBuildJob(
 
   // The one difference between a first build and a re-render.
   const existingConcept = generation.concept as Record<string, unknown> | null;
-  const needsConcept = !existingConcept || Object.keys(existingConcept).length === 0;
+  // A frame remake carries the old set's concept so the replacement can be
+  // written against its siblings — but it is context, not the answer. Reusing
+  // it would re-render every frame of a set we are replacing one frame of.
+  const needsConcept =
+    Boolean(remake) || !existingConcept || Object.keys(existingConcept).length === 0;
 
   const { data: brief, error: briefError } = await sb
     .from("client_briefs")
@@ -400,6 +442,23 @@ export async function runCreativeBuildJob(
   // every brief written before 113 is in, and it means what it always meant:
   // the agent decides.
   const frameAsk: FrameAsk = { count: typed.frame_count, plan: typed.frame_plan };
+
+  // The set being rebuilt part of. Loaded before the concept, because the
+  // replacement frame has to be written against the frames it will sit
+  // between — and because a remake naming a frame that does not exist should
+  // fail before anything is paid for.
+  let sourceFrames: { position: number; storage_path: string; caption: string | null }[] = [];
+  if (remake) {
+    const { data: rows, error: framesError } = await sb
+      .from("client_media_frames")
+      .select("position, storage_path, caption")
+      .eq("asset_id", remake.sourceAssetId)
+      .order("position");
+    if (framesError) throw new Error(`Could not load the frames: ${framesError.message}`);
+    sourceFrames = (rows ?? []) as typeof sourceFrames;
+    const problem = frameRemakeProblem(sourceFrames, remake.position);
+    if (problem) return { ok: false, retryable: false, failureMessage: problem };
+  }
   // A recruitment brief used to arrive looking exactly like a client campaign
   // brief, so the agent wrote a good ad for the wrong job.
   const isRecruitment = typed.purpose === "recruitment";
@@ -500,7 +559,9 @@ export async function runCreativeBuildJob(
     .join("\n");
 
   const hasReference = Boolean(renderReference);
-  const submitTool = isFramed
+  const submitTool = remake
+    ? frameRemakeTool(remake.position, sourceFrames.length)
+    : isFramed
     ? framesConceptTool(typed.content_format, frameAsk)
     : isImage
       ? IMAGE_CONCEPT_TOOL
@@ -510,8 +571,10 @@ export async function runCreativeBuildJob(
   // same brief and no account of the rejection writes the same concept.
   const remakeFeedback = String(generation.remake_feedback ?? "").trim();
 
-  const prompt = `Turn this approved brief into ${
-    isFramed
+  const prompt = `${remake ? "REPLACE ONE FRAME" : "Turn this approved brief into"} ${
+    remake
+      ? ""
+      : isFramed
       ? `an ordered set of frames for a ${typed.content_format}`
       : isImage
         ? "a creative concept for a single image"
@@ -523,7 +586,16 @@ ${
     : ""
 }
 
-${remakeBlock(remakeFeedback)}${isRecruitment ? recruitmentBlock(roleLabel) : ""}${isFramed ? `\nTHE SET\n${frameAskInstruction(frameAsk)}\n` : ""}
+${
+  remake
+    ? `\n${frameRemakeBrief(
+        remake.position,
+        sourceFrames.length,
+        normaliseFrames((existingConcept ?? {}).frames),
+        remakeFeedback,
+      )}\n`
+    : ""
+}${remake ? "" : remakeBlock(remakeFeedback)}${isRecruitment ? recruitmentBlock(roleLabel) : ""}${isFramed && !remake ? `\nTHE SET\n${frameAskInstruction(frameAsk)}\n` : ""}
 THE BRIEF
 ${typed.title}
 
@@ -613,7 +685,20 @@ Call ${submitTool.name} once when you are done.`;
   // Checked before anything is rendered or stored: a text card costs the same
   // to make as a picture and is discovered much later, in the approval queue.
   let plannedFrames: FrameConcept[] = [];
-  if (isFramed) {
+  if (remake) {
+    // One frame, held to the same bar a frame in a fresh set is held to: a
+    // replacement that is a text card is the same wrong deliverable, found
+    // at the same point, for the same price.
+    const [replacement] = normaliseFrames([{ ...(concept.frame as object), position: remake.position }]);
+    const problem = replacement
+      ? conceptProblem(replacement as unknown as Record<string, unknown>)
+      : "The model returned no replacement frame.";
+    if (problem) {
+      await fail(problem);
+      return { ok: false, retryable: true, failureMessage: problem, usage };
+    }
+    plannedFrames = [replacement as FrameConcept];
+  } else if (isFramed) {
     plannedFrames = normaliseFrames(concept.frames);
     const problem = framesConceptProblem(plannedFrames, conceptProblem, requiredFrameCount(frameAsk));
     if (problem) {
@@ -686,6 +771,120 @@ Call ${submitTool.name} once when you are done.`;
 
     await markBriefComplete(sb, typed.id);
     await appendEvent(sb, job.id, "Copy written and filed under the client's assets.");
+    return { ok: true, retryable: false, usage };
+  }
+
+  // ---- one frame of an existing set -------------------------------------
+  if (remake) {
+    await sb
+      .from("creative_generations")
+      .update({
+        stage: "render",
+        concept,
+        concept_model: conceptModel,
+        image_model: config.imageModel,
+        cost_usd: usage.costUsd,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", generationId);
+
+    const replacement = plannedFrames[0];
+    if (!replacement) {
+      // Unreachable: the check above returns on an empty set. Narrowing for
+      // the compiler rather than trusting the read.
+      return { ok: false, retryable: false, failureMessage: "No replacement frame to render.", usage };
+    }
+    const total = sourceFrames.length;
+    const pathFor = (position: number, extension: string) =>
+      framePath(String(job.client_id), renderId, position, extension);
+
+    let newPath: string;
+    try {
+      const composed = composePrompt(
+        replacement as unknown as Record<string, unknown>,
+        typed,
+        clientName,
+        identity,
+        brand,
+      );
+      const out = await renderImage(config, framePrompt(replacement, total, composed), {
+        size: renderSize,
+        quality: renderQuality,
+        reference: null,
+      });
+      newPath = pathFor(replacement.position, out.extension);
+      const { error: upErr } = await sb.storage
+        .from(BUCKET)
+        .upload(newPath, out.bytes, { contentType: out.contentType, upsert: true });
+      if (upErr) throw new Error(`Could not store frame ${replacement.position}: ${upErr.message}`);
+      await appendEvent(sb, job.id, `Rebuilt frame ${replacement.position} of ${total}.`);
+
+      // The frames that were fine: copied, not re-rendered. This is the
+      // whole point — one image call instead of ${total}. Copied rather
+      // than referenced where they are, so the new asset does not depend on
+      // files belonging to an older render.
+      for (const frame of framesToCarry(sourceFrames, remake.position)) {
+        const destination = carriedFrameDestination(frame.storage_path, pathFor, frame.position);
+        if (destination === frame.storage_path) continue;
+        const { error: copyErr } = await sb.storage
+          .from(BUCKET)
+          .copy(frame.storage_path, destination);
+        // A retry re-copies what it already copied, so a file that is
+        // already there is the expected case, not a failure.
+        if (copyErr && !/exists/i.test(copyErr.message)) {
+          throw new Error(`Could not carry frame ${frame.position} across: ${copyErr.message}`);
+        }
+      }
+      await appendEvent(sb, job.id, `Carried ${total - 1} frames across unchanged.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await fail(message);
+      return { ok: false, retryable: true, failureMessage: message, usage };
+    }
+
+    const carried = framesToCarry(sourceFrames, remake.position).map((frame) => ({
+      position: frame.position,
+      storage_path: carriedFrameDestination(frame.storage_path, pathFor, frame.position),
+      caption: frame.caption,
+    }));
+    const finished = remadeSet(carried, {
+      position: replacement.position,
+      storage_path: newPath,
+      caption: replacement.headline || replacement.subhead || null,
+    });
+
+    const { data: remadeId, error: saveError } = await sb.rpc("save_framed_asset", {
+      p_client_id: job.client_id,
+      p_brief_id: typed.id,
+      p_format: typed.content_format,
+      p_media_type: "image",
+      p_title: typed.title,
+      p_frames: finished,
+    });
+    if (saveError) throw new Error(`Could not file the rebuilt ${typed.content_format}: ${saveError.message}`);
+
+    await sb
+      .from("creative_renders")
+      .update({
+        status: "done",
+        asset_id: remadeId as string,
+        model: config.imageModel,
+        cost_usd: usage.costUsd + estimateImageCostUsd(renderQuality),
+        error: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", renderId);
+    await sb
+      .from("creative_generations")
+      .update({ stage: "done", asset_id: remadeId as string, cost_usd: usage.costUsd, updated_at: new Date().toISOString() })
+      .eq("id", generationId);
+
+    await markBriefComplete(sb, typed.id);
+    await appendEvent(
+      sb,
+      job.id,
+      `Filed a rebuilt ${typed.content_format}: frame ${remake.position} replaced, ${total - 1} carried over. Awaiting approval.`,
+    );
     return { ok: true, retryable: false, usage };
   }
 

@@ -6,6 +6,7 @@ import { StatusBadge } from "./MediaCard";
 import { supabase } from "../lib/supabase";
 import { cn } from "../lib/cn";
 import { RepurposeModal } from "./RepurposeModal";
+import { FrameStrip } from "./FrameStrip";
 
 type Review = {
   id: string;
@@ -207,6 +208,13 @@ export function MediaDetailModal({
               ) : null,
             )}
           </dl>
+
+          {/* A set is judged on all of its frames. Before this, the modal
+              showed the cover and a count, so frame five was approved
+              sight unseen. */}
+          {asset.content_format && asset.content_format !== "single" && (
+            <FrameStrip assetId={asset.id} onQueued={setNotice} onError={setNotice} />
+          )}
 
           {reviews.length > 0 && (
             <div className="border-t border-border px-5 py-4">
