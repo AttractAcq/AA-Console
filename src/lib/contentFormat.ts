@@ -86,3 +86,17 @@ export const formatFilters: Array<{ id: FormatFilterId; label: string }> = [
   { id: "all", label: "All formats" },
   ...CONTENT_FORMATS.map((f) => ({ id: f.value as FormatFilterId, label: f.label })),
 ];
+
+/** The one shape a story can be. Mirrors size_fits_format() in migration 116. */
+export const STORY_SIZE = "1024x1536";
+
+/**
+ * Whether a render size can carry a format.
+ *
+ * A story is full-screen vertical and has one answer. A carousel is
+ * legitimately square or portrait depending on the channel, so it is left
+ * alone — only the format with a single correct answer is constrained.
+ */
+export function sizeFitsFormat(format: string | null | undefined, size: string): boolean {
+  return format === "story" ? size === STORY_SIZE : true;
+}

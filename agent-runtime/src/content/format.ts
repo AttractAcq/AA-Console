@@ -55,3 +55,38 @@ export function coerceFormat(format: unknown, mediaType: string): ContentFormat 
 export function formatsForMedia(mediaType: string): ContentFormat[] {
   return CONTENT_FORMATS.filter((f) => formatFitsMedia(f, mediaType));
 }
+
+/**
+ * How many frames a set may have.
+ *
+ * Here rather than in creative_build, because two places now need them: the
+ * brief agent, which writes the plan, and the render, which builds to it. A
+ * bound that lives beside only one of them is a bound the other can quietly
+ * disagree with.
+ *
+ * Fewer than two is not a carousel, it is two posts. Meta caps a carousel at
+ * ten, and nobody swipes that far anyway.
+ */
+export const MIN_FRAMES = 2;
+export const MAX_FRAMES = 10;
+
+/**
+ * Why this ordered plan cannot be briefed from, or null if it can.
+ *
+ * Mirrors frame_plan_is_usable() in migration 113, which is the copy that
+ * holds. A blank line is refused rather than dropped here: the model was
+ * asked for N frames and returned one it had nothing to say about, and
+ * silently shrinking the set would hide that.
+ */
+export function framePlanProblem(lines: readonly string[]): string | null {
+  if (lines.length < MIN_FRAMES) {
+    return `A frame set needs at least ${MIN_FRAMES} frames; this plan has ${lines.length}.`;
+  }
+  if (lines.length > MAX_FRAMES) {
+    return `${MAX_FRAMES} frames is the limit; this plan has ${lines.length}.`;
+  }
+
+  const blank = lines.findIndex((line) => line.trim().length === 0);
+  if (blank >= 0) return `Frame ${blank + 1} of the plan says nothing about what that frame is for.`;
+  return null;
+}
