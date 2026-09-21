@@ -83,13 +83,73 @@ export function framesToRender(
 }
 
 /**
+ * What the brief asks of the frame set.
+ *
+ * Both halves are optional and null means the same in each: the agent
+ * decides, which is what it did before these columns existed. `count` is
+ * the common ask — "give me five" — and `plan` is the rarer one, an ordered
+ * line per frame, for a sequence that has to argue in a particular order.
+ */
+export interface FrameAsk {
+  count: number | null;
+  plan: readonly string[] | null;
+}
+
+/** Nothing asked for: the shape a brief written before 113 still has. */
+export const NO_FRAME_ASK: FrameAsk = { count: null, plan: null };
+
+/**
+ * How many frames the brief requires, or null to leave it to the agent.
+ *
+ * A plan's length IS the count — a plan of four lines asking for five
+ * frames is two instructions, and the database refuses that pairing. Where
+ * only one is given, it is the answer.
+ */
+export function requiredFrameCount(ask: FrameAsk): number | null {
+  if (ask.plan && ask.plan.length > 0) return ask.plan.length;
+  return ask.count && ask.count > 0 ? ask.count : null;
+}
+
+/**
+ * What to tell the model about the set it has to return.
+ *
+ * The plan is listed frame by frame rather than summarised, because an
+ * instruction the model cannot follow line by line is one it approximates —
+ * the same failure as the pillar brief that named a wrong pillar without
+ * listing the right ones.
+ */
+export function frameAskInstruction(ask: FrameAsk): string {
+  const required = requiredFrameCount(ask);
+  if (ask.plan && ask.plan.length > 0) {
+    const lines = ask.plan.map((line, i) => `Frame ${i + 1}: ${line}`).join("\n");
+    return `The brief sets the sequence. Return exactly ${ask.plan.length} frames, in this order, each doing the job named for it:\n${lines}`;
+  }
+  if (required !== null) {
+    return `The brief asks for exactly ${required} frames. Return that many, numbered 1 to ${required}.`;
+  }
+  return `Choose how many frames the idea needs, between ${MIN_FRAMES} and ${MAX_FRAMES}.`;
+}
+
+/**
  * Why this frame plan cannot be built, or null if it can.
  *
  * Correctness only. Whether the frames are any good is taste and belongs in
  * the prompt; what is checked here is what would make the set unbuildable —
  * too few, too many, a gap in the order, or a frame with nothing to render.
+ *
+ * `required` is the count the brief asked for. A model that returns four
+ * frames for a five-frame brief has not made a smaller carousel, it has
+ * dropped a beat of an argument somebody wrote down; it is told so and asked
+ * again, which is cheaper than a person noticing after five images are paid
+ * for.
  */
-export function framePlanProblem(frames: readonly FrameConcept[]): string | null {
+export function framePlanProblem(
+  frames: readonly FrameConcept[],
+  required: number | null = null,
+): string | null {
+  if (required !== null && frames.length !== required) {
+    return `The brief asks for ${required} frames; this set has ${frames.length}.`;
+  }
   if (frames.length < MIN_FRAMES) {
     return `A frame set needs at least ${MIN_FRAMES} frames; this one has ${frames.length}.`;
   }
@@ -250,8 +310,9 @@ export function buildRoute(
 export function framesConceptProblem(
   frames: readonly FrameConcept[],
   checkOne: (concept: Record<string, unknown>) => string | null,
+  required: number | null = null,
 ): string | null {
-  const plan = framePlanProblem(frames);
+  const plan = framePlanProblem(frames, required);
   if (plan) return plan;
   for (const frame of frames) {
     const problem = checkOne(frame as unknown as Record<string, unknown>);
