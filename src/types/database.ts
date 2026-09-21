@@ -5638,6 +5638,10 @@ export type Database = {
         }
         Returns: string
       }
+      regenerate_frame: {
+        Args: { p_asset_id: string; p_feedback: string; p_position: number }
+        Returns: string
+      }
       renew_agent_job_lease: {
         Args: {
           p_job_id: string
