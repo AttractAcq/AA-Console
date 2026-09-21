@@ -19,6 +19,7 @@ import { OfferStrategyPanel } from "./strategy/OfferStrategyPanel";
 import { MoneyModelStrategyPanel } from "./strategy/MoneyModelStrategyPanel";
 import { ProofBankPanel } from "./proof-bank/ProofBankPanel";
 import { GenerationPanel } from "./ideation/GenerationPanel";
+import { ContentArchivePanel } from "./archive/ContentArchivePanel";
 import { BriefsPanel } from "./ideation/BriefsPanel";
 import { ImageLibraryPanel } from "./media/ImageLibraryPanel";
 import { StoryLibraryPanel } from "./media/StoryLibraryPanel";
@@ -123,6 +124,9 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   conversion: {
     "primary-landing-pages": () => <PageBuilderPanel pageType="landing" />,
     "secondary-offer-pages": () => <PageBuilderPanel pageType="offer" />,
+  },
+  archive: {
+    "content-production": () => <ContentArchivePanel />,
   },
   reporting: {
     organic: () => <OrganicReportingPanel />,

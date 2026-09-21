@@ -21,7 +21,7 @@ vi.mock("../../lib/useAgentJobs", () => ({ useAgentJobs: () => ({ inFlight: [], 
 import { GenerationPanel } from "./GenerationPanel";
 beforeEach(() => {
   vi.clearAllMocks();
-  const chain = { select: () => chain, eq, update, single, order };
+  const chain = { select: () => chain, eq, update, single, order, is: () => chain };
   from.mockReturnValue(chain); eq.mockReturnValue(chain); update.mockReturnValue(chain);
   single.mockResolvedValue({ data: { id: "draft-1" }, error: null });
   rpc.mockResolvedValue({ error: null });

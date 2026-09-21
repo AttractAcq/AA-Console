@@ -59,6 +59,11 @@ export function BriefsPanel() {
         )
         .eq("client_id", clientId)
         .neq("purpose", "recruitment")
+        // Only briefs still being worked on. One that has produced its asset
+        // is finished, and reads from the archive instead.
+        .is("archived_at", null)
+        // Only briefs still being worked on. One that has produced its asset
+        // is finished, and reads from the archive instead.
         .order("created_at", { ascending: false });
       if (error) throw error;
       setBriefs((data ?? []) as Brief[]);

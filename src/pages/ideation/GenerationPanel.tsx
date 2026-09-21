@@ -75,6 +75,10 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
         .from("client_ideas")
         .select("id, title, media_type, content_format, source, status")
         .eq("client_id", clientId)
+        // An idea whose brief exists is record, not work. It lives in the
+        // archive from that moment; leaving it here is how 300 drafts and 33
+        // finished ideas became one indistinguishable list.
+        .is("archived_at", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
       setIdeas((data ?? []) as Idea[]);
