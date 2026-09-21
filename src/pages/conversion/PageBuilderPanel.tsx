@@ -10,6 +10,7 @@ import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
+import { ArchiveAction } from "../../components/ArchiveAction";
 import { PublishButton } from "../../components/sites/PublishButton";
 import type { SiteRepo } from "../sites/readiness";
 import { PagePreview } from "../../components/pages/PagePreview";
@@ -92,6 +93,8 @@ export function PageBuilderPanel({
           )
           .eq("client_id", clientId)
           .eq("page_type", pageType)
+          // Archived pages are filed, not deleted, and not working pages.
+          .is("archived_at", null)
           .order("created_at", { ascending: false }),
         isRecruitment
           ? Promise.resolve({ data: [], error: null })
@@ -434,6 +437,17 @@ export function PageBuilderPanel({
                     <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     Delete page
                   </button>
+                  {/* Beside Delete on purpose: archiving is the answer almost
+                      every time somebody reaches for Delete on a finished
+                      page, and it keeps the page and its published URL. */}
+                  <ArchiveAction
+                    table="client_pages"
+                    id={p.id}
+                    archived={false}
+                    noun="page"
+                    onDone={() => void refresh()}
+                    onError={setActionError}
+                  />
                 </div>
               </div>
             </Panel>

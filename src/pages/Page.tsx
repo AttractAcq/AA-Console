@@ -20,6 +20,7 @@ import { MoneyModelStrategyPanel } from "./strategy/MoneyModelStrategyPanel";
 import { ProofBankPanel } from "./proof-bank/ProofBankPanel";
 import { GenerationPanel } from "./ideation/GenerationPanel";
 import { ContentArchivePanel } from "./archive/ContentArchivePanel";
+import { ARCHIVE_DOMAINS, SimpleArchivePanel } from "./archive/SimpleArchivePanel";
 import { BriefsPanel } from "./ideation/BriefsPanel";
 import { ImageLibraryPanel } from "./media/ImageLibraryPanel";
 import { StoryLibraryPanel } from "./media/StoryLibraryPanel";
@@ -127,6 +128,9 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   },
   archive: {
     "content-production": () => <ContentArchivePanel />,
+    pages: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.pages!} />,
+    campaigns: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.campaigns!} />,
+    "sales-agents": () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS["sales-agents"]!} />,
   },
   reporting: {
     organic: () => <OrganicReportingPanel />,

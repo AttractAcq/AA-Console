@@ -38,8 +38,13 @@ vi.mock("../../lib/options", async (orig) => ({
 
 vi.mock("../../lib/useAgentJobs", () => ({ useAgentJobs: () => ({ inFlight: [], recentFailures: [] }) }));
 
+vi.mock("../../lib/useAgentJobs", () => ({ useAgentJobs: () => ({ inFlight: [], recentFailures: [] }) }));
+
 const { GenerationPanel } = await import("../ideation/GenerationPanel");
 const { BriefsPanel } = await import("../ideation/BriefsPanel");
+const { PageBuilderPanel } = await import("../conversion/PageBuilderPanel");
+const { CampaignExecutionPanel } = await import("../campaigns/CampaignExecutionPanel");
+const { SalesOverviewPanel } = await import("../sales/SalesOverviewPanel");
 
 const show = (ui: React.ReactNode) =>
   render(
@@ -68,6 +73,30 @@ describe("the active lists exclude archived work", () => {
     await waitFor(() => {
       const briefs = calls.find((c) => c.table === "client_briefs");
       expect(briefs?.filters).toContain("is:archived_at=null");
+    });
+  });
+
+  it("Page Builder asks only for pages that are not archived", async () => {
+    show(<PageBuilderPanel pageType="landing" />);
+    await waitFor(() => {
+      const pages = calls.find((c) => c.table === "client_pages");
+      expect(pages?.filters).toContain("is:archived_at=null");
+    });
+  });
+
+  it("Campaigns asks only for campaigns that are not archived", async () => {
+    show(<CampaignExecutionPanel />);
+    await waitFor(() => {
+      const campaigns = calls.find((c) => c.table === "client_campaigns");
+      expect(campaigns?.filters).toContain("is:archived_at=null");
+    });
+  });
+
+  it("Sales Agents asks only for agents that are not archived", async () => {
+    show(<SalesOverviewPanel />);
+    await waitFor(() => {
+      const agents = calls.find((c) => c.table === "client_sales_agents");
+      expect(agents?.filters).toContain("is:archived_at=null");
     });
   });
 });

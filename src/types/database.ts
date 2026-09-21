@@ -420,6 +420,13 @@ export type Database = {
             foreignKeyName: "campaign_artifacts_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
             referencedRelation: "client_campaigns"
             referencedColumns: ["id"]
           },
@@ -438,6 +445,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "campaign_artifacts_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "campaign_artifacts_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
@@ -449,6 +463,13 @@ export type Database = {
             columns: ["sales_agent_id"]
             isOneToOne: false
             referencedRelation: "client_sales_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_sales_agent_id_fkey"
+            columns: ["sales_agent_id"]
+            isOneToOne: false
+            referencedRelation: "sales_agents_archive"
             referencedColumns: ["id"]
           },
         ]
@@ -470,6 +491,13 @@ export type Database = {
           pillar_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "campaign_content_pillars_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "campaign_content_pillars_campaign_id_fkey"
             columns: ["campaign_id"]
@@ -1232,6 +1260,7 @@ export type Database = {
       client_campaigns: {
         Row: {
           ad_campaign_id: string | null
+          archived_at: string | null
           audience: string | null
           brief: string
           budget: number | null
@@ -1270,6 +1299,7 @@ export type Database = {
         }
         Insert: {
           ad_campaign_id?: string | null
+          archived_at?: string | null
           audience?: string | null
           brief: string
           budget?: number | null
@@ -1308,6 +1338,7 @@ export type Database = {
         }
         Update: {
           ad_campaign_id?: string | null
+          archived_at?: string | null
           audience?: string | null
           brief?: string
           budget?: number | null
@@ -1357,6 +1388,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_feeds_from_campaign_id_fkey"
+            columns: ["feeds_from_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
             referencedColumns: ["id"]
           },
           {
@@ -1594,6 +1632,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_ideas_campaign_client_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
           {
             foreignKeyName: "client_ideas_campaign_client_fkey"
             columns: ["campaign_id", "client_id"]
@@ -1850,6 +1895,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_leads_source_page_id_fkey"
+            columns: ["source_page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "client_leads_source_post_id_fkey"
             columns: ["source_post_id"]
             isOneToOne: false
@@ -1861,6 +1913,13 @@ export type Database = {
             columns: ["source_sales_agent_id"]
             isOneToOne: false
             referencedRelation: "client_sales_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_leads_source_sales_agent_id_fkey"
+            columns: ["source_sales_agent_id"]
+            isOneToOne: false
+            referencedRelation: "sales_agents_archive"
             referencedColumns: ["id"]
           },
         ]
@@ -1920,6 +1979,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_marketing_spend_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
             referencedColumns: ["id"]
           },
           {
@@ -2244,6 +2310,13 @@ export type Database = {
             referencedRelation: "client_pages"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "client_page_findings_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
         ]
       }
       client_page_revisions: {
@@ -2324,10 +2397,18 @@ export type Database = {
             referencedRelation: "client_pages"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "client_page_revisions_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
         ]
       }
       client_pages: {
         Row: {
+          archived_at: string | null
           body: string | null
           brief: string | null
           built_at: string | null
@@ -2355,6 +2436,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           body?: string | null
           brief?: string | null
           built_at?: string | null
@@ -2382,6 +2464,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           body?: string | null
           brief?: string | null
           built_at?: string | null
@@ -2619,10 +2702,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_sales_agent_deployments_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "client_sales_agent_deployments_sales_agent_id_fkey"
             columns: ["sales_agent_id"]
             isOneToOne: false
             referencedRelation: "client_sales_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_sales_agent_deployments_sales_agent_id_fkey"
+            columns: ["sales_agent_id"]
+            isOneToOne: false
+            referencedRelation: "sales_agents_archive"
             referencedColumns: ["id"]
           },
           {
@@ -2638,6 +2735,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          archived_at: string | null
           booking_rule: string | null
           built_at: string | null
           client_id: string
@@ -2660,6 +2758,7 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          archived_at?: string | null
           booking_rule?: string | null
           built_at?: string | null
           client_id: string
@@ -2682,6 +2781,7 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          archived_at?: string | null
           booking_rule?: string | null
           built_at?: string | null
           client_id?: string
@@ -2728,6 +2828,13 @@ export type Database = {
             columns: ["page_id"]
             isOneToOne: false
             referencedRelation: "client_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_sales_agents_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
             referencedColumns: ["id"]
           },
         ]
@@ -3849,10 +3956,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "sales_agent_conversations_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "sales_agent_conversations_sales_agent_id_fkey"
             columns: ["sales_agent_id"]
             isOneToOne: false
             referencedRelation: "client_sales_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_agent_conversations_sales_agent_id_fkey"
+            columns: ["sales_agent_id"]
+            isOneToOne: false
+            referencedRelation: "sales_agents_archive"
             referencedColumns: ["id"]
           },
         ]
@@ -4407,6 +4528,62 @@ export type Database = {
         }
         Relationships: []
       }
+      campaigns_archive: {
+        Row: {
+          archived_at: string | null
+          budget: number | null
+          client_id: string | null
+          created_at: string | null
+          ends_on: string | null
+          id: string | null
+          kind: string | null
+          launched_at: string | null
+          objective: string | null
+          pieces: number | null
+          starts_on: string | null
+          status: string | null
+          title: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          budget?: number | null
+          client_id?: string | null
+          created_at?: string | null
+          ends_on?: string | null
+          id?: string | null
+          kind?: never
+          launched_at?: string | null
+          objective?: string | null
+          pieces?: never
+          starts_on?: string | null
+          status?: string | null
+          title?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          budget?: number | null
+          client_id?: string | null
+          created_at?: string | null
+          ends_on?: string | null
+          id?: string | null
+          kind?: never
+          launched_at?: string | null
+          objective?: string | null
+          pieces?: never
+          starts_on?: string | null
+          status?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_billing_view: {
         Row: {
           client_id: string | null
@@ -4641,6 +4818,103 @@ export type Database = {
           paying_clients: number | null
         }
         Relationships: []
+      }
+      pages_archive: {
+        Row: {
+          archived_at: string | null
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          kind: string | null
+          publish_status: string | null
+          published_url: string | null
+          revisions: number | null
+          status: string | null
+          title: string | null
+          was_published: boolean | null
+        }
+        Insert: {
+          archived_at?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          kind?: never
+          publish_status?: string | null
+          published_url?: string | null
+          revisions?: never
+          status?: never
+          title?: string | null
+          was_published?: never
+        }
+        Update: {
+          archived_at?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          kind?: never
+          publish_status?: string | null
+          published_url?: string | null
+          revisions?: never
+          status?: never
+          title?: string | null
+          was_published?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_pages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_agents_archive: {
+        Row: {
+          approved_at: string | null
+          archived_at: string | null
+          client_id: string | null
+          conversations: number | null
+          created_at: string | null
+          id: string | null
+          kind: string | null
+          purpose: string | null
+          status: string | null
+          title: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          archived_at?: string | null
+          client_id?: string | null
+          conversations?: never
+          created_at?: string | null
+          id?: string | null
+          kind?: never
+          purpose?: string | null
+          status?: string | null
+          title?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          archived_at?: string | null
+          client_id?: string | null
+          conversations?: never
+          created_at?: string | null
+          id?: string | null
+          kind?: never
+          purpose?: string | null
+          status?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_sales_agents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       work_submissions: {
         Row: {
