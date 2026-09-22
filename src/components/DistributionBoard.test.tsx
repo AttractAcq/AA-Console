@@ -36,6 +36,31 @@ function postsReturn(rows: unknown[]) {
   return chain;
 }
 
+/** A row of the distribution_due view, which is a different shape to a post. */
+const dueRow = (over: Record<string, unknown> = {}) => ({
+  schedule_id: "p1",
+  asset_id: "asset-1",
+  ref_number: "AA-014",
+  scheduled_for: "2026-09-09",
+  channel: "organic",
+  platform: "instagram",
+  media_type: "image",
+  asset_title: "Chair shot",
+  state: "overdue",
+  days_late: 13,
+  human_approved: true,
+  ...over,
+});
+
+/**
+ * Answer each table with its own rows. One chain for both made the board's
+ * tests pass by accident: the due view returned posts, which carry no state,
+ * so the banner stayed silent whatever the data said.
+ */
+function byTable(posts: unknown[], due: unknown[] = []) {
+  return (table: string) => postsReturn(table === "distribution_due" ? due : posts);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   useParams.mockReturnValue({ clientId: "client-1" });
@@ -43,7 +68,7 @@ beforeEach(() => {
     { id: "asset-1", ref_number: "AA-014", title: "Chair shot" },
   ]);
   rpc.mockResolvedValue({ error: null });
-  from.mockReturnValue(postsReturn([post()]));
+  from.mockImplementation(byTable([post()]));
 });
 
 async function openScheduler() {
@@ -102,5 +127,39 @@ describe("scheduling", () => {
       p_date: "2026-10-09",
       p_channel: "organic",
     });
+  });
+});
+
+describe("what is late", () => {
+  // The board rendered published_at ? "Published" : "Scheduled", so a post
+  // 13 days past its date still read as Scheduled and nothing said otherwise.
+  it("says how overdue a post is instead of calling it scheduled", async () => {
+    from.mockImplementation(byTable([post()], [dueRow()]));
+    render(<DistributionBoard channel="organic" />);
+    expect(await screen.findByText("Overdue by 13 days")).toBeInTheDocument();
+    expect(screen.queryByText("Scheduled")).not.toBeInTheDocument();
+  });
+
+  it("warns at the top of the board, with the age of the worst one", async () => {
+    from.mockImplementation(byTable([post()], [dueRow()]));
+    render(<DistributionBoard channel="organic" />);
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "1 post overdue, the oldest by 13 days.",
+    );
+  });
+
+  // An orphan can never publish however long anyone waits, so it is not late.
+  it("names a post whose asset was deleted as unpublishable", async () => {
+    from.mockImplementation(byTable([post()], [dueRow({ state: "orphaned", asset_id: null })]));
+    render(<DistributionBoard channel="organic" />);
+    expect(await screen.findByText("No asset — cannot publish")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("can never publish");
+  });
+
+  it("stays quiet when nothing is late", async () => {
+    from.mockImplementation(byTable([post()], [dueRow({ state: "upcoming", days_late: 0 })]));
+    render(<DistributionBoard channel="organic" />);
+    expect(await screen.findByText("Scheduled")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });
