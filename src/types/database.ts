@@ -455,6 +455,13 @@ export type Database = {
             foreignKeyName: "campaign_artifacts_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
+            referencedRelation: "distribution_due"
+            referencedColumns: ["schedule_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
             referencedRelation: "scheduled_posts"
             referencedColumns: ["id"]
           },
@@ -1900,6 +1907,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pages_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_leads_source_post_id_fkey"
+            columns: ["source_post_id"]
+            isOneToOne: false
+            referencedRelation: "distribution_due"
+            referencedColumns: ["schedule_id"]
           },
           {
             foreignKeyName: "client_leads_source_post_id_fkey"
@@ -3778,6 +3792,13 @@ export type Database = {
             foreignKeyName: "metrics_daily_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
+            referencedRelation: "distribution_due"
+            referencedColumns: ["schedule_id"]
+          },
+          {
+            foreignKeyName: "metrics_daily_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
             referencedRelation: "scheduled_posts"
             referencedColumns: ["id"]
           },
@@ -4732,6 +4753,60 @@ export type Database = {
           },
           {
             foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distribution_due: {
+        Row: {
+          asset_id: string | null
+          asset_title: string | null
+          channel: string | null
+          client_id: string | null
+          content_format: string | null
+          days_late: number | null
+          human_approved: boolean | null
+          media_type: string | null
+          platform: string | null
+          ref_number: string | null
+          schedule_id: string | null
+          scheduled_for: string | null
+          state: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"

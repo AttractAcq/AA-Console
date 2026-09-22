@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { attentionLine, fetchDue, stateLabel } from "../lib/distributionDue";
+import type { DueRow } from "../lib/distributionDue";
 import { useParams } from "react-router-dom";
 import { CalendarPlus } from "lucide-react";
 import { Button } from "./Button";
@@ -37,6 +39,7 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
   const [assetOptions, setAssetOptions] = useState<Array<{ value: string; label: string }>>([]);
 
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [due, setDue] = useState<DueRow[]>([]);
 
   const refresh = useCallback(async () => {
     setLoadError(null);
@@ -50,6 +53,11 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
       .order("scheduled_for");
     if (error) throw error;
     setPosts((data ?? []) as Post[]);
+    // The outstanding queue, which is the only thing that knows a post is
+    // late or that its asset has been deleted. scheduled_posts alone cannot
+    // say either, which is why the board called a 13-day-old post
+    // "Scheduled".
+    setDue(await fetchDue(clientId, channel));
     } catch (error) {
       setLoadError("Failed to load schedule: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
     }
@@ -85,6 +93,14 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
     .map((p) => ({ day: Number(p.scheduled_for.slice(8, 10)), refNumber: p.ref_number ?? "—" }));
 
   const shown = posts.filter((p) => p.media_type === activeFilter);
+  // Computed from the queue rather than from the row, because "late" and
+  // "its asset is gone" are facts about the join, not about the post.
+  const attention = useMemo(() => attentionLine(due), [due]);
+  const statusFor = (scheduleId: string): string | null => {
+    const row = due.find((d) => d.schedule_id === scheduleId);
+    return row ? stateLabel(row) : null;
+  };
+
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
 
   const fields: FieldDef[] = [
@@ -119,6 +135,14 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
       <MonthCalendar assets={calendarAssets} />
 
       <div>
+        {attention && (
+          <p
+            role="status"
+            className="mb-4 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          >
+            {attention}
+          </p>
+        )}
         <div className="mb-4">
           <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
         </div>
@@ -130,7 +154,7 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
             p.ref_number ?? "—",
             p.media_type,
             platformLabel(p.platform),
-            p.published_at ? "Published" : "Scheduled",
+            p.published_at ? "Published" : (statusFor(p.id) ?? "Scheduled"),
           ])}
         />
       </div>
