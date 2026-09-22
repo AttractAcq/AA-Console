@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronRight, Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 import { ApproveAndBuildModal } from "../../components/briefs/ApproveAndBuildModal";
@@ -6,12 +7,13 @@ import { BriefDetailModal } from "../../components/briefs/BriefDetailModal";
 import { MediaDetailModal } from "../../components/MediaDetailModal";
 import { signPaths, type MediaAsset } from "../../lib/media";
 import { formatLabel } from "../../lib/contentFormat";
+import { cn } from "../../lib/cn";
 
 type Idea = Database["public"]["Tables"]["client_ideas"]["Row"];
 type Brief = Database["public"]["Tables"]["client_briefs"]["Row"];
 const buttonClass = "rounded-md border border-border px-2.5 py-1 text-xs font-medium text-card-foreground hover:bg-accent disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-type BusyAction = "approve" | "brief" | "plan";
+type BusyAction = "approve" | "brief" | "plan" | "delete";
 
 export function CampaignContentPanel({ clientId, campaignId, contentCount, builtAt, contentIdeasGeneratedAt, onChanged, refreshToken }: {
   clientId: string;
@@ -36,6 +38,10 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Collapsed on load, every time. A campaign with twelve ideas opened a page
+  // of twelve full bodies; nobody scrolls that to find one. Match the empty-Set
+  // pattern CampaignExecutionPanel uses for campaign cards.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
     try {
@@ -94,6 +100,22 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
       inFlight.current = false;
       setBusy(null);
     }
+  }
+
+  /**
+   * Remove one campaign content piece: the idea and the briefs/assets made
+   * from it. Never the parent campaign, and never a sibling idea.
+   */
+  async function deleteIdea(idea: Idea) {
+    const warning =
+      `Delete "${idea.title}"? This also deletes briefs and assets produced ` +
+      `from this idea. The campaign itself stays. It cannot be undone.`;
+    if (!window.confirm(warning)) return;
+    await act(
+      () => supabase.rpc("delete_client_idea", { p_idea_id: idea.id }),
+      "Idea deleted.",
+      { id: idea.id, action: "delete" },
+    );
   }
 
   const briefById = new Map(briefs.map((brief) => [brief.id, brief]));
@@ -178,22 +200,61 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
       {contentCount > 0 && builtAt && ideas.length === 0 && <p className="text-xs text-muted-foreground">No campaign ideas yet.</p>}
       {ideas.map((idea) => {
         const ideaBriefs = briefsByIdea.get(idea.id) ?? [];
+        const detailsOpen = expanded.has(idea.id);
+        const hasDetails = Boolean(idea.body || idea.source_question || idea.strategic_reason);
         return <div key={idea.id} className="space-y-2 rounded-md border border-border p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-card-foreground">{idea.title}</span>
-            <span className="text-xs text-muted-foreground">{idea.media_type}</span>
-            {/* The campaign chose the shape when it planned the piece. Showing
-                the media type alone made a carousel indistinguishable from a
-                single image on the page where you review the plan. */}
-            {idea.content_format && idea.content_format !== "single" && (
-              <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-                {formatLabel(idea.content_format)}
-              </span>
-            )}
-            <span className="text-xs text-muted-foreground">{idea.source_question}</span>
-            <span className="text-xs text-muted-foreground">{idea.status.replace(/_/g, " ")}</span>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <h5 className="min-w-0 flex-1">
+              <button
+                type="button"
+                aria-expanded={detailsOpen}
+                aria-label={`Details for ${idea.title}`}
+                disabled={!hasDetails}
+                onClick={() =>
+                  setExpanded((previous) => {
+                    const next = new Set(previous);
+                    if (next.has(idea.id)) next.delete(idea.id);
+                    else next.add(idea.id);
+                    return next;
+                  })
+                }
+                className="flex w-full items-start gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+              >
+                <ChevronRight
+                  aria-hidden="true"
+                  className={cn(
+                    "mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                    detailsOpen && "rotate-90",
+                    !hasDetails && "opacity-30",
+                  )}
+                />
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-card-foreground">{idea.title}</span>
+                    {/* The campaign chose the shape when it planned the piece. Showing
+                        the media type alone made a carousel indistinguishable from a
+                        single image on the page where you review the plan. */}
+                    {idea.content_format && idea.content_format !== "single" && (
+                      <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                        {formatLabel(idea.content_format)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                    {idea.media_type} · {idea.status.replace(/_/g, " ")}
+                    {hasDetails ? " · Details" : ""}
+                  </span>
+                </span>
+              </button>
+            </h5>
           </div>
-          {idea.body && <p className="text-xs text-muted-foreground">{idea.body}</p>}
+          {detailsOpen && hasDetails && (
+            <div className="space-y-1 border-t border-border pt-2">
+              {idea.source_question && <p className="text-xs text-muted-foreground">{idea.source_question}</p>}
+              {idea.body && <p className="text-xs text-muted-foreground">{idea.body}</p>}
+              {idea.strategic_reason && <p className="text-xs text-muted-foreground">{idea.strategic_reason}</p>}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             {idea.status === "draft" && <>
               <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.from("client_ideas").update({ status: "approved" }).eq("id", idea.id).eq("client_id", clientId).eq("campaign_id", campaignId).eq("status", "draft"), "Idea approved.", { id: idea.id, action: "approve" })}>{busyFor(idea.id, "approve") ? "Approving…" : "Approve"}</button>
@@ -203,6 +264,16 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
             {/* A briefed idea whose brief has not arrived looks identical to one
                 that failed, unless it says which it is. */}
             {idea.status === "briefed" && ideaBriefs.length === 0 && <span className="text-xs text-muted-foreground">Brief being written — this takes a couple of minutes.</span>}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded text-xs text-destructive hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={busy !== null}
+              onClick={() => void deleteIdea(idea)}
+              aria-label={`Delete ${idea.title}`}
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              {busyFor(idea.id, "delete") ? "Deleting…" : "Delete"}
+            </button>
           </div>
 
           {ideaBriefs.map((brief) => {

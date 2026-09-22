@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Plus, Trash2 } from "lucide-react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { FormModal } from "../../components/forms/FormModal";
@@ -290,6 +290,50 @@ export function CampaignExecutionPanel() {
     void refresh();
   };
 
+  /**
+   * Remove a campaign and the content produced for it.
+   *
+   * Pattern A: the RPC deletes owned ideas, content briefs and assets
+   * intentionally, then the campaign. CASCADE also clears artifact and pillar
+   * links. Landing pages and sales agents stay; only their campaign links go.
+   * Confirm copy must name that scope — a silent cascade is how somebody
+   * deletes twelve ideas by accident.
+   */
+  const deleteCampaign = async (campaign: Campaign) => {
+    const warning =
+      `Delete "${campaign.name}"? This also deletes its campaign ideas, ` +
+      `content briefs and generated assets. Landing pages and sales agents ` +
+      `stay, but their link to this campaign is removed. It cannot be undone.`;
+    if (!window.confirm(warning)) return;
+    setBusy(true);
+    setProblem(null);
+    setNotice(null);
+    const { data, error } = await supabase.rpc("delete_client_campaign", {
+      p_campaign_id: campaign.id,
+    });
+    setBusy(false);
+    if (error) {
+      setProblem(error.message);
+      return;
+    }
+    const row = Array.isArray(data) ? data[0] : null;
+    const ideas = row?.deleted_ideas ?? 0;
+    const briefs = row?.deleted_briefs ?? 0;
+    const assets = row?.deleted_assets ?? 0;
+    const parts = [
+      ideas > 0 ? `${ideas} idea${ideas === 1 ? "" : "s"}` : null,
+      briefs > 0 ? `${briefs} brief${briefs === 1 ? "" : "s"}` : null,
+      assets > 0 ? `${assets} asset${assets === 1 ? "" : "s"}` : null,
+    ].filter(Boolean);
+    setNotice(
+      parts.length > 0
+        ? `Deleted "${campaign.name}", along with ${parts.join(", ")}.`
+        : `Deleted "${campaign.name}".`,
+    );
+    if (contentCampaignId === campaign.id) setContentCampaignId(null);
+    void refresh();
+  };
+
   return (
     <div>
       <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
@@ -514,6 +558,16 @@ export function CampaignExecutionPanel() {
                     onDone={() => void refresh()}
                     onError={setProblem}
                   />
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void deleteCampaign(c)}
+                    aria-label={`Delete ${c.name}`}
+                    className="inline-flex items-center gap-1 rounded text-xs text-destructive hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Delete
+                  </button>
                 </div>
                 )}
                 {contentCampaignId === c.id && clientId && <CampaignContentPanel key={`${clientId}:${c.id}`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} onChanged={refresh} refreshToken={campaigns} />}

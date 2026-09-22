@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PenLine, Sparkles, BadgeCheck, Columns3 } from "lucide-react";
+import { PenLine, Sparkles, BadgeCheck, Columns3, Trash2 } from "lucide-react";
 import { ActionCard } from "../../components/ActionCard";
 import { FilterPills } from "../../components/FilterPills";
 import { DataTable } from "../../components/DataTable";
@@ -51,7 +51,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [activeFormat, setActiveFormat] = useState<FormatFilterId>("all");
   const [ideas, setIdeas] = useState<Idea[]>([]);
-  const [busyAction, setBusyAction] = useState<{ ideaId: string; action: "approve" | "brief" | "approve-and-brief" } | null>(null);
+  const [busyAction, setBusyAction] = useState<{ ideaId: string; action: "approve" | "brief" | "approve-and-brief" | "delete" } | null>(null);
   const actionInFlight = useRef(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const proofOptions = useOptions(
@@ -133,6 +133,44 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
     }
   }
 
+  /**
+   * Remove one idea and the briefs/assets produced from it.
+   * Never the parent campaign — delete_client_idea refuses that scope.
+   */
+  async function deleteIdea(idea: Idea) {
+    if (!clientId || actionInFlight.current) return;
+    const warning =
+      `Delete "${idea.title}"? This also deletes briefs and assets produced ` +
+      `from this idea. It cannot be undone.`;
+    if (!window.confirm(warning)) return;
+    actionInFlight.current = true;
+    setBusyAction({ ideaId: idea.id, action: "delete" });
+    setNotice(null);
+    try {
+      const { data, error } = await supabase.rpc("delete_client_idea", { p_idea_id: idea.id });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : null;
+      const briefs = row?.deleted_briefs ?? 0;
+      const assets = row?.deleted_assets ?? 0;
+      const parts = [
+        briefs > 0 ? `${briefs} brief${briefs === 1 ? "" : "s"}` : null,
+        assets > 0 ? `${assets} asset${assets === 1 ? "" : "s"}` : null,
+      ].filter(Boolean);
+      setNotice({
+        kind: "ok",
+        text: parts.length > 0
+          ? `Deleted, along with ${parts.join(" and ")}.`
+          : "Idea deleted.",
+      });
+      await refresh();
+    } catch (error) {
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : (error as { message?: string }).message ?? "Something went wrong." });
+    } finally {
+      actionInFlight.current = false;
+      setBusyAction(null);
+    }
+  }
+
   const pillarFields: FieldDef[] = [
     {
       name: "pillar_id",
@@ -195,7 +233,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
           formatLabel(i.content_format),
           i.source,
           i.status,
-          i.status === "draft" || i.status === "approved" ? (
+          (
             <span key={i.id} className="inline-flex items-center gap-3">
               {i.status === "draft" && (
                 <button
@@ -207,18 +245,28 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
                   {busyAction?.ideaId === i.id && busyAction.action === "approve" ? "Approving…" : "Approve"}
                 </button>
               )}
+              {(i.status === "draft" || i.status === "approved") && (
+                <button
+                  type="button"
+                  disabled={busyAction !== null}
+                  onClick={() => void actOnIdea(i.id, i.status === "draft" ? "approve-and-brief" : "brief")}
+                  className="text-sm text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {busyAction?.ideaId === i.id && (busyAction.action === "brief" || busyAction.action === "approve-and-brief")
+                    ? "Queueing…" : i.status === "draft" ? "Approve & brief" : "Brief"}
+                </button>
+              )}
               <button
                 type="button"
                 disabled={busyAction !== null}
-                onClick={() => void actOnIdea(i.id, i.status === "draft" ? "approve-and-brief" : "brief")}
-                className="text-sm text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => void deleteIdea(i)}
+                aria-label={`Delete ${i.title}`}
+                className="inline-flex items-center gap-1 text-sm text-destructive hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {busyAction?.ideaId === i.id && busyAction.action !== "approve"
-                  ? "Queueing…" : i.status === "draft" ? "Approve & brief" : "Brief"}
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                {busyAction?.ideaId === i.id && busyAction.action === "delete" ? "Deleting…" : "Delete"}
               </button>
             </span>
-          ) : (
-            "—"
           ),
         ])}
       />

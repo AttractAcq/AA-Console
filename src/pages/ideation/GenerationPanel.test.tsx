@@ -57,10 +57,16 @@ it("disables actions while approving and recovers on a stale-row error", async (
   await waitFor(() => expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled());
   expect(screen.queryByText("Idea approved.")).not.toBeInTheDocument();
 });
-it("offers no actions for completed or rejected ideas", async () => {
+it("still offers delete for completed or rejected ideas, but not approve or brief", async () => {
   render(<GenerationPanel />);
   await screen.findByText("briefed idea");
-  expect(screen.getAllByText("—")).toHaveLength(2);
+  // Draft and approved still get approve/brief. Briefed and rejected only get Delete.
+  expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Brief" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Approve & brief" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Delete briefed idea" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Delete rejected idea" })).toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: /^Delete / })).toHaveLength(4);
 });
 
 describe("running ideation inside one pillar", () => {
@@ -87,5 +93,38 @@ describe("running ideation inside one pillar", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Pillar Idea/i }));
     expect(await screen.findByText(/no active content pillars yet/i)).toBeInTheDocument();
     expect(screen.getByText(/Strategy first/i)).toBeInTheDocument();
+  });
+});
+
+describe("deleting an idea", () => {
+  beforeEach(() => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  it("deletes through delete_client_idea after confirm", async () => {
+    rpc.mockResolvedValue({ data: [{ deleted_briefs: 0, deleted_assets: 0 }], error: null });
+    render(<GenerationPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "Delete draft idea" }));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("delete_client_idea", { p_idea_id: "draft-1" }),
+    );
+    expect(await screen.findByText("Idea deleted.")).toBeInTheDocument();
+    // Idea delete must never touch the campaign.
+    expect(rpc).not.toHaveBeenCalledWith("delete_client_campaign", expect.anything());
+  });
+
+  it("asks first, and does nothing if the answer is no", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<GenerationPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "Delete draft idea" }));
+    await waitFor(() => expect(rpc).not.toHaveBeenCalledWith("delete_client_idea", expect.anything()));
+  });
+
+  it("surfaces a permission refusal rather than pretending it worked", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "Only an admin can delete an idea." } });
+    render(<GenerationPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "Delete draft idea" }));
+    expect(await screen.findByText(/Only an admin can delete an idea/i)).toHaveClass("text-destructive");
+    expect(screen.queryByText("Idea deleted.")).not.toBeInTheDocument();
   });
 });

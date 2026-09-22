@@ -236,3 +236,58 @@ it("adds no badge to a single", async () => {
   expect(await screen.findByText("WhatsApp photo triage")).toBeInTheDocument();
   expect(screen.queryByText("Single")).not.toBeInTheDocument();
 });
+
+describe("idea Details default collapsed", () => {
+  it("hides the body until Details is opened", async () => {
+    show();
+    expect(await screen.findByText("WhatsApp photo triage")).toBeInTheDocument();
+    expect(screen.queryByText(/Ask the spouse to send three photos/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Makes the booking step feel small/i)).not.toBeInTheDocument();
+
+    const toggle = screen.getByRole("button", { name: /Details for WhatsApp photo triage/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/Ask the spouse to send three photos/i)).toBeInTheDocument();
+    expect(screen.getByText(/Makes the booking step feel small/i)).toBeInTheDocument();
+  });
+
+  it("still shows production actions and the brief while Details is collapsed", async () => {
+    // Collapsing Details must not hide the work — only the prose.
+    show();
+    expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(screen.getByText("Campaign piece")).toBeInTheDocument();
+  });
+});
+
+describe("deleting a campaign content idea", () => {
+  beforeEach(() => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  it("deletes the idea through delete_client_idea and never the campaign", async () => {
+    rpc.mockResolvedValue({ data: [{ deleted_briefs: 1, deleted_assets: 1 }], error: null });
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Delete WhatsApp photo triage" }));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("delete_client_idea", { p_idea_id: "idea-1" }),
+    );
+    expect(rpc).not.toHaveBeenCalledWith("delete_client_campaign", expect.anything());
+    expect(await screen.findByRole("status")).toHaveTextContent(/Idea deleted/i);
+  });
+
+  it("asks first, and does nothing if the answer is no", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Delete WhatsApp photo triage" }));
+    await waitFor(() => expect(rpc).not.toHaveBeenCalledWith("delete_client_idea", expect.anything()));
+  });
+
+  it("surfaces a permission refusal from the RPC", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "Only an admin can delete an idea." } });
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Delete WhatsApp photo triage" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Only an admin can delete an idea/i);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+});
