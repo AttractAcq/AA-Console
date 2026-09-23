@@ -11,10 +11,12 @@ import { MasterAIChat } from "../../components/masterai/MasterAIChat";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { cn } from "../../lib/cn";
+import { latestByAgent as latestJobByAgent, totalSpend, unresolvedFailures } from "../../lib/jobHistory";
 
 type JobRow = {
   id: string;
   agent_key: string;
+  input_id: string | null;
   status: string;
   attempts: number;
   cost_usd: number | null;
@@ -51,10 +53,30 @@ const RUN_ORDER = [
   "ideation",
 ];
 
+const JOB_COLUMNS = "id, agent_key, input_id, status, attempts, cost_usd, error, created_at, completed_at";
+// PostgREST caps a response at 1000 rows, so the history is read in pages.
+const JOB_PAGE = 1000;
+
+async function loadJobHistory(clientId: string): Promise<JobRow[]> {
+  const all: JobRow[] = [];
+  for (let from = 0; ; from += JOB_PAGE) {
+    const { data, error } = await supabase
+      .from("agent_jobs")
+      .select(JOB_COLUMNS)
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + JOB_PAGE - 1);
+    if (error || !data) break;
+    all.push(...(data as JobRow[]));
+    if (data.length < JOB_PAGE) break;
+  }
+  return all;
+}
+
 export function ClientDashboardPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [jobs, setJobs] = useState<JobRow[]>([]);
-  const [pipelineJobs, setPipelineJobs] = useState<JobRow[]>([]);
   const [counts, setCounts] = useState<Counts>({
     records: 0,
     ideas: 0,
@@ -73,37 +95,15 @@ export function ClientDashboardPanel() {
       return;
     }
     const head = { count: "exact" as const, head: true };
-    const jobColumns = "id, agent_key, status, attempts, cost_usd, error, created_at, completed_at";
-    // Each pipeline card gets its own latest-job lookup: the recent-jobs
-    // window below fills up with creative/brief runs, which would otherwise
-    // push completed strategy agents out and show them as "not run".
-    const pipelinePromise = Promise.all(
-      RUN_ORDER.map((key) =>
-        supabase
-          .from("agent_jobs")
-          .select(jobColumns)
-          .eq("client_id", clientId)
-          .eq("agent_key", key)
-          .order("created_at", { ascending: false })
-          .limit(1),
-      ),
-    );
-    const [jobRes, records, ideas, briefs, media, proof] = await Promise.all([
-      supabase
-        .from("agent_jobs")
-        .select(jobColumns)
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false })
-        .limit(40),
+    const [history, records, ideas, briefs, media, proof] = await Promise.all([
+      loadJobHistory(clientId),
       supabase.from("client_agent_records").select("id", head).eq("client_id", clientId),
       supabase.from("client_ideas").select("id", head).eq("client_id", clientId),
       supabase.from("client_briefs").select("id", head).eq("client_id", clientId),
       supabase.from("client_media_assets").select("id", head).eq("client_id", clientId),
       supabase.from("client_proof_assets").select("id", head).eq("client_id", clientId),
     ]);
-    setJobs((jobRes.data ?? []) as JobRow[]);
-    const pipelineRes = await pipelinePromise;
-    setPipelineJobs(pipelineRes.flatMap((r) => (r.data ?? []) as JobRow[]));
+    setJobs(history);
     setCounts({
       records: records.count ?? 0,
       ideas: ideas.count ?? 0,
@@ -122,13 +122,15 @@ export function ClientDashboardPanel() {
   // soon as a job settles.
   const { inFlight: active, recentFailures } = useAgentJobs(clientId, refresh);
 
-  const spend = jobs.reduce((sum, j) => sum + Number(j.cost_usd ?? 0), 0);
-  const failed = jobs.filter((j) => j.status === "failed");
-
+  // All derived from the client's full job history: a busy client runs
+  // hundreds of creative and brief jobs, and a recent-jobs window would
+  // drop completed strategy agents, undercount spend and keep reporting
+  // failures that a later run already fixed.
+  const spend = totalSpend(jobs);
+  const failed = unresolvedFailures(jobs);
   // Latest job per agent, so the pipeline reads as current state rather
   // than as history.
-  const latestByAgent = new Map<string, JobRow>();
-  for (const job of pipelineJobs) latestByAgent.set(job.agent_key, job);
+  const latestByAgent = latestJobByAgent(jobs);
 
   const stats = [
     { id: "records", label: "Intelligence records", value: counts.records },
