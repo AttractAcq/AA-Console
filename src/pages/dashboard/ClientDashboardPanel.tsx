@@ -54,6 +54,7 @@ const RUN_ORDER = [
 export function ClientDashboardPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [jobs, setJobs] = useState<JobRow[]>([]);
+  const [pipelineJobs, setPipelineJobs] = useState<JobRow[]>([]);
   const [counts, setCounts] = useState<Counts>({
     records: 0,
     ideas: 0,
@@ -72,10 +73,25 @@ export function ClientDashboardPanel() {
       return;
     }
     const head = { count: "exact" as const, head: true };
+    const jobColumns = "id, agent_key, status, attempts, cost_usd, error, created_at, completed_at";
+    // Each pipeline card gets its own latest-job lookup: the recent-jobs
+    // window below fills up with creative/brief runs, which would otherwise
+    // push completed strategy agents out and show them as "not run".
+    const pipelinePromise = Promise.all(
+      RUN_ORDER.map((key) =>
+        supabase
+          .from("agent_jobs")
+          .select(jobColumns)
+          .eq("client_id", clientId)
+          .eq("agent_key", key)
+          .order("created_at", { ascending: false })
+          .limit(1),
+      ),
+    );
     const [jobRes, records, ideas, briefs, media, proof] = await Promise.all([
       supabase
         .from("agent_jobs")
-        .select("id, agent_key, status, attempts, cost_usd, error, created_at, completed_at")
+        .select(jobColumns)
         .eq("client_id", clientId)
         .order("created_at", { ascending: false })
         .limit(40),
@@ -86,6 +102,8 @@ export function ClientDashboardPanel() {
       supabase.from("client_proof_assets").select("id", head).eq("client_id", clientId),
     ]);
     setJobs((jobRes.data ?? []) as JobRow[]);
+    const pipelineRes = await pipelinePromise;
+    setPipelineJobs(pipelineRes.flatMap((r) => (r.data ?? []) as JobRow[]));
     setCounts({
       records: records.count ?? 0,
       ideas: ideas.count ?? 0,
@@ -110,7 +128,7 @@ export function ClientDashboardPanel() {
   // Latest job per agent, so the pipeline reads as current state rather
   // than as history.
   const latestByAgent = new Map<string, JobRow>();
-  for (const job of jobs) if (!latestByAgent.has(job.agent_key)) latestByAgent.set(job.agent_key, job);
+  for (const job of pipelineJobs) latestByAgent.set(job.agent_key, job);
 
   const stats = [
     { id: "records", label: "Intelligence records", value: counts.records },
