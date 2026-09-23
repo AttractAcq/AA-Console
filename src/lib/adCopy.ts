@@ -48,8 +48,41 @@ export function clip(text: string, limit: number): string {
 }
 
 /**
+ * The words a hook puts on the image, if it quotes them.
+ *
+ * Briefs write the hook as art direction — "Full-bleed navy type, nothing
+ * else on the frame: \"IS IT YOUR MARKETING, OR IS IT YOUR OFFER?\"" — so
+ * the hook itself is not copy, but the line it quotes is the ad's headline.
+ * Shouted capitals come back in sentence case, because Meta renders the
+ * headline in its own bold and capitals there read as shouting twice.
+ */
+export function quotedLine(hook: string | null | undefined): string {
+  const match = clean(hook).match(/["“]([^"”]{3,})["”]/);
+  if (!match) return "";
+  const line = match[1]!.trim();
+  if (line !== line.toUpperCase()) return line;
+  // Sentence case, sentence by sentence: "ONE FEE. ONE TOTAL." → "One fee. One total."
+  return line.toLowerCase().replace(/(^|[.!?]\s+)([a-z])/g, (_, lead: string, c: string) => lead + c.toUpperCase());
+}
+
+/**
+ * A brief title with its production label removed. "Kill Switch — Static
+ * Meta Ad (Piece 4 of 12)" is how the team files the piece, not a headline.
+ */
+export function headlineFromTitle(title: string | null | undefined): string {
+  return clean(title)
+    .replace(/\s*\((?:[^)]*\bpiece\b[^)]*)\)\s*$/i, "")
+    .split(/\s+[—–]\s+/)[0]!
+    .trim();
+}
+
+/**
  * A first draft. Every field is a suggestion the form shows, never something
  * written without a person saving it.
+ *
+ * The premise is the body: it is the one field briefs write as a sentence
+ * to the reader. The hook is art direction and the argument is a numbered
+ * plan for the writer, so neither is pasted in whole.
  *
  * The button is the brief's own call to action when it is one this campaign
  * can carry, otherwise the template's most apt one. A brief written before
@@ -62,16 +95,14 @@ export function draftAdCopy(args: {
   allowedCtas: readonly string[];
 }): AdCopy {
   const { brief, landingUrl, allowedCtas } = args;
-  const hook = clean(brief?.hook);
-  const body = clean(brief?.premise) || clean(brief?.argument);
-  const primary = [hook, body].filter(Boolean).join("\n\n");
+  const primary = clean(brief?.premise) || clean(brief?.argument);
 
   const briefCta = clean(brief?.call_to_action).toUpperCase().replace(/\s+/g, "_");
   const cta = allowedCtas.includes(briefCta) ? briefCta : (allowedCtas[0] ?? "");
 
   return {
     ad_primary_text: primary,
-    ad_headline: clip(clean(brief?.title) || hook, HEADLINE_LIMIT),
+    ad_headline: clip(quotedLine(brief?.hook) || headlineFromTitle(brief?.title), HEADLINE_LIMIT),
     ad_description: "",
     ad_link_url: clean(landingUrl),
     ad_cta: cta,

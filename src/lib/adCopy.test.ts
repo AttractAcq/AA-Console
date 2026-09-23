@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { adCopyProblems, clip, draftAdCopy, mergeCopy, toColumns, type AdCopy } from "./adCopy";
+import {
+  adCopyProblems,
+  clip,
+  draftAdCopy,
+  headlineFromTitle,
+  mergeCopy,
+  quotedLine,
+  toColumns,
+  type AdCopy,
+} from "./adCopy";
 
 const brief = {
   title: "Open day at Greenfield: see the classrooms for yourself",
@@ -10,9 +19,9 @@ const brief = {
 };
 
 describe("draftAdCopy", () => {
-  it("drafts from the brief's hook, premise, title and call to action", () => {
+  it("drafts the body from the premise and the headline from the title", () => {
     expect(draftAdCopy({ brief, landingUrl: "https://greenfield.example/open-day", allowedCtas: ["SIGN_UP"] })).toEqual({
-      ad_primary_text: "Most parents choose a school from a brochure.\n\nCome and walk the corridors instead.",
+      ad_primary_text: "Come and walk the corridors instead.",
       ad_headline: "Open day at Greenfield: see the",
       ad_description: "",
       ad_link_url: "https://greenfield.example/open-day",
@@ -26,15 +35,44 @@ describe("draftAdCopy", () => {
     expect(copy.ad_link_url).toBe("");
   });
 
-  it("uses the argument when there is no premise, and the hook when there is no title", () => {
-    const copy = draftAdCopy({ brief: { hook: "Short hook", argument: "The case." }, landingUrl: null, allowedCtas: [] });
-    expect(copy.ad_primary_text).toBe("Short hook\n\nThe case.");
-    expect(copy.ad_headline).toBe("Short hook");
+  it("uses the argument when there is no premise", () => {
+    const copy = draftAdCopy({ brief: { argument: "The case." }, landingUrl: null, allowedCtas: [] });
+    expect(copy.ad_primary_text).toBe("The case.");
     expect(copy.ad_cta).toBe("");
+  });
+
+  /** Taken from a real Attract Acquisition brief, where the hook is art direction. */
+  it("never pastes art direction or a production label into the ad", () => {
+    const copy = draftAdCopy({
+      brief: {
+        title: "Marketing or Offer — static lead ad (Meta, piece 1 of 12)",
+        hook: 'Full-bleed navy-on-white type, nothing else on the frame: "IS IT YOUR MARKETING, OR IS IT YOUR OFFER?"',
+        premise: "You don't have a posting problem.",
+      },
+      landingUrl: null,
+      allowedCtas: [],
+    });
+    expect(copy.ad_primary_text).toBe("You don't have a posting problem.");
+    expect(copy.ad_headline).toBe("Is it your marketing, or is it your");
   });
 
   it("drafts something empty rather than failing when there is no brief", () => {
     expect(draftAdCopy({ brief: null, landingUrl: null, allowedCtas: [] }).ad_primary_text).toBe("");
+  });
+});
+
+describe("quotedLine", () => {
+  it("takes the quoted on-image line and calms shouted capitals", () => {
+    expect(quotedLine('A card that opens: "ONE FEE. ONE TOTAL."')).toBe("One fee. One total.");
+    expect(quotedLine("On-image: “We will tell you not to spend it.”")).toBe("We will tell you not to spend it.");
+    expect(quotedLine("No quote here")).toBe("");
+  });
+});
+
+describe("headlineFromTitle", () => {
+  it("drops the production label", () => {
+    expect(headlineFromTitle("Kill Switch — Static Meta Ad (Piece 4 of 12)")).toBe("Kill Switch");
+    expect(headlineFromTitle("Open day")).toBe("Open day");
   });
 });
 

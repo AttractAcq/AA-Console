@@ -42,9 +42,7 @@ function open(asset = { id: "a1", title: "Hero" }, onSaved = vi.fn()) {
 describe("AdCopyModal", () => {
   it("opens on a draft from the brief and the campaign's page", () => {
     open();
-    expect(screen.getByLabelText(/Primary text/)).toHaveValue(
-      "Most parents choose from a brochure.\n\nWalk the corridors instead.",
-    );
+    expect(screen.getByLabelText(/Primary text/)).toHaveValue("Walk the corridors instead.");
     expect(screen.getByLabelText(/Headline/)).toHaveValue("Open day");
     expect(screen.getByLabelText(/Link/)).toHaveValue("https://school.example/open-day");
     expect(screen.getByLabelText(/Button/)).toHaveValue("SIGN_UP");
@@ -76,7 +74,7 @@ describe("AdCopyModal", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save ad copy" }));
     expect(from).toHaveBeenCalledWith("client_media_assets");
     expect(update).toHaveBeenCalledWith({
-      ad_primary_text: "Most parents choose from a brochure.\n\nWalk the corridors instead.",
+      ad_primary_text: "Walk the corridors instead.",
       ad_headline: "Open day",
       ad_description: null,
       ad_link_url: "https://school.example/open-day",
