@@ -65,7 +65,11 @@ async function loadCredentials(sb: SupabaseClient, clientId: string, surface: Su
     .select("credential_label, ad_account_id, status")
     .eq("client_id", clientId)
     .eq("provider", provider)
-    .eq("status", "active")
+    // The states the scheduler enqueues from (migration 124). Requiring
+    // 'active' alone meant a newly connected integration was queued every
+    // morning and then refused here as "no active integration", because
+    // only a successful ingest ever writes 'active'.
+    .in("status", ["connected", "active"])
     .maybeSingle();
   if (error) throw new Error(`Could not read the integration: ${error.message}`);
   if (!integration) return null;
