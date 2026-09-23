@@ -150,3 +150,38 @@ export async function createAd(
   refusesToSendLive(payload, "an ad");
   return post(account, "ads", payload);
 }
+
+/**
+ * The ad account's currency, read from Meta rather than stored.
+ *
+ * A budget is sent in the account's minor units, so the currency decides
+ * whether R50 goes out as 5000 or 50. A stored copy that drifted from the
+ * account would get that wrong by a factor of a hundred, silently; asking
+ * the account itself cannot.
+ */
+export async function readAccountCurrency(account: AdAccount): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await fetch(
+      `${BASE}/${encodeURIComponent(account.accountId)}?fields=currency`,
+      {
+        headers: { authorization: `Bearer ${account.accessToken}` },
+        signal: controller.signal,
+      },
+    );
+    const body = (await response.json().catch(() => null)) as { currency?: unknown } | null;
+    if (!response.ok) throw classifyWrite(response.status, body);
+    const currency = typeof body?.currency === "string" ? body.currency.trim().toUpperCase() : "";
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      throw new MetaWriteError("Meta did not say which currency this ad account bills in.", false);
+    }
+    return currency;
+  } catch (error) {
+    if (error instanceof MetaWriteError) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new MetaWriteError(`Could not reach the Marketing API: ${message}`, true);
+  } finally {
+    clearTimeout(timer);
+  }
+}

@@ -1,7 +1,14 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createAd, createAdSet, createCampaign, classifyWrite, refusesToSendLive } from "./ads.js";
+import {
+  createAd,
+  createAdSet,
+  createCampaign,
+  classifyWrite,
+  readAccountCurrency,
+  refusesToSendLive,
+} from "./ads.js";
 
 const account = { accessToken: "t", accountId: "act_1" };
 const paused = { name: "x", status: "PAUSED" };
@@ -86,6 +93,32 @@ describe("writing to the account", () => {
     vi.stubGlobal("fetch", fetchMock);
     await expect(createCampaign(account, paused)).rejects.toThrow(/Could not reach/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("readAccountCurrency", () => {
+  it("reads the currency off the ad account with a GET", async () => {
+    const fetchMock = respond({ currency: "zar", id: "act_1" });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(readAccountCurrency(account)).resolves.toBe("ZAR");
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://graph.facebook.com/v21.0/act_1?fields=currency");
+    expect(init.method).toBeUndefined();
+    expect(init.headers.authorization).toBe("Bearer t");
+  });
+
+  it("refuses to guess when Meta names no currency", async () => {
+    vi.stubGlobal("fetch", respond({ id: "act_1" }));
+    await expect(readAccountCurrency(account)).rejects.toThrow(/which currency/);
+  });
+
+  it("classifies a refused read like a refused write", async () => {
+    vi.stubGlobal("fetch", respond({ error: { message: "bad token", code: 190 } }, false, 400));
+    const failure = readAccountCurrency(account);
+    await expect(failure).rejects.toThrow(/ads_management/);
+    await expect(failure).rejects.toMatchObject({ retryable: false });
   });
 });
 

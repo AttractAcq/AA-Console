@@ -5,6 +5,8 @@ import type { Database } from "../../types/database";
 import { ApproveAndBuildModal } from "../../components/briefs/ApproveAndBuildModal";
 import { BriefDetailModal } from "../../components/briefs/BriefDetailModal";
 import { MediaDetailModal } from "../../components/MediaDetailModal";
+import { AdCopyModal, type AdCopyAsset } from "../../components/AdCopyModal";
+import { allowedCtas } from "../../lib/campaignTemplates";
 import { signPaths, type MediaAsset } from "../../lib/media";
 import { formatLabel } from "../../lib/contentFormat";
 import { cn } from "../../lib/cn";
@@ -15,9 +17,20 @@ const buttonClass = "rounded-md border border-border px-2.5 py-1 text-xs font-me
 
 type BusyAction = "approve" | "brief" | "plan" | "delete";
 
-export function CampaignContentPanel({ clientId, campaignId, contentCount, builtAt, contentIdeasGeneratedAt, onChanged, refreshToken }: {
+/** An asset as this panel loads it: select("*") carries the ad columns too. */
+type CampaignAsset = MediaAsset & AdCopyAsset;
+
+/** Any copy at all puts an asset in the build — the same rule the build uses (isAdCandidate). */
+function hasAdCopy(asset: CampaignAsset): boolean {
+  return [asset.ad_primary_text, asset.ad_headline, asset.ad_link_url, asset.ad_cta].some((v) => (v ?? "").trim() !== "");
+}
+
+export function CampaignContentPanel({ clientId, campaignId, contentCount, builtAt, contentIdeasGeneratedAt, template = null, mirrorsTemplate = null, onChanged, refreshToken }: {
   clientId: string;
   campaignId: string;
+  /** The campaign template, which decides which Meta buttons an ad may carry. */
+  template?: string | null;
+  mirrorsTemplate?: string | null;
   contentCount: number;
   builtAt: string | null;
   contentIdeasGeneratedAt: string | null;
@@ -26,7 +39,9 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 }) {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [briefs, setBriefs] = useState<Brief[]>([]);
-  const [assets, setAssets] = useState<MediaAsset[]>([]);
+  const [assets, setAssets] = useState<CampaignAsset[]>([]);
+  const [copying, setCopying] = useState<CampaignAsset | null>(null);
+  const [landingUrl, setLandingUrl] = useState<string | null>(null);
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
   const [building, setBuilding] = useState<Brief | null>(null);
   const [viewing, setViewing] = useState<Brief | null>(null);
@@ -45,9 +60,11 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 
   const refresh = useCallback(async () => {
     try {
-      const [ideaRows, links] = await Promise.all([
+      const [ideaRows, links, pageLinks] = await Promise.all([
         supabase.from("client_ideas").select("*").eq("client_id", clientId).eq("campaign_id", campaignId).order("campaign_position", { ascending: true }),
         supabase.from("campaign_artifacts").select("brief_id, asset_id").eq("client_id", clientId).eq("campaign_id", campaignId).eq("kind", "content"),
+        // Where an ad's link is drafted from: the campaign's own published page.
+        supabase.from("campaign_artifacts").select("client_pages(published_url)").eq("client_id", clientId).eq("campaign_id", campaignId).eq("kind", "landing_page"),
       ]);
       if (ideaRows.error) throw ideaRows.error;
       if (links.error) throw links.error;
@@ -61,7 +78,9 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
       if (briefRows.error) throw briefRows.error;
       if (byBrief.error) throw byBrief.error;
       if (direct.error) throw direct.error;
-      const rows = [...new Map([...(byBrief.data ?? []), ...(direct.data ?? [])].map((asset) => [asset.id, asset])).values()] as MediaAsset[];
+      const rows = [...new Map([...(byBrief.data ?? []), ...(direct.data ?? [])].map((asset) => [asset.id, asset])).values()] as CampaignAsset[];
+      const pages = (pageLinks.data ?? []) as { client_pages: { published_url: string | null } | null }[];
+      setLandingUrl(pages.map((p) => p.client_pages?.published_url).find((u) => u) ?? null);
       setIdeas((ideaRows.data ?? []) as Idea[]);
       setBriefs(briefRows.data ?? []);
       setAssets(rows);
@@ -163,7 +182,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
    * new type on every render, so React unmounts and remounts its subtree each
    * time — which throws away focus and any in-flight interaction.
    */
-  const assetRow = (asset: MediaAsset) => (
+  const assetRow = (asset: CampaignAsset) => (
     <div key={asset.id} className="flex flex-wrap items-center gap-2">
       <button type="button" className="text-sm text-brand-strong hover:underline" onClick={() => setPreview(asset)}>
         Preview {asset.title ?? "asset"}
@@ -171,6 +190,16 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
       <span className="text-xs text-muted-foreground">
         {asset.review_status === "approved" ? "Ready to distribute" : asset.review_status === "pending" ? "Awaiting approval" : "Rejected"}
       </span>
+      {/* Only an approved single image can be built as a Meta ad. Copy on
+          it is what puts it into the campaign's next build. */}
+      {asset.review_status === "approved" && asset.media_type === "image" && asset.content_format !== "carousel" && <>
+        <span className="text-xs text-muted-foreground">
+          {asset.meta_ad_id ? "· Built in Meta" : hasAdCopy(asset) ? "· Has ad copy" : "· No ad copy"}
+        </span>
+        <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => setCopying(asset)}>
+          {hasAdCopy(asset) ? "Edit ad copy" : "Write ad copy"}
+        </button>
+      </>}
       {asset.review_status === "pending" && <>
         <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("review_media_asset", { p_asset_id: asset.id, p_decision: "approved" }), "Asset approved. Ready to distribute.", { id: asset.id, action: "approve" })}>Approve asset</button>
         <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => { setRejecting(asset); setReason(""); }}>Reject asset</button>
@@ -314,6 +343,15 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
     </div>}
     <BriefDetailModal brief={viewing} open={viewing !== null} onClose={() => setViewing(null)} />
     <ApproveAndBuildModal brief={building} open={building !== null} onClose={() => setBuilding(null)} onDone={() => { void refresh(); onChanged(); setNotice("Production queued. Assets will appear here for approval."); }} />
+    <AdCopyModal
+      asset={copying}
+      brief={copying?.brief_id ? briefById.get(copying.brief_id) ?? null : null}
+      landingUrl={landingUrl}
+      allowedCtas={allowedCtas(template, mirrorsTemplate)}
+      open={copying !== null}
+      onClose={() => setCopying(null)}
+      onSaved={() => { setNotice("Ad copy saved. This asset is in the next Meta build."); void refresh(); }}
+    />
     <MediaDetailModal asset={preview} url={preview ? urls.get(preview.storage_path) : undefined} open={preview !== null} onClose={() => setPreview(null)} />
   </section>;
 }
