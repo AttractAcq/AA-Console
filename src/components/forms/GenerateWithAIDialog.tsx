@@ -17,6 +17,9 @@ import { callRuntime } from "../../lib/callRuntime";
  *   the operator knows things about a role that are written down nowhere. A
  *   campaign does not: the business's own strategy is already on file, so a
  *   blank box should still produce a real proposal.
+ * @param maxNotesLength Longest the box accepts, or `null` for no limit. A
+ *   campaign's steer can be a whole pasted strategy, so it passes `null`; the
+ *   endpoints that still cap their notes keep the 4000 default to match.
  */
 export function GenerateWithAIDialog<T>({
   open,
@@ -27,6 +30,7 @@ export function GenerateWithAIDialog<T>({
   endpoint,
   payload,
   requireNotes = true,
+  maxNotesLength = 4000,
   footnote,
   extra,
   onClose,
@@ -41,6 +45,7 @@ export function GenerateWithAIDialog<T>({
   /** Sent alongside `notes` — the client, the role, whatever identifies the subject. */
   payload: Record<string, unknown>;
   requireNotes?: boolean;
+  maxNotesLength?: number | null;
   footnote?: string;
   /** Rendered above the notes box — a choice the generator needs first. */
   extra?: ReactNode;
@@ -105,7 +110,7 @@ export function GenerateWithAIDialog<T>({
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={6}
-          maxLength={4000}
+          maxLength={maxNotesLength ?? undefined}
           disabled={busy}
           placeholder={placeholder}
           className="mt-2 w-full rounded-md border border-input bg-background p-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
