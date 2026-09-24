@@ -690,6 +690,7 @@ export function CampaignExecutionPanel() {
           endpoint="/admin/campaigns/draft"
           payload={{ clientId, template: proposeTemplate }}
           requireNotes={false}
+          maxNotesLength={null}
           extra={
             <div>
               <label

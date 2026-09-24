@@ -23,7 +23,11 @@ import type { BusinessContext } from "../agents/shared.js";
 import { campaignDraftProblem, normaliseCampaignDraft } from "./draft.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MAX_NOTES = 4000;
+// The steer is not truncated: an operator may paste a whole strategy and every
+// word of it is meant to be read. This only bounds the request body so an
+// admin endpoint cannot be made to buffer without end; 1 MB is far past any
+// steer a person writes, and well inside what the model will take.
+const MAX_BODY_BYTES = 1_000_000;
 
 const SUBMIT_TOOL = {
   name: "submit_campaign_proposal",
@@ -87,7 +91,7 @@ export async function handleCampaignDraft(
 
   let body: Record<string, unknown>;
   try {
-    body = await readJsonBody(req, 8192);
+    body = await readJsonBody(req, MAX_BODY_BYTES, 30_000);
   } catch {
     json(400, { ok: false, error: "That request could not be read." });
     return;
@@ -100,7 +104,7 @@ export async function handleCampaignDraft(
   }
   // Optional, unlike a hiring brief: the business's own strategy is already on
   // file, so a blank box should still produce a real proposal.
-  const notes = String(body.notes ?? "").trim().slice(0, MAX_NOTES);
+  const notes = String(body.notes ?? "").trim();
   // The operator may have picked a template. It fixes the objective, the
   // audience it aims at and what has to be built, so the proposal is written
   // for that shape rather than for a shape the model chooses and the form
