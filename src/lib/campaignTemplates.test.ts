@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   CAMPAIGN_TEMPLATES,
+  TEMPLATE_CTAS,
+  allowedCtas,
   NO_TEMPLATE,
   derivedNeeds,
   templateColumns,
@@ -96,5 +98,20 @@ describe("the line under the picker", () => {
     const summary = templateSummary(templateFor("P2")!);
     expect(summary).not.toContain("Needs");
     expect(summary).toMatch(/Moves people Stranger → Identified\.$/);
+  });
+});
+
+describe("TEMPLATE_CTAS", () => {
+  it("matches the buttons the Meta build checks against", async () => {
+    const runtime = await import("../../agent-runtime/src/campaigns/templates");
+    const fromRuntime = Object.fromEntries(runtime.CAMPAIGN_TEMPLATES.map((t) => [t.code, [...t.ctas]]));
+    expect(TEMPLATE_CTAS).toEqual(fromRuntime);
+  });
+
+  it("takes a mirroring template's buttons from the one it mirrors", () => {
+    expect(allowedCtas("X2", "R1")).toEqual(["BOOK_NOW", "SHOP_NOW", "LEARN_MORE"]);
+    expect(allowedCtas("X2", null)).toEqual([]);
+    expect(allowedCtas("O2")).toEqual(["SIGN_UP"]);
+    expect(allowedCtas(null)).toEqual([]);
   });
 });

@@ -1276,8 +1276,10 @@ export type Database = {
           client_id: string
           content_count: number
           content_ideas_generated_at: string | null
+          conversion_event: string | null
           core_message: string | null
           created_at: string
+          daily_budget: number | null
           ends_on: string | null
           entry_state: Database["public"]["Enums"]["audience_state"] | null
           exit_state: Database["public"]["Enums"]["audience_state"] | null
@@ -1301,6 +1303,7 @@ export type Database = {
           optimisation_event: string | null
           starts_on: string | null
           status: string
+          target_countries: string[]
           template: Database["public"]["Enums"]["campaign_template"] | null
           updated_at: string
         }
@@ -1315,8 +1318,10 @@ export type Database = {
           client_id: string
           content_count?: number
           content_ideas_generated_at?: string | null
+          conversion_event?: string | null
           core_message?: string | null
           created_at?: string
+          daily_budget?: number | null
           ends_on?: string | null
           entry_state?: Database["public"]["Enums"]["audience_state"] | null
           exit_state?: Database["public"]["Enums"]["audience_state"] | null
@@ -1340,6 +1345,7 @@ export type Database = {
           optimisation_event?: string | null
           starts_on?: string | null
           status?: string
+          target_countries?: string[]
           template?: Database["public"]["Enums"]["campaign_template"] | null
           updated_at?: string
         }
@@ -1354,8 +1360,10 @@ export type Database = {
           client_id?: string
           content_count?: number
           content_ideas_generated_at?: string | null
+          conversion_event?: string | null
           core_message?: string | null
           created_at?: string
+          daily_budget?: number | null
           ends_on?: string | null
           entry_state?: Database["public"]["Enums"]["audience_state"] | null
           exit_state?: Database["public"]["Enums"]["audience_state"] | null
@@ -1379,6 +1387,7 @@ export type Database = {
           optimisation_event?: string | null
           starts_on?: string | null
           status?: string
+          target_countries?: string[]
           template?: Database["public"]["Enums"]["campaign_template"] | null
           updated_at?: string
         }
@@ -1701,6 +1710,8 @@ export type Database = {
           id: string
           ingest_enabled: boolean
           last_checked_at: string | null
+          meta_page_id: string | null
+          meta_pixel_id: string | null
           provider: string
           status: string
           updated_at: string
@@ -1715,6 +1726,8 @@ export type Database = {
           id?: string
           ingest_enabled?: boolean
           last_checked_at?: string | null
+          meta_page_id?: string | null
+          meta_pixel_id?: string | null
           provider: string
           status?: string
           updated_at?: string
@@ -1729,6 +1742,8 @@ export type Database = {
           id?: string
           ingest_enabled?: boolean
           last_checked_at?: string | null
+          meta_page_id?: string | null
+          meta_pixel_id?: string | null
           provider?: string
           status?: string
           updated_at?: string
@@ -6123,6 +6138,7 @@ export type Database = {
         Args: { p_generation_id: string; p_quality?: string; p_size?: string }
         Returns: string
       }
+      request_meta_build: { Args: { p_campaign_id: string }; Returns: string }
       resolve_sales_deployment: {
         Args: { p_public_id: string }
         Returns: {

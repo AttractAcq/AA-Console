@@ -33,6 +33,7 @@ import { runSalesAgentJob } from "../agents/sales_agent/index.js";
 import { runCampaignPlanJob } from "../agents/campaign_plan/index.js";
 import { runPageAuditJob } from "../agents/page_audit/index.js";
 import { runPageReviseJob } from "../agents/page_revise/index.js";
+import { runMetaBuildJob } from "../agents/meta_build/index.js";
 
 export interface JobResult {
   ok: boolean;
@@ -84,6 +85,9 @@ const RUNNERS: Record<string, JobRunner> = {
   // A brief becomes an asset, or a brief reaches a person.
   creative_build: runCreativeBuildJob,
   brief_dispatch: runBriefDispatchJob,
+  // Approved assets become a paused Meta campaign. No model; launching stays
+  // a person in Ads Manager.
+  meta_build: runMetaBuildJob,
   // outcome until that product decision is made.
 };
 

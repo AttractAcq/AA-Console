@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
@@ -18,7 +18,40 @@ type Integration = {
   status: string;
   ingest_enabled: boolean;
   last_checked_at: string | null;
+  ad_account_id: string | null;
+  meta_page_id: string | null;
+  meta_pixel_id: string | null;
 };
+
+/**
+ * What building ads needs from the Meta account beyond the token. The page
+ * every ad runs from, and the pixel conversion goals count against. The
+ * currency is deliberately not asked for: the build reads it from Meta.
+ */
+const META_AD_FIELDS: FieldDef[] = [
+  {
+    name: "meta_page_id",
+    label: "Facebook page ID",
+    kind: "text",
+    required: true,
+    placeholder: "104123456789012",
+    hint: "The page ads run from. In Meta Business Suite: Settings → Business assets → Pages.",
+  },
+  {
+    name: "meta_pixel_id",
+    label: "Pixel ID (optional)",
+    kind: "text",
+    placeholder: "123456789012345",
+    hint: "Needed only for templates that optimise for conversions or landing page views.",
+  },
+];
+
+function numericId(value: unknown, label: string): string | null {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return null;
+  if (!/^[0-9]+$/.test(text)) throw new Error(`${label} should be digits only.`);
+  return text;
+}
 
 /**
  * Which providers the daily metrics pull knows how to read, and what it
@@ -64,6 +97,7 @@ const FIELDS: FieldDef[] = [
 
 export function IntegrationsPanel() {
   const [addOpen, setAddOpen] = useState(false);
+  const [adSettings, setAdSettings] = useState<Integration | null>(null);
   const { clientId } = useParams<{ clientId: string }>();
   const [rows, setRows] = useState<Integration[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
@@ -76,7 +110,7 @@ export function IntegrationsPanel() {
     try {
       const { data, error } = await supabase
         .from("client_integrations")
-        .select("id, provider, credential_label, access_level, status, ingest_enabled, last_checked_at")
+        .select("id, provider, credential_label, access_level, status, ingest_enabled, last_checked_at, ad_account_id, meta_page_id, meta_pixel_id")
         .eq("client_id", clientId)
         .order("provider");
       if (error) throw error;
@@ -89,6 +123,11 @@ export function IntegrationsPanel() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const adSettingsValues = useMemo(
+    () => ({ meta_page_id: adSettings?.meta_page_id ?? "", meta_pixel_id: adSettings?.meta_pixel_id ?? "" }),
+    [adSettings],
+  );
 
   /**
    * Turns the scheduled pull on or off for one integration. This gates the
@@ -155,7 +194,7 @@ export function IntegrationsPanel() {
       )}
 
       <DataTable
-        columns={["Integration", "Credential", "Access Level", "Status", "Daily sync"]}
+        columns={["Integration", "Credential", "Access Level", "Status", "Daily sync", "Ads"]}
         emptyLabel="No integrations connected yet"
         rows={rows.map((r) => [
           <span key="p" className="capitalize">{r.provider}</span>,
@@ -206,6 +245,18 @@ export function IntegrationsPanel() {
               Not synced
             </span>
           ),
+          r.provider === "meta" ? (
+            <button
+              key="a"
+              type="button"
+              onClick={() => setAdSettings(r)}
+              className="text-xs text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {r.meta_page_id ? `Page ${r.meta_page_id}` : "Add page for ads"}
+            </button>
+          ) : (
+            <span key="a" className="text-xs text-muted-foreground">—</span>
+          ),
         ])}
       />
 
@@ -216,6 +267,27 @@ export function IntegrationsPanel() {
           run a pull by hand.
         </p>
       )}
+
+      <FormModal
+        open={adSettings !== null}
+        onClose={() => setAdSettings(null)}
+        title="Meta ad settings"
+        intro="What building ads in Meta needs beyond the credential. Ads are always built paused; launching happens in Ads Manager."
+        fields={META_AD_FIELDS}
+        initialValues={adSettingsValues}
+        submitLabel="Save"
+        onSubmit={async (v) => {
+          if (!adSettings) throw new Error("No integration selected.");
+          const pageId = numericId(v.meta_page_id, "The page ID");
+          if (!pageId) throw new Error("The page ID is required.");
+          const { error } = await supabase
+            .from("client_integrations")
+            .update({ meta_page_id: pageId, meta_pixel_id: numericId(v.meta_pixel_id, "The pixel ID") })
+            .eq("id", adSettings.id);
+          if (error) throw new Error(error.message);
+        }}
+        onSaved={refresh}
+      />
 
       <FormModal
         open={addOpen}

@@ -127,3 +127,42 @@ export function templateSummary(template: CampaignTemplateSummary): string {
     .filter(Boolean)
     .join(" ");
 }
+
+/**
+ * The Meta buttons each template's destination can serve, most apt first.
+ *
+ * Kept in step with `ctas` in agent-runtime/src/campaigns/templates.ts,
+ * which is what the Meta build checks against; campaignTemplates.test.ts
+ * fails if the two drift. Empty means the template runs without a button.
+ * X1 and X2 take their buttons from the template they mirror.
+ */
+export const TEMPLATE_CTAS: Readonly<Record<string, readonly string[]>> = {
+  P1: ["LEARN_MORE"],
+  P2: ["SIGN_UP", "BOOK_NOW", "GET_QUOTE"],
+  P3: ["SEND_MESSAGE"],
+  P4: [],
+  P5: ["DOWNLOAD", "SIGN_UP"],
+  R1: ["BOOK_NOW", "SHOP_NOW", "LEARN_MORE"],
+  R2: ["BOOK_NOW", "LEARN_MORE"],
+  R3: ["BOOK_NOW"],
+  R4: [],
+  C1: ["SHOP_NOW", "BOOK_NOW"],
+  C2: ["GET_OFFER", "BOOK_NOW"],
+  C3: ["LEARN_MORE"],
+  O1: ["GET_OFFER", "SHOP_NOW"],
+  O2: ["SIGN_UP"],
+  X1: [],
+  X2: [],
+};
+
+// One shared empty list, so a campaign with no template hands the ad copy
+// form the same array every render instead of resetting it.
+const NO_CTAS: readonly string[] = Object.freeze([]);
+
+/** The buttons an ad in this campaign may carry. Stable references, safe as a hook dependency. */
+export function allowedCtas(template: string | null | undefined, mirrorsTemplate?: string | null): readonly string[] {
+  const code = (template ?? "").trim();
+  const t = templateFor(code);
+  if (t && t.optimisation === null) return TEMPLATE_CTAS[(mirrorsTemplate ?? "").trim()] ?? NO_CTAS;
+  return TEMPLATE_CTAS[code] ?? NO_CTAS;
+}

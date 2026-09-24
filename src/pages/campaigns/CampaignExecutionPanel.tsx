@@ -18,6 +18,7 @@ import {
   templateSummary,
 } from "../../lib/campaignTemplates";
 import { CampaignContentPanel } from "./CampaignContentPanel";
+import { MetaBuildSection } from "./MetaBuildSection";
 import { ArchiveAction } from "../../components/ArchiveAction";
 import { cn } from "../../lib/cn";
 
@@ -43,6 +44,13 @@ type Campaign = {
   content_ideas_generated_at: string | null;
   launched_at: string | null;
   created_at: string;
+  template: string | null;
+  mirrors_template: string | null;
+  daily_budget: number | null;
+  target_countries: string[] | null;
+  conversion_event: string | null;
+  meta_campaign_id: string | null;
+  meta_built_at: string | null;
 };
 
 export type Requirement = {
@@ -125,7 +133,7 @@ export function CampaignExecutionPanel() {
       const { data, error } = await supabase
         .from("client_campaigns")
         .select(
-          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, launched_at, created_at",
+          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_built_at",
         )
         .eq("client_id", clientId)
         // A campaign somebody archived is over. It reads from the archive.
@@ -493,6 +501,15 @@ export function CampaignExecutionPanel() {
                 </div>
                 )}
 
+                {expanded.has(c.id) && clientId && (
+                  <MetaBuildSection
+                    clientId={clientId}
+                    campaign={c}
+                    building={inFlight.some((j) => j.agent_key === "meta_build" && j.input_id === c.id)}
+                    onChanged={() => void refresh()}
+                  />
+                )}
+
                 {expanded.has(c.id) && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
                   {!c.built_at && (
@@ -570,7 +587,7 @@ export function CampaignExecutionPanel() {
                   </button>
                 </div>
                 )}
-                {contentCampaignId === c.id && clientId && <CampaignContentPanel key={`${clientId}:${c.id}`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} onChanged={refresh} refreshToken={campaigns} />}
+                {contentCampaignId === c.id && clientId && <CampaignContentPanel key={`${clientId}:${c.id}`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} template={c.template} mirrorsTemplate={c.mirrors_template} onChanged={refresh} refreshToken={campaigns} />}
               </div>
             );
           })}
