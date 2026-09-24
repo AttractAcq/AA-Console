@@ -80,6 +80,7 @@ declare
   v_ext text;
   v_path text;
   v_result jsonb;
+  v_in_scope boolean;
 begin
   perform mcp_internal.require_active_bot(p_bot_id);
   if p_bot_id not in ('bot_production', 'bot_chief_of_staff') then
@@ -103,6 +104,34 @@ begin
     raise exception using message = 'brief_not_found', errcode = 'P0001';
   end if;
   if v_brief.client_id <> p_client_id then
+    raise exception using message = 'client_mismatch', errcode = 'P0001';
+  end if;
+  -- CLEAR B: the brief's client is e4b4b001-81f6-4997-8429-ff21f4ee1fbe,
+  -- or its idea is on campaign 457e0ca8-8af6-4ead-a39d-d5326c729882.
+  -- campaign_id lives on client_ideas (not client_briefs). The column is
+  -- optional in partial fixtures, so the campaign arm is dynamic.
+  v_in_scope := v_brief.client_id = 'e4b4b001-81f6-4997-8429-ff21f4ee1fbe'::uuid;
+  if not v_in_scope and exists (
+    select 1
+      from pg_attribute a
+      join pg_class c on c.oid = a.attrelid
+      join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public'
+       and c.relname = 'client_ideas'
+       and a.attname = 'campaign_id'
+       and a.attnum > 0
+       and not a.attisdropped
+  ) then
+    execute $sql$
+      select exists (
+        select 1 from public.client_ideas i
+         where i.id = $1
+           and i.client_id = $2
+           and i.campaign_id = '457e0ca8-8af6-4ead-a39d-d5326c729882'::uuid
+      )
+    $sql$ into v_in_scope using v_brief.source_idea_id, v_brief.client_id;
+  end if;
+  if not coalesce(v_in_scope, false) then
     raise exception using message = 'client_mismatch', errcode = 'P0001';
   end if;
   -- draft covers campaign packs that have not been assigned yet (Harbour

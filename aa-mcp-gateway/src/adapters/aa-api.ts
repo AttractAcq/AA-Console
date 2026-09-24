@@ -306,13 +306,21 @@ ROUTES["content.submit_asset"] = {
       client_id: uuid,
       storage_path: z.string().trim().min(1).max(500).optional(),
       pending_asset_id: uuid.optional(),
+      asset_id: uuid.optional(),
       media_type: z.enum(["image", "video", "text"]),
       brief_id: uuid.optional(),
       assignment_id: uuid.optional(),
       title: z.string().trim().min(1).max(200).optional(),
     })
     .strip()
-    .refine((value) => Boolean(value.storage_path || value.pending_asset_id)),
+    .refine(
+      (value) =>
+        !(
+          value.pending_asset_id &&
+          value.asset_id &&
+          value.pending_asset_id !== value.asset_id
+        ) && Boolean(value.storage_path || value.pending_asset_id || value.asset_id),
+    ),
 };
 
 for (const tool of registry.filter(
@@ -561,7 +569,8 @@ function aaBody(
       media_type: input.media_type,
     };
     if (input.storage_path !== undefined) body.storage_path = input.storage_path;
-    if (input.pending_asset_id !== undefined) body.pending_asset_id = input.pending_asset_id;
+    const pendingAssetId = input.pending_asset_id ?? input.asset_id;
+    if (pendingAssetId !== undefined) body.pending_asset_id = pendingAssetId;
     if (input.brief_id !== undefined) body.brief_id = input.brief_id;
     if (input.assignment_id !== undefined) body.assignment_id = input.assignment_id;
     if (input.title !== undefined) body.title = input.title;

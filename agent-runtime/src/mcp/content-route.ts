@@ -312,25 +312,29 @@ const ROUTES: Record<string, Route> = {
       const client_id = uuid(body, 'client_id');
       const storage_path = body.storage_path === undefined ? undefined : str(body, 'storage_path');
       const pending_asset_id = body.pending_asset_id === undefined ? undefined : uuid(body, 'pending_asset_id');
+      const asset_id = body.asset_id === undefined ? undefined : uuid(body, 'asset_id');
       const media_type = str(body, 'media_type');
       const brief_id = body.brief_id === undefined ? undefined : uuid(body, 'brief_id');
       const assignment_id = body.assignment_id === undefined ? undefined : uuid(body, 'assignment_id');
       const title = body.title === undefined ? undefined : str(body, 'title');
-      if (!client_id || (!storage_path && !pending_asset_id)
+      const reserved_id = pending_asset_id ?? asset_id;
+      if (!client_id || (!storage_path && !reserved_id)
           || (storage_path !== undefined && (storage_path.length < 1 || storage_path.length > 500))
           || (body.pending_asset_id !== undefined && !pending_asset_id)
+          || (body.asset_id !== undefined && !asset_id)
+          || (pending_asset_id && asset_id && pending_asset_id !== asset_id)
           || (media_type !== 'image' && media_type !== 'video' && media_type !== 'text')
           || (!brief_id && !assignment_id)
           || (body.brief_id !== undefined && !brief_id)
           || (body.assignment_id !== undefined && !assignment_id)
           || (title !== undefined && (title.length < 1 || title.length > 200))
-          || !subset(body, ['client_id', 'storage_path', 'pending_asset_id', 'media_type', 'brief_id', 'assignment_id', 'title'])) {
+          || !subset(body, ['client_id', 'storage_path', 'pending_asset_id', 'asset_id', 'media_type', 'brief_id', 'assignment_id', 'title'])) {
         return undefined;
       }
       return {
         p_bot_id: null, p_client_id: client_id, p_media_type: media_type,
         ...(storage_path === undefined ? {} : { p_storage_path: storage_path }),
-        ...(pending_asset_id === undefined ? {} : { p_pending_asset_id: pending_asset_id }),
+        ...(reserved_id === undefined ? {} : { p_pending_asset_id: reserved_id }),
         ...(brief_id === undefined ? {} : { p_brief_id: brief_id }),
         ...(assignment_id === undefined ? {} : { p_assignment_id: assignment_id }),
         ...(title === undefined ? {} : { p_title: title }),

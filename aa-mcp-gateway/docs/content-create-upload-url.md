@@ -5,16 +5,21 @@ Production uploads image bytes without a service-role key in the bot environment
 ## Flow
 
 1. `content.create_upload_url` as `bot_production`, with `brief_id` and `content_type` (`image/png`, `image/jpeg`, or `image/webp`). Optional `filename` and `byte_size` (1–26214400).
-2. The gateway calls Console `/internal/mcp/content/create-upload-url`. The RPC checks the bot, the client grant, that the brief belongs to that client, and that the brief status is `draft`, `approved`, or `in_production` and not archived. It reserves `{client_id}/{pending_asset_id}.{ext}` in `client-media` for 30 minutes.
+2. The gateway calls Console `/internal/mcp/content/create-upload-url`. The RPC checks the bot, the client grant, that the brief exists, that `client_briefs.client_id` is `e4b4b001-81f6-4997-8429-ff21f4ee1fbe` or `client_ideas.campaign_id` is `457e0ca8-8af6-4ead-a39d-d5326c729882`, and that status is `draft`, `approved`, or `in_production` and not archived. It reserves `{client_id}/{pending_asset_id}.{ext}` in `client-media` for 30 minutes.
 3. The Console runtime, which already holds `SUPABASE_SERVICE_ROLE_KEY`, calls Storage `createSignedUploadUrl` and returns `{ upload_url, storage_path, pending_asset_id, expires_at, content_type, headers }`. The URL is not a long-lived key. Supabase's upload token is single-use. The reservation TTL is 30 minutes even though the platform token may live longer; `content.submit_asset` rejects an expired or already-consumed reservation.
 4. The bot `PUT`s the file to `upload_url` with `headers` (`content-type`, `cache-control`). Do not send the service role.
-5. `content.submit_asset` with `brief_id` plus `storage_path` or `pending_asset_id`, and `media_type: "image"`. That call stays metadata-only: it inserts `client_media_assets` (`review_status=pending`) only after the object is in the bucket, then consumes the reservation.
+5. `content.submit_asset` with `brief_id` plus `storage_path` or `asset_id` (the returned `pending_asset_id`; `asset_id` is the same reservation id), and `media_type: "image"`. That call stays metadata-only: it inserts `client_media_assets` (`review_status=pending`) only after the object is in the bucket, then consumes the reservation.
 
 `bot_chief_of_staff` may call the same tool as a read-check. The response is `{ client_id, brief_id, brief_status, eligible: true, read_check: true }` and never includes `upload_url` or `storage_path`. Marketing and every other bot are hard-denied.
 
 ## Smoke (one Harbour PNG)
 
-Client `e4b4b001-81f6-4997-8429-ff21f4ee1fbe` (`clients.id`). Campaign `457e0ca8-8af6-4ead-a39d-d5326c729882` is `client_ideas.campaign_id`; briefs hang off `client_briefs.client_id` and `client_briefs.source_idea_id` (there is no `client_briefs.campaign_id`). Draft briefs on that client are accepted. The tool does not hard-code these UUIDs: the bot passes `client_id`, and the RPC requires `client_briefs.client_id` to match that grant.
+The RPC requires the brief to exist, `client_briefs.client_id` to match the granted `client_id`, and one of:
+
+- `client_briefs.client_id` = `e4b4b001-81f6-4997-8429-ff21f4ee1fbe`, or
+- `client_ideas.campaign_id` = `457e0ca8-8af6-4ead-a39d-d5326c729882` on `client_briefs.source_idea_id` (there is no `client_briefs.campaign_id`).
+
+Status must be `draft`, `approved`, or `in_production`, and `archived_at` must be null.
 
 1. Apply migration `20260924110000_126_content_create_upload_url.sql` (Alex via Chief of Staff; do not apply it from this PR alone).
 2. Deploy the gateway and the agent-runtime together. The runtime already has the service role; do not add it to the Production bot env.

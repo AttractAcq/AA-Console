@@ -504,6 +504,19 @@ test("create_upload_url mints for production, read-checks for CoS, and denies ma
   const pending = "77777777-7777-4777-8777-777777777777";
   let calls = 0;
   const { adapter, received } = await mockAa(t, ({ url, body }) => {
+    if (url === "/internal/mcp/content/submit-asset") {
+      return {
+        status: 200,
+        body: {
+          client_id: client,
+          asset_id: "66666666-6666-4666-8666-666666666666",
+          brief_id: body.brief_id,
+          review_status: "pending",
+          storage_path: body.storage_path,
+          replayed: false,
+        },
+      };
+    }
     if (url !== "/internal/mcp/content/create-upload-url") throw new Error(url);
     calls += 1;
     if (calls === 1) {
@@ -549,6 +562,16 @@ test("create_upload_url mints for production, read-checks for CoS, and denies ma
   assert.equal(received[0]?.body.filename, "pack-01.png");
   assert.equal(received[0]?.body.byte_size, 1200);
   assert.equal((minted.data as any).upload_url.includes("service_role"), false);
+  const submitted = await engine.call(identity, "content.submit_asset", {
+    client_id: client,
+    brief_id: brief,
+    asset_id: pending,
+    media_type: "image",
+    idempotency_key: "submit-by-asset",
+  });
+  assert.equal(submitted.status, "completed");
+  assert.equal(received.at(-1)?.body.pending_asset_id, pending);
+  assert.equal(received.at(-1)?.body.asset_id, undefined);
   const cos = await engine.call(
     { bot: "bot_chief_of_staff", clients: [client] },
     "content.create_upload_url",
@@ -561,7 +584,7 @@ test("create_upload_url mints for production, read-checks for CoS, and denies ma
   assert.equal((await engine.call(marketing, "content.create_upload_url", {
     client_id: client, brief_id: brief, content_type: "image/png", idempotency_key: "mkt-upload",
   })).status, "rejected");
-  assert.equal(received.length, 2);
+  assert.equal(received.length, 3);
 });
 
 test("Phase 16b: proof reads and writes complete for bot_production; usage_rights is not a Bot field", async (t) => {
