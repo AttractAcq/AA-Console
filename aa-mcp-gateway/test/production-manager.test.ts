@@ -565,13 +565,13 @@ test("create_upload_url mints for production, read-checks for CoS, and denies ma
   const submitted = await engine.call(identity, "content.submit_asset", {
     client_id: client,
     brief_id: brief,
-    asset_id: pending,
+    storage_path: `${client}/${pending}.png`,
     media_type: "image",
-    idempotency_key: "submit-by-asset",
+    idempotency_key: "submit-by-path",
   });
   assert.equal(submitted.status, "completed");
-  assert.equal(received.at(-1)?.body.pending_asset_id, pending);
-  assert.equal(received.at(-1)?.body.asset_id, undefined);
+  assert.equal(received.at(-1)?.body.storage_path, `${client}/${pending}.png`);
+  assert.equal(received.at(-1)?.body.media_type, "image");
   const cos = await engine.call(
     { bot: "bot_chief_of_staff", clients: [client] },
     "content.create_upload_url",

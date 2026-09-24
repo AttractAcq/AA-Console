@@ -3199,7 +3199,7 @@ describe('content.create_upload_url', () => {
 
   beforeEach(async () => {
     await db.exec(`
-      insert into clients (id, name, initials) values ('${AA_CLIENT}', 'AttractAcq', 'HQ');
+      insert into clients (id, name, initials) values ('${AA_CLIENT}', 'Attract Acquisition', 'HQ');
       insert into mcp_bot_clients (bot_id, client_id) values
         ('bot_production', '${AA_CLIENT}'),
         ('${COS}', '${AA_CLIENT}'),
@@ -3275,14 +3275,14 @@ describe('content.create_upload_url', () => {
       `select mcp_create_upload_url('bot_production','req-up2','exec-up2','${AA_CLIENT}','${BRIEF}','image/png','pack-02.png',800) as result`,
     )).rows[0]!.result;
     await expect(db.query(
-      `select mcp_submit_uploaded_asset('bot_production','req-sub','exec-sub','${AA_CLIENT}',null,'image','${BRIEF}',null,null,'${minted.pending_asset_id}')`,
+      `select mcp_submit_asset('bot_production','req-sub','exec-sub','${AA_CLIENT}','${minted.storage_path}','image','${BRIEF}',null,null)`,
     )).rejects.toThrow('bytes_missing');
     await db.exec(`
       insert into storage.objects (bucket_id, name, metadata)
       values ('client-media', '${minted.storage_path}', '{"size":800,"mimetype":"image/png"}'::jsonb);
     `);
     const submitted = (await db.query<{ result: any }>(
-      `select mcp_submit_uploaded_asset('bot_production','req-sub','exec-sub','${AA_CLIENT}',null,'image','${BRIEF}',null,'Cut','${minted.pending_asset_id}') as result`,
+      `select mcp_submit_asset('bot_production','req-sub','exec-sub','${AA_CLIENT}','${minted.storage_path}','image','${BRIEF}',null,'Cut') as result`,
     )).rows[0]!.result;
     expect(submitted.review_status).toBe('pending');
     expect(submitted.storage_path).toBe(minted.storage_path);
@@ -3293,7 +3293,7 @@ describe('content.create_upload_url', () => {
     expect(consumed.consumed).toBe(true);
     expect(consumed.asset).toBe(submitted.asset_id);
     await expect(db.query(
-      `select mcp_submit_uploaded_asset('bot_production','req-sub2','exec-sub2','${AA_CLIENT}','${minted.storage_path}','image','${BRIEF}',null,null,null)`,
+      `select mcp_submit_asset('bot_production','req-sub2','exec-sub2','${AA_CLIENT}','${minted.storage_path}','image','${BRIEF}',null,null)`,
     )).rejects.toThrow('upload_consumed');
   });
 });

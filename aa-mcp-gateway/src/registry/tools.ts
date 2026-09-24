@@ -492,9 +492,8 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         fields.byte_size = z.number().int().min(1).max(26_214_400).optional();
       }
       if (name === "content.submit_asset") {
-        fields.asset_id = id.optional();
-        fields.storage_path = z.string().trim().min(1).max(500).optional();
-        fields.pending_asset_id = id.optional();
+        delete fields.asset_id;
+        fields.storage_path = z.string().trim().min(1).max(500);
         fields.media_type = z.enum(["image", "video", "text"]);
         fields.brief_id = id.optional();
         fields.assignment_id = id.optional();
@@ -837,21 +836,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         ].includes(name)
           ? "real"
           : "stub";
-      const objectSchema = z.object(fields).strict();
-      const input =
-        name === "content.submit_asset"
-          ? objectSchema.refine((value) => {
-              if (
-                value.pending_asset_id &&
-                value.asset_id &&
-                value.pending_asset_id !== value.asset_id
-              )
-                return false;
-              return Boolean(
-                value.storage_path || value.pending_asset_id || value.asset_id,
-              );
-            })
-          : objectSchema;
+      const input = z.object(fields).strict();
       return {
         name,
         domain,
