@@ -282,6 +282,29 @@ const ROUTES: Record<string, Route> = {
       };
     },
   },
+  '/internal/mcp/content/create-upload-url': {
+    rpc: 'mcp_create_upload_url',
+    kind: 'write',
+    parse: (body) => {
+      const client_id = uuid(body, 'client_id');
+      const brief_id = uuid(body, 'brief_id');
+      const content_type = str(body, 'content_type');
+      const filename = body.filename === undefined ? undefined : str(body, 'filename');
+      const byte_size = body.byte_size;
+      const types = new Set(['image/png', 'image/jpeg', 'image/webp']);
+      if (!client_id || !brief_id || !content_type || !types.has(content_type)
+          || (filename !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._ -]{0,199}$/.test(filename))
+          || (byte_size !== undefined && (typeof byte_size !== 'number' || !Number.isInteger(byte_size) || byte_size < 1 || byte_size > 26_214_400))
+          || !subset(body, ['client_id', 'brief_id', 'content_type', 'filename', 'byte_size'])) {
+        return undefined;
+      }
+      return {
+        p_bot_id: null, p_client_id: client_id, p_brief_id: brief_id, p_content_type: content_type,
+        ...(filename === undefined ? {} : { p_filename: filename }),
+        ...(byte_size === undefined ? {} : { p_byte_size: byte_size }),
+      };
+    },
+  },
   '/internal/mcp/content/submit-asset': {
     rpc: 'mcp_submit_asset',
     kind: 'write',
@@ -310,6 +333,80 @@ const ROUTES: Record<string, Route> = {
     },
   },
 };
+
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+
+function asIso(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.length > 0) return value;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+  return undefined;
+}
+
+/** Mint the signed PUT URL with the runtime service role. Never return one to CoS. */
+export async function attachSignedUpload(
+  sb: SupabaseClient,
+  record: Record<string, unknown>,
+  bot: string,
+): Promise<Record<string, unknown>> {
+  if (bot !== 'bot_production' || record.read_check === true) {
+    const clientId = typeof record.client_id === 'string' ? record.client_id : '';
+    const briefId = typeof record.brief_id === 'string' ? record.brief_id : '';
+    const briefStatus = typeof record.brief_status === 'string' ? record.brief_status : '';
+    if (!UUID.test(clientId) || !UUID.test(briefId) || !briefStatus
+        || record.eligible !== true || record.read_check !== true) {
+      throw new Error('sign_failed');
+    }
+    return {
+      client_id: clientId,
+      brief_id: briefId,
+      brief_status: briefStatus,
+      eligible: true,
+      read_check: true,
+    };
+  }
+  const clientId = typeof record.client_id === 'string' ? record.client_id : '';
+  const briefId = typeof record.brief_id === 'string' ? record.brief_id : '';
+  const pendingId = typeof record.pending_asset_id === 'string' ? record.pending_asset_id : '';
+  const storagePath = typeof record.storage_path === 'string' ? record.storage_path : '';
+  const contentType = typeof record.content_type === 'string' ? record.content_type : '';
+  const expiresAt = asIso(record.expires_at);
+  if (!UUID.test(clientId) || !UUID.test(briefId) || !UUID.test(pendingId) || !expiresAt
+      || !IMAGE_TYPES.has(contentType)
+      || !storagePath.startsWith(`${clientId}/`)
+      || storagePath.includes('..')
+      || storagePath.includes('\\')
+      || storagePath.includes('//')) {
+    throw new Error('sign_failed');
+  }
+  const signed = await sb.storage.from('client-media').createSignedUploadUrl(storagePath, { upsert: false });
+  const uploadUrl = signed.data?.signedUrl ?? '';
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(uploadUrl);
+  } catch {
+    throw new Error('sign_failed');
+  }
+  if ((parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:')
+      || uploadUrl.toLowerCase().includes('service_role')) {
+    throw new Error('sign_failed');
+  }
+  return {
+    client_id: clientId,
+    brief_id: briefId,
+    pending_asset_id: pendingId,
+    storage_path: storagePath,
+    upload_url: uploadUrl,
+    expires_at: expiresAt,
+    content_type: contentType,
+    headers: {
+      'content-type': contentType,
+      'cache-control': 'max-age=3600',
+    },
+    ...(typeof record.replayed === 'boolean' ? { replayed: record.replayed } : {}),
+    ...(record.filename === undefined ? {} : { filename: record.filename }),
+    ...(record.byte_size === undefined ? {} : { byte_size: record.byte_size }),
+  };
+}
 
 export async function handleMcpContent(
   req: IncomingMessage, res: ServerResponse, sb: SupabaseClient,
@@ -363,6 +460,14 @@ export async function handleMcpContent(
       return json(res, 200, record);
     }
     if (clientId !== String(parsed.p_client_id).toLowerCase() || !UUID.test(clientId)) return fail(res, 'internal_error');
+    if (req.url === '/internal/mcp/content/create-upload-url') {
+      try {
+        const minted = await attachSignedUpload(sb, record, bot);
+        return json(res, 200, minted);
+      } catch {
+        return fail(res, 'internal_error');
+      }
+    }
     if (route.kind === 'queue') {
       if (typeof record.job_id !== 'string' || !UUID.test(record.job_id)
           || typeof record.replayed !== 'boolean') return fail(res, 'internal_error');

@@ -206,6 +206,7 @@ beforeAll(async () => {
   `);
   await db.exec(await migration('20260916150000_91_mcp_attribution_brand_sites.sql'));
   await db.exec(await migration('20260916180000_93_assign_production_ai_render.sql'));
+  await db.exec(await migration('20260924110000_126_content_create_upload_url.sql'));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
       client_leads, client_billing, finance_entries to authenticated;
@@ -270,6 +271,7 @@ describe('Phase 4 RLS inventory (relrowsecurity must be on)', () => {
     for (const name of [
       'mcp_bots', 'mcp_bot_tokens', 'mcp_bot_clients', 'mcp_brief_requests', 'mcp_content_requests',
       'mcp_pipeline_requests', 'mcp_conversion_requests', 'mcp_campaign_requests',
+      'asset_upload_grants',
     ]) {
       expect(present.find((r) => r.rel === name)?.rls_forced).toBe(true);
     }
@@ -2799,6 +2801,7 @@ describe('Phase 16b Sales attach/enable/build + Proof Bank + production assign/s
       'mcp_internal.proof_attach_asset(text,text,text,uuid,uuid,text,uuid)',
       'mcp_internal.assign_production(text,text,text,uuid,uuid,text,uuid[],date,numeric,text,text)',
       'mcp_internal.submit_asset(text,text,text,uuid,text,text,uuid,uuid,text)',
+      'mcp_internal.create_upload_url(text,text,text,uuid,uuid,text,text,integer)',
     ];
     for (const sig of signatures) {
       const src = await db.query<{ def: string }>(`select pg_get_functiondef('${sig}'::regprocedure) as def`);
@@ -3184,5 +3187,115 @@ describe('Phase 16c Attribution Brand Sites isolation', () => {
       expect(row.def).toContain('require_bot_client_grant');
       expect(row.def).not.toContain('can_access_client');
     }
+  });
+});
+
+describe('content.create_upload_url', () => {
+  const BRIEF = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const IDEA = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const COS = 'bot_chief_of_staff';
+  const AA_CLIENT = 'e4b4b001-81f6-4997-8429-ff21f4ee1fbe';
+  const AA_CAMPAIGN = '457e0ca8-8af6-4ead-a39d-d5326c729882';
+
+  beforeEach(async () => {
+    await db.exec(`
+      insert into clients (id, name, initials) values ('${AA_CLIENT}', 'Attract Acquisition', 'HQ');
+      insert into mcp_bot_clients (bot_id, client_id) values
+        ('bot_production', '${AA_CLIENT}'),
+        ('${COS}', '${AA_CLIENT}'),
+        ('bot_production', '${CLIENT_B}')
+        on conflict do nothing;
+      insert into client_briefs (id, client_id, title, body, status, media_type)
+        values ('${BRIEF}', '${AA_CLIENT}', 'Pack', 'Body', 'draft', 'image');
+      alter table client_ideas add column if not exists campaign_id uuid;
+      create schema if not exists storage;
+      create table if not exists storage.objects (
+        id uuid primary key default gen_random_uuid(),
+        bucket_id text,
+        name text,
+        metadata jsonb
+      );
+      delete from storage.objects;
+    `);
+    await asService();
+  });
+
+  it('reserves a client-prefixed path for production and only an eligibility read for CoS', async () => {
+    const minted = (await db.query<{ result: any }>(
+      `select mcp_create_upload_url('bot_production','req-up','exec-up','${AA_CLIENT}','${BRIEF}','image/png','pack-01.png',1200) as result`,
+    )).rows[0]!.result;
+    expect(minted.replayed).toBe(false);
+    expect(minted.storage_path).toBe(`${AA_CLIENT}/${minted.pending_asset_id}.png`);
+    expect(minted.content_type).toBe('image/png');
+    expect(minted.upload_url).toBeUndefined();
+    const replay = (await db.query<{ result: any }>(
+      `select mcp_create_upload_url('bot_production','req-up','exec-up','${AA_CLIENT}','${BRIEF}','image/png','pack-01.png',1200) as result`,
+    )).rows[0]!.result;
+    expect(replay.replayed).toBe(true);
+    expect(replay.pending_asset_id).toBe(minted.pending_asset_id);
+
+    const checked = (await db.query<{ result: any }>(
+      `select mcp_create_upload_url('${COS}','req-cos','exec-cos','${AA_CLIENT}','${BRIEF}','image/png',null,null) as result`,
+    )).rows[0]!.result;
+    expect(checked).toEqual({
+      client_id: AA_CLIENT,
+      brief_id: BRIEF,
+      brief_status: 'draft',
+      eligible: true,
+      read_check: true,
+    });
+    await expect(db.query(
+      `select mcp_create_upload_url('bot_marketing','req-m','exec-m','${AA_CLIENT}','${BRIEF}','image/png',null,null)`,
+    )).rejects.toThrow('bot_forbidden');
+    await db.exec(`
+      insert into client_briefs (id, client_id, title, body, status, media_type)
+        values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd', '${CLIENT_A}', 'Other', 'Body', 'draft', 'image');
+    `);
+    await expect(db.query(
+      `select mcp_create_upload_url('bot_production','req-other','exec-other','${CLIENT_A}','dddddddd-dddd-4ddd-8ddd-dddddddddddd','image/png',null,null)`,
+    )).rejects.toThrow('client_mismatch');
+    await db.exec(`
+      insert into client_campaigns (id, client_id, name, brief, status)
+        values ('${AA_CAMPAIGN}', '${CLIENT_B}', 'Organic launch', 'Pack', 'planning');
+      insert into client_ideas (id, client_id, title, source, status, campaign_id)
+        values ('${IDEA}', '${CLIENT_B}', 'Pack idea', 'manual', 'approved', '${AA_CAMPAIGN}');
+      insert into client_briefs (id, client_id, source_idea_id, title, body, status, media_type)
+        values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', '${CLIENT_B}', '${IDEA}', 'Campaign pack', 'Body', 'draft', 'image');
+    `);
+    const viaCampaign = (await db.query<{ result: any }>(
+      `select mcp_create_upload_url('bot_production','req-camp','exec-camp','${CLIENT_B}','cccccccc-cccc-4ccc-8ccc-cccccccccccc','image/png',null,null) as result`,
+    )).rows[0]!.result;
+    expect(viaCampaign.storage_path).toBe(`${CLIENT_B}/${viaCampaign.pending_asset_id}.png`);
+    await db.exec(`update client_briefs set status = 'complete' where id = '${BRIEF}'`);
+    await expect(db.query(
+      `select mcp_create_upload_url('bot_production','req-bad','exec-bad','${AA_CLIENT}','${BRIEF}','image/png',null,null)`,
+    )).rejects.toThrow('invalid_brief_status');
+  });
+
+  it('submit_asset consumes the reservation only after the object exists', async () => {
+    const minted = (await db.query<{ result: any }>(
+      `select mcp_create_upload_url('bot_production','req-up2','exec-up2','${AA_CLIENT}','${BRIEF}','image/png','pack-02.png',800) as result`,
+    )).rows[0]!.result;
+    await expect(db.query(
+      `select mcp_submit_asset('bot_production','req-sub','exec-sub','${AA_CLIENT}','${minted.storage_path}','image','${BRIEF}',null,null)`,
+    )).rejects.toThrow('bytes_missing');
+    await db.exec(`
+      insert into storage.objects (bucket_id, name, metadata)
+      values ('client-media', '${minted.storage_path}', '{"size":800,"mimetype":"image/png"}'::jsonb);
+    `);
+    const submitted = (await db.query<{ result: any }>(
+      `select mcp_submit_asset('bot_production','req-sub','exec-sub','${AA_CLIENT}','${minted.storage_path}','image','${BRIEF}',null,'Cut') as result`,
+    )).rows[0]!.result;
+    expect(submitted.review_status).toBe('pending');
+    expect(submitted.storage_path).toBe(minted.storage_path);
+    const consumed = (await db.query<{ consumed: boolean; asset: string }>(
+      `select consumed_at is not null as consumed, asset_id::text as asset
+         from mcp_internal.asset_upload_grants where id = '${minted.pending_asset_id}'`,
+    )).rows[0]!;
+    expect(consumed.consumed).toBe(true);
+    expect(consumed.asset).toBe(submitted.asset_id);
+    await expect(db.query(
+      `select mcp_submit_asset('bot_production','req-sub2','exec-sub2','${AA_CLIENT}','${minted.storage_path}','image','${BRIEF}',null,null)`,
+    )).rejects.toThrow('upload_consumed');
   });
 });

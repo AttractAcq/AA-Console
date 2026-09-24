@@ -99,7 +99,7 @@ async function mockAa(
 test("Engineering exact discovery equality is 12 and related stubs stay stub", (t) => {
   const e = engine(t);
   assertEngineeringDiscovery(e.discover(identity).map((t) => t.name));
-  assert.equal(registry.length, 103); // catalog after #48+#47+#46 (90+7+3+3)
+  assert.equal(registry.length, 104); // 103 + content.create_upload_url
   for (const name of engineeringOps.grants)
     assert.equal(registry.find((t) => t.name === name)?.implementation, "real");
   for (const name of [

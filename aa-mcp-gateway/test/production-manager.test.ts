@@ -60,6 +60,7 @@ test("Phase 5 tools are real and generate_brief stays accepted", async (t) => {
     "content.select_idea",
     "content.approve_asset",
     "content.assign_production",
+    "content.create_upload_url",
     "content.submit_asset",
   ])
     assert.ok(real.includes(name), name);
@@ -259,6 +260,7 @@ test("gateway denies other-client and unauthorized bots before AA for every real
     "content.approve_asset",
     "content.assign_production",
     "content.create_repurpose_plan",
+    "content.create_upload_url",
     "content.generate_brief",
     "content.get_brief",
     "content.get_idea",
@@ -328,6 +330,12 @@ test("gateway denies other-client and unauthorized bots before AA for every real
       media_type: "image",
       brief_id: brief,
       idempotency_key: "scope-submit",
+    },
+    "content.create_upload_url": {
+      client_id: other,
+      brief_id: brief,
+      content_type: "image/png",
+      idempotency_key: "scope-upload",
     },
   };
   for (const name of realContentForProduction) {
@@ -481,7 +489,7 @@ test("Phase 16b: assign_production and submit_asset complete for bot_production;
   });
   assert.equal(submitted.status, "completed");
   const marketing = { bot: "bot_marketing" as const, clients: [client] };
-  for (const name of ["content.assign_production", "content.submit_asset", "content.approve_asset"] as const) {
+  for (const name of ["content.assign_production", "content.submit_asset", "content.approve_asset", "content.create_upload_url"] as const) {
     const denied = await engine.call(marketing, name, {
       client_id: client, brief_id: brief, asset_id: asset, decision: "approved",
       storage_path: "path/a.png", media_type: "image", route: "ai",
@@ -490,6 +498,93 @@ test("Phase 16b: assign_production and submit_asset complete for bot_production;
     assert.equal(denied.status, "rejected", name);
   }
   assert.equal(received.length, 2);
+});
+
+test("create_upload_url mints for production, read-checks for CoS, and denies marketing", async (t) => {
+  const pending = "77777777-7777-4777-8777-777777777777";
+  let calls = 0;
+  const { adapter, received } = await mockAa(t, ({ url, body }) => {
+    if (url === "/internal/mcp/content/submit-asset") {
+      return {
+        status: 200,
+        body: {
+          client_id: client,
+          asset_id: "66666666-6666-4666-8666-666666666666",
+          brief_id: body.brief_id,
+          review_status: "pending",
+          storage_path: body.storage_path,
+          replayed: false,
+        },
+      };
+    }
+    if (url !== "/internal/mcp/content/create-upload-url") throw new Error(url);
+    calls += 1;
+    if (calls === 1) {
+      return {
+        status: 200,
+        body: {
+          client_id: client,
+          brief_id: body.brief_id,
+          pending_asset_id: pending,
+          storage_path: `${client}/${pending}.png`,
+          upload_url: "https://example.test/storage/v1/object/upload/sign/client-media/a.png?token=once",
+          expires_at: "2026-09-24T12:00:00.000Z",
+          content_type: "image/png",
+          headers: { "content-type": "image/png", "cache-control": "max-age=3600" },
+          replayed: false,
+        },
+      };
+    }
+    return {
+      status: 200,
+      body: {
+        client_id: body.client_id,
+        brief_id: body.brief_id,
+        brief_status: "draft",
+        eligible: true,
+        read_check: true,
+      },
+    };
+  });
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const engine = new ActionEngine(store, registry, adapter);
+  const minted = await engine.call(identity, "content.create_upload_url", {
+    client_id: client,
+    brief_id: brief,
+    content_type: "image/png",
+    filename: "pack-01.png",
+    byte_size: 1200,
+    idempotency_key: "upload-0001",
+  });
+  assert.equal(minted.status, "completed");
+  assert.equal((minted.data as any).pending_asset_id, pending);
+  assert.equal(received[0]?.body.filename, "pack-01.png");
+  assert.equal(received[0]?.body.byte_size, 1200);
+  assert.equal((minted.data as any).upload_url.includes("service_role"), false);
+  const submitted = await engine.call(identity, "content.submit_asset", {
+    client_id: client,
+    brief_id: brief,
+    storage_path: `${client}/${pending}.png`,
+    media_type: "image",
+    idempotency_key: "submit-by-path",
+  });
+  assert.equal(submitted.status, "completed");
+  assert.equal(received.at(-1)?.body.storage_path, `${client}/${pending}.png`);
+  assert.equal(received.at(-1)?.body.media_type, "image");
+  const cos = await engine.call(
+    { bot: "bot_chief_of_staff", clients: [client] },
+    "content.create_upload_url",
+    { client_id: client, brief_id: brief, content_type: "image/png", idempotency_key: "cos-read-1" },
+  );
+  assert.equal(cos.status, "completed");
+  assert.equal((cos.data as any).read_check, true);
+  assert.equal((cos.data as any).upload_url, undefined);
+  const marketing = { bot: "bot_marketing" as const, clients: [client] };
+  assert.equal((await engine.call(marketing, "content.create_upload_url", {
+    client_id: client, brief_id: brief, content_type: "image/png", idempotency_key: "mkt-upload",
+  })).status, "rejected");
+  assert.equal(received.length, 3);
 });
 
 test("Phase 16b: proof reads and writes complete for bot_production; usage_rights is not a Bot field", async (t) => {

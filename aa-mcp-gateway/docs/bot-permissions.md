@@ -4,9 +4,9 @@ Default deny. Both discovery and calls use the same permission matrix. Default M
 
 ## bot_chief_of_staff
 
-Configured grants: `delivery.*`, `campaign.*`, `workflow.*`, `attribution.*`.
+Configured grants: `delivery.*`, `campaign.*`, `workflow.*`, `attribution.*`, `content.create_upload_url`.
 
-Effective tools (31):
+Effective tools (32):
 
 - `delivery.list_clients`
 - `delivery.get_client`
@@ -26,6 +26,7 @@ Effective tools (31):
 - `campaign.provision`
 - `campaign.launch`
 - `campaign.get_readiness`
+- `content.create_upload_url`
 - `attribution.get_campaign_performance`
 - `attribution.get_content_performance`
 - `attribution.get_revenue_attribution`
@@ -122,7 +123,7 @@ Effective tools (45):
 
 Configured grants: `content.*`, `proof.search`, `proof.get`, `proof.get_for_avatar`, `proof.get_for_claim`, `proof.create`, `proof.attach_asset`, `brand.get_profile`, `workflow.create_task`, `workflow.assign_task`, `workflow.get_task`, `workflow.list_tasks`, `workflow.complete_task`, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`.
 
-Effective tools (29):
+Effective tools (30):
 
 - `content.list_ideas`
 - `content.generate_ideas`
@@ -132,6 +133,7 @@ Effective tools (29):
 - `content.get_brief`
 - `content.assign_production`
 - `content.get_production_status`
+- `content.create_upload_url`
 - `content.submit_asset`
 - `content.request_revision`
 - `content.request_approval`
@@ -293,9 +295,9 @@ Effective tools (14):
 - `security.create_finding`
 - `security.get_incident_status`
 
-All Bots are denied `workflow.record_decision`, including wildcard workflow grants. No finance payment or production deployment capability is exposed. `sales_agents.deploy` is a CRITICAL stub behind mandatory approval. Production Manager (`bot_production`) default discovery is the real granted tools: `content.list_ideas`, `content.get_idea`, `content.generate_brief`, `content.get_brief`, `content.request_revision`, `content.get_production_status`, `content.create_repurpose_plan`, `content.request_approval`, `content.select_idea`, `content.approve_asset`, `content.assign_production`, `content.submit_asset`, all six `proof.*` tools, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`, and the five durable workflow task tools.
+All Bots are denied `workflow.record_decision`, including wildcard workflow grants. No finance payment or production deployment capability is exposed. `sales_agents.deploy` is a CRITICAL stub behind mandatory approval. Production Manager (`bot_production`) default discovery is the real granted tools: `content.list_ideas`, `content.get_idea`, `content.generate_brief`, `content.get_brief`, `content.request_revision`, `content.get_production_status`, `content.create_repurpose_plan`, `content.request_approval`, `content.select_idea`, `content.approve_asset`, `content.assign_production`, `content.create_upload_url`, `content.submit_asset`, all six `proof.*` tools, `workflow.create_approval`, `workflow.get_pending_approvals`, `workflow.get_activity`, and the five durable workflow task tools.
 
-`content.select_idea` (idea approve), `content.approve_asset` (asset decide), `content.assign_production` and `content.submit_asset` are real **only** for `bot_production` ([Phase 9b](phase-9b-production-bot-decide.md), [Phase 16b](phase-16b-sales-proof-production.md)). `bot_marketing` keeps its `content.*` grant — needed for its other real content tools — but is hard-denied on these names in `src/policy/permissions.ts` `allowed()` and again inside the AA RPCs themselves, exactly like `workflow.record_decision`. `bot_chief_of_staff` and `bot_client_delivery` never held `content.*` or these exact names.
+`content.select_idea` (idea approve), `content.approve_asset` (asset decide), `content.assign_production`, `content.create_upload_url` and `content.submit_asset` are real **only** for `bot_production` ([Phase 9b](phase-9b-production-bot-decide.md), [Phase 16b](phase-16b-sales-proof-production.md), [content.create_upload_url](content-create-upload-url.md)). `bot_chief_of_staff` may call `content.create_upload_url` as a read-check (eligible / brief status only; no URL, no storage path). `bot_marketing` keeps its `content.*` grant — needed for its other real content tools — but is hard-denied on these names in `src/policy/permissions.ts` `allowed()` and again inside the AA RPCs themselves, exactly like `workflow.record_decision`. `bot_client_delivery` never held `content.*` or these exact names.
 
 `content.queue_distribution` (schedule) and `content.record_publication` (Gate 10 publish record) are real **only** for `bot_distribution` ([Phase 10](phase-10-distribution-manager.md)), same hard-coded pattern. `bot_production` keeps its `content.*` grant — needed for its other real content tools — but is hard-denied on these two names. `content.get_performance` and `attribution.get_content_performance` remain stubs (no live performance read yet): granted to `bot_distribution` per the original migration 65 seed, but indistinguishable from an ungranted tool unless `MCP_DISCOVER_STUBS=true`.
 
@@ -319,3 +321,6 @@ Phase 16b: `bot_sales_ops` has an exact 25-tool ceiling after this PR (Phase 11b
 
 
 Phase 16c: Attribution funnel and content-performance reads are real (empty data returns zeros/null ratios or `items: []`, never invented numbers). `attribution.generate_report` stays stub. `attribution.get_revenue_attribution` remains Finance/CoS. `brand.get_profile` is read-only for Marketing, Sales Ops and Production. `sites.provision` / `sites.publish_page` call the same runtime orchestration as Console admin routes; GitHub App keys stay on the agent-runtime. Owners are `bot_marketing` and `bot_sales_ops` — not Engineering. Both sites writes require gateway approval (HIGH, irreversible GitHub write). Conversion and campaign execution tools stay **real** after this last-writer PR (merge order #48→#47→#46). Marketing ceiling is **45**; Sales Ops is **28**. Catalog after A+B+C: **103**. See [Phase 16c](phase-16c-attribution-brand-sites.md). Gate 16c is NOT YET CLOSED.
+
+
+`content.create_upload_url` (migration 126): `bot_production` receives a 30-minute `client-media` reservation and a signed PUT URL minted by the Console runtime service role. Flow is `content.create_upload_url` → HTTP PUT bytes → existing `content.submit_asset` (`client_id`, `idempotency_key`, `storage_path`, `media_type`, optional `brief_id`). `bot_chief_of_staff` gets an eligibility read-check and never a URL. Marketing and every other bot are denied. No service-role key is added to a bot environment. Catalog **104**. See [content.create_upload_url](content-create-upload-url.md).

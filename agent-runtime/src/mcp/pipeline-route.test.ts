@@ -161,6 +161,7 @@ beforeAll(async () => {
   `);
   await db.exec(await migration('20260916140000_90_mcp_sales_proof_production.sql'));
   await db.exec(await migration('20260916180000_93_assign_production_ai_render.sql'));
+  await db.exec(await migration('20260924110000_126_content_create_upload_url.sql'));
 }, 60_000);
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => {
