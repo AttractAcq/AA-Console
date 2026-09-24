@@ -3255,6 +3255,8 @@ describe('content.create_upload_url', () => {
       `select mcp_create_upload_url('bot_production','req-other','exec-other','${CLIENT_A}','dddddddd-dddd-4ddd-8ddd-dddddddddddd','image/png',null,null)`,
     )).rejects.toThrow('client_mismatch');
     await db.exec(`
+      insert into client_campaigns (id, client_id, name, brief, status)
+        values ('${AA_CAMPAIGN}', '${CLIENT_B}', 'Organic launch', 'Pack', 'planning');
       insert into client_ideas (id, client_id, title, source, status, campaign_id)
         values ('${IDEA}', '${CLIENT_B}', 'Pack idea', 'manual', 'approved', '${AA_CAMPAIGN}');
       insert into client_briefs (id, client_id, source_idea_id, title, body, status, media_type)

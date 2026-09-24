@@ -106,28 +106,35 @@ begin
   if v_brief.client_id <> p_client_id then
     raise exception using message = 'client_mismatch', errcode = 'P0001';
   end if;
-  -- CLEAR B: the brief's client is e4b4b001-81f6-4997-8429-ff21f4ee1fbe,
-  -- or its idea is on campaign 457e0ca8-8af6-4ead-a39d-d5326c729882.
-  -- campaign_id lives on client_ideas (not client_briefs). The column is
-  -- optional in partial fixtures, so the campaign arm is dynamic.
+  -- DB-verified: Attract Acquisition is clients.id
+  -- e4b4b001-81f6-4997-8429-ff21f4ee1fbe. The organic launch is
+  -- client_campaigns.id 457e0ca8-8af6-4ead-a39d-d5326c729882 (status planning).
+  -- client_ideas.campaign_id references that client_campaigns id. Briefs have
+  -- no campaign_id of their own; they hang off source_idea_id.
   v_in_scope := v_brief.client_id = 'e4b4b001-81f6-4997-8429-ff21f4ee1fbe'::uuid;
-  if not v_in_scope and exists (
-    select 1
-      from pg_attribute a
-      join pg_class c on c.oid = a.attrelid
-      join pg_namespace n on n.oid = c.relnamespace
-     where n.nspname = 'public'
-       and c.relname = 'client_ideas'
-       and a.attname = 'campaign_id'
-       and a.attnum > 0
-       and not a.attisdropped
-  ) then
+  if not v_in_scope
+     and to_regclass('public.client_campaigns') is not null
+     and exists (
+       select 1
+         from pg_attribute a
+         join pg_class c on c.oid = a.attrelid
+         join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public'
+          and c.relname = 'client_ideas'
+          and a.attname = 'campaign_id'
+          and a.attnum > 0
+          and not a.attisdropped
+     ) then
     execute $sql$
       select exists (
-        select 1 from public.client_ideas i
+        select 1
+          from public.client_ideas i
+          join public.client_campaigns camp
+            on camp.id = i.campaign_id
+           and camp.client_id = i.client_id
          where i.id = $1
            and i.client_id = $2
-           and i.campaign_id = '457e0ca8-8af6-4ead-a39d-d5326c729882'::uuid
+           and camp.id = '457e0ca8-8af6-4ead-a39d-d5326c729882'::uuid
       )
     $sql$ into v_in_scope using v_brief.source_idea_id, v_brief.client_id;
   end if;
