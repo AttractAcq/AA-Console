@@ -22,6 +22,7 @@ export const grants: Record<Bot, string[]> = {
     "campaign.*",
     "workflow.*",
     "attribution.*",
+    "content.create_upload_url",
   ],
   bot_client_delivery: [
     "delivery.*",
@@ -78,6 +79,7 @@ export const PRODUCTION_ONLY_TOOLS = new Set([
   "content.select_idea",
   "content.approve_asset",
   "content.assign_production",
+  "content.create_upload_url",
   "content.submit_asset",
 ]);
 /**
@@ -132,8 +134,16 @@ export function allowed(botOrIdentity: Bot | Identity, tool: Tool): boolean {
     typeof botOrIdentity === "string"
       ? { bot: botOrIdentity, clients: [] }
       : botOrIdentity;
-  if (PRODUCTION_ONLY_TOOLS.has(tool.name) && identity.bot !== "bot_production")
-    return false;
+  if (PRODUCTION_ONLY_TOOLS.has(tool.name) && identity.bot !== "bot_production") {
+    // CoS may read-check brief eligibility. The RPC returns no URL and no path.
+    if (
+      !(
+        tool.name === "content.create_upload_url" &&
+        identity.bot === "bot_chief_of_staff"
+      )
+    )
+      return false;
+  }
   if (
     DISTRIBUTION_ONLY_TOOLS.has(tool.name) &&
     identity.bot !== "bot_distribution"

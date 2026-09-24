@@ -87,6 +87,7 @@ export const marketingDirector = {
     "content.approve_asset",
     "content.queue_distribution",
     "content.assign_production",
+    "content.create_upload_url",
     "content.submit_asset",
     "attribution.get_revenue_attribution",
     "delivery.list_clients",

@@ -6002,6 +6002,34 @@ export type Database = {
         }
         Returns: Json
       }
+      mcp_create_upload_url: {
+        Args: {
+          p_bot_id: string
+          p_brief_id: string
+          p_byte_size?: number
+          p_client_id: string
+          p_content_type: string
+          p_execution_id: string
+          p_filename?: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      mcp_submit_uploaded_asset: {
+        Args: {
+          p_assignment_id?: string
+          p_bot_id: string
+          p_brief_id?: string
+          p_client_id: string
+          p_execution_id: string
+          p_media_type?: string
+          p_pending_asset_id?: string
+          p_request_id: string
+          p_storage_path?: string
+          p_title?: string
+        }
+        Returns: Json
+      }
       mcp_suspend_bot: {
         Args: { p_actor: string; p_bot_id: string; p_reason?: string }
         Returns: Json

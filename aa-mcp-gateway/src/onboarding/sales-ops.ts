@@ -20,7 +20,7 @@ export const salesOps = {
   bot_id: "bot_sales_ops", reads, writes,
   grants: [...reads, ...writes],
   expectedDiscovery: [...reads, ...writes],
-  forbidden: ["economics", "security", "engineering", "finance", "deploy", "infra", "secrets", "admin", "workflow.record_decision", "pipeline.record_sale", "sales_agents.deploy", "proof.search", "proof.get", "content.select_idea", "content.approve_asset", "content.queue_distribution", "content.record_publication", "content.generate_brief", "content.generate_ideas", "content.assign_production", "content.submit_asset", "campaign.create", "campaign.update", "campaign.request_approval"],
+  forbidden: ["economics", "security", "engineering", "finance", "deploy", "infra", "secrets", "admin", "workflow.record_decision", "pipeline.record_sale", "sales_agents.deploy", "proof.search", "proof.get", "content.select_idea", "content.approve_asset", "content.queue_distribution", "content.record_publication", "content.generate_brief", "content.generate_ideas", "content.assign_production", "content.create_upload_url", "content.submit_asset", "campaign.create", "campaign.update", "campaign.request_approval"],
   /** Not granted; require a separate Alex CLEAR before any future phase realizes or grants these (Alex CLEAR #5, SEC_BAR #2/#3/#4). sales_agents.deploy + live channel OAuth/webhook/send deferred to Phase 11c / Eng. */
   future: ["pipeline.record_sale", "sales_agents.deploy", "proof.search", "proof.get"] as string[],
   connector: { ...chiefOfStaff.connector, args: [...chiefOfStaff.connector.args] },

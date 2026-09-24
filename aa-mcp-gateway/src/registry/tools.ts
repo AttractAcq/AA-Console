@@ -6,7 +6,7 @@ const domains: Record<string, string> = {
     "list_clients get_client get_status get_plan get_blockers get_next_action create_task get_client_health",
   campaign: "list get create update get_status request_approval plan provision launch get_readiness",
   content:
-    "list_ideas generate_ideas get_idea select_idea generate_brief get_brief assign_production get_production_status submit_asset request_revision request_approval approve_asset create_repurpose_plan queue_distribution record_publication get_performance",
+    "list_ideas generate_ideas get_idea select_idea generate_brief get_brief assign_production get_production_status create_upload_url submit_asset request_revision request_approval approve_asset create_repurpose_plan queue_distribution record_publication get_performance",
   conversion:
     "list_pages get_page create_page generate_structure generate_copy request_approval get_performance audit_page revise_page revert_page",
   sales_agents:
@@ -476,9 +476,25 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         delete fields.title;
         delete fields.summary;
       }
+      if (name === "content.create_upload_url") {
+        delete fields.asset_id;
+        delete fields.summary;
+        delete fields.title;
+        fields.brief_id = id;
+        fields.content_type = z.enum(["image/png", "image/jpeg", "image/webp"]);
+        fields.filename = z
+          .string()
+          .trim()
+          .min(1)
+          .max(200)
+          .regex(/^[A-Za-z0-9][A-Za-z0-9._ -]*$/)
+          .optional();
+        fields.byte_size = z.number().int().min(1).max(26_214_400).optional();
+      }
       if (name === "content.submit_asset") {
         delete fields.asset_id;
-        fields.storage_path = z.string().trim().min(1).max(500);
+        fields.storage_path = z.string().trim().min(1).max(500).optional();
+        fields.pending_asset_id = id.optional();
         fields.media_type = z.enum(["image", "video", "text"]);
         fields.brief_id = id.optional();
         fields.assignment_id = id.optional();
@@ -725,6 +741,7 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         "content.record_publication",
         // Sec Phase 16b: bot_production only (PRODUCTION_ONLY_TOOLS + RPC).
         "content.assign_production",
+        "content.create_upload_url",
         "content.submit_asset",
       ]);
       // Sec Phase 16b: isolation tests must stay green before adding a name.
@@ -820,11 +837,18 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         ].includes(name)
           ? "real"
           : "stub";
+      const objectSchema = z.object(fields).strict();
+      const input =
+        name === "content.submit_asset"
+          ? objectSchema.refine((value) =>
+              Boolean(value.storage_path || value.pending_asset_id),
+            )
+          : objectSchema;
       return {
         name,
         domain,
         description: `${action.replaceAll("_", " ")} in AA ${domain.replaceAll("_", " ")}. ${implementation === "stub" ? "Contract only; AA adapter not implemented." : ""}`,
-        input: z.object(fields).strict(),
+        input,
         output: resultSchema,
         risk:
           action === "deploy"

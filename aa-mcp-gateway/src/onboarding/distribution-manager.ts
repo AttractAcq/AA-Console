@@ -12,7 +12,7 @@ export const distributionManager = {
   bot_id: "bot_distribution", reads, writes, stubs,
   grants: [...reads, ...writes, ...stubs],
   expectedDiscovery: [...reads, ...writes],
-  forbidden: ["economics", "security", "engineering", "pipeline", "sales_agents", "finance", "deploy", "infra", "secrets", "admin", "workflow.record_decision", "content.select_idea", "content.approve_asset", "content.generate_brief", "content.generate_ideas", "content.assign_production", "content.submit_asset", "campaign.create", "campaign.update", "campaign.request_approval"],
+  forbidden: ["economics", "security", "engineering", "pipeline", "sales_agents", "finance", "deploy", "infra", "secrets", "admin", "workflow.record_decision", "content.select_idea", "content.approve_asset", "content.generate_brief", "content.generate_ideas", "content.assign_production", "content.create_upload_url", "content.submit_asset", "campaign.create", "campaign.update", "campaign.request_approval"],
   future: [] as string[],
   connector: { ...chiefOfStaff.connector, args: [...chiefOfStaff.connector.args] },
   contractSteps: [4, 5, 6, 7, 8, 9, 10],

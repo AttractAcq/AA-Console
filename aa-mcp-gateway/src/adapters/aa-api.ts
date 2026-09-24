@@ -290,13 +290,29 @@ ROUTES["content.assign_production"] = {
     .input.omit({ idempotency_key: true } as never)
     .strip(),
 };
+ROUTES["content.create_upload_url"] = {
+  path: "/internal/mcp/content/create-upload-url",
+  kind: "write",
+  input: registry
+    .find((t) => t.name === "content.create_upload_url")!
+    .input.omit({ idempotency_key: true } as never)
+    .strip(),
+};
 ROUTES["content.submit_asset"] = {
   path: "/internal/mcp/content/submit-asset",
   kind: "write",
-  input: registry
-    .find((t) => t.name === "content.submit_asset")!
-    .input.omit({ idempotency_key: true } as never)
-    .strip(),
+  input: z
+    .object({
+      client_id: uuid,
+      storage_path: z.string().trim().min(1).max(500).optional(),
+      pending_asset_id: uuid.optional(),
+      media_type: z.enum(["image", "video", "text"]),
+      brief_id: uuid.optional(),
+      assignment_id: uuid.optional(),
+      title: z.string().trim().min(1).max(200).optional(),
+    })
+    .strip()
+    .refine((value) => Boolean(value.storage_path || value.pending_asset_id)),
 };
 
 for (const tool of registry.filter(
@@ -373,6 +389,10 @@ const codes = new Set([
   "proof_not_found",
   "invalid_production_route",
   "member_not_found",
+  "upload_not_found",
+  "upload_expired",
+  "upload_consumed",
+  "bytes_missing",
   "idempotency_conflict",
   "brief_agent_unavailable",
   "repurpose_agent_unavailable",
@@ -525,12 +545,23 @@ function aaBody(
     if (input.size !== undefined) body.size = input.size;
     return body;
   }
+  if (tool === "content.create_upload_url") {
+    const body: Record<string, unknown> = {
+      client_id: input.client_id,
+      brief_id: input.brief_id,
+      content_type: input.content_type,
+    };
+    if (input.filename !== undefined) body.filename = input.filename;
+    if (input.byte_size !== undefined) body.byte_size = input.byte_size;
+    return body;
+  }
   if (tool === "content.submit_asset") {
     const body: Record<string, unknown> = {
       client_id: input.client_id,
-      storage_path: input.storage_path,
       media_type: input.media_type,
     };
+    if (input.storage_path !== undefined) body.storage_path = input.storage_path;
+    if (input.pending_asset_id !== undefined) body.pending_asset_id = input.pending_asset_id;
     if (input.brief_id !== undefined) body.brief_id = input.brief_id;
     if (input.assignment_id !== undefined) body.assignment_id = input.assignment_id;
     if (input.title !== undefined) body.title = input.title;
@@ -895,6 +926,59 @@ export class AAApiAdapter implements Adapter {
           if (row.client_id !== input.client_id)
             return fail("malformed_response", response.status);
         }
+      }
+      if (tool.name === "content.create_upload_url") {
+        if (response.status !== 200)
+          return fail("malformed_response", response.status);
+        if (context.bot !== "bot_production") {
+          const readCheck = z
+            .object({
+              client_id: uuid,
+              brief_id: uuid,
+              brief_status: z.string().min(1),
+              eligible: z.literal(true),
+              read_check: z.literal(true),
+            })
+            .strict()
+            .safeParse(raw);
+          if (
+            !readCheck.success ||
+            readCheck.data.client_id !== input.client_id ||
+            readCheck.data.brief_id !== input.brief_id
+          )
+            return fail("malformed_response", response.status);
+          return {
+            status: "completed",
+            capability: tool.name,
+            data: readCheck.data,
+          };
+        }
+        const minted = z
+          .object({
+            client_id: uuid,
+            brief_id: uuid,
+            pending_asset_id: uuid,
+            storage_path: z.string().min(1).max(500),
+            upload_url: z.string().url(),
+            expires_at: z.string().min(1),
+            content_type: z.enum(["image/png", "image/jpeg", "image/webp"]),
+            headers: z.record(z.string(), z.string()).optional(),
+            replayed: z.boolean().optional(),
+            filename: z.string().nullable().optional(),
+            byte_size: z.number().int().nullable().optional(),
+          })
+          .strict()
+          .safeParse(raw);
+        if (
+          !minted.success ||
+          minted.data.client_id !== input.client_id ||
+          minted.data.brief_id !== input.brief_id ||
+          !minted.data.storage_path.startsWith(`${input.client_id}/`) ||
+          minted.data.storage_path.includes("..") ||
+          minted.data.upload_url.toLowerCase().includes("service_role")
+        )
+          return fail("malformed_response", response.status);
+        return { status: "completed", capability: tool.name, data: minted.data };
       }
       if (route.kind === "queue") {
         if (![200, 202].includes(response.status))

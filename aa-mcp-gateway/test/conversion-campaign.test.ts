@@ -55,7 +55,7 @@ async function mockAa(
 
 test("Phase 16 registry: conversion and campaign execution tools are real", () => {
   // Catalog size after #48+#47+#46 (90+7 conversion/campaign + 3 sales + 3 brand/sites).
-  assert.equal(registry.length, 103);
+  assert.equal(registry.length, 104);
   assert.equal(marketingDirector.grants.length, 45);
   assert.equal(marketingDirector.phase16Owned.length, 17);
   for (const name of [
