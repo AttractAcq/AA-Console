@@ -81,6 +81,18 @@ const NOT_READY: Requirement[] = [
   req("Sales agent", true, "Built and live."),
 ];
 
+/**
+ * What `.limit()` hands back: awaitable for the list reads, and still
+ * chainable into `.maybeSingle()` for the Meta section's single-row reads,
+ * which find nothing here — no integration, no build yet.
+ */
+function limited(data: unknown, error: unknown = null) {
+  return Object.assign(Promise.resolve({ data, error }), { maybeSingle: noRow });
+}
+function noRow() {
+  return Promise.resolve({ data: null, error: null });
+}
+
 /** A thenable query chain resolving to whatever rows it is given. */
 function rows(data: unknown[], error: unknown = null) {
   const chain: Record<string, unknown> = {
@@ -88,7 +100,8 @@ function rows(data: unknown[], error: unknown = null) {
     eq: () => chain,
     is: () => chain,
     order: () => chain,
-    limit: () => Promise.resolve({ data, error }),
+    maybeSingle: noRow,
+    limit: () => limited(data, error),
     then: (r: (v: { data: unknown; error: unknown }) => unknown) =>
       Promise.resolve({ data, error }).then(r),
   };
@@ -293,7 +306,8 @@ describe("building what the campaign needs", () => {
         eq: () => chain,
         is: () => chain,
         order: () => chain,
-        limit: () => Promise.resolve({ data: [] }),
+        maybeSingle: noRow,
+        limit: () => limited([]),
         then: (r: (v: { data: unknown }) => unknown) =>
           Promise.resolve({ data: [planned()] }).then(r),
       };
@@ -326,7 +340,7 @@ describe("campaign visibility", () => {
     initial.unmount();
     from.mockImplementation(() => {
       const chain = { select: () => chain, eq: () => chain, is: () => chain, order: () => chain,
-        limit: () => Promise.resolve({ data: [] }),
+        maybeSingle: noRow, limit: () => limited([]),
         then: (r: (v: unknown) => unknown) => Promise.resolve({ data: null, error: { message } }).then(r) };
       return chain;
     });
