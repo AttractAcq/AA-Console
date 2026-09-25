@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
-import { ChevronRight, Plus, Trash2 } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { FormModal } from "../../components/forms/FormModal";
@@ -88,13 +88,10 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export function CampaignExecutionPanel() {
-  const { clientId } = useParams<{ clientId: string }>();
+  const { clientId, campaignId } = useParams<{ clientId: string; campaignId?: string }>();
+  const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [readiness, setReadiness] = useState<Record<string, Requirement[]>>({});
-  const [contentCampaignId, setContentCampaignId] = useState<string | null>(null);
-  // Collapsed on load, every time. A client with fifteen campaigns opened a
-  // page of fifteen full cards; nobody scrolls that to find one.
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
   const [proposing, setProposing] = useState(false);
   // The dialog's own pick, kept here so the generated draft can carry it into
@@ -130,14 +127,15 @@ export function CampaignExecutionPanel() {
       if (!clientId) {
         throw new Error("No client selected.");
       }
-      const { data, error } = await supabase
+      const query = supabase
         .from("client_campaigns")
         .select(
           "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_built_at",
         )
         .eq("client_id", clientId)
         // A campaign somebody archived is over. It reads from the archive.
-        .is("archived_at", null)
+        .is("archived_at", null);
+      const { data, error } = await (campaignId ? query.eq("id", campaignId) : query)
         .order("created_at", { ascending: false });
 
       if (version !== request.current) return;
@@ -167,7 +165,7 @@ export function CampaignExecutionPanel() {
     } finally {
       if (version === request.current) setLoading(false);
     }
-  }, [clientId]);
+  }, [clientId, campaignId]);
 
   useEffect(() => {
     void refresh();
@@ -338,19 +336,22 @@ export function CampaignExecutionPanel() {
         ? `Deleted "${campaign.name}", along with ${parts.join(", ")}.`
         : `Deleted "${campaign.name}".`,
     );
-    if (contentCampaignId === campaign.id) setContentCampaignId(null);
-    void refresh();
+    if (campaignId) navigate(`/clients/${clientId}/delivery/campaign-execution`);
+    else void refresh();
   };
+
+  const visibleCampaigns = campaignId ? campaigns.filter((campaign) => campaign.id === campaignId) : campaigns;
 
   return (
     <div>
       <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
 
-      <div className="mb-4 flex justify-end">
+      {campaignId && clientId && <Link to={`/clients/${clientId}/delivery/campaign-execution`} className="mb-4 inline-block text-sm text-brand-strong hover:underline">← All campaigns</Link>}
+      {!campaignId && <div className="mb-4 flex justify-end">
         <Button icon={Plus} onClick={() => setNewOpen(true)}>
           New Campaign
         </Button>
-      </div>
+      </div>}
 
       {notice && (
         <p role="status" className="mb-4 text-sm text-brand-strong">
@@ -366,11 +367,11 @@ export function CampaignExecutionPanel() {
       {readinessError && <p role="alert">{readinessError}</p>}
       {loadError ? <p role="alert">{loadError}</p> : loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : campaigns.length === 0 ? (
-        <EmptyState label="No campaigns yet" />
+      ) : visibleCampaigns.length === 0 ? (
+        <EmptyState label={campaignId ? "Campaign not found" : "No campaigns yet"} />
       ) : (
         <div className="space-y-4">
-          {campaigns.map((c) => {
+          {visibleCampaigns.map((c) => {
             const reqs = readiness[c.id] ?? [];
             const unmet = reqs.filter((r) => !r.met);
             const ready = reqs.length > 0 && unmet.length === 0;
@@ -379,38 +380,18 @@ export function CampaignExecutionPanel() {
             return (
               <div key={c.id} className="rounded-lg border border-border bg-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  {/* The whole heading toggles, not a chevron nobody can hit. */}
-                  {/* h3 wraps the button so the campaign name stays a
-                      heading. A heading inside a button would be invalid: a
-                      button may only contain phrasing content. */}
                   <h3 className="min-w-0 flex-1">
-                  <button
-                    type="button"
-                    aria-expanded={expanded.has(c.id)}
-                    onClick={() =>
-                      setExpanded((previous) => {
-                        const next = new Set(previous);
-                        if (next.has(c.id)) next.delete(c.id);
-                        else next.add(c.id);
-                        return next;
-                      })
-                    }
-                    className="flex w-full items-start gap-2 rounded text-left text-sm font-semibold text-card-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  {campaignId ? <span className="flex w-full items-start gap-2 text-lg font-semibold text-card-foreground">{c.name}</span> : <Link
+                    to={`/clients/${clientId}/delivery/campaign-execution/${c.id}`}
+                    className="flex w-full items-start gap-2 rounded text-left text-sm font-semibold text-card-foreground hover:text-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <ChevronRight
-                      aria-hidden="true"
-                      className={cn(
-                        "mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                        expanded.has(c.id) && "rotate-90",
-                      )}
-                    />
                     <span className="min-w-0">
                       <span className="block">{c.name}</span>
                       <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
                         {c.objective ?? c.brief}
                       </span>
                     </span>
-                  </button>
+                  </Link>}
                   </h3>
                   <span
                     className={cn(
@@ -422,7 +403,16 @@ export function CampaignExecutionPanel() {
                   </span>
                 </div>
 
-                {!expanded.has(c.id) ? null : c.built_at ? (
+                {campaignId && <dl className="mt-4 grid gap-3 border-t border-border pt-3 text-xs sm:grid-cols-2">
+                  <div><dt className="text-muted-foreground">Brief</dt><dd className="whitespace-pre-wrap text-card-foreground">{c.brief}</dd></div>
+                  <div><dt className="text-muted-foreground">Objective</dt><dd className="text-card-foreground">{c.objective ?? "Awaiting plan"}</dd></div>
+                  <div><dt className="text-muted-foreground">Offer</dt><dd className="text-card-foreground">{c.offer_summary ?? "—"}</dd></div>
+                  <div><dt className="text-muted-foreground">Budget</dt><dd className="text-card-foreground">{c.budget == null ? "—" : c.budget.toLocaleString()}</dd></div>
+                  <div><dt className="text-muted-foreground">Dates</dt><dd className="text-card-foreground">{c.starts_on ?? "—"} to {c.ends_on ?? "—"}</dd></div>
+                  <div><dt className="text-muted-foreground">Template</dt><dd className="text-card-foreground">{c.template ?? "—"}</dd></div>
+                </dl>}
+
+                {!campaignId ? null : c.built_at ? (
                   <dl className="mt-3 grid gap-3 border-t border-border pt-3 text-xs sm:grid-cols-4">
                     <div>
                       <dt className="text-muted-foreground">Audience</dt>
@@ -454,12 +444,7 @@ export function CampaignExecutionPanel() {
                   </p>
                 )}
 
-                {/* Collapsed still says where the campaign stands. Triaging a
-                    list of fifteen must not require opening all fifteen.
-                    Built as one string: two expressions in one element become
-                    two text nodes, which no text matcher can see as a
-                    sentence. */}
-                {!expanded.has(c.id) && (
+                {!campaignId && (
                   <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
                     {[
                       c.built_at
@@ -476,7 +461,7 @@ export function CampaignExecutionPanel() {
                   </p>
                 )}
 
-                {expanded.has(c.id) && (
+                {campaignId && (
                 <div className="mt-3 border-t border-border pt-3">
                   <h4 className="text-xs font-semibold text-foreground">Before this can launch</h4>
                   {reqs.length === 0 ? (
@@ -501,7 +486,7 @@ export function CampaignExecutionPanel() {
                 </div>
                 )}
 
-                {expanded.has(c.id) && clientId && (
+                {campaignId && clientId && (
                   <MetaBuildSection
                     clientId={clientId}
                     campaign={c}
@@ -510,7 +495,7 @@ export function CampaignExecutionPanel() {
                   />
                 )}
 
-                {expanded.has(c.id) && (
+                {campaignId && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
                   {!c.built_at && (
                     <button
@@ -522,11 +507,6 @@ export function CampaignExecutionPanel() {
                       {isPlanning ? "Planning…" : "Run the planner"}
                     </button>
                   )}
-                  <button type="button"
-                    aria-expanded={contentCampaignId === c.id}
-                    onClick={() => setContentCampaignId(contentCampaignId === c.id ? null : c.id)}
-                    className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-card-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >Content production</button>
                   {c.built_at && (
                     <button
                       type="button"
@@ -572,7 +552,7 @@ export function CampaignExecutionPanel() {
                     id={c.id}
                     archived={false}
                     noun="campaign"
-                    onDone={() => void refresh()}
+                    onDone={() => navigate(`/clients/${clientId}/delivery/campaign-execution`)}
                     onError={setProblem}
                   />
                   <button
@@ -587,7 +567,7 @@ export function CampaignExecutionPanel() {
                   </button>
                 </div>
                 )}
-                {contentCampaignId === c.id && clientId && <CampaignContentPanel key={`${clientId}:${c.id}`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} template={c.template} mirrorsTemplate={c.mirrors_template} onChanged={refresh} refreshToken={campaigns} />}
+                {campaignId && clientId && <CampaignContentPanel key={`${clientId}:${c.id}`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} template={c.template} mirrorsTemplate={c.mirrors_template} onChanged={refresh} refreshToken={campaigns} />}
               </div>
             );
           })}

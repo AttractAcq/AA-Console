@@ -115,6 +115,14 @@ it("queues campaign idea generation for an older planned campaign", async () => 
   expect(await screen.findByRole("status")).toHaveTextContent("creating the campaign-specific content ideas");
 });
 
+it("still offers the planned idea batch when a manual idea was assigned first", async () => {
+  ideas = [{ ...idea, source: "manual", campaign_position: 3 }];
+  links = [];
+  show({ contentIdeasGeneratedAt: null });
+  expect(await screen.findByText("WhatsApp photo triage")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Generate campaign ideas" })).toBeInTheDocument();
+});
+
 it("manual approval is tightly scoped to the campaign idea", async () => {
   show();
   fireEvent.click(await screen.findByRole("button", { name: "Approve" }));

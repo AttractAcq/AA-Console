@@ -2,7 +2,11 @@ import { createElement } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const { from, rpc, update, eq, single, order, loadContentPillars } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), update: vi.fn(), eq: vi.fn(), single: vi.fn(), order: vi.fn(), loadContentPillars: vi.fn() }));
+const { from, rpc, update, eq, single, order, insert, positions, campaignOrder, campaignSingle, campaignNot, campaignIs, campaignEq, loadContentPillars } = vi.hoisted(() => ({
+  from: vi.fn(), rpc: vi.fn(), update: vi.fn(), eq: vi.fn(), single: vi.fn(), order: vi.fn(),
+  insert: vi.fn(), positions: vi.fn(), campaignOrder: vi.fn(), campaignSingle: vi.fn(),
+  campaignNot: vi.fn(), campaignIs: vi.fn(), campaignEq: vi.fn(), loadContentPillars: vi.fn(),
+}));
 // Only the loaders are faked; MEDIA_TYPE_OPTIONS and useOptions are real,
 // because the form renders through them.
 vi.mock("../../lib/options", async (importOriginal) => ({
@@ -21,12 +25,98 @@ vi.mock("../../lib/useAgentJobs", () => ({ useAgentJobs: () => ({ inFlight: [], 
 import { GenerationPanel } from "./GenerationPanel";
 beforeEach(() => {
   vi.clearAllMocks();
-  const chain = { select: () => chain, eq, update, single, order, is: () => chain };
-  from.mockReturnValue(chain); eq.mockReturnValue(chain); update.mockReturnValue(chain);
+  const chain = {
+    select: () => chain, eq, update, single, order, insert, is: () => chain,
+    then: (resolve: (value: unknown) => unknown) => Promise.resolve(positions()).then(resolve),
+  };
+  const campaignChain = {
+    select: () => campaignChain, eq: campaignEq, not: campaignNot, is: campaignIs,
+    order: campaignOrder, maybeSingle: campaignSingle,
+  };
+  from.mockImplementation((table: string) => table === "client_campaigns" ? campaignChain : chain);
+  eq.mockReturnValue(chain); update.mockReturnValue(chain);
+  campaignEq.mockReturnValue(campaignChain);
+  campaignNot.mockReturnValue(campaignChain);
+  campaignIs.mockReturnValue(campaignChain);
+  campaignOrder.mockResolvedValue({ data: [{ id: "campaign-1", name: "Autumn launch", status: "planning" }], error: null });
+  campaignSingle.mockResolvedValue({ data: { id: "campaign-1", built_at: "2026-09-20", content_count: 2, content_ideas_generated_at: "2026-09-20" }, error: null });
+  positions.mockReturnValue({ data: [{ campaign_position: 1 }, { campaign_position: 2 }], error: null });
+  insert.mockResolvedValue({ error: null });
   single.mockResolvedValue({ data: { id: "draft-1" }, error: null });
   rpc.mockResolvedValue({ error: null });
   loadContentPillars.mockResolvedValue([{ value: "pil-1", label: "Honest proof · 25% of the calendar" }]);
   order.mockResolvedValue({ data: ["draft", "approved", "briefed", "rejected"].map((status, i) => ({ id: `${status}-${i + 1}`, title: status + " idea", source: "manual", media_type: "image", status })) });
+});
+
+describe("manual idea campaign assignment", () => {
+  async function openManualIdea() {
+    render(<GenerationPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /Manual Idea/i }));
+    const dialog = within(screen.getByRole("dialog"));
+    await dialog.findByRole("option", { name: "Autumn launch · planning" });
+    await userEvent.type(dialog.getByLabelText(/^Idea/), "A human idea");
+    return dialog;
+  }
+
+  it("keeps campaign optional", async () => {
+    const dialog = await openManualIdea();
+    await userEvent.click(dialog.getByRole("button", { name: "Add idea" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      client_id: "client-1", title: "A human idea", source: "manual",
+    })));
+    expect(insert.mock.calls[0][0]).not.toHaveProperty("campaign_id");
+    expect(campaignSingle).not.toHaveBeenCalled();
+  });
+
+  it("assigns a built campaign and appends after its existing ideas", async () => {
+    positions.mockReturnValue({ data: [{ campaign_position: 1 }, { campaign_position: 2 }, { campaign_position: 4 }], error: null });
+    const dialog = await openManualIdea();
+    expect(campaignEq).toHaveBeenCalledWith("client_id", "client-1");
+    expect(campaignNot).toHaveBeenCalledWith("built_at", "is", null);
+    expect(campaignIs).toHaveBeenCalledWith("archived_at", null);
+    await userEvent.selectOptions(dialog.getByLabelText(/Assign to campaign/), "campaign-1");
+    await userEvent.click(dialog.getByRole("button", { name: "Add idea" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      campaign_id: "campaign-1", campaign_position: 5,
+    })));
+    expect(await screen.findByText("Idea added to Autumn launch.")).toBeInTheDocument();
+  });
+
+  it("reserves positions for campaign ideas the planner has not generated yet", async () => {
+    campaignSingle.mockResolvedValue({ data: { id: "campaign-1", built_at: "2026-09-20", content_count: 3, content_ideas_generated_at: null }, error: null });
+    positions.mockReturnValue({ data: [], error: null });
+    const dialog = await openManualIdea();
+    await userEvent.selectOptions(dialog.getByLabelText(/Assign to campaign/), "campaign-1");
+    await userEvent.click(dialog.getByRole("button", { name: "Add idea" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({ campaign_position: 4 })));
+  });
+
+  it("can add a manual idea after a full 30-piece planned batch", async () => {
+    positions.mockReturnValue({ data: Array.from({ length: 30 }, (_, index) => ({ campaign_position: index + 1 })), error: null });
+    const dialog = await openManualIdea();
+    await userEvent.selectOptions(dialog.getByLabelText(/Assign to campaign/), "campaign-1");
+    await userEvent.click(dialog.getByRole("button", { name: "Add idea" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({ campaign_position: 31 })));
+  });
+
+  it("refuses a campaign that stopped being built before save", async () => {
+    campaignSingle.mockResolvedValue({ data: { id: "campaign-1", built_at: null, content_count: 2, content_ideas_generated_at: null }, error: null });
+    const dialog = await openManualIdea();
+    await userEvent.selectOptions(dialog.getByLabelText(/Assign to campaign/), "campaign-1");
+    await userEvent.click(dialog.getByRole("button", { name: "Add idea" }));
+    expect(await dialog.findByRole("alert")).toHaveTextContent("no longer built");
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("shows the assigned campaign in the ideas table", async () => {
+    order.mockResolvedValue({ data: [{
+      id: "idea-1", title: "Campaign idea", source: "manual", media_type: "image",
+      content_format: "single", status: "draft", campaign: { name: "Autumn launch" },
+    }] });
+    render(<GenerationPanel />);
+    expect(await screen.findByText("Autumn launch")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Campaign" })).toBeInTheDocument();
+  });
 });
 it("scopes manual approval to the selected draft and client, then refreshes", async () => {
   render(<GenerationPanel />);
