@@ -55,9 +55,31 @@ beforeAll(async () => {
       id uuid primary key default gen_random_uuid(),
       lead_id uuid references client_leads(id)
     );
+    insert into clients (id,name,initials)
+      values ('66666666-6666-4666-8666-666666666666','Legacy','LG');
+    insert into client_leads (id,client_id,name,stage) values
+      ('77777777-7777-4777-8777-777777777777','66666666-6666-4666-8666-666666666666','Old lead','lead'),
+      ('88888888-8888-4888-8888-888888888888','66666666-6666-4666-8666-666666666666','Old sale','sale');
+    insert into lead_events (lead_id,client_id,kind,body)
+      values ('77777777-7777-4777-8777-777777777777','66666666-6666-4666-8666-666666666666','note','Old note');
+    insert into client_sales_agents (id,client_id,name,purpose)
+      values ('99999999-9999-4999-8999-999999999999','66666666-6666-4666-8666-666666666666','Legacy agent','Calls');
+    insert into sales_agent_conversations (client_id,sales_agent_id,lead_id)
+      values ('66666666-6666-4666-8666-666666666666','99999999-9999-4999-8999-999999999999','77777777-7777-4777-8777-777777777777');
+    insert into mcp_internal.mcp_pipeline_requests (lead_id)
+      values ('88888888-8888-4888-8888-888888888888');
   `);
   await db.exec(await migration("20260925120000_128_lead_stage_enum.sql"));
   await db.exec(await migration("20260925121000_129_lead_pipeline_archive.sql"));
+  expect((await db.query("select id from client_leads")).rows).toHaveLength(0);
+  expect((await db.query("select id from lead_events")).rows).toHaveLength(0);
+  expect((await db.query("select lead_id from sales_agent_conversations where lead_id is not null")).rows).toHaveLength(1);
+  expect((await db.query("select lead_id from mcp_internal.mcp_pipeline_requests where lead_id is not null")).rows).toHaveLength(1);
+  await db.exec(`
+    delete from sales_agent_conversations; delete from client_sales_agents;
+    delete from mcp_internal.mcp_pipeline_requests; delete from lead_identities;
+    delete from clients;
+  `);
   await db.exec(`
     insert into auth.users (id) values ('${ADMIN}'),('${CLIENT_USER}'),('${OTHER_USER}');
     update profiles set role='admin' where id='${ADMIN}';

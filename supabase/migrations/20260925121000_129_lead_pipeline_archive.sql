@@ -45,6 +45,11 @@ alter table mcp_internal.mcp_pipeline_requests drop constraint mcp_pipeline_requ
 alter table mcp_internal.mcp_pipeline_requests add constraint mcp_pipeline_requests_lead_id_fkey
   foreign key (lead_id) references lead_identities(id);
 
+-- Alex confirmed on 25 Sept 2026 that the existing prospects are disposable.
+-- Clear only the rows present when this migration runs. Lead events cascade;
+-- durable identities keep historical conversation and MCP request references valid.
+delete from client_leads;
+
 create table archived_leads (
   id uuid primary key references lead_identities(id),
   client_id uuid not null references clients(id) on delete cascade,
@@ -71,7 +76,7 @@ returns integer language sql immutable security definer set search_path = public
     when 'conversation' then 4 when 'qualified_conversation' then 5
     when 'appointment' then 6 when 'qualified_appointment' then 7
     when 'shown' then 8 when 'cash' then 9
-    -- Legacy stages remain readable until Alex confirms their mapping.
+    -- Legacy enum values remain readable if an older writer uses them.
     when 'lead' then 3 when 'sale' then 8 when 'lost' then 1
   end;
 $$;
@@ -226,7 +231,7 @@ begin
     raise exception 'This lead has cash collected. Archiving it would remove that revenue from reports.';
   end if;
   if v_lead.stage in ('lead','sale') then
-    raise exception 'This legacy stage needs Alex''s mapping approval before it can be archived.';
+    raise exception 'Move this legacy lead to a current stage before archiving.';
   end if;
   insert into archived_leads (id,client_id,name,stage_at_archive,lead,events,reason,archived_by)
   select v_lead.id,v_lead.client_id,v_lead.name,v_lead.stage,to_jsonb(v_lead),
@@ -247,7 +252,7 @@ begin
   if not found then raise exception 'That archived lead no longer exists.'; end if;
   if not can_access_client(v_archive.client_id) then raise exception 'Not permitted for this client'; end if;
   if v_archive.stage_at_archive in ('lead','sale') then
-    raise exception 'This legacy stage needs Alex''s mapping approval before recovery.';
+    raise exception 'This legacy lead cannot be recovered into an old stage.';
   end if;
   insert into client_leads select * from jsonb_populate_record(null::client_leads,v_archive.lead);
   insert into lead_events select * from jsonb_populate_recordset(null::lead_events,v_archive.events);

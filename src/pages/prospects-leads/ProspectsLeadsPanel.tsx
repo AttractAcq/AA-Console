@@ -239,7 +239,7 @@ export function ProspectsLeadsPanel() {
       )}
 
       {legacy.length > 0 && <p role="status" className="text-sm text-muted-foreground">
-        {legacy.length} legacy lead{legacy.length === 1 ? "" : "s"} in old stages await Alex&apos;s mapping approval. They remain unchanged in storage.
+        {legacy.length} lead{legacy.length === 1 ? "" : "s"} in retired stages need administrator cleanup.
       </p>}
 
       <FormModal
