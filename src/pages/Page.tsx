@@ -1,8 +1,12 @@
-import { useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
+import { useState } from "react";
+import { Download } from "lucide-react";
 import { ClientDashboardPanel } from "./dashboard/ClientDashboardPanel";
 import type { ReactNode } from "react";
 import type { NavNode, NavTab } from "../config/navigation";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
+import { downloadModuleZip, downloadTabPdf, type ExportModule } from "../lib/moduleExport";
 import { Tabs } from "../components/Tabs";
 import { EmptyState } from "../components/EmptyState";
 import { DashboardPanel } from "./DashboardPanel";
@@ -173,7 +177,12 @@ function getPanelBody(
 
 export function Page({ node }: { node: NavNode }) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { clientId } = useParams<{ clientId: string }>();
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const tabs = node.tabs;
+  const exportModule: ExportModule | null =
+    node.id === "intelligence" || node.id === "strategy" ? node.id : null;
 
   const requestedTab = searchParams.get("tab");
   const activeTab =
@@ -190,14 +199,45 @@ export function Page({ node }: { node: NavNode }) {
     }
   }
 
+  async function handleExport(all: boolean) {
+    if (!clientId || !exportModule || !tabs || !activeTab) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      if (all) await downloadModuleZip(clientId, exportModule, tabs);
+      else await downloadTabPdf(clientId, exportModule, activeTab);
+    } catch (error) {
+      setExportError(`Download failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div>
-      <PageHeader title={node.label} />
+      {exportModule && clientId ? (
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[22px] font-semibold tracking-[-0.012em] text-foreground">{node.label}</h1>
+          </div>
+          <Button icon={Download} disabled={exporting} onClick={() => void handleExport(true)}>
+            {exporting ? "Preparing download…" : "Download all"}
+          </Button>
+        </div>
+      ) : <PageHeader title={node.label} />}
       {tabs && activeTab && (
         <div className="mb-6">
           <Tabs tabs={tabs} activeId={activeTab.id} onChange={handleTabChange} />
         </div>
       )}
+      {exportModule && clientId && activeTab && (
+        <div className="mb-4 flex justify-end">
+          <Button icon={Download} disabled={exporting} onClick={() => void handleExport(false)}>
+            {exporting ? "Preparing download…" : "Download PDF"}
+          </Button>
+        </div>
+      )}
+      {exportError && <p role="alert" className="mb-4 text-sm text-destructive">{exportError}</p>}
       <div
         id={activeTab ? `tabpanel-${activeTab.id}` : undefined}
         role={activeTab ? "tabpanel" : undefined}
