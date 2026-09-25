@@ -212,7 +212,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
     <p className="text-xs text-muted-foreground">{ready} ready to distribute · {contentCount} pieces planned · {ideas.length} campaign ideas</p>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
-    {contentCount > 0 && builtAt && !contentIdeasGeneratedAt && ideas.length === 0 && <div className="rounded-md border border-border p-3">
+    {contentCount > 0 && builtAt && !contentIdeasGeneratedAt && <div className="rounded-md border border-border p-3">
       <p className="text-xs text-muted-foreground">Generate the {contentCount} campaign-specific ideas the planner asked for, then brief and produce them here.</p>
       <button type="button" className={`${buttonClass} mt-2`} disabled={busy !== null || loading} onClick={() => void act(() => supabase.rpc("enqueue_agent_job", {
         p_agent_key: "campaign_plan",

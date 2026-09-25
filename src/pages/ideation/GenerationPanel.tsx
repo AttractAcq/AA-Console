@@ -26,6 +26,13 @@ type Idea = {
   content_format: string;
   source: string;
   status: string;
+  campaign: { name: string } | null;
+};
+
+type CampaignChoice = {
+  id: string;
+  name: string;
+  status: string;
 };
 
 const MANUAL_FIELDS: FieldDef[] = [
@@ -51,6 +58,9 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [activeFormat, setActiveFormat] = useState<FormatFilterId>("all");
   const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignChoice[]>([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [campaignsError, setCampaignsError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<{ ideaId: string; action: "approve" | "brief" | "approve-and-brief" | "delete" } | null>(null);
   const actionInFlight = useRef(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
@@ -65,6 +75,31 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
     [clientId],
   );
 
+  useEffect(() => {
+    if (openCardId !== "manual-idea" || !clientId) return;
+    let cancelled = false;
+    setCampaigns([]);
+    setCampaignsLoading(true);
+    setCampaignsError(null);
+    void (async () => {
+      try {
+        const { data, error } = await supabase.from("client_campaigns")
+          .select("id, name, status")
+          .eq("client_id", clientId)
+          .not("built_at", "is", null)
+          .is("archived_at", null)
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        if (!cancelled) setCampaigns(data ?? []);
+      } catch (error) {
+        if (!cancelled) setCampaignsError(error instanceof Error ? error.message : "Could not load campaigns.");
+      } finally {
+        if (!cancelled) setCampaignsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [clientId, openCardId]);
+
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -73,7 +108,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
       if (!clientId) return;
       const { data, error } = await supabase
         .from("client_ideas")
-        .select("id, title, media_type, content_format, source, status")
+        .select("id, title, media_type, content_format, source, status, campaign:client_campaigns!client_ideas_campaign_client_fkey(name)")
         .eq("client_id", clientId)
         // An idea whose brief exists is record, not work. It lives in the
         // archive from that moment; leaving it here is how 300 drafts and 33
@@ -196,6 +231,23 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
     },
   ];
 
+  const manualFields: FieldDef[] = [
+    ...MANUAL_FIELDS,
+    {
+      name: "campaign_id",
+      label: "Assign to campaign (optional)",
+      kind: "select",
+      options: campaigns.map((campaign) => ({ value: campaign.id, label: `${campaign.name} · ${campaign.status}` })),
+      hint: campaignsError
+        ? `Could not load campaigns: ${campaignsError}`
+        : campaignsLoading
+          ? "Loading built campaigns…"
+          : campaigns.length === 0
+            ? "No built campaigns available for this client. You can still save an unassigned idea."
+            : "The idea will appear under Content production in the chosen campaign. Leave blank to keep it unassigned.",
+    },
+  ];
+
   if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
@@ -226,12 +278,13 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
         <FilterPills options={formatFilters} activeId={activeFormat} onChange={setActiveFormat} />
       </div>
       <DataTable
-        columns={["Idea", "Format", "Type", "Status", ""]}
+        columns={["Idea", "Format", "Type", "Campaign", "Status", ""]}
         emptyLabel={`No ${activeLabel.toLowerCase()} ideas yet`}
         rows={shown.map((i) => [
           i.title,
           formatLabel(i.content_format),
           i.source,
+          i.campaign?.name ?? "—",
           i.status,
           (
             <span key={i.id} className="inline-flex items-center gap-3">
@@ -276,7 +329,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
         onClose={() => setOpenCardId(null)}
         title="Manual Idea"
         draftKey={`idea-manual:${clientId}`}
-        fields={MANUAL_FIELDS}
+        fields={manualFields}
         submitLabel="Add idea"
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
@@ -289,6 +342,36 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
           if (!formatAllows(format, mediaType)) {
             throw new Error(`A ${formatLabel(format).toLowerCase()} cannot be ${mediaType}. Change one of the two.`);
           }
+          const campaignId = (v.campaign_id as string) || null;
+          let campaignPosition: number | null = null;
+          if (campaignId) {
+            if (!campaigns.some((campaign) => campaign.id === campaignId)) {
+              throw new Error("This campaign is no longer available. Close and reopen Manual Idea to refresh the list.");
+            }
+            const [campaignResult, positionsResult] = await Promise.all([
+              supabase.from("client_campaigns")
+                .select("id, built_at, content_count, content_ideas_generated_at")
+                .eq("id", campaignId)
+                .eq("client_id", clientId)
+                .is("archived_at", null)
+                .maybeSingle(),
+              supabase.from("client_ideas")
+                .select("campaign_position")
+                .eq("client_id", clientId)
+                .eq("campaign_id", campaignId),
+            ]);
+            if (campaignResult.error) throw campaignResult.error;
+            if (positionsResult.error) throw positionsResult.error;
+            const campaign = campaignResult.data;
+            if (!campaign?.built_at) throw new Error("This campaign is no longer built and available for ideas.");
+            // The planner owns positions 1…content_count until its batch is
+            // generated. Manual ideas go after those reserved slots.
+            const reserved = campaign.content_ideas_generated_at ? 0 : campaign.content_count;
+            const existing = (positionsResult.data ?? [])
+              .map((row) => row.campaign_position)
+              .filter((position): position is number => position !== null);
+            campaignPosition = Math.max(reserved, 0, ...existing) + 1;
+          }
           const { error } = await supabase.from("client_ideas").insert({
             client_id: clientId,
             title: (v.title as string).trim(),
@@ -296,8 +379,17 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
             media_type: mediaType,
             content_format: format,
             source: "manual",
+            ...(campaignId ? { campaign_id: campaignId, campaign_position: campaignPosition } : {}),
           });
-          if (error) throw error;
+          if (error) {
+            if (error.code === "23505" && campaignId) {
+              throw new Error("Another idea took that campaign position. Try adding this idea again.");
+            }
+            throw error;
+          }
+          setNotice({ kind: "ok", text: campaignId
+            ? `Idea added to ${campaigns.find((campaign) => campaign.id === campaignId)?.name ?? "campaign"}.`
+            : "Idea added." });
         }}
         onSaved={refresh}
       />
