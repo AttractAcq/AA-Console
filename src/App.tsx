@@ -10,6 +10,7 @@ import { EmployeeLoginPage } from "./pages/employee/EmployeeLoginPage";
 import { EmployeeConsolePage } from "./pages/employee/EmployeeConsolePage";
 import { MemberDetailPage } from "./pages/operations/MemberDetailPage";
 import { AgentDetailPage } from "./pages/team/AgentDetailPage";
+import { CampaignExecutionPanel } from "./pages/campaigns/CampaignExecutionPanel";
 import { ThemeProvider } from "./context/theme";
 import { AuthProvider } from "./context/auth";
 import { agencyNav, clientNavGroups } from "./config/navigation";
@@ -100,6 +101,7 @@ export default function App() {
                   index
                   element={<Navigate to="delivery/dashboard" replace />}
                 />
+                <Route path="delivery/campaign-execution/:campaignId" element={<CampaignExecutionPanel />} />
                 {clientNavGroups.flatMap((group) =>
                   (group.children ?? []).map((child) => (
                     <Route

@@ -3,11 +3,12 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, useParams, useAgentJobs, callRuntime } = vi.hoisted(() => ({
+const { from, rpc, useParams, useNavigate, useAgentJobs, callRuntime } = vi.hoisted(() => ({
   callRuntime: vi.fn(),
   from: vi.fn(),
   rpc: vi.fn(),
   useParams: vi.fn(),
+  useNavigate: vi.fn(() => vi.fn()),
   useAgentJobs: vi.fn(),
 }));
 vi.mock("../../lib/supabase", () => ({
@@ -20,6 +21,7 @@ vi.mock("../../lib/supabase", () => ({
 }));
 vi.mock("react-router-dom", () => ({
   useParams,
+  useNavigate,
   // Link renders as an anchor so tests can still find navigation by role.
   Link: ({ to, children, ...rest }: { to: string; children?: unknown }) =>
     createElement("a", { href: to, ...rest }, children as never),
@@ -122,14 +124,13 @@ function show(campaigns: unknown[] = [planned()], reqs: Requirement[] = NOT_READ
   return render(<CampaignExecutionPanel />);
 }
 
-/** Cards arrive collapsed, so anything inside one has to be opened first. */
 async function open(name = "Winter full-arch push") {
-  await userEvent.click(await screen.findByRole("button", { name: new RegExp(name, "i") }));
+  await screen.findByRole("heading", { name: new RegExp(name, "i") });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useParams.mockReturnValue({ clientId: "client-1" });
+  useParams.mockReturnValue({ clientId: "client-1", campaignId: "camp-1" });
   useAgentJobs.mockReturnValue({ inFlight: [], recentFailures: [] });
 });
 
@@ -145,54 +146,26 @@ describe("the plan", () => {
 
   it("says a campaign is still being planned rather than showing empty fields", async () => {
     show([planned({ built_at: null, objective: null })]);
-    // Visible collapsed, because triaging a list must not need fifteen clicks.
-    expect(await screen.findByText(/waiting for the planner/i)).toBeInTheDocument();
+    expect(await screen.findByText("Waiting for the planner to write this.")).toBeInTheDocument();
   });
 });
 
-describe("collapsing", () => {
-  it("opens collapsed, so fifteen campaigns are a list and not a wall", async () => {
-    show();
-    await screen.findByText("Winter full-arch push");
-    // The objective stays visible — it is the card's one-line summary. What
-    // goes away is the detail: channels, requirements, and every action.
-    expect(screen.queryByText("instagram, facebook")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Launch" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Before this can launch")).not.toBeInTheDocument();
-  });
-
-  it("still says where a campaign stands while collapsed", async () => {
-    // Otherwise triaging a list means opening every card in it.
-    show();
-    expect(await screen.findByText(/Planned\. · 2 things still missing/)).toBeInTheDocument();
-  });
-
-  it("opens and closes on the heading", async () => {
-    show();
-    const toggle = await screen.findByRole("button", { name: /Winter full-arch push/i });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("instagram, facebook")).toBeInTheDocument();
-
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("instagram, facebook")).not.toBeInTheDocument();
-  });
-
-  it("opens one card without opening the rest", async () => {
+describe("campaign pages", () => {
+  it("links each list name to its own page without expanding a card", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
     show([planned(), planned({ id: "camp-2", name: "Spring whitening" })]);
-    await userEvent.click(await screen.findByRole("button", { name: /Winter full-arch push/i }));
-    expect(screen.getByRole("button", { name: /Spring whitening/i })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
+    expect(await screen.findAllByRole("heading", { level: 3 })).toHaveLength(2);
+    expect(screen.getByRole("link", { name: /Winter full-arch push/i })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-execution/camp-1");
+    expect(screen.getByRole("link", { name: /Spring whitening/i })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-execution/camp-2");
+    expect(screen.queryByRole("button", { name: "Launch" })).not.toBeInTheDocument();
   });
 
-  it("keeps the campaign name a heading, so the list is still navigable", async () => {
-    show();
-    expect(await screen.findAllByRole("heading", { level: 3 })).toHaveLength(1);
+  it("shows only the selected campaign and its actions", async () => {
+    show([planned(), planned({ id: "camp-2", name: "Spring whitening" })]);
+    await open();
+    expect(screen.queryByText("Spring whitening")).not.toBeInTheDocument();
+    expect(screen.getByText("instagram, facebook")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Launch" })).toBeInTheDocument();
   });
 });
 
@@ -276,7 +249,7 @@ describe("building what the campaign needs", () => {
 
   it("offers neither until the planner has written the campaign", async () => {
     show([planned({ built_at: null, objective: null })]);
-    await screen.findByText(/waiting for the planner/i);
+    await screen.findByText("Waiting for the planner to write this.");
     await open("Winter full-arch push");
     expect(screen.queryByRole("button", { name: "Build landing page" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Build sales agent" })).not.toBeInTheDocument();
@@ -332,6 +305,7 @@ describe("campaign visibility", () => {
     expect(from).toHaveBeenCalledWith("client_campaigns");
   });
   it("distinguishes a successful empty query", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
     show([]);
     expect(await screen.findByText("No campaigns yet")).toBeInTheDocument();
   });
@@ -485,6 +459,7 @@ describe("proposing a campaign", () => {
   };
 
   async function openProposer() {
+    useParams.mockReturnValue({ clientId: "client-1" });
     show();
     await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
     await userEvent.click(screen.getByRole("button", { name: "Generate with AI" }));
@@ -553,6 +528,7 @@ describe("proposing a campaign", () => {
   });
 
   it("does not offer pillars to a client that has none", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
     from.mockImplementation((table: string) =>
       table === "client_content_pillars"
         ? { select: () => ({ eq: () => ({ eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }) }) }) }
@@ -567,6 +543,7 @@ describe("proposing a campaign", () => {
   // Without this the campaign is created, the pillars silently are not, and
   // the planner runs without them while the operator believes they were set.
   it("refuses to queue the planner when the pillars cannot be attached", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
     const pillarInsert = vi.fn().mockResolvedValue({ error: { message: "pillar write failed" } });
     from.mockImplementation((table: string) => {
       if (table === "client_content_pillars") {
@@ -597,6 +574,7 @@ describe("proposing a campaign", () => {
   // A failed load must not look like "this client has no pillars": somebody
   // would plan without them believing there were none to pick.
   it("says so when the pillars could not be loaded", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
     from.mockImplementation((table: string) =>
       table === "client_content_pillars"
         ? {

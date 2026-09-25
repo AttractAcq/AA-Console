@@ -43,7 +43,7 @@ it("lists canonical campaigns across clients and filters readiness, status and c
   mockRows([campaign("planned"), campaign("live", "live", "other")]);
   render(<MemoryRouter><CampaignsPanel /></MemoryRouter>);
   expect(await screen.findByText("Campaign live")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Campaign planned" })).toHaveAttribute("href", `/clients/${clientId}/delivery/campaign-execution`);
+  expect(screen.getByRole("link", { name: "Campaign planned" })).toHaveAttribute("href", `/clients/${clientId}/delivery/campaign-execution/planned`);
   expect(from).not.toHaveBeenCalledWith("campaigns");
   expect(eq).not.toHaveBeenCalled();
   await userEvent.click(screen.getByRole("button", { name: "Ready to Launch" }));
