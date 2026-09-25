@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      archived_leads: {
+        Row: {
+          id: string
+          client_id: string
+          name: string | null
+          stage_at_archive: Database["public"]["Enums"]["lead_stage"]
+          lead: Json
+          events: Json
+          reason: string | null
+          archived_at: string
+          archived_by: string | null
+        }
+        Insert: {
+          id: string
+          client_id: string
+          name?: string | null
+          stage_at_archive: Database["public"]["Enums"]["lead_stage"]
+          lead: Json
+          events?: Json
+          reason?: string | null
+          archived_at?: string
+          archived_by?: string | null
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          name?: string | null
+          stage_at_archive?: Database["public"]["Enums"]["lead_stage"]
+          lead?: Json
+          events?: Json
+          reason?: string | null
+          archived_at?: string
+          archived_by?: string | null
+        }
+        Relationships: []
+      }
+      lead_identities: {
+        Row: { id: string; client_id: string }
+        Insert: { id: string; client_id: string }
+        Update: { id?: string; client_id?: string }
+        Relationships: []
+      }
       agent_job_events: {
         Row: {
           created_at: string
@@ -4697,6 +4739,9 @@ export type Database = {
       content_attribution: {
         Row: {
           appointments: number | null
+          profile_visits: number | null
+          followers: number | null
+          qualified: number | null
           asset_created_at: string | null
           asset_id: string | null
           asset_ref: string | null
@@ -5065,6 +5110,9 @@ export type Database = {
         Args: { p_client_id: string; p_days?: number }
         Returns: {
           appointments: number
+          profile_visits: number
+          followers: number
+          qualified: number
           cash_collected: number
           conversations: number
           cost_per_lead: number
@@ -5105,6 +5153,22 @@ export type Database = {
           p_note?: string
           p_stage: Database["public"]["Enums"]["lead_stage"]
         }
+        Returns: undefined
+      }
+      add_lead_note: {
+        Args: { p_lead_id: string; p_note: string }
+        Returns: undefined
+      }
+      archive_lead: {
+        Args: { p_lead_id: string; p_reason?: string | null }
+        Returns: undefined
+      }
+      recover_lead: {
+        Args: { p_lead_id: string }
+        Returns: undefined
+      }
+      update_lead: {
+        Args: { p_lead_id: string; p_fields: Json }
         Returns: undefined
       }
       approve_idea_and_generate_brief: {
@@ -5192,6 +5256,9 @@ export type Database = {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: {
           appointments: number
+          profile_visits: number
+          followers: number
+          qualified: number
           avg_customer_value: number
           cac: number
           cash_collected: number
@@ -5214,6 +5281,9 @@ export type Database = {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: {
           cac: number
+          profile_visits: number
+          followers: number
+          qualified: number
           campaign_id: string
           campaign_ref: string
           cash_collected: number
@@ -5229,6 +5299,9 @@ export type Database = {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: {
           cac: number
+          profile_visits: number
+          followers: number
+          qualified: number
           cash_collected: number
           channel: string
           cpl: number
@@ -6335,6 +6408,9 @@ export type Database = {
         | "cancelled"
       lead_stage:
         | "lead"
+        | "profile_visit"
+        | "follower"
+        | "qualified"
         | "conversation"
         | "qualified_conversation"
         | "appointment"
@@ -6546,6 +6622,9 @@ export const Constants = {
       ],
       lead_stage: [
         "lead",
+        "profile_visit",
+        "follower",
+        "qualified",
         "conversation",
         "qualified_conversation",
         "appointment",

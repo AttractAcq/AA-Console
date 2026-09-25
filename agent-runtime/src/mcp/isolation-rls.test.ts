@@ -206,9 +206,14 @@ beforeAll(async () => {
   `);
   await db.exec(await migration('20260916150000_91_mcp_attribution_brand_sites.sql'));
   await db.exec(await migration('20260916180000_93_assign_production_ai_render.sql'));
+  for (const file of [
+    '20260925120000_128_lead_stage_enum.sql',
+    '20260925121000_129_lead_pipeline_archive.sql',
+    '20260925123000_131_bot_lead_stages.sql',
+  ]) await db.exec(await migration(file));
   await db.exec(`
     grant select on table clients, client_ideas, campaigns, finance_periods,
-      client_leads, client_billing, finance_entries to authenticated;
+      client_leads, archived_leads, client_billing, finance_entries to authenticated;
     grant execute on function is_admin() to authenticated;
     grant execute on function current_role_of() to authenticated;
     grant execute on function can_access_client(uuid) to authenticated;
@@ -228,7 +233,8 @@ beforeEach(async () => {
       creative_generations, creative_renders, brief_dispatches, job_assignments,
       client_sales_agent_deployments, client_pages,
       agent_job_events, agent_jobs,
-      campaigns, lead_events, client_leads, sales_agent_conversations, client_sales_agents,
+      campaigns, lead_events, client_leads, archived_leads, lead_identities,
+      sales_agent_conversations, client_sales_agents,
       finance_entries, finance_periods, client_billing,
       client_users, clients, profiles, auth.users cascade;
     update mcp_internal.mcp_bots set status = 'active';
@@ -358,6 +364,32 @@ describe('Phase 4 CoS domain prohibitions', () => {
 });
 
 describe('Phase 4 cross-client isolation on an RLS-enabled database', () => {
+  it('isolates archived leads and archive/recover RPCs by client', async () => {
+    const own = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const other = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    await db.exec(`insert into client_leads (id,client_id,name,stage) values
+      ('${own}','${CLIENT_A}','Own','qualified'),
+      ('${other}','${CLIENT_B}','Other','qualified');`);
+    await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
+      select set_config('request.jwt.claim.sub','${USER_A}',false); set role authenticated;`);
+    await db.query('select archive_lead($1,null)', [own]);
+    expect((await db.query<{ id: string }>('select id from archived_leads')).rows.map((r) => r.id)).toEqual([own]);
+    await expect(db.query('select archive_lead($1,null)', [other])).rejects.toThrow(/Not permitted/);
+    await db.exec('reset role;');
+    await db.exec(`select set_config('request.jwt.claim.role','service_role',false);
+      select set_config('request.jwt.claim.sub','',false);`);
+    await db.exec(`insert into archived_leads (id,client_id,name,stage_at_archive,lead,events)
+      select id,client_id,name,stage,to_jsonb(client_leads),'[]'::jsonb
+      from client_leads where id='${other}';
+      delete from client_leads where id='${other}';`);
+    await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
+      select set_config('request.jwt.claim.sub','${USER_A}',false); set role authenticated;`);
+    expect((await db.query<{ id: string }>('select id from archived_leads')).rows.map((r) => r.id)).toEqual([own]);
+    await expect(db.query('select recover_lead($1)', [other])).rejects.toThrow(/Not permitted/);
+    await db.query('select recover_lead($1)', [own]);
+    expect((await db.query<{ id: string }>('select id from client_leads where id=$1', [own])).rows).toHaveLength(1);
+  });
+
   it('positive: same-client enqueue succeeds for a granted active bot', async () => {
     const result = await enqueue('bot_production', 'r1', 'e1', CLIENT_A, IDEA_A);
     expect(result.rows[0]?.result).toMatchObject({ client_id: CLIENT_A, replayed: false });

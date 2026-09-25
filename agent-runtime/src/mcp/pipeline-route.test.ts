@@ -161,6 +161,11 @@ beforeAll(async () => {
   `);
   await db.exec(await migration('20260916140000_90_mcp_sales_proof_production.sql'));
   await db.exec(await migration('20260916180000_93_assign_production_ai_render.sql'));
+  for (const file of [
+    '20260925120000_128_lead_stage_enum.sql',
+    '20260925121000_129_lead_pipeline_archive.sql',
+    '20260925123000_131_bot_lead_stages.sql',
+  ]) await db.exec(await migration(file));
 }, 60_000);
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => {
@@ -175,8 +180,8 @@ beforeEach(async () => {
     update agents set paused = false, archived_at = null, requires_upstream = '{}';
     insert into clients (id,name,initials) values ('${CLIENT}','First','FI'),('${OTHER}','Other','OT');
     insert into client_leads (id,client_id,name,email,stage) values
-      ('${LEAD}','${CLIENT}','Alpha Lead','a@example.com','lead'),
-      ('${LEAD_B}','${OTHER}','Other Lead','b@example.com','lead');
+      ('${LEAD}','${CLIENT}','Alpha Lead','a@example.com','qualified'),
+      ('${LEAD_B}','${OTHER}','Other Lead','b@example.com','qualified');
     insert into client_sales_agents (id,client_id,name,purpose,status,built_at,approved_at) values
       ('${AGENT}','${CLIENT}','Closer','Qualify and book','live', now(), now());
     insert into client_pages (id,client_id,page_type,title,status,published_url,publish_status) values
@@ -271,7 +276,7 @@ describe('Phase 11 pipeline routes', () => {
   it('gets one lead and rejects a cross-client lead id', async () => {
     const ok = await pipeline('get-lead', { client_id: CLIENT, lead_id: LEAD });
     expect(ok.status).toBe(200);
-    expect(ok.body.stage).toBe('lead');
+    expect(ok.body.stage).toBe('qualified');
     const mismatch = await pipeline('get-lead', { client_id: CLIENT, lead_id: LEAD_B });
     expect(mismatch.status).toBe(403);
     expect(mismatch.body.error.code).toBe('client_mismatch');
@@ -286,14 +291,19 @@ describe('Phase 11 pipeline routes', () => {
     expect(summary.body.total_leads).toBe(1);
   });
 
-  it('moves a lead stage, refuses sale/cash at the parse layer, and replays idempotently', async () => {
-    const moved = await pipeline('update-stage', { client_id: CLIENT, lead_id: LEAD, stage: 'conversation' });
+  it('moves through new stages, refuses legacy and cash stages, and replays idempotently', async () => {
+    const moved = await pipeline('update-stage', { client_id: CLIENT, lead_id: LEAD, stage: 'profile_visit' });
     expect(moved.status).toBe(200);
-    expect(moved.body.stage).toBe('conversation');
+    expect(moved.body.stage).toBe('profile_visit');
     expect(moved.body.replayed).toBe(false);
-    const replay = await pipeline('update-stage', { client_id: CLIENT, lead_id: LEAD, stage: 'conversation' });
+    const replay = await pipeline('update-stage', { client_id: CLIENT, lead_id: LEAD, stage: 'profile_visit' });
     expect(replay.body.replayed).toBe(true);
-    for (const stage of ['sale', 'cash']) {
+    for (const stage of ['follower', 'qualified']) {
+      const accepted = await pipeline('update-stage', { client_id: CLIENT, lead_id: LEAD, stage },
+        { headers: { 'idempotency-key': `new-${stage}` } });
+      expect(accepted.status).toBe(200);
+    }
+    for (const stage of ['lead', 'sale', 'cash']) {
       const denied = await pipeline('update-stage', {
         client_id: CLIENT, lead_id: LEAD, stage,
       }, { headers: { 'idempotency-key': `no-${stage}` } });

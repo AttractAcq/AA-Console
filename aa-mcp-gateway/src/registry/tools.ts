@@ -94,13 +94,14 @@ export const orchestrationTools = new Set([
 const id = z.string().uuid();
 const text = z.string().min(1).max(4000);
 const leadStage = z.enum([
-  "lead",
+  "profile_visit",
+  "follower",
+  "qualified",
   "conversation",
   "qualified_conversation",
   "appointment",
   "qualified_appointment",
   "shown",
-  "sale",
   "cash",
   "lost",
 ]);
@@ -310,10 +311,10 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
       }
       if (name === "pipeline.update_stage") {
         fields.lead_id = id;
-        // sale/cash excluded: money-adjacent, deferred to pipeline.record_sale
+        // Cash excluded: revenue recording stays a human action.
         // (see registry/tools.ts realPipeline comment and the migration 76
         // RPC's hard-coded invalid_stage guard).
-        fields.stage = leadStage.exclude(["sale", "cash"]);
+        fields.stage = leadStage.exclude(["cash"]);
         fields.note = text.optional();
         delete fields.summary;
         delete fields.title;

@@ -1,161 +1,148 @@
-import { createElement } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { order, rpc, useParams } = vi.hoisted(() => ({
-  order: vi.fn(), rpc: vi.fn(), useParams: vi.fn(),
+const { from, rpc, useParams, insert } = vi.hoisted(() => ({
+  from: vi.fn(), rpc: vi.fn(), useParams: vi.fn(), insert: vi.fn(),
 }));
-
-vi.mock("../../lib/supabase", () => ({
-  supabase: {
-    from: () => ({ select: () => ({ eq: () => ({ order }) }), insert: vi.fn() }),
-    rpc,
-  },
-}));
-vi.mock("react-router-dom", () => ({
-  useParams,
-  // Link renders as an anchor so tests can still find navigation by role.
-  Link: ({ to, children, ...rest }: { to: string; children?: unknown }) =>
-    createElement("a", { href: to, ...rest }, children as never),
-}));
+vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
+vi.mock("react-router-dom", () => ({ useParams }));
 
 import { ProspectsLeadsPanel } from "./ProspectsLeadsPanel";
 
 const lead = (over: Record<string, unknown> = {}) => ({
-  id: crypto.randomUUID(),
-  name: "Naledi K",
-  contact: null, email: null, phone: null,
-  stage: "conversation",
-  stage_at: "2026-09-01T00:00:00Z",
-  next_action: "Send the quote",
-  next_action_due: "2026-09-30",
-  opportunity_value: 12000,
-  sale_value: null,
-  cash_collected: null,
-  source_channel: "Instagram reel",
-  ...over,
+  id: "lead-1", name: "Naledi K", contact: null, email: "naledi@example.com", phone: null,
+  stage: "conversation", stage_at: "2026-09-01T00:00:00Z", next_action: "Send quote",
+  next_action_due: "2026-09-30", opportunity_value: 12000, sale_value: null,
+  cash_collected: null, source_channel: "Instagram reel", owner_member_id: null,
+  appointment_at: null, appointment_outcome: null, ...over,
 });
 
-function show(leads: unknown[] = [], stalled: unknown[] = []) {
-  order.mockResolvedValue({ data: leads });
-  rpc.mockResolvedValue({ data: stalled });
+function chain(data: unknown[]) {
+  const query = {
+    select: () => query, eq: () => query, order: () => Promise.resolve({ data, error: null }),
+    insert,
+  };
+  return query;
+}
+
+function show(leads: unknown[] = [lead()], archives: unknown[] = [], stalled: unknown[] = []) {
+  from.mockImplementation((table: string) => chain(table === "client_leads" ? leads : table === "archived_leads" ? archives : []));
+  rpc.mockImplementation((name: string) => Promise.resolve({ data: name === "stalled_leads" ? stalled : null, error: null }));
   return render(<ProspectsLeadsPanel />);
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   useParams.mockReturnValue({ clientId: "client-1" });
+  insert.mockResolvedValue({ error: null });
 });
 
-describe("the chain the board shows", () => {
-  // Attention is impressions against a post, not a pipeline stage. Putting it
-  // here would double-count it and add a column nobody can act on.
-  it("starts at Lead, because attention is not a stage", async () => {
-    show([lead()]);
-    expect(await screen.findByText("Lead")).toBeInTheDocument();
-    expect(screen.queryByText(/attention/i)).not.toBeInTheDocument();
+describe("AA lead funnel", () => {
+  it("renders the nine stages in order and keeps Lost collapsed", async () => {
+    show([lead(), lead({ id: "lost-1", name: "Lost prospect", stage: "lost" })]);
+    await screen.findByText("Naledi K");
+    const headings = within(screen.getByLabelText("Lead pipeline")).getAllByRole("heading", { level: 3 });
+    expect(headings.map((heading) => heading.textContent)).toEqual([
+      "Profile Visits", "Followers", "Qualified", "Conversations", "Qualified Conversations",
+      "Appointments", "Qualified Appointments", "Show Ups", "Cash Collected",
+    ]);
+    expect(screen.queryByText("Sale")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Lost (1)" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Lost prospect")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Lost (1)" }));
+    expect(screen.getByText("Lost prospect")).toBeInTheDocument();
   });
 
-  it("runs the whole chain through to Cash", async () => {
-    show([lead()]);
-    await screen.findByText("Lead");
-    for (const label of ["Conversation", "Qualified", "Appointment", "Showed", "Sale", "Cash"]) {
-      expect(screen.getByText(label)).toBeInTheDocument();
-    }
+  it("keeps stats, stalled warning and an archive count", async () => {
+    show([lead()], [{ id: "archive-1", name: "Old", stage_at_archive: "qualified", lead: {}, events: [], archived_at: "2026-09-01", archived_by: null, reason: null }],
+      [{ id: "lead-1", name: "Naledi K", stage: "conversation", days_in_stage: 4, next_action: null, overdue: false, owner_name: null }]);
+    expect(await screen.findByText("Pipeline value")).toBeInTheDocument();
+    expect(screen.getByText("Open leads")).toBeInTheDocument();
+    expect(screen.getByText("Cash collected")).toBeInTheDocument();
+    expect(screen.getByText(/1 lead with nothing scheduled next/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Archive (1)" })).toBeInTheDocument();
   });
 
-  it("keeps money out of the pipeline count once it is collected", async () => {
-    show([lead({ opportunity_value: 5000 }), lead({ stage: "cash", opportunity_value: 9000, cash_collected: 9000 })]);
-    await screen.findByText("Pipeline value");
-    expect(screen.getByText("R5,000")).toBeInTheDocument();
-    expect(screen.getByText("R9,000")).toBeInTheDocument();
-  });
-});
-
-describe("what is sitting still", () => {
-  // The question the tool exists to answer, and it leads the page: a board
-  // shows the shape, this shows the work.
-  it("leads with the stalled leads rather than the board", async () => {
-    show([lead()], [{
-      id: "l1", name: "Thabo M", stage: "qualified_conversation",
-      days_in_stage: 9, next_action: null, next_action_due: null,
-      overdue: false, owner_name: null,
-    }]);
-    expect(await screen.findByText(/1 lead with nothing scheduled next/)).toBeInTheDocument();
-    expect(screen.getByText(/Thabo M/)).toBeInTheDocument();
-    expect(screen.getByText(/9 days there/)).toBeInTheDocument();
+  it("opens the same editor from the button and the card", async () => {
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Naledi K" }));
+    expect(screen.getByRole("dialog", { name: "Edit Naledi K" })).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole("button", { name: "Close dialog" })[0]!);
+    await userEvent.click(screen.getByLabelText("Open Naledi K"));
+    expect(screen.getByRole("dialog", { name: "Edit Naledi K" })).toBeInTheDocument();
   });
 
-  // An unowned stalled lead is worse than a stalled one, and saying "nobody"
-  // is more useful than leaving the space blank.
-  it("says when nobody is assigned", async () => {
-    show([lead()], [{
-      id: "l1", name: "Thabo M", stage: "lead", days_in_stage: 3,
-      next_action: null, next_action_due: null, overdue: false, owner_name: null,
-    }]);
-    expect(await screen.findByText(/nobody assigned/)).toBeInTheDocument();
+  it("saves details through update_lead and keeps the editor open", async () => {
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Naledi K" }));
+    await userEvent.clear(screen.getByLabelText(/Name/));
+    await userEvent.type(screen.getByLabelText(/Name/), "Naledi Updated");
+    await userEvent.click(screen.getByRole("button", { name: "Save details" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("update_lead", expect.objectContaining({
+      p_lead_id: "lead-1", p_fields: expect.objectContaining({ name: "Naledi Updated" }),
+    })));
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Edit Naledi K" })).toBeInTheDocument();
   });
 
-  it("names the overdue action rather than only flagging it", async () => {
-    show([lead()], [{
-      id: "l1", name: "Thabo M", stage: "appointment", days_in_stage: 2,
-      next_action: "Call back", next_action_due: "2026-09-01", overdue: true, owner_name: "Sipho",
-    }]);
-    expect(await screen.findByText(/"Call back" overdue/)).toBeInTheDocument();
+  it("moves through advance_lead and requires a reason for Lost", async () => {
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Naledi K" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Move to" }));
+    await userEvent.selectOptions(screen.getByLabelText("Move to stage"), "lost");
+    await userEvent.click(screen.getByRole("button", { name: "Move lead" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Say why");
+    expect(rpc).not.toHaveBeenCalledWith("advance_lead", expect.anything());
+    await userEvent.type(screen.getByLabelText(/Note \(required/), "No longer interested");
+    await userEvent.click(screen.getByRole("button", { name: "Move lead" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("advance_lead", {
+      p_lead_id: "lead-1", p_stage: "lost", p_note: "No longer interested",
+    }));
   });
 
-  it("shows no warning when nothing is stalled", async () => {
-    show([lead()], []);
-    await screen.findByText("Lead");
-    expect(screen.queryByText(/nothing scheduled next/)).not.toBeInTheDocument();
-  });
-
-  // On the card too: a lead with no next action is stalled whatever its stage.
-  it("marks a lead with no next action on its own card", async () => {
-    show([lead({ next_action: null })]);
-    expect(await screen.findByText("nothing scheduled")).toBeInTheDocument();
-  });
-});
-
-describe("where a lead came from", () => {
-  // Without this, revenue can never be traced back to the content that made it.
-  it("shows the source on the card", async () => {
-    show([lead()]);
-    expect(await screen.findByText(/Instagram reel/)).toBeInTheDocument();
-  });
-
-  it("says plainly when there are no leads at all", async () => {
-    show([]);
-    expect(await screen.findByText(/Nothing has come in from a page, a post or a referral/)).toBeInTheDocument();
-  });
-});
-
-
-describe("moving leads", () => {
-  it("drops a card into a stage using the existing audited transition", async () => {
-    show([lead({ id: "lead-1" })]);
-    const card = (await screen.findByText("Naledi K")).closest("li")!;
+  it("still moves a card by dragging", async () => {
+    show();
+    const card = await screen.findByLabelText("Open Naledi K");
     const dataTransfer = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
     fireEvent.dragStart(card, { dataTransfer });
-    fireEvent.dragOver(screen.getByLabelText("Sale stage"), { dataTransfer });
-    fireEvent.drop(screen.getByLabelText("Sale stage"), { dataTransfer });
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("advance_lead", { p_lead_id: "lead-1", p_stage: "sale" }));
-    expect(await screen.findByText("Naledi K moved to Sale.")).toBeInTheDocument();
-    expect(order).toHaveBeenCalledTimes(2);
+    fireEvent.dragOver(screen.getByLabelText("Appointments stage"), { dataTransfer });
+    fireEvent.drop(screen.getByLabelText("Appointments stage"), { dataTransfer });
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("advance_lead", { p_lead_id: "lead-1", p_stage: "appointment" }));
   });
-  it("supports keyboard stage selection and reports errors without moving the card", async () => {
-    show([lead({ id: "lead-1" })]);
-    const select = await screen.findByLabelText("Move Naledi K to");
-    rpc.mockResolvedValue({ error: { message: "Not permitted" } });
-    fireEvent.change(select, { target: { value: "sale" } });
-    expect(await screen.findByRole("alert")).toHaveTextContent("Not permitted");
-    expect(select).toHaveValue("conversation");
+
+  it("adds a timeline note", async () => {
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Naledi K" }));
+    await userEvent.click(screen.getByRole("tab", { name: /timeline/i }));
+    await userEvent.type(screen.getByLabelText("Add note"), "Called and left voicemail");
+    await userEvent.click(screen.getByRole("button", { name: "Add note" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("add_lead_note", { p_lead_id: "lead-1", p_note: "Called and left voicemail" }));
   });
-  it("ignores a drop in the current stage", async () => {
-    show([lead({ id: "lead-1" })]);
-    const card = (await screen.findByText("Naledi K")).closest("li")!;
-    fireEvent.dragStart(card, { dataTransfer: { setData: vi.fn() } });
-    fireEvent.drop(screen.getByLabelText("Conversation stage"));
-    expect(rpc).not.toHaveBeenCalledWith("advance_lead", expect.anything());
+
+  it("archives only through the editor", async () => {
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Naledi K" }));
+    await userEvent.click(screen.getByRole("tab", { name: /archive/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Archive this lead" }));
+    await userEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("archive_lead", { p_lead_id: "lead-1", p_reason: null }));
+  });
+
+  it("searches and views the archive, then recovers the original ID", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    show([lead()], [{
+      id: "archived-1", name: "Old prospect", stage_at_archive: "qualified",
+      lead: { id: "archived-1", name: "Old prospect", opportunity_value: 500 },
+      events: [{ id: "event-1", kind: "note", body: "Called", from_stage: null, to_stage: null, occurred_at: "2026-09-01T00:00:00Z" }],
+      archived_at: "2026-09-02T00:00:00Z", archived_by: null, reason: "No response",
+    }]);
+    await userEvent.click(await screen.findByRole("button", { name: "Archive (1)" }));
+    expect(screen.getByText("Old prospect")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "View" }));
+    expect(screen.getByText("Called")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Archive list/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Recover" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("recover_lead", { p_lead_id: "archived-1" }));
   });
 });
