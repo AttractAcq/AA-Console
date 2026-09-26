@@ -57,6 +57,7 @@ import { AuditLogPanel } from "./account/AuditLogPanel";
 import { TeamCategoryPanel } from "./operations/TeamCategoryPanel";
 import { RecruitmentPanel } from "./operations/RecruitmentPanel";
 import { RecruitmentPagesPanel } from "./team/RecruitmentPagesPanel";
+import { RecruitmentDistributionPanel } from "./team/RecruitmentDistributionPanel";
 import { CampaignsPanel } from "./operations/CampaignsPanel";
 import { CalendarPanel } from "./operations/CalendarPanel";
 import { ChatPanel } from "./team/ChatPanel";
@@ -81,6 +82,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     smm: () => <TeamCategoryPanel category="smm" />,
     recruitment: () => <RecruitmentPanel />,
     "recruitment-pages": () => <RecruitmentPagesPanel />,
+    "recruitment-distribution": () => <RecruitmentDistributionPanel />,
   },
   intelligence: {
     "business-context": () => <BusinessContextPanel />,

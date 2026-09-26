@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../../components/Button";
@@ -42,6 +42,7 @@ type Campaign = {
   needs_sales_agent: boolean;
   built_at: string | null;
   content_ideas_generated_at: string | null;
+  ideate_on_plan: boolean;
   launched_at: string | null;
   created_at: string;
   template: string | null;
@@ -78,6 +79,12 @@ const FIELDS: FieldDef[] = [
     required: true,
     hint: "The planner writes the objective, audience, message, channels and what has to be built, from this plus your offer strategy and ICP.",
   },
+  {
+    name: "ideate_on_plan",
+    label: "Generate content ideas with this plan",
+    kind: "toggle",
+    placeholder: "On — generate ideas now. Turn off to plan the campaign and generate ideas later.",
+  },
 ];
 
 const STATUS_TONE: Record<string, string> = {
@@ -93,6 +100,7 @@ export function CampaignExecutionPanel() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [readiness, setReadiness] = useState<Record<string, Requirement[]>>({});
   const [newOpen, setNewOpen] = useState(false);
+  const [planIdeaChoices, setPlanIdeaChoices] = useState<Record<string, boolean>>({});
   const [proposing, setProposing] = useState(false);
   // The dialog's own pick, kept here so the generated draft can carry it into
   // the form. The endpoint steers by it but does not echo it back.
@@ -108,6 +116,7 @@ export function CampaignExecutionPanel() {
   const [aiDraft, setAiDraft] = useState<
     { name: string; brief: string; template?: string } | null
   >(null);
+  const newCampaignValues = useMemo(() => ({ ...aiDraft, ideate_on_plan: true }), [aiDraft]);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -130,7 +139,7 @@ export function CampaignExecutionPanel() {
       const query = supabase
         .from("client_campaigns")
         .select(
-          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_built_at",
+          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_built_at",
         )
         .eq("client_id", clientId)
         // A campaign somebody archived is over. It reads from the archive.
@@ -231,6 +240,12 @@ export function CampaignExecutionPanel() {
     }
     setBusy(true);
     setProblem(null);
+    const ideate = planIdeaChoices[campaign.id] ?? campaign.ideate_on_plan ?? true;
+    if (ideate !== (campaign.ideate_on_plan ?? true)) {
+      const { error: updateError } = await supabase.from("client_campaigns")
+        .update({ ideate_on_plan: ideate }).eq("id", campaign.id).eq("client_id", clientId);
+      if (updateError) { setBusy(false); setProblem(updateError.message); return; }
+    }
     const { error } = await supabase.rpc("enqueue_agent_job", {
       p_agent_key: "campaign_plan",
       p_client_id: clientId,
@@ -498,6 +513,13 @@ export function CampaignExecutionPanel() {
                 {campaignId && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
                   {!c.built_at && (
+                    <label className="flex items-center gap-2 text-xs text-foreground">
+                      <input type="checkbox" checked={planIdeaChoices[c.id] ?? c.ideate_on_plan ?? true}
+                        onChange={(event) => setPlanIdeaChoices((current) => ({ ...current, [c.id]: event.target.checked }))}
+                        disabled={busy || isPlanning} /> Generate content ideas with this plan
+                    </label>
+                  )}
+                  {!c.built_at && (
                     <button
                       type="button"
                       disabled={busy || isPlanning}
@@ -624,7 +646,7 @@ export function CampaignExecutionPanel() {
           ) : null
         }
         submitLabel="Plan it"
-        initialValues={aiDraft ?? undefined}
+        initialValues={newCampaignValues}
         actions={
           <button
             type="button"
@@ -642,6 +664,7 @@ export function CampaignExecutionPanel() {
               client_id: clientId,
               name: (v.name as string).trim(),
               brief: (v.brief as string).trim(),
+              ideate_on_plan: v.ideate_on_plan !== false,
               // Spread only when a template was picked. The columns arrive in
               // migration 96, and a campaign planned without a template must
               // keep working on a database that does not have them yet.

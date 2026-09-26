@@ -80,7 +80,7 @@ async function loadAssets(sb: SupabaseClient, clientId: string, campaignId: stri
   return [...new Map(all.map((a) => [a.id, a])).values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
-async function loadIntegration(sb: SupabaseClient, clientId: string) {
+export async function loadIntegration(sb: SupabaseClient, clientId: string) {
   const { data: row, error } = await sb
     .from("client_integrations")
     .select("status, ad_account_id, credential_label, meta_page_id, meta_pixel_id")
@@ -131,7 +131,7 @@ function filenameOf(path: string): string {
   return path.split("/").pop() || path;
 }
 
-function metaWriter(account: AdAccount): MetaWriter {
+export function metaWriter(account: AdAccount): MetaWriter {
   return {
     createCampaign: (p) => createCampaign(account, p),
     createAdSet: (p) => createAdSet(account, p),

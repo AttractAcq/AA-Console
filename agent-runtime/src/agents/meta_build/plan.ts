@@ -238,11 +238,12 @@ export function preflight(args: {
   settings: MetaSettings;
   currency: string;
   today: string;
+  spec?: ResolvedSpec;
 }): { problems: string[]; inputs: BuildInputs | null } {
   const { campaign, assets, settings, currency, today } = args;
   const problems: string[] = [];
 
-  const spec = resolveSpec(campaign);
+  const spec = args.spec ?? resolveSpec(campaign);
   if ("problem" in spec) problems.push(spec.problem);
 
   const budget = Number(campaign.daily_budget);
