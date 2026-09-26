@@ -458,6 +458,25 @@ describe("proposing a campaign", () => {
       "Fill the January consultation diary with full-arch patients, using the written plan assessment the offer strategy says nobody is using.",
   };
 
+  it("can plan a new campaign without generating content ideas", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "new-1" }, error: null }) }) }));
+    from.mockImplementation((table: string) => table === "client_content_pillars"
+      ? rows([])
+      : table === "client_campaigns" ? { ...rows([]), insert } : rows([]));
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.type(screen.getByLabelText(/Campaign name/i), "Editor hiring");
+    await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Plan the campaign first");
+    const toggle = screen.getByRole("checkbox", { name: /Generate content ideas with this plan/i });
+    expect(toggle).toBeChecked();
+    await userEvent.click(toggle);
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({ ideate_on_plan: false })));
+    expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", expect.objectContaining({ p_input_id: "new-1" }));
+  });
+
   async function openProposer() {
     useParams.mockReturnValue({ clientId: "client-1" });
     show();

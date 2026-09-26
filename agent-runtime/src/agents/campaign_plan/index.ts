@@ -49,7 +49,7 @@ import {
  * running — which lands in somebody else's calendar share with nothing to
  * flag it. Same discipline as proof_ref on a brief.
  */
-export function submitToolFor(pillars: readonly { id: string; name: string }[] = []) {
+export function submitToolFor(pillars: readonly { id: string; name: string }[] = [], includeIdeas = true) {
   const ids = pillars.map((p) => p.id);
   return {
   name: "submit_campaign_plan",
@@ -75,7 +75,7 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
         type: "number",
         description: `How many distinct pieces of content this campaign needs. 0 if none. At most ${MAX_CONTENT}.`,
       },
-      ideas: {
+      ...(includeIdeas ? { ideas: {
         type: "array",
         // No maxItems, and no maxLength on the title: the API rejects both on
         // a strict tool. They were redundant anyway — campaignIdeas() refuses
@@ -114,14 +114,14 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
           ],
           additionalProperties: false,
         },
-      },
+      }} : {}),
       needs_landing_page: { type: "boolean", description: "Whether this campaign needs its own landing page built." },
       needs_sales_agent: { type: "boolean", description: "Whether it needs a client-facing sales agent on that page." },
       reasoning: { type: "string", description: "Why this shape, and what you deliberately left out." },
     },
     required: [
       "objective", "audience", "offer_summary", "core_message", "channels",
-      "kpi_metric", "content_count", "ideas", "needs_landing_page", "needs_sales_agent", "reasoning",
+      "kpi_metric", "content_count", ...(includeIdeas ? ["ideas"] : []), "needs_landing_page", "needs_sales_agent", "reasoning",
     ],
     additionalProperties: false,
   },
@@ -218,7 +218,8 @@ export async function runCampaignPlanJob(
       Boolean(p) && typeof p === "object",
     );
 
-  const submitTool = submitToolFor(pillars);
+  const includeIdeas = campaign.built_at != null || campaign.ideate_on_plan !== false;
+  const submitTool = submitToolFor(pillars, includeIdeas);
 
   const system = `You plan marketing campaigns for Attract Acquisition, a marketing agency.
 
@@ -233,7 +234,9 @@ WHAT MAKES A PLAN GOOD
 ABSOLUTE RULES
 - Never invent a budget, a price, a date or a target you have no basis for. Omitting a number is honest; inventing one becomes a commitment somebody else has to meet.
 - Take the audience from the ICP and the offer from the offer strategy. Do not invent either.
-- Supply exactly content_count distinct ideas tailored to this campaign, its audience, offer, dates, channels and constraints. An idea is an angle and purpose, not a finished production brief.
+- ${includeIdeas
+    ? "Supply exactly content_count distinct ideas tailored to this campaign, its audience, offer, dates, channels and constraints. An idea is an angle and purpose, not a finished production brief."
+    : "Plan the campaign and decide how many content pieces it needs, but do not ideate any content. Do not write titles, angles or concepts. The operator can generate campaign ideas later."}
 - Ask only for what is needed. Every piece of content you request is real work for a real person.
 - Respect anything the offer strategy lists as a limit or a thing that cannot be promised.`;
 
@@ -343,22 +346,31 @@ Call ${submitTool.name} once when you are done.`;
     return { ok: false, retryable: true, failureMessage: problem, usage };
   }
 
-  let ideas;
-  try {
-    ideas = campaignIdeas(result.submitted.ideas, plan.content_count, pillars.map((p) => p.id));
-  } catch (error) {
-    return { ok: false, retryable: true, failureMessage: (error as Error).message, usage };
+  if (includeIdeas) {
+    let ideas;
+    try {
+      ideas = campaignIdeas(result.submitted.ideas, plan.content_count, pillars.map((p) => p.id));
+    } catch (error) {
+      return { ok: false, retryable: true, failureMessage: (error as Error).message, usage };
+    }
+    // One transaction commits the plan and its exact idea batch, or neither.
+    const { error } = await sb.rpc("save_campaign_plan_with_ideas", {
+      p_campaign_id: campaign.id,
+      p_client_id: job.client_id,
+      p_job_id: job.id,
+      p_plan: plan,
+      p_ideas: ideas,
+    });
+    if (error) throw new Error(`Failed to write campaign plan and ideas: ${error.message}`);
+  } else {
+    const { error } = await sb.rpc("save_campaign_plan_only", {
+      p_campaign_id: campaign.id,
+      p_client_id: job.client_id,
+      p_job_id: job.id,
+      p_plan: plan,
+    });
+    if (error) throw new Error(`Failed to write campaign plan: ${error.message}`);
   }
-  // One transaction commits the plan and its exact idea batch, or neither.
-  // The database locks the campaign so concurrent jobs cannot duplicate it.
-  const { error } = await sb.rpc("save_campaign_plan_with_ideas", {
-    p_campaign_id: campaign.id,
-    p_client_id: job.client_id,
-    p_job_id: job.id,
-    p_plan: plan,
-    p_ideas: ideas,
-  });
-  if (error) throw new Error(`Failed to write campaign plan and ideas: ${error.message}`);
 
   await appendEvent(sb, job.id, `Planned "${campaign.name}".\n\n${planSummary(plan)}`, "info", {
     cost_usd: usage.costUsd,

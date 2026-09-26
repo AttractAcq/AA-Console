@@ -80,6 +80,7 @@ export const agencyNav: NavNode[] = [
       // those ads point at.
       { id: "recruitment", label: "Recruitment" },
       { id: "recruitment-pages", label: "Recruitment Landing Pages" },
+      { id: "recruitment-distribution", label: "Recruitment Distribution" },
     ],
   },
   {

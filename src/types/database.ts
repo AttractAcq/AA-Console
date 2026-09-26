@@ -1327,6 +1327,7 @@ export type Database = {
           exit_state: Database["public"]["Enums"]["audience_state"] | null
           feeds_from_campaign_id: string | null
           id: string
+          ideate_on_plan: boolean
           job_id: string | null
           kpi_metric: string | null
           kpi_target: number | null
@@ -1369,6 +1370,7 @@ export type Database = {
           exit_state?: Database["public"]["Enums"]["audience_state"] | null
           feeds_from_campaign_id?: string | null
           id?: string
+          ideate_on_plan?: boolean
           job_id?: string | null
           kpi_metric?: string | null
           kpi_target?: number | null
@@ -1411,6 +1413,7 @@ export type Database = {
           exit_state?: Database["public"]["Enums"]["audience_state"] | null
           feeds_from_campaign_id?: string | null
           id?: string
+          ideate_on_plan?: boolean
           job_id?: string | null
           kpi_metric?: string | null
           kpi_target?: number | null
@@ -3922,6 +3925,72 @@ export type Database = {
         }
         Relationships: []
       }
+      recruitment_meta_campaigns: {
+        Row: {
+          id: string
+          client_id: string
+          name: string
+          daily_budget: number
+          target_countries: string[]
+          conversion_event: string
+          meta_campaign_id: string | null
+          meta_ad_set_id: string | null
+          meta_built_at: string | null
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          name: string
+          daily_budget: number
+          target_countries: string[]
+          conversion_event?: string
+          meta_campaign_id?: string | null
+          meta_ad_set_id?: string | null
+          meta_built_at?: string | null
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          name?: string
+          daily_budget?: number
+          target_countries?: string[]
+          conversion_event?: string
+          meta_campaign_id?: string | null
+          meta_ad_set_id?: string | null
+          meta_built_at?: string | null
+          created_at?: string
+          created_by?: string | null
+        }
+        Relationships: []
+      }
+      recruitment_meta_campaign_ads: {
+        Row: {
+          campaign_id: string
+          asset_id: string
+          meta_image_hash: string | null
+          meta_creative_id: string | null
+          meta_ad_id: string | null
+        }
+        Insert: {
+          campaign_id: string
+          asset_id: string
+          meta_image_hash?: string | null
+          meta_creative_id?: string | null
+          meta_ad_id?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          asset_id?: string
+          meta_image_hash?: string | null
+          meta_creative_id?: string | null
+          meta_ad_id?: string | null
+        }
+        Relationships: []
+      }
       ref_counters: {
         Row: {
           client_id: string
@@ -6211,6 +6280,16 @@ export type Database = {
         Args: { p_generation_id: string; p_quality?: string; p_size?: string }
         Returns: string
       }
+      request_recruitment_meta_build: { Args: { p_campaign_id: string }; Returns: string }
+      create_recruitment_meta_campaign: {
+        Args: {
+          p_name: string
+          p_daily_budget: number
+          p_target_countries: string[]
+          p_asset_ids: string[]
+        }
+        Returns: string
+      }
       request_meta_build: { Args: { p_campaign_id: string }; Returns: string }
       resolve_sales_deployment: {
         Args: { p_public_id: string }
@@ -6254,6 +6333,15 @@ export type Database = {
           allowed: boolean
           reason: string
         }[]
+      }
+      save_campaign_plan_only: {
+        Args: {
+          p_campaign_id: string
+          p_client_id: string
+          p_job_id: string
+          p_plan: Json
+        }
+        Returns: undefined
       }
       save_campaign_plan_with_ideas: {
         Args: {

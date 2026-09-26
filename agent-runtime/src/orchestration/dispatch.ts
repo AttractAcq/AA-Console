@@ -34,6 +34,7 @@ import { runCampaignPlanJob } from "../agents/campaign_plan/index.js";
 import { runPageAuditJob } from "../agents/page_audit/index.js";
 import { runPageReviseJob } from "../agents/page_revise/index.js";
 import { runMetaBuildJob } from "../agents/meta_build/index.js";
+import { runRecruitmentMetaBuildJob } from "../agents/recruitment_meta_build/index.js";
 
 export interface JobResult {
   ok: boolean;
@@ -88,6 +89,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // Approved assets become a paused Meta campaign. No model; launching stays
   // a person in Ads Manager.
   meta_build: runMetaBuildJob,
+  recruitment_meta_build: runRecruitmentMetaBuildJob,
   // outcome until that product decision is made.
 };
 

@@ -81,6 +81,13 @@ describe("planProblem", () => {
   });
 });
 
+it("offers a plan-only tool with no content-idea field", () => {
+  const tool = submitToolFor([], false);
+  expect(tool.inputSchema.properties).not.toHaveProperty("ideas");
+  expect(tool.inputSchema.required).not.toContain("ideas");
+  expect(tool.inputSchema.required).toContain("content_count");
+});
+
 describe("asCount", () => {
   it("keeps a whole count", () => {
     expect(asCount(6)).toBe(6);
