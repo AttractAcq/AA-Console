@@ -84,6 +84,24 @@ beforeAll(async () => {
     "20260911205529_79_client_marketing_spend.sql",
     "20260915180000_85_mcp_finance_controller.sql",
   ]) await db.exec(await migration(file));
+  await db.exec(`
+    create table metrics_daily (
+      id uuid primary key default gen_random_uuid(),
+      client_id uuid not null references clients(id),
+      post_id uuid,
+      metric_date date,
+      impressions bigint,
+      reach bigint,
+      clicks bigint,
+      spend numeric
+    );
+    alter table metrics_daily enable row level security;
+  `);
+  for (const file of [
+    "20260925120000_128_lead_stage_enum.sql",
+    "20260925121000_129_lead_pipeline_archive.sql",
+    "20260925122000_130_lead_reporting_bot_stages.sql",
+  ]) await db.exec(await migration(file));
 }, 60_000);
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => {

@@ -1,30 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertTriangle, Plus } from "lucide-react";
+import { AlertTriangle, Archive, Pencil, Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
+import { LeadEditModal } from "../../components/leads/LeadEditModal";
+import { ArchivedLeadsModal, type ArchivedLead } from "../../components/leads/ArchivedLeadsModal";
+import { detailFields, leadFieldsPayload, type OwnerOption } from "../../components/leads/leadDetails";
+import { PIPELINE_STAGES, STAGE_OPTIONS, stageLabel, type LeadStage } from "../../components/leads/stages";
+import type { Lead } from "../../components/leads/types";
 import type { Database } from "../../types/database";
-
-type LeadStage = Database["public"]["Enums"]["lead_stage"];
-
-type Lead = {
-  id: string;
-  name: string | null;
-  contact: string | null;
-  email: string | null;
-  phone: string | null;
-  stage: LeadStage;
-  stage_at: string;
-  next_action: string | null;
-  next_action_due: string | null;
-  opportunity_value: number | null;
-  sale_value: number | null;
-  cash_collected: number | null;
-  source_channel: string | null;
-};
 
 type Stalled = {
   id: string;
@@ -37,51 +24,8 @@ type Stalled = {
   owner_name: string | null;
 };
 
-/**
- * The acquisition chain, in the order it actually happens.
- *
- * Attention is deliberately absent: it is impressions against a post and lives
- * in metrics, and a lead begins when attention becomes a name someone can
- * contact. Putting it here would double-count it and add a column nobody can
- * act on.
- */
-const STAGES: Array<{ id: LeadStage; label: string }> = [
-  { id: "lead", label: "Lead" },
-  { id: "conversation", label: "Conversation" },
-  { id: "qualified_conversation", label: "Qualified" },
-  { id: "appointment", label: "Appointment" },
-  { id: "qualified_appointment", label: "Qualified appt" },
-  { id: "shown", label: "Showed" },
-  { id: "sale", label: "Sale" },
-  { id: "cash", label: "Cash" },
-];
-
-const FIELDS: FieldDef[] = [
-  { name: "name", label: "Name", kind: "text", required: true },
-  { name: "email", label: "Email", kind: "text" },
-  { name: "phone", label: "Phone", kind: "text" },
-  {
-    name: "stage",
-    label: "Stage",
-    kind: "select",
-    options: STAGES.map((s) => ({ value: s.id, label: s.label })),
-  },
-  {
-    name: "source_channel",
-    label: "Where they came from",
-    kind: "text",
-    placeholder: "Instagram reel, landing page, referral",
-    hint: "Revenue can only be traced back to the content that caused it if this is recorded.",
-  },
-  {
-    name: "next_action",
-    label: "Next action",
-    kind: "text",
-    hint: "A lead with nothing scheduled next is stalled, whatever stage it sits in.",
-  },
-  { name: "next_action_due", label: "Due", kind: "date" },
-  { name: "opportunity_value", label: "Worth", kind: "text", placeholder: "0.00" },
-];
+const ADD_STAGE: FieldDef = { name: "stage", label: "Initial stage", kind: "select", options: STAGE_OPTIONS.map((stage) => ({ value: stage.id, label: stage.label })) };
+const ADD_INITIAL = { stage: "profile_visit" };
 
 const money = (v: number | null) => (v === null ? null : `R${Number(v).toLocaleString()}`);
 
@@ -89,6 +33,11 @@ export function ProspectsLeadsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [addOpen, setAddOpen] = useState(false);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [archived, setArchived] = useState<ArchivedLead[]>([]);
+  const [owners, setOwners] = useState<OwnerOption[]>([]);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [lostOpen, setLostOpen] = useState(false);
   const [stalled, setStalled] = useState<Stalled[]>([]);
   const [loading, setLoading] = useState(true);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -103,18 +52,25 @@ export function ProspectsLeadsPanel() {
       setLoading(false);
       return;
     }
-    const [rows, stalledRows] = await Promise.all([
+    const [rows, stalledRows, archivedRows, ownerRows] = await Promise.all([
       supabase
         .from("client_leads")
         .select(
-          "id, name, contact, email, phone, stage, stage_at, next_action, next_action_due, opportunity_value, sale_value, cash_collected, source_channel",
+          "id, name, contact, email, phone, stage, stage_at, next_action, next_action_due, opportunity_value, sale_value, cash_collected, source_channel, owner_member_id, appointment_at, appointment_outcome",
         )
         .eq("client_id", clientId)
         .order("stage_at", { ascending: false }),
       supabase.rpc("stalled_leads", { p_client_id: clientId, p_days: 30 }),
+      supabase.from("archived_leads").select("id, name, stage_at_archive, lead, events, reason, archived_at, archived_by")
+        .eq("client_id", clientId).order("archived_at", { ascending: false }),
+      supabase.from("team_members").select("id, name").eq("active", true).order("name"),
     ]);
+    const failed = rows.error ?? stalledRows.error ?? archivedRows.error ?? ownerRows.error;
+    if (failed) setError(failed.message);
     setLeads((rows.data ?? []) as Lead[]);
     setStalled((stalledRows.data ?? []) as Stalled[]);
+    setArchived((archivedRows.data ?? []) as unknown as ArchivedLead[]);
+    setOwners((ownerRows.data ?? []) as OwnerOption[]);
     setLoading(false);
   }, [clientId]);
 
@@ -133,7 +89,7 @@ export function ProspectsLeadsPanel() {
       const { error } = await supabase.rpc("advance_lead", { p_lead_id: leadId, p_stage: stage });
       if (error) throw error;
       await refresh();
-      setNotice(`${lead.name ?? "Lead"} moved to ${STAGES.find((s) => s.id === stage)?.label}.`);
+      setNotice(`${lead.name ?? "Lead"} moved to ${stageLabel(stage)}.`);
     } catch (error) {
       setError(error instanceof Error ? error.message : (error as { message?: string }).message ?? "Could not move this lead.");
     } finally {
@@ -149,12 +105,39 @@ export function ProspectsLeadsPanel() {
   const open = leads.filter((l) => l.stage !== "cash" && l.stage !== "lost");
   const pipelineValue = open.reduce((sum, l) => sum + Number(l.opportunity_value ?? 0), 0);
   const collected = leads.reduce((sum, l) => sum + Number(l.cash_collected ?? 0), 0);
+  const selectedLead = leads.find((lead) => lead.id === selectedId) ?? null;
+  const lost = leads.filter((lead) => lead.stage === "lost");
+  const legacy = leads.filter((lead) => lead.stage === "lead" || lead.stage === "sale");
+
+  function card(lead: Lead) {
+    return <li key={lead.id} draggable={busyId === null}
+      onDragStart={(event) => {
+        setDraggedId(lead.id);
+        event.dataTransfer.setData("text/plain", lead.id);
+        event.dataTransfer.effectAllowed = "move";
+      }}
+      onDragEnd={() => { setDraggedId(null); setDropStage(null); }}
+      onClick={() => setSelectedId(lead.id)}
+      onKeyDown={(event) => { if (event.key === "Enter") setSelectedId(lead.id); }}
+      tabIndex={0}
+      aria-label={`Open ${lead.name ?? "Unnamed"}`}
+      className={`cursor-pointer rounded-md border border-border/60 p-2 ${busyId !== null ? "opacity-60" : ""}`}>
+      <p className="truncate text-sm font-medium text-foreground">{lead.name ?? "Unnamed"}</p>
+      <p className="truncate text-xs text-muted-foreground">{lead.next_action ?? <span className="text-destructive">nothing scheduled</span>}</p>
+      {(lead.opportunity_value != null || lead.source_channel) && <p className="mt-0.5 truncate text-xs text-muted-foreground">
+        {[money(lead.opportunity_value), lead.source_channel].filter(Boolean).join(" · ")}</p>}
+      <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(lead.id); }}
+        aria-label={`Edit ${lead.name ?? "Unnamed"}`} className="mt-2 inline-flex items-center gap-1 text-xs text-brand-strong hover:underline">
+        <Pencil className="h-3 w-3" aria-hidden="true" />Edit</button>
+      {busyId === lead.id && <span role="status" className="ml-2 text-xs text-muted-foreground">Moving…</span>}
+    </li>;
+  }
 
   return (
     <div className="space-y-4">
       {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <p className="text-xs text-muted-foreground">Drag a card to a stage, or use its Move to control.</p>
+      <p className="text-xs text-muted-foreground">Drag a card to a stage, or open Edit to move it.</p>
       {/* What is sitting still, before what exists. A pipeline board shows
           you the shape; this shows you the work. */}
       {stalled.length > 0 && (
@@ -169,7 +152,7 @@ export function ProspectsLeadsPanel() {
                 <span className="font-medium">{l.name ?? "Unnamed"}</span>
                 <span className="text-muted-foreground">
                   {" · "}
-                  {STAGES.find((s) => s.id === l.stage)?.label ?? l.stage}
+                  {stageLabel(l.stage)}
                   {" · "}
                   {l.days_in_stage} day{l.days_in_stage === 1 ? "" : "s"} there
                   {l.overdue ? ` · "${l.next_action}" overdue` : ""}
@@ -200,7 +183,8 @@ export function ProspectsLeadsPanel() {
         </div>
       </div>
 
-      <div className="mb-2 flex justify-end">
+      <div className="mb-2 flex justify-end gap-2">
+        <Button icon={Archive} className="bg-secondary text-secondary-foreground" onClick={() => setArchiveOpen(true)}>Archive ({archived.length})</Button>
         <Button icon={Plus} onClick={() => setAddOpen(true)}>
           Add Lead
         </Button>
@@ -209,8 +193,9 @@ export function ProspectsLeadsPanel() {
       {leads.length === 0 ? (
         <EmptyState label="No leads yet. Nothing has come in from a page, a post or a referral." />
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {STAGES.map((stage) => {
+        <div className="overflow-x-auto pb-3" aria-label="Lead pipeline">
+        <div className="flex w-max gap-3">
+          {PIPELINE_STAGES.map((stage) => {
             const inStage = leads.filter((l) => l.stage === stage.id);
             return (
               <div key={stage.id}
@@ -228,7 +213,7 @@ export function ProspectsLeadsPanel() {
                   setDraggedId(null);
                   setDropStage(null);
                 }}
-                className={`rounded-lg border border-border bg-card p-3.5 ${dropStage === stage.id ? "ring-2 ring-ring" : ""}`}>
+                className={`w-72 shrink-0 rounded-lg border border-border bg-card p-3.5 ${dropStage === stage.id ? "ring-2 ring-ring" : ""}`}>
 
                 <div className="mb-2 flex items-baseline justify-between gap-2">
                   <h3 className="text-sm font-semibold text-card-foreground">{stage.label}</h3>
@@ -238,75 +223,50 @@ export function ProspectsLeadsPanel() {
                   <p className="text-xs text-muted-foreground">—</p>
                 ) : (
                   <ul className="space-y-1.5">
-                    {inStage.map((l) => (
-                      <li key={l.id}
-                        draggable={busyId === null}
-                        onDragStart={(event) => {
-                          setDraggedId(l.id);
-                          event.dataTransfer.setData("text/plain", l.id);
-                          event.dataTransfer.effectAllowed = "move";
-                        }}
-                        onDragEnd={() => { setDraggedId(null); setDropStage(null); }}
-                        className={`rounded-md border border-border/60 p-2 ${busyId === null ? "cursor-grab" : "opacity-60"}`}>
-
-                        <p className="truncate text-sm text-foreground">{l.name ?? "Unnamed"}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {l.next_action ?? (
-                            <span className="text-destructive">nothing scheduled</span>
-                          )}
-                        </p>
-                        {(l.opportunity_value || l.source_channel) && (
-                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                            {[money(l.opportunity_value), l.source_channel]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </p>
-                        )}
-                        <select
-                          aria-label={`Move ${l.name ?? "Unnamed"} to`}
-                          value={l.stage}
-                          disabled={busyId !== null}
-                          onChange={(event) => void moveLead(l.id, event.target.value as LeadStage)}
-                          className="mt-2 w-full rounded-md border border-input bg-background p-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          {STAGES.map((s) => <option key={s.id} value={s.id}>Move to {s.label}</option>)}
-                        </select>
-                        {busyId === l.id && <span role="status" className="text-xs text-muted-foreground">Moving…</span>}
-                      </li>
-                    ))}
+                    {inStage.map(card)}
                   </ul>
                 )}
               </div>
             );
           })}
+          <div className="w-72 shrink-0 rounded-lg border border-border bg-card p-3.5">
+            <button type="button" aria-expanded={lostOpen} onClick={() => setLostOpen((value) => !value)}
+              className="w-full text-left text-sm font-semibold">Lost ({lost.length})</button>
+            {lostOpen && <ul className="mt-2 space-y-1.5">{lost.map(card)}</ul>}
+          </div>
+        </div>
         </div>
       )}
+
+      {legacy.length > 0 && <p role="status" className="text-sm text-muted-foreground">
+        {legacy.length} lead{legacy.length === 1 ? "" : "s"} in retired stages need administrator cleanup.
+      </p>}
 
       <FormModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title="Add Lead"
         draftKey={`lead:${clientId}`}
-        fields={FIELDS}
+        fields={[...detailFields(owners), ADD_STAGE]}
+        initialValues={ADD_INITIAL}
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
-          const worth = String(v.opportunity_value ?? "").trim();
+          const details = leadFieldsPayload(v);
+          const stage = ((v.stage as string) || "profile_visit") as LeadStage;
+          if (Number(details.cash_collected ?? 0) > 0 && stage !== "shown" && stage !== "cash")
+            throw new Error("Move the lead to Show Ups or Cash Collected before recording cash.");
           const { error } = await supabase.from("client_leads").insert({
             client_id: clientId,
-            name: (v.name as string).trim(),
-            email: (v.email as string)?.trim() || null,
-            phone: (v.phone as string)?.trim() || null,
-            contact: (v.email as string)?.trim() || (v.phone as string)?.trim() || null,
-            stage: ((v.stage as string) || "lead") as LeadStage,
-            source_channel: (v.source_channel as string)?.trim() || null,
-            next_action: (v.next_action as string)?.trim() || null,
-            next_action_due: (v.next_action_due as string) || null,
-            opportunity_value: worth ? Number(worth) : null,
-          });
+            ...details,
+            contact: details.email ?? details.phone,
+            stage,
+          } as Database["public"]["Tables"]["client_leads"]["Insert"]);
           if (error) throw error;
         }}
         onSaved={refresh}
       />
+      <LeadEditModal lead={selectedLead} owners={owners} onClose={() => setSelectedId(null)} onChanged={refresh} onArchived={refresh} />
+      <ArchivedLeadsModal open={archiveOpen} rows={archived} onClose={() => setArchiveOpen(false)} onRecovered={refresh} />
     </div>
   );
 }
