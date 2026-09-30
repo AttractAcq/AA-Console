@@ -58,7 +58,7 @@ export type MediaAsset = {
   review_status: "pending" | "approved" | "rejected";
   /** Null unless a person approved it. A bot approval never sets this. */
   human_approved_at?: string | null;
-  content_format?: "single" | "carousel" | "story";
+  content_format?: "single" | "carousel" | "story" | "reel";
   member_id: string | null;
   created_at: string;
 };
@@ -84,8 +84,8 @@ export async function fetchClientAssets(
      * review_status alone cannot tell these apart: a bot approval sets it too.
      */
     humanApproved?: boolean;
-    /** "single" for the plain libraries; "carousel"/"story" for the frame ones. */
-    contentFormat?: "single" | "carousel" | "story";
+    /** "single" for the plain libraries; "carousel"/"story"/"reel" when a library asks for one shape. */
+    contentFormat?: "single" | "carousel" | "story" | "reel";
   } = {},
 ): Promise<MediaAsset[]> {
   let query = supabase

@@ -1,38 +1,38 @@
 /**
  * What shape a piece of content runs in, and which media types can carry it.
  *
- * The same three values as the console's src/lib/contentFormat.ts and the
- * content_format enum in migration 109. The runtime is a separate package
- * and cannot import the console's copy, so this is a deliberate mirror
- * rather than an accident — and the rule it exists to state is also written
- * as a check constraint in migration 112, which is the copy that actually
- * holds. Two of these are convenience; the database is the enforcement.
+ * The same values as the console's src/lib/contentFormat.ts and the
+ * content_format enum. The runtime is a separate package and cannot import
+ * the console's copy, so this is a deliberate mirror rather than an
+ * accident — and the rule it exists to state is also written as a check
+ * constraint in format_fits_media(), which is the copy that actually holds.
  */
 
-export const CONTENT_FORMATS = ["single", "carousel", "story"] as const;
+export const CONTENT_FORMATS = ["single", "carousel", "story", "reel"] as const;
 export type ContentFormat = (typeof CONTENT_FORMATS)[number];
 
 export function isContentFormat(value: unknown): value is ContentFormat {
   return typeof value === "string" && (CONTENT_FORMATS as readonly string[]).includes(value);
 }
 
-/** Whether a format is made of ordered frames rather than one file. */
+/** Whether a format is made of ordered frames rather than one file. A reel's frames are shots. */
 export function isMultiFrame(format: string): boolean {
-  return format === "carousel" || format === "story";
+  return format === "carousel" || format === "story" || format === "reel";
 }
 
 /**
  * Whether this format can carry this media type.
  *
  * A carousel is images: a swipeable set of clips is a story, not a carousel.
- * A story is either. Single carries anything, including text, which has no
- * frames and so has no other shape available to it.
+ * A story is either. A reel is a video. Single carries anything, including
+ * text, which has no frames and so has no other shape available to it.
  *
- * Mirrors format_fits_media() in migration 112.
+ * Mirrors format_fits_media().
  */
 export function formatFitsMedia(format: string, mediaType: string): boolean {
   if (format === "carousel") return mediaType === "image";
   if (format === "story") return mediaType === "image" || mediaType === "video";
+  if (format === "reel") return mediaType === "video";
   return format === "single";
 }
 

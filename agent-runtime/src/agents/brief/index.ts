@@ -21,6 +21,7 @@ import { briefSubmitTool, composeBody, composeAvatarBody, composeEditorBody, bri
 import { isMultiFrame } from "../../content/format.js";
 import { loadIdentity, identityWriterBlock } from "../identity.js";
 import { loadUsableProof, renderProof, proofIdForRef } from "../proof.js";
+import { reelBriefProblem, reelPlannerNote } from "./shots.js";
 
 export async function runBriefJob(
   sb: SupabaseClient,
@@ -109,6 +110,9 @@ export async function runBriefJob(
   // The shape the campaign or the ideation chose for this piece. A carousel
   // brief is a different brief, not an image brief with a note on it.
   const contentFormat = idea.content_format ?? "single";
+  const reelProblem = reelBriefProblem(contentFormat, idea.media_type);
+  if (reelProblem) return { ok: false, retryable: false, failureMessage: reelProblem };
+
   const submitTool = briefSubmitTool(
     idea.media_type,
     usable.map((p) => p.ref_number ?? "").filter(Boolean),
@@ -139,7 +143,9 @@ Core idea: ${idea.body ?? ""}
 ${idea.source_question ? `Answers this buyer question: ${idea.source_question}` : ""}
 ${idea.strategic_reason ? `Why it matters: ${idea.strategic_reason}` : ""}
 ${idea.content_territory ? `Content territory: ${idea.content_territory}` : ""}
-Format: ${idea.media_type}${idea.content_format && idea.content_format !== "single" ? ` — produced as a ${idea.content_format}, which is an ordered set of frames rather than one picture` : ""}
+${contentFormat === "reel"
+    ? reelPlannerNote()
+    : `Format: ${idea.media_type}${idea.content_format && idea.content_format !== "single" ? ` — produced as a ${idea.content_format}, which is an ordered set of frames rather than one picture` : ""}`}
 
 BRAND STRATEGY — hold this point of view, respect what it says to avoid
 ${strategy || "(none on file)"}

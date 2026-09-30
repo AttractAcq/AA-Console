@@ -25,6 +25,7 @@ import { runLandingPageJob } from "../agents/landing_page/index.js";
 import { runMetricsIngestJob } from "../agents/metrics_ingest/index.js";
 import { runReportingJob } from "../agents/reporting/index.js";
 import { runCreativeBuildJob } from "../agents/creative_build/index.js";
+import { runVideoBuildJob } from "../agents/video_build/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
 import { runRepurposeJob } from "../agents/repurpose/index.js";
@@ -85,6 +86,10 @@ const RUNNERS: Record<string, JobRunner> = {
   reporting: runReportingJob,
   // A brief becomes an asset, or a brief reaches a person.
   creative_build: runCreativeBuildJob,
+  // Generated reels. Stills stay on creative_build. Motion pauses with no
+  // Higgsfield call when credentials are missing, and also when they are
+  // present, until an adapter exists.
+  video_build: runVideoBuildJob,
   brief_dispatch: runBriefDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
   // a person in Ads Manager.

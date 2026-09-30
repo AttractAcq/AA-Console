@@ -11,22 +11,24 @@ import {
 } from "./contentFormat";
 
 describe("the formats", () => {
-  it("holds the three that change how something is produced", () => {
-    expect(CONTENT_FORMATS.map((f) => f.value)).toEqual(["single", "carousel", "story"]);
+  it("holds the shapes that change how something is produced", () => {
+    expect(CONTENT_FORMATS.map((f) => f.value)).toEqual(["single", "carousel", "story", "reel"]);
   });
 
   it("knows which are made of frames", () => {
     expect(isMultiFrame("carousel")).toBe(true);
     expect(isMultiFrame("story")).toBe(true);
+    expect(isMultiFrame("reel")).toBe(true);
     expect(isMultiFrame("single")).toBe(false);
     expect(isMultiFrame(null)).toBe(false);
-    expect(isMultiFrame("reel")).toBe(false);
+    expect(isMultiFrame("short")).toBe(false);
   });
 
   it("names them for a screen, and shows an unknown value rather than hiding it", () => {
     expect(formatLabel("carousel")).toBe("Carousel");
+    expect(formatLabel("reel")).toBe("Reel");
     expect(formatLabel("")).toBe("");
-    expect(formatLabel("reel")).toBe("reel");
+    expect(formatLabel("short")).toBe("short");
   });
 });
 
@@ -49,8 +51,15 @@ describe("what a format can carry", () => {
     expect(formatAllows("story", "text")).toBe(false);
   });
 
+  it("keeps a reel to video", () => {
+    expect(mediaTypesFor("reel")).toEqual(["video"]);
+    expect(formatAllows("reel", "video")).toBe(true);
+    expect(formatAllows("reel", "image")).toBe(false);
+    expect(formatAllows("reel", "text")).toBe(false);
+  });
+
   it("refuses a format it does not know", () => {
-    expect(formatAllows("reel", "video")).toBe(false);
+    expect(formatAllows("short", "video")).toBe(false);
   });
 });
 

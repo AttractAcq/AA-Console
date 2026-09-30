@@ -1075,6 +1075,7 @@ export type Database = {
           editor_brief: string | null
           frame_count: number | null
           frame_plan: string[] | null
+          format_code: string | null
           hook: string | null
           id: string
           job_id: string | null
@@ -1090,6 +1091,7 @@ export type Database = {
           repurpose_format: string | null
           script: string | null
           shot_requirements: string | null
+          slot_role: string | null
           source_idea_id: string | null
           status: Database["public"]["Enums"]["brief_status"]
           title: string
@@ -1114,6 +1116,7 @@ export type Database = {
           editor_brief?: string | null
           frame_count?: number | null
           frame_plan?: string[] | null
+          format_code?: string | null
           hook?: string | null
           id?: string
           job_id?: string | null
@@ -1129,6 +1132,7 @@ export type Database = {
           repurpose_format?: string | null
           script?: string | null
           shot_requirements?: string | null
+          slot_role?: string | null
           source_idea_id?: string | null
           status?: Database["public"]["Enums"]["brief_status"]
           title: string
@@ -1153,6 +1157,7 @@ export type Database = {
           editor_brief?: string | null
           frame_count?: number | null
           frame_plan?: string[] | null
+          format_code?: string | null
           hook?: string | null
           id?: string
           job_id?: string | null
@@ -1168,6 +1173,7 @@ export type Database = {
           repurpose_format?: string | null
           script?: string | null
           shot_requirements?: string | null
+          slot_role?: string | null
           source_idea_id?: string | null
           status?: Database["public"]["Enums"]["brief_status"]
           title?: string
@@ -1244,6 +1250,7 @@ export type Database = {
         Row: {
           brand_voice: string | null
           business_overview: string | null
+          business_type: string | null
           client_id: string
           competitors: string | null
           created_at: string
@@ -1260,6 +1267,7 @@ export type Database = {
         Insert: {
           brand_voice?: string | null
           business_overview?: string | null
+          business_type?: string | null
           client_id: string
           competitors?: string | null
           created_at?: string
@@ -1276,6 +1284,7 @@ export type Database = {
         Update: {
           brand_voice?: string | null
           business_overview?: string | null
+          business_type?: string | null
           client_id?: string
           competitors?: string | null
           created_at?: string
@@ -2209,26 +2218,47 @@ export type Database = {
       client_media_frames: {
         Row: {
           asset_id: string
+          beat: string | null
           caption: string | null
+          clip_path: string | null
           created_at: string
+          duration_sec: number | null
           id: string
+          motion_preset: string | null
           position: number
+          proof_asset_id: string | null
+          provider_job_id: string | null
+          shot_source_kind: string | null
           storage_path: string
         }
         Insert: {
           asset_id: string
+          beat?: string | null
           caption?: string | null
+          clip_path?: string | null
           created_at?: string
+          duration_sec?: number | null
           id?: string
+          motion_preset?: string | null
           position: number
+          proof_asset_id?: string | null
+          provider_job_id?: string | null
+          shot_source_kind?: string | null
           storage_path: string
         }
         Update: {
           asset_id?: string
+          beat?: string | null
           caption?: string | null
+          clip_path?: string | null
           created_at?: string
+          duration_sec?: number | null
           id?: string
+          motion_preset?: string | null
           position?: number
+          proof_asset_id?: string | null
+          provider_job_id?: string | null
+          shot_source_kind?: string | null
           storage_path?: string
         }
         Relationships: [
@@ -6481,9 +6511,9 @@ export type Database = {
         | "O2"
         | "X1"
         | "X2"
-      content_format: "single" | "carousel" | "story"
+      content_format: "single" | "carousel" | "story" | "reel"
       content_purpose: "client" | "recruitment"
-      creative_stage: "concept" | "render" | "done" | "failed"
+      creative_stage: "concept" | "render" | "motion" | "done" | "failed"
       engagement_type: "employee" | "contractor"
       idea_source: "manual" | "auto" | "proof" | "pillar"
       idea_status: "draft" | "approved" | "rejected" | "briefed"
@@ -6694,9 +6724,9 @@ export const Constants = {
         "X1",
         "X2",
       ],
-      content_format: ["single", "carousel", "story"],
+      content_format: ["single", "carousel", "story", "reel"],
       content_purpose: ["client", "recruitment"],
-      creative_stage: ["concept", "render", "done", "failed"],
+      creative_stage: ["concept", "render", "motion", "done", "failed"],
       engagement_type: ["employee", "contractor"],
       idea_source: ["manual", "auto", "proof", "pillar"],
       idea_status: ["draft", "approved", "rejected", "briefed"],

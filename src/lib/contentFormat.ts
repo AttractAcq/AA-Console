@@ -2,22 +2,17 @@
  * The shape a piece of content runs in.
  *
  * Separate from media_type, which says what the file IS. A story can be a
- * still or a clip; a carousel is one thing made of several images. Folding
- * these into media_type would make a video story unsayable and leave a
- * carousel's frames nowhere to go.
+ * still or a clip; a carousel is several images; a reel is a video made of
+ * ordered shots. Folding these into media_type would make a video story
+ * unsayable and leave a carousel's frames nowhere to go.
  *
- * Three values, not ten. The repurpose menu lists eight derivatives — reel,
- * short, quote graphic and the rest — and media_type already covers them: a
- * reel is a video, a quote graphic is an image. Only carousel and story need
- * production to behave differently, because only they are made of ordered
- * frames.
- *
- * Kept in step with the content_format enum in migration 109.
+ * Kept in step with the content_format enum.
  */
 export const CONTENT_FORMATS = [
   { value: "single", label: "Single", multiFrame: false },
   { value: "carousel", label: "Carousel", multiFrame: true },
   { value: "story", label: "Story", multiFrame: true },
+  { value: "reel", label: "Reel", multiFrame: true },
 ] as const;
 
 export type ContentFormat = (typeof CONTENT_FORMATS)[number]["value"];
@@ -40,11 +35,13 @@ export function formatLabel(format: string | null | undefined): string {
  * Which media types a format can carry.
  *
  * A carousel is images — a swipeable set of clips is a story, not a
- * carousel. A story is either. Text has no frames, so it is single only.
+ * carousel. A story is either. A reel is a video. Text has no frames, so
+ * it is single only.
  */
 export function mediaTypesFor(format: ContentFormat): readonly string[] {
   if (format === "carousel") return ["image"];
   if (format === "story") return ["image", "video"];
+  if (format === "reel") return ["video"];
   return ["image", "text", "video"];
 }
 
