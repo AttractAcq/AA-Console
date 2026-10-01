@@ -100,6 +100,42 @@ reel, as every other agent already does.
 - Migration: an `edit_plan jsonb` + `render_path` on the reel's asset row, and
   the new agent row. Applied by Alex via Chief of Staff, per the Phase 6 gate.
 
+## Spike status
+
+Built in `agent-runtime/src/agents/video_edit/`. It is not registered as an
+agent, has no migration, and the worker never imports it.
+
+| Module | What it does |
+|---|---|
+| `edl.ts` | EDL types, the strict tool schema, `parseEdl` (untrusted JSON → typed) and `validateEdl`. The validator checks clip bounds, flash frames, format length, the end card, caption length, read time and overlap. It flags brand-banned phrases, **figures not in the brief**, and crossfades over `source_asset` footage. |
+| `render.ts` | EDL → ffmpeg argv, nothing executed. It scales and crops each clip to 1080×1920 at 30 fps and joins them with cuts or crossfades. Captions are word-wrapped, the end card uses brand colours, and music is optional and fades out. Caption text goes through files (`textfile=`, `expansion=none`), never into the filtergraph. |
+| `media.ts` | Runs ffprobe/ffmpeg through `execFile` (no shell), samples frames for the planner and renders. |
+| `plan.ts` | One Claude call: brief and labelled frames in, EDL out through a strict submit tool. The model is a parameter, and a revise call sends back every validation problem. |
+| `spike.ts` | Local CLI. `--edl` renders a hand-written plan with no API spend. `--model` plans with Claude, allows one revise, and prints tokens and cost. |
+
+Verified so far:
+- A local render of three synthetic clips with a crossfade, wrapped captions,
+  a brand-coloured end card and music. It came out at the exact predicted
+  length (10.6s), 1080×1920 H.264 + AAC, in about 5s of wall time.
+- 30 new tests, including an ffmpeg render test. That test skips where ffmpeg
+  isn't installed, so it may not run in CI.
+
+Not done yet:
+- **No model has been called.** The Opus 5.5 vs Fable 5.1 comparison needs an
+  `ANTHROPIC_API_KEY`, real Higgsfield clips and sign-off on the spend
+  (est. $1–3 per reel per model, so ~$20–40 for 5 reels on both).
+- Self-review of the render, transcription, and caption centring per line
+  (drawtext centres the block, not each line).
+
+To run it:
+
+```
+cd agent-runtime
+npx tsx src/agents/video_edit/spike.ts --brief reel.json --out reel.mp4 \
+  --font /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf \
+  --model claude-opus-5-5        # or --edl plan.json to skip the model
+```
+
 ## Suggested phasing
 
 1. **Spike (no prod):** EDL schema, validator and ffmpeg command builder as
