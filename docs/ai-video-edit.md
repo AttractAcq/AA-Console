@@ -26,6 +26,30 @@ Claude pattern: **the model decides, ffmpeg renders.** The model choice stays a
 config value (`AGENT_RUNTIME_MODEL` pattern), so Opus 5.5 vs Fable 5.1 is a
 measured decision, not an architectural one.
 
+## The chain as it stands
+
+What is already built, verified against the code rather than recalled:
+
+| # | Step | Where | What it leaves behind |
+|---|---|---|---|
+| 1 | Brief | `agents/brief` + `brief/shots.ts` | `client_briefs.frame_plan`: one JSON shot per line (beat, duration, `ai_generated`, motion preset), plus `format_code` F6/F7 |
+| 2 | Approve & Build | `ApproveAndBuildModal.tsx` → `build_brief_with_ai` (migration 136) | AI route on a Phase 1 reel queues `video_build` on the brief, and the opening stills as an image build on `creative_build` |
+| 3 | Opening stills | `creative_build/openingStills.ts` | `client_media_assets` + one `client_media_frames` row per shot, with `storage_path` |
+| 4 | Motion | `video_build/` → `higgsfield.ts` (DoP image-to-video) | `provider_job_id` on submit, then `clip_path` once `clip.ts` copies the clip into `client-media` |
+| 5 | **Assembly** | `video_build/assembly.ts` | **A stub.** `{ via: "brief_dispatch", status: "not_started" }` — a human editor |
+| 6 | Review | `ReelShotsPanel` / `ReelShotGrid.tsx` | Per shot: still on file, clip submitted or on file. Approval sits on the parent asset |
+
+Step 5 is the hole, and it is where AI editing goes. Everything either side
+already exists: step 4 produces exactly the inputs an editor needs, and step 6
+is where the cut would be reviewed.
+
+Note that **motion is gated and dark**. `decideMotion` pauses before any
+request unless all four of `HIGGSFIELD_API_KEY`, `HIGGSFIELD_API_SECRET`,
+`HIGGSFIELD_MODEL_DRAFT` and `HIGGSFIELD_MODEL_FINAL` are set, and the motion
+catalog has exactly one confirmed id (Zoom In,
+`fbcbec5b-30f8-4b17-ba6e-8e8d5b265562`). So no real clip has ever been
+produced, and the editor has never had real footage to cut.
+
 ## Where it fits
 
 `video_build` already turns an F6/F7 reel brief into a shot plan, stills and
@@ -111,19 +135,29 @@ agent, has no migration, and the worker never imports it.
 | `render.ts` | EDL → ffmpeg argv, nothing executed. It scales and crops each clip to 1080×1920 at 30 fps and joins them with cuts or crossfades. Captions are word-wrapped, the end card uses brand colours, and music is optional and fades out. Caption text goes through files (`textfile=`, `expansion=none`), never into the filtergraph. |
 | `media.ts` | Runs ffprobe/ffmpeg through `execFile` (no shell), samples frames for the planner and renders. |
 | `plan.ts` | One Claude call: brief and labelled frames in, EDL out through a strict submit tool. The model is a parameter, and a revise call sends back every validation problem. |
+| `handoff.ts` | The join to `video_build`. Turns brief + `client_media_frames` rows into shots, the brief text the claim check measures against, and the validation context. Readiness is a gate: a reel is edited whole or not yet, and a shot waiting on Higgsfield is reported differently from one never submitted. |
 | `spike.ts` | Local CLI. `--edl` renders a hand-written plan with no API spend. `--model` plans with Claude, allows one revise, and prints tokens and cost. |
 
 Verified so far:
 - A local render of three synthetic clips with a crossfade, wrapped captions,
   a brand-coloured end card and music. It came out at the exact predicted
   length (10.6s), 1080×1920 H.264 + AAC, in about 5s of wall time.
-- 30 new tests, including an ffmpeg render test. That test skips where ffmpeg
-  isn't installed, so it may not run in CI.
+- **The full chain, end to end** (`pipeline.test.ts`): a stored shot plan and
+  `client_media_frames` rows in the shape PostgREST returns, through the brief
+  agent's own plan parser, readiness, probing, validation and an ffmpeg render
+  to a 1080×1920 file. Clips are generated locally because Higgsfield is not
+  reachable from a test. The same test proves the gate holds while a clip is
+  missing, and that a caption claiming "80%" against a brief that does not say
+  it is refused.
+- 44 tests. The three that call ffmpeg skip where it is not installed, so they
+  may not run in CI.
 
 Not done yet:
 - **No model has been called.** The Opus 5.5 vs Fable 5.1 comparison needs an
   `ANTHROPIC_API_KEY`, real Higgsfield clips and sign-off on the spend
   (est. $1–3 per reel per model, so ~$20–40 for 5 reels on both).
+- **No real Higgsfield clip exists to cut.** Motion has never run: the four
+  env vars are unset, so every reel stops at the stills stage.
 - Self-review of the render, transcription, and caption centring per line
   (drawtext centres the block, not each line).
 
