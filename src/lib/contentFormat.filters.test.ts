@@ -34,6 +34,8 @@ describe("the pairings the manual idea form allows", () => {
     expect(formatAllows("carousel", "image")).toBe(true);
     expect(formatAllows("story", "image")).toBe(true);
     expect(formatAllows("story", "video")).toBe(true);
+    expect(formatAllows("reel", "video")).toBe(true);
+    expect(formatAllows("reel", "image")).toBe(false);
     for (const media of ["image", "text", "video"]) {
       expect(formatAllows("single", media)).toBe(true);
     }

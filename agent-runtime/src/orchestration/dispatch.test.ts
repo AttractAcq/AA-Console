@@ -35,6 +35,13 @@ describe("dispatch registry", () => {
   });
 });
 
+describe("the video build agent is wired in", () => {
+  it("has a runner, so a queued reel can be claimed", () => {
+    expect(hasRunner("video_build")).toBe(true);
+    expect(registeredAgentKeys()).toContain("video_build");
+  });
+});
+
 describe("the repurpose agent is wired in", () => {
   it("has a runner, so a queued repurpose can execute", () => {
     expect(hasRunner("repurpose")).toBe(true);

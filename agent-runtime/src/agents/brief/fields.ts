@@ -1,4 +1,5 @@
 import { MAX_FRAMES, MIN_FRAMES, framePlanProblem, isMultiFrame } from "../../content/format.js";
+import { readableShotPlan, reelSubmitProperties, shotPlanColumns } from "./shots.js";
 
 /**
  * The shape of a production brief.
@@ -48,12 +49,24 @@ const FRAMED_DESCRIPTIONS: Partial<Record<BriefField, string>> = {
   call_to_action: "The action asked for, which lands on the last frame. Earlier frames earn it rather than repeat it.",
 };
 
+/** A reel is shots, not a swipe. Carousel and story keep the descriptions above. */
+const REEL_DESCRIPTIONS: Partial<Record<BriefField, string>> = {
+  hook: "The first thing in shot 1. It has one job: stop the scroll. If shot 1 does not stop them, no later shot is seen.",
+  script: "The words across the reel, in order, marked by shot. Each shot carries its own line.",
+  visual_direction: "How the generated stills should look. One treatment across the reel: these shots are one piece.",
+  shot_requirements: "What each generated shot must show. Phase 1 does not capture client footage.",
+  call_to_action: "The action asked for, which lands on the last shot.",
+};
+
 export function fieldsFor(
   mediaType: string,
   contentFormat = "single",
 ): ReadonlyArray<readonly [string, string]> {
   const base =
     mediaType === "video" ? BRIEF_FIELDS : BRIEF_FIELDS.filter(([k]) => !VIDEO_ONLY.has(k));
+  if (contentFormat === "reel") {
+    return base.map(([name, description]) => [name, REEL_DESCRIPTIONS[name] ?? description]);
+  }
   if (!isMultiFrame(contentFormat)) return base;
   return base.map(([name, description]) => [name, FRAMED_DESCRIPTIONS[name] ?? description]);
 }
@@ -75,7 +88,9 @@ export function briefSubmitTool(
 ) {
   const fields = fieldsFor(mediaType, contentFormat);
   const refs = proofRefs.filter((r) => typeof r === "string" && r.trim());
-  const framed = isMultiFrame(contentFormat);
+  const reel = contentFormat === "reel";
+  const framed = isMultiFrame(contentFormat) && !reel;
+  const reelFields = reel ? reelSubmitProperties() : null;
   return {
     name: "submit_brief",
     description: "Submit the finished production brief. Call this exactly once.",
@@ -86,6 +101,7 @@ export function briefSubmitTool(
         ...Object.fromEntries(
           fields.map(([name, description]) => [name, { type: "string", description }]),
         ),
+        ...(reelFields ? reelFields.properties : {}),
         ...(framed
           ? {
               frames: {
@@ -119,6 +135,7 @@ export function briefSubmitTool(
       required: [
         "title",
         ...fields.map(([name]) => name),
+        ...(reelFields ? reelFields.required : []),
         ...(framed ? ["frames"] : []),
         ...(refs.length ? ["proof_ref"] : []),
       ],
@@ -163,10 +180,15 @@ export function composeBody(
   // The sequence, in the readable brief as well as in the column. Whoever
   // opens the brief is looking at the thing that decides its shape, and a
   // plan that exists only as an array is invisible to them.
-  const plan = framePlanFrom(submitted);
-  if (isMultiFrame(contentFormat) && plan.length > 0) {
-    const lines = plan.map((line, i) => `${i + 1}. ${line}`).join("\n");
-    parts.push(`## Frames\n\n${lines}`);
+  if (contentFormat === "reel") {
+    const shots = readableShotPlan(submitted);
+    if (shots) parts.push(`## Shots\n\n${shots}`);
+  } else {
+    const plan = framePlanFrom(submitted);
+    if (isMultiFrame(contentFormat) && plan.length > 0) {
+      const lines = plan.map((line, i) => `${i + 1}. ${line}`).join("\n");
+      parts.push(`## Frames\n\n${lines}`);
+    }
   }
   return parts.join("\n\n");
 }
@@ -193,6 +215,7 @@ export function framePlanColumns(
   submitted: Record<string, unknown>,
   contentFormat: string,
 ): { columns: Record<string, unknown>; problem: string | null } {
+  if (contentFormat === "reel") return shotPlanColumns(submitted);
   if (!isMultiFrame(contentFormat)) return { columns: {}, problem: null };
   const plan = framePlanFrom(submitted);
   const problem = framePlanProblem(plan);
@@ -258,11 +281,14 @@ function composeRoleBody(
  * framing for the person on camera — not captions, crops, or assembly rules.
  */
 export function composeAvatarBody(submitted: Record<string, unknown>): string {
-  return composeRoleBody(
+  const body = composeRoleBody(
     AVATAR_FIELDS,
     submitted,
     "# Avatar brief\n\nWhat you need to perform and shoot. Ignore edit, caption, and export notes — those go to the editor.",
   );
+  const shots = readableShotPlan(submitted);
+  if (!shots) return body;
+  return `${body}\n\n## Shots\n\nThis reel is generated. There is no on-camera performance and no client footage to shoot.\n\n${shots}`;
 }
 
 /**
@@ -270,9 +296,12 @@ export function composeAvatarBody(submitted: Record<string, unknown>): string {
  * not wardrobe or "what not to say" performance constraints.
  */
 export function composeEditorBody(submitted: Record<string, unknown>): string {
-  return composeRoleBody(
+  const body = composeRoleBody(
     EDITOR_FIELDS,
     submitted,
     "# Editor brief\n\nWhat you need to cut, caption, and deliver. Include 9:16 / 4:5 / 1:1 crops unless the channel intent says otherwise. Do not invent music, graphics, or b-roll the brief forbids.",
   );
+  const shots = readableShotPlan(submitted);
+  if (!shots) return body;
+  return `${body}\n\n## Shots\n\nAssemble these generated shots in order. Do not substitute client footage.\n\n${shots}`;
 }
