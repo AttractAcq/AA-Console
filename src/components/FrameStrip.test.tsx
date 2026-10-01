@@ -77,6 +77,25 @@ describe("FrameStrip", () => {
     expect(screen.getByText(/other 2 carry over/)).toBeTruthy();
   });
 
+  it("shows clip status on a reel shot and does not offer an image rebuild", async () => {
+    fetchFrames.mockResolvedValue([
+      {
+        id: "f1",
+        position: 1,
+        storage_path: "c/still.png",
+        caption: null,
+        beat: "Name the mechanism",
+        motion_preset: "pending",
+        clip_path: null,
+        shot_source_kind: "ai_generated",
+      },
+    ]);
+    show();
+    await waitFor(() => expect(screen.getByText("Name the mechanism")).toBeTruthy());
+    expect(screen.getByText(/No clip · pending/)).toBeTruthy();
+    expect(screen.queryByText("Rebuild")).toBeNull();
+  });
+
   it("reports a refusal rather than claiming it queued", async () => {
     rpc.mockResolvedValue({ error: { message: "Only an admin can regenerate a frame." } });
     const { onQueued, onError } = show();

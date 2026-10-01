@@ -33,13 +33,21 @@ export interface Frame {
   position: number;
   storage_path: string;
   caption: string | null;
+  beat?: string | null;
+  duration_sec?: number | null;
+  motion_preset?: string | null;
+  clip_path?: string | null;
+  shot_source_kind?: string | null;
+  provider_job_id?: string | null;
 }
 
 /** The frames of one asset, in the order they run. */
 export async function fetchFrames(assetId: string): Promise<Frame[]> {
   const { data, error } = await supabase
     .from("client_media_frames")
-    .select("id, position, storage_path, caption")
+    .select(
+      "id, position, storage_path, caption, beat, duration_sec, motion_preset, clip_path, shot_source_kind, provider_job_id",
+    )
     .eq("asset_id", assetId)
     .order("position");
   if (error) throw new Error(error.message);

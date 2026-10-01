@@ -19,6 +19,7 @@ type Brief = {
   body: string | null;
   media_type: "image" | "text" | "video";
   content_format: string;
+  format_code?: string | null;
   brief_ref: string | null;
   status: string;
   source_idea_id: string | null;
@@ -55,7 +56,7 @@ export function BriefsPanel() {
       const { data, error } = await supabase
         .from("client_briefs")
         .select(
-          "id, title, body, avatar_brief, editor_brief, media_type, content_format, brief_ref, status, source_idea_id, created_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
+          "id, title, body, avatar_brief, editor_brief, media_type, content_format, format_code, brief_ref, status, source_idea_id, created_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
         )
         .eq("client_id", clientId)
         .neq("purpose", "recruitment")

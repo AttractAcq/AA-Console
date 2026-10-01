@@ -30,6 +30,7 @@ import { ImageLibraryPanel } from "./media/ImageLibraryPanel";
 import { StoryLibraryPanel } from "./media/StoryLibraryPanel";
 import { CarouselLibraryPanel } from "./media/CarouselLibraryPanel";
 import { VideoLibraryPanel } from "./media/VideoLibraryPanel";
+import { ReelShotsPanel } from "./media/ReelShotsPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { OrganicPanel } from "./distribution/OrganicPanel";
 import { AssetsPanel } from "./distribution/AssetsPanel";
@@ -108,6 +109,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "story-library": () => <StoryLibraryPanel />,
     "carousel-library": () => <CarouselLibraryPanel />,
     "video-library": () => <VideoLibraryPanel />,
+    "reel-shots": () => <ReelShotsPanel />,
     "copy-library": () => <CopyLibraryPanel />,
   },
   distribution: {

@@ -48,7 +48,7 @@ Production already held the four proof **read** grants; this phase makes them di
 
 | Tool | Notes |
 | --- | --- |
-| `content.assign_production` | `route=ai` inserts `creative_generations` and enqueues `creative_build` (video refused). `route=human` inserts `job_assignments` + `brief_dispatches` and enqueues `brief_dispatch` for active editors/avatars. |
+| `content.assign_production` | `route=ai` inserts `creative_generations` and enqueues `creative_build` for stills. A Phase 1 reel (F6/F7) queues `video_build` on the brief instead; other video is still refused. `route=human` inserts `job_assignments` + `brief_dispatches` and enqueues `brief_dispatch` for active editors/avatars. |
 | `content.submit_asset` | Inserts `client_media_assets` with `review_status=pending` and completes the assignment when one is supplied. |
 | `content.approve_asset` | Unchanged: Production-only hard deny in `PRODUCTION_ONLY_TOOLS` and in the AA RPC. |
 
