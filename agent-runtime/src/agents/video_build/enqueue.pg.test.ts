@@ -8,6 +8,7 @@ const REEL = "11111111-1111-4111-8111-111111111111";
 const STILL = "22222222-2222-4222-8222-222222222222";
 const STORY = "33333333-3333-4333-8333-333333333333";
 const LATER = "44444444-4444-4444-8444-444444444444";
+const UNTAGGED = "55555555-5555-4555-8555-555555555555";
 
 const shot = (beat: string) =>
   JSON.stringify({
@@ -86,14 +87,67 @@ beforeAll(async () => {
       created_by uuid
     );
     create schema mcp_internal;
+    create function auth.role() returns text language sql stable as
+      $$ select coalesce(nullif(current_setting('request.jwt.claim.role', true), ''), 'service_role') $$;
+
+    create or replace function format_fits_media(p_format content_format, p_media media_type)
+    returns boolean language sql immutable as $$
+      select case p_format
+        when 'carousel' then p_media = 'image'
+        when 'story' then p_media in ('image', 'video')
+        when 'reel' then p_media = 'video'
+        else true
+      end;
+    $$;
+
+    create table client_media_assets (
+      id uuid primary key default gen_random_uuid(),
+      client_id uuid not null references clients(id),
+      brief_id uuid references client_briefs(id),
+      media_type media_type not null,
+      title text,
+      storage_path text not null,
+      review_status text not null default 'pending',
+      content_format content_format not null default 'single',
+      constraint assets_format_fits check (format_fits_media(content_format, media_type))
+    );
+    create table client_media_frames (
+      id uuid primary key default gen_random_uuid(),
+      asset_id uuid not null references client_media_assets(id) on delete cascade,
+      position integer not null,
+      storage_path text not null,
+      caption text,
+      shot_source_kind text,
+      beat text,
+      duration_sec numeric,
+      motion_preset text,
+      unique (asset_id, position)
+    );
   `);
   const sql = await readFile(
-    new URL("../../../../supabase/migrations/20261001120000_136_enqueue_video_build.sql", import.meta.url),
+    new URL("../../../../supabase/migrations/20261001143000_137_reel_opening_stills.sql", import.meta.url),
     "utf8",
   );
   expect(sql).not.toMatch(/platform\.higgsfield\.ai/);
   expect(sql).not.toMatch(/HIGGSFIELD_/);
   await db.exec(sql);
+  await db.exec(`
+    create function mcp_internal.require_active_bot(text) returns void language plpgsql as $$ begin end $$;
+    create function mcp_internal.require_bot_client_grant(text, uuid) returns void language plpgsql as $$ begin end $$;
+    create function mcp_internal.require_mcp_ids(text, text) returns void language plpgsql as $$ begin end $$;
+    create function mcp_internal.take_content_request(text, text, text, uuid, jsonb)
+    returns jsonb language plpgsql as $$ begin return null; end $$;
+    create table mcp_internal.mcp_content_requests (
+      bot_id text,
+      execution_id text,
+      request_id text,
+      tool text,
+      client_id uuid,
+      brief_id uuid,
+      payload jsonb,
+      result jsonb
+    );
+  `);
 }, 30_000);
 
 afterAll(async () => {
@@ -102,7 +156,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.exec(`
-    truncate agent_job_events, agent_jobs, creative_renders, creative_generations, client_briefs, agents, clients, profiles;
+    truncate client_media_frames, client_media_assets, agent_job_events, agent_jobs, creative_renders, creative_generations, client_briefs, agents, clients, profiles, mcp_internal.mcp_content_requests;
     insert into profiles (id, role) values ('${ADMIN}', 'admin');
     insert into clients (id) values ('${CLIENT}');
     insert into agents (agent_key, paused) values ('creative_build', false), ('video_build', false);
@@ -111,7 +165,8 @@ beforeEach(async () => {
       ('${REEL}', '${CLIENT}', 'video', 'reel', 'F6', array['${shot("Name the mechanism")}','${shot("Show the step")}']::text[], 'approved', 'How it works'),
       ('${STILL}', '${CLIENT}', 'image', 'carousel', null, null, 'approved', 'Five reasons'),
       ('${STORY}', '${CLIENT}', 'video', 'story', null, null, 'approved', 'A story'),
-      ('${LATER}', '${CLIENT}', 'video', 'reel', 'F5', null, 'approved', 'Proof reel');
+      ('${LATER}', '${CLIENT}', 'video', 'reel', 'F5', null, 'approved', 'Proof reel'),
+      ('${UNTAGGED}', '${CLIENT}', 'video', 'reel', null, array['${shot("Open on the problem")}','${shot("Leave the question")}']::text[], 'approved', 'Cold open');
     select set_config('request.jwt.claim.sub', '${ADMIN}', false);
   `);
 });
@@ -135,8 +190,18 @@ describe("build_brief_with_ai reel enqueue", () => {
       client_id: CLIENT,
     });
 
-    const gens = await db.query(`select id from creative_generations`);
-    expect(gens.rows).toHaveLength(0);
+    const gens = await db.query<{ media_type: string }>(
+      `select media_type::text as media_type from creative_generations`,
+    );
+    expect(gens.rows).toEqual([{ media_type: "image" }]);
+
+    const jobs = await db.query<{ agent_key: string; params: { opening_stills?: boolean; render_id?: string } }>(
+      `select agent_key, params from agent_jobs order by agent_key`,
+    );
+    expect(jobs.rows.map((row) => row.agent_key)).toEqual(["creative_build", "video_build"]);
+    const stillsJob = jobs.rows.find((row) => row.agent_key === "creative_build");
+    expect(stillsJob?.params.opening_stills).toBe(true);
+    expect(stillsJob?.params.render_id).toBeTruthy();
 
     const brief = await db.query<{ status: string; frame_plan: string[] }>(
       `select status, frame_plan from client_briefs where id = '${REEL}'`,
@@ -158,8 +223,15 @@ describe("build_brief_with_ai reel enqueue", () => {
     const id = queued.rows[0]?.build_brief_with_ai;
     const gen = await db.query(`select id from creative_generations where id = '${id}'`);
     expect(gen.rows).toHaveLength(1);
-    const jobs = await db.query<{ agent_key: string }>(`select agent_key from agent_jobs`);
+    const jobs = await db.query<{ agent_key: string; params: { opening_stills?: boolean } }>(
+      `select agent_key, params from agent_jobs`,
+    );
     expect(jobs.rows.map((row) => row.agent_key)).toEqual(["creative_build"]);
+    expect(jobs.rows[0]?.params.opening_stills).toBeUndefined();
+    const media = await db.query<{ media_type: string }>(
+      `select media_type::text as media_type from creative_generations where id = '${id}'`,
+    );
+    expect(media.rows[0]?.media_type).toBe("image");
   });
 
   it("refuses a video story and a later-phase reel", async () => {
@@ -169,13 +241,112 @@ describe("build_brief_with_ai reel enqueue", () => {
     expect(jobs.rows).toHaveLength(0);
   });
 
-  it("refuses a paused video_build", async () => {
+  it("queues the same image stills for a reel that has no format code yet", async () => {
+    await db.query(`select build_brief_with_ai('${UNTAGGED}')`);
+    const jobs = await db.query<{ agent_key: string }>(`select agent_key from agent_jobs order by agent_key`);
+    expect(jobs.rows.map((row) => row.agent_key)).toEqual(["creative_build", "video_build"]);
+    const gens = await db.query<{ media_type: string }>(
+      `select media_type::text as media_type from creative_generations`,
+    );
+    expect(gens.rows).toEqual([{ media_type: "image" }]);
+  });
+
+  it("refuses a paused video_build and a paused creative_build", async () => {
     await db.exec(`update agents set paused = true where agent_key = 'video_build'`);
     await expect(db.query(`select build_brief_with_ai('${REEL}')`)).rejects.toThrow(/paused/);
+    await db.exec(`update agents set paused = false where agent_key = 'video_build'`);
+    await db.exec(`update agents set paused = true where agent_key = 'creative_build'`);
+    await expect(db.query(`select build_brief_with_ai('${REEL}')`)).rejects.toThrow(/creative_build is paused/);
+    const jobs = await db.query(`select id from agent_jobs`);
+    expect(jobs.rows).toHaveLength(0);
   });
 
   it("refuses anyone who is not an admin", async () => {
     await db.exec(`select set_config('request.jwt.claim.sub', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', false)`);
     await expect(db.query(`select build_brief_with_ai('${REEL}')`)).rejects.toThrow(/Only an admin/);
+  });
+});
+
+describe("assign_production reel enqueue", () => {
+  it("queues an image stills job and video_build for an F6 reel", async () => {
+    const queued = await db.query<{ result: { agent_key: string; generation_media_type: string; stills_job_id: string } }>(
+      `select mcp_internal.assign_production(
+         'bot_production', 'req-reel', 'exec-reel', '${CLIENT}', '${REEL}', 'ai',
+         null, null, null, 'medium', '1024x1536', null
+       ) as result`,
+    );
+    expect(queued.rows[0]?.result.agent_key).toBe("video_build");
+    expect(queued.rows[0]?.result.generation_media_type).toBe("image");
+    const jobs = await db.query<{ agent_key: string }>(`select agent_key from agent_jobs order by agent_key`);
+    expect(jobs.rows.map((row) => row.agent_key)).toEqual(["creative_build", "video_build"]);
+    const gen = await db.query<{ media_type: string }>(
+      `select media_type::text as media_type from creative_generations`,
+    );
+    expect(gen.rows).toEqual([{ media_type: "image" }]);
+  });
+});
+
+describe("save_framed_asset reel stills", () => {
+  it("files a reel as video and keeps shot columns on the frames", async () => {
+    const saved = await db.query<{ save_framed_asset: string }>(
+      `select save_framed_asset(
+         '${CLIENT}', '${REEL}', 'reel', 'video', 'How it works',
+         $json$[
+           {"position":1,"storage_path":"c/01.png","caption":"open","beat":"Name the mechanism","duration_sec":3,"motion_preset":"pending","shot_source_kind":"ai_generated"},
+           {"position":2,"storage_path":"c/02.png","beat":"Show the step","duration_sec":4,"motion_preset":"pending","shot_source_kind":"ai_generated"}
+         ]$json$::jsonb
+       )`,
+    );
+    const assetId = saved.rows[0]?.save_framed_asset;
+    const asset = await db.query<{ media_type: string; content_format: string; storage_path: string }>(
+      `select media_type::text as media_type, content_format::text as content_format, storage_path
+         from client_media_assets where id = '${assetId}'`,
+    );
+    expect(asset.rows[0]).toMatchObject({
+      media_type: "video",
+      content_format: "reel",
+      storage_path: "c/01.png",
+    });
+    const frames = await db.query<{ position: number; beat: string; motion_preset: string }>(
+      `select position, beat, motion_preset from client_media_frames where asset_id = '${assetId}' order by position`,
+    );
+    expect(frames.rows.map((row) => row.beat)).toEqual(["Name the mechanism", "Show the step"]);
+    expect(frames.rows[0]?.motion_preset).toBe("pending");
+  });
+
+  it("still files a carousel without shot columns", async () => {
+    const saved = await db.query<{ save_framed_asset: string }>(
+      `select save_framed_asset(
+         '${CLIENT}', '${STILL}', 'carousel', 'image', 'Five reasons',
+         '[{"position":1,"storage_path":"c/a.png","caption":"hook"},{"position":2,"storage_path":"c/b.png","caption":"proof"}]'::jsonb
+       )`,
+    );
+    const assetId = saved.rows[0]?.save_framed_asset;
+    const frames = await db.query<{ beat: string | null; shot_source_kind: string | null }>(
+      `select beat, shot_source_kind from client_media_frames where asset_id = '${assetId}'`,
+    );
+    expect(frames.rows).toHaveLength(2);
+    expect(frames.rows.every((row) => row.beat === null && row.shot_source_kind === null)).toBe(true);
+  });
+
+  it("refuses a reel filed as an image, and refuses a caller who is not the runtime", async () => {
+    await expect(
+      db.query(
+        `select save_framed_asset(
+           '${CLIENT}', '${REEL}', 'reel', 'image', 'Nope',
+           '[{"position":1,"storage_path":"c/01.png"},{"position":2,"storage_path":"c/02.png"}]'::jsonb
+         )`,
+      ),
+    ).rejects.toThrow(/reel asset is a video/);
+    await db.exec(`select set_config('request.jwt.claim.role', 'authenticated', false)`);
+    await expect(
+      db.query(
+        `select save_framed_asset(
+           '${CLIENT}', '${REEL}', 'reel', 'video', 'Nope',
+           '[{"position":1,"storage_path":"c/01.png"},{"position":2,"storage_path":"c/02.png"}]'::jsonb
+         )`,
+      ),
+    ).rejects.toThrow(/Only the agent runtime/);
+    await db.exec(`select set_config('request.jwt.claim.role', '', false)`);
   });
 });

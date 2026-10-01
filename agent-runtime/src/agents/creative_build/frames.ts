@@ -288,9 +288,12 @@ export async function renderFrames(opts: {
  * happened the first time this was written: flipping the branch off broke
  * nothing, because nothing exercised it.
  *
- * Video never reaches this: the job refuses it earlier, since people make
- * video. So a story brief that is rendered here is an image story, and a
- * video story goes to an editor like any other video.
+ * A video story never reaches this: people make that video, and
+ * buildRoute("video", …) stays on text so a video brief cannot fall into
+ * the frame renderer by accident. Phase 1 reel opening stills do not use
+ * this function either. They are image generations forced onto the frame
+ * path by openingStillsRoute, after the generation has been checked to be
+ * an image. A story brief that is rendered here is an image story.
  */
 export function buildRoute(
   mediaType: string,

@@ -238,6 +238,13 @@ describe("buildRoute", () => {
     expect(buildRoute("text", "single")).toBe("text");
     expect(buildRoute("text", "carousel")).toBe("text");
   });
+
+  // A video reel must not fall into the frame renderer from this function.
+  // Opening stills opt in through openingStillsRoute, and only as images.
+  it("keeps a video reel off the frame route", () => {
+    expect(buildRoute("video", "reel")).toBe("text");
+    expect(buildRoute("video", "story")).toBe("text");
+  });
 });
 
 describe("framesConceptProblem", () => {

@@ -86,9 +86,8 @@ const RUNNERS: Record<string, JobRunner> = {
   reporting: runReportingJob,
   // A brief becomes an asset, or a brief reaches a person.
   creative_build: runCreativeBuildJob,
-  // Generated reels. Stills stay on creative_build. Motion pauses with no
-  // Higgsfield call when credentials are missing, and also when they are
-  // present, until an adapter exists.
+  // Generated reels. Opening stills are an image build on creative_build.
+  // Motion calls Higgsfield only when the four HIGGSFIELD_* env vars are set.
   video_build: runVideoBuildJob,
   brief_dispatch: runBriefDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays

@@ -268,7 +268,7 @@ export function ApproveAndBuildModal({
                   {peopleOnlyVideo
                     ? "Not available for video — video is made by people."
                     : phase1Motion
-                      ? "Queues a video build from the shot plan. Motion stays paused and does not call Higgsfield."
+                      ? "Queues opening stills as images, then a video build. Motion stays paused and does not call Higgsfield."
                       : "Writes the creative concept, then renders it. Text and image only."}
                 </span>
               </button>
@@ -294,9 +294,9 @@ export function ApproveAndBuildModal({
           {route === "ai" && phase1Motion && (
             <section>
               <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-                This queues video build against the shot plan already on the brief. Opening stills,
-                when they are images, stay on the stills build. Motion does not run until Higgsfield
-                is enabled, and this click does not call it. Review the shots under Media → Reel shots.
+                This queues an image build for each shot's opening still, and a video build against
+                the shot plan already on the brief. Motion does not run until Higgsfield is enabled,
+                and this click does not call it. Review the shots under Media → Reel shots.
               </p>
             </section>
           )}
