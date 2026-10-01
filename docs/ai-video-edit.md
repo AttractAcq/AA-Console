@@ -43,12 +43,37 @@ Step 5 is the hole, and it is where AI editing goes. Everything either side
 already exists: step 4 produces exactly the inputs an editor needs, and step 6
 is where the cut would be reviewed.
 
-Note that **motion is gated and dark**. `decideMotion` pauses before any
-request unless all four of `HIGGSFIELD_API_KEY`, `HIGGSFIELD_API_SECRET`,
+**The chain has never been run.** Counted on the production database on
+1 October 2026:
+
+| | Count |
+|---|---|
+| Reel briefs (`content_format = 'reel'`) | **0** |
+| F6/F7 briefs | **0** |
+| Reel shot rows (`shot_source_kind` set) | **0** |
+| Shots submitted to Higgsfield (`provider_job_id`) | **0** |
+| Clips on file (`clip_path`) | **0** |
+| Stills on file (carousel and story frames) | 103 |
+
+```sql
+select count(*) filter (where clip_path is not null) as clips_on_file,
+       count(*) filter (where provider_job_id is not null) as submitted,
+       count(*) filter (where shot_source_kind is not null) as reel_shots,
+       count(*) as all_frames
+from client_media_frames;
+```
+
+So the gap is not only assembly. Nothing upstream of it has been exercised
+either: no reel has been briefed, so no still has been generated for one and
+no motion request has been sent. `decideMotion` also pauses before any request
+unless all four of `HIGGSFIELD_API_KEY`, `HIGGSFIELD_API_SECRET`,
 `HIGGSFIELD_MODEL_DRAFT` and `HIGGSFIELD_MODEL_FINAL` are set, and the motion
-catalog has exactly one confirmed id (Zoom In,
-`fbcbec5b-30f8-4b17-ba6e-8e8d5b265562`). So no real clip has ever been
-produced, and the editor has never had real footage to cut.
+catalog carries exactly one confirmed id (Zoom In,
+`fbcbec5b-30f8-4b17-ba6e-8e8d5b265562`).
+
+That changes the order of work. The editor is the last link of a chain whose
+earlier links are untested, so proving steps 1–4 on one real reel comes before
+spending anything on comparing editing models.
 
 ## Where it fits
 
@@ -156,8 +181,8 @@ Not done yet:
 - **No model has been called.** The Opus 5.5 vs Fable 5.1 comparison needs an
   `ANTHROPIC_API_KEY`, real Higgsfield clips and sign-off on the spend
   (est. $1–3 per reel per model, so ~$20–40 for 5 reels on both).
-- **No real Higgsfield clip exists to cut.** Motion has never run: the four
-  env vars are unset, so every reel stops at the stills stage.
+- **No real Higgsfield clip exists to cut**, and no reel has been briefed. See
+  the counts above.
 - Self-review of the render, transcription, and caption centring per line
   (drawtext centres the block, not each line).
 
@@ -172,13 +197,28 @@ npx tsx src/agents/video_edit/spike.ts --brief reel.json --out reel.mp4 \
 
 ## Suggested phasing
 
-1. **Spike (no prod):** EDL schema, validator and ffmpeg command builder as
-   pure, tested modules; a script that cuts 3 existing Higgsfield clips locally.
-   Compare Opus 5.5 vs Fable 5.1 on the same 5 reels for approval rate and cost.
-2. **Wire it:** `video_edit` agent, migration, Dockerfile ffmpeg, console
-   preview of the rendered reel next to the shot review.
-3. **Extend:** Repurposing Engine produces real cuts from long-form uploads
+Reordered after the counts above: the editor is the last link of a chain whose
+earlier links have never carried anything.
+
+1. **Prove the existing chain on one reel.** Brief an F6 or F7, press Approve &
+   Build, and check that stills land on `client_media_frames`. This spends
+   image credits only and needs no Higgsfield key. It is the cheapest way to
+   find out whether steps 1–3 work, and nothing downstream matters until they
+   do.
+2. **Turn motion on.** Set the four `HIGGSFIELD_*` vars on Railway and run the
+   same reel again. Expect the catalog to be the first problem: one id is
+   confirmed, so anything but Zoom In pauses. A real clip on `clip_path` is the
+   gate for everything below.
+3. **Compare editing models** on 3–5 real reels, Opus 5.5 against Fable 5.1,
+   scored on approval rate and cost per reel. `spike.ts --model` already does
+   this; it needs the clips from step 2 and sign-off on roughly $20–40.
+4. **Wire it:** `video_edit` agent, migration, ffmpeg in the Dockerfile,
+   console preview of the cut next to the shot review.
+5. **Extend:** Repurposing Engine produces real cuts from long-form uploads
    (transcription-driven), then Remotion graphics if approvals call for it.
+
+Steps 1 and 2 are Alex's: they need production credentials and the Phase 6
+release gate. The spike covers step 3 onwards as soon as there is footage.
 
 ## Sources
 
