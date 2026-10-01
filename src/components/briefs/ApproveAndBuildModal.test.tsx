@@ -100,10 +100,11 @@ describe("ApproveAndBuildModal — routing", () => {
     show({ media_type: "video", content_format: "reel", format_code: "F6" });
     expect(screen.getByRole("button", { name: /AI/ })).toBeEnabled();
     expect(screen.getByText(/does not call Higgsfield/i)).toBeInTheDocument();
+    expect(screen.getByText(/opening stills as images/i)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /Send to/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /AI/ }));
-    expect(screen.getByText(/queues video build against the shot plan/i)).toBeInTheDocument();
+    expect(screen.getByText(/image build for each shot's opening still/i)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /^Quality$/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/The set/i)).not.toBeInTheDocument();
 

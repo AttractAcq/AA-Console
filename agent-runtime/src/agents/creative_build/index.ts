@@ -12,8 +12,11 @@
 // Stage two renders it. For text briefs there is nothing to render — the
 // concept IS the deliverable — so stage one writes the copy and stops.
 //
-// Video never reaches here. It is human work, and the database rejects an
-// AI video generation outright rather than relying on the UI to hide it.
+// A video story, and any reel that is not Phase 1, never reaches a render.
+// Those are human work, and creative_generations rejects media_type video.
+// A Phase 1 reel (F6/F7) is the exception: its opening stills are queued as
+// an image generation, one still per shot, and rendered here. The reel
+// itself stays a video. Motion is video_build's job and is not called here.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { anthropicKeyForAgent, type RuntimeConfig } from "../../config.js";
@@ -55,6 +58,7 @@ import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { placeLogo } from "./logo.js";
 import { brandConceptBlock, brandRenderBlock, loadBrandProfile, type BrandProfile } from "./brand.js";
+import { openingStillsRoute, withOpeningShotFields } from "./openingStills.js";
 
 const BUCKET = "client-media";
 
@@ -68,8 +72,10 @@ interface BriefRow {
   /** 'client' or 'recruitment'. A hiring ad is a different deliverable. */
   purpose: string | null;
   recruitment_role: string | null;
-  /** 'single', 'carousel' or 'story'. The last two are made of frames. */
-  content_format: "single" | "carousel" | "story";
+  /** 'single', 'carousel', 'story' or 'reel'. Carousel, story and reel are frames. */
+  content_format: "single" | "carousel" | "story" | "reel";
+  /** F6/F7 on a Phase 1 reel. Null on a still. */
+  format_code: string | null;
   /** How many frames the brief asks for, or null to leave it to the agent. */
   frame_count: number | null;
   /** An ordered line per frame saying what it is for, or null. */
@@ -419,29 +425,41 @@ export async function runCreativeBuildJob(
 
   const { data: brief, error: briefError } = await sb
     .from("client_briefs")
-    .select("id, client_id, title, body, media_type, brief_ref, purpose, recruitment_role, content_format, frame_count, frame_plan")
+    .select("id, client_id, title, body, media_type, brief_ref, purpose, recruitment_role, content_format, format_code, frame_count, frame_plan")
     .eq("id", generation.brief_id)
     .maybeSingle();
   if (briefError) throw new Error(`Could not load the brief: ${briefError.message}`);
   if (!brief) return { ok: false, retryable: false, failureMessage: "That brief no longer exists." };
 
   const typed = brief as BriefRow;
-  if (typed.media_type === "video") {
+  // A Phase 1 reel's opening stills are an image generation on a video brief.
+  // Every other video still stops here. Carousel, story and single never
+  // match, because their briefs are not video.
+  const route = openingStillsRoute(typed, String(generation.media_type));
+  if (route.kind === "refuse") {
+    return { ok: false, retryable: false, failureMessage: route.message };
+  }
+  if (route.kind === "stills" && remake) {
     return {
       ok: false,
       retryable: false,
-      failureMessage: "Video is produced by people. Send this brief to an editor or avatar instead.",
+      failureMessage: "Replacing one opening still of a reel is not available yet. Rebuild the set.",
     };
   }
+  const openingShots = route.kind === "stills" ? route.shots : null;
 
-  const isImage = typed.media_type === "image";
-  // A carousel or story is rendered as an ordered set. Only the image route
-  // builds them; a video story is a person's job, same as any other video.
-  const isFramed = buildRoute(typed.media_type, typed.content_format) === "frames";
+  const isImage = openingShots !== null || typed.media_type === "image";
+  // A carousel or story is rendered as an ordered set. Reel opening stills
+  // join that path as images. buildRoute("video", "reel") stays "text" on
+  // purpose: a video brief must not become frames unless the generation is
+  // an image and the route above said so.
+  const isFramed = openingShots !== null || buildRoute(typed.media_type, typed.content_format) === "frames";
   // What the operator asked of the set. Null in both halves is the state
   // every brief written before 113 is in, and it means what it always meant:
-  // the agent decides.
-  const frameAsk: FrameAsk = { count: typed.frame_count, plan: typed.frame_plan };
+  // the agent decides. A reel stills job uses the shot beats, not the raw
+  // JSON plan, so the model is asked for one picture per shot.
+  const frameAsk: FrameAsk =
+    route.kind === "stills" ? route.frameAsk : { count: typed.frame_count, plan: typed.frame_plan };
 
   // The set being rebuilt part of. Loaded before the concept, because the
   // replacement frame has to be written against the frames it will sit
@@ -575,7 +593,9 @@ export async function runCreativeBuildJob(
     remake
       ? ""
       : isFramed
-      ? `an ordered set of frames for a ${typed.content_format}`
+      ? openingShots
+        ? "opening stills for a reel, one image per shot"
+        : `an ordered set of frames for a ${typed.content_format}`
       : isImage
         ? "a creative concept for a single image"
         : "finished copy"
@@ -595,7 +615,11 @@ ${
         remakeFeedback,
       )}\n`
     : ""
-}${remake ? "" : remakeBlock(remakeFeedback)}${isRecruitment ? recruitmentBlock(roleLabel) : ""}${isFramed && !remake ? `\nTHE SET\n${frameAskInstruction(frameAsk)}\n` : ""}
+}${remake ? "" : remakeBlock(remakeFeedback)}${isRecruitment ? recruitmentBlock(roleLabel) : ""}${
+  openingShots
+    ? "\nOPENING STILLS\nEach frame is the opening still of one shot. Describe the picture. Do not describe a camera move. Motion is applied later and is not part of this image.\n"
+    : ""
+}${isFramed && !remake ? `\nTHE SET\n${frameAskInstruction(frameAsk)}\n` : ""}
 THE BRIEF
 ${typed.title}
 
@@ -952,15 +976,17 @@ Call ${submitTool.name} once when you are done.`;
       return { ok: false, retryable: true, failureMessage: message, usage };
     }
 
+    const filedFormat = openingShots ? "reel" : typed.content_format;
+    const filedFrames = openingShots ? withOpeningShotFields(frames, openingShots) : frames;
     const { data: framedId, error: saveError } = await sb.rpc("save_framed_asset", {
       p_client_id: job.client_id,
       p_brief_id: typed.id,
-      p_format: typed.content_format,
-      p_media_type: "image",
+      p_format: filedFormat,
+      p_media_type: openingShots ? "video" : "image",
       p_title: typed.title,
-      p_frames: frames,
+      p_frames: filedFrames,
     });
-    if (saveError) throw new Error(`Could not file the ${typed.content_format}: ${saveError.message}`);
+    if (saveError) throw new Error(`Could not file the ${filedFormat}: ${saveError.message}`);
 
     await sb
       .from("creative_renders")
@@ -982,7 +1008,9 @@ Call ${submitTool.name} once when you are done.`;
     await appendEvent(
       sb,
       job.id,
-      `Filed a ${typed.content_format} of ${frames.length} frames, awaiting approval.`,
+      openingShots
+        ? `Filed ${frames.length} opening stills for the reel. Motion was not called.`
+        : `Filed a ${typed.content_format} of ${frames.length} frames, awaiting approval.`,
     );
     return { ok: true, retryable: false, usage };
   }
