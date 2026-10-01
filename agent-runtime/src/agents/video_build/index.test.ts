@@ -4,6 +4,7 @@ import type { RuntimeConfig } from "../../config.js";
 import type { AgentRow } from "../../orchestration/registry.js";
 import type { AgentJobRow } from "../../queue.js";
 import { MOTION_PRESET_PLACEHOLDER, serializeShot } from "../brief/shots.js";
+import { ZOOM_IN_MOTION_ID } from "./motions.js";
 import { runVideoBuildJob } from "./index.js";
 
 const saved = {
@@ -58,12 +59,15 @@ function harness(
       position: number;
       storage_path: string | null;
       provider_job_id: string | null;
+      clip_path?: string | null;
     }>;
     signedUrl?: string | null;
   } = {},
 ) {
   const events: Array<Record<string, unknown>> = [];
   const frameUpdates: Array<Record<string, unknown>> = [];
+  const briefUpdates: Array<Record<string, unknown>> = [];
+  const uploads: Array<{ bucket: string; path: string; upsert: boolean; contentType: string; bytes: Buffer }> = [];
   const assets = options.assets ?? [];
   const frames = options.frames ?? [];
   const sb = {
@@ -74,6 +78,12 @@ function harness(
             eq: () => ({
               maybeSingle: async () => ({ data: brief, error: null }),
             }),
+          }),
+          update: (row: Record<string, unknown>) => ({
+            eq: async () => {
+              briefUpdates.push(row);
+              return { error: null };
+            },
           }),
         };
       }
@@ -111,15 +121,20 @@ function harness(
       throw new Error(`unexpected table ${table}`);
     },
     storage: {
-      from: () => ({
+      from: (bucket: string) => ({
         createSignedUrl: async () => ({
           data: options.signedUrl ? { signedUrl: options.signedUrl } : null,
           error: options.signedUrl ? null : { message: "no url" },
         }),
+        upload: async (path: string, bytes: Buffer, init: { contentType: string; upsert: boolean }) => {
+          uploads.push({ bucket, path, bytes, upsert: init.upsert, contentType: init.contentType });
+          return { error: null };
+        },
+        remove: async () => ({ error: null }),
       }),
     },
   };
-  return { sb: sb as unknown as SupabaseClient, events, frameUpdates };
+  return { sb: sb as unknown as SupabaseClient, events, frameUpdates, briefUpdates, uploads };
 }
 
 const job: AgentJobRow = {
@@ -153,7 +168,7 @@ describe("video_build", () => {
   it("refuses motion without Higgsfield credentials and does not call the network", async () => {
     clearHiggsfieldEnv();
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network disabled"));
-    const { sb, events } = harness(reel);
+    const { sb, events, briefUpdates } = harness(reel);
 
     const result = await runVideoBuildJob(sb, runtime, agent, job);
 
@@ -173,6 +188,10 @@ describe("video_build", () => {
     const payload = motion?.payload as { higgsfield_called?: boolean; status?: string };
     expect(payload.higgsfield_called).toBe(false);
     expect(payload.status).toBe("paused");
+    const saved = briefUpdates[0]?.frame_plan as string[];
+    expect(JSON.parse(saved[0] ?? "").motion_preset).toBe(ZOOM_IN_MOTION_ID);
+    expect(JSON.parse(saved[1] ?? "").motion_preset).toBe(ZOOM_IN_MOTION_ID);
+    expect(saved.join(" ")).not.toContain(`"${MOTION_PRESET_PLACEHOLDER}"`);
   });
 
   it("still makes no request when credentials are present but opening stills are not", async () => {
@@ -214,18 +233,26 @@ describe("video_build", () => {
       ...reel,
       frame_plan: [shotLine("Name the mechanism").replace('"pending"', `"${motion}"`), shotLine("Show the step").replace('"pending"', `"${motion}"`)],
     };
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+    const clipUrl = "https://cdn.example.test/clip.mp4";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      const href = String(url);
+      if (href === clipUrl) {
+        return new Response(Uint8Array.from([1, 2, 3, 4]), {
+          status: 200,
+          headers: { "content-type": "video/mp4" },
+        });
+      }
       if (init?.method === "POST") {
         return new Response(
           JSON.stringify({ request_id: "req_abc12345", status: "queued", status_url: "https://platform.higgsfield.ai/requests/req_abc12345/status" }),
           { status: 200 },
         );
       }
-      return new Response(JSON.stringify({ status: "completed", video: { url: "https://cdn.example.test/clip.mp4" } }), {
+      return new Response(JSON.stringify({ status: "completed", video: { url: clipUrl } }), {
         status: 200,
       });
     });
-    const { sb, frameUpdates } = harness(ready, {
+    const { sb, frameUpdates, uploads } = harness(ready, {
       assets: [{ id: "asset-1" }],
       frames: [
         { id: "frame-1", position: 1, storage_path: "client-1/generated/r/01.png", provider_job_id: null },
@@ -238,16 +265,67 @@ describe("video_build", () => {
 
     expect(result.ok).toBe(true);
     expect(fetchSpy).toHaveBeenCalled();
-    for (const call of fetchSpy.mock.calls) {
+    const apiCalls = fetchSpy.mock.calls.filter((call) => String(call[0]) !== clipUrl);
+    expect(apiCalls.length).toBeGreaterThan(0);
+    for (const call of apiCalls) {
       expect(String(call[0])).toMatch(/^https:\/\/platform\.higgsfield\.ai\//);
     }
+    expect(fetchSpy.mock.calls.filter((call) => String(call[0]) === clipUrl)).toHaveLength(2);
     const post = fetchSpy.mock.calls.find((call) => call[1]?.method === "POST");
     const body = JSON.parse(String(post?.[1]?.body));
     expect(body.prompt).toBe("Name the mechanism");
     expect(body.image_url).toBe("https://cdn.example.test/still.png");
     expect(body.motions).toEqual([{ id: motion, strength: 1 }]);
-    expect(frameUpdates.map((row) => row.provider_job_id)).toEqual(["req_abc12345", "req_abc12345"]);
+    expect(frameUpdates.map((row) => row.provider_job_id).filter(Boolean)).toEqual(["req_abc12345", "req_abc12345"]);
+    expect(frameUpdates.map((row) => row.clip_path).filter(Boolean)).toEqual([
+      "client-1/generated/clips/frame-1.mp4",
+      "client-1/generated/clips/frame-2.mp4",
+    ]);
+    expect(uploads.map((upload) => ({ path: upload.path, upsert: upload.upsert, contentType: upload.contentType }))).toEqual([
+      { path: "client-1/generated/clips/frame-1.mp4", upsert: false, contentType: "video/mp4" },
+      { path: "client-1/generated/clips/frame-2.mp4", upsert: false, contentType: "video/mp4" },
+    ]);
     expect(JSON.stringify(result)).not.toContain("not-a-real-secret");
+  });
+
+  it("pauses an unknown motion name and does not invent a catalog id", async () => {
+    setHiggsfieldEnv();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network disabled"));
+    const orbit = {
+      ...reel,
+      frame_plan: [
+        serializeShot({
+          beat: "Drift",
+          duration_sec: 3,
+          shot_source_kind: "ai_generated",
+          motion_preset: "Orbit",
+        }),
+        serializeShot({
+          beat: "Hold",
+          duration_sec: 3,
+          shot_source_kind: "ai_generated",
+          motion_preset: "Orbit",
+        }),
+      ],
+    };
+    const { sb, uploads } = harness(orbit, {
+      assets: [{ id: "asset-1" }],
+      frames: [
+        { id: "frame-1", position: 1, storage_path: "client-1/generated/r/01.png", provider_job_id: null },
+        { id: "frame-2", position: 2, storage_path: "client-1/generated/r/02.png", provider_job_id: null },
+      ],
+      signedUrl: "https://cdn.example.test/still.png",
+    });
+
+    const result = await runVideoBuildJob(sb, runtime, agent, job);
+
+    expect(result.ok).toBe(false);
+    expect(result.retryable).toBe(false);
+    expect(result.failureMessage).toContain("Orbit");
+    expect(result.failureMessage).toMatch(/No Higgsfield request was sent/);
+    expect(result.failureMessage).not.toContain(ZOOM_IN_MOTION_ID);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(uploads).toEqual([]);
   });
 
   it("does not throw when the stills lookup fails on the way to the pause", async () => {

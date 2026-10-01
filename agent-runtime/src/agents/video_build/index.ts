@@ -8,8 +8,10 @@
 // Motion pauses when HIGGSFIELD_API_KEY, HIGGSFIELD_API_SECRET,
 // HIGGSFIELD_MODEL_DRAFT or HIGGSFIELD_MODEL_FINAL is missing. When all four
 // are set, shots that have an https still and a catalog motion id are
-// submitted and polled through the Higgsfield adapter. A pending motion
-// preset is not invented into a UUID, and a missing still is not sent.
+// submitted and polled through the Higgsfield adapter. Pending and Zoom In
+// are stored as the Cockpit Zoom In catalog id. Any other name is not
+// invented into a UUID, and a missing still is not sent.
+// A completed poll copies the clip into client-media and sets clip_path.
 // Nothing here sets agents.paused: that would stop the agent for every client.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -18,8 +20,9 @@ import type { AgentRow } from "../../orchestration/registry.js";
 import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
-import { isPhase1FormatCode, parseStoredShotPlan } from "../brief/shots.js";
+import { isPhase1FormatCode, parseStoredShotPlan, serializeShot, type ShotPlanEntry } from "../brief/shots.js";
 import { assemblyHandoff } from "./assembly.js";
+import { ClipStoreError, persistCompletedClip } from "./clip.js";
 import { createHiggsfieldClient, HiggsfieldError } from "./higgsfield.js";
 import {
   decideMotion,
@@ -46,6 +49,7 @@ interface FrameRow {
   position: number;
   storage_path: string | null;
   provider_job_id: string | null;
+  clip_path: string | null;
 }
 
 function failed(failureMessage: string, retryable = false): JobResult {
@@ -65,6 +69,23 @@ async function stillsOnFile(
   return { count: Array.isArray(data) ? data.length : 0, error: null };
 }
 
+function motionOf(line: string | undefined): string {
+  if (!line) return "";
+  try {
+    const raw = JSON.parse(line) as { motion_preset?: unknown };
+    return typeof raw.motion_preset === "string" ? raw.motion_preset.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Lines to write when a stored preset resolved to a catalog id. Null if nothing changed. */
+function resolvedPlanLines(stored: readonly string[], shots: readonly ShotPlanEntry[]): string[] | null {
+  const next = shots.map(serializeShot);
+  const changed = next.some((line, i) => motionOf(line) !== motionOf(stored[i]));
+  return changed ? next : null;
+}
+
 function stillsMessage(stills: { count: number; error: string | null }): string {
   if (stills.error) {
     return `Could not check stills (${stills.error}). Opening frames are an image build on creative_build. This agent does not render them.`;
@@ -82,7 +103,7 @@ async function framesForBrief(sb: SupabaseClient, briefId: string): Promise<Fram
   if (ids.length === 0) return [];
   const { data, error: frameError } = await sb
     .from("client_media_frames")
-    .select("id, position, storage_path, provider_job_id")
+    .select("id, position, storage_path, provider_job_id, clip_path")
     .in("asset_id", ids);
   if (frameError) throw new Error(`Could not load shot frames: ${frameError.message}`);
   return (data ?? []) as FrameRow[];
@@ -136,11 +157,38 @@ export async function runVideoBuildJob(
   if (plan.problem) return failed(plan.problem);
 
   const title = brief.title?.trim() || "this reel";
+  const resolvedLines = resolvedPlanLines(brief.frame_plan ?? [], plan.shots);
+  let planSaved: boolean | null = null;
+  if (resolvedLines) {
+    planSaved = false;
+    try {
+      const { error: saveError } = await sb.from("client_briefs").update({ frame_plan: resolvedLines }).eq("id", brief.id);
+      if (saveError) {
+        await appendEvent(
+          sb,
+          job.id,
+          `Shot motions resolved to catalog ids but the plan could not be saved (${saveError.message}).`,
+          "warn",
+          { stage: "plan", plan_saved: false },
+        );
+      } else {
+        planSaved = true;
+      }
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      await appendEvent(sb, job.id, `Shot motions resolved to catalog ids but the plan could not be saved (${message}).`, "warn", {
+        stage: "plan",
+        plan_saved: false,
+      });
+    }
+  }
   await appendEvent(sb, job.id, `Planned ${plan.shots.length} generated shots for "${title}".`, "info", {
     stage: "plan",
     shot_count: plan.shots.length,
     format_code: brief.format_code,
     shot_source_kind: "ai_generated",
+    motion_presets: plan.shots.map((shot) => shot.motion_preset),
+    plan_saved: planSaved,
   });
 
   let stills: { count: number; error: string | null };
@@ -250,17 +298,32 @@ export async function runVideoBuildJob(
     globalThis.fetch,
   );
   const statuses: string[] = [];
-  const submitted: Array<{ position: number; requestId: string; status: string; videoUrl: string | null }> = [];
+  const submitted: Array<{
+    position: number;
+    requestId: string;
+    status: string;
+    videoUrl: string | null;
+    clipPath: string | null;
+  }> = [];
   try {
     for (const call of prepared.calls) {
       if (call.kind === "poll") {
         const polled = await client.pollStatus(call.requestId);
+        const clipPath = await persistCompletedClip(sb, {
+          clientId: job.client_id,
+          frameId: call.frameId,
+          status: polled.status,
+          videoUrl: polled.videoUrl,
+          existingClipPath: frames.find((frame) => frame.id === call.frameId)?.clip_path,
+          fetchImpl: globalThis.fetch,
+        });
         statuses.push(polled.status);
         submitted.push({
           position: call.position,
           requestId: polled.requestId,
           status: polled.status,
           videoUrl: polled.videoUrl,
+          clipPath,
         });
         continue;
       }
@@ -289,17 +352,27 @@ export async function runVideoBuildJob(
         return failed(message);
       }
       const polled = await client.pollStatus(accepted.requestId);
+      const clipPath = await persistCompletedClip(sb, {
+        clientId: job.client_id,
+        frameId: call.frameId,
+        status: polled.status,
+        videoUrl: polled.videoUrl,
+        existingClipPath: frames.find((frame) => frame.id === call.frameId)?.clip_path,
+        fetchImpl: globalThis.fetch,
+      });
       statuses.push(polled.status);
       submitted.push({
         position: call.position,
         requestId: accepted.requestId,
         status: polled.status,
         videoUrl: polled.videoUrl,
+        clipPath,
       });
     }
   } catch (caught) {
-    const retryable = caught instanceof HiggsfieldError ? caught.retryable : true;
-    const message = caught instanceof HiggsfieldError ? caught.message : "Higgsfield could not be reached.";
+    const known = caught instanceof HiggsfieldError || caught instanceof ClipStoreError;
+    const retryable = caught instanceof HiggsfieldError || caught instanceof ClipStoreError ? caught.retryable : true;
+    const message = known && caught instanceof Error ? caught.message : "Higgsfield could not be reached.";
     await appendEvent(sb, job.id, message, "warn", {
       creative_stage: "motion",
       status: "paused",
