@@ -2,12 +2,14 @@
  * Whether motion may run, and which shots are ready to submit.
  *
  * Missing Higgsfield env pauses before any request. When the key, the
- * secret, and both model ids are set, the adapter may submit. A shot whose
- * motion preset is still "pending", or whose opening still has no https
- * URL, is not submitted — inventing a catalog id would point DoP at nothing.
+ * secret, and both model ids are set, the adapter may submit. Pending and
+ * Zoom In are the Cockpit Zoom In catalog id. Any other name that is not
+ * already a catalog UUID is not submitted — inventing an id would point
+ * DoP at nothing. A shot whose opening still has no https URL is not sent.
  */
 
 import type { ShotPlanEntry } from "../brief/shots.js";
+import { resolveMotionPreset } from "./motions.js";
 
 export const HIGGSFIELD_KEY_ENV = "HIGGSFIELD_API_KEY";
 export const HIGGSFIELD_SECRET_ENV = "HIGGSFIELD_API_SECRET";
@@ -154,7 +156,7 @@ export function prepareMotionCalls(input: {
   const strength = input.strength ?? 1;
   const calls: MotionCall[] = [];
   const stillProblems: number[] = [];
-  const motionProblems: number[] = [];
+  const motionProblems: Array<{ position: number; preset: string }> = [];
 
   input.shots.forEach((shot, index) => {
     const position = index + 1;
@@ -165,13 +167,21 @@ export function prepareMotionCalls(input: {
       return;
     }
     const imageUrl = httpsUrl(input.stillUrlByPosition.get(position));
-    const motionId = isMotionCatalogId(shot.motion_preset) ? shot.motion_preset.trim() : "";
+    const resolved = resolveMotionPreset(shot.motion_preset);
+    // A UUID already stored on the shot is a catalog id the plan carried.
+    // It is not replaced. Only pending and Zoom In are filled in from the
+    // Cockpit mapping. Any other name stays unresolved.
+    const motionId = resolved.ok
+      ? resolved.id
+      : isMotionCatalogId(shot.motion_preset)
+        ? shot.motion_preset.trim()
+        : "";
     if (!frame || !imageUrl) {
       stillProblems.push(position);
       return;
     }
     if (!motionId) {
-      motionProblems.push(position);
+      motionProblems.push({ position, preset: shot.motion_preset.trim() || "(blank)" });
       return;
     }
     calls.push({
@@ -199,9 +209,8 @@ export function prepareMotionCalls(input: {
       parts.push(`opening stills are not ready for shot ${stillProblems.join(", ")}`);
     }
     if (motionProblems.length > 0) {
-      parts.push(
-        `motion preset is not a catalog id yet for shot ${motionProblems.join(", ")} (it is still pending)`,
-      );
+      const listed = motionProblems.map((item) => `"${item.preset}" (shot ${item.position})`).join(", ");
+      parts.push(`motion preset ${listed} is not a known catalog id`);
     }
     return {
       ok: false,

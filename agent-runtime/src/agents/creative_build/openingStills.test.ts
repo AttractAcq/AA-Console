@@ -4,6 +4,7 @@ import type { RuntimeConfig } from "../../config.js";
 import type { AgentRow } from "../../orchestration/registry.js";
 import type { AgentJobRow } from "../../queue.js";
 import { MOTION_PRESET_PLACEHOLDER, serializeShot } from "../brief/shots.js";
+import { ZOOM_IN_MOTION_ID } from "../video_build/motions.js";
 import { runCreativeBuildJob } from "./index.js";
 import { openingStillsRoute, withOpeningShotFields } from "./openingStills.js";
 
@@ -85,7 +86,7 @@ describe("openingStillsRoute", () => {
     expect(filed[0]).toMatchObject({
       beat: "Name the mechanism",
       duration_sec: 3,
-      motion_preset: MOTION_PRESET_PLACEHOLDER,
+      motion_preset: ZOOM_IN_MOTION_ID,
       shot_source_kind: "ai_generated",
     });
     expect(filed[1]?.caption).toBe("step");

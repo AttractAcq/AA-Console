@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createHiggsfieldClient, HIGGSFIELD_BASE_URL, HiggsfieldError } from "./higgsfield.js";
+import { createHiggsfieldClient, HIGGSFIELD_BASE_URL, HIGGSFIELD_MOTIONS_PATH, HiggsfieldError, listMotions } from "./higgsfield.js";
+import { resolveMotionPreset, ZOOM_IN_MOTION_ID } from "./motions.js";
 
 const MOTION = "11111111-1111-4111-8111-111111111111";
 
@@ -129,5 +130,41 @@ describe("Higgsfield adapter", () => {
     expect(() => createHiggsfieldClient({ apiKey: " ", apiSecret: "s" }, vi.fn() as typeof fetch)).toThrow(
       /missing/i,
     );
+  });
+});
+
+describe("listMotions", () => {
+  it("does not fetch when credentials are missing", async () => {
+    const fetchImpl = vi.fn();
+    const result = await listMotions({ apiKey: "", apiSecret: "secret" }, fetchImpl as typeof fetch);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe("missing_higgsfield_credentials");
+    expect(result.message).toContain("HIGGSFIELD_API_KEY");
+    expect(result.message).not.toContain("secret");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("reads the catalog from a mock and resolves only ids the catalog returned", async () => {
+    const dollyId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+      jsonResponse({
+        motions: [{ id: ZOOM_IN_MOTION_ID, name: "Zoom In" }, { id: dollyId, name: "Dolly In" }],
+      }),
+    );
+    const listed = await listMotions({ apiKey: "test-key", apiSecret: "test-secret" }, fetchImpl as typeof fetch);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const call = fetchImpl.mock.calls[0];
+    if (!call) throw new Error("catalog fetch was not made");
+    const [url, init] = call;
+    expect(String(url)).toBe(`${HIGGSFIELD_BASE_URL}${HIGGSFIELD_MOTIONS_PATH}`);
+    expect(init?.method).toBe("GET");
+    const headers = init?.headers as Record<string, string> | undefined;
+    expect(headers?.Authorization).toBe("Key test-key:test-secret");
+    expect(listed.ok).toBe(true);
+    if (!listed.ok) return;
+    expect(resolveMotionPreset("Dolly In", listed.motions)).toMatchObject({ ok: true, id: dollyId, via: "catalog" });
+    expect(resolveMotionPreset("Orbit", listed.motions)).toEqual({ ok: false, preset: "Orbit" });
+    expect(resolveMotionPreset("pending", listed.motions)).toMatchObject({ id: ZOOM_IN_MOTION_ID, via: "phase1_default" });
   });
 });

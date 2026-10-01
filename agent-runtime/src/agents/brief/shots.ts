@@ -1,4 +1,10 @@
 import { MAX_FRAMES, MIN_FRAMES } from "../../content/format.js";
+import {
+  MOTION_PRESET_PENDING,
+  resolveMotionPreset,
+  ZOOM_IN_MOTION_ID,
+  ZOOM_IN_MOTION_NAME,
+} from "../video_build/motions.js";
 
 /**
  * Shot source on a frame.
@@ -19,10 +25,12 @@ export const PHASE1_FORMAT_CODES = ["F6", "F7"] as const;
 export type Phase1FormatCode = (typeof PHASE1_FORMAT_CODES)[number];
 
 /**
- * Stored until a Higgsfield motions-catalog id is chosen.
- * Not a UUID. Inventing one would point a later submit at nothing.
+ * Token a planner may still emit. Phase 1 stores the Zoom In catalog UUID
+ * instead. The token is accepted and replaced; it is not what gets written.
  */
-export const MOTION_PRESET_PLACEHOLDER = "pending";
+export const MOTION_PRESET_PLACEHOLDER = MOTION_PRESET_PENDING;
+
+export { ZOOM_IN_MOTION_ID, ZOOM_IN_MOTION_NAME };
 
 export interface ShotPlanEntry {
   beat: string;
@@ -53,8 +61,10 @@ export function reelPlannerNote(): string {
     "Phase 1 formats are F6 (mechanism explainer) and F7 (problem cold-open).",
     "Both are generated stills with motion applied. They need no client assets and no proof footage.",
     "Submit a shot plan. Each shot has a beat, a duration in seconds, shot_source_kind ai_generated,",
-    `and motion_preset "${MOTION_PRESET_PLACEHOLDER}" unless you were given a real catalog id.`,
-    "Do not invent a motion UUID. Do not mark any shot as a client asset or as proof.",
+    `and a motion_preset. The Phase 1 motion is ${ZOOM_IN_MOTION_NAME}, catalog id ${ZOOM_IN_MOTION_ID}.`,
+    `Write that id. "${MOTION_PRESET_PLACEHOLDER}" and "${ZOOM_IN_MOTION_NAME}" are accepted and stored as that id.`,
+    "Do not invent a motion UUID. Any other name is stored as written, and motion pauses until a catalog confirms it.",
+    "Do not mark any shot as a client asset or as proof.",
     "slot_role is not yours to choose. Leave quota buckets alone.",
   ].join(" ");
 }
@@ -94,7 +104,7 @@ export function reelSubmitProperties(): {
             },
             motion_preset: {
               type: "string",
-              description: `Higgsfield motion id, or "${MOTION_PRESET_PLACEHOLDER}" until a catalog id is chosen. Do not invent a UUID.`,
+              description: `Higgsfield motions-catalog id. Phase 1 default is ${ZOOM_IN_MOTION_NAME} (${ZOOM_IN_MOTION_ID}). "${MOTION_PRESET_PLACEHOLDER}" and "${ZOOM_IN_MOTION_NAME}" are stored as that id. Do not invent a UUID.`,
             },
           },
           required: ["beat", "duration_sec", "shot_source_kind", "motion_preset"],
@@ -143,16 +153,19 @@ function asShot(raw: unknown, index: number): { shot: ShotPlanEntry | null; prob
   if (!motion) {
     return {
       shot: null,
-      problem: `${label} needs a motion preset. Use "${MOTION_PRESET_PLACEHOLDER}" until a catalog id exists.`,
+      problem: `${label} needs a motion preset. Phase 1 uses ${ZOOM_IN_MOTION_NAME} (${ZOOM_IN_MOTION_ID}). "${MOTION_PRESET_PLACEHOLDER}" is accepted and stored as that id.`,
     };
   }
 
+  // Known SoT names become the catalog UUID. Anything else is kept verbatim
+  // so a later pause can name it. No other UUID is filled in here.
+  const resolved = resolveMotionPreset(motion);
   return {
     shot: {
       beat,
       duration_sec: duration,
       shot_source_kind: SHOT_SOURCE_GENERATED,
-      motion_preset: motion,
+      motion_preset: resolved.ok ? resolved.id : motion,
     },
     problem: "",
   };
@@ -258,6 +271,12 @@ export function readableShotPlan(submitted: Record<string, unknown>): string | n
   const plan = shotsFromSubmitted(submitted);
   if (plan.problem || plan.shots.length === 0) return null;
   return plan.shots
-    .map((shot, i) => `${i + 1}. ${shot.beat} (${shot.duration_sec}s, generated, motion ${shot.motion_preset})`)
+    .map((shot, i) => `${i + 1}. ${shot.beat} (${shot.duration_sec}s, generated, motion ${motionForReader(shot.motion_preset)})`)
     .join("\n");
+}
+
+function motionForReader(preset: string): string {
+  const resolved = resolveMotionPreset(preset);
+  if (resolved.ok && resolved.id === ZOOM_IN_MOTION_ID) return `${ZOOM_IN_MOTION_NAME} ${ZOOM_IN_MOTION_ID}`;
+  return preset;
 }

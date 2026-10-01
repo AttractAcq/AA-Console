@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MOTION_PRESET_PLACEHOLDER, serializeShot, type ShotPlanEntry } from "../brief/shots.js";
+import { ZOOM_IN_MOTION_ID } from "./motions.js";
 import {
   decideMotion,
   motionFollowUp,
@@ -108,9 +109,23 @@ describe("prepareMotionCalls", () => {
     [2, "https://cdn.example.test/2.png"],
   ]);
 
-  it("does not submit while the motion preset is still pending", () => {
+  it("submits pending and Zoom In as the Cockpit catalog id", () => {
     const plan = prepareMotionCalls({
-      shots: [shot("Name it"), shot("Show it")],
+      shots: [shot("Name it", "pending"), shot("Show it", "Zoom In")],
+      frames,
+      stillUrlByPosition: urls,
+      modelId: "higgsfield-ai/dop/lite",
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.calls[0]).toMatchObject({ kind: "submit", motionId: ZOOM_IN_MOTION_ID });
+    expect(plan.calls[1]).toMatchObject({ kind: "submit", motionId: ZOOM_IN_MOTION_ID });
+    expect(JSON.stringify(plan.calls)).not.toContain(MOTION);
+  });
+
+  it("does not invent an id for an unknown motion name", () => {
+    const plan = prepareMotionCalls({
+      shots: [shot("Name it", "Orbit"), shot("Show it", "Orbit")],
       frames,
       stillUrlByPosition: urls,
       modelId: "higgsfield-ai/dop/lite",
@@ -118,7 +133,9 @@ describe("prepareMotionCalls", () => {
     expect(plan.ok).toBe(false);
     if (plan.ok) return;
     expect(plan.reason).toBe("motion_preset_pending");
+    expect(plan.message).toContain("Orbit");
     expect(plan.message).toContain("No Higgsfield request was sent");
+    expect(plan.message).not.toContain(ZOOM_IN_MOTION_ID);
     expect(plan.message).not.toContain(MOTION);
   });
 
@@ -173,7 +190,7 @@ describe("prepareMotionCalls", () => {
 
   it("drops new submits when another shot is blocked, and still polls what was stored", () => {
     const plan = prepareMotionCalls({
-      shots: [shot("Name it", MOTION), shot("Show it", MOTION_PRESET_PLACEHOLDER)],
+      shots: [shot("Name it", MOTION), shot("Show it", "Orbit")],
       frames: [
         { id: "frame-1", position: 1, providerJobId: "req_already" },
         { id: "frame-2", position: 2, providerJobId: null },

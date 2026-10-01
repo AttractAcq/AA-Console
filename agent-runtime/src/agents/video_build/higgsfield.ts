@@ -1,3 +1,5 @@
+import type { MotionCatalogEntry } from "./motions.js";
+
 /**
  * Higgsfield DoP image-to-video client.
  *
@@ -9,7 +11,11 @@
  * Contract, from the Cockpit DoP rules (rebuilt, not ported):
  *   POST /{model_id}  { prompt, image_url, motions: [{ id, strength }] }
  *   GET  /requests/{request_id}/status
+ *   GET  /v1/motions
  * Auth: Authorization: Key {api_key}:{api_key_secret}
+ *
+ * listMotions is not called by the video_build job. Phase 1 resolves
+ * Zoom In locally. The job does not open the catalog.
  */
 
 export const HIGGSFIELD_BASE_URL = "https://platform.higgsfield.ai";
@@ -195,4 +201,89 @@ export function createHiggsfieldClient(
       };
     },
   };
+}
+
+export const HIGGSFIELD_MOTIONS_PATH = "/v1/motions";
+
+export type ListMotionsResult =
+  | { ok: true; motions: MotionCatalogEntry[] }
+  | { ok: false; reason: "missing_higgsfield_credentials"; message: string };
+
+function catalogList(body: unknown): unknown[] {
+  if (Array.isArray(body)) return body;
+  if (body && typeof body === "object") {
+    const row = body as Record<string, unknown>;
+    if (Array.isArray(row.motions)) return row.motions;
+    if (Array.isArray(row.data)) return row.data;
+  }
+  throw new HiggsfieldError("Motions catalog response was not a list.", false);
+}
+
+function catalogEntry(raw: unknown, index: number): MotionCatalogEntry {
+  const label = `Motions catalog entry ${index + 1}`;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new HiggsfieldError(`${label} is not an object.`, false);
+  }
+  const row = raw as Record<string, unknown>;
+  const id = typeof row.id === "string" ? row.id.trim() : "";
+  const name = typeof row.name === "string" ? row.name.trim() : "";
+  if (!MOTION_UUID.test(id)) throw new HiggsfieldError(`${label} has no catalog id.`, false);
+  if (!name) throw new HiggsfieldError(`${label} has no name.`, false);
+  return {
+    id: id.toLowerCase(),
+    name,
+    description: typeof row.description === "string" ? row.description : null,
+    preview_url: typeof row.preview_url === "string" ? row.preview_url : null,
+    start_end_frame: typeof row.start_end_frame === "boolean" ? row.start_end_frame : null,
+  };
+}
+
+/**
+ * GET /v1/motions. Missing credentials return a pause and make no request.
+ * video_build does not call this.
+ */
+export async function listMotions(
+  credentials: { apiKey?: string | null; apiSecret?: string | null },
+  fetchImpl: typeof fetch = globalThis.fetch,
+): Promise<ListMotionsResult> {
+  const apiKey = credentials.apiKey?.trim() ?? "";
+  const apiSecret = credentials.apiSecret?.trim() ?? "";
+  if (!apiKey || !apiSecret) {
+    const missing = [apiKey ? null : "HIGGSFIELD_API_KEY", apiSecret ? null : "HIGGSFIELD_API_SECRET"].filter(
+      (name): name is string => name !== null,
+    );
+    const listed = missing.join(" and ");
+    const verb = missing.length === 1 ? "is" : "are";
+    return {
+      ok: false,
+      reason: "missing_higgsfield_credentials",
+      message: `Motions catalog was not requested: ${listed} ${verb} not set.`,
+    };
+  }
+
+  let response: Response;
+  try {
+    response = await fetchImpl(`${HIGGSFIELD_BASE_URL}${HIGGSFIELD_MOTIONS_PATH}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Key ${apiKey}:${apiSecret}`,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    throw new HiggsfieldError("Higgsfield could not be reached.", true);
+  }
+  if (!response.ok) {
+    throw new HiggsfieldError(`Motions catalog request failed (${response.status}).`, response.status === 429 || response.status >= 500);
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new HiggsfieldError("Motions catalog response was not JSON.", false);
+  }
+  const motions = catalogList(body).map((entry, index) => catalogEntry(entry, index));
+  return { ok: true, motions };
 }
