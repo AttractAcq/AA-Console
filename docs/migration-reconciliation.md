@@ -19,7 +19,7 @@ rehearse a production apply against.** That has to be fixed before migrations
 | `89_delete_recruitment_ad` | applied | **never applied** | present |
 | `90_recruitment_page_type` | applied | **never applied** | present |
 | `91_page_reference_asset` | applied | **never applied** | present |
-| `106_remake_rejected_asset_fix` | **not applied** | applied | **in no branch** |
+| `106_remake_rejected_asset_fix` | not applied | applied | in no branch — but moot, see 1.1 |
 | `127_fix_team_category_text_compare` | applied | not applied | **in no branch** |
 | `fix_assign_production_ai_render_columns` | applied | not applied | only on PR #108 |
 | `104_campaign_pillars` | 1 row | **split into 2 rows** | 1 file |
@@ -36,16 +36,28 @@ migration-40 version with no `p_brief_role`. So the September audit's
 "staging matches production count for count" is no longer true in either
 direction.
 
-### Two hotfixes exist only in a database
+### 1.1 Hotfixes that exist only in a database
 
-Neither is in any branch. Both were applied straight to an environment and
-never committed, so a replay of git silently loses them:
+Two migrations were applied straight to an environment and never committed.
+Neither is the hazard it first looked like, because **Supabase stores the SQL
+it ran**: `supabase_migrations.schema_migrations.statements` holds the full text
+of both, so nothing is unrecoverable and no rebuild can lose them.
 
-- **`127_fix_team_category_text_compare`** (production only) — captured by new
-  migration 138, below.
-- **`106_remake_rejected_asset_fix`** (staging only) — **not yet captured.**
-  Its content is unknown from git and must be read out of staging before
-  staging is rebuilt, or it is lost.
+- **`127_fix_team_category_text_compare`** (production only) — recovered and
+  read. It is more interesting than its name: see 3.2. Captured by new
+  migration 138.
+- **`106_remake_rejected_asset_fix`** (staging only) — recovered and read, then
+  **found to be moot.** It patched `remake_rejected_asset`, which migration 108
+  then dropped outright in favour of `regenerate_asset`:
+
+  ```sql
+  drop function if exists remake_rejected_asset(uuid, text, text);
+  ```
+
+  The function exists in neither database today (0 rows in `pg_proc` on both),
+  and the repo's own 106 already carries the corrected body. It is a dead
+  intermediate, not a divergence. **Nothing needs recovering before staging can
+  be rebuilt.**
 
 ---
 
@@ -123,6 +135,41 @@ Two functions carry the fault. Only one was ever fixed:
 This is why PR #108 must not merge as written: it reproduces the broken
 declaration verbatim.
 
+#### The hotfix tried to fix both, and silently fixed one
+
+Reading the stored SQL of `127_fix_team_category_text_compare` shows it was
+aimed at **both** functions — two `DO` blocks, one per function. It worked on
+`dispatch_brief_to_members` and did not take on `assign_production`, and
+nothing checked.
+
+The mechanism is why. Rather than restating the function, each block read the
+live definition and string-replaced inside it:
+
+```sql
+def := pg_get_functiondef(reg);
+def := replace(def, 'v_need_cat text;', 'v_need_cat team_category;');
+def := replace(def, $s$...case v_role
+      when 'avatar' then 'avatars'$s$, $s$...::team_category$s$);
+EXECUTE def;
+```
+
+`replace()` that matches nothing is not an error — it returns the input
+unchanged. So a pattern that misses by one space, or by an indentation level,
+produces a migration that succeeds, records itself as applied, and changes
+nothing. The first block hedged against exactly this by trying both the
+one-space and two-space spellings of the declaration; the second block tried
+only one. Whatever the precise miss, the shape of the technique is the fault:
+it cannot fail loudly.
+
+It also picked its target with `SELECT ... LIMIT 1` and no `ORDER BY`. There
+is only one overload today, so that did not bite — but it is the same class of
+silence.
+
+**Trap worth keeping:** do not patch a function by string-replacing
+`pg_get_functiondef` output. State the whole body, so a mismatch is a syntax
+error rather than a no-op. Both new migrations here restate the body in full,
+and both end in a verification query rather than an assumption.
+
 ---
 
 ## 4. What this branch adds
@@ -150,38 +197,49 @@ enum fix changes it anyway — not because it would have misapplied.
 ## 5. The blocker, and the decision it needs
 
 The plan was to rehearse the production apply on staging. **That is not
-currently safe:** staging is missing migration 95 and three others, so an
-apply there proves nothing about production, and migration 138 would create a
-second overload of `dispatch_brief_to_members` beside the stale four-argument
-one rather than replacing it.
+currently safe:** staging never received migration 95 (or 89, 90, 91), so an
+apply there proves nothing about production. Migration 138 would also create a
+second five-argument overload of `dispatch_brief_to_members` beside staging's
+stale four-argument one, rather than replacing it.
 
-Nor can git simply be replayed onto a fresh database to produce production:
-git is missing both untracked hotfixes, and the `106` one is still only
-recoverable from staging.
+Nor can git be replayed onto an empty database to reproduce production: git is
+missing the production hotfix, which migration 138 now supplies but which has
+never been executed anywhere in that form.
 
-Three options, in the order I would take them:
+What has changed since I started: **nothing is unrecoverable.** Both
+uncommitted hotfixes were read out of
+`supabase_migrations.schema_migrations.statements`, and the staging-only one
+turned out to be moot. So staging can be rebuilt without losing anything, and
+that is the recommendation.
 
-**A. Rebuild staging from git, then forward-apply.** Read
-`106_remake_rejected_asset_fix` out of staging and commit it first — it is the
-only copy. Then reset staging and replay the full history from git, which also
-proves the fresh-replay path and would have caught the 95 fault on its own.
-Then apply 126–131, 133, 138, 139 on top and compare against production object
-by object. Slowest, and the only one that leaves all three in agreement.
+**A. Rebuild staging from git, then forward-apply.** Reset staging and replay
+the full history from git. This proves the fresh-replay path, which would have
+caught the migration 95 fault on its own, and gives a genuine rehearsal
+surface. Then apply 126–131, 133, 138, 139 on top and compare against
+production object by object. Expect the replay itself to surface problems —
+five duplicated migration numbers, migration 11's plaintext passwords (trap 2
+in `gap-audit.md`), and the `rls_auto_enable()` event trigger. Those are worth
+finding on staging.
 
-**B. A throwaway Supabase branch as the replay target.** Leaves staging alone;
-costs money and needs a cost confirmation. Still needs the `106` hotfix
-recovered first.
+**B. A throwaway Supabase branch as the replay target.** Leaves staging alone,
+costs money, needs a cost confirmation. Same work, narrower blast radius.
 
-**C. Apply straight to production with no rehearsal.** Fastest, and I do not
-recommend it for seven migrations that include RLS helper functions, an enum
-addition and foreign-key swaps on `sales_agent_conversations` and
+**C. Apply straight to production with no rehearsal.** Not recommended: seven
+migrations including four RLS helper functions, an `ALTER TYPE ADD VALUE`, and
+foreign-key swaps on `sales_agent_conversations` and
 `mcp_internal.mcp_pipeline_requests`.
 
-Recovering the `106` hotfix out of staging is required by all three and is the
-next step regardless.
+### What I need from Alex
+
+1. **Go-ahead on A or B** — which replay target. A destroys nothing of value
+   now that the hotfixes are recovered.
+2. **The production apply itself**, once a rehearsal has passed. That is the
+   `AGENTS.md` gate, via Chief of Staff.
+
+Independent of either, two things can proceed now: Codex guarding the two
+broken panels and the retire button, and tests for both new migrations.
 
 ### Gates
 
 Per `AGENTS.md`, the production apply is Alex's via Chief of Staff. Rebuilding
-staging is not a production action, but it destroys the only copy of one
-untracked hotfix, so it should not happen before that hotfix is committed.
+staging is not a production action and no longer destroys any unique artefact.
