@@ -243,3 +243,84 @@ broken panels and the retire button, and tests for both new migrations.
 
 Per `AGENTS.md`, the production apply is Alex's via Chief of Staff. Rebuilding
 staging is not a production action and no longer destroys any unique artefact.
+
+---
+
+## 6. Rehearsal progress — 2 October
+
+### 6.1 A landmine found on the way
+
+`supabase/.temp/project-ref` reads **`bancbdztffokwiifzoiv`** — production. Any
+`supabase db reset --linked` or `supabase db push` run in this repo aims at
+production by default, not staging.
+
+It is partly defused by accident: the CLI's logged-in account has no access to
+the `xtrbqjmxehvggtgddrtf` organisation at all — `supabase projects list` does
+not show AA-Console or AA-Console-Staging, and `supabase link
+--project-ref <staging>` fails with *"Your account does not have the necessary
+privileges"*. So platform API calls fail rather than doing damage.
+
+That is not a safeguard worth relying on. `db reset` builds a direct database
+connection from the project ref and a password; it does not go through the
+platform API. If a database password is ever supplied in this working copy, the
+stale ref points it at production.
+
+**Two things to fix:** re-link deliberately to staging, and log the CLI into
+the account that owns the org — currently nobody can drive either project from
+the CLI, which is also why the rebuild had to go through the MCP instead.
+
+### 6.2 Staging is now production-shaped
+
+Rebuilding from git was not possible without CLI access, so staging was brought
+**forward** to production's shape instead, through the MCP. Strictly less
+destructive than a reset, free, and it preserves staging's data.
+
+Applied to staging, in order:
+
+| Migration | Result | Note |
+|---|---|---|
+| `89_delete_recruitment_ad` | applied | `client_briefs.purpose` confirmed present afterwards, so the body resolves |
+| `91_page_reference_asset` | applied | `reference_asset_id` + partial index |
+| `95_video_dual_briefs` | applied | Verbatim, broken function included — deliberately |
+| `90_recruitment_page_type` | skipped | Already present. `client_pages.page_type` is the same `page_type` enum in both databases; only the history row was missing |
+| `fix_assign_production_ai_render_columns` | skipped | Migration 139 supersedes it |
+
+Staging went from 137 migration rows to **140, matching production**, and now
+carries every object production has.
+
+### 6.3 Why staging is now a better rehearsal surface than production
+
+Migration 95 was applied verbatim rather than pre-fixed, so staging reproduces
+both faults:
+
+| | Production | Staging |
+|---|---|---|
+| `dispatch_brief_to_members` enum comparison | fixed by the hotfix | **broken** |
+| `assign_production` enum comparison | **broken** | **broken** |
+| `assign_production` AI column list | fixed by the hotfix | **broken** |
+
+So on staging, migrations 138 and 139 are tested as genuine repairs of all
+three. Against production, 138 and half of 139 would be no-ops and prove
+nothing. The rehearsal is therefore stricter than the thing it rehearses.
+
+### 6.4 Next
+
+Apply to staging, in this order, then diff against production object by object:
+
+```
+126 → 127 → 128 (alone, must commit) → 129 → 130 → 131 → 133 → 138 → 139
+```
+
+Acceptance for the rehearsal:
+
+1. All nine apply without error, 128 in its own transaction.
+2. `archived_leads`, `lead_identities` and `recruitment_meta_campaigns` exist;
+   `request_recruitment_meta_build` exists; the `recruitment_meta_build` agent
+   row exists, taking staging to 25 agents.
+3. `client_ideas_campaign_position_pair` no longer caps at 30.
+4. The four client-access functions all carry `tm.active`.
+5. Both `v_need_cat` declarations read `team_category`, and
+   `select 'editors'::team_category is distinct from 'editors'::text` is no
+   longer reachable from either function.
+6. `assign_production` inserts the migration-93 column list.
+7. A retired team member loses access — the test migration 127 exists for.
