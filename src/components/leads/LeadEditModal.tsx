@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase";
 import { detailFields, leadFieldsPayload, leadFormValues, type OwnerOption } from "./leadDetails";
 import { STAGE_OPTIONS, stageLabel, type LeadStage } from "./stages";
 import type { Lead, LeadEvent } from "./types";
+import { isMissingFunction, MIGRATION_PENDING_NOTE } from "../../lib/schemaGaps";
 
 type Tab = "details" | "move" | "timeline" | "archive";
 
@@ -148,7 +149,13 @@ export function LeadEditModal({ lead, owners, onClose, onChanged, onArchived }: 
             <p className="mb-2 text-sm">Archive {lead.name ?? "this lead"}?</p>
             <button type="button" disabled={busy} onClick={() => void run(async () => {
               const { error: archiveError } = await supabase.rpc("archive_lead", { p_lead_id: lead.id, p_reason: reason.trim() || null });
-              if (archiveError) throw archiveError;
+              // archive_lead arrives with migration 129. Until it is applied,
+              // say so rather than showing PostgREST's schema-cache message.
+              if (archiveError) {
+                throw isMissingFunction(archiveError)
+                  ? new Error(`Archiving is unavailable. ${MIGRATION_PENDING_NOTE}`)
+                  : archiveError;
+              }
               await onArchived();
               onClose();
             })} className="rounded-md bg-destructive px-3 py-2 text-sm text-destructive-foreground disabled:opacity-50">Confirm archive</button>

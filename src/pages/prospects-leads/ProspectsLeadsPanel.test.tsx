@@ -146,3 +146,57 @@ describe("AA lead funnel", () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("recover_lead", { p_lead_id: "archived-1" }));
   });
 });
+
+// The console deploys on merge; migrations are applied by hand afterwards. This
+// panel shipped in #112 and has been reading archived_leads, which migration
+// 129 creates and production does not have — so the archive query fails while
+// every other query on the panel succeeds.
+describe("when archived_leads has not been migrated yet", () => {
+  const MISSING_TABLE = {
+    code: "PGRST205",
+    message: "Could not find the table 'public.archived_leads' in the schema cache",
+  };
+
+  function chainError(error: { code: string; message: string }) {
+    const query = {
+      select: () => query, eq: () => query, order: () => Promise.resolve({ data: null, error }),
+      insert,
+    };
+    return query;
+  }
+
+  function showWithArchiveError(error: { code: string; message: string }) {
+    from.mockImplementation((table: string) =>
+      table === "archived_leads" ? chainError(error) : chain(table === "client_leads" ? [lead()] : []));
+    rpc.mockImplementation(() => Promise.resolve({ data: [], error: null }));
+    return render(<ProspectsLeadsPanel />);
+  }
+
+  it("still shows the pipeline, and names the reason instead of failing", async () => {
+    showWithArchiveError(MISSING_TABLE);
+
+    // The leads loaded fine. Before the guard, one missing table hid all of them.
+    expect(await screen.findByText("Naledi K")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText(/waiting on a database migration/i)).toBeInTheDocument();
+  });
+
+  it("disables archiving rather than offering a button that cannot work", async () => {
+    showWithArchiveError(MISSING_TABLE);
+    await screen.findByText("Naledi K");
+
+    const archive = screen.getByRole("button", { name: /Archive unavailable/ });
+    expect(archive).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /^Archive \(/ })).toBeNull();
+  });
+
+  it("still reports a real archive failure as an error", async () => {
+    // The guard must recognise its own case only. A permission denial or a
+    // timeout on the same query is a fault and has to stay loud.
+    showWithArchiveError({ code: "42501", message: "permission denied for table archived_leads" });
+    await screen.findByText("Naledi K");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/permission denied/);
+    expect(screen.queryByText(/waiting on a database migration/i)).toBeNull();
+  });
+});

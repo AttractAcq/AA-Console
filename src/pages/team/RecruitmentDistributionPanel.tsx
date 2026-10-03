@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase";
 import { adsManagerUrl, parseCountries } from "../../lib/metaBuild";
 import { signPaths } from "../../lib/media";
 import { useAgentJobs } from "../../lib/useAgentJobs";
+import { isMissingFunction, isMissingTable, MIGRATION_PENDING_NOTE } from "../../lib/schemaGaps";
 
 type Brief = {
   id: string; title: string; recruitment_role: string | null;
@@ -41,6 +42,7 @@ export function RecruitmentDistributionPanel() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -67,7 +69,14 @@ export function RecruitmentDistributionPanel() {
           .eq("agent_key", "recruitment_meta_build")
           .eq("client_id", clientId).order("created_at", { ascending: false }).limit(50),
       ]);
-      const failure = meta.error ?? images.error ?? copy.error ?? rows.error ?? jobRows.error;
+      // recruitment_meta_campaigns arrives with migration 133. Everything
+      // else on this panel reads tables that already exist, so the approved
+      // ads still list and the Meta account still reports — only building is
+      // out of reach. Throwing on this hid all of it behind one error.
+      const campaignsMissing = isMissingTable(rows.error);
+      setUnavailable(campaignsMissing);
+      const failure = meta.error ?? images.error ?? copy.error
+        ?? (campaignsMissing ? null : rows.error) ?? jobRows.error;
       if (failure) throw failure;
       setIntegration(meta.data as Integration | null);
       setAssets((images.data ?? []) as Asset[]);
@@ -110,7 +119,12 @@ export function RecruitmentDistributionPanel() {
       p_target_countries: targetCountries.codes, p_asset_ids: selected,
     });
     setBusy(false);
-    if (createError) { setError(createError.message); return; }
+    if (createError) {
+      setError(isMissingFunction(createError)
+        ? `Building is unavailable. ${MIGRATION_PENDING_NOTE}`
+        : createError.message);
+      return;
+    }
     setSelected([]); setName(""); setBudget(""); setCountries("");
     setNotice("Queued. The selected ads will be built in AA's Ads Manager as a paused campaign.");
     void refresh();
@@ -120,7 +134,9 @@ export function RecruitmentDistributionPanel() {
     setError(null); setNotice(null); setBusy(true);
     const { error: retryError } = await supabase.rpc("request_recruitment_meta_build", { p_campaign_id: id });
     setBusy(false);
-    if (retryError) setError(retryError.message);
+    if (retryError) setError(isMissingFunction(retryError)
+      ? `Building is unavailable. ${MIGRATION_PENDING_NOTE}`
+      : retryError.message);
     else { setNotice("Recruitment Meta build queued again."); void refresh(); }
   }
 
@@ -132,6 +148,11 @@ export function RecruitmentDistributionPanel() {
     </div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
+    {unavailable && (
+      <p role="status" className="text-sm text-muted-foreground">
+        Building recruitment ads is unavailable. {MIGRATION_PENDING_NOTE} The approved ads below still show what is ready to go.
+      </p>
+    )}
     <section className="rounded-lg border border-border p-4">
       <h3 className="font-semibold">AA Ads Manager</h3>
       {accountReady
@@ -157,11 +178,12 @@ export function RecruitmentDistributionPanel() {
             </label>;
           })}
         </fieldset>}
-      <Button onClick={() => void submit()} disabled={!accountReady || busy || eligible.length === 0}>Push selected ads to Ads Manager</Button>
+      <Button onClick={() => void submit()} disabled={unavailable || !accountReady || busy || eligible.length === 0}>Push selected ads to Ads Manager</Button>
     </section>
     <section className="space-y-2">
       <h3 className="font-semibold">Recruitment campaigns</h3>
-      {campaigns.length === 0 ? <p className="text-sm text-muted-foreground">No recruitment campaigns built yet.</p> :
+      {unavailable ? <p className="text-sm text-muted-foreground">Recruitment campaigns cannot be listed yet. {MIGRATION_PENDING_NOTE}</p> :
+        campaigns.length === 0 ? <p className="text-sm text-muted-foreground">No recruitment campaigns built yet.</p> :
         campaigns.map((campaign) => {
           const job = lastJob(campaign.id);
           const running = job && ["queued", "claimed", "running"].includes(job.status);
