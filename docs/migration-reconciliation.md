@@ -379,14 +379,42 @@ Editor 1 is still active.
 Two things differ from the rehearsal, and both are in production's favour
 except the first:
 
-1. **Migration 129 runs `delete from client_leads` unconditionally.** On
-   staging that was a no-op — 0 rows. **In production it deletes 2 leads and
-   cascades 6 `lead_events`.** The migration's comment cites an Alex
-   confirmation of 25 September that the existing prospects were disposable;
-   that was eight days ago and these may not be the same rows.
-   **This needs re-confirming before the apply, and it is the only
-   irreversible data loss in the set.** `sales_agent_conversations` has 0 rows
-   referencing a lead, so nothing else is affected.
+1. **Migration 129 now archives those rows instead of deleting them.**
+   As written it ran a bare `delete from client_leads`, on the strength of a
+   25 September note that the existing prospects were disposable. Eight days
+   later two rows were still there, and `lead_events.lead_id` is
+   `ON DELETE CASCADE`, so the delete would have taken their history with
+   them:
+
+   | Lead | Stage | Events |
+   |---|---|---|
+   | Gate 11 Harbour fixture lead | `conversation` | 2 |
+   | Gate 11 Attract denied fixture lead | `sale` | 4 |
+
+   Both are Gate 11 test fixtures rather than real prospects, so the original
+   note was probably right — but archiving costs nothing and `archived_leads`
+   is created by this very migration for exactly this. The block was moved
+   above the delete and the delete now follows an archive insert that captures
+   each lead's events as JSON.
+
+   One limitation, recorded rather than fixed: the second lead sits at `sale`,
+   a legacy stage, and `recover_lead` refuses `lead` and `sale` by design. It
+   will be readable in the archive but not recoverable through the console.
+
+   Proved on staging with seeded rows mimicking production, in a rolled-back
+   block:
+
+   ```
+   ARCHIVE-INSTEAD-OF-DELETE TEST
+     archived=2  client_leads_left=0
+     events captured: lead_a=2 (expect 2)  lead_b=4 (expect 4)
+     stages: sale,conversation
+   ```
+
+   Staging could not simply re-run 129, which was already applied there, so
+   the amended block was exercised on its own. Rollback verified: all four
+   lead tables back to 0 rows.
+
 2. **Migration 138 is a no-op in production**, which already carries the
    hotfix. It exists so a replay cannot lose it.
 3. **Migration 139 repairs a live fault in production** — the
