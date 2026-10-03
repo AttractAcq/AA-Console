@@ -51,6 +51,7 @@ type Campaign = {
   target_countries: string[] | null;
   conversion_event: string | null;
   meta_campaign_id: string | null;
+  meta_ad_set_id: string | null;
   meta_built_at: string | null;
 };
 
@@ -139,7 +140,7 @@ export function CampaignExecutionPanel() {
       const query = supabase
         .from("client_campaigns")
         .select(
-          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_built_at",
+          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at",
         )
         .eq("client_id", clientId)
         // A campaign somebody archived is over. It reads from the archive.

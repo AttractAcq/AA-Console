@@ -38,7 +38,7 @@ import { UnrecordedError, executeBuild, progressFrom, type BuildStore, type Meta
 
 const BUCKET = "client-media";
 
-const CAMPAIGN_COLUMNS =
+export const CAMPAIGN_COLUMNS =
   "id, client_id, name, template, mirrors_template, optimisation_event, conversion_event, daily_budget, target_countries, starts_on, ends_on, meta_campaign_id, meta_ad_set_id";
 
 const ASSET_COLUMNS =
@@ -52,7 +52,7 @@ function fail(message: string, retryable = false): JobResult {
 }
 
 /** The campaign's content assets, by the same links campaign_readiness counts. */
-async function loadAssets(sb: SupabaseClient, clientId: string, campaignId: string): Promise<AssetRow[]> {
+export async function loadAssets(sb: SupabaseClient, clientId: string, campaignId: string): Promise<AssetRow[]> {
   const { data: links, error } = await sb
     .from("campaign_artifacts")
     .select("brief_id, asset_id")

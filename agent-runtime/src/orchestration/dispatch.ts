@@ -36,6 +36,7 @@ import { runPageAuditJob } from "../agents/page_audit/index.js";
 import { runPageReviseJob } from "../agents/page_revise/index.js";
 import { runMetaBuildJob } from "../agents/meta_build/index.js";
 import { runRecruitmentMetaBuildJob } from "../agents/recruitment_meta_build/index.js";
+import { runMetaBuildSheetJob } from "../agents/meta_build_sheet/index.js";
 
 export interface JobResult {
   ok: boolean;
@@ -94,6 +95,9 @@ const RUNNERS: Record<string, JobRunner> = {
   // a person in Ads Manager.
   meta_build: runMetaBuildJob,
   recruitment_meta_build: runRecruitmentMetaBuildJob,
+  // The same build written out for a person, for when there is no usable
+  // token. Reads only, and never calls Meta.
+  meta_build_sheet: runMetaBuildSheetJob,
   // outcome until that product decision is made.
 };
 
