@@ -4,7 +4,7 @@ import type { FieldDef } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
 import { templateFor } from "../../lib/campaignTemplates";
 import { cn } from "../../lib/cn";
-import { adsManagerUrl, parseCountries } from "../../lib/metaBuild";
+import { adsManagerUrl, parseCountries, parseMetaObjectId } from "../../lib/metaBuild";
 
 export type MetaCampaign = {
   id: string;
@@ -15,6 +15,7 @@ export type MetaCampaign = {
   target_countries: string[] | null;
   conversion_event: string | null;
   meta_campaign_id: string | null;
+  meta_ad_set_id: string | null;
   meta_built_at: string | null;
 };
 
@@ -62,6 +63,30 @@ const FIELDS: FieldDef[] = [
 ];
 
 /**
+ * Recording a structure somebody created in Ads Manager themselves.
+ *
+ * The ad set is optional because a hand build can legitimately stop after the
+ * campaign, and build.ts treats a campaign with no ad set as a partial build it
+ * can finish. The reverse — an ad set with no campaign — is the state it
+ * refuses, so this never writes one without the other.
+ */
+const HAND_BUILD_FIELDS: FieldDef[] = [
+  {
+    name: "meta_campaign_id",
+    label: "Meta campaign id",
+    kind: "text",
+    required: true,
+    hint: "From the id column in Ads Manager. Digits only.",
+  },
+  {
+    name: "meta_ad_set_id",
+    label: "Ad set id",
+    kind: "text",
+    hint: "Leave empty if only the campaign exists so far.",
+  },
+];
+
+/**
  * Building a campaign in Meta.
  *
  * The checklist is the obvious prerequisites, shown so nobody presses Build
@@ -83,6 +108,7 @@ export function MetaBuildSection({
   const [integration, setIntegration] = useState<Integration | null>(null);
   const [lastBuild, setLastBuild] = useState<LastBuild | null>(null);
   const [editing, setEditing] = useState(false);
+  const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -127,6 +153,14 @@ export function MetaBuildSection({
     [campaign.daily_budget, (campaign.target_countries ?? []).join(","), campaign.conversion_event],
   );
 
+  const handBuildValues = useMemo(
+    () => ({
+      meta_campaign_id: campaign.meta_campaign_id ?? "",
+      meta_ad_set_id: campaign.meta_ad_set_id ?? "",
+    }),
+    [campaign.meta_campaign_id, campaign.meta_ad_set_id],
+  );
+
   const template = templateFor(campaign.template);
   const checks = [
     {
@@ -156,6 +190,29 @@ export function MetaBuildSection({
           : `${integration.ad_account_id ?? "No ad account id"} · page ${integration.meta_page_id}`,
     },
   ];
+
+  /**
+   * The sheet, for when there is no usable token.
+   *
+   * Queued rather than rendered here: the objective and the payload rules live
+   * in the runtime, and a copy of them in the app would drift from the one that
+   * actually sends. The runner writes the sheet into its own job log.
+   */
+  const requestSheet = async () => {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    const { error: rpcError } = await supabase.rpc("request_meta_build_sheet", { p_campaign_id: campaign.id });
+    setBusy(false);
+    if (rpcError) {
+      setError(rpcError.message);
+      return;
+    }
+    setNotice(
+      "Queued. The sheet appears in the Meta Build Sheet agent's log; it sends nothing to Meta and changes nothing here.",
+    );
+    onChanged();
+  };
 
   const request = async () => {
     setBusy(true);
@@ -234,6 +291,17 @@ export function MetaBuildSection({
         <button
           type="button"
           className={buttonClass}
+          disabled={busy}
+          onClick={() => void requestSheet()}
+        >
+          Write build sheet
+        </button>
+        <button type="button" className={buttonClass} onClick={() => setRecording(true)}>
+          Record a hand build
+        </button>
+        <button
+          type="button"
+          className={buttonClass}
           disabled={busy || building}
           onClick={() => void request()}
         >
@@ -263,6 +331,53 @@ export function MetaBuildSection({
           if (updateError) throw new Error(updateError.message);
         }}
         onSaved={onChanged}
+      />
+
+      <FormModal
+        open={recording}
+        onClose={() => setRecording(false)}
+        title={`Record a hand build · ${campaign.name}`}
+        fields={HAND_BUILD_FIELDS}
+        initialValues={handBuildValues}
+        onSubmit={async (v) => {
+          const campaignId = parseMetaObjectId(String(v.meta_campaign_id ?? ""), "campaign id");
+          if ("problem" in campaignId) throw new Error(campaignId.problem);
+
+          const adSetText = String(v.meta_ad_set_id ?? "").trim();
+          let adSetId: string | null = null;
+          if (adSetText) {
+            const parsed = parseMetaObjectId(adSetText, "ad set id");
+            if ("problem" in parsed) throw new Error(parsed.problem);
+            adSetId = parsed.id;
+          }
+
+          const { error: updateError } = await supabase
+            .from("client_campaigns")
+            .update({
+              meta_campaign_id: campaignId.id,
+              meta_ad_set_id: adSetId,
+              // What this column means is that the structure exists in the
+              // account, which is as true of a hand build as of ours. Kept if
+              // it is already set, so re-recording does not move the date.
+              meta_built_at: campaign.meta_built_at ?? new Date().toISOString(),
+            })
+            .eq("id", campaign.id);
+          if (updateError) {
+            // The unique index on meta_campaign_id. Worth naming, because the
+            // likeliest cause is the id belonging to a different console
+            // campaign, and reporting would then credit the wrong one.
+            if (updateError.code === "23505") {
+              throw new Error("Another campaign in the console is already recorded as that Meta campaign.");
+            }
+            throw new Error(updateError.message);
+          }
+        }}
+        onSaved={() => {
+          setNotice(
+            "Recorded. Reporting can now match the spend, and building in Meta will finish what is missing rather than starting again.",
+          );
+          onChanged();
+        }}
       />
     </div>
   );

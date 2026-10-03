@@ -6291,6 +6291,7 @@ export type Database = {
         Returns: string
       }
       request_meta_build: { Args: { p_campaign_id: string }; Returns: string }
+      request_meta_build_sheet: { Args: { p_campaign_id: string }; Returns: string }
       resolve_sales_deployment: {
         Args: { p_public_id: string }
         Returns: {

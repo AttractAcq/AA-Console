@@ -8,11 +8,14 @@ vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
 import { MetaBuildSection, type MetaCampaign } from "./MetaBuildSection";
 
 /** A query builder that answers every chain with one row. */
-function answering(row: unknown) {
+function answering(row: unknown, updates?: Record<string, unknown>[], updateError?: { code?: string; message: string }) {
   const chain: Record<string, unknown> = {};
   for (const m of ["select", "eq", "order", "limit"]) chain[m] = () => chain;
   chain.maybeSingle = () => Promise.resolve({ data: row, error: null });
-  chain.update = () => ({ eq: () => Promise.resolve({ error: null }) });
+  chain.update = (values: Record<string, unknown>) => {
+    updates?.push(values);
+    return { eq: () => Promise.resolve({ error: updateError ?? null }) };
+  };
   return chain;
 }
 
@@ -25,6 +28,7 @@ const campaign = (over: Partial<MetaCampaign> = {}): MetaCampaign => ({
   target_countries: ["ZA"],
   conversion_event: null,
   meta_campaign_id: null,
+  meta_ad_set_id: null,
   meta_built_at: null,
   ...over,
 });
@@ -98,5 +102,83 @@ describe("MetaBuildSection", () => {
     );
     render(<MetaBuildSection clientId="c" campaign={campaign()} building={false} onChanged={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Set a daily budget/));
+  });
+  it("records a structure somebody built in Ads Manager by hand", async () => {
+    const updates: Record<string, unknown>[] = [];
+    from.mockImplementation((table: string) =>
+      table === "client_integrations"
+        ? answering({ status: "connected", ad_account_id: "act_9", meta_page_id: "77", meta_pixel_id: null })
+        : answering(null, updates),
+    );
+    const onChanged = vi.fn();
+    render(<MetaBuildSection clientId="c" campaign={campaign()} building={false} onChanged={onChanged} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Record a hand build" }));
+    await userEvent.type(screen.getByLabelText(/Meta campaign id/), "120200");
+    await userEvent.type(screen.getByLabelText(/Ad set id/), "120300");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(updates).toHaveLength(1));
+    expect(updates[0]).toMatchObject({ meta_campaign_id: "120200", meta_ad_set_id: "120300" });
+    expect(updates[0].meta_built_at).toEqual(expect.any(String));
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("refuses an id that is not one, rather than storing something reporting cannot match", async () => {
+    const updates: Record<string, unknown>[] = [];
+    from.mockImplementation((table: string) =>
+      table === "client_integrations"
+        ? answering({ status: "connected", ad_account_id: "act_9", meta_page_id: "77", meta_pixel_id: null })
+        : answering(null, updates),
+    );
+    render(<MetaBuildSection clientId="c" campaign={campaign()} building={false} onChanged={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Record a hand build" }));
+    await userEvent.type(screen.getByLabelText(/Meta campaign id/), "act_9");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    expect(await screen.findByText(/That is an ad account id/)).toBeInTheDocument();
+    expect(updates).toHaveLength(0);
+  });
+
+  it("names the clash when that Meta campaign is already recorded elsewhere", async () => {
+    from.mockImplementation((table: string) =>
+      table === "client_integrations"
+        ? answering({ status: "connected", ad_account_id: "act_9", meta_page_id: "77", meta_pixel_id: null })
+        : answering(null, [], { code: "23505", message: "duplicate key value violates unique constraint" }),
+    );
+    render(<MetaBuildSection clientId="c" campaign={campaign()} building={false} onChanged={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Record a hand build" }));
+    await userEvent.type(screen.getByLabelText(/Meta campaign id/), "120200");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    expect(await screen.findByText(/already recorded as that Meta campaign/)).toBeInTheDocument();
+  });
+  it("queues the manual build sheet without touching Meta", async () => {
+    rpc.mockResolvedValue({ data: "job-2", error: null });
+    const onChanged = vi.fn();
+    render(<MetaBuildSection clientId="c" campaign={campaign()} building={false} onChanged={onChanged} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Write build sheet" }));
+
+    expect(rpc).toHaveBeenCalledWith("request_meta_build_sheet", { p_campaign_id: "camp-1" });
+    expect(await screen.findByRole("status")).toHaveTextContent(/sends nothing to Meta/);
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("shows the refusal when a sheet is already being written", async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: { message: "A build sheet for this campaign is already queued or running." },
+    });
+    render(<MetaBuildSection clientId="c" campaign={campaign()} building={false} onChanged={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Write build sheet" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/already queued or running/);
+  });
+
+  it("offers the sheet even while a build is in flight, since it sends nothing", () => {
+    render(<MetaBuildSection clientId="c" campaign={campaign()} building onChanged={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Write build sheet" })).not.toBeDisabled();
   });
 });

@@ -11,6 +11,31 @@ export function parseCountries(text: string): { codes: string[] } | { problem: s
   return { codes };
 }
 
+/**
+ * A Meta object id as typed by a person, or a reason it is not one.
+ *
+ * Only needed because a campaign built by hand in Ads Manager — which is what
+ * happens when there is no usable token — leaves the console with no record of
+ * what exists. Until the ids are here, reporting cannot match the spend
+ * against the campaign, and a later automated build creates a second campaign
+ * beside the one already in the account.
+ *
+ * Strict about shape rather than forgiving: Meta's ids are bare digits, and the
+ * things people paste instead are an Ads Manager URL or an act_ account id.
+ * Storing either would point reporting at nothing, silently.
+ */
+export function parseMetaObjectId(text: string, label: string): { id: string } | { problem: string } {
+  const value = text.trim();
+  if (!value) return { problem: `Enter the ${label}.` };
+  if (/^act_/.test(value)) {
+    return { problem: `That is an ad account id, not the ${label}.` };
+  }
+  if (!/^[0-9]+$/.test(value)) {
+    return { problem: `A ${label} is all digits. Copy it from the id column in Ads Manager, not from the address bar.` };
+  }
+  return { id: value };
+}
+
 /** Ads Manager, opened on the campaign this built. */
 export function adsManagerUrl(accountId: string, campaignId: string): string {
   const act = accountId.replace(/^act_/, "");
