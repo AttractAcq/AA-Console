@@ -125,12 +125,32 @@ select 'editors'::team_category is distinct from 'editors'::text;
 -- ERROR 42883: operator does not exist: team_category = text
 ```
 
+**A correction to what this document said first.** I wrote that "the `full`
+role escapes it because `v_need_cat` stays null and the guard
+short-circuits". That is wrong, and a test contradicted it. PL/pgSQL plans an
+`IF` condition as a single SQL expression, so `team_category = text` has to
+resolve before any value is considered — short-circuiting never gets the
+chance. **Every send that reaches the member loop fails, including `full`.**
+
+Production bears that out exactly:
+
+| | |
+|---|---|
+| `brief_dispatches` rows before migration 95 | 1, on 5 September, role `full` |
+| Rows between 95 (19 Sept) and the hotfix | **0** |
+| Hotfix `127_fix_team_category_text_compare` applied | 25 Sept, **20:48:49** |
+| First successful dispatch after it | 25 Sept, **20:50:56** — two minutes later |
+
+So nothing was dispatched at all in that window, and the repair and the first
+success are two minutes apart. Someone hit the error, patched production, and
+immediately succeeded.
+
 Two functions carry the fault. Only one was ever fixed:
 
 | Function | Production state | Consequence |
 |---|---|---|
 | `public.dispatch_brief_to_members` | **Fixed**, by the untracked hotfix | Works — but git still holds the broken version, so any replay reintroduces it |
-| `mcp_internal.assign_production` | **Still broken.** `v_need_cat text`, zero `::team_category` casts | `content.assign_production` route=human has never worked for an avatar or editor role. The `full` role escapes it because `v_need_cat` stays null and the guard short-circuits |
+| `mcp_internal.assign_production` | **Still broken.** `v_need_cat text`, zero `::team_category` casts | `content.assign_production` route=human has never worked, for any role. `mcp_content_requests` holds 63 calls to that tool and **every one is route=ai** — the human route has never been exercised in production, which is why this went unseen |
 
 This is why PR #108 must not merge as written: it reproduces the broken
 declaration verbatim.
@@ -433,3 +453,67 @@ except the first:
   check and both enum checks should become `*.pg.test.ts` cases so CI holds
   them, rather than living only in this document.
 - **PR #108 should be closed** as superseded by migration 139.
+
+---
+
+## 7. Tests
+
+The checks in sections 3 and 6 lived only in this document. They are now in the
+suite, so CI holds them.
+
+| File | Covers | Tests |
+|---|---|---|
+| `agent-runtime/src/retired-team-access.pg.test.ts` | Migration 127 | 6 |
+| `agent-runtime/src/team-category-enum.pg.test.ts` | Migrations 138 and 139 | 9 |
+| `agent-runtime/src/public/lead-pipeline.pg.test.ts` | Migration 129's archive, amended | 4 (existing) |
+
+Both new files replay the real migration files into PGlite rather than
+hand-rolling a schema, so they test the migrations rather than a copy of them.
+
+### 7.1 Each suite is shown to fail
+
+A suite that has only ever passed proves that it runs, not that it works
+(trap 13 in `gap-audit.md`). Both were broken on purpose and the failures
+checked:
+
+| Mutation | Result |
+|---|---|
+| `tm.active` removed from the two assignment clauses in 127 | **4 of 6 fail.** The two that pass are right to: the edit did not touch `is_member`, and the ended-assignment case never depended on `active` |
+| `v_need_cat` reverted to `text` in 138 and 139 | **Whole suite fails** in `beforeAll`, on the tripwire that asserts the repaired declaration, with the expected pattern named in the message |
+
+Both files also carry a permanent counter-test that re-installs the pre-fix
+body and asserts the old behaviour returns — so the bite is checked on every
+run, not only when someone remembers to mutate the source.
+
+### 7.2 What the tests found
+
+Writing them turned up two things reading the code had not.
+
+**The `full` role was never safe.** Correcting section 3.2: PL/pgSQL plans an
+`IF` condition as one SQL expression, so a missing operator resolves before
+any value is considered. Every send that reaches the member loop failed, not
+just avatar and editor. The test asserted the opposite first and failed, which
+is how this was caught.
+
+**The amendment to 129 broke an existing suite, correctly.**
+`lead-pipeline.pg.test.ts` asserted the old contract and then deleted
+`lead_identities` — which `archived_leads` now references, so it failed on a
+foreign key. Its assertions now prove the new contract instead: the two
+fixture leads land in `archived_leads` with their events (1 and 0), carrying
+the migration's own reason string.
+
+### 7.3 A flake fixed on the way
+
+The `*.pg.test.ts` suites stand up a PGlite instance and replay a dozen or
+more migrations in `beforeAll`, which does not fit the 10s default hook
+timeout — and because Vitest runs files in parallel, several WASM Postgres
+instances compete for the same cores, so **which** suite trips the limit
+varied run to run. Five different files failed across two runs of the same
+unchanged code, and `lead-capture.pg.test.ts` had been failing this way since
+before any of this work started.
+
+`agent-runtime/vitest.config.ts` now sets `hookTimeout: 60_000`. Raising the
+ceiling rather than lowering parallelism: the work is bounded, just not fast.
+
+Full runtime suite after the change: **95 files, 1403 tests, all passing** —
+up from 1384 passing with 19 skipped behind two failed suites.

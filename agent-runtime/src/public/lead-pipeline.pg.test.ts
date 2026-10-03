@@ -71,13 +71,24 @@ beforeAll(async () => {
   `);
   await db.exec(await migration("20260925120000_128_lead_stage_enum.sql"));
   await db.exec(await migration("20260925121000_129_lead_pipeline_archive.sql"));
+  // 129 clears the active tables, but archives what it finds rather than
+  // dropping it. lead_events.lead_id is ON DELETE CASCADE, so a bare delete
+  // would have taken each lead's history with it.
   expect((await db.query("select id from client_leads")).rows).toHaveLength(0);
   expect((await db.query("select id from lead_events")).rows).toHaveLength(0);
+  const migrated = await db.query<{ name: string; stage_at_archive: string; events: unknown[]; reason: string }>(
+    "select name, stage_at_archive, events, reason from archived_leads order by name");
+  expect(migrated.rows.map((row) => [row.name, row.stage_at_archive, row.events.length])).toEqual([
+    ["Old lead", "lead", 1],
+    ["Old sale", "sale", 0],
+  ]);
+  expect(migrated.rows[0]?.reason).toMatch(/migration 129/);
   expect((await db.query("select lead_id from sales_agent_conversations where lead_id is not null")).rows).toHaveLength(1);
   expect((await db.query("select lead_id from mcp_internal.mcp_pipeline_requests where lead_id is not null")).rows).toHaveLength(1);
   await db.exec(`
     delete from sales_agent_conversations; delete from client_sales_agents;
-    delete from mcp_internal.mcp_pipeline_requests; delete from lead_identities;
+    delete from mcp_internal.mcp_pipeline_requests;
+    delete from archived_leads; delete from lead_identities;
     delete from clients;
   `);
   await db.exec(`

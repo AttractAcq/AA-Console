@@ -8,9 +8,15 @@
 --
 -- Postgres has no team_category = text operator, so that line raises
 --   ERROR 42883: operator does not exist: team_category = text
--- every time an avatar or editor role send reaches the loop. Only the
--- 'full' role escaped it, because v_need_cat stays null and the guard
--- short-circuits.
+-- for every send that reaches the member loop. Not only the avatar and
+-- editor roles: PL/pgSQL plans an IF condition as a single SQL expression,
+-- so the operator has to resolve before any value is considered and
+-- short-circuiting never gets the chance. 'full' fails too.
+--
+-- Production shows it. brief_dispatches holds one row from 5 September,
+-- before migration 95, and then nothing until 25 September at 20:50:56 --
+-- two minutes after the hotfix below was applied at 20:48:49. Nothing was
+-- dispatched at all in between.
 --
 -- Production was hotfixed remotely as 127_fix_team_category_text_compare,
 -- which was never committed: it exists in no branch of this repository. The

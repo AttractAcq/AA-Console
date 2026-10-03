@@ -21,8 +21,13 @@
 --      if v_need_cat is not null and v_member.category is distinct from v_need_cat
 --    Postgres has no team_category = text operator, so this raises
 --      ERROR 42883: operator does not exist: team_category = text
---    whenever an avatar or editor role send reaches the loop. The 'full' role
---    escapes it because v_need_cat stays null and the guard short-circuits.
+--    for every role that reaches the member loop, not only avatar and editor.
+--    PL/pgSQL plans an IF condition as one SQL expression, so the operator
+--    resolves before any value is considered; short-circuiting never applies.
+--
+--    So content.assign_production route=human has never worked at all. The
+--    reason nobody noticed: mcp_content_requests holds 63 calls to that tool
+--    and every single one is route=ai. The human route has never been run.
 --
 --    The sibling function dispatch_brief_to_members had the identical fault
 --    and WAS hotfixed in production (127_fix_team_category_text_compare, also
