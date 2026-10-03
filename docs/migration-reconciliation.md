@@ -303,24 +303,105 @@ So on staging, migrations 138 and 139 are tested as genuine repairs of all
 three. Against production, 138 and half of 139 would be no-ops and prove
 nothing. The rehearsal is therefore stricter than the thing it rehearses.
 
-### 6.4 Next
+### 6.4 Rehearsal result — PASSED
 
-Apply to staging, in this order, then diff against production object by object:
+All nine applied to staging in order, no errors, 128 in its own transaction.
+Staging went 140 → **149 migration rows**.
+
+#### Structural diff, staging (post-apply) against production (pre-apply)
+
+| | Production | Staging | Delta | Accounted for by |
+|---|---|---|---|---|
+| Tables | 62 | 66 | **+4** | `lead_identities`, `archived_leads` (129), `recruitment_meta_campaigns`, `recruitment_meta_campaign_ads` (133) |
+| Policies | 134 | 140 | **+6** | 2 per new lead table, 1 per new recruitment table |
+| Tables without RLS | 0 | 0 | 0 | — |
+| `public` functions | 163 | 171 | **+8** | `sync_team_member_profile_name` (127); `register_lead_identity`, `archive_lead`, `recover_lead`, `update_lead`, `add_lead_note` (129); `request_recruitment_meta_build`, `create_recruitment_meta_campaign` (133) |
+| `mcp_internal` functions | 109 | 109 | 0 | 131 and 139 replace, never add |
+| Agents | 24 | 25 | **+1** | `recruitment_meta_build` (133) |
+| Enum types | 30 | 30 | 0 | 128 adds values, not a type — `lead_stage` went 9 → 12 labels |
+| Triggers | 55 | 54 | −1 | See below |
+| Views | 15 | 15 | 0 | 130 replaces `content_attribution` |
+
+Production has no function, table or policy that staging lacks. The delta is
+exactly the intended one.
+
+The trigger count is the one line that needs reading rather than counting.
+Staging gained the two expected application triggers —
+`client_leads.client_leads_register_identity` (129) and
+`team_members.team_member_profile_name_sync` (127). Production carries three
+that staging does not, all of them
+`storage.buckets.protect_bucket_control_*`: Supabase platform triggers from a
+different storage version, not application drift. 55 − 3 + 2 = 54.
+
+#### Behavioural checks
+
+| # | Check | Result |
+|---|---|---|
+| 3 | `client_ideas_campaign_position_pair` no longer caps at 30 | `campaign_position > 0` |
+| 4 | Four client-access functions carry `tm.active` | all four |
+| 5 | Both `v_need_cat` declarations | `team_category` |
+| 6 | `assign_production` AI insert | migration-93 column list |
+
+#### Check 7: a retired member loses access
+
+Tested against a real employee login by setting `request.jwt.claims`, in a
+`DO` block that raises at the end so every effect rolls back:
 
 ```
-126 → 127 → 128 (alone, must commit) → 129 → 130 → 131 → 133 → 138 → 139
+client_assignment path:  active=t  retired=f
+job_assignment path:     active=t  retired=f
+accessible_client_ids:   active=1  retired=0
 ```
 
-Acceptance for the rehearsal:
+The job-assignment path needed its own run: staging has one client, so the
+first attempt passed a null `client_id` and read false in both states — a
+vacuous pass, not a real one.
 
-1. All nine apply without error, 128 in its own transaction.
-2. `archived_leads`, `lead_identities` and `recruitment_meta_campaigns` exist;
-   `request_recruitment_meta_build` exists; the `recruitment_meta_build` agent
-   row exists, taking staging to 25 agents.
-3. `client_ideas_campaign_position_pair` no longer caps at 30.
-4. The four client-access functions all carry `tm.active`.
-5. Both `v_need_cat` declarations read `team_category`, and
-   `select 'editors'::team_category is distinct from 'editors'::text` is no
-   longer reachable from either function.
-6. `assign_production` inserts the migration-93 column list.
-7. A retired team member loses access — the test migration 127 exists for.
+**And the counter-test, which is the part that matters.** Reverting
+`can_access_client` to production's current shape inside the same rolled-back
+block:
+
+```
+PRE-127 COUNTER-TEST (production shape)
+  can_access_client: active=t retired=t
+```
+
+So the test genuinely bites: with production's function a retired member keeps
+access, and with migration 127 they lose it. Per trap 13 in `gap-audit.md`, a
+suite that has never failed has not been shown to work.
+
+Rollback verified afterwards: `can_access_client` still carries `tm.active`,
+zero test rows left in `client_assignments` or `job_assignments`, and
+Editor 1 is still active.
+
+### 6.5 What the production apply will actually do
+
+Two things differ from the rehearsal, and both are in production's favour
+except the first:
+
+1. **Migration 129 runs `delete from client_leads` unconditionally.** On
+   staging that was a no-op — 0 rows. **In production it deletes 2 leads and
+   cascades 6 `lead_events`.** The migration's comment cites an Alex
+   confirmation of 25 September that the existing prospects were disposable;
+   that was eight days ago and these may not be the same rows.
+   **This needs re-confirming before the apply, and it is the only
+   irreversible data loss in the set.** `sales_agent_conversations` has 0 rows
+   referencing a lead, so nothing else is affected.
+2. **Migration 138 is a no-op in production**, which already carries the
+   hotfix. It exists so a replay cannot lose it.
+3. **Migration 139 repairs a live fault in production** — the
+   `team_category = text` comparison that has never worked on the human
+   avatar/editor route of `content.assign_production`.
+
+### 6.6 Still outstanding
+
+- **Fresh-replay from git is still unproven.** This rehearsal proved the
+  forward path from a production-shaped database, which is what de-risks the
+  apply. It did not prove that git replays onto an empty database to produce
+  the same schema — that needs CLI access or a paid branch, and would likely
+  surface the five duplicated migration numbers, migration 11's plaintext
+  passwords, and `rls_auto_enable()`.
+- **Tests.** Neither new migration has a test in the repo yet. The retirement
+  check and both enum checks should become `*.pg.test.ts` cases so CI holds
+  them, rather than living only in this document.
+- **PR #108 should be closed** as superseded by migration 139.
