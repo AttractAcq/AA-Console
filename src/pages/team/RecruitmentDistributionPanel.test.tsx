@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
@@ -49,4 +49,59 @@ it("selects approved AA ads and queues a paused house-account campaign", async (
     p_target_countries: ["ZA", "GB"], p_asset_ids: ["asset-1"],
   }));
   expect(await screen.findByRole("status")).toHaveTextContent(/paused campaign/i);
+});
+
+// This panel shipped in #113 and reads recruitment_meta_campaigns plus two
+// RPCs, all of which migration 133 creates and production does not have. Every
+// other query here reads a table that does exist, so the approved ads and the
+// Meta account status are still worth showing.
+describe("when migration 133 has not been applied", () => {
+  const MISSING_TABLE = {
+    code: "PGRST205",
+    message: "Could not find the table 'public.recruitment_meta_campaigns' in the schema cache",
+  };
+
+  function chainError(error: { code: string; message: string }) {
+    const query: Record<string, unknown> = {};
+    for (const method of ["select", "eq", "order", "limit"]) query[method] = () => query;
+    query.maybeSingle = () => Promise.resolve({ data: null, error });
+    query.then = (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
+      Promise.resolve({ data: null, error }).then(resolve, reject);
+    return query;
+  }
+
+  function withCampaignsError(error: { code: string; message: string }) {
+    const base = from.getMockImplementation()!;
+    from.mockImplementation((table: string) =>
+      table === "recruitment_meta_campaigns" ? chainError(error) : base(table));
+  }
+
+  it("keeps the approved ads visible and names the reason", async () => {
+    withCampaignsError(MISSING_TABLE);
+    render(<RecruitmentDistributionPanel />);
+
+    expect(await screen.findByText(/Building recruitment ads is unavailable/)).toBeInTheDocument();
+    // The ad list reads client_media_assets, which exists. Before the guard the
+    // whole panel collapsed into one error and showed none of this.
+    expect(screen.getByText("Editor image")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("disables the build and does not claim nothing has been built", async () => {
+    withCampaignsError(MISSING_TABLE);
+    render(<RecruitmentDistributionPanel />);
+    await screen.findByText(/Building recruitment ads is unavailable/);
+
+    expect(screen.getByRole("button", { name: /Push selected ads to Ads Manager/ })).toBeDisabled();
+    expect(screen.getByText(/cannot be listed yet/)).toBeInTheDocument();
+    expect(screen.queryByText("No recruitment campaigns built yet.")).toBeNull();
+  });
+
+  it("still reports a real failure on that table as an error", async () => {
+    withCampaignsError({ code: "42501", message: "permission denied for table recruitment_meta_campaigns" });
+    render(<RecruitmentDistributionPanel />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/permission denied/);
+    expect(screen.queryByText(/Building recruitment ads is unavailable/)).toBeNull();
+  });
 });
