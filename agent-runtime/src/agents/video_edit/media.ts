@@ -2,8 +2,9 @@
  * The only module here that runs ffmpeg or ffprobe.
  *
  * execFile, never a shell: every argument arrives as one argv entry, so a
- * path or caption cannot become a second command. The runtime image does not
- * ship ffmpeg yet; this spike runs where it is installed.
+ * path or caption cannot become a second command. The runtime image installs
+ * ffmpeg; renderCapability checks it can do the filters a cut needs before
+ * anything is planned or paid for.
  */
 
 import { execFile } from "node:child_process";
@@ -41,6 +42,41 @@ export class MediaError extends Error {
  * tail for context. Capped so a job event stays readable.
  */
 const ERROR_LINE = /no such filter|error (initializing|while|opening|applying)|invalid|unable to|failed to|unrecognized|cannot/i;
+
+/**
+ * Whether this ffmpeg can actually render a cut, checked before paying for one.
+ *
+ * The render burns captions with drawtext, which is a build-time option.
+ * Homebrew's default build omits it and the tests had to learn to check for
+ * the filter rather than the binary; the same question applies to whatever
+ * ffmpeg the container ships. Asking afterwards means discovering it after a
+ * plan has been written and paid for, with an error that says "Invalid
+ * argument" rather than "this ffmpeg cannot do captions".
+ *
+ * Cheap: one ffmpeg -filters, no media touched.
+ */
+export async function renderCapability(): Promise<{ ok: true } | { ok: false; message: string }> {
+  let filters: string;
+  try {
+    const result = await run("ffmpeg", ["-hide_banner", "-filters"], { timeout: 20_000, maxBuffer: 8 * 1024 * 1024 });
+    filters = result.stdout;
+  } catch (error) {
+    return {
+      ok: false,
+      message: `ffmpeg is not usable on this runtime: ${formatFfmpegStderr(error)}`,
+    };
+  }
+  const missing = ["drawtext", "xfade", "scale"].filter((filter) => !new RegExp(`\\b${filter}\\b`).test(filters));
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      message:
+        `This ffmpeg has no ${missing.join(", ")} filter, so a cut cannot be rendered. ` +
+        `drawtext needs a build with libfreetype. Nothing was planned, so nothing was spent.`,
+    };
+  }
+  return { ok: true };
+}
 
 export function formatFfmpegStderr(error: unknown): string {
   const stderr = (error as { stderr?: unknown })?.stderr;

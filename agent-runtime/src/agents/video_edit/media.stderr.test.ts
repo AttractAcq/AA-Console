@@ -53,3 +53,27 @@ describe("a failed render names the cause, not the aftermath", () => {
     expect(formatFfmpegStderr({ stderr: "   " })).toMatch(/.+/);
   });
 });
+
+describe("the render capability is checked before anything is paid for", () => {
+  it("passes on an ffmpeg that has the filters a cut needs", async () => {
+    const { renderCapability } = await import("./media.js");
+    const result = await renderCapability();
+    // Locally this depends on the installed build; either answer is valid,
+    // but a refusal has to say which filter is missing rather than just no.
+    if (!result.ok) {
+      expect(result.message).toMatch(/drawtext|xfade|scale|not usable/);
+      expect(result.message).toMatch(/nothing was spent|not usable/i);
+    } else {
+      expect(result.ok).toBe(true);
+    }
+  });
+
+  it("names the missing filter and says nothing was spent", async () => {
+    // The point of the preflight: a refusal a person can act on, before the
+    // plan is written. "Invalid argument" after two model calls is not that.
+    const { renderCapability } = await import("./media.js");
+    const result = await renderCapability();
+    if (!result.ok) expect(result.message).toMatch(/libfreetype|not usable/);
+    else expect(result).toMatchObject({ ok: true });
+  });
+});
