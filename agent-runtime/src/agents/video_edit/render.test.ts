@@ -23,6 +23,23 @@ const edl: Edl = {
   notes: "",
 };
 
+/**
+ * The order that failed on AA-0121: two cuts, then a crossfade. The fixture
+ * above only ever crossfades before it cuts, which is the safe direction,
+ * so it could not have caught this.
+ */
+const cutThenCrossfade: Edl = {
+  segments: [
+    { shot: 1, in_sec: 0, out_sec: 2, transition: "cut" },
+    { shot: 2, in_sec: 0, out_sec: 2, transition: "cut" },
+    { shot: 1, in_sec: 0, out_sec: 2, transition: "crossfade" },
+  ],
+  captions: [],
+  end_card_text: "",
+  end_card_sec: 0,
+  notes: "",
+};
+
 const options = {
   clipPaths: new Map([
     [1, "/clips/shot-1.mp4"],
@@ -54,7 +71,25 @@ describe("buildRenderPlan", () => {
     const filter = filterOf(buildRenderPlan(edl, options).args);
     // First segment is 2s long, so a 0.4s fade starts at 1.6s.
     expect(filter).toContain("[s0][s1]xfade=transition=fade:duration=0.4:offset=1.6[j1]");
-    expect(filter).toContain("[j1][s2]concat=n=2:v=1:a=0[j2]");
+    expect(filter).toContain("[j1][s2]concat=n=2:v=1:a=0,settb=1/30[j2]");
+  });
+
+  /**
+   * concat rewrites its output timebase to 1/1000000 and xfade refuses two
+   * inputs whose timebases differ, so a cut followed by a crossfade used to
+   * die with "Failed to configure output pad". Every link that feeds a join
+   * carries 1/30, so the order the model picks cannot matter.
+   */
+  it("gives every link that feeds a join the same timebase", () => {
+    const filter = filterOf(buildRenderPlan(cutThenCrossfade, options).args);
+    for (const link of ["[s0]", "[s1]", "[s2]"]) {
+      expect(filter).toContain(`settb=1/30${link}`);
+    }
+    expect(filter).toContain("[s0][s1]concat=n=2:v=1:a=0,settb=1/30[j1]");
+    // The xfade that used to fail: its first input is a concat output.
+    expect(filter).toContain("[j1][s2]xfade=transition=fade:duration=0.4:offset=3.6[j2]");
+    // No concat anywhere may hand its raw 1/1000000 on to a join.
+    expect(filter).not.toMatch(/concat=n=2:v=1:a=0\[/);
   });
 
   it("keeps caption text out of the filtergraph", () => {
@@ -92,6 +127,78 @@ describe("buildRenderPlan", () => {
       "Shot 2 has no clip file.",
     );
   });
+});
+
+function ffmpegFilters(): string {
+  try {
+    return execFileSync("ffmpeg", ["-hide_banner", "-filters"], { encoding: "utf8" });
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The graph, run for real, on any ffmpeg that can cut video.
+ *
+ * The render test below needs drawtext, which Homebrew omits, so it skips on
+ * a developer machine — and a test that only ever skips proves nothing. The
+ * timebase fault lived in the joins, and the joins need no captions, so a
+ * captionless EDL builds a graph with no drawtext in it. This runs wherever
+ * xfade does, which is everywhere, and it is the test that would have caught
+ * the fault before it cost two paid plans.
+ */
+describe.skipIf(!/\bxfade\b/.test(ffmpegFilters()))("the joins configure in real ffmpeg", () => {
+  let dir = "";
+  afterAll(async () => {
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
+
+  const orders: Array<{ name: string; edl: Edl; seconds: number }> = [
+    { name: "a cut before a crossfade", edl: cutThenCrossfade, seconds: 5.6 },
+    {
+      name: "a crossfade before a cut",
+      edl: { ...cutThenCrossfade, segments: [
+        { shot: 1, in_sec: 0, out_sec: 2, transition: "cut" },
+        { shot: 2, in_sec: 0, out_sec: 2, transition: "crossfade" },
+        { shot: 1, in_sec: 0, out_sec: 2, transition: "cut" },
+      ] },
+      seconds: 5.6,
+    },
+    {
+      name: "two crossfades in a row",
+      edl: { ...cutThenCrossfade, segments: [
+        { shot: 1, in_sec: 0, out_sec: 2, transition: "cut" },
+        { shot: 2, in_sec: 0, out_sec: 2, transition: "crossfade" },
+        { shot: 1, in_sec: 0, out_sec: 2, transition: "crossfade" },
+      ] },
+      seconds: 5.2,
+    },
+  ];
+
+  it.each(orders)("renders $name", async ({ edl: order, seconds }) => {
+    dir ||= await mkdtemp(join(tmpdir(), "video-edit-joins-"));
+    for (const shot of [1, 2]) {
+      const clip = join(dir, `join-shot-${shot}.mp4`);
+      if (!existsSync(clip)) {
+        execFileSync("ffmpeg", [
+          "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi",
+          "-i", `testsrc2=s=360x640:r=24:d=3`, "-pix_fmt", "yuv420p", clip,
+        ]);
+      }
+    }
+    const output = join(dir, `joins-${seconds}-${order.segments[1]!.transition}.mp4`);
+    const plan = buildRenderPlan(order, {
+      clipPaths: new Map([[1, join(dir, "join-shot-1.mp4")], [2, join(dir, "join-shot-2.mp4")]]),
+      outputPath: output,
+      fontFile: join(dir, "unused.ttf"),
+      workDir: dir,
+    });
+    expect(filterOf(plan.args)).not.toContain("drawtext");
+    // The assertion that matters: ffmpeg configures the graph and writes it.
+    await render(plan);
+    expect(plan.durationSec).toBeCloseTo(seconds, 1);
+    expect(await probeDurationSec(output)).toBeCloseTo(seconds, 1);
+  }, 60_000);
 });
 
 function hasFfmpeg(): boolean {

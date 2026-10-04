@@ -30,18 +30,30 @@ export class MediaError extends Error {
 /**
  * The part of ffmpeg's stderr that says what went wrong.
  *
- * This used to keep the last three lines. ffmpeg reports the actual fault
- * near the top — "No such filter", "Error initializing filter", "Invalid
- * argument" against a specific option — and then prints a generic tail about
- * the encoder and the empty output file. So the three lines kept were the
- * three least useful ones, and the first real cut failed with
- * "Task finished with error code: -22" and "Nothing was written into output
- * file", neither of which names a cause.
+ * Two wrong answers preceded this one. Keeping the last three lines kept
+ * ffmpeg's generic tail about the encoder and the empty output file, so the
+ * first real cut failed with "Task finished with error code: -22" and
+ * "Nothing was written into output file", neither of which names a cause.
+ * Keeping the lines that match error-ish words then dropped the one line
+ * that mattered: a cut followed by a crossfade reported "Failed to configure
+ * output pad on Parsed_xfade_38", while the line above it —
+ * "First input link main timebase (1/1000000) do not match ... (1/30)" —
+ * has no such word in it and was filtered out as noise. It was the whole
+ * diagnosis.
  *
- * Now the diagnosis comes first: the lines that look like the error, then the
- * tail for context. Capped so a job event stays readable.
+ * So the head is kept unconditionally. Every call here runs ffmpeg at
+ * -loglevel error, where every line is already an error and the cause comes
+ * first, so the first few lines are the diagnosis whether or not they
+ * contain a word a regex likes. Keywords still have a use, but only to pull
+ * a cause forward from under a banner — additively, never as the filter that
+ * decides what survives. That distinction is the whole of the second bug.
  */
-const ERROR_LINE = /no such filter|error (initializing|while|opening|applying)|invalid|unable to|failed to|unrecognized|cannot/i;
+const HEAD_LINES = 6;
+const TAIL_LINES = 2;
+/** Only ever used to pull a cause forward, never to discard a line. */
+const CAUSE_LINE = /no such filter|error (initializing|reinitializing|while|opening|applying)|do not match|unable to|unrecognized option|invalid argument for/i;
+/** Version and stream chatter: the only lines that never carry a cause. */
+const BANNER_LINE = /^(ffmpeg version|built with|\s*configuration:|\s*lib(av|sw|post)\w*\s|\s*Stream #|\s*Metadata:|\s*encoder\s*:|Input #|Output #)/i;
 
 /**
  * Whether this ffmpeg can actually render a cut, checked before paying for one.
@@ -84,9 +96,20 @@ export function formatFfmpegStderr(error: unknown): string {
   if (!text) return error instanceof Error ? error.message : String(error);
 
   const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
-  const diagnostic = lines.filter((line) => ERROR_LINE.test(line)).slice(0, 4);
-  const tail = lines.slice(-2);
-  const kept = [...diagnostic, ...tail.filter((line) => !diagnostic.includes(line))];
+  // Drop version and stream chatter: the one thing ffmpeg prints that never
+  // carries a cause. If that leaves nothing, keep what there was.
+  const meaningful = lines.filter((line) => !BANNER_LINE.test(line));
+  const body = meaningful.length > 0 ? meaningful : lines;
+
+  const head = body.slice(0, HEAD_LINES);
+  const kept = [...head];
+  const add = (line: string) => {
+    if (!kept.includes(line)) kept.push(line);
+  };
+  // Additive, not selective: a cause pushed past the head by a banner still
+  // gets in, and a cause with no keyword is already in the head.
+  for (const line of body.filter((line) => CAUSE_LINE.test(line)).slice(0, 2)) add(line);
+  for (const line of body.slice(-TAIL_LINES)) add(line);
   return kept.join(" | ").slice(0, 1500);
 }
 

@@ -26,10 +26,39 @@ describe("a failed render names the cause, not the aftermath", () => {
     expect(message).toMatch(/Nothing was written into output file/);
   });
 
+  /**
+   * The line that cost a deploy cycle. "First input link main timebase ... do
+   * not match ..." is the entire diagnosis of a cut-before-crossfade render,
+   * and it contains no word a keyword filter would recognise, so the filter
+   * dropped it and kept five lines of aftermath instead.
+   */
+  it("keeps a cause that contains no error-sounding word at all", () => {
+    const message = formatFfmpegStderr({
+      stderr: [
+        "[Parsed_xfade_38 @ 0x7f74] First input link main timebase (1/1000000) do not match the corresponding second input link xfade timebase (1/30)",
+        "[Parsed_xfade_38 @ 0x7f74] Failed to configure output pad on Parsed_xfade_38",
+        "[fc#0 @ 0x7f74] Task finished with error code: -22 (Invalid argument)",
+        "[fc#0 @ 0x7f74] Terminating thread with return code -22 (Invalid argument)",
+        "[vost#0:0/libx264 @ 0x7f74] Task finished with error code: -22 (Invalid argument)",
+        "[vost#0:0/libx264 @ 0x7f74] Terminating thread with return code -22 (Invalid argument)",
+        "[out#0/mp4 @ 0x7f74] Nothing was written into output file, because at least one of its streams received no packets.",
+      ].join("\n"),
+    });
+    expect(message).toMatch(/do not match/);
+    expect(message).toMatch(/timebase \(1\/1000000\)/);
+    // And it comes first, because that is where ffmpeg put it.
+    expect(message.indexOf("do not match")).toBeLessThan(message.indexOf("Nothing was written"));
+  });
+
   it("finds a cause buried under a long configuration banner", () => {
     const message = formatFfmpegStderr({
       stderr: [
-        ...Array.from({ length: 20 }, (_, i) => `  configuration line ${i}`),
+        "ffmpeg version 6.1 Copyright (c) 2000-2023 the FFmpeg developers",
+        "  built with Apple clang version 15.0.0",
+        "  configuration: --prefix=/opt --enable-gpl --enable-libx264",
+        ...Array.from({ length: 17 }, (_, i) => `  libavcodec     ${60 + i}. 31.102 / ${60 + i}. 31.102`),
+        "Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/clips/shot-1.mp4':",
+        "  Stream #0:0: Video: h264, yuv420p, 720x1280, 30 fps",
         "[fc#0 @ 0x1] Error initializing filter 'xfade' with args 'offset=99'",
         "Conversion failed!",
         "[out#0/mp4 @ 0x7f8] Nothing was written into output file",

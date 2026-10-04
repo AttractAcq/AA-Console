@@ -12,6 +12,14 @@
  * Output is 1080x1920, 30 fps, H.264, faststart: what Reels and TikTok take.
  * Clips are scaled to fill and centre-cropped, not letterboxed. Generated
  * shots are already 9:16, so the crop is a no-op for them.
+ *
+ * Every link that feeds a join carries OUTPUT_TB. xfade refuses two inputs
+ * whose timebases differ, and concat rewrites its output to AV_TIME_BASE_Q
+ * (1/1000000) whatever it was given. So a cut followed by a crossfade handed
+ * xfade one link at 1/1000000 and one at 1/30, and the render died with
+ * "Failed to configure output pad" and "-22 (Invalid argument)". A settb
+ * after every concat, and on every segment, makes the timebases agree by
+ * construction instead of by the order the model happened to choose.
  */
 
 import { CROSSFADE_SEC, segmentsDuration, totalDuration, type CaptionPosition, type Edl } from "./edl.js";
@@ -19,6 +27,8 @@ import { CROSSFADE_SEC, segmentsDuration, totalDuration, type CaptionPosition, t
 export const OUTPUT_WIDTH = 1080;
 export const OUTPUT_HEIGHT = 1920;
 export const OUTPUT_FPS = 30;
+/** The one timebase every join input carries. See the note above. */
+export const OUTPUT_TB = `1/${OUTPUT_FPS}`;
 
 /** Paths go into the filtergraph unquoted, so they are held to plain characters. */
 const SAFE_PATH = /^[A-Za-z0-9_./-]+$/;
@@ -116,7 +126,8 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
     args.push("-ss", sec(segment.in_sec), "-t", sec(segment.out_sec - segment.in_sec), "-i", path);
     filters.push(
       `[${i}:v]scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,` +
-        `crop=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT},setsar=1,fps=${OUTPUT_FPS},format=yuv420p,setpts=PTS-STARTPTS[s${i}]`,
+        `crop=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT},setsar=1,fps=${OUTPUT_FPS},format=yuv420p,` +
+        `setpts=PTS-STARTPTS,settb=${OUTPUT_TB}[s${i}]`,
     );
   });
 
@@ -132,7 +143,7 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
       );
       elapsed += length - CROSSFADE_SEC;
     } else {
-      filters.push(`[${current}][s${i}]concat=n=2:v=1:a=0[${next}]`);
+      filters.push(`[${current}][s${i}]concat=n=2:v=1:a=0,settb=${OUTPUT_TB}[${next}]`);
       elapsed += length;
     }
     current = next;
@@ -150,7 +161,7 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
       `color=c=${background}:s=${OUTPUT_WIDTH}x${OUTPUT_HEIGHT}:r=${OUTPUT_FPS}`,
     );
     filters.push(`[${inputCount}:v]format=yuv420p,setsar=1[card]`);
-    filters.push(`[${current}][card]concat=n=2:v=1:a=0[withcard]`);
+    filters.push(`[${current}][card]concat=n=2:v=1:a=0,settb=${OUTPUT_TB}[withcard]`);
     current = "withcard";
     inputCount += 1;
   }
