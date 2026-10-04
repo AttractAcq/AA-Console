@@ -88,18 +88,36 @@ function harness(
         };
       }
       if (table === "client_media_assets") {
-        return {
-          select: () => ({
-            eq: async () => {
-              if (options.stillsThrows) throw new Error("stills lookup failed");
-              return { data: assets, error: null };
-            },
-          }),
+        // stillsOnFile awaits .eq() directly; framesForBrief continues
+        // .order().limit() off it to take only the newest build. The same
+        // object has to serve both, so it is thenable and chainable.
+        // Honours .limit() for real, so a test asserting "only the newest
+        // build is animated" measures the query rather than the fixture.
+        let take: number | null = null;
+        const assetQuery: Record<string, unknown> = {};
+        const settle = async () => {
+          if (options.stillsThrows) throw new Error("stills lookup failed");
+          return { data: take === null ? assets : assets.slice(0, take), error: null };
         };
+        assetQuery.order = () => assetQuery;
+        assetQuery.limit = (n: number) => {
+          take = n;
+          return assetQuery;
+        };
+        assetQuery.then = (resolve: (v: unknown) => unknown, reject: (r: unknown) => unknown) =>
+          settle().then(resolve, reject);
+        return { select: () => ({ eq: () => assetQuery }) };
       }
       if (table === "client_media_frames") {
         return {
           select: () => ({
+            // Filters by asset_id, so frames belonging to a superseded build
+            // are not handed back just because the fixture holds them.
+            eq: async (_column: string, assetId: string) => ({
+              data: frames.filter((f) => (f as { asset_id?: string }).asset_id === undefined
+                || (f as { asset_id?: string }).asset_id === assetId),
+              error: null,
+            }),
             in: async () => ({ data: frames, error: null }),
           }),
           update: (row: Record<string, unknown>) => ({
@@ -122,9 +140,16 @@ function harness(
     },
     storage: {
       from: (bucket: string) => ({
-        createSignedUrl: async () => ({
-          data: options.signedUrl ? { signedUrl: options.signedUrl } : null,
-          error: options.signedUrl ? null : { message: "no url" },
+        // A configured URL is returned verbatim, as the existing tests expect.
+        // Without one, the path is echoed back, so a test can tell which
+        // build's still was actually submitted rather than only how many.
+        createSignedUrl: async (path: string) => ({
+          data: options.signedUrl
+            ? { signedUrl: options.signedUrl }
+            : options.signedUrl === null
+              ? null
+              : { signedUrl: `https://cdn.example.test/${path}` },
+          error: options.signedUrl === null ? { message: "no url" } : null,
         }),
         upload: async (path: string, bytes: Buffer, init: { contentType: string; upsert: boolean }) => {
           uploads.push({ bucket, path, bytes, upsert: init.upsert, contentType: init.contentType });
@@ -224,6 +249,53 @@ describe("video_build", () => {
     expect(result.failureMessage).toMatch(/HIGGSFIELD_MODEL_DRAFT/);
     expect(result.failureMessage).not.toContain("not-a-real-secret");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("animates only the newest build when a brief has been rebuilt", async () => {
+    // The bug this exists for: a brief built three times files three assets,
+    // each with positions 1..n, and reading every asset's frames turned into
+    // three Higgsfield submissions per shot — triple the cost, two thirds of
+    // them stills that had already been superseded.
+    setHiggsfieldEnv();
+    const motion = "11111111-1111-4111-8111-111111111111";
+    const ready = {
+      ...reel,
+      frame_plan: [
+        shotLine("Name the mechanism").replace('"pending"', `"${motion}"`),
+        shotLine("Show the step").replace('"pending"', `"${motion}"`),
+      ],
+    };
+    const posts: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      const href = String(url);
+      if (href.endsWith(".mp4")) {
+        return new Response(Uint8Array.from([1]), { status: 200, headers: { "content-type": "video/mp4" } });
+      }
+      if (init?.method === "POST") {
+        posts.push(String(init.body));
+        return new Response(
+          JSON.stringify({ request_id: "req_abc12345", status: "queued", status_url: "https://platform.higgsfield.ai/requests/req_abc12345/status" }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ status: "completed", video: { url: "https://cdn.example.test/c.mp4" } }), { status: 200 });
+    });
+
+    const { sb } = harness(ready, {
+      // Newest first, the order the query asks for.
+      assets: [{ id: "asset-new" }, { id: "asset-old" }],
+      frames: [
+        { id: "f-new-1", position: 1, storage_path: "client-1/generated/new/01.png", provider_job_id: null, asset_id: "asset-new" },
+        { id: "f-new-2", position: 2, storage_path: "client-1/generated/new/02.png", provider_job_id: null, asset_id: "asset-new" },
+        { id: "f-old-1", position: 1, storage_path: "client-1/generated/old/01.png", provider_job_id: null, asset_id: "asset-old" },
+        { id: "f-old-2", position: 2, storage_path: "client-1/generated/old/02.png", provider_job_id: null, asset_id: "asset-old" },
+      ] as never,
+    });
+    await runVideoBuildJob(sb, {} as RuntimeConfig, {} as AgentRow, job);
+
+    // Two shots, two submissions. Not four.
+    expect(posts).toHaveLength(2);
+    expect(posts.join(" ")).not.toContain("/old/");
   });
 
   it("submits and polls through the mock when stills and a catalog motion are ready", async () => {

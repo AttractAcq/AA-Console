@@ -96,15 +96,33 @@ function stillsMessage(stills: { count: number; error: string | null }): string 
   return "No stills on file yet. Opening frames are queued as an image build on creative_build. This agent does not render them.";
 }
 
+/**
+ * The shots of the newest stills build, and only those.
+ *
+ * A brief can be built more than once — a rebuild after a rejection, or a
+ * re-render because the first set came out the wrong shape. Each build files
+ * its own asset against the same brief, each with positions 1..n, so reading
+ * every asset's frames returns the same position several times over.
+ *
+ * That was not a display problem. Every frame became a motion ref, so a brief
+ * built three times submitted three clips per shot to Higgsfield: triple the
+ * cost, and two thirds of them stills that had already been superseded. A
+ * rebuild supersedes, so the newest asset is the one that gets animated.
+ */
 async function framesForBrief(sb: SupabaseClient, briefId: string): Promise<FrameRow[]> {
-  const { data: assets, error } = await sb.from("client_media_assets").select("id").eq("brief_id", briefId);
+  const { data: assets, error } = await sb
+    .from("client_media_assets")
+    .select("id")
+    .eq("brief_id", briefId)
+    .order("created_at", { ascending: false })
+    .limit(1);
   if (error) throw new Error(`Could not load stills: ${error.message}`);
-  const ids = ((assets ?? []) as { id: string }[]).map((asset) => asset.id);
-  if (ids.length === 0) return [];
+  const newest = ((assets ?? []) as { id: string }[])[0];
+  if (!newest) return [];
   const { data, error: frameError } = await sb
     .from("client_media_frames")
     .select("id, position, storage_path, provider_job_id, clip_path")
-    .in("asset_id", ids);
+    .eq("asset_id", newest.id);
   if (frameError) throw new Error(`Could not load shot frames: ${frameError.message}`);
   return (data ?? []) as FrameRow[];
 }
