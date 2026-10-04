@@ -26,6 +26,7 @@ import { runMetricsIngestJob } from "../agents/metrics_ingest/index.js";
 import { runReportingJob } from "../agents/reporting/index.js";
 import { runCreativeBuildJob } from "../agents/creative_build/index.js";
 import { runVideoBuildJob } from "../agents/video_build/index.js";
+import { runVideoEditJob } from "../agents/video_edit/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
 import { runRepurposeJob } from "../agents/repurpose/index.js";
@@ -90,6 +91,10 @@ const RUNNERS: Record<string, JobRunner> = {
   // Generated reels. Opening stills are an image build on creative_build.
   // Motion calls Higgsfield only when the four HIGGSFIELD_* env vars are set.
   video_build: runVideoBuildJob,
+  // The cut. video_build's assembly.ts hands a reel to a person; this is
+  // the other half. A model writes the edit decision list, code validates
+  // it against the clips and the brief's own claims, ffmpeg renders it.
+  video_edit: runVideoEditJob,
   brief_dispatch: runBriefDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
   // a person in Ads Manager.
