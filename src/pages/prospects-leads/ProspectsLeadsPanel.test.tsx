@@ -126,7 +126,10 @@ describe("AA lead funnel", () => {
     await userEvent.click(screen.getByRole("tab", { name: /archive/i }));
     await userEvent.click(screen.getByRole("button", { name: "Archive this lead" }));
     await userEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("archive_lead", { p_lead_id: "lead-1", p_reason: null }));
+    // p_reason is omitted rather than sent as null: archive_lead declares
+    // `p_reason text default null`, so leaving it out is the documented way
+    // to say "no reason", and the generated types say `p_reason?: string`.
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("archive_lead", { p_lead_id: "lead-1", p_reason: undefined }));
   });
 
   it("searches and views the archive, then recovers the original ID", async () => {
