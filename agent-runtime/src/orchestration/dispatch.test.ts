@@ -51,3 +51,53 @@ describe("the repurpose agent is wired in", () => {
     expect(registeredAgentKeys()).toContain("repurpose");
   });
 });
+
+describe("the video edit agent is wired in", () => {
+  it("has a runner, so a queued cut can be claimed", () => {
+    expect(hasRunner("video_edit")).toBe(true);
+    expect(registeredAgentKeys()).toContain("video_edit");
+  });
+});
+
+describe("the spend cap stops a job before the runner, not inside it", () => {
+  // The architectural claim worth pinning. Checking in dispatchJob is what
+  // makes an agent added later bounded whether or not it thinks to ask; a
+  // check inside each runner is a check somebody eventually forgets.
+  const jobFor = (clientId: string) =>
+    ({ id: "job-1", agent_key: "ideation", client_id: clientId, input_table: null, input_id: null }) as never;
+
+  const sbWithCap = (capped: boolean, cap: number, spent: number) =>
+    ({
+      rpc: async (name: string) => {
+        if (name !== "client_budget_state") throw new Error(`unexpected rpc ${name}`);
+        return { data: [{ capped, cap_usd: cap, spent_usd: spent, remaining_usd: cap - spent }], error: null };
+      },
+    }) as never;
+
+  it("refuses without calling the runner when the client is over", async () => {
+    const { dispatchJob } = await import("./dispatch.js");
+    const result = await dispatchJob(
+      sbWithCap(true, 25, 25),
+      { model: "claude-opus-5" } as never,
+      { agent_key: "ideation" } as never,
+      jobFor("client-over"),
+    );
+    expect(result.ok).toBe(false);
+    // Not retryable: a retry spends the money the cap just refused.
+    expect(result.retryable).toBe(false);
+    expect(result.failureMessage).toMatch(/cap for the month/);
+  });
+
+  it("does not refuse a client with no cap set", async () => {
+    const { dispatchJob } = await import("./dispatch.js");
+    // No cap means the runner is reached. ideation then fails on its own
+    // terms against this stub, which is the point: the budget did not stop it.
+    const result = await dispatchJob(
+      sbWithCap(false, 0, 9999),
+      { model: "claude-opus-5" } as never,
+      { agent_key: "ideation" } as never,
+      jobFor("client-uncapped"),
+    ).catch((error: unknown) => ({ ok: false, retryable: false, failureMessage: String(error) }));
+    expect(result.failureMessage ?? "").not.toMatch(/cap for the month/);
+  });
+});

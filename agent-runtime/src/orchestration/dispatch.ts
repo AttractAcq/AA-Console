@@ -38,6 +38,7 @@ import { runPageReviseJob } from "../agents/page_revise/index.js";
 import { runMetaBuildJob } from "../agents/meta_build/index.js";
 import { runRecruitmentMetaBuildJob } from "../agents/recruitment_meta_build/index.js";
 import { runMetaBuildSheetJob } from "../agents/meta_build_sheet/index.js";
+import { checkClientBudget } from "./budget.js";
 
 export interface JobResult {
   ok: boolean;
@@ -123,6 +124,14 @@ export async function dispatchJob(
   const runner = RUNNERS[job.agent_key];
   if (!runner) {
     throw new Error(`No runtime implementation for agent_key "${job.agent_key}" (job ${job.id}).`);
+  }
+  // Before the runner, not inside it: a client over its monthly cap stops
+  // here whatever the agent is, including one added later that forgets to
+  // ask. Non-retryable, because a retry spends the money the cap refused and
+  // three attempts at the same refusal is three lies about having tried.
+  const budget = await checkClientBudget(sb, job.client_id);
+  if (!budget.allowed) {
+    return { ok: false, retryable: false, failureMessage: budget.message };
   }
   // Computed here rather than inside each runner so every agent is bounded by
   // construction, including any added later that forgets to ask.
