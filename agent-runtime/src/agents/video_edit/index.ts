@@ -35,7 +35,7 @@ import {
   type EditShot,
   type FrameRowForEdit,
 } from "./handoff.js";
-import { probeDurationSec, render, sampleFrames } from "./media.js";
+import { probeDurationSec, render, renderCapability, sampleFrames } from "./media.js";
 import { installFont } from "./font.js";
 import { planEdit, type PlanClip } from "./plan.js";
 import { buildRenderPlan } from "./render.js";
@@ -127,6 +127,16 @@ export async function runVideoEditJob(
   const brand = (brandRow ?? null) as
     | { never_do: string | null; colour_background: string | null; colour_text: string | null }
     | null;
+
+  // Before the clips, and well before the model: a cut this ffmpeg cannot
+  // render is a cut not worth planning. Discovering it afterwards is how the
+  // first real attempt spent a plan and a revision to arrive at "Invalid
+  // argument".
+  const capable = await renderCapability();
+  if (!capable.ok) {
+    await appendEvent(sb, job.id, capable.message, "error", { stage: "preflight" });
+    return failed(capable.message);
+  }
 
   const work = await mkdtemp(join(tmpdir(), "reel-cut-"));
   try {
