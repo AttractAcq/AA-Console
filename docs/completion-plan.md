@@ -11,6 +11,66 @@ places: agent spend, the `SECURITY DEFINER` count, and "schema in git".
 
 ---
 
+## 0. Where this stands — updated 4 October 2026
+
+Sections 1 to 3 below were written on 1 October and describe the problem. This
+section is the current state. Where the two disagree, this one is right.
+
+### Closed since
+
+| | Then | Now |
+|---|---|---|
+| Production vs staging vs git | Three different schemas, no two agreeing | **All three agree.** 66 tables, 140 policies, 172 functions, 26 agents, 150 migrations, 0 tables without RLS |
+| Migrations 126–133, 138–140 | Unapplied; two hotfixes existed only in a database | **All applied**, rehearsed on staging first, diffed object by object |
+| Retired team members | Kept access to every client; the button promised otherwise | **Fixed.** 127 is live and `tm.active` is honoured on all four access paths |
+| `team_category = text` | `content.assign_production` route=human had never worked, for any role | **Fixed** by 138 and 139 |
+| Prospects & Leads, Recruitment Distribution | Calling tables production did not have | **Fixed**, and guarded so the next gap degrades instead of erroring |
+| The reel chain | Never run. 0 briefs, 0 shots, 0 stills | **Run end to end.** AA-0118 brief, AA-0119 asset, 6 stills on file |
+| Reel stills | 1024x1536 — the wrong shape for a reel | **1080x1920**, composed for the crop |
+| `src/types/database.ts` | Partly hand-edited fiction | **Regenerated from production** |
+| Node version | Root pinned nothing; local diverged from CI | **Pinned to 22** |
+| OpenAI | Out of credits since 25 September | Topped up and proven |
+
+### Phase status
+
+- **P0 — make everything agree.** Done.
+- **P1 — prove Build A's chain.** Done. Brief → shot plan → stills works; cost $0.33 for the first reel.
+- **P2 — turn motion on.** Alex's: the four `HIGGSFIELD_*` variables on Railway. Everything up to that point is proven, including that `video_build` finds the stills and refuses to re-render them.
+- **P3 — assembly, where Build B lands.** Not started. The spike is on PR #120, still a draft.
+- **P4 — make one automatic workflow work.** Not started. Still the highest-leverage single step: connecting Meta un-inerts the one cron that exists, `metrics_daily`, the Reporting panels, the commentary agent and `meta_build`.
+- **P5 — the engine.** Not started. PR #119's plan still needs a CLEAR.
+- **P6 — close out.** Partly: branches cleaned, Node pinned, types regenerated. Leaked-password protection is still off.
+
+### Open, with a decision attached
+
+1. **A deliberate pause records as `failed`.** `job_status` has no `paused` value, so the
+   Higgsfield gate — working exactly as designed, no request sent — is
+   indistinguishable from a fault in any count. `terminal=true` stops it burning
+   retries, so this is cosmetic, but it will report a false failure on every
+   `video_build` until P2 lands.
+   **Decision: not fixed yet, deliberately.** It needs an enum value on
+   `job_status`, which the claim protocol, the worker and the dashboard all read.
+   That is the most load-bearing table in the system and the fix is worth more
+   than a blind change at the end of a session. Do it as its own PR, with the
+   worker's claim path tested, before P4 adds more scheduled work.
+
+2. **No library will ever list a finished reel.** `MediaLibrary` asks for
+   `content_format = 'single'`, so an assembled reel is filtered out the same way
+   a reel in production is.
+   **Decision: Reel shots becomes the reel library** when assembly lands — a
+   reel's reviewable unit is its shots, and the finished file belongs beside them
+   rather than in a flat list of singles. Nothing to build until P3 produces a
+   file. Video Library already says where reels went.
+
+3. **Leaked-password protection is still off.** Five minutes in the Supabase
+   dashboard, open since 7 September.
+
+4. **`SECURITY DEFINER` functions callable by `authenticated`** are now 50+. Each
+   carries its own guard, but nothing enforces that a new one does. P6.3 still
+   stands: a test, not a lint rule.
+
+---
+
 ## 0. First thing to know: this checkout is not the repo
 
 | | Commit | Note |
