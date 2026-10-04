@@ -5,16 +5,22 @@ import sharp from "sharp";
  *
  * It offers 1024x1536, 1024x1024 and 1536x1024 — 2:3, 1:1 and 3:2. The
  * closest vertical, 2:3, is 0.667 against a reel's 0.5625, so a still
- * rendered at 1024x1536 is visibly too wide and every frame AA-0119
- * produced was the wrong shape for the thing it was being made for.
+ * rendered at 1024x1536 is too wide for the thing it is being made for.
  *
- * Two halves, and both are needed. This module crops the render to 9:16 and
- * scales it to the 1080x1920 the platforms expect, so what lands in storage
- * is already a reel frame and Higgsfield animates the right rectangle.
- * REEL_SAFE_AREA_NOTE goes into the prompt so the composition survives that
- * crop: the first stills put headlines across the full width, and a centre
- * crop alone would have taken the ends off "WE BUILD IT AS ONE CHAIN" and
- * clipped the last card out of the frame.
+ * This extends the frame rather than cropping it, which is the second
+ * attempt. The first cropped 160px of width and asked the renderer, in the
+ * prompt, to compose inside the width that survived. It did not: both test
+ * stills put their headline edge to edge anyway and lost a letter at each
+ * end — "WE BUILD IT AS ONE CHAIN" came back without its W or its N. A
+ * model filling a canvas it has been given is a stronger instinct than a
+ * sentence asking it not to, and arguing with that in the prompt is a
+ * negotiation you lose quietly, one render at a time.
+ *
+ * Extending cannot clip anything. 1024x1536 becomes 1024x1820 by adding 142
+ * rows top and bottom, then scales to 1080x1920 — one uniform 1.055x, no
+ * distortion, and every pixel the renderer composed still in frame. The
+ * added rows are copies of the edge rows, which on these backgrounds is a
+ * continuation of the paper rather than a band.
  *
  * Only reel opening stills come through here. A carousel, a story and a
  * single are legitimately 2:3 or square and are left exactly as rendered.
@@ -25,19 +31,18 @@ export const REEL_HEIGHT = 1920;
 const REEL_RATIO = 9 / 16;
 
 /**
- * What the renderer is told, so the crop costs nothing.
+ * What the renderer is told.
  *
- * Stated as a share of the width rather than in pixels: the model is not
- * composing in pixels, and a fraction survives a change of render size.
- * 80% rather than the 84.4% actually kept, so a composition that sits right
- * on the line still has somewhere to go.
+ * It no longer asks for an inset, because that is the instruction the first
+ * attempt proved does not hold. It asks for the one thing extending needs:
+ * that the very top and bottom rows be background, since those rows are the
+ * ones copied outward. Text touching the top edge would smear upward.
  */
 export const REEL_SAFE_AREA_NOTE =
-  "Vertical 9:16 framing. This image is cropped to a tall 9:16 reel frame afterwards, " +
-  "losing roughly 8% of the width from each side. Keep every piece of text, every " +
-  "logo and the whole of the main subject inside the middle 80% of the width. " +
-  "Background, texture and shadow may run to the edges; nothing that has to be read " +
-  "or recognised may.";
+  "Vertical 9:16 reel frame. The image is extended slightly at the top and bottom " +
+  "afterwards to reach 9:16, by continuing whatever is already at those edges. " +
+  "Leave the top and bottom edges as clean background — no text, no logo and no " +
+  "part of the main subject touching them. The full width is yours to use.";
 
 export interface VerticalFrame {
   bytes: Buffer;
@@ -46,37 +51,35 @@ export interface VerticalFrame {
 }
 
 /**
- * Centre-crop to 9:16, then scale to 1080x1920.
+ * Pad to 9:16 without losing a pixel, then scale to 1080x1920.
  *
- * Centre rather than top: a cold-open headline sits high and an end card
- * sits low, so there is no one edge that is safe to favour, and the note
- * above is what keeps the middle enough.
- *
- * An image already at 9:16 or taller is not cropped, only scaled — cropping
- * a correct shape to make it correct again would only lose pixels.
+ * A frame wider than 9:16 gains height; a frame taller than 9:16 gains
+ * width. One already at 9:16 is only scaled. The padding is split evenly so
+ * the composition stays centred where the renderer put it.
  */
 export async function toReelFrame(bytes: Buffer): Promise<VerticalFrame> {
-  const image = sharp(bytes);
-  const { width, height } = await image.metadata();
+  const { width, height } = await sharp(bytes).metadata();
   if (!width || !height) {
-    throw new Error("Could not read the rendered still's dimensions, so it was not cropped to 9:16.");
+    throw new Error("Could not read the rendered still's dimensions, so it was not made 9:16.");
   }
 
-  const pipeline = sharp(bytes);
-  const widthAtRatio = Math.round(height * REEL_RATIO);
-  if (widthAtRatio < width) {
-    pipeline.extract({
-      left: Math.round((width - widthAtRatio) / 2),
-      top: 0,
-      width: widthAtRatio,
-      height,
-    });
+  // Two passes, not one chain. sharp applies resize before extend whatever
+  // order they are called in, so chaining them pads the already-scaled frame
+  // and overshoots: 1024x1536 came back 1080x2204 rather than 1080x1920.
+  const ratio = width / height;
+  let padded = bytes;
+
+  if (ratio > REEL_RATIO) {
+    // Too wide. Add rows rather than remove columns: nothing composed is lost.
+    const extra = Math.round(width / REEL_RATIO) - height;
+    const top = Math.floor(extra / 2);
+    padded = await sharp(bytes).extend({ top, bottom: extra - top, extendWith: "copy" }).png().toBuffer();
+  } else if (ratio < REEL_RATIO) {
+    const extra = Math.round(height * REEL_RATIO) - width;
+    const left = Math.floor(extra / 2);
+    padded = await sharp(bytes).extend({ left, right: extra - left, extendWith: "copy" }).png().toBuffer();
   }
 
-  const out = await pipeline
-    .resize(REEL_WIDTH, REEL_HEIGHT, { fit: "fill" })
-    .png()
-    .toBuffer();
-
+  const out = await sharp(padded).resize(REEL_WIDTH, REEL_HEIGHT, { fit: "fill" }).png().toBuffer();
   return { bytes: out, contentType: "image/png", extension: "png" };
 }
