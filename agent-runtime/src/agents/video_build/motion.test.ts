@@ -4,6 +4,7 @@ import { ZOOM_IN_MOTION_ID } from "./motions.js";
 import {
   decideMotion,
   motionFollowUp,
+  MOTION_POLL_AFTER_SECONDS,
   prepareMotionCalls,
   readHiggsfieldEnv,
   type MotionFrameRef,
@@ -207,17 +208,49 @@ describe("prepareMotionCalls", () => {
 });
 
 describe("motionFollowUp", () => {
+  it("never reports waiting as a failure, whatever the mix of statuses", () => {
+    // The specific regression: anything still in flight must come back as
+    // pending, so the caller schedules a collection instead of burning an
+    // attempt. Six paid clips were orphaned by the old behaviour.
+    for (const statuses of [
+      ["in_progress"],
+      ["queued", "completed"],
+      ["completed", "completed", "in_progress"],
+      ["starting"],
+    ]) {
+      const result = motionFollowUp(statuses);
+      expect(result.outcome).toBe("pending");
+      expect(result).not.toHaveProperty("retryable");
+    }
+  });
+
+  it("still fails hard when a shot genuinely failed, even beside a pending one", () => {
+    // A failure is not something to wait for.
+    expect(motionFollowUp(["in_progress", "failed"])).toMatchObject({ outcome: "failed", retryable: false });
+  });
+
+  it("waits long enough to be worth waiting, and not so long a clip sits", () => {
+    expect(MOTION_POLL_AFTER_SECONDS).toBeGreaterThanOrEqual(60);
+    expect(MOTION_POLL_AFTER_SECONDS).toBeLessThanOrEqual(600);
+  });
+
   it("finishes when every shot completed", () => {
-    expect(motionFollowUp(["completed", "completed"])).toMatchObject({ ok: true, retryable: false });
+    expect(motionFollowUp(["completed", "completed"])).toMatchObject({ outcome: "completed" });
   });
 
   it("asks for another poll while a shot is still rendering", () => {
-    expect(motionFollowUp(["completed", "in_progress"])).toMatchObject({ ok: false, retryable: true });
+    // Waiting is its own outcome. It used to be a retryable failure, which
+    // the queue answered by retrying three times in a minute and then giving
+    // up while the clips were still rendering.
+    expect(motionFollowUp(["completed", "in_progress"])).toMatchObject({
+      outcome: "pending",
+      pollAfterSeconds: MOTION_POLL_AFTER_SECONDS,
+    });
   });
 
   it("does not retry a failed or nsfw shot", () => {
-    expect(motionFollowUp(["nsfw"])).toMatchObject({ ok: false, retryable: false });
-    expect(motionFollowUp(["failed"])).toMatchObject({ ok: false, retryable: false });
+    expect(motionFollowUp(["nsfw"])).toMatchObject({ outcome: "failed", retryable: false });
+    expect(motionFollowUp(["failed"])).toMatchObject({ outcome: "failed", retryable: false });
   });
 });
 

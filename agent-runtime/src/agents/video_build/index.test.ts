@@ -62,6 +62,7 @@ function harness(
       clip_path?: string | null;
     }>;
     signedUrl?: string | null;
+    scheduleFails?: boolean;
   } = {},
 ) {
   const events: Array<Record<string, unknown>> = [];
@@ -70,7 +71,12 @@ function harness(
   const uploads: Array<{ bucket: string; path: string; upsert: boolean; contentType: string; bytes: Buffer }> = [];
   const assets = options.assets ?? [];
   const frames = options.frames ?? [];
+  const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
   const sb = {
+    async rpc(name: string, args: Record<string, unknown>) {
+      rpcCalls.push({ name, args });
+      return { data: "follow-up-job", error: options.scheduleFails ? null : null };
+    },
     from(table: string) {
       if (table === "client_briefs") {
         return {
@@ -159,7 +165,7 @@ function harness(
       }),
     },
   };
-  return { sb: sb as unknown as SupabaseClient, events, frameUpdates, briefUpdates, uploads };
+  return { sb: sb as unknown as SupabaseClient, events, frameUpdates, briefUpdates, uploads, rpcCalls };
 }
 
 const job: AgentJobRow = {
@@ -249,6 +255,50 @@ describe("video_build", () => {
     expect(result.failureMessage).toMatch(/HIGGSFIELD_MODEL_DRAFT/);
     expect(result.failureMessage).not.toContain("not-a-real-secret");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("schedules a collection instead of failing while Higgsfield renders", async () => {
+    // The orphaning bug. Waiting used to be a retryable failure, so the queue
+    // retried three times in about a minute, ran out of attempts mid-render,
+    // and left six paid clips with nothing that would ever fetch them.
+    setHiggsfieldEnv();
+    const motion = "11111111-1111-4111-8111-111111111111";
+    const ready = {
+      ...reel,
+      frame_plan: [
+        shotLine("Name the mechanism").replace('"pending"', `"${motion}"`),
+        shotLine("Show the step").replace('"pending"', `"${motion}"`),
+      ],
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      if (init?.method === "POST") {
+        return new Response(
+          JSON.stringify({ request_id: "req_abc12345", status: "queued", status_url: "https://platform.higgsfield.ai/requests/req_abc12345/status" }),
+          { status: 200 },
+        );
+      }
+      // Never finishes within this run.
+      return new Response(JSON.stringify({ status: "in_progress" }), { status: 200 });
+    });
+
+    const { sb, rpcCalls } = harness(ready, {
+      assets: [{ id: "asset-1" }],
+      frames: [
+        { id: "frame-1", position: 1, storage_path: "client-1/generated/r/01.png", provider_job_id: null },
+        { id: "frame-2", position: 2, storage_path: "client-1/generated/r/02.png", provider_job_id: null },
+      ],
+    });
+    const result = await runVideoBuildJob(sb, {} as RuntimeConfig, {} as AgentRow, job);
+
+    // The job succeeds: the work is in flight, not broken.
+    expect(result.ok).toBe(true);
+    const scheduled = rpcCalls.find((call) => call.name === "schedule_agent_follow_up");
+    expect(scheduled).toBeTruthy();
+    expect(scheduled!.args).toMatchObject({
+      p_agent_key: "video_build",
+      p_input_table: "client_briefs",
+    });
+    expect(Number(scheduled!.args.p_after_seconds)).toBeGreaterThan(0);
   });
 
   it("animates only the newest build when a brief has been rebuilt", async () => {

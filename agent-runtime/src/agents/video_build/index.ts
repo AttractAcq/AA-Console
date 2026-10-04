@@ -404,16 +404,44 @@ export async function runVideoBuildJob(
   }
 
   const followUp = motionFollowUp(statuses);
-  await appendEvent(sb, job.id, followUp.message, followUp.ok ? "info" : "warn", {
+  const level = followUp.outcome === "failed" ? "warn" : "info";
+  await appendEvent(sb, job.id, followUp.message, level, {
     creative_stage: "motion",
-    status: followUp.ok ? "completed" : "paused",
-    job_outcome: followUp.ok ? "completed" : "failed",
-    reason: followUp.ok ? "completed" : "higgsfield_pending",
+    status: followUp.outcome === "completed" ? "completed" : followUp.outcome,
+    job_outcome: followUp.outcome,
+    reason: followUp.outcome === "completed" ? "completed" : "higgsfield_" + followUp.outcome,
     provider: "higgsfield",
     higgsfield_called: true,
     shots: submitted,
     assembly: assemblyHandoff(),
   });
-  if (!followUp.ok) return failed(followUp.message, followUp.retryable);
+
+  if (followUp.outcome === "failed") return failed(followUp.message, followUp.retryable);
+
+  if (followUp.outcome === "pending") {
+    // Not a failure and not a retry: the clips are rendering and already
+    // paid for, so this schedules the collection rather than spending an
+    // attempt on waiting. Without it the attempts ran out mid-render and
+    // six finished clips had nothing left that would ever fetch them.
+    const { error: scheduleError } = await sb.rpc("schedule_agent_follow_up", {
+      p_agent_key: "video_build",
+      p_client_id: job.client_id,
+      p_input_table: "client_briefs",
+      p_input_id: brief.id,
+      p_after_seconds: followUp.pollAfterSeconds,
+      p_description: "Scheduled: collect the Higgsfield clips",
+    });
+    if (scheduleError) {
+      // Nothing will collect them if this did not land, so say so loudly and
+      // let the retry budget do what it can.
+      const message =
+        `Higgsfield is still rendering, and the follow-up could not be scheduled ` +
+        `(${scheduleError.message}). The request ids are stored on the shots.`;
+      await appendEvent(sb, job.id, message, "error", { creative_stage: "motion", reason: "follow_up_unscheduled" });
+      return failed(message, true);
+    }
+    return { ok: true, retryable: false };
+  }
+
   return { ok: true, retryable: false };
 }
