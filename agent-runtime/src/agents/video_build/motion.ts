@@ -230,36 +230,49 @@ export function prepareMotionCalls(input: {
 }
 
 /** What the job should do after submit/poll statuses come back. */
-export function motionFollowUp(statuses: readonly string[]): {
-  ok: boolean;
-  retryable: boolean;
-  message: string;
-} {
+/**
+ * How long to wait before looking at Higgsfield again.
+ *
+ * DoP took a little over a minute for six shots on the first real run. Two
+ * minutes is long enough that a poll usually finds work finished, and short
+ * enough that a finished clip is not left sitting.
+ */
+export const MOTION_POLL_AFTER_SECONDS = 120;
+
+export type MotionFollowUp =
+  | { outcome: "completed"; message: string }
+  /** Waiting on the provider. Not a failure, and not a retry. */
+  | { outcome: "pending"; message: string; pollAfterSeconds: number }
+  | { outcome: "failed"; retryable: boolean; message: string };
+
+export function motionFollowUp(statuses: readonly string[]): MotionFollowUp {
   const normalized = statuses.map((status) => status.trim().toLowerCase());
   if (normalized.length === 0) {
     return {
-      ok: false,
+      outcome: "failed",
       retryable: false,
       message: "Motion paused: nothing was submitted. No Higgsfield request was sent.",
     };
   }
   if (normalized.some((status) => status === "failed" || status === "nsfw")) {
     return {
-      ok: false,
+      outcome: "failed",
       retryable: false,
       message: "Higgsfield reported a shot as failed. The request id is stored. It was not submitted again.",
     };
   }
   if (normalized.every((status) => status === "completed")) {
     return {
-      ok: true,
-      retryable: false,
+      outcome: "completed",
       message: "Higgsfield completed the submitted shots.",
     };
   }
+  // Waiting, not failing. The caller schedules the next look rather than
+  // spending a retry on it: retries run out at whatever speed the queue
+  // loops at, which has nothing to do with how long a render takes.
   return {
-    ok: false,
-    retryable: true,
-    message: "Higgsfield is still rendering. The request id is stored. It will be polled, not submitted again.",
+    outcome: "pending",
+    pollAfterSeconds: MOTION_POLL_AFTER_SECONDS,
+    message: "Higgsfield is still rendering. The request ids are stored, and a follow-up is scheduled to collect them.",
   };
 }
