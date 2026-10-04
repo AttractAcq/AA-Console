@@ -26,10 +26,32 @@ export class MediaError extends Error {
   }
 }
 
-function stderrOf(error: unknown): string {
+/**
+ * The part of ffmpeg's stderr that says what went wrong.
+ *
+ * This used to keep the last three lines. ffmpeg reports the actual fault
+ * near the top — "No such filter", "Error initializing filter", "Invalid
+ * argument" against a specific option — and then prints a generic tail about
+ * the encoder and the empty output file. So the three lines kept were the
+ * three least useful ones, and the first real cut failed with
+ * "Task finished with error code: -22" and "Nothing was written into output
+ * file", neither of which names a cause.
+ *
+ * Now the diagnosis comes first: the lines that look like the error, then the
+ * tail for context. Capped so a job event stays readable.
+ */
+const ERROR_LINE = /no such filter|error (initializing|while|opening|applying)|invalid|unable to|failed to|unrecognized|cannot/i;
+
+export function formatFfmpegStderr(error: unknown): string {
   const stderr = (error as { stderr?: unknown })?.stderr;
   const text = typeof stderr === "string" ? stderr.trim() : "";
-  return text ? text.split("\n").slice(-3).join(" ") : error instanceof Error ? error.message : String(error);
+  if (!text) return error instanceof Error ? error.message : String(error);
+
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  const diagnostic = lines.filter((line) => ERROR_LINE.test(line)).slice(0, 4);
+  const tail = lines.slice(-2);
+  const kept = [...diagnostic, ...tail.filter((line) => !diagnostic.includes(line))];
+  return kept.join(" | ").slice(0, 1500);
 }
 
 export async function probeDurationSec(path: string): Promise<number> {
@@ -44,7 +66,7 @@ export async function probeDurationSec(path: string): Promise<number> {
     return duration;
   } catch (error) {
     if (error instanceof MediaError) throw error;
-    throw new MediaError(`Could not probe ${path}: ${stderrOf(error)}`);
+    throw new MediaError(`Could not probe ${path}: ${formatFfmpegStderr(error)}`);
   }
 }
 
@@ -77,7 +99,7 @@ export async function sampleFrames(
       { timeout: RENDER_TIMEOUT_MS },
     );
   } catch (error) {
-    throw new MediaError(`Could not sample frames from ${clipPath}: ${stderrOf(error)}`);
+    throw new MediaError(`Could not sample frames from ${clipPath}: ${formatFfmpegStderr(error)}`);
   }
   const files = (await readdir(outDir)).filter((name) => /^frame-\d+\.jpg$/.test(name)).sort();
   return Promise.all(
@@ -94,6 +116,6 @@ export async function render(plan: RenderPlan): Promise<void> {
   try {
     await run("ffmpeg", plan.args, { timeout: RENDER_TIMEOUT_MS, maxBuffer: 8 * 1024 * 1024 });
   } catch (error) {
-    throw new MediaError(`ffmpeg failed: ${stderrOf(error)}`);
+    throw new MediaError(`ffmpeg failed: ${formatFfmpegStderr(error)}`);
   }
 }
