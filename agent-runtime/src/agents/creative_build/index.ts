@@ -59,6 +59,7 @@ import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } f
 import { placeLogo } from "./logo.js";
 import { brandConceptBlock, brandRenderBlock, loadBrandProfile, type BrandProfile } from "./brand.js";
 import { openingStillsRoute, withOpeningShotFields } from "./openingStills.js";
+import { REEL_SAFE_AREA_NOTE, toReelFrame } from "./vertical.js";
 
 const BUCKET = "client-media";
 
@@ -952,11 +953,19 @@ Call ${submitTool.name} once when you are done.`;
             identity,
             brand,
           );
-          const out = await renderImage(config, framePrompt(frame, total, composed), {
+          // A reel frame is 9:16 and the image API cannot render one, so the
+          // still is composed for the crop and then cropped. Both halves
+          // matter: without the note the crop takes the ends off a headline,
+          // and without the crop Higgsfield animates a 2:3 rectangle.
+          const prompt = openingShots
+            ? `${framePrompt(frame, total, composed)}\n\n${REEL_SAFE_AREA_NOTE}`
+            : framePrompt(frame, total, composed);
+          const out = await renderImage(config, prompt, {
             size: renderSize,
             quality: renderQuality,
             reference: null,
           });
+          if (openingShots) return toReelFrame(out.bytes);
           return { bytes: out.bytes, contentType: out.contentType, extension: out.extension };
         },
         store: async (frame, out) => {

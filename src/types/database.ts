@@ -14,48 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      archived_leads: {
-        Row: {
-          id: string
-          client_id: string
-          name: string | null
-          stage_at_archive: Database["public"]["Enums"]["lead_stage"]
-          lead: Json
-          events: Json
-          reason: string | null
-          archived_at: string
-          archived_by: string | null
-        }
-        Insert: {
-          id: string
-          client_id: string
-          name?: string | null
-          stage_at_archive: Database["public"]["Enums"]["lead_stage"]
-          lead: Json
-          events?: Json
-          reason?: string | null
-          archived_at?: string
-          archived_by?: string | null
-        }
-        Update: {
-          id?: string
-          client_id?: string
-          name?: string | null
-          stage_at_archive?: Database["public"]["Enums"]["lead_stage"]
-          lead?: Json
-          events?: Json
-          reason?: string | null
-          archived_at?: string
-          archived_by?: string | null
-        }
-        Relationships: []
-      }
-      lead_identities: {
-        Row: { id: string; client_id: string }
-        Insert: { id: string; client_id: string }
-        Update: { id?: string; client_id?: string }
-        Relationships: []
-      }
       agent_job_events: {
         Row: {
           created_at: string
@@ -275,6 +233,64 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      archived_leads: {
+        Row: {
+          archived_at: string
+          archived_by: string | null
+          client_id: string
+          events: Json
+          id: string
+          lead: Json
+          name: string | null
+          reason: string | null
+          stage_at_archive: Database["public"]["Enums"]["lead_stage"]
+        }
+        Insert: {
+          archived_at?: string
+          archived_by?: string | null
+          client_id: string
+          events?: Json
+          id: string
+          lead: Json
+          name?: string | null
+          reason?: string | null
+          stage_at_archive: Database["public"]["Enums"]["lead_stage"]
+        }
+        Update: {
+          archived_at?: string
+          archived_by?: string | null
+          client_id?: string
+          events?: Json
+          id?: string
+          lead?: Json
+          name?: string | null
+          reason?: string | null
+          stage_at_archive?: Database["public"]["Enums"]["lead_stage"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "archived_leads_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "archived_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "archived_leads_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "lead_identities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       brief_dispatches: {
         Row: {
@@ -1073,9 +1089,9 @@ export type Database = {
           created_at: string
           derived_from_asset_id: string | null
           editor_brief: string | null
+          format_code: string | null
           frame_count: number | null
           frame_plan: string[] | null
-          format_code: string | null
           hook: string | null
           id: string
           job_id: string | null
@@ -1114,9 +1130,9 @@ export type Database = {
           created_at?: string
           derived_from_asset_id?: string | null
           editor_brief?: string | null
+          format_code?: string | null
           frame_count?: number | null
           frame_plan?: string[] | null
-          format_code?: string | null
           hook?: string | null
           id?: string
           job_id?: string | null
@@ -1155,9 +1171,9 @@ export type Database = {
           created_at?: string
           derived_from_asset_id?: string | null
           editor_brief?: string | null
+          format_code?: string | null
           frame_count?: number | null
           frame_plan?: string[] | null
-          format_code?: string | null
           hook?: string | null
           id?: string
           job_id?: string | null
@@ -2288,6 +2304,13 @@ export type Database = {
             columns: ["asset_id"]
             isOneToOne: false
             referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_frames_proof_asset_id_fkey"
+            columns: ["proof_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
             referencedColumns: ["id"]
           },
         ]
@@ -3632,6 +3655,29 @@ export type Database = {
           },
         ]
       }
+      lead_identities: {
+        Row: {
+          client_id: string
+          id: string
+        }
+        Insert: {
+          client_id: string
+          id: string
+        }
+        Update: {
+          client_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_identities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       master_ai_conversations: {
         Row: {
           client_id: string | null
@@ -3955,71 +4001,122 @@ export type Database = {
         }
         Relationships: []
       }
-      recruitment_meta_campaigns: {
-        Row: {
-          id: string
-          client_id: string
-          name: string
-          daily_budget: number
-          target_countries: string[]
-          conversion_event: string
-          meta_campaign_id: string | null
-          meta_ad_set_id: string | null
-          meta_built_at: string | null
-          created_at: string
-          created_by: string | null
-        }
-        Insert: {
-          id?: string
-          client_id: string
-          name: string
-          daily_budget: number
-          target_countries: string[]
-          conversion_event?: string
-          meta_campaign_id?: string | null
-          meta_ad_set_id?: string | null
-          meta_built_at?: string | null
-          created_at?: string
-          created_by?: string | null
-        }
-        Update: {
-          id?: string
-          client_id?: string
-          name?: string
-          daily_budget?: number
-          target_countries?: string[]
-          conversion_event?: string
-          meta_campaign_id?: string | null
-          meta_ad_set_id?: string | null
-          meta_built_at?: string | null
-          created_at?: string
-          created_by?: string | null
-        }
-        Relationships: []
-      }
       recruitment_meta_campaign_ads: {
         Row: {
-          campaign_id: string
           asset_id: string
-          meta_image_hash: string | null
-          meta_creative_id: string | null
+          campaign_id: string
           meta_ad_id: string | null
+          meta_creative_id: string | null
+          meta_image_hash: string | null
         }
         Insert: {
-          campaign_id: string
           asset_id: string
-          meta_image_hash?: string | null
-          meta_creative_id?: string | null
+          campaign_id: string
           meta_ad_id?: string | null
+          meta_creative_id?: string | null
+          meta_image_hash?: string | null
         }
         Update: {
-          campaign_id?: string
           asset_id?: string
-          meta_image_hash?: string | null
-          meta_creative_id?: string | null
+          campaign_id?: string
           meta_ad_id?: string | null
+          meta_creative_id?: string | null
+          meta_image_hash?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recruitment_meta_campaign_ads_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_meta_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recruitment_meta_campaigns: {
+        Row: {
+          client_id: string
+          conversion_event: string
+          created_at: string
+          created_by: string | null
+          daily_budget: number
+          id: string
+          meta_ad_set_id: string | null
+          meta_built_at: string | null
+          meta_campaign_id: string | null
+          name: string
+          target_countries: string[]
+        }
+        Insert: {
+          client_id: string
+          conversion_event?: string
+          created_at?: string
+          created_by?: string | null
+          daily_budget: number
+          id?: string
+          meta_ad_set_id?: string | null
+          meta_built_at?: string | null
+          meta_campaign_id?: string | null
+          name: string
+          target_countries: string[]
+        }
+        Update: {
+          client_id?: string
+          conversion_event?: string
+          created_at?: string
+          created_by?: string | null
+          daily_budget?: number
+          id?: string
+          meta_ad_set_id?: string | null
+          meta_built_at?: string | null
+          meta_campaign_id?: string | null
+          name?: string
+          target_countries?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recruitment_meta_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recruitment_meta_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ref_counters: {
         Row: {
@@ -4115,15 +4212,8 @@ export type Database = {
             foreignKeyName: "sales_agent_conversations_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
-            referencedRelation: "client_leads"
+            referencedRelation: "lead_identities"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sales_agent_conversations_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "lead_progress"
-            referencedColumns: ["lead_id"]
           },
           {
             foreignKeyName: "sales_agent_conversations_page_id_fkey"
@@ -4838,9 +4928,6 @@ export type Database = {
       content_attribution: {
         Row: {
           appointments: number | null
-          profile_visits: number | null
-          followers: number | null
-          qualified: number | null
           asset_created_at: string | null
           asset_id: string | null
           asset_ref: string | null
@@ -4857,6 +4944,7 @@ export type Database = {
           conversations: number | null
           derived_from_asset_id: string | null
           first_published: string | null
+          followers: number | null
           hook: string | null
           idea_id: string | null
           idea_title: string | null
@@ -4866,7 +4954,9 @@ export type Database = {
           media_type: Database["public"]["Enums"]["media_type"] | null
           opportunity_value: number | null
           posts: number | null
+          profile_visits: number | null
           proof_asset_id: string | null
+          qualified: number | null
           reach: number | null
           repurpose_format: string | null
           review_status: Database["public"]["Enums"]["review_status"] | null
@@ -5209,21 +5299,25 @@ export type Database = {
         Args: { p_client_id: string; p_days?: number }
         Returns: {
           appointments: number
-          profile_visits: number
-          followers: number
-          qualified: number
           cash_collected: number
           conversations: number
           cost_per_lead: number
+          followers: number
           lead_to_sale_pct: number
           leads: number
           lost: number
           pipeline_value: number
+          profile_visits: number
+          qualified: number
           return_on_spend: number
           sale_value: number
           sales: number
           spend: number
         }[]
+      }
+      add_lead_note: {
+        Args: { p_lead_id: string; p_note: string }
+        Returns: undefined
       }
       admin_create_team_member: {
         Args: {
@@ -5254,28 +5348,16 @@ export type Database = {
         }
         Returns: undefined
       }
-      add_lead_note: {
-        Args: { p_lead_id: string; p_note: string }
-        Returns: undefined
-      }
-      archive_lead: {
-        Args: { p_lead_id: string; p_reason?: string | null }
-        Returns: undefined
-      }
-      recover_lead: {
-        Args: { p_lead_id: string }
-        Returns: undefined
-      }
-      update_lead: {
-        Args: { p_lead_id: string; p_fields: Json }
-        Returns: undefined
-      }
       approve_idea_and_generate_brief: {
         Args: { p_idea_id: string }
         Returns: string
       }
       approve_recruitment_brief: {
         Args: { p_brief_id: string }
+        Returns: undefined
+      }
+      archive_lead: {
+        Args: { p_lead_id: string; p_reason?: string }
         Returns: undefined
       }
       build_brief_with_ai: {
@@ -5355,9 +5437,6 @@ export type Database = {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: {
           appointments: number
-          profile_visits: number
-          followers: number
-          qualified: number
           avg_customer_value: number
           cac: number
           cash_collected: number
@@ -5367,8 +5446,11 @@ export type Database = {
           cpql: number
           currency: string
           customers: number
+          followers: number
           leads: number
           mixed_currency: boolean
+          profile_visits: number
+          qualified: number
           qualified_leads: number
           revenue: number
           revenue_per_lead: number
@@ -5380,15 +5462,15 @@ export type Database = {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: {
           cac: number
-          profile_visits: number
-          followers: number
-          qualified: number
           campaign_id: string
           campaign_ref: string
           cash_collected: number
           cpl: number
           customers: number
+          followers: number
           leads: number
+          profile_visits: number
+          qualified: number
           revenue: number
           roas: number
           spend: number
@@ -5398,14 +5480,14 @@ export type Database = {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: {
           cac: number
-          profile_visits: number
-          followers: number
-          qualified: number
           cash_collected: number
           channel: string
           cpl: number
           customers: number
+          followers: number
           leads: number
+          profile_visits: number
+          qualified: number
           revenue: number
           roas: number
           spend: number
@@ -5444,6 +5526,15 @@ export type Database = {
           p_script: string
           p_title: string
           p_visual_direction?: string
+        }
+        Returns: string
+      }
+      create_recruitment_meta_campaign: {
+        Args: {
+          p_asset_ids: string[]
+          p_daily_budget: number
+          p_name: string
+          p_target_countries: string[]
         }
         Returns: string
       }
@@ -6281,6 +6372,7 @@ export type Database = {
         }
         Returns: number
       }
+      recover_lead: { Args: { p_lead_id: string }; Returns: undefined }
       regenerate_asset: {
         Args: {
           p_asset_id: string
@@ -6306,22 +6398,19 @@ export type Database = {
         Args: { p_asset_id: string; p_formats: string[] }
         Returns: string
       }
+      request_meta_build: { Args: { p_campaign_id: string }; Returns: string }
+      request_meta_build_sheet: {
+        Args: { p_campaign_id: string }
+        Returns: string
+      }
+      request_recruitment_meta_build: {
+        Args: { p_campaign_id: string }
+        Returns: string
+      }
       rerender_generation: {
         Args: { p_generation_id: string; p_quality?: string; p_size?: string }
         Returns: string
       }
-      request_recruitment_meta_build: { Args: { p_campaign_id: string }; Returns: string }
-      create_recruitment_meta_campaign: {
-        Args: {
-          p_name: string
-          p_daily_budget: number
-          p_target_countries: string[]
-          p_asset_ids: string[]
-        }
-        Returns: string
-      }
-      request_meta_build: { Args: { p_campaign_id: string }; Returns: string }
-      request_meta_build_sheet: { Args: { p_campaign_id: string }; Returns: string }
       resolve_sales_deployment: {
         Args: { p_public_id: string }
         Returns: {
@@ -6452,6 +6541,10 @@ export type Database = {
         Args: { p_concept: Json; p_generation_id: string }
         Returns: undefined
       }
+      update_lead: {
+        Args: { p_fields: Json; p_lead_id: string }
+        Returns: undefined
+      }
       usable_proof: {
         Args: { p_avatar?: string; p_client_id: string; p_limit?: number }
         Returns: {
@@ -6527,9 +6620,6 @@ export type Database = {
         | "cancelled"
       lead_stage:
         | "lead"
-        | "profile_visit"
-        | "follower"
-        | "qualified"
         | "conversation"
         | "qualified_conversation"
         | "appointment"
@@ -6538,6 +6628,9 @@ export type Database = {
         | "sale"
         | "cash"
         | "lost"
+        | "profile_visit"
+        | "follower"
+        | "qualified"
       master_ai_scope: "client" | "company"
       media_type: "image" | "text" | "video"
       metric_basis: "daily" | "cumulative"
@@ -6741,9 +6834,6 @@ export const Constants = {
       ],
       lead_stage: [
         "lead",
-        "profile_visit",
-        "follower",
-        "qualified",
         "conversation",
         "qualified_conversation",
         "appointment",
@@ -6752,6 +6842,9 @@ export const Constants = {
         "sale",
         "cash",
         "lost",
+        "profile_visit",
+        "follower",
+        "qualified",
       ],
       master_ai_scope: ["client", "company"],
       media_type: ["image", "text", "video"],

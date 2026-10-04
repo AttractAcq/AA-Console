@@ -148,7 +148,7 @@ export function LeadEditModal({ lead, owners, onClose, onChanged, onArchived }: 
           <div className="rounded-md border border-destructive p-3">
             <p className="mb-2 text-sm">Archive {lead.name ?? "this lead"}?</p>
             <button type="button" disabled={busy} onClick={() => void run(async () => {
-              const { error: archiveError } = await supabase.rpc("archive_lead", { p_lead_id: lead.id, p_reason: reason.trim() || null });
+              const { error: archiveError } = await supabase.rpc("archive_lead", { p_lead_id: lead.id, p_reason: reason.trim() || undefined });
               // archive_lead arrives with migration 129. Until it is applied,
               // say so rather than showing PostgREST's schema-cache message.
               if (archiveError) {
