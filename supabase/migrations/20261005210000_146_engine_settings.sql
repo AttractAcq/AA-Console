@@ -400,7 +400,10 @@ grant execute on function public.remove_engine_window(uuid) to authenticated;
 -- One row per client the engine could run for, with the reasons it cannot.
 -- A panel that only says "off" leaves someone hunting for which of four
 -- things is missing.
-create or replace view engine_readiness as
+-- security_invoker, like almost every view in this schema. Without it the
+-- view runs as its owner and reads past the RLS on the tables underneath,
+-- handing every client's configuration to anyone signed in.
+create or replace view engine_readiness with (security_invoker = true) as
 select
   c.id as client_id,
   c.name as client_name,
