@@ -18,6 +18,7 @@ import {
 } from "./queue.js";
 import { getAgent } from "./orchestration/registry.js";
 import { dispatchJob, hasRunner, registeredAgentKeys } from "./orchestration/dispatch.js";
+import { failSlot, slotIdOf } from "./engine/slot.js";
 import { logger } from "./logging/logger.js";
 
 export interface WorkerHandle {
@@ -118,6 +119,17 @@ async function runOneJob(
         result.usage,
       );
       await appendEvent(sb, job.id, message, "error", { retryable: result.retryable });
+
+      // Tell the slot, but only once the job is actually finished with. A
+      // retryable failure that still has attempts left is going to be tried
+      // again, and moving the slot to failed in the meantime would strand
+      // it: the only way out of failed is back to planned, which would
+      // restart work the queue was about to resume.
+      const slotId = slotIdOf(job);
+      if (slotId && (!result.retryable || job.attempts >= job.max_attempts)) {
+        await failSlot(sb, slotId, message, { agentKey: job.agent_key, jobId: job.id });
+      }
+
       logger.warn("job_failed", {
         jobId: job.id,
         agentKey: job.agent_key,

@@ -1,0 +1,145 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { advanceSlot, failSlot, isEngineJob, loadSlot, slotIdOf, SLOT_IDEA_COUNT } from "./slot.js";
+import type { AgentJobRow } from "../queue.js";
+
+const job = (params: unknown, clientId: string | null = "c1"): AgentJobRow =>
+  ({ id: "j1", client_id: clientId, params, input_table: "content_slots", input_id: "s1" }) as unknown as AgentJobRow;
+
+function sbReturning(row: unknown, error: { message: string } | null = null) {
+  const maybeSingle = vi.fn().mockResolvedValue({ data: row, error });
+  return {
+    client: {
+      from: () => ({ select: () => ({ eq: () => ({ maybeSingle }) }) }),
+      rpc: vi.fn().mockResolvedValue({ error: null }),
+    },
+    maybeSingle,
+  };
+}
+
+const SLOT = {
+  id: "s1",
+  client_id: "c1",
+  stage: "ideating",
+  format: "reel",
+  platform: "instagram",
+  scheduled_at: "2026-11-02T09:00:00Z",
+  pillar_id: "p1",
+  idea_id: null,
+  brief_id: null,
+  asset_id: null,
+  attempts: 0,
+};
+
+describe("reading the slot off a job", () => {
+  it("finds the id the engine put in params", () => {
+    expect(slotIdOf(job({ slot_id: "s1", source: "engine" }))).toBe("s1");
+    expect(isEngineJob(job({ slot_id: "s1" }))).toBe(true);
+  });
+
+  it("says there is no slot when a person ran the agent", () => {
+    // The same agents still work when somebody presses the button, so no
+    // slot is an ordinary case rather than a fault.
+    expect(slotIdOf(job({}))).toBeNull();
+    expect(slotIdOf(job(null))).toBeNull();
+    expect(isEngineJob(job({}))).toBe(false);
+  });
+
+  it("ignores a slot_id that is not a usable id", () => {
+    expect(slotIdOf(job({ slot_id: "" }))).toBeNull();
+    expect(slotIdOf(job({ slot_id: 42 }))).toBeNull();
+    expect(slotIdOf(job({ slot_id: null }))).toBeNull();
+  });
+});
+
+describe("loadSlot", () => {
+  it("returns null for a job with no slot, without asking the database", async () => {
+    const { client, maybeSingle } = sbReturning(SLOT);
+    expect(await loadSlot(client as never, job({}))).toBeNull();
+    expect(maybeSingle).not.toHaveBeenCalled();
+  });
+
+  it("returns the slot for a job that has one", async () => {
+    const { client } = sbReturning(SLOT);
+    expect(await loadSlot(client as never, job({ slot_id: "s1" }))).toMatchObject({
+      id: "s1",
+      format: "reel",
+      pillar_id: "p1",
+    });
+  });
+
+  it("throws when the job names a slot that is gone", async () => {
+    // Carrying on without the constraints the slot carries would produce
+    // work nobody asked for and file it as though they had.
+    const { client } = sbReturning(null);
+    await expect(loadSlot(client as never, job({ slot_id: "s1" }))).rejects.toThrow(/no longer exists/);
+  });
+
+  it("throws when the slot belongs to another client", async () => {
+    const { client } = sbReturning({ ...SLOT, client_id: "somebody-else" });
+    await expect(loadSlot(client as never, job({ slot_id: "s1" }))).rejects.toThrow(/different client/);
+  });
+
+  it("surfaces a read error rather than treating it as no slot", async () => {
+    const { client } = sbReturning(null, { message: "connection reset" });
+    await expect(loadSlot(client as never, job({ slot_id: "s1" }))).rejects.toThrow(/connection reset/);
+  });
+});
+
+describe("advanceSlot", () => {
+  it("goes through the RPC, never a direct write", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    await advanceSlot({ rpc } as never, "s1", "idea_selected", {
+      agentKey: "ideation",
+      costUsd: 0.2,
+      ideaId: "i1",
+    });
+    expect(rpc).toHaveBeenCalledWith(
+      "advance_slot",
+      expect.objectContaining({
+        p_slot_id: "s1",
+        p_to_stage: "idea_selected",
+        p_actor: "agent",
+        p_agent_key: "ideation",
+        p_cost_usd: 0.2,
+        p_idea_id: "i1",
+      }),
+    );
+  });
+
+  it("raises when the move was refused, since the caller must not carry on", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: { message: "A slot cannot go from planned to published." } });
+    await expect(advanceSlot({ rpc } as never, "s1", "published")).rejects.toThrow(/cannot go from planned/);
+  });
+});
+
+describe("failSlot", () => {
+  it("records the reason in both the note and blocked_reason", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    await failSlot({ rpc } as never, "s1", "Higgsfield returned nothing", { agentKey: "video_build" });
+    expect(rpc).toHaveBeenCalledWith(
+      "advance_slot",
+      expect.objectContaining({
+        p_to_stage: "failed",
+        p_note: "Higgsfield returned nothing",
+        p_blocked_reason: "Higgsfield returned nothing",
+      }),
+    );
+  });
+
+  it("stays quiet when it cannot report, so the real failure survives", async () => {
+    // An agent that throws while reporting a failure replaces a message
+    // about what went wrong with a message about the reporting.
+    const rpc = vi.fn().mockResolvedValue({ error: { message: "already failed" } });
+    await expect(failSlot({ rpc } as never, "s1", "the real problem")).resolves.toBeUndefined();
+  });
+});
+
+describe("how many ideas a slot asks for", () => {
+  it("is a handful, not a bank", () => {
+    // Twenty-five ideas for one post is twenty-one nobody reads and a bill
+    // for all of them.
+    expect(SLOT_IDEA_COUNT).toBeGreaterThanOrEqual(3);
+    expect(SLOT_IDEA_COUNT).toBeLessThanOrEqual(5);
+  });
+});
