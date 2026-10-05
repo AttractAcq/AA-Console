@@ -214,8 +214,8 @@ describe("who can see and write copy", () => {
   });
 
   it("really does drop to the authenticated role, or none of this means anything", async () => {
-    const [{ role }] = await asUser(MEMBER, `select current_user as role`);
-    expect(role).toBe("authenticated");
+    const rows = await asUser<{ role: string }>(MEMBER, `select current_user as role`);
+    expect(rows[0]?.role).toBe("authenticated");
     // and is back afterwards
     expect(await currentRole()).not.toBe("authenticated");
   });
