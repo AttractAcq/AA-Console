@@ -3078,6 +3078,7 @@ export type Database = {
           name: string
           sector: string | null
           tier: string | null
+          timezone: string
           updated_at: string
         }
         Insert: {
@@ -3089,6 +3090,7 @@ export type Database = {
           name: string
           sector?: string | null
           tier?: string | null
+          timezone?: string
           updated_at?: string
         }
         Update: {
@@ -3100,6 +3102,7 @@ export type Database = {
           name?: string
           sector?: string | null
           tier?: string | null
+          timezone?: string
           updated_at?: string
         }
         Relationships: []
@@ -4321,6 +4324,7 @@ export type Database = {
           published_at: string | null
           published_by_bot: string | null
           ref_number: string | null
+          scheduled_at: string
           scheduled_for: string
           updated_at: string
         }
@@ -4341,6 +4345,7 @@ export type Database = {
           published_at?: string | null
           published_by_bot?: string | null
           ref_number?: string | null
+          scheduled_at: string
           scheduled_for: string
           updated_at?: string
         }
@@ -4361,6 +4366,7 @@ export type Database = {
           published_at?: string | null
           published_by_bot?: string | null
           ref_number?: string | null
+          scheduled_at?: string
           scheduled_for?: string
           updated_at?: string
         }
@@ -5021,7 +5027,9 @@ export type Database = {
           media_type: string | null
           platform: string | null
           ref_number: string | null
+          due_now: boolean | null
           schedule_id: string | null
+          scheduled_at: string | null
           scheduled_for: string | null
           state: string | null
         }
@@ -6126,6 +6134,7 @@ export type Database = {
           p_execution_id: string
           p_request_id: string
           p_scheduled_for: string
+          p_scheduled_time?: string
         }
         Returns: Json
       }
@@ -6490,6 +6499,7 @@ export type Database = {
           p_channel?: Database["public"]["Enums"]["post_channel"]
           p_date: string
           p_platform?: Database["public"]["Enums"]["post_platform"]
+          p_time?: string
         }
         Returns: string
       }

@@ -3,10 +3,14 @@ import { supabase } from "./supabase";
 /**
  * Distribution work still outstanding.
  *
- * Mirrors the `distribution_due` view from migration 123, which is the copy
+ * Mirrors the `distribution_due` view from migration 144, which is the copy
  * that decides. The states are its states, in the order they demand
  * attention: an orphan can never publish, an overdue post should already
  * have, and the rest is just a calendar.
+ *
+ * state answers "which day", and since 144 it answers it on the client's
+ * clock rather than the server's. due_now answers "has the moment passed",
+ * which is the publisher's question and not the board's.
  */
 export type DueState = "orphaned" | "overdue" | "due_today" | "upcoming";
 
@@ -15,6 +19,10 @@ export type DueRow = {
   asset_id: string | null;
   ref_number: string | null;
   scheduled_for: string;
+  /** The instant the post goes out. The publisher reads this; the board reads the date. */
+  scheduled_at: string;
+  /** Whether that instant has passed. Migration 144. */
+  due_now: boolean;
   channel: string;
   platform: string | null;
   media_type: string;

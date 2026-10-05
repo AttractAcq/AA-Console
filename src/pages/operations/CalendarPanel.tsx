@@ -45,6 +45,12 @@ export function CalendarPanel() {
   const fields: FieldDef[] = [
     { name: "scheduled_for", label: "Date", kind: "date", required: true },
     {
+      name: "scheduled_time",
+      label: "Time",
+      kind: "time",
+      hint: "The client's local time. Left empty, the post goes out at 09:00 their time.",
+    },
+    {
       name: "asset_id",
       label: "Asset",
       kind: "select",
@@ -93,6 +99,7 @@ export function CalendarPanel() {
             p_asset_id: v.asset_id as string,
             p_date: v.scheduled_for as string,
             p_channel: ((v.channel as string) || "organic") as "organic" | "paid",
+            ...(v.scheduled_time ? { p_time: v.scheduled_time as string } : {}),
           });
           if (error) throw new Error(error.message);
         }}

@@ -114,6 +114,12 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
     },
     { name: "scheduled_for", label: "Date", kind: "date", required: true },
     {
+      name: "scheduled_time",
+      label: "Time",
+      kind: "time",
+      hint: "The client's local time. Left empty, the post goes out at 09:00 their time.",
+    },
+    {
       name: "platform",
       label: "Platform (optional)",
       kind: "select",
@@ -171,6 +177,7 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
             p_asset_id: v.asset_id as string,
             p_date: v.scheduled_for as string,
             p_channel: channel,
+            ...(v.scheduled_time ? { p_time: v.scheduled_time as string } : {}),
             // Empty means undecided, which is a real answer. "" would fail
             // the enum, so the key is left out entirely and the function's
             // own default null applies — which is what an optional argument

@@ -8,6 +8,7 @@ import { Modal } from "../../components/Modal";
 import { fetchClientAssets, fetchTextBodies, shortDate, signPaths } from "../../lib/media";
 import type { MediaAsset } from "../../lib/media";
 import { POST_PLATFORMS, platformLabel } from "../../lib/postPlatform";
+import { DEFAULT_POST_TIME } from "../../lib/postTime";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 
@@ -41,6 +42,10 @@ export function AssetsPanel() {
   const [preview, setPreview] = useState<MediaAsset | null>(null);
   const [scheduling, setScheduling] = useState<MediaAsset | null>(null);
   const [date, setDate] = useState("");
+  // The client's local time of day. Prefilled with the hour the database
+  // would have picked anyway, so the field explains the default rather than
+  // quietly applying it.
+  const [time, setTime] = useState(DEFAULT_POST_TIME);
   const [channel, setChannel] = useState<"organic" | "paid">("organic");
   const [platform, setPlatform] = useState("");
   const [busy, setBusy] = useState(false);
@@ -98,6 +103,7 @@ export function AssetsPanel() {
       p_asset_id: scheduling.id,
       p_date: date,
       p_channel: channel,
+      ...(time ? { p_time: time } : {}),
       ...(platform
         ? { p_platform: platform as Database["public"]["Enums"]["post_platform"] }
         : {}),
@@ -109,6 +115,7 @@ export function AssetsPanel() {
     }
     setScheduling(null);
     setDate("");
+    setTime(DEFAULT_POST_TIME);
     setPlatform("");
     void refresh();
   }
@@ -213,6 +220,17 @@ export function AssetsPanel() {
               onChange={(e) => setDate(e.target.value)}
               className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
             />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-card-foreground">Time</span>
+            <input
+              type="time"
+              aria-label="Time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+            />
+            <span className="mt-1 block text-xs text-muted-foreground">The client's local time.</span>
           </label>
           <label className="block">
             <span className="text-sm font-medium text-card-foreground">Channel</span>
