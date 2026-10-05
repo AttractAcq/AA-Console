@@ -13,12 +13,13 @@ const input: PlanInput = {
       beat: "cold open",
       duration_sec: 5,
       shot_source_kind: "ai_generated",
+      burnedInText: "",
       frames: [
         { atSec: 0, jpeg: Buffer.from("a") },
         { atSec: 0.5, jpeg: Buffer.from("b") },
       ],
     },
-    { shot: 2, beat: "proof", duration_sec: 3, shot_source_kind: "source_asset", frames: [] },
+    { shot: 2, beat: "proof", duration_sec: 3, shot_source_kind: "source_asset", burnedInText: "", frames: [] },
   ],
 };
 
@@ -53,5 +54,38 @@ describe("buildPlanContent", () => {
     expect(last).toContain("- The reel runs 20.0s. This format allows 15s.");
     expect(last).toContain("- Caption 1 is empty.");
     expect(last).toContain('"segments":[]');
+  });
+});
+
+/**
+ * The planner has to know which shots carry their own line, or it writes
+ * captions that the validator then has to refuse — a revise call, paid for,
+ * to learn something the prompt could have said up front.
+ */
+describe("shots that already carry their line", () => {
+  const withText: PlanInput = {
+    ...input,
+    clips: [
+      { ...input.clips[0]!, burnedInText: "NOTHING LINKS THEM." },
+      input.clips[1]!,
+    ],
+  };
+
+  it("tells the model what the artwork already says, and not to caption over it", () => {
+    const shotLine = texts(buildPlanContent(withText)).find((t) => t.startsWith("SHOT 1:"))!;
+    expect(shotLine).toContain('Already on screen: "NOTHING LINKS THEM."');
+    expect(shotLine).toContain("do not caption over this shot");
+  });
+
+  it("says nothing of the sort about a shot with no text in it", () => {
+    const shotLine = texts(buildPlanContent(withText)).find((t) => t.startsWith("SHOT 2:"))!;
+    expect(shotLine).not.toContain("Already on screen");
+    expect(shotLine).not.toContain("do not caption");
+  });
+
+  it("tells the editor in the system prompt that no captions is a valid plan", async () => {
+    const { SYSTEM } = await import("./plan.js");
+    expect(SYSTEM).toMatch(/no captions is a good plan/i);
+    expect(SYSTEM).toMatch(/already on screen/i);
   });
 });

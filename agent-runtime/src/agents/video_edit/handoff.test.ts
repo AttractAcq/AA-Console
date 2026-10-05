@@ -42,6 +42,7 @@ function frame(position: number, overrides: Partial<FrameRowForEdit> = {}): Fram
     beat: `Beat ${position}`,
     duration_sec: 4,
     shot_source_kind: "ai_generated",
+    caption: null,
     clip_path: `client/generated/clips/f${position}.mp4`,
     provider_job_id: `req-${position}`,
     ...overrides,
@@ -127,6 +128,7 @@ describe("maxReelSeconds", () => {
         plannedDurationSec,
         shotSourceKind: "ai_generated",
         clipPath: "c.mp4",
+        burnedInText: "",
       }));
     expect(maxReelSeconds(shots([4, 4, 4]))).toBe(12);
     expect(maxReelSeconds(shots([2, 2]))).toBe(10);
@@ -169,5 +171,22 @@ describe("editContext", () => {
     expect(context.clips[1]!.duration_sec).toBe(4);
     expect(context.banned_phrases).toEqual(["Never say guaranteed"]);
     expect(context.max_total_sec).toBe(12);
+  });
+});
+
+describe("the line already on the artwork", () => {
+  it("travels from the frame row to the shot and into the edit context", () => {
+    const frames = [1, 2, 3].map((i) => frame(i, { caption: i === 2 ? "  NOTHING LINKS THEM.  " : null }));
+    const result = editReadiness(brief, frames);
+    expect(result.ready).toBe(true);
+    if (!result.ready) return;
+    expect(result.shots.map((shot) => shot.burnedInText)).toEqual(["", "NOTHING LINKS THEM.", ""]);
+
+    const context = editContext({
+      shots: result.shots,
+      probedDurations: new Map(result.shots.map((shot) => [shot.shot, 4])),
+      brief,
+    });
+    expect(context.clips.map((clip) => clip.burned_in_text)).toEqual(["", "NOTHING LINKS THEM.", ""]);
   });
 });

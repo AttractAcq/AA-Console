@@ -102,7 +102,7 @@ export async function runVideoEditJob(
 
   const { data: frameRows, error: frameError } = await sb
     .from("client_media_frames")
-    .select("id, position, beat, duration_sec, shot_source_kind, clip_path, provider_job_id")
+    .select("id, position, beat, duration_sec, shot_source_kind, clip_path, provider_job_id, caption")
     .eq("asset_id", asset.id)
     .order("position");
   if (frameError) return failed(`Could not load the shots: ${frameError.message}`, true);
@@ -184,6 +184,7 @@ async function cut(
       beat: shot.beat,
       duration_sec: probed.get(shot.shot) ?? shot.plannedDurationSec,
       shot_source_kind: shot.shotSourceKind,
+      burnedInText: shot.burnedInText,
       frames: await sampleFrames(clipPaths.get(shot.shot)!, work, { fps: SAMPLE_FPS, width: SAMPLE_WIDTH }),
     });
   }

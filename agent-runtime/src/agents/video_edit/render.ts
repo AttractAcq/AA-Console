@@ -22,7 +22,14 @@
  * construction instead of by the order the model happened to choose.
  */
 
-import { CROSSFADE_SEC, segmentsDuration, totalDuration, type CaptionPosition, type Edl } from "./edl.js";
+import {
+  CROSSFADE_SEC,
+  segmentsDuration,
+  segmentWindows,
+  totalDuration,
+  type CaptionPosition,
+  type Edl,
+} from "./edl.js";
 
 export const OUTPUT_WIDTH = 1080;
 export const OUTPUT_HEIGHT = 1920;
@@ -131,20 +138,18 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
     );
   });
 
+  // An xfade starts where its own segment starts on the timeline, which is
+  // what segmentWindows works out. validateEdl reads the same windows.
+  const windows = segmentWindows(edl.segments);
   let current = "s0";
-  let elapsed = edl.segments[0]!.out_sec - edl.segments[0]!.in_sec;
   for (let i = 1; i < edl.segments.length; i += 1) {
-    const segment = edl.segments[i]!;
-    const length = segment.out_sec - segment.in_sec;
     const next = `j${i}`;
-    if (segment.transition === "crossfade") {
+    if (edl.segments[i]!.transition === "crossfade") {
       filters.push(
-        `[${current}][s${i}]xfade=transition=fade:duration=${sec(CROSSFADE_SEC)}:offset=${sec(elapsed - CROSSFADE_SEC)}[${next}]`,
+        `[${current}][s${i}]xfade=transition=fade:duration=${sec(CROSSFADE_SEC)}:offset=${sec(windows[i]!.start)}[${next}]`,
       );
-      elapsed += length - CROSSFADE_SEC;
     } else {
       filters.push(`[${current}][s${i}]concat=n=2:v=1:a=0,settb=${OUTPUT_TB}[${next}]`);
-      elapsed += length;
     }
     current = next;
   }

@@ -32,7 +32,7 @@ interface ReelFile {
   banned_phrases?: string[];
   background_colour?: string;
   text_colour?: string;
-  shots: Array<{ shot: number; beat: string; file: string; shot_source_kind?: string }>;
+  shots: Array<{ shot: number; beat: string; file: string; shot_source_kind?: string; caption?: string }>;
 }
 
 async function main(): Promise<void> {
@@ -63,7 +63,12 @@ async function main(): Promise<void> {
   );
 
   const context: EdlContext = {
-    clips: shots.map((s) => ({ shot: s.shot, duration_sec: s.duration_sec, shot_source_kind: s.kind })),
+    clips: shots.map((s) => ({
+      shot: s.shot,
+      duration_sec: s.duration_sec,
+      shot_source_kind: s.kind,
+      burned_in_text: s.caption ?? "",
+    })),
     max_total_sec: reel.max_total_sec,
     brief_text: reel.brief_text,
     banned_phrases: reel.banned_phrases ?? [],
@@ -84,6 +89,7 @@ async function main(): Promise<void> {
         beat: shot.beat,
         duration_sec: shot.duration_sec,
         shot_source_kind: shot.kind,
+        burnedInText: shot.caption ?? "",
         frames: await sampleFrames(shot.file, join(work, `frames-${shot.shot}`), { fps, width: 512 }),
       });
     }
