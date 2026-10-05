@@ -3943,6 +3943,66 @@ export type Database = {
           },
         ]
       }
+      post_copy: {
+        Row: {
+          alt_text: string | null
+          asset_id: string | null
+          caption: string | null
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          created_by_bot: string | null
+          cta: string | null
+          first_comment: string | null
+          hashtags: string[]
+          id: string
+          link_url: string | null
+          platform: Database["public"]["Enums"]["post_platform"]
+          scheduled_post_id: string | null
+          source: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          alt_text?: string | null
+          asset_id?: string | null
+          caption?: string | null
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_bot?: string | null
+          cta?: string | null
+          first_comment?: string | null
+          hashtags?: string[]
+          id?: string
+          link_url?: string | null
+          platform: Database["public"]["Enums"]["post_platform"]
+          scheduled_post_id?: string | null
+          source?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          alt_text?: string | null
+          asset_id?: string | null
+          caption?: string | null
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_bot?: string | null
+          cta?: string | null
+          first_comment?: string | null
+          hashtags?: string[]
+          id?: string
+          link_url?: string | null
+          platform?: Database["public"]["Enums"]["post_platform"]
+          scheduled_post_id?: string | null
+          source?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -4673,6 +4733,23 @@ export type Database = {
       }
     }
     Views: {
+      post_copy_effective: {
+        Row: {
+          alt_text: string | null
+          asset_id: string | null
+          caption: string | null
+          client_id: string | null
+          cta: string | null
+          first_comment: string | null
+          hashtags: string[] | null
+          level: string | null
+          link_url: string | null
+          platform: Database["public"]["Enums"]["post_platform"] | null
+          scheduled_post_id: string | null
+          source: string | null
+        }
+        Relationships: []
+      }
       agent_runtime_status: {
         Row: {
           active_jobs: number | null
@@ -6490,6 +6567,21 @@ export type Database = {
           p_frames: Json
           p_media_type: Database["public"]["Enums"]["media_type"]
           p_title: string
+        }
+        Returns: string
+      }
+      set_post_copy: {
+        Args: {
+          p_alt_text?: string
+          p_asset_id?: string
+          p_caption?: string
+          p_cta?: string
+          p_first_comment?: string
+          p_hashtags?: string[]
+          p_link_url?: string
+          p_platform: Database["public"]["Enums"]["post_platform"]
+          p_scheduled_post_id?: string
+          p_source?: string
         }
         Returns: string
       }

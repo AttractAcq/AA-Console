@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { attentionLine, fetchDue, stateLabel } from "../lib/distributionDue";
+import { PostCopyEditor } from "./PostCopyEditor";
 import type { DueRow } from "../lib/distributionDue";
 import { useParams } from "react-router-dom";
 import { CalendarPlus } from "lucide-react";
@@ -40,6 +41,9 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [due, setDue] = useState<DueRow[]>([]);
+  // Which slot's words are being edited, or null. Copy belongs to the slot,
+  // so the board is where it is reachable from.
+  const [copyFor, setCopyFor] = useState<{ id: string; title: string | null } | null>(null);
 
   const refresh = useCallback(async () => {
     setLoadError(null);
@@ -153,7 +157,7 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
           <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
         </div>
         <DataTable
-          columns={["Date", "Ref Number", "Type", "Platform", "Status"]}
+          columns={["Date", "Ref Number", "Type", "Platform", "Status", "Copy"]}
           emptyLabel={`No ${activeLabel.toLowerCase()} assets scheduled`}
           rows={shown.map((p) => [
             p.scheduled_for,
@@ -161,9 +165,24 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
             p.media_type,
             platformLabel(p.platform),
             p.published_at ? "Published" : (statusFor(p.id) ?? "Scheduled"),
+            <button
+              key={`copy-${p.id}`}
+              type="button"
+              onClick={() => setCopyFor({ id: p.id, title: p.ref_number })}
+              className="rounded-md bg-secondary px-2.5 py-1 text-xs text-secondary-foreground"
+            >
+              Edit copy
+            </button>,
           ])}
         />
       </div>
+
+      <PostCopyEditor
+        open={copyFor !== null}
+        onClose={() => setCopyFor(null)}
+        scheduledPostId={copyFor?.id}
+        title={copyFor?.title}
+      />
 
       <FormModal
         open={scheduleOpen}
