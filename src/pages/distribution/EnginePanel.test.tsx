@@ -5,36 +5,69 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EnginePanel } from "./EnginePanel";
 
 const rpc = vi.fn();
-const maybeSingle = vi.fn();
-const order = vi.fn();
-const eq = vi.fn(() => ({ maybeSingle, order }));
-const select = vi.fn(() => ({ eq }));
-const from = vi.fn(() => ({ select }));
+
+/**
+ * Dispatch by table, not by call order.
+ *
+ * The first version of this mock queued results with mockResolvedValueOnce,
+ * which ran out the moment the panel refreshed after a successful save — the
+ * refresh then read `undefined.error` and threw. It passed locally because
+ * vitest reports that as an unhandled error rather than a failing test, and
+ * CI counted it. Keying off the table name means any number of refreshes
+ * behave the same, which is also what the panel actually does.
+ */
+type State = { readiness: Record<string, unknown> | null; windows: unknown[]; platforms: unknown[] };
+const state: State = { readiness: null, windows: [], platforms: [] };
+
+const SETTINGS = {
+  plan_horizon_days: 14,
+  min_qa_score: 70,
+  approval_mode: "per_post",
+  auto_approve_ideas: false,
+  auto_approve_briefs: false,
+  max_jobs_in_flight: 3,
+};
+
+function result(table: string) {
+  switch (table) {
+    case "engine_readiness":
+      return { data: state.readiness, error: null };
+    case "client_engine_settings":
+      return { data: state.readiness ? SETTINGS : null, error: null };
+    case "client_engine_platforms":
+      return { data: state.platforms, error: null };
+    default:
+      return { data: state.windows, error: null };
+  }
+}
+
+const from = vi.fn((table: string) => {
+  const payload = () => Promise.resolve(result(table));
+  const chain = {
+    maybeSingle: payload,
+    order: payload,
+    // The platforms query ends at .eq(), so the chain is itself awaitable.
+    then: (...a: Parameters<Promise<unknown>["then"]>) => payload().then(...a),
+  };
+  return { select: () => ({ eq: () => chain }) };
+});
 
 vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: "c1" }) }));
 vi.mock("../../lib/supabase", () => ({
-  supabase: { from: (...a: unknown[]) => from(...(a as [])), rpc: (...a: unknown[]) => rpc(...(a as [])) },
+  supabase: { from: (...a: unknown[]) => from(...(a as [string])), rpc: (...a: unknown[]) => rpc(...(a as [])) },
 }));
 
-/** engine_readiness, settings, platforms, windows — in the order the panel asks. */
 function withState(readiness: Record<string, unknown>, windows: unknown[] = []) {
-  maybeSingle
-    .mockResolvedValueOnce({ data: readiness, error: null })
-    .mockResolvedValueOnce({
-      data: { plan_horizon_days: 14, min_qa_score: 70, approval_mode: "per_post", auto_approve_ideas: false, auto_approve_briefs: false, max_jobs_in_flight: 3 },
-      error: null,
-    });
-  eq.mockReturnValue({ maybeSingle, order });
-  order.mockResolvedValue({ data: windows, error: null });
-  // The platforms query ends at .eq(), so it resolves as a thenable.
-  eq.mockImplementation(() => {
-    const result = { maybeSingle, order };
-    return Object.assign(Promise.resolve({ data: [], error: null }), result);
-  });
+  state.readiness = readiness;
+  state.windows = windows;
+  state.platforms = [];
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  state.readiness = null;
+  state.windows = [];
+  state.platforms = [];
   rpc.mockResolvedValue({ error: null });
 });
 
