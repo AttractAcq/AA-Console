@@ -183,6 +183,7 @@ export const clientNavGroups: NavNode[] = [
           { id: "distribution-assets", label: "Assets" },
           { id: "organic", label: "Organic" },
           { id: "paid", label: "Paid" },
+          { id: "engine", label: "Engine" },
         ],
       },
       {
