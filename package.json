@@ -12,7 +12,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "postinstall": "node scripts/exclude-node-modules-from-icloud.mjs"
+    "postinstall": "node scripts/exclude-node-modules-from-icloud.mjs",
+    "sync:platform-limits": "node scripts/sync-platform-limits.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.114.0",
