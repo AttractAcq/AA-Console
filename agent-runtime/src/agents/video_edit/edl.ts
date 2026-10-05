@@ -59,6 +59,8 @@ export interface EdlContext {
     duration_sec: number;
     /** source_asset is proof footage: cut it, never alter it. */
     shot_source_kind: string;
+    /** The line the shot already shows. A caption over it would double the text. */
+    burned_in_text: string;
   }>;
   max_total_sec: number;
   /** Brief text. A number in a caption that is not in here is invented. */
@@ -166,14 +168,30 @@ export function parseEdl(raw: unknown): ParseResult {
   };
 }
 
+/**
+ * Where each segment sits on the finished timeline.
+ *
+ * A crossfade overlaps its predecessor, so a segment's start is not the sum
+ * of the lengths before it. render.ts needs this to place an xfade offset and
+ * validateEdl needs it to tell which shot is on screen when a caption is, so
+ * it lives here rather than being worked out twice and drifting apart.
+ */
+export function segmentWindows(segments: readonly EdlSegment[]): Array<{ start: number; end: number }> {
+  const windows: Array<{ start: number; end: number }> = [];
+  let cursor = 0;
+  segments.forEach((segment, i) => {
+    const length = segment.out_sec - segment.in_sec;
+    const start = i > 0 && segment.transition === "crossfade" ? cursor - CROSSFADE_SEC : cursor;
+    windows.push({ start, end: start + length });
+    cursor = start + length;
+  });
+  return windows;
+}
+
 /** Length of the cut, before the end card. Crossfades overlap their neighbours. */
 export function segmentsDuration(segments: readonly EdlSegment[]): number {
-  let total = 0;
-  segments.forEach((segment, i) => {
-    total += segment.out_sec - segment.in_sec;
-    if (i > 0 && segment.transition === "crossfade") total -= CROSSFADE_SEC;
-  });
-  return total;
+  const windows = segmentWindows(segments);
+  return windows.length > 0 ? windows[windows.length - 1]!.end : 0;
 }
 
 export function totalDuration(edl: Edl): number {
@@ -258,6 +276,32 @@ export function validateEdl(edl: Edl, context: EdlContext): string[] {
       problems.push(`${label} runs outside the reel.`);
     }
   });
+  // A caption over a shot that already carries its line puts two texts in two
+  // typefaces in the same frame. On AA-0121 every shot had a burned-in line
+  // and all three captions landed on one, which is what the cut looked like.
+  const windows = segmentWindows(edl.segments);
+  edl.captions.forEach((caption, i) => {
+    const collisions = new Set<string>();
+    edl.segments.forEach((segment, s) => {
+      const clip = clips.get(segment.shot);
+      const burned = clip?.burned_in_text?.trim();
+      if (!burned) return;
+      const window = windows[s]!;
+      // Touching at a boundary is not an overlap.
+      if (caption.start_sec < window.end - 0.05 && caption.end_sec > window.start + 0.05) {
+        collisions.add(`shot ${segment.shot}`);
+      }
+    });
+    if (collisions.size > 0) {
+      const many = collisions.size > 1;
+      problems.push(
+        `Caption ${i + 1} is on screen over ${[...collisions].join(" and ")}, ` +
+          `which already ${many ? "show their own lines" : "shows its own line"}. ` +
+          `Drop the caption or move it to a shot with no text in it.`,
+      );
+    }
+  });
+
   const byPosition = new Map<CaptionPosition, EdlCaption[]>();
   for (const caption of edl.captions) {
     byPosition.set(caption.position, [...(byPosition.get(caption.position) ?? []), caption]);

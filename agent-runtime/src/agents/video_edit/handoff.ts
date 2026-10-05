@@ -27,6 +27,8 @@ export interface FrameRowForEdit {
   shot_source_kind: string | null;
   clip_path: string | null;
   provider_job_id: string | null;
+  /** The line the still already shows. Set when the artwork has text burned in. */
+  caption: string | null;
 }
 
 export interface BriefForEdit {
@@ -51,6 +53,15 @@ export interface EditShot {
   plannedDurationSec: number;
   shotSourceKind: string;
   clipPath: string;
+  /**
+   * The line this shot already shows on screen, or empty.
+   *
+   * Higgsfield burns the script line into the still, so the frame arrives
+   * with its own typography in it. A drawtext caption over the same shot is
+   * a second piece of text in a second typeface, and on AA-0121 all three
+   * landed on top of the artwork. Captions are suppressed where this is set.
+   */
+  burnedInText: string;
 }
 
 export type ReadinessResult =
@@ -145,6 +156,7 @@ export function editReadiness(brief: BriefForEdit, frames: readonly FrameRowForE
       plannedDurationSec: numeric(frame.duration_sec) ?? planned.duration_sec,
       shotSourceKind: frame.shot_source_kind?.trim() || planned.shot_source_kind,
       clipPath,
+      burnedInText: frame.caption?.trim() ?? "",
     });
   });
 
@@ -219,6 +231,7 @@ export function editContext(input: {
       shot: shot.shot,
       duration_sec: input.probedDurations.get(shot.shot) ?? shot.plannedDurationSec,
       shot_source_kind: shot.shotSourceKind,
+      burned_in_text: shot.burnedInText,
     })),
     max_total_sec: input.maxTotalSec ?? maxReelSeconds(input.shots),
     brief_text: briefTextForEdit(input.brief),

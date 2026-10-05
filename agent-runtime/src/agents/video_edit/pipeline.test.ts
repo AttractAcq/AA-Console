@@ -94,6 +94,8 @@ describe.skipIf(!hasFfmpeg())("video_build to video_edit, end to end", () => {
         // PostgREST returns numeric as a string.
         duration_sec: String(shot.seconds),
         shot_source_kind: "ai_generated",
+        // testsrc2 has no text burned into it, so captions are allowed here.
+        caption: null,
         clip_path: path,
         provider_job_id: `hf-request-${position}`,
       };

@@ -24,6 +24,8 @@ export interface PlanClip {
   beat: string;
   duration_sec: number;
   shot_source_kind: string;
+  /** The line already burned into this shot's artwork, or empty. */
+  burnedInText: string;
   frames: ReadonlyArray<{ atSec: number; jpeg: Buffer }>;
 }
 
@@ -49,6 +51,10 @@ Cut the clips into one reel that delivers the brief:
 - Cut on movement where you can see it. Drop frames that warp, smear or show artefacts.
 - Captions say what the brief says. Never add a figure, claim or promise the brief does not make.
 - One idea per caption, short enough to read in the time it is on screen.
+- A shot marked "already on screen" has its line burned into the artwork. Never put a caption over
+  one: a second text in a second typeface lands on top of the first. Most reels here need no
+  captions at all, and no captions is a good plan, not an unfinished one. Caption only a shot with
+  no text of its own, and only to say something the artwork does not.
 - End on the call to action from the brief as an end card, or no end card if the brief has none.
 Submit the plan with ${SUBMIT_TOOL_NAME}. Put your reasons in notes for the human who approves it.`;
 
@@ -70,9 +76,12 @@ export function buildPlanContent(input: PlanInput): Anthropic.Messages.ContentBl
 
   for (const clip of input.clips) {
     const proof = clip.shot_source_kind === "source_asset" ? " Client footage: cut only, no crossfade." : "";
+    const burned = clip.burnedInText.trim()
+      ? ` Already on screen: "${clip.burnedInText.trim()}" — do not caption over this shot.`
+      : "";
     content.push({
       type: "text",
-      text: `SHOT ${clip.shot}: ${clip.beat}. Clip length ${clip.duration_sec.toFixed(2)}s.${proof}`,
+      text: `SHOT ${clip.shot}: ${clip.beat}. Clip length ${clip.duration_sec.toFixed(2)}s.${proof}${burned}`,
     });
     for (const frame of clip.frames) {
       content.push({ type: "text", text: `Shot ${clip.shot} at ${frame.atSec.toFixed(2)}s` });
