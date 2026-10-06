@@ -56,7 +56,78 @@ export type ReelAssetReview = {
   title: string | null;
   ref_number: string | null;
   review_status: "pending" | "approved" | "rejected";
+  /** Set once video_edit has rendered a cut. Null means nobody has asked, or it failed. */
+  render_path?: string | null;
 };
+
+/** A video_edit job as the panel needs to read it. */
+export type ReelEditJob = {
+  input_id: string | null;
+  status: string;
+  error?: string | null;
+};
+
+export type CutState = {
+  /** What the reel's cut is, in one word for the UI to branch on. */
+  status: "cut" | "running" | "failed" | "ready" | "incomplete";
+  /** What a person reads. Always says what is actually on file. */
+  detail: string;
+  /** Whether asking for a cut now would do anything. */
+  canRequest: boolean;
+};
+
+const IN_FLIGHT = new Set(["queued", "claimed", "running"]);
+
+/**
+ * Whether this reel has a cut, is getting one, or could ask for one.
+ *
+ * Asking is allowed with clips missing, on purpose: request_video_edit says
+ * nothing about readiness either, because the runner is what knows whether
+ * the clips have landed and refusing in SQL means the answer never reaches
+ * the person who pressed the button. So the line below states the gap and
+ * the button stays live.
+ */
+export function cutState(
+  asset: { render_path?: string | null },
+  shots: readonly ShotRow[],
+  jobs: readonly ReelEditJob[],
+): CutState {
+  if (asset.render_path?.trim()) {
+    return { status: "cut", detail: "Cut on file.", canRequest: false };
+  }
+  const latest = jobs[0];
+  if (latest && IN_FLIGHT.has(latest.status)) {
+    return {
+      status: "running",
+      detail: latest.status === "queued" ? "Queued for cutting." : "Being cut now.",
+      canRequest: false,
+    };
+  }
+
+  const withClips = shots.filter((shot) => shot.clip === "Clip on file").length;
+  const gap =
+    shots.length === 0
+      ? "No shots on this reel."
+      : withClips === shots.length
+        ? `All ${shots.length} clips on file.`
+        : `${withClips} of ${shots.length} clips on file.`;
+
+  if (latest && latest.status === "failed") {
+    return {
+      status: "failed",
+      // The reason the runner gave, not a generic one: it is the only part
+      // of the failure anyone can act on.
+      detail: `Last cut failed: ${latest.error?.trim() || "no reason recorded"}. ${gap}`,
+      canRequest: true,
+    };
+  }
+
+  return {
+    status: withClips === shots.length && shots.length > 0 ? "ready" : "incomplete",
+    detail: gap,
+    canRequest: true,
+  };
+}
 
 export type ReelBriefInput = {
   id: string;
@@ -83,6 +154,7 @@ export type ReelMasterView = {
     refNumber: string | null;
     reviewStatus: "pending" | "approved" | "rejected";
     shots: ShotRow[];
+    cut: CutState;
   }>;
 };
 
@@ -179,6 +251,7 @@ export function buildReelMasters(
   briefs: ReelBriefInput[],
   assets: ReelAssetReview[],
   frames: ReelFrameRow[],
+  editJobs: ReelEditJob[] = [],
 ): ReelMasterView[] {
   return briefs.filter(isPhase1MotionBrief).map((brief) => {
     const plan = readShotPlan(brief.frame_plan);
@@ -191,16 +264,22 @@ export function buildReelMasters(
       briefStatus: brief.status,
       planProblem: plan.problem,
       plannedShots: plan.shots.length > 0 ? shotRows(plan.shots, []) : [],
-      assets: owned.map((asset) => ({
-        id: asset.id,
-        title: asset.title,
-        refNumber: asset.ref_number,
-        reviewStatus: asset.review_status,
-        shots: shotRows(
+      assets: owned.map((asset) => {
+        const shots = shotRows(
           plan.shots,
           frames.filter((frame) => frame.asset_id === asset.id),
-        ),
-      })),
+        );
+        return {
+          id: asset.id,
+          title: asset.title,
+          refNumber: asset.ref_number,
+          reviewStatus: asset.review_status,
+          shots,
+          // Newest first, as the panel queries them: the latest job is the
+          // one that says where this reel's cut has got to.
+          cut: cutState(asset, shots, editJobs.filter((job) => job.input_id === asset.id)),
+        };
+      }),
     };
   });
 }

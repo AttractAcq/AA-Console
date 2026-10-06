@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildReelMasters, isPhase1MotionBrief, readShotPlan } from "./reelShots";
+import { buildReelMasters, cutState, isPhase1MotionBrief, readShotPlan } from "./reelShots";
+import type { ShotRow } from "./reelShots";
 
 const shot = (beat: string) =>
   JSON.stringify({
@@ -85,5 +86,93 @@ describe("buildReelMasters", () => {
 
   it("leaves an F5 reel out of the Phase 1 grid", () => {
     expect(buildReelMasters([{ ...brief, format_code: "F5" }], [], [])).toHaveLength(0);
+  });
+});
+
+describe("where a reel's cut has got to", () => {
+  const shots = (withClips: number, total = 3): ShotRow[] =>
+    Array.from({ length: total }, (_, i) => ({
+      position: i + 1,
+      beat: `beat ${i + 1}`,
+      durationLabel: "3s",
+      source: "Generated",
+      motion: "pending",
+      still: "Still on file" as const,
+      clip: (i < withClips ? "Clip on file" : "No clip") as ShotRow["clip"],
+    }));
+
+  it("says the cut is on file once one has been rendered", () => {
+    const state = cutState({ render_path: "cuts/a.mp4" }, shots(3), []);
+    expect(state).toMatchObject({ status: "cut", canRequest: false });
+  });
+
+  it("does not offer a second cut while one is running", () => {
+    // request_video_edit refuses a second anyway. Offering the button is
+    // offering an error.
+    for (const status of ["queued", "claimed", "running"]) {
+      const state = cutState({}, shots(3), [{ input_id: "a", status }]);
+      expect(state.canRequest).toBe(false);
+      expect(state.status).toBe("running");
+    }
+  });
+
+  it("gives the runner's own reason when the last cut failed", () => {
+    // It is the only part of the failure anyone can act on.
+    const state = cutState({}, shots(3), [
+      { input_id: "a", status: "failed", error: "Shot 2 has no clip." },
+    ]);
+    expect(state.detail).toContain("Shot 2 has no clip.");
+    expect(state.canRequest).toBe(true);
+  });
+
+  it("says so rather than inventing a reason when none was recorded", () => {
+    const state = cutState({}, shots(3), [{ input_id: "a", status: "failed", error: null }]);
+    expect(state.detail).toContain("no reason recorded");
+  });
+
+  it("counts the clips that are actually on file", () => {
+    expect(cutState({}, shots(1), []).detail).toBe("1 of 3 clips on file.");
+    expect(cutState({}, shots(3), []).detail).toBe("All 3 clips on file.");
+    expect(cutState({}, [], []).detail).toBe("No shots on this reel.");
+  });
+
+  it("still offers the cut with clips missing, and says what is missing", () => {
+    // request_video_edit says nothing about readiness either: the runner is
+    // what knows, and refusing here means the answer never reaches the
+    // person who pressed the button.
+    const state = cutState({}, shots(1), []);
+    expect(state).toMatchObject({ status: "incomplete", canRequest: true });
+    expect(state.detail).toContain("1 of 3");
+  });
+
+  it("treats an old finished job as no job at all", () => {
+    const state = cutState({}, shots(3), [{ input_id: "a", status: "succeeded" }]);
+    expect(state).toMatchObject({ status: "ready", canRequest: true });
+  });
+
+  it("reads each asset's own jobs and nobody else's", () => {
+    const masters = buildReelMasters(
+      [
+        {
+          id: "brief-1",
+          title: "How it works",
+          brief_ref: null,
+          status: "in_production",
+          content_format: "reel",
+          format_code: "F6",
+          media_type: "video",
+          frame_plan: [shot("Name the mechanism")],
+        },
+      ],
+      [
+        { id: "asset-1", brief_id: "brief-1", title: null, ref_number: null, review_status: "pending" },
+        { id: "asset-2", brief_id: "brief-1", title: null, ref_number: null, review_status: "pending" },
+      ],
+      [],
+      [{ input_id: "asset-2", status: "running" }],
+    );
+    const [one, two] = masters[0]!.assets;
+    expect(one!.cut.status).not.toBe("running");
+    expect(two!.cut.status).toBe("running");
   });
 });

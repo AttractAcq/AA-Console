@@ -1,5 +1,6 @@
 import { DataTable } from "./DataTable";
 import { ApprovalActions } from "./ApprovalActions";
+import { RequestCutButton } from "./RequestCutButton";
 import { StatusBadge } from "./MediaCard";
 import { REVIEW_TONE } from "../lib/media";
 import { cn } from "../lib/cn";
@@ -113,6 +114,12 @@ export function ReelShotGrid({
                       onError={onError}
                     />
                   )}
+                  <RequestCutButton
+                    assetId={asset.id}
+                    state={asset.cut}
+                    onRequested={onChanged}
+                    onError={onError}
+                  />
                 </div>
                 {shotTable(asset.shots.length > 0 ? asset.shots : master.plannedShots)}
               </div>

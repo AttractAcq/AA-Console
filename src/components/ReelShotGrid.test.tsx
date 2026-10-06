@@ -48,6 +48,7 @@ describe("ReelShotGrid", () => {
                 refNumber: "MD-1",
                 reviewStatus: "pending",
                 shots: master().plannedShots,
+                cut: { status: "incomplete" as const, detail: "0 of 1 clips on file.", canRequest: true },
               },
             ],
           }),
