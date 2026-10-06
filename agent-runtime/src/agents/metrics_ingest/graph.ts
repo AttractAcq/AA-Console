@@ -27,10 +27,16 @@ const PAID_FIELDS = [
   "actions",
 ].join(",");
 
+// `impressions` was removed from Instagram insights in the 2024 Graph API and
+// replaced by `views`; asking for it now fails the whole request with
+// "(#100) metric[0] must be one of the following values: reach,
+// follower_count, website_clicks, profile_views, online_followers,
+// accounts_engaged, total_interactions, ...". Observed on 6 October against
+// the live account: the token was fine and the metric name was not.
 const IG_MEDIA_FIELDS =
-  "id,caption,media_type,permalink,timestamp,insights.metric(impressions,reach,total_interactions)";
+  "id,caption,media_type,permalink,timestamp,insights.metric(views,reach,total_interactions)";
 
-const ACCOUNT_METRICS = "impressions,reach,total_interactions";
+const ACCOUNT_METRICS = "views,reach,total_interactions";
 
 /**
  * Meta's error codes, mapped to whether trying again could plausibly work.
