@@ -23,6 +23,7 @@ import { anthropicKeyForAgent, type RuntimeConfig } from "../../config.js";
 import type { AgentRow } from "../../orchestration/registry.js";
 import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
+import { handOffToSlot } from "../../engine/slot.js";
 import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { OpenAiError, runStructuredCompletion } from "../../tools/openai.js";
@@ -1021,6 +1022,9 @@ Call ${submitTool.name} once when you are done.`;
         ? `Filed ${frames.length} opening stills for the reel. Motion was not called.`
         : `Filed a ${typed.content_format} of ${frames.length} frames, awaiting approval.`,
     );
+    // A reel's opening stills are not the finished asset: video_build still
+    // has to animate them, so the slot stays at building for it.
+    if (!openingShots) await handOffToSlot(sb, job, "creative_build");
     return { ok: true, retryable: false, usage };
   }
 
@@ -1139,6 +1143,7 @@ Call ${submitTool.name} once when you are done.`;
       ? "Image rendered and filed under the client's assets, awaiting review."
       : "Re-render complete, filed alongside the earlier ones.",
   );
+  await handOffToSlot(sb, job, "creative_build");
   return { ok: true, retryable: false, usage };
 }
 
