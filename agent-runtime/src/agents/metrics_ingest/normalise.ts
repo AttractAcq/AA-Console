@@ -130,7 +130,7 @@ export function normaliseOrganicPosts(rows: unknown[], asOf: string): MetricRow[
     if (typeof id !== "string") continue;
 
     const metric = blank("organic", "post", id, asOf, "cumulative", row);
-    metric.impressions = igMetric(row.insights, "impressions");
+    metric.impressions = igMetric(row.insights, "views") ?? igMetric(row.insights, "impressions");
     metric.reach = igMetric(row.insights, "reach");
     // Newer IG accounts report "total_interactions" where older ones
     // report "engagement"; take whichever is present.
@@ -172,7 +172,9 @@ export function normaliseOrganicAccount(
       (row.raw as unknown[]).push(point);
 
       const n = num(value.value);
-      if (metric.name === "impressions") row.impressions = n;
+      // `views` is what `impressions` was called before the 2024 API. Both
+      // are read, so a replay of older stored payloads still normalises.
+      if (metric.name === "impressions" || metric.name === "views") row.impressions = n;
       else if (metric.name === "reach") row.reach = n;
       else if (metric.name === "accounts_engaged" || metric.name === "total_interactions") {
         row.engagements = n;

@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { advanceSlot, failSlot, isEngineJob, loadSlot, slotIdOf, SLOT_IDEA_COUNT } from "./slot.js";
+import {
+  advanceSlot,
+  failSlot,
+  handOffToSlot,
+  isEngineJob,
+  loadSlot,
+  slotIdOf,
+  SLOT_IDEA_COUNT,
+} from "./slot.js";
 import type { AgentJobRow } from "../queue.js";
 
 const job = (params: unknown, clientId: string | null = "c1"): AgentJobRow =>
@@ -141,5 +149,51 @@ describe("how many ideas a slot asks for", () => {
     // for all of them.
     expect(SLOT_IDEA_COUNT).toBeGreaterThanOrEqual(3);
     expect(SLOT_IDEA_COUNT).toBeLessThanOrEqual(5);
+  });
+});
+
+describe("handOffToSlot", () => {
+  function sb(asset: { id: string } | null) {
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    const maybeSingle = vi.fn().mockResolvedValue({ data: asset, error: null });
+    const client = {
+      rpc,
+      from: () => ({
+        select: () => ({ eq: () => ({ order: () => ({ limit: () => ({ maybeSingle }) }) }) }),
+      }),
+    };
+    return { client, rpc, maybeSingle };
+  }
+
+  const buildJob = (params: unknown) =>
+    ({ id: "j1", client_id: "c1", params, input_table: "client_briefs", input_id: "brief-1" }) as unknown as AgentJobRow;
+
+  it("finds the asset by the brief the job was pointed at, and moves the slot", async () => {
+    const { client, rpc } = sb({ id: "asset-1" });
+    await handOffToSlot(client as never, buildJob({ slot_id: "s1" }), "creative_build");
+    expect(rpc).toHaveBeenCalledWith(
+      "advance_slot",
+      expect.objectContaining({
+        p_slot_id: "s1",
+        p_to_stage: "copywriting",
+        p_asset_id: "asset-1",
+        p_agent_key: "creative_build",
+      }),
+    );
+  });
+
+  it("does nothing for a hand run, which has no slot", async () => {
+    const { client, rpc, maybeSingle } = sb({ id: "asset-1" });
+    await handOffToSlot(client as never, buildJob({}), "creative_build");
+    expect(rpc).not.toHaveBeenCalled();
+    expect(maybeSingle).not.toHaveBeenCalled();
+  });
+
+  it("leaves the slot where it is when the build produced no asset", async () => {
+    // Moving it on to be written about would mean writing copy about
+    // nothing. Staying put keeps the failure visible on the board.
+    const { client, rpc } = sb(null);
+    await handOffToSlot(client as never, buildJob({ slot_id: "s1" }), "creative_build");
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

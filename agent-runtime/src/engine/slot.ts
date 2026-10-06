@@ -147,3 +147,45 @@ export async function failSlot(
     // Deliberately quiet. See above.
   }
 }
+
+/**
+ * Tell the slot the asset exists, and send it on to be written about.
+ *
+ * The builders create assets by several internal routes — a fresh build, a
+ * re-render, a reel's opening stills — and threading an id out of each one
+ * would mean editing every path and remembering the next. The asset is
+ * already joined to the brief, and the brief is what the job was pointed at,
+ * so the newest asset for that brief is the one this run produced.
+ *
+ * Does nothing for a job with no slot, which is every hand run.
+ */
+export async function handOffToSlot(
+  sb: SupabaseClient,
+  job: AgentJobRow,
+  agentKey: string,
+): Promise<void> {
+  const slotId = slotIdOf(job);
+  if (!slotId || !job.input_id) return;
+
+  const { data } = await sb
+    .from("client_media_assets")
+    .select("id")
+    .eq("brief_id", job.input_id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const assetId = (data as { id?: string } | null)?.id;
+  if (!assetId) {
+    // No asset means the build did not produce one. Leaving the slot where
+    // it is keeps that visible rather than moving it on to be written about.
+    return;
+  }
+
+  await advanceSlot(sb, slotId, "copywriting", {
+    agentKey,
+    jobId: job.id,
+    assetId,
+    note: "Asset built.",
+  });
+}

@@ -16,6 +16,7 @@ import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
+import { advanceSlot, loadSlot, type SlotContext } from "../../engine/slot.js";
 import { loadUpstreamRecords } from "../shared.js";
 import { briefSubmitTool, composeBody, composeAvatarBody, composeEditorBody, briefColumns, fieldsFor, framePlanColumns } from "./fields.js";
 import { isMultiFrame } from "../../content/format.js";
@@ -41,26 +42,65 @@ export async function runBriefJob(
     };
   }
 
+  // The engine points this job at a slot, not at an idea: the slot is what
+  // the tick knows about, and the idea is whatever the selector chose for it.
+  // A person pressing the button still points it straight at an idea.
+  let slot: SlotContext | null = null;
+  try {
+    slot = await loadSlot(sb, job);
+  } catch (error) {
+    return {
+      ok: false,
+      retryable: false,
+      failureMessage: error instanceof Error ? error.message : String(error),
+    };
+  }
+  if (slot && !slot.idea_id) {
+    return {
+      ok: false,
+      retryable: false,
+      failureMessage: "This slot has no chosen idea, so there is nothing to write a brief from.",
+    };
+  }
+  const ideaId = slot?.idea_id ?? job.input_id;
+
   // A completed insert may outlive a crashed worker. Reuse it on retry and
   // avoid paying for another model call. The unique index is the final guard
   // if two attempts reach persistence concurrently.
-  const alreadyPersisted = async (): Promise<boolean> => {
+  const persistedBriefId = async (): Promise<string | null> => {
     const { data, error } = await sb.from("client_briefs")
       .select("id, client_id, source_idea_id")
       .eq("job_id", job.id).is("repurpose_format", null).maybeSingle();
     if (error) throw new Error(`Failed to check existing brief: ${error.message}`);
-    if (!data) return false;
-    if (data.client_id !== job.client_id || data.source_idea_id !== job.input_id) {
+    if (!data) return null;
+    if (data.client_id !== job.client_id || data.source_idea_id !== ideaId) {
       throw new Error("Existing brief does not match this job's input.");
     }
-    return true;
+    return String(data.id);
   };
-  if (await alreadyPersisted()) return { ok: true, retryable: false };
+
+  /** Tell the slot the brief exists. A hand run has no slot and skips it. */
+  const handOff = async (briefId: string | null) => {
+    if (!slot || !briefId) return;
+    await advanceSlot(sb, slot.id, "building", {
+      agentKey: agent.agent_key,
+      jobId: job.id,
+      briefId,
+      note: "Brief written.",
+    });
+  };
+
+  const existing = await persistedBriefId();
+  if (existing) {
+    // The brief survived a crashed worker. The slot may not have been told.
+    await handOff(existing);
+    return { ok: true, retryable: false };
+  }
 
   const { data: idea, error: ideaError } = await sb
     .from("client_ideas")
     .select("id, title, body, media_type, content_territory, source_question, strategic_reason, content_format")
-    .eq("id", job.input_id)
+    .eq("id", ideaId)
     .maybeSingle();
   if (ideaError) throw new Error(`Failed to load idea: ${ideaError.message}`);
   if (!idea) {
@@ -250,11 +290,12 @@ Call ${submitTool.name} once when you are done.`;
   if (error) {
     // Only accept a uniqueness conflict when the expected output exists.
     // Never overwrite an existing brief (including a human-edited one).
-    if (error.code !== "23505" || !(await alreadyPersisted())) {
+    if (error.code !== "23505" || !(await persistedBriefId())) {
       throw new Error(`Failed to write brief: ${error.message}`);
     }
   }
 
   await appendEvent(sb, job.id, `Wrote brief "${title}".`, "info", { cost_usd: usage.costUsd });
+  await handOff(await persistedBriefId());
   return { ok: true, retryable: false, usage };
 }

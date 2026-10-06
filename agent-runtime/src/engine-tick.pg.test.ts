@@ -37,6 +37,31 @@ const tick = (now = MONDAY) =>
     notes: Array<{ reason: string; client_id?: string }>;
   }>(`select * from engine_tick(timestamptz '${now}')`);
 
+
+/**
+ * Walk a slot to a stage, carrying the ids that stage's work produces.
+ *
+ * A real slot at `building` always has a brief, because the brief agent is
+ * what put it there. Advancing without one used to be harmless; since the
+ * tick points each agent at the input it expects, a slot missing that input
+ * is correctly refused, so the fixtures have to be as complete as the real
+ * thing.
+ */
+async function carryTo(slot: string, stage: "idea_selected" | "building") {
+  const { id: idea } = await one<{ id: string }>(`insert into client_ideas default values returning id`);
+  await db.exec(
+    `select advance_slot('${slot}', 'idea_selected'::slot_stage, 'agent', null, null, null, null, '${idea}')`,
+  );
+  if (stage === "idea_selected") return { idea, brief: null };
+
+  const { id: brief } = await one<{ id: string }>(`insert into client_briefs default values returning id`);
+  await db.exec(`select advance_slot('${slot}', 'briefing'::slot_stage, 'engine')`);
+  await db.exec(
+    `select advance_slot('${slot}', 'building'::slot_stage, 'agent', null, null, null, null, null, '${brief}')`,
+  );
+  return { idea, brief };
+}
+
 const jobs = () =>
   all<{ agent_key: string; slot_id: string; status: string }>(
     `select agent_key, params->>'slot_id' as slot_id, status::text as status from agent_jobs order by created_at`,
@@ -109,7 +134,9 @@ beforeAll(async () => {
     create table client_engine_budgets (
       client_id uuid references clients(id) on delete cascade, month date, cap_usd numeric,
       primary key (client_id, month));
-    create table client_ideas (id uuid primary key default gen_random_uuid());
+    create table client_ideas (id uuid primary key default gen_random_uuid(),
+      client_id uuid, slot_id uuid, title text, status text default 'draft',
+      archived_at timestamptz, created_at timestamptz default now());
     create table client_briefs (id uuid primary key default gen_random_uuid());
     create table client_media_assets (id uuid primary key default gen_random_uuid(), title text);
     create table scheduled_posts (
@@ -167,6 +194,8 @@ beforeAll(async () => {
     "20261005230000_147_content_slots.sql",
     "20261006020000_149_plan_slots.sql",
     "20261006040000_150_engine_tick.sql",
+    "20261006060000_151_ideas_know_their_slot.sql",
+    "20261006140000_155_tick_queues_the_right_input.sql",
   ]) {
     await db.exec(await migration(file));
   }
@@ -316,9 +345,7 @@ describe("running again", () => {
     await tick();
     const { id } = await one<{ id: string }>(`select id from content_slots limit 1`);
     await db.exec(`update agent_jobs set status = 'completed'`);
-    await db.exec(`select advance_slot('${id}', 'idea_selected'::slot_stage, 'agent')`);
-    await db.exec(`select advance_slot('${id}', 'briefing'::slot_stage, 'engine')`);
-    await db.exec(`select advance_slot('${id}', 'building'::slot_stage, 'agent')`);
+    await carryTo(id, "building");
 
     // First tick queues the build.
     expect((await tick()).jobs_queued).toBe(1);
@@ -336,7 +363,7 @@ describe("running again", () => {
     const { id } = await one<{ id: string }>(`select id from content_slots limit 1`);
     // The ideation job finishes and selection picks an idea.
     await db.exec(`update agent_jobs set status = 'completed'`);
-    await db.exec(`select advance_slot('${id}', 'idea_selected'::slot_stage, 'agent')`);
+    await carryTo(id, "idea_selected");
 
     expect((await tick()).jobs_queued).toBe(1);
     const latest = (await jobs()).at(-1)!;
@@ -359,9 +386,7 @@ describe("the pipeline table", () => {
     await tick();
     await db.exec(`update agent_jobs set status = 'completed'`);
     const slot = await one<{ id: string }>(`select id from content_slots limit 1`);
-    await db.exec(`select advance_slot('${slot.id}', 'idea_selected'::slot_stage, 'agent')`);
-    await db.exec(`select advance_slot('${slot.id}', 'briefing'::slot_stage, 'engine')`);
-    await db.exec(`select advance_slot('${slot.id}', 'building'::slot_stage, 'agent')`);
+    await carryTo(slot.id, "building");
 
     await db.exec(`update agent_jobs set status = 'completed'`);
     await db.exec(`update content_slots set format = 'single' where id = '${slot.id}'`);
@@ -381,9 +406,8 @@ describe("the pipeline table", () => {
     await tick();
     const { id } = await one<{ id: string }>(`select id from content_slots limit 1`);
     await db.exec(`update agent_jobs set status = 'completed'`);
-    for (const stage of ["idea_selected", "briefing", "building", "copywriting"]) {
-      await db.exec(`select advance_slot('${id}', '${stage}'::slot_stage, 'agent')`);
-    }
+    await carryTo(id, "building");
+    await db.exec(`select advance_slot('${id}', 'copywriting'::slot_stage, 'agent')`);
     const run = await tick();
     expect(run.jobs_queued).toBe(0);
     expect(
@@ -469,10 +493,93 @@ describe("the schedule", () => {
   });
 
   it("is registered exactly once, so re-applying does not double it", async () => {
+    // Re-applying 150 alone would leave engine_tick at its 150 definition for
+    // every test after this one — 155 replaces that function. A real re-run
+    // replays the migrations in order, so this does too.
     await db.exec(await migration("20261006040000_150_engine_tick.sql"));
+    await db.exec(await migration("20261006140000_155_tick_queues_the_right_input.sql"));
     const { n } = await one<{ n: number }>(
       `select count(*)::int as n from cron.job where jobname = 'engine-tick'`,
     );
     expect(n).toBe(1);
+  });
+});
+
+describe("pointing each agent at what it expects", () => {
+  beforeEach(async () => {
+    await db.exec(`select set_engine_running(true)`);
+  });
+
+  async function slotAt(stage: "idea_selected" | "building", opts: { brief?: boolean } = {}) {
+    await readyClient(CLIENT, { cap: 100, perWeek: 1 });
+    await tick();
+    const { id } = await one<{ id: string }>(`select id from content_slots limit 1`);
+    await db.exec(`update agent_jobs set status = 'completed'`);
+    if (stage === "idea_selected") {
+      const { idea } = await carryTo(id, "idea_selected");
+      return { slot: id, idea, brief: null };
+    }
+    if (opts.brief === false) {
+      // Deliberately incomplete: a slot at building with no brief.
+      const { idea } = await carryTo(id, "idea_selected");
+      await db.exec(`select advance_slot('${id}', 'briefing'::slot_stage, 'engine')`);
+      await db.exec(`select advance_slot('${id}', 'building'::slot_stage, 'agent')`);
+      return { slot: id, idea, brief: null };
+    }
+    const { idea, brief } = await carryTo(id, "building");
+    return { slot: id, idea, brief };
+  }
+
+  it("hands the brief agent an idea, not a slot", async () => {
+    // The brief agent reads client_ideas by input_id. Handed a slot id it
+    // reported "That idea no longer exists" and the chain stopped there.
+    const { idea } = await slotAt("idea_selected");
+    await tick();
+    const job = (await jobs()).at(-1)!;
+    const row = await one<{ input_table: string; input_id: string }>(
+      `select input_table, input_id from agent_jobs order by created_at desc limit 1`,
+    );
+    expect(job.agent_key).toBe("brief");
+    expect(row).toMatchObject({ input_table: "client_ideas", input_id: idea });
+  });
+
+  it("hands a builder a brief, not a slot", async () => {
+    const { brief } = await slotAt("building");
+    await tick();
+    const row = await one<{ agent_key: string; input_table: string; input_id: string }>(
+      `select agent_key, input_table, input_id from agent_jobs order by created_at desc limit 1`,
+    );
+    expect(row).toMatchObject({
+      agent_key: "creative_build",
+      input_table: "client_briefs",
+      input_id: brief,
+    });
+  });
+
+  it("still puts the slot in params, so the hand-off back works", async () => {
+    const { slot } = await slotAt("building");
+    await tick();
+    const row = await one<{ slot_id: string }>(
+      `select params->>'slot_id' as slot_id from agent_jobs order by created_at desc limit 1`,
+    );
+    expect(row.slot_id).toBe(slot);
+  });
+
+  it("points an engine-native agent at the slot itself", async () => {
+    await readyClient(CLIENT, { cap: 100, perWeek: 1 });
+    await tick();
+    const row = await one<{ agent_key: string; input_table: string }>(
+      `select agent_key, input_table from agent_jobs order by created_at desc limit 1`,
+    );
+    expect(row).toMatchObject({ agent_key: "ideation", input_table: "content_slots" });
+  });
+
+  it("queues nothing, and says why, when the id the stage needs is missing", async () => {
+    // A slot at building with no brief would hand the builder a null and
+    // get back a failure that blames the builder.
+    await slotAt("building", { brief: false });
+    const run = await tick();
+    expect(run.jobs_queued).toBe(0);
+    expect(JSON.stringify(run.notes)).toMatch(/has no brief_id/);
   });
 });

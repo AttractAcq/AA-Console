@@ -19,6 +19,7 @@ import type { RuntimeConfig } from "../../config.js";
 import type { AgentRow } from "../../orchestration/registry.js";
 import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
+import { handOffToSlot } from "../../engine/slot.js";
 import { appendEvent } from "../../queue.js";
 import { isPhase1FormatCode, parseStoredShotPlan, serializeShot, type ShotPlanEntry } from "../brief/shots.js";
 import { assemblyHandoff } from "./assembly.js";
@@ -430,6 +431,10 @@ export async function runVideoBuildJob(
       p_input_id: brief.id,
       p_after_seconds: followUp.pollAfterSeconds,
       p_description: "Scheduled: collect the Higgsfield clips",
+      // The slot comes with it. Without this the follow-up is invisible to
+      // slot_has_job_in_flight, and an hour later the tick starts a second
+      // build while these clips are still rendering and already paid for.
+      p_params: job.params ?? {},
     });
     if (scheduleError) {
       // Nothing will collect them if this did not land, so say so loudly and
@@ -440,8 +445,11 @@ export async function runVideoBuildJob(
       await appendEvent(sb, job.id, message, "error", { creative_stage: "motion", reason: "follow_up_unscheduled" });
       return failed(message, true);
     }
+    // Deliberately no hand-off: the clips are still rendering, so the slot
+    // stays at building and the scheduled follow-up is what moves it on.
     return { ok: true, retryable: false };
   }
 
+  await handOffToSlot(sb, job, "video_build");
   return { ok: true, retryable: false };
 }

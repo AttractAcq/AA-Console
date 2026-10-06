@@ -155,3 +155,38 @@ describe("organic account normalisation", () => {
     expect(rows.map((r) => r.metric_date)).toEqual(["2026-09-03"]);
   });
 });
+
+/**
+ * Instagram renamed `impressions` to `views` in the 2024 Graph API, and
+ * asking for the old name fails the whole request rather than omitting one
+ * column. Observed against the live account on 6 October: the token was
+ * fine, the metric name was not.
+ *
+ * Both names are read, because stored payloads from before the rename are
+ * still worth normalising if anything replays them.
+ */
+describe("the rename of impressions to views", () => {
+  const point = (name: string, value: number) => ({
+    name,
+    period: "day",
+    values: [{ value, end_time: "2026-10-05T07:00:00+0000" }],
+  });
+
+  it("reads views as impressions", () => {
+    const rows = normaliseOrganicAccount(
+      [point("views", 120), point("reach", 90)],
+      "acct-1",
+      { since: "2026-10-01", until: "2026-10-10" },
+    );
+    expect(rows[0]).toMatchObject({ impressions: 120, reach: 90 });
+  });
+
+  it("still reads the old name, so a replay of an older payload works", () => {
+    const rows = normaliseOrganicAccount(
+      [point("impressions", 55)],
+      "acct-1",
+      { since: "2026-10-01", until: "2026-10-10" },
+    );
+    expect(rows[0]).toMatchObject({ impressions: 55 });
+  });
+});
