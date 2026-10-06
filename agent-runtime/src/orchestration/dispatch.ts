@@ -30,6 +30,7 @@ import { runVideoEditJob } from "../agents/video_edit/index.js";
 import { runIdeaSelectJob } from "../agents/idea_select/index.js";
 import { runCopywriterJob } from "../agents/copywriter/index.js";
 import { runTokenHealthJob } from "../agents/token_health/index.js";
+import { runQaJob } from "../agents/qa/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
 import { runRepurposeJob } from "../agents/repurpose/index.js";
@@ -102,6 +103,7 @@ const RUNNERS: Record<string, JobRunner> = {
   idea_select: runIdeaSelectJob,
   copywriter: runCopywriterJob,
   token_health: runTokenHealthJob,
+  qa: runQaJob,
   brief_dispatch: runBriefDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
   // a person in Ads Manager.

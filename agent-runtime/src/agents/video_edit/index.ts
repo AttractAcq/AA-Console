@@ -38,7 +38,7 @@ import {
 import { probeDurationSec, render, renderCapability, sampleFrames } from "./media.js";
 import { installFont } from "./font.js";
 import { planEdit, type PlanClip } from "./plan.js";
-import { buildRenderPlan } from "./render.js";
+import { buildRenderPlan, OUTPUT_HEIGHT, OUTPUT_WIDTH } from "./render.js";
 
 const BUCKET = "client-media";
 /** Enough to read the cut without paying for every frame of it. */
@@ -256,7 +256,16 @@ async function cut(
 
   const { error: saveError } = await sb
     .from("client_media_assets")
-    .update({ edit_plan: edl as unknown as Record<string, unknown>, render_path: storagePath })
+    .update({
+      edit_plan: edl as unknown as Record<string, unknown>,
+      render_path: storagePath,
+      // The shape of what was just rendered. QA checks aspect ratio and
+      // duration, and this is the only moment either is known for certain —
+      // afterwards they would have to be probed back out of the file.
+      width: OUTPUT_WIDTH,
+      height: OUTPUT_HEIGHT,
+      duration_sec: Number(renderPlan.durationSec.toFixed(2)),
+    })
     .eq("id", asset.id);
   if (saveError) throw new Error(`Could not file the cut: ${saveError.message}`);
 
