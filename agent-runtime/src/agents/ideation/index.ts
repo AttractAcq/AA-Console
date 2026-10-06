@@ -31,6 +31,7 @@ import { logger } from "../../logging/logger.js";
 import { ideaSource, pillarBrief, pillarFields, type PillarScope } from "../../pillars/scope.js";
 import { coerceFormat } from "../../content/format.js";
 import type { ContentFormat } from "../../content/format.js";
+import { loadSlot, SLOT_IDEA_COUNT, type SlotContext } from "../../engine/slot.js";
 
 const DEFAULT_IDEA_COUNT = 25;
 
@@ -109,6 +110,20 @@ export async function runIdeationJob(
     return { ok: false, retryable: false, failureMessage: "Ideation jobs require a client." };
   }
 
+  // The engine asks for ideas for one slot: one pillar, one format, a
+  // handful of candidates for the selector to choose between. A person
+  // asking for ideas gets the bank they have always got.
+  let slot: SlotContext | null = null;
+  try {
+    slot = await loadSlot(sb, job);
+  } catch (error) {
+    return {
+      ok: false,
+      retryable: false,
+      failureMessage: error instanceof Error ? error.message : String(error),
+    };
+  }
+
   const records = await loadUpstreamRecords(sb, job.client_id, [
     "icp",
     "brand_strategy",
@@ -164,11 +179,12 @@ export async function runIdeationJob(
   // fills a pillar, which is a different job with a different shape.
   let pillar: PillarScope | null = null;
   let siblings: PillarScope[] = [];
-  if (job.input_table === "client_content_pillars" && job.input_id) {
+  const pillarId = slot?.pillar_id ?? (job.input_table === "client_content_pillars" ? job.input_id : null);
+  if (pillarId) {
     const { data } = await sb
       .from("client_content_pillars")
       .select("id, name, premise, belongs, does_not_belong, active")
-      .eq("id", job.input_id)
+      .eq("id", pillarId)
       .maybeSingle();
     if (!data) {
       return {
@@ -213,7 +229,14 @@ export async function runIdeationJob(
   }
 
   const configured = Number((agent.config as { idea_count?: unknown })?.idea_count);
-  const ideaCount = Number.isFinite(configured) && configured > 0 ? Math.min(configured, 60) : DEFAULT_IDEA_COUNT;
+  // A slot needs a few candidates to choose between, not a bank. Twenty-five
+  // ideas for one post is twenty-one ideas nobody reads and a bill for all
+  // of them, and the selector is choosing by score rather than by stamina.
+  const ideaCount = slot
+    ? SLOT_IDEA_COUNT
+    : Number.isFinite(configured) && configured > 0
+      ? Math.min(configured, 60)
+      : DEFAULT_IDEA_COUNT;
 
   const submitTool = {
     name: "submit_ideas",
@@ -276,14 +299,20 @@ ${pack.icpSummary}
 ${pack.offer ? `\nOFFER — what is ultimately being sold\n${pack.offer}` : ""}
 ${proof ? `\nPROOF ON FILE — the only proof you may reference\n${proof}` : "\nPROOF ON FILE\nNone. Do not reference any proof, results or figures."}
 ${seededProof ? `\nSEED THIS RUN FROM THIS PROOF ITEM SPECIFICALLY\n${seededProof}\nAt least half the ideas should build on it.` : ""}
-${pillar ? `\n${pillarBrief(pillar, siblings)}` : ""}
+${pillar ? `\n${pillarBrief(pillar, siblings)}` : ""}${
+    slot
+      ? `\nTHE SLOT THIS IS FOR\nThis is for one post, going out on ${slot.platform} as a ${slot.format}. Every idea must work in that shape: do not propose an idea whose point only lands as something else. The shape is already decided and is not yours to change.`
+      : ""
+  }
 
 Call ${submitTool.name} once when you are done.`;
 
   await appendEvent(
     sb,
     job.id,
-    `Generating ${ideaCount} ideas from the question universe${pillar ? ` within "${pillar.name}"` : ""}${seededProof ? ", seeded from one proof item" : ""}.`,
+    slot
+      ? `Generating ${ideaCount} ${slot.format} ideas for the ${slot.platform} slot${pillar ? ` within "${pillar.name}"` : ""}.`
+      : `Generating ${ideaCount} ideas from the question universe${pillar ? ` within "${pillar.name}"` : ""}${seededProof ? ", seeded from one proof item" : ""}.`,
   );
 
   let result;
@@ -347,7 +376,10 @@ Call ${submitTool.name} once when you are done.`;
     };
   }
 
-  const source = ideaSource(job.input_table);
+  // A slot run is scoped to a pillar, so that is what it is. The engine
+  // showing up in this column would be a fourth kind of source that means
+  // the same as the third.
+  const source = slot ? "pillar" : ideaSource(job.input_table);
   const { error } = await sb.from("client_ideas").insert(
     valid.map((idea) => ({
       client_id: job.client_id,
@@ -357,9 +389,13 @@ Call ${submitTool.name} once when you are done.`;
       source_question: idea.source_question,
       strategic_reason: idea.strategic_reason || null,
       media_type: idea.media_type,
-      content_format: idea.content_format,
+      // The slot's format wins. The planner chose it from the client's mix
+      // and the calendar; an idea that arrives as something else is the
+      // model having a view about a decision already taken.
+      content_format: slot ? slot.format : idea.content_format,
       source,
       job_id: job.id,
+      slot_id: slot?.id ?? null,
       proof_id: job.input_table === "client_proof_assets" ? job.input_id : null,
     })),
   );

@@ -2110,6 +2110,111 @@ export type Database = {
           },
         ]
       }
+      client_engine_platforms: {
+        Row: {
+          active: boolean
+          client_id: string
+          created_at: string
+          platform: Database["public"]["Enums"]["post_platform"]
+          posts_per_week: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          client_id: string
+          created_at?: string
+          platform: Database["public"]["Enums"]["post_platform"]
+          posts_per_week?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          client_id?: string
+          created_at?: string
+          platform?: Database["public"]["Enums"]["post_platform"]
+          posts_per_week?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      client_engine_settings: {
+        Row: {
+          approval_mode: string
+          auto_approve_briefs: boolean
+          auto_approve_ideas: boolean
+          client_id: string
+          created_at: string
+          enabled: boolean
+          enabled_at: string | null
+          enabled_by: string | null
+          format_mix: Json
+          max_jobs_in_flight: number
+          min_qa_score: number
+          plan_horizon_days: number
+          updated_at: string
+        }
+        Insert: {
+          approval_mode?: string
+          auto_approve_briefs?: boolean
+          auto_approve_ideas?: boolean
+          client_id: string
+          created_at?: string
+          enabled?: boolean
+          enabled_at?: string | null
+          enabled_by?: string | null
+          format_mix?: Json
+          max_jobs_in_flight?: number
+          min_qa_score?: number
+          plan_horizon_days?: number
+          updated_at?: string
+        }
+        Update: {
+          approval_mode?: string
+          auto_approve_briefs?: boolean
+          auto_approve_ideas?: boolean
+          client_id?: string
+          created_at?: string
+          enabled?: boolean
+          enabled_at?: string | null
+          enabled_by?: string | null
+          format_mix?: Json
+          max_jobs_in_flight?: number
+          min_qa_score?: number
+          plan_horizon_days?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      client_engine_windows: {
+        Row: {
+          client_id: string
+          created_at: string
+          ends_at: string
+          id: string
+          platform: Database["public"]["Enums"]["post_platform"] | null
+          starts_at: string
+          weekday: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          ends_at: string
+          id?: string
+          platform?: Database["public"]["Enums"]["post_platform"] | null
+          starts_at: string
+          weekday: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          ends_at?: string
+          id?: string
+          platform?: Database["public"]["Enums"]["post_platform"] | null
+          starts_at?: string
+          weekday?: number
+        }
+        Relationships: []
+      }
       client_media_assets: {
         Row: {
           ad_cta: string | null
@@ -4733,6 +4838,23 @@ export type Database = {
       }
     }
     Views: {
+      engine_readiness: {
+        Row: {
+          active_pillars: number | null
+          active_platforms: number | null
+          approval_mode: string | null
+          client_id: string | null
+          client_name: string | null
+          enabled: boolean | null
+          month_cap_usd: number | null
+          plan_horizon_days: number | null
+          posting_windows: number | null
+          posts_per_week: number | null
+          readiness: string | null
+          timezone: string | null
+        }
+        Relationships: []
+      }
       post_copy_effective: {
         Row: {
           alt_text: string | null
@@ -6584,6 +6706,50 @@ export type Database = {
           p_source?: string
         }
         Returns: string
+      }
+      add_engine_window: {
+        Args: {
+          p_client_id: string
+          p_ends_at: string
+          p_platform?: Database["public"]["Enums"]["post_platform"]
+          p_starts_at: string
+          p_weekday: number
+        }
+        Returns: string
+      }
+      engine_is_enabled: {
+        Args: { p_client_id: string }
+        Returns: boolean
+      }
+      remove_engine_window: {
+        Args: { p_window_id: string }
+        Returns: undefined
+      }
+      set_engine_enabled: {
+        Args: { p_client_id: string; p_enabled: boolean }
+        Returns: Database["public"]["Tables"]["client_engine_settings"]["Row"]
+      }
+      set_engine_platform: {
+        Args: {
+          p_active?: boolean
+          p_client_id: string
+          p_platform: Database["public"]["Enums"]["post_platform"]
+          p_posts_per_week: number
+        }
+        Returns: undefined
+      }
+      set_engine_settings: {
+        Args: {
+          p_approval_mode?: string
+          p_auto_approve_briefs?: boolean
+          p_auto_approve_ideas?: boolean
+          p_client_id: string
+          p_format_mix?: Json
+          p_max_jobs_in_flight?: number
+          p_min_qa_score?: number
+          p_plan_horizon_days?: number
+        }
+        Returns: Database["public"]["Tables"]["client_engine_settings"]["Row"]
       }
       schedule_asset: {
         Args: {

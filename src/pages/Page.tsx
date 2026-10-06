@@ -34,6 +34,7 @@ import { ReelShotsPanel } from "./media/ReelShotsPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { OrganicPanel } from "./distribution/OrganicPanel";
 import { AssetsPanel } from "./distribution/AssetsPanel";
+import { EnginePanel } from "./distribution/EnginePanel";
 import { PaidPanel } from "./distribution/PaidPanel";
 import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "./sales/SalesOverviewPanel";
@@ -114,6 +115,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   },
   distribution: {
     "distribution-assets": () => <AssetsPanel />,
+    engine: () => <EnginePanel />,
     organic: () => <OrganicPanel />,
     paid: () => <PaidPanel />,
   },
