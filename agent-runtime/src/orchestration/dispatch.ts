@@ -31,6 +31,7 @@ import { runIdeaSelectJob } from "../agents/idea_select/index.js";
 import { runCopywriterJob } from "../agents/copywriter/index.js";
 import { runTokenHealthJob } from "../agents/token_health/index.js";
 import { runQaJob } from "../agents/qa/index.js";
+import { runPublisherJob } from "../agents/publisher/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
 import { runRepurposeJob } from "../agents/repurpose/index.js";
@@ -104,6 +105,12 @@ const RUNNERS: Record<string, JobRunner> = {
   copywriter: runCopywriterJob,
   token_health: runTokenHealthJob,
   qa: runQaJob,
+  // The end of the chain, and the only thing here that makes a client's
+  // account say something in public. Does nothing at all unless
+  // PUBLISH_ENABLED is on in this runtime AND publishing is on for that
+  // client: two switches, so turning it on for one account is not turning
+  // it on for every account.
+  publisher: runPublisherJob,
   brief_dispatch: runBriefDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
   // a person in Ads Manager.
