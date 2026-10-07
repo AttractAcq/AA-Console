@@ -1,12 +1,13 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { tables, inserted, updates, upload } = vi.hoisted(() => ({
+const { tables, inserted, updates, upload, rpc } = vi.hoisted(() => ({
   tables: new Map<string, unknown>(),
   inserted: [] as Array<{ table: string; row: Record<string, unknown> }>,
   updates: [] as Array<{ table: string; patch: Record<string, unknown> }>,
   upload: vi.fn(),
+  rpc: vi.fn(),
 }));
 
 vi.mock("../../../lib/supabase", () => ({
@@ -34,6 +35,7 @@ vi.mock("../../../lib/supabase", () => ({
       };
     },
     storage: { from: () => ({ upload }) },
+    rpc: (...args: unknown[]) => rpc(...args),
   },
 }));
 
@@ -45,6 +47,8 @@ const JOB_WITH_BRIEF = {
   due_date: "2026-09-30",
   compensation: 250,
   completed_at: null,
+  stage: "assigned",
+  stage_reason: null,
   client_id: "client-1",
   brief_id: "brief-1",
   clients: { name: "Harbour Dental" },
@@ -86,6 +90,8 @@ beforeEach(() => {
   tables.clear();
   inserted.length = 0;
   updates.length = 0;
+  rpc.mockReset();
+  rpc.mockResolvedValue({ data: null, error: null });
   upload.mockResolvedValue({ error: null });
 });
 
@@ -110,14 +116,31 @@ describe("delivering against a brief", () => {
     expect(inserted[0]?.row.title).toBe('"Natural For My Age" Is A Design Brief');
   });
 
-  // Otherwise a delivered job sits in the open queue forever and nobody can
-  // tell what is still outstanding.
-  it("closes the assignment on delivery", async () => {
+  // It used to write completed_at directly, which closed the job the instant
+  // a file arrived — while the asset was still unreviewed, and leaving a
+  // later rejection with nowhere to go.
+  it("marks the assignment delivered rather than done", async () => {
     show();
     await deliver(/Shade Guide Still/);
-    await waitFor(() => expect(updates).toHaveLength(1));
-    expect(updates[0]?.table).toBe("job_assignments");
-    expect(typeof updates[0]?.patch.completed_at).toBe("string");
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith(
+        "deliver_assignment",
+        expect.objectContaining({ p_assignment_id: "job-1" }),
+      ),
+    );
+    // Nothing writes the stage or completed_at by hand any more: a direct
+    // update is refused by trigger.
+    expect(updates).toHaveLength(0);
+  });
+
+  it("hands over the asset it just created, not a different one", async () => {
+    show();
+    await deliver(/Shade Guide Still/);
+    await waitFor(() => expect(inserted).toHaveLength(1));
+    const args = rpc.mock.calls.find((c) => c[0] === "deliver_assignment")![1] as {
+      p_asset_id: string;
+    };
+    expect(args.p_asset_id).toBe(inserted[0]!.row.id);
   });
 
   it("still delivers for a job with no brief attached", async () => {
@@ -165,13 +188,90 @@ describe("when something goes wrong", () => {
     expect(inserted).toHaveLength(0);
   });
 
-  // The file is delivered either way; a failure to close the job is worth
+  // The file is delivered either way; a failure to record it is worth
   // saying rather than swallowing, but it is not a failed delivery.
-  it("reports a delivery whose job could not be closed", async () => {
-    tables.set("job_assignments:updateError", { message: "denied" });
+  it("reports a delivery that could not be marked delivered", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "denied" } });
     show();
     await deliver(/Shade Guide Still/);
-    expect(await screen.findByText(/could not be marked done/i)).toBeInTheDocument();
+    expect(await screen.findByText(/could not be marked delivered/i)).toBeInTheDocument();
     expect(inserted).toHaveLength(1);
+  });
+});
+
+describe("the states an assignment can be in", () => {
+  const at = (stage: string, over: Record<string, unknown> = {}) => ({
+    ...JOB_WITH_BRIEF,
+    stage,
+    ...over,
+  });
+
+  it("offers accept and decline on new work, and nowhere else", async () => {
+    // An editor who could not take a job had no way to say so, and the
+    // agency found out when the due date passed.
+    show([at("assigned")]);
+    expect(await screen.findByRole("button", { name: "Accept" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Decline" })).toBeInTheDocument();
+  });
+
+  it("accepts through the named function, not a direct write", async () => {
+    // job_assignments.stage is written only by advance_assignment; a direct
+    // update is refused by trigger.
+    show([at("assigned")]);
+    await userEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("accept_assignment", { p_assignment_id: "job-1" }),
+    );
+    expect(updates).toHaveLength(0);
+  });
+
+  it("will not send a decline with no reason", async () => {
+    show([at("assigned")]);
+    await userEvent.click(await screen.findByRole("button", { name: "Decline" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Decline" })).toBeDisabled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("sends the decline with its reason", async () => {
+    show([at("assigned")]);
+    await userEvent.click(await screen.findByRole("button", { name: "Decline" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.type(within(dialog).getByRole("textbox"), "Away until the 14th.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Decline" }));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("decline_assignment", {
+        p_assignment_id: "job-1",
+        p_reason: "Away until the 14th.",
+      }),
+    );
+  });
+
+  it("says delivered work is with the reviewer, not that it is done", async () => {
+    show([at("delivered")]);
+    expect(await screen.findByText("With the reviewer")).toBeInTheDocument();
+    expect(screen.queryByText("Done")).not.toBeInTheDocument();
+  });
+
+  it("shows the reviewer's reason on work that needs another version", async () => {
+    // Before this there was nowhere for it to go: the assignment was
+    // already closed when the rejection arrived.
+    show([at("rework", { stage_reason: "The first three seconds are dead." })]);
+    expect(await screen.findByText("Needs another version")).toBeInTheDocument();
+    expect(screen.getByText("The first three seconds are dead.")).toBeInTheDocument();
+  });
+
+  it("counts rework as outstanding and delivered as not", async () => {
+    show([at("rework"), at("delivered", { id: "job-9", title: "Other" })]);
+    await screen.findByText("Needs another version");
+    // One of the two is still owed.
+    const open = screen.getByText("Open").parentElement;
+    expect(open).toHaveTextContent("1");
+  });
+
+  it("offers nothing to do on finished work", async () => {
+    show([at("approved")]);
+    expect(await screen.findByText("Done")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
   });
 });
