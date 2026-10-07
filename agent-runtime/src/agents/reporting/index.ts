@@ -14,6 +14,7 @@ import type { AgentJobRow } from "../../queue.js";
 import { createRecordAgent, type PromptArgs } from "../factory.js";
 import { renderContext, renderUpstream } from "../shared.js";
 import type { BusinessContext } from "../shared.js";
+import { formatComparison, priorWindow } from "./compare.js";
 
 const DEFAULT_DAYS = 30;
 
@@ -134,7 +135,12 @@ export function formatSummary(s: PeriodSummary): string {
   return lines.join("\n");
 }
 
-async function loadMetrics(
+/**
+ * Both windows, as prose for the prompt. Exported for its tests: whether the
+ * earlier period is fetched at all, and what happens when it is missing, is
+ * the whole of this feature.
+ */
+export async function loadMetrics(
   sb: SupabaseClient,
   job: AgentJobRow,
 ): Promise<{ text: string; block?: string }> {
@@ -158,14 +164,29 @@ async function loadMetrics(
   const until = new Date();
   const since = new Date(until.getTime() - days * 86_400_000);
 
-  const { data, error } = await sb.rpc("metrics_period_summary", {
-    p_client_id: job.client_id,
-    p_since: typeof params.since === "string" ? params.since : since.toISOString().slice(0, 10),
-    p_until: typeof params.until === "string" ? params.until : until.toISOString().slice(0, 10),
-  });
-  if (error) throw new Error(`Could not read metrics: ${error.message}`);
+  const windowSince = typeof params.since === "string" ? params.since : since.toISOString().slice(0, 10);
+  const windowUntil = typeof params.until === "string" ? params.until : until.toISOString().slice(0, 10);
+  const prior = priorWindow(windowSince, windowUntil);
 
-  const summary = data as PeriodSummary | null;
+  // Both windows in one round trip. The prior one is what makes "lead with
+  // the thing that changed" possible at all: the system prompt asks for
+  // that and forbids comparing to a period it was not given, and until now
+  // it was never given one.
+  const [current, before] = await Promise.all([
+    sb.rpc("metrics_period_summary", {
+      p_client_id: job.client_id,
+      p_since: windowSince,
+      p_until: windowUntil,
+    }),
+    sb.rpc("metrics_period_summary", {
+      p_client_id: job.client_id,
+      p_since: prior.since,
+      p_until: prior.until,
+    }),
+  ]);
+  if (current.error) throw new Error(`Could not read metrics: ${current.error.message}`);
+
+  const summary = current.data as PeriodSummary | null;
   if (!summary || summary.total_rows === 0) {
     return {
       text: "",
@@ -174,7 +195,20 @@ async function loadMetrics(
     };
   }
 
-  return { text: formatSummary(summary) };
+  // A failure to read the earlier window is not a failure of the job. The
+  // commentary is still worth writing without a trend, and refusing to
+  // write it would make a new feature able to break an old one.
+  const priorSummary = before.error ? null : (before.data as PeriodSummary | null);
+  if (!priorSummary || priorSummary.total_rows === 0) {
+    return {
+      text: `${formatSummary(summary)}
+
+=== THE PERIOD BEFORE THIS ONE ===
+Nothing was ingested for ${prior.since} to ${prior.until}, so there is no comparison to make. This is the first window with data rather than a rise from zero, and saying anything about a trend would be inventing one.`,
+    };
+  }
+
+  return { text: `${formatSummary(summary)}\n${formatComparison(summary, priorSummary)}` };
 }
 
 export const runReportingJob = createRecordAgent({
@@ -186,13 +220,14 @@ ARITHMETIC
 Every figure has been calculated for you and is in the summary. Use those numbers exactly as given. Do not compute a new total, average or rate that is not there — if you need one that is missing, say it is not available rather than working it out. A number you derived is a number nobody checked.
 
 WHAT MAKES THIS USEFUL
-- Lead with the thing that changed, not with a recap of what was done.
+- Lead with the thing that changed, not with a recap of what was done. The period before this one is in the summary, with every change already calculated — use those figures and do not work out any others.
 - A movement is only worth reporting if it is big enough to act on. Say plainly when something is noise, and say plainly when a window is too short or a spend too small for a rate to mean anything.
 - Name the specific campaign or post. "Video content performed well" is not a finding; "AA-ORG-016 carried 60% of the month's impressions" is.
 - Recommendations must follow from a figure in the summary. General marketing advice that would be true for any client is worse than saying nothing.
 
 HONESTY
-- Never invent a figure, a comparison to a previous period you were not given, or a benchmark.
+- Never invent a figure or a benchmark. Compare only against the earlier period's figures as given: where the summary says a comparison is not available — uneven coverage, no earlier data, a base too small for a percentage — say so plainly instead of reporting a difference.
+- Never compare individual posts across the two periods. Those figures are lifetime-to-date, so the difference between two snapshots is not what the post earned, and it is always positive.
 - If the data does not support a conclusion, the correct output is that it does not. An operator who reads a confident story into thin data will repeat it to the client.
 - Cumulative post figures are lifetime-to-date, not this period's. Never present them as if they were earned during the window.`,
 
