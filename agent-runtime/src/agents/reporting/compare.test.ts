@@ -186,11 +186,15 @@ describe("the comparison the prompt gets", () => {
 
 describe("the two halves refuse independently", () => {
   it("compares organic when paid cannot be compared", () => {
-    const paid = comparePaid(
-      summary(),
-      summary({ paid: { spend: 0, impressions: 0, clicks: 0, conversions: 0, days_covered: 0, currency: null } }),
-    );
-    const organic = compareOrganicAccount(summary(), summary());
+    const paid = comparePaid(summary().paid, {
+      spend: 0,
+      impressions: 0,
+      clicks: 0,
+      conversions: 0,
+      days_covered: 0,
+      currency: null,
+    });
+    const organic = compareOrganicAccount(summary().organic_account, summary().organic_account);
     expect(paid.refusal).not.toBeNull();
     expect(paid.deltas).toEqual([]);
     expect(organic.refusal).toBeNull();
