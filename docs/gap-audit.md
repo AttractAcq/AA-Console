@@ -12,8 +12,9 @@ than stale, and it is called out below.
 
 ## Where the build is
 
-Counts are staging unless stated. Staging is ahead of production by eleven
-migrations, which is the headline of this revision — see **Drift**.
+Counts are staging unless stated. Staging is ahead of production by
+**seventeen** migrations, which is the headline of this revision — see
+**Drift**. The engine does not exist on production at all.
 
 | Area | State | Checked by |
 |---|---|---|
@@ -23,23 +24,43 @@ migrations, which is the headline of this revision — see **Drift**.
 | Hosting | **Live.** Console at `console.attractacq.com`, runtime on Railway. | `/health` and `agent_runtime_status` |
 | RLS | **81 tables, all with RLS. 146 policies.** | `pg_class.relrowsecurity`, `pg_policies` |
 | Exposed functions | **Staging: no `SECURITY DEFINER` function is reachable by `anon`. Production: 21 are.** | `select * from security_definer_exposure` |
-| Schema in git | **174 migrations.** Staging has 157–167; production stops at 156. | `supabase/migrations/`, and a per-object comparison of the two databases |
+| Schema in git | **174 migrations.** Staging has all of them. Production's recorded history ends at **149**, plus 156 applied out of order. | `mcp list_migrations` against production, confirmed by `to_regclass` / `to_regprocedure` on objects from each missing migration |
 | Tests | **3,028** — 950 console, 2,078 runtime. | `npm test` in both packages |
-| Idea → brief → asset → scheduled → published | **Built end to end, and inert at the last step by design.** Both publishing switches are off. | Migrations 144–166; `publish_due` |
-| The one human gate | **Reachable.** Approvals → Engine calls `approve_slot`. | `src/pages/approvals/EngineInboxPanel.tsx` |
+| Idea → brief → asset → scheduled → published | **Built end to end on staging, and inert at the last step by design.** Both publishing switches are off. **Absent on production** — see Drift. | Migrations 144–167; `publish_due` |
+| The one human gate | **Reachable on staging.** Approvals → Engine calls `approve_slot`. | `src/pages/approvals/EngineInboxPanel.tsx` |
 | Reporting ingest | **Paid works; organic fails on one metric name.** Three paid pulls completed 6–7 Oct. | `agent_jobs` for `metrics_ingest`, and `client_integrations.status` |
 
 Agent spend to date, production: **$83.50**.
 
 ---
 
-## Drift: staging is eleven migrations ahead of production
+## Drift: staging is seventeen migrations ahead of production
 
-This is the thing to read first. Migrations 157–167 are applied to staging and
-not to production, and one of them is a security fix.
+This is the thing to read first, and the first draft of this revision got it
+wrong — it said eleven, on the assumption that production "stops at 156"
+because 156 is there. 156 is a one-function fix to `integration_secret` and
+applied cleanly out of order, which is exactly why it is misleading evidence.
+
+Asked properly — `list_migrations` against production — the recorded history
+ends at **149_plan_slots**, with 156 as the only later entry. Confirmed
+object by object: `engine_controls`, `slot_pipeline`, `engine_tick`,
+`engine_decisions`, `select_idea_for_slot`, `client_ideas.slot_id` and
+`slot_pipeline.input_table` are all absent.
+
+**So the engine does not exist on production.** Not "is switched off", not
+"has no work" — there is no tick, no pipeline table, no idea selection and no
+decision log. Everything from M3.3 onward lives only on staging. The console
+has an Engine panel that reads `engine_readiness`, which 146 did create, so
+the screen renders against a database that cannot run what it describes.
 
 | # | What it is | Why it matters that production lacks it |
 |---|---|---|
+| 150 | The engine tick | Nothing moves a slot. The engine cannot run. |
+| 151 | Ideas know their slot | Ideation output has nowhere to attach |
+| 152 | Idea selection and policy | No candidate can be chosen or auto-approved |
+| 153 | Copywriter | The engine cannot write per-platform copy |
+| 154 | Follow-up keeps its params | A rescheduled job loses its input |
+| 155 | Tick queues the right input | The tick would hand agents the wrong row |
 | 157 | Token health | An errored integration cannot clear itself |
 | 158 | QA | The engine has no gate before a person |
 | 159 | The approval inbox | An approved asset never reaches a calendar |
