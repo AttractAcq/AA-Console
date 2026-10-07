@@ -9,6 +9,7 @@ import { ACCESS_LEVEL_OPTIONS } from "../../lib/options";
 import { supabase } from "../../lib/supabase";
 import { SYNCING_PROVIDERS } from "../../lib/onboarding";
 import { cn } from "../../lib/cn";
+import { MetricsBackfill } from "../../components/MetricsBackfill";
 
 type Integration = {
   id: string;
@@ -264,9 +265,11 @@ export function IntegrationsPanel() {
         <p className="mt-3 text-xs text-muted-foreground">
           Daily sync runs at 03:15 UTC and re-pulls the last 7 days, because these numbers keep
           moving for about a week after the fact. Turning it off stops the schedule; you can still
-          run a pull by hand.
+          pull a window by hand below.
         </p>
       )}
+
+      {clientId && rows.some((r) => SYNCS[r.provider]) && <MetricsBackfill clientId={clientId} />}
 
       <FormModal
         open={adSettings !== null}
