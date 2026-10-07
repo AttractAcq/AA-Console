@@ -17,20 +17,25 @@ vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
   useParams,
 }));
-vi.mock("../../lib/supabase", () => ({
-  supabase: {
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: () => Promise.resolve({ data: null }),
-          order: () => Promise.resolve({ data: [] }),
-        }),
-        in: () => Promise.resolve({ data: [] }),
-      }),
-    }),
-    rpc: vi.fn(),
-  },
-}));
+// A chain that answers whatever order the panel calls it in. The engine-held
+// lookup is .select().eq().eq().not(), the rest are shorter, and a mock that
+// only answers one shape fails on the first query that is not that shape.
+const engineHeldRows: Array<{ asset_id: string | null }> = [];
+
+vi.mock("../../lib/supabase", () => {
+  const chain: Record<string, unknown> = {};
+  Object.assign(chain, {
+    select: () => chain,
+    eq: () => chain,
+    in: () => chain,
+    not: () => Promise.resolve({ data: engineHeldRows, error: null }),
+    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+    order: () => Promise.resolve({ data: [], error: null }),
+    then: (resolve: (value: unknown) => unknown) =>
+      Promise.resolve({ data: [], error: null }).then(resolve),
+  });
+  return { supabase: { from: () => chain, rpc: vi.fn() } };
+});
 
 import { ApprovalsPanel } from "./ApprovalsPanel";
 
@@ -54,6 +59,7 @@ function textAsset(over: Partial<MediaAsset> = {}): MediaAsset {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  engineHeldRows.length = 0;
   useParams.mockReturnValue({ clientId: "client-1" });
   // Two calls now: pending, and approved-without-a-human. They are mutually
   // exclusive in the database, so the mock answers only the pending one —
@@ -122,5 +128,46 @@ describe("ApprovalsPanel — review controls stay intact", () => {
     await screen.findByText("Shade guide follow-up");
     expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
+  });
+});
+
+describe("an asset the engine's own queue owns", () => {
+  it("is not offered here, because approving it here would strand the slot", async () => {
+    // review_media_asset signs the asset off and moves nothing. An asset
+    // whose slot is awaiting_approval would end up approved with the slot
+    // still waiting, never scheduled and in no queue at all — which is the
+    // fault migration 159 exists to fix, reintroduced on the wrong tab.
+    engineHeldRows.push({ asset_id: "asset-text-1" });
+    const user = userEvent.setup();
+    render(<ApprovalsPanel />);
+
+    await user.click(await screen.findByRole("button", { name: "Text" }));
+    expect(await screen.findByText(/waiting on the Engine tab/i)).toBeInTheDocument();
+    expect(screen.queryByText("Shade guide follow-up")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  });
+
+  it("counts them so nobody thinks the queue is empty", async () => {
+    engineHeldRows.push({ asset_id: "asset-text-1" });
+    const user = userEvent.setup();
+    render(<ApprovalsPanel />);
+    await user.click(await screen.findByRole("button", { name: "Text" }));
+    expect(await screen.findByText(/^1 piece is waiting on the Engine tab\./)).toBeInTheDocument();
+  });
+
+  it("says nothing when the engine holds nothing", async () => {
+    const user = userEvent.setup();
+    render(<ApprovalsPanel />);
+    await user.click(await screen.findByRole("button", { name: "Text" }));
+    await screen.findByText("Shade guide follow-up");
+    expect(screen.queryByText(/Engine tab/i)).not.toBeInTheDocument();
+  });
+
+  it("ignores a slot with no asset on it", async () => {
+    engineHeldRows.push({ asset_id: null });
+    const user = userEvent.setup();
+    render(<ApprovalsPanel />);
+    await user.click(await screen.findByRole("button", { name: "Text" }));
+    expect(await screen.findByText("Shade guide follow-up")).toBeInTheDocument();
   });
 });
