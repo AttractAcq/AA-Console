@@ -36,7 +36,27 @@ const PAID_FIELDS = [
 const IG_MEDIA_FIELDS =
   "id,caption,media_type,permalink,timestamp,insights.metric(views,reach,total_interactions)";
 
-const ACCOUNT_METRICS = "views,reach,total_interactions";
+/**
+ * Account-level insights, period=day.
+ *
+ * `views` is deliberately absent, and this is the second time the same shape
+ * of mistake has been made here. The media endpoint accepts it — that is what
+ * IG_MEDIA_FIELDS above is about — and the account endpoint does not. Every
+ * organic ingest on production failed on 6 October with the account call's
+ * own answer:
+ *
+ *   (#100) metric[0] must be one of the following values: reach,
+ *   follower_count, website_clicks, profile_views, online_followers,
+ *   accounts_engaged, total_interactions, ...
+ *
+ * `views` is not in that list and `metric[0]` was `views`. The 2024
+ * replacement for account `impressions` exists but needs
+ * metric_type=total_value and gives a period total rather than a daily
+ * series, which does not fit a table of daily rows — so account impressions
+ * are simply not available per day, and the panels say so rather than
+ * showing a zero. Per-post views still come back on the media call.
+ */
+const ACCOUNT_METRICS = "reach,total_interactions";
 
 /**
  * Meta's error codes, mapped to whether trying again could plausibly work.

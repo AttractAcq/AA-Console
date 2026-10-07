@@ -35,7 +35,8 @@ export interface PaidTotals {
 
 /** Just the organic account figures a comparison needs. */
 export interface AccountTotals {
-  impressions: number;
+  /** Null when no day carried one. Not comparable, and not a zero. */
+  impressions: number | null;
   best_day_reach: number;
   engagements: number;
   days_covered: number;
@@ -128,7 +129,12 @@ export function compareOrganicAccount(now: AccountTotals, before: AccountTotals)
   return {
     refusal: null,
     deltas: [
-      delta("Impressions", now.impressions, before.impressions),
+      // Impressions only when both sides have one. Treating a null as 0
+      // would report a fall to nothing, or a rise from it, for a figure
+      // the account endpoint simply does not return.
+      ...(now.impressions !== null && before.impressions !== null
+        ? [delta("Impressions", now.impressions, before.impressions)]
+        : []),
       // Both sides are "the best single day", which is the only reach figure
       // that compares. A sum would double-count anybody who saw the account
       // twice, in each window independently.

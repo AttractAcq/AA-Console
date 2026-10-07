@@ -40,10 +40,28 @@ export function OrganicReportingPanel() {
 
       {account && account.days_covered > 0 && (
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
+          {/* Null, not zero. The Instagram account endpoint has no daily
+              impressions series, so "0 — summed across the period" beside a
+              real reach figure would say the account was seen by people and
+              shown to nobody. */}
           <Panel title="Impressions">
-            <p className="text-2xl font-semibold text-card-foreground">{count(account.impressions)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Summed across the period</p>
-            {trend && <TrendLine comparison={trend.organic} label="Impressions" />}
+            {account.impressions === null || account.impression_days === 0 ? (
+              <>
+                <p className="text-2xl font-semibold text-muted-foreground">—</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Not available per day from the Instagram account endpoint. Per-post views are in
+                  the table below.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-2xl font-semibold text-card-foreground">
+                  {count(account.impressions)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Summed across the period</p>
+                {trend && <TrendLine comparison={trend.organic} label="Impressions" />}
+              </>
+            )}
           </Panel>
           <Panel title="Best day for reach">
             <p className="text-2xl font-semibold text-card-foreground">

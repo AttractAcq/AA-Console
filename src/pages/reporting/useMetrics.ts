@@ -30,7 +30,15 @@ export interface PeriodSummary {
     conversions: number; days_active: number;
   }>;
   organic_account: {
-    impressions: number; best_day_reach: number; engagements: number; days_covered: number;
+    /**
+     * Null when no day carried one: the Instagram account endpoint has no
+     * daily impressions series. "Not measured", not "measured as none".
+     */
+    impressions: number | null;
+    impression_days: number;
+    best_day_reach: number;
+    engagements: number;
+    days_covered: number;
   };
   organic_posts: Array<{
     external_id: string; ref_number: string | null; media_type: string | null;

@@ -35,7 +35,17 @@ export interface PeriodSummary {
     conversions: number; days_active: number;
   }>;
   organic_account: {
-    impressions: number; best_day_reach: number; engagements: number; days_covered: number;
+    /**
+     * Null when no day carried one. The Instagram account endpoint has no
+     * daily impressions series, so this is "not measured" rather than
+     * "measured as none" — and 0 would say the account was seen by people
+     * and shown to nobody, which cannot happen.
+     */
+    impressions: number | null;
+    impression_days: number;
+    best_day_reach: number;
+    engagements: number;
+    days_covered: number;
   };
   organic_posts: Array<{
     external_id: string; ref_number: string | null; media_type: string | null;
@@ -96,7 +106,11 @@ export function formatSummary(s: PeriodSummary): string {
     lines.push(
       "",
       "ORGANIC ACCOUNT (daily figures)",
-      `- Impressions across the period: ${s.organic_account.impressions}`,
+      // Said rather than printed as 0. The model is told every figure in
+      // this summary is usable, so a 0 here would be repeated to a client.
+      s.organic_account.impressions === null || s.organic_account.impression_days === 0
+        ? "- Impressions across the period: not available. The Instagram account endpoint has no daily impressions series, so this is a gap in what can be measured and not a result. Do not report it as zero or as a fall."
+        : `- Impressions across the period: ${s.organic_account.impressions}`,
       // Reach counts people, so it is never summed across days.
       `- Best single day for reach: ${s.organic_account.best_day_reach}`,
       `- Interactions: ${s.organic_account.engagements}`,

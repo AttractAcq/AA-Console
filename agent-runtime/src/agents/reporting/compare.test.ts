@@ -16,7 +16,7 @@ const summary = (over: Partial<PeriodSummary> = {}): PeriodSummary => ({
   window: { since: "2026-09-01", until: "2026-09-30" },
   paid: { spend: 1000, impressions: 50000, clicks: 400, conversions: 40, days_covered: 30, currency: "ZAR" },
   paid_campaigns: [],
-  organic_account: { impressions: 20000, best_day_reach: 3000, engagements: 900, days_covered: 30 },
+  organic_account: { impressions: 20000, impression_days: 30, best_day_reach: 3000, engagements: 900, days_covered: 30 },
   organic_posts: [],
   unmapped_rows: 0,
   total_rows: 100,
@@ -131,7 +131,7 @@ describe("the comparison the prompt gets", () => {
       summary({
         window: { since: "2026-08-02", until: "2026-08-31" },
         paid: { spend: 800, impressions: 40000, clicks: 300, conversions: 50, days_covered: 30, currency: "ZAR" },
-        organic_account: { impressions: 15000, best_day_reach: 2500, engagements: 1000, days_covered: 30 },
+        organic_account: { impressions: 15000, impression_days: 30, best_day_reach: 2500, engagements: 1000, days_covered: 30 },
       }),
     );
     expect(text).toContain("Comparing 2026-09-01 to 2026-09-30 against 2026-08-02 to 2026-08-31");
@@ -145,7 +145,7 @@ describe("the comparison the prompt gets", () => {
   it("compares the best day for reach against the best day, never a sum", () => {
     // Reach counts people. A sum would double-count anybody who saw the
     // account twice, in each window independently.
-    const text = formatComparison(summary(), summary({ organic_account: { impressions: 15000, best_day_reach: 2000, engagements: 900, days_covered: 30 } }));
+    const text = formatComparison(summary(), summary({ organic_account: { impressions: 15000, impression_days: 30, best_day_reach: 2000, engagements: 900, days_covered: 30 } }));
     expect(text).toContain("Best day for reach: 3000 now against 2000 before");
   });
 
@@ -199,5 +199,41 @@ describe("the two halves refuse independently", () => {
     expect(paid.deltas).toEqual([]);
     expect(organic.refusal).toBeNull();
     expect(organic.deltas).toHaveLength(3);
+  });
+});
+
+describe("an account figure the endpoint cannot give", () => {
+  // The Instagram account endpoint has no daily impressions series, so
+  // metrics_period_summary returns null rather than 0. Comparing a null as
+  // though it were 0 reports a fall to nothing, or a rise from it, for a
+  // figure nobody ever measured.
+  const account = (impressions: number | null) => ({
+    impressions,
+    impression_days: impressions === null ? 0 : 30,
+    best_day_reach: 3000,
+    engagements: 900,
+    days_covered: 30,
+  });
+
+  it("leaves impressions out when this period has none", () => {
+    const c = compareOrganicAccount(account(null), account(15000));
+    expect(c.refusal).toBeNull();
+    expect(c.deltas.map((d) => d.label)).toEqual(["Best day for reach", "Interactions"]);
+  });
+
+  it("leaves impressions out when the earlier period has none", () => {
+    const c = compareOrganicAccount(account(20000), account(null));
+    expect(c.deltas.some((d) => d.label === "Impressions")).toBe(false);
+  });
+
+  it("still compares the figures that do exist", () => {
+    const c = compareOrganicAccount(account(null), account(null));
+    expect(c.deltas).toHaveLength(2);
+    expect(c.deltas[0]).toMatchObject({ label: "Best day for reach", change: 0 });
+  });
+
+  it("compares impressions when both sides have them", () => {
+    const c = compareOrganicAccount(account(20000), account(15000));
+    expect(c.deltas[0]).toMatchObject({ label: "Impressions", change: 5000 });
   });
 });

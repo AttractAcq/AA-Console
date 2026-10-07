@@ -10,7 +10,7 @@ const summary = (over: Partial<PeriodSummary> = {}): PeriodSummary => ({
   window: { since: "2026-09-01", until: "2026-09-30" },
   paid: { spend: 1000, impressions: 50000, clicks: 400, conversions: 40, days_covered: 30, currency: "ZAR" },
   paid_campaigns: [],
-  organic_account: { impressions: 20000, best_day_reach: 3000, engagements: 900, days_covered: 30 },
+  organic_account: { impressions: 20000, impression_days: 30, best_day_reach: 3000, engagements: 900, days_covered: 30 },
   organic_posts: [],
   unmapped_rows: 0,
   total_rows: 100,
