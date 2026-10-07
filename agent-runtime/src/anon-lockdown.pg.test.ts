@@ -214,6 +214,15 @@ beforeAll(async () => {
 
   await db.exec(await migration("20261007090000_161_anon_cannot_drive_the_engine.sql"));
 
+  // Supabase's defaults apply at CREATE time, so the two functions 161
+  // itself created got them — and only those two. Granting the whole schema
+  // again here would undo 161's own revokes on functions that existed
+  // before it, which is not what happens in production.
+  await db.exec(`grant execute on function public.lock_down_definer_functions() to anon, authenticated;
+                 grant execute on function public.may_advance_slot(uuid) to anon, authenticated;`);
+
+  await db.exec(await migration("20261007100000_162_three_the_sweep_could_not_fix.sql"));
+
   await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
                  select set_config('request.jwt.claim.sub','${ADMIN}',false);`);
 });
@@ -417,5 +426,96 @@ describe("the rest of the lint", () => {
         where tablename = 'slot_pipeline' and cmd = 'SELECT'`,
     );
     expect(count).toBe(1);
+  });
+});
+
+describe("the three the sweep could not fix", () => {
+  it("will not let a signed-in person plan another client's month", async () => {
+    // No check at all before this: anybody signed in could create slots
+    // against any client_id — rows they cannot even read back — and the
+    // tick would pick them up and spend that client's budget.
+    await expect(
+      as(
+        "authenticated",
+        STAFF,
+        `select create_content_slot('${CLIENT}','instagram', now() + interval '5 days')`,
+      ),
+    ).rejects.toThrow(/Not permitted for this client/);
+  });
+
+  it("still plans for a client the caller can reach", async () => {
+    const planned = await as<{ id: string }>(
+      "authenticated",
+      STAFF,
+      `select id from create_content_slot('${OTHER}','instagram', now() + interval '5 days')`,
+    );
+    expect(planned[0]!.id).toBeTruthy();
+  });
+
+  it("still plans for the engine", async () => {
+    const planned = await as<{ id: string }>(
+      "service_role",
+      "",
+      `select id from create_content_slot('${CLIENT}','facebook', now() + interval '6 days')`,
+    );
+    expect(planned[0]!.id).toBeTruthy();
+  });
+
+  it("is still idempotent, which is what the planner leans on", async () => {
+    // A literal instant, not now(): the index is on the exact timestamp, so
+    // two calls a microsecond apart are two different windows and the test
+    // would be measuring the clock rather than the function.
+    const when = "timestamptz '2026-12-01 09:00:00+00'";
+    const a = await one<{ id: string }>(`select id from create_content_slot('${CLIENT}','instagram', ${when})`);
+    const b = await one<{ id: string }>(`select id from create_content_slot('${CLIENT}','instagram', ${when})`);
+    expect(b.id).toBe(a.id);
+  });
+
+  it("will not say whether somebody else's account is connected", async () => {
+    // Not a token and not a number, but it is somebody else's business, and
+    // it was answerable one call at a time for every client in turn.
+    await db.exec(`insert into client_integrations (client_id, provider, credential_secret_id, status)
+                   values ('${CLIENT}','instagram','55555555-5555-4555-8555-555555555555','connected')`);
+    const mine = await one<{ u: boolean }>(`select integration_usable('${CLIENT}','instagram') as u`);
+    expect(mine.u).toBe(true);
+
+    const theirs = await as<{ u: boolean | null }>(
+      "authenticated",
+      STAFF,
+      `select integration_usable('${CLIENT}','instagram') as u`,
+    );
+    // Null, not false: "no" is also an answer about somebody else's account.
+    expect(theirs[0]!.u).toBeNull();
+  });
+
+  it("still blocks a post whose client has no integration at all", async () => {
+    // The null branch itself is unreachable through this view today —
+    // scheduled_posts' RLS means a reader who cannot reach the client never
+    // sees the row — so what is pinned here is that making the call
+    // nullable did not break the ordinary answer.
+    const { id: asset } = await one<{ id: string }>(
+      `insert into client_media_assets (client_id, title, storage_path, human_approved_at, review_status)
+       values ('${CLIENT}','Built','a.mp4', now(), 'approved') returning id`,
+    );
+    const { id: post } = await one<{ id: string }>(
+      `insert into scheduled_posts (client_id, asset_id, scheduled_for, scheduled_at, platform, media_type)
+       values ('${CLIENT}','${asset}', current_date, now() - interval '1 hour','instagram','video') returning id`,
+    );
+    await db.exec(`insert into post_copy (scheduled_post_id, platform, caption, source)
+                   values ('${post}','instagram','Words.','agent');
+                   select set_publishing_enabled('${CLIENT}', true);
+                   delete from client_integrations where client_id = '${CLIENT}';`);
+
+    const blocker = await one<{ blocker: string | null }>(
+      `select blocker from publish_due where post_id = '${post}'`,
+    );
+    expect(blocker.blocker).toMatch(/No usable instagram integration/);
+  });
+
+  it("does not leave the privilege primitive callable by a signed-in person", async () => {
+    const { can } = await one<{ can: boolean }>(
+      `select has_function_privilege('authenticated', 'public.lock_down_definer_functions()', 'execute') as can`,
+    );
+    expect(can).toBe(false);
   });
 });
