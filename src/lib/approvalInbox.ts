@@ -35,6 +35,8 @@ export interface InboxRow {
   cost_usd: number | string | null;
   asset_id: string | null;
   asset_title: string | null;
+  /** Set once a person has signed the asset off. Null for everything in this queue. */
+  human_approved_at: string | null;
   pillar_name: string | null;
   idea_score: number | string | null;
   idea_reasons: unknown;

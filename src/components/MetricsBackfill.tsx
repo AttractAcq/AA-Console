@@ -93,7 +93,9 @@ export function MetricsBackfill({ clientId }: { clientId: string }) {
       p_client_id: clientId,
       p_since: window.since,
       p_until: window.until,
-      p_surface: surface === "both" ? null : surface,
+      // Omitted rather than null: the function's own default is null, and
+      // the generated signature types it optional.
+      p_surface: surface === "both" ? undefined : surface,
     });
     setBusy(false);
     if (failure) {

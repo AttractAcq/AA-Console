@@ -76,9 +76,12 @@ describe("pulling history", () => {
     await userEvent.click(await screen.findByRole("button", { name: /last 7 days/i }));
     await userEvent.click(screen.getByRole("button", { name: /^pull 7 days$/i }));
     const args = rpc.mock.calls.find((c) => c[0] === "request_metrics_backfill")![1] as {
-      p_surface: string | null;
+      p_surface?: string;
     };
-    expect(args.p_surface).toBeNull();
+    // Omitted rather than null. The function defaults p_surface to null, so
+    // leaving it out is the same request and is what the generated
+    // signature types: nothing is sent, which is what this test is about.
+    expect(args.p_surface).toBeUndefined();
   });
 
   it("says how many pulls were queued and that they cost quota", async () => {

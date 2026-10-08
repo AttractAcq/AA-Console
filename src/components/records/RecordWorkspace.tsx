@@ -45,6 +45,9 @@ type Job = {
 
 const JOB_TONE: Record<JobStatus, string> = {
   queued: "bg-secondary text-secondary-foreground",
+  // Held, not broken. Amber rather than the destructive red a failure
+  // gets: the reason will pass on its own and the work is still there.
+  paused: "bg-secondary text-secondary-foreground",
   claimed: "bg-secondary text-secondary-foreground",
   running: "bg-primary/10 text-brand-strong",
   completed: "bg-primary/10 text-brand-strong",
@@ -54,6 +57,9 @@ const JOB_TONE: Record<JobStatus, string> = {
 
 const JOB_LABEL: Record<JobStatus, string> = {
   queued: "Queued — waiting for a worker",
+  // The error column carries why, and resume_paused_jobs re-checks it
+  // hourly, so this says "waiting" rather than "stopped".
+  paused: "Held — waiting on a cap or a paused agent",
   claimed: "Claimed — starting",
   running: "Running",
   completed: "Completed",

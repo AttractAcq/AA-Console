@@ -35,7 +35,7 @@ type Brief = {
  * the stage, so work waiting on a reviewer is visibly not the maker's to do
  * while still not being filed as done.
  */
-const FINISHED = ["approved", "cancelled"];
+const FINISHED = ["approved", "cancelled"] as const;
 export function JobsTable({
   memberId,
   scope,
