@@ -1,4 +1,4 @@
-# Gap audit — 7 October 2026
+# Gap audit — 8 October 2026
 
 The current reference for what is built, what is not, and what is built but
 unproven. Every claim was checked against the running system rather than
@@ -12,14 +12,17 @@ than stale, and it is called out below.
 
 ## Where the build is
 
-**Closed on 8 October.** Seventeen migrations applied to production and
-verified: no `SECURITY DEFINER` function reachable by `anon`, all 41 console
-RPCs still callable by a signed-in user, both publishing switches off, the
-engine installed and switched off, and 166's backfill landing 11 assignments
-at `assigned` and 2 at `delivered` with `completed_at` correctly cleared.
+**Closed on 8 October. The two databases are now structurally identical**, and
+that is a measurement rather than an impression — 81 tables, 0 without RLS,
+146 policies, 32 agents, 101 SECURITY DEFINER functions reachable by a
+signed-in user, 15 of those not checking their own caller, and 0 reachable by
+`anon`. Both, same numbers.
 
-One file outstanding: **168**, written while verifying the push, is on staging
-and not yet on production.
+Eighteen migrations went to production: 150–155 and 157–168. Verified beyond
+the counts — all 41 console RPCs still callable by a signed-in user, both
+publishing switches off, the engine installed and switched off behind three
+switches, and 166's backfill landing 11 assignments at `assigned` and 2 at
+`delivered` with `completed_at` correctly cleared.
 
 The drift section below stays because the habit that caused it has not
 changed — see
@@ -33,12 +36,13 @@ changed — see
 | Hosting | **Live.** Console at `console.attractacq.com`, runtime on Railway. | `/health` and `agent_runtime_status` |
 | RLS | **81 tables, all with RLS. 146 policies.** | `pg_class.relrowsecurity`, `pg_policies` |
 | Exposed functions | **No `SECURITY DEFINER` function is reachable by `anon`, on either.** Was 21 on production until 8 Oct. | `select * from security_definer_exposure where anon_can_execute` — empty on both |
-| Schema in git | **175 migrations.** Production has 150–167 as of 8 Oct, its history repaired; **168 is on staging only** and is the one outstanding file. | `supabase migration list --linked` after the repair; 168 applied to staging and not yet pushed |
+| Schema in git | **175 migrations, and both databases have every one.** Production's history was repaired on 8 Oct, having ended at 149 plus 156 out of order. `db push` now works there with no flags. | `supabase migration list --linked`: nothing pending, nothing remote-only |
 | Tests | **3,034** — 950 console, 2,084 runtime. | `npm test` in both packages |
 | Idea → brief → asset → scheduled → published | **Built end to end on both, and inert at the last step by design.** Both publishing switches off, no client enabled. | Migrations 144–168; `publish_due` returns 6 outstanding, 0 that would go out |
 | The one human gate | **Reachable.** Approvals → Engine calls `approve_slot`. | `src/pages/approvals/EngineInboxPanel.tsx`; `approval_inbox` readable on production |
 | The engine | **Installed on both, and switched off on both.** Three independent switches, none flipped by the push. | `engine_controls.enabled` false; 0 clients with `enabled`; no client has a month cap |
-| Reporting ingest | **Paid works; organic fails on one metric name.** Three paid pulls completed 6–7 Oct. | `agent_jobs` for `metrics_ingest`, and `client_integrations.status` |
+| Assignments | **Seven states, and the first overdue count this system has produced.** 4 of 13 are late. | `assignment_board` on production |
+| Reporting ingest | **Paid works. Organic's fix is deployed and unproven.** Three paid pulls completed 6–7 Oct; `metrics_daily` is still empty because the account had no delivery in the window. 167 stopped the organic call asking for a metric that endpoint rejects, and has not run against the live API yet. | `agent_jobs` for `metrics_ingest`; `client_integrations`: meta=active, instagram=error, facebook=connected |
 
 Agent spend to date, production: **$83.50**.
 
@@ -60,11 +64,15 @@ object by object: `engine_controls`, `slot_pipeline`, `engine_tick`,
 `engine_decisions`, `select_idea_for_slot`, `client_ideas.slot_id` and
 `slot_pipeline.input_table` are all absent.
 
-**So the engine does not exist on production.** Not "is switched off", not
-"has no work" — there is no tick, no pipeline table, no idea selection and no
-decision log. Everything from M3.3 onward lives only on staging. The console
-has an Engine panel that reads `engine_readiness`, which 146 did create, so
-the screen renders against a database that cannot run what it describes.
+**So the engine did not exist on production.** Not "was switched off", not
+"had no work" — there was no tick, no pipeline table, no idea selection and no
+decision log. Everything from M3.3 onward lived only on staging, while the
+console's Engine panel rendered against it quite happily, because
+`engine_readiness` came with 146 and 146 was applied. A screen describing a
+database that cannot run what it shows is the most expensive kind of drift:
+nothing looks wrong.
+
+All of it is on production as of 8 October, and still switched off.
 
 ### `supabase db push` cannot be used against production, and would abort
 
@@ -392,14 +400,25 @@ know which to believe and both look authoritative.
   select * from security_definer_exposure where not body_checks_the_caller;
   ```
 
-  Twenty rows on staging. Fifteen are fine and the reason is written into
-  migration 162 so it is not re-litigated on every review: `is_admin`,
+  **Fifteen rows, on both databases**, and all fifteen are fine — the reason
+  is written into migration 162 so it is not re-litigated on every review:
+  `is_admin`,
   `is_member`, `current_role_of` and the rest are the permission primitives
   themselves, so "check the caller" is what they are; `lead_stage_rank` is
   arithmetic on an enum; the trigger functions are run by Postgres without
   consulting EXECUTE at all; the MCP entry points check a bot's own grant.
-  The remaining five are the engine's own drivers, which are service_role
-  only. Any row that is none of those is a finding.
+  The last two are `enqueue_publish_sweep` and `enqueue_token_health_job`,
+  deliberately reachable so an admin can prod them, each queueing one
+  idempotent job. The engine's own drivers are absent from this view
+  entirely — they are service_role only, which is the point of 161.
+
+  Any row that is none of those is a finding. That contract is only worth
+  something if the view counts correctly, and on 8 October it did not:
+  migration 168 found six gated functions being reported as ungated,
+  because 161 taught the heuristic `may_advance_slot` and 166 introduced
+  `may_touch_assignment` without going back. The pattern now lives in
+  `caller_gate_markers()` and a source test asserts every `may_*` predicate
+  in the migrations appears in it.
 
 ---
 
@@ -615,7 +634,19 @@ credential does not silently start billing API calls.
     output is expected to be consistent about needs the two-state treatment:
     the real value quoted verbatim, or its absence stated explicitly. There is
     no third state, and a blank is not the absence — it is an invitation.
-13. **A suite that passes on first run has not been shown to work.** Every one
+13. **A typecheck can check nothing and exit 0.** The root `tsconfig.json`
+    is a solution file — `"files": []` plus two project references — so
+    `npx tsc --noEmit -p tsconfig.json` type-checks zero files and passes.
+    Confirmed with `--listFiles`. CI runs `npx tsc -b`, which follows the
+    references; an entire session of "typecheck clean" for the console was a
+    no-op, and it hid five real errors including a `Record<JobStatus,
+    string>` with no entry for the `paused` status added in 163 — a held job
+    would have rendered with no label. `agent-runtime`'s own config is real,
+    so `npm run typecheck` there does check. The full console set is
+    `npm run lint` (oxlint, not eslint), `npx tsc -b`, `npm test`,
+    `npm run build`.
+
+14. **A suite that passes on first run has not been shown to work.** Every one
     of these did. The check is to break the source deliberately and confirm the
     right tests fail: `isVideo = false` must fail the video tests, and removing
     the orphaned-selection cleanup must fail that one. Both did, and both were
@@ -663,3 +694,24 @@ credential does not silently start billing API calls.
 - **Whether the frontend suites still bite:** break one invariant in the source
   on purpose, run `npm test`, confirm the expected tests fail, and revert. A
   passing suite is evidence only if it can fail.
+- **The console typecheck:** `npx tsc -b`, never
+  `npx tsc --noEmit -p tsconfig.json`. The second checks zero files and exits
+  0 — see trap 13. `npm run lint` is oxlint.
+- **Whether the two databases agree:** run the same block against both and
+  compare, rather than reasoning from which migrations went where.
+
+  ```sql
+  select
+    (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r') as tables,
+    (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity) as no_rls,
+    (select count(*) from pg_policies where schemaname = 'public') as policies,
+    (select count(*) from agents where archived_at is null) as agents,
+    (select count(*) from security_definer_exposure where anon_can_execute) as anon,
+    (select count(*) from security_definer_exposure) as definer_signed_in,
+    (select count(*) from security_definer_exposure
+      where not body_checks_the_caller) as ungated;
+  ```
+
+  On 8 October both answered: 81, 0, 146, 32, 0, 101, 15.
