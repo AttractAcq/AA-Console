@@ -12,9 +12,18 @@ than stale, and it is called out below.
 
 ## Where the build is
 
-Counts are staging unless stated. Staging is ahead of production by
-**seventeen** migrations, which is the headline of this revision — see
-**Drift**. The engine does not exist on production at all.
+**Closed on 8 October.** Seventeen migrations applied to production and
+verified: no `SECURITY DEFINER` function reachable by `anon`, all 41 console
+RPCs still callable by a signed-in user, both publishing switches off, the
+engine installed and switched off, and 166's backfill landing 11 assignments
+at `assigned` and 2 at `delivered` with `completed_at` correctly cleared.
+
+One file outstanding: **168**, written while verifying the push, is on staging
+and not yet on production.
+
+The drift section below stays because the habit that caused it has not
+changed — see
+[migration-history-repair-2026-10-08.md](migration-history-repair-2026-10-08.md).
 
 | Area | State | Checked by |
 |---|---|---|
@@ -23,23 +32,27 @@ Counts are staging unless stated. Staging is ahead of production by
 | Agent runtime | **32 agents, 32 runners.** Nothing can be queued that cannot execute. | `agents` table vs `RUNNERS` in `dispatch.ts`, exact set match |
 | Hosting | **Live.** Console at `console.attractacq.com`, runtime on Railway. | `/health` and `agent_runtime_status` |
 | RLS | **81 tables, all with RLS. 146 policies.** | `pg_class.relrowsecurity`, `pg_policies` |
-| Exposed functions | **Staging: no `SECURITY DEFINER` function is reachable by `anon`. Production: 21 are.** | `select * from security_definer_exposure` |
-| Schema in git | **174 migrations.** Staging has all of them. Production's recorded history ends at **149**, plus 156 applied out of order. | `mcp list_migrations` against production, confirmed by `to_regclass` / `to_regprocedure` on objects from each missing migration |
-| Tests | **3,028** — 950 console, 2,078 runtime. | `npm test` in both packages |
-| Idea → brief → asset → scheduled → published | **Built end to end on staging, and inert at the last step by design.** Both publishing switches are off. **Absent on production** — see Drift. | Migrations 144–167; `publish_due` |
-| The one human gate | **Reachable on staging.** Approvals → Engine calls `approve_slot`. | `src/pages/approvals/EngineInboxPanel.tsx` |
+| Exposed functions | **No `SECURITY DEFINER` function is reachable by `anon`, on either.** Was 21 on production until 8 Oct. | `select * from security_definer_exposure where anon_can_execute` — empty on both |
+| Schema in git | **175 migrations.** Production has 150–167 as of 8 Oct, its history repaired; **168 is on staging only** and is the one outstanding file. | `supabase migration list --linked` after the repair; 168 applied to staging and not yet pushed |
+| Tests | **3,034** — 950 console, 2,084 runtime. | `npm test` in both packages |
+| Idea → brief → asset → scheduled → published | **Built end to end on both, and inert at the last step by design.** Both publishing switches off, no client enabled. | Migrations 144–168; `publish_due` returns 6 outstanding, 0 that would go out |
+| The one human gate | **Reachable.** Approvals → Engine calls `approve_slot`. | `src/pages/approvals/EngineInboxPanel.tsx`; `approval_inbox` readable on production |
+| The engine | **Installed on both, and switched off on both.** Three independent switches, none flipped by the push. | `engine_controls.enabled` false; 0 clients with `enabled`; no client has a month cap |
 | Reporting ingest | **Paid works; organic fails on one metric name.** Three paid pulls completed 6–7 Oct. | `agent_jobs` for `metrics_ingest`, and `client_integrations.status` |
 
 Agent spend to date, production: **$83.50**.
 
 ---
 
-## Drift: staging is seventeen migrations ahead of production
+## Drift: closed 8 October, and worth reading anyway
 
-This is the thing to read first, and the first draft of this revision got it
-wrong — it said eleven, on the assumption that production "stops at 156"
-because 156 is there. 156 is a one-function fix to `integration_secret` and
-applied cleanly out of order, which is exactly why it is misleading evidence.
+Production is now level. This section stays because the drift took three
+wrong answers to measure and the habit that caused it has not changed.
+
+The first draft of this revision said eleven migrations, on the assumption
+that production "stops at 156" because 156 is there. 156 is a one-function fix
+to `integration_secret` and applied cleanly out of order, which is exactly why
+it is misleading evidence.
 
 Asked properly — `list_migrations` against production — the recorded history
 ends at **149_plan_slots**, with 156 as the only later entry. Confirmed
