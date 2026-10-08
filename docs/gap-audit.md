@@ -53,6 +53,50 @@ decision log. Everything from M3.3 onward lives only on staging. The console
 has an Engine panel that reads `engine_readiness`, which 146 did create, so
 the screen renders against a database that cannot run what it describes.
 
+### `supabase db push` cannot be used against production, and would abort
+
+The obvious way to close seventeen migrations is one `db push`. It does not
+work here, and finding out by running it is the expensive way.
+
+`supabase migration list --linked` against production shows the two histories
+have diverged at scale, not just over the recent gap:
+
+- **65 recorded remote versions correspond to no local file.** The earliest is
+  `20260916203244`. They are the local migrations applied through the MCP or
+  the dashboard, each stamped with the time it was applied rather than the
+  version in its filename.
+- **Local files from mid-September onward therefore show as unapplied**, even
+  though their objects plainly exist — `scheduled_posts.platform`,
+  `distribution_due`, `client_media_frames` and the rest are all there.
+
+`db push` applies every local file the remote history does not list. Against
+production that is roughly eighty files, most of them already applied in
+substance, and it aborts at the first statement that is not idempotent —
+`147_content_slots` opens with `create type slot_stage as enum (...)`, which
+fails with "type already exists" and takes the transaction with it. A partial
+push that stops in the middle of a renumbered sequence is a worse state than
+the one it started from.
+
+**What closing this properly looks like**, in order, and none of it is
+guesswork once the first step is done:
+
+1. `supabase migration list --linked`, and for each local version that shows
+   as pending but whose objects exist, `supabase migration repair --status
+   applied <version>`. This writes only the history table, never the schema.
+   The remote-only rows can be left: they are harmless records of the same
+   work under a different version string.
+2. Confirm the list then shows exactly the seventeen genuine gaps as pending.
+3. `supabase db push --linked`, which applies them in order, each file its own
+   transaction — which also resolves the one ordering constraint, that 163
+   adds an enum value and 164 is the first to use it.
+4. Re-run the two post-checks: `select * from security_definer_exposure where
+   anon_can_execute` should be empty, and the 36-RPC authenticated-callable
+   query should match the baseline taken before 161.
+
+The repair step is the whole job, and it is the step nobody should do from a
+guess. Until it is done, every production migration has to go one at a time
+through the MCP, which is how the drift got here.
+
 | # | What it is | Why it matters that production lacks it |
 |---|---|---|
 | 150 | The engine tick | Nothing moves a slot. The engine cannot run. |
