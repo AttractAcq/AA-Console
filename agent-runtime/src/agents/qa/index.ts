@@ -107,7 +107,11 @@ export async function runQaJob(
             .eq("id", slot.brief_id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
-      sb.from("client_media_assets").select("width, height, duration_sec").eq("id", slot.asset_id).maybeSingle(),
+      sb
+        .from("client_media_assets")
+        .select("width, height, duration_sec, render_path")
+        .eq("id", slot.asset_id)
+        .maybeSingle(),
       sb
         .from("client_proof_assets")
         .select("id", { count: "exact", head: true })
@@ -149,7 +153,12 @@ export async function runQaJob(
     .filter(Boolean)
     .join("\n");
 
-  const dims = (asset ?? {}) as { width?: number | null; height?: number | null; duration_sec?: number | null };
+  const dims = (asset ?? {}) as {
+    width?: number | null;
+    height?: number | null;
+    duration_sec?: number | null;
+    render_path?: string | null;
+  };
 
   const findings = qaFindings({
     platform: slot.platform,
@@ -158,7 +167,12 @@ export async function runQaJob(
     bannedPhrases: banned,
     briefText,
     hasProof: (proof.count ?? 0) > 0,
-    asset: { width: dims.width, height: dims.height, durationSec: dims.duration_sec },
+    asset: {
+      width: dims.width,
+      height: dims.height,
+      durationSec: dims.duration_sec,
+      renderPath: dims.render_path,
+    },
   });
 
   const score = qaScore(findings);

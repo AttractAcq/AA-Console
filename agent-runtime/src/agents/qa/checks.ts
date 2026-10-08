@@ -75,7 +75,13 @@ export interface QaInput {
   /** Whether any cleared proof exists for this client. */
   hasProof: boolean;
   /** Dimensions of the asset, when known. */
-  asset?: { width?: number | null; height?: number | null; durationSec?: number | null } | null;
+  asset?: {
+    width?: number | null;
+    height?: number | null;
+    durationSec?: number | null;
+    /** Where the assembled reel is. Null means nothing was ever assembled. */
+    renderPath?: string | null;
+  } | null;
 }
 
 /** 9:16 within a tolerance, because a render can be a pixel out. */
@@ -112,7 +118,23 @@ export function qaFindings(input: QaInput): Finding[] {
     findings.push({ area: "platform", severity: "blocker", detail: problem });
   }
 
-  const { width, height, durationSec } = input.asset ?? {};
+  const { width, height, durationSec, renderPath } = input.asset ?? {};
+
+  // A reel with no cut is not a reel. This is the one case where a missing
+  // figure is a fault rather than an absence: every check below treats a null
+  // dimension as "not recorded, nothing to check", which is right for a still
+  // that will never have a duration — and exactly wrong for a reel whose
+  // clips were built and never assembled. Without this, such a reel has
+  // nulls everywhere, raises nothing, scores 100 and reaches a person with
+  // no video in it.
+  if (input.format === "reel" && !String(renderPath ?? "").trim()) {
+    findings.push({
+      area: "platform",
+      severity: "blocker",
+      detail: "This reel has clips but no cut. There is no video to approve.",
+    });
+  }
+
   if (VERTICAL_FORMATS.has(input.format) && width && height && !isVertical(width, height)) {
     findings.push({
       area: "platform",

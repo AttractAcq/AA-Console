@@ -188,7 +188,7 @@ describe("the QA pass", () => {
   it("flags a reel that is not 9:16", async () => {
     const { sb, rpc } = database({
       slot: { ...SLOT, format: "reel" },
-      asset: { width: 1080, height: 1080, duration_sec: 20 },
+      asset: { width: 1080, height: 1080, duration_sec: 20, render_path: "cuts/a.mp4" },
     });
     await runQaJob(sb, config, agent, job);
     const args = rpc.mock.calls[0]![1] as { p_findings: Finding[]; p_to_stage: string };
@@ -200,10 +200,25 @@ describe("the QA pass", () => {
   it("says nothing about dimensions that were never recorded", async () => {
     const { sb, rpc } = database({
       slot: { ...SLOT, format: "reel" },
-      asset: { width: null, height: null, duration_sec: null },
+      // Cut, but before migration 158 added the dimension columns — which is
+      // the state the one real cut in production is in.
+      asset: { width: null, height: null, duration_sec: null, render_path: "cuts/a.mp4" },
     });
     await runQaJob(sb, config, agent, job);
     expect((rpc.mock.calls[0]![1] as { p_score: number }).p_score).toBe(100);
+  });
+
+  it("refuses to send an uncut reel for approval, and sends it back to be built", async () => {
+    // The whole point of the editing stage: clips are not a cut, and with
+    // every dimension null nothing else in QA would have fired.
+    const { sb, rpc } = database({
+      slot: { ...SLOT, format: "reel" },
+      asset: { width: null, height: null, duration_sec: null, render_path: null },
+    });
+    await runQaJob(sb, config, agent, job);
+    const args = rpc.mock.calls[0]![1] as { p_to_stage: string; p_findings: { detail: string }[] };
+    expect(args.p_to_stage).not.toBe("awaiting_approval");
+    expect(args.p_findings.some((f) => /clips but no cut/.test(f.detail))).toBe(true);
   });
 
   it("refuses a slot with no copy rather than passing it", async () => {

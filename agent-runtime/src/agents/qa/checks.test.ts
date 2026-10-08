@@ -98,13 +98,46 @@ describe("platform", () => {
   });
 
   it("warns about a reel that has stopped being one", () => {
-    const f = qaFindings(input({ format: "reel", asset: { width: 1080, height: 1920, durationSec: 120 } }));
+    const f = qaFindings(
+      input({
+        format: "reel",
+        asset: { width: 1080, height: 1920, durationSec: 120, renderPath: "cuts/a.mp4" },
+      }),
+    );
     expect(f).toHaveLength(1);
     expect(f[0]).toMatchObject({ severity: "warning" });
   });
 
-  it("says nothing about dimensions it was not given", () => {
-    expect(qaFindings(input({ format: "reel", asset: null }))).toEqual([]);
+  it("says nothing about dimensions it was not given, on a reel that was cut", () => {
+    // Not a hypothetical: the one cut in production rendered on 5 October and
+    // migration 158 added the dimension columns on the 6th, so it has a
+    // render_path and three nulls. A null stays "not recorded, nothing to
+    // check" — that is the rule 158 set and it is right.
+    expect(qaFindings(input({ format: "reel", asset: { renderPath: "cuts/a.mp4" } }))).toEqual([]);
+  });
+
+  it("blocks a reel that was never cut, which is a fault and not an absence", () => {
+    // The gap this closes. video_build makes stills and submits clips; it
+    // produces no video. Before the `editing` stage the engine advanced such
+    // a reel straight to copywriting, and with every dimension null nothing
+    // here fired: it scored 100 and reached a person with no video in it.
+    const f = qaFindings(input({ format: "reel", asset: null }));
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ area: "platform", severity: "blocker" });
+    expect(f[0]!.detail).toMatch(/clips but no cut/);
+  });
+
+  it("blocks an empty render path as firmly as a missing one", () => {
+    for (const renderPath of ["", "   ", null]) {
+      expect(qaFindings(input({ format: "reel", asset: { renderPath } }))).toHaveLength(1);
+    }
+  });
+
+  it("says nothing about a cut on a format that is not a reel", () => {
+    // A still has no render_path and never will. Only a reel is assembled.
+    for (const format of ["single", "carousel", "story"]) {
+      expect(qaFindings(input({ format, asset: null }))).toEqual([]);
+    }
   });
 });
 

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -195,5 +196,69 @@ describe("handOffToSlot", () => {
     const { client, rpc } = sb(null);
     await handOffToSlot(client as never, buildJob({ slot_id: "s1" }), "creative_build");
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("sends a reel to editing, because clips are not a video", async () => {
+    // The gap this closes. video_build makes stills and submits the
+    // Higgsfield clips; it produces nothing watchable. Handing off to
+    // copywriting is what let an uncut reel reach a person — QA reads
+    // dimensions only video_edit writes and treats a null as nothing to
+    // check, so it scored 100 on the way past.
+    const { client, rpc } = sb({ id: "asset-1" });
+    await handOffToSlot(client as never, buildJob({ slot_id: "s1" }), "video_build", "editing");
+    expect(rpc).toHaveBeenCalledWith(
+      "advance_slot",
+      expect.objectContaining({
+        p_slot_id: "s1",
+        p_to_stage: "editing",
+        p_asset_id: "asset-1",
+        p_agent_key: "video_build",
+      }),
+    );
+  });
+
+  it("still defaults to copywriting, so every other build is unchanged", async () => {
+    const { client, rpc } = sb({ id: "asset-1" });
+    await handOffToSlot(client as never, buildJob({ slot_id: "s1" }), "creative_build");
+    const args = rpc.mock.calls[0]![1] as { p_to_stage: string };
+    expect(args.p_to_stage).toBe("copywriting");
+  });
+
+  it("is called with 'editing' by video_build and nothing else", () => {
+    /**
+     * A call-site test, because the unit tests above pass the stage in
+     * themselves and so cannot catch the caller passing the wrong one — which
+     * is the regression that matters. video_build makes footage; only
+     * video_edit makes a video.
+     */
+    const callers = {
+      "../agents/video_build/index.ts": "editing",
+      "../agents/creative_build/index.ts": null,
+    } as const;
+
+    for (const [path, stage] of Object.entries(callers)) {
+      const src = readFileSync(new URL(path, import.meta.url), "utf8");
+      const call = src.match(/handOffToSlot\((?:[^;]*?)\);/s);
+      expect(call, `${path} no longer calls handOffToSlot`).not.toBeNull();
+      if (stage === null) {
+        // No fourth argument: the default is copywriting, which is right for
+        // a build that produced the finished thing.
+        expect(call![0], path).not.toMatch(/"editing"/);
+      } else {
+        expect(call![0], path).toContain(`"${stage}"`);
+      }
+    }
+  });
+
+  it("says which hand-off it was in the note", async () => {
+    // "Asset built." is wrong for a reel that has no asset yet, and the note
+    // is what a person reads on the slot timeline.
+    const reel = sb({ id: "asset-1" });
+    await handOffToSlot(reel.client as never, buildJob({ slot_id: "s1" }), "video_build", "editing");
+    expect((reel.rpc.mock.calls[0]![1] as { p_note: string }).p_note).toMatch(/cut comes next/i);
+
+    const still = sb({ id: "asset-1" });
+    await handOffToSlot(still.client as never, buildJob({ slot_id: "s1" }), "creative_build");
+    expect((still.rpc.mock.calls[0]![1] as { p_note: string }).p_note).toBe("Asset built.");
   });
 });
