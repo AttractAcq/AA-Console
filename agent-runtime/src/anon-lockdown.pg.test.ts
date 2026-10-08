@@ -222,6 +222,7 @@ beforeAll(async () => {
                  grant execute on function public.may_advance_slot(uuid) to anon, authenticated;`);
 
   await db.exec(await migration("20261007100000_162_three_the_sweep_could_not_fix.sql"));
+  await db.exec(await migration("20261008090000_168_the_exposure_view_needs_to_know_every_gate.sql"));
 
   await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
                  select set_config('request.jwt.claim.sub','${ADMIN}',false);`);
@@ -517,5 +518,31 @@ describe("the three the sweep could not fix", () => {
       `select has_function_privilege('authenticated', 'public.lock_down_definer_functions()', 'execute') as can`,
     );
     expect(can).toBe(false);
+  });
+});
+
+describe("the exposure view still bites", () => {
+  it("reports a function that checks nothing", async () => {
+    // Making the heuristic quieter in 168 must not have made it blind.
+    await db.exec(`create or replace function public.gates_nothing() returns int
+                   language sql security definer set search_path to 'public' as $$ select 1 $$;
+                   grant execute on function public.gates_nothing() to authenticated;`);
+    const { body_checks_the_caller } = await one<{ body_checks_the_caller: boolean }>(
+      `select body_checks_the_caller from security_definer_exposure
+        where "function" = 'gates_nothing'`,
+    );
+    expect(body_checks_the_caller).toBe(false);
+  });
+
+  it("does not report one that gates through a named predicate", async () => {
+    await db.exec(`create or replace function public.gated_by_slot(p uuid) returns boolean
+                   language sql security definer set search_path to 'public'
+                   as $$ select may_advance_slot(p) $$;
+                   grant execute on function public.gated_by_slot(uuid) to authenticated;`);
+    const { body_checks_the_caller } = await one<{ body_checks_the_caller: boolean }>(
+      `select body_checks_the_caller from security_definer_exposure
+        where "function" = 'gated_by_slot'`,
+    );
+    expect(body_checks_the_caller).toBe(true);
   });
 });
