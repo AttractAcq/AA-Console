@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { ReelShotGrid } from "../../components/ReelShotGrid";
 import { supabase } from "../../lib/supabase";
 import { buildReelMasters } from "../../lib/reelShots";
+import { signPaths } from "../../lib/media";
 import type {
   ReelAssetReview,
   ReelBriefInput,
@@ -75,12 +76,19 @@ export function ReelShotsPanel() {
             .order("created_at", { ascending: false })
         : { data: [], error: null };
       if (jobRes.error) throw jobRes.error;
+      // The finished cuts, signed so the grid can play them rather than
+      // assert they exist.
+      const signedCuts = await signPaths(
+        "client-media",
+        assets.map((a) => a.render_path ?? "").filter(Boolean),
+      );
       setMasters(
         buildReelMasters(
           briefs,
           assets,
           (frameRes.data ?? []) as ReelFrameRow[],
           (jobRes.data ?? []) as ReelEditJob[],
+          signedCuts,
         ),
       );
     } catch (error) {

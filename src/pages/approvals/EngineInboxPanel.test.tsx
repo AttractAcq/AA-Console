@@ -75,7 +75,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   inboxRows = [row()];
   rejectedRows = [];
-  assetRows = [{ id: "asset-1", storage_path: "client-1/a.mp4", render_path: null }];
+  assetRows = [
+    { id: "asset-1", storage_path: "client-1/a.mp4", render_path: null, media_type: "video" },
+  ];
   inboxError = null;
   useParams.mockReturnValue({ clientId: "client-1" });
   rpc.mockResolvedValue({ data: null, error: null });
@@ -124,10 +126,55 @@ describe("what is waiting on a person", () => {
     expect(titles).toEqual(["Late", "Later"]);
   });
 
-  it("links to the asset a person is being asked to approve", async () => {
+  it("plays the reel a person is being asked to approve", async () => {
+    // A reel reviewed from a filename is a reel nobody watched, and this
+    // card is the one place the decision is made.
+    render(<EngineInboxPanel />);
+    await screen.findByText("The Chain");
+    const player = document.querySelector("video");
+    expect(player).not.toBeNull();
+    expect(player!.getAttribute("src")).toBe("https://signed/a.mp4");
+    // Not autoplay: a queue of reels all talking at once is worse than a
+    // queue of still frames.
+    expect(player!.hasAttribute("autoplay")).toBe(false);
+  });
+
+  it("shows an image inline rather than a player", async () => {
+    assetRows = [
+      { id: "asset-1", storage_path: "client-1/a.png", render_path: null, media_type: "image" },
+    ];
+    signPaths.mockResolvedValue(new Map([["client-1/a.png", "https://signed/a.png"]]));
+    render(<EngineInboxPanel />);
+    const shot = await screen.findByRole("img", { name: /the chain/i });
+    expect(shot).toHaveAttribute("src", "https://signed/a.png");
+    expect(document.querySelector("video")).toBeNull();
+  });
+
+  it("falls back to a link for anything it cannot show", async () => {
+    assetRows = [
+      { id: "asset-1", storage_path: "client-1/a.md", render_path: null, media_type: "text" },
+    ];
+    signPaths.mockResolvedValue(new Map([["client-1/a.md", "https://signed/a.md"]]));
     render(<EngineInboxPanel />);
     const link = await screen.findByRole("link", { name: /open the asset/i });
-    expect(link).toHaveAttribute("href", "https://signed/a.mp4");
+    expect(link).toHaveAttribute("href", "https://signed/a.md");
+  });
+
+  it("prefers the cut over the opening still", async () => {
+    // For a reel the cut is the thing being approved; storage_path is the
+    // first frame.
+    assetRows = [
+      {
+        id: "asset-1",
+        storage_path: "client-1/still.png",
+        render_path: "client-1/cut.mp4",
+        media_type: "video",
+      },
+    ];
+    signPaths.mockResolvedValue(new Map([["client-1/cut.mp4", "https://signed/cut.mp4"]]));
+    render(<EngineInboxPanel />);
+    await screen.findByText("The Chain");
+    expect(document.querySelector("video")!.getAttribute("src")).toBe("https://signed/cut.mp4");
   });
 });
 

@@ -74,6 +74,12 @@ export type CutState = {
   detail: string;
   /** Whether asking for a cut now would do anything. */
   canRequest: boolean;
+  /**
+   * A signed URL for the finished cut, where one exists and has been signed.
+   * "Cut on file" with no way to watch it is a claim a reviewer has to take
+   * on trust.
+   */
+  url?: string | null;
 };
 
 const IN_FLIGHT = new Set(["queued", "claimed", "running"]);
@@ -91,9 +97,17 @@ export function cutState(
   asset: { render_path?: string | null },
   shots: readonly ShotRow[],
   jobs: readonly ReelEditJob[],
+  /** Signed URLs by storage path, from signPaths. */
+  signed?: ReadonlyMap<string, string>,
 ): CutState {
-  if (asset.render_path?.trim()) {
-    return { status: "cut", detail: "Cut on file.", canRequest: false };
+  const renderPath = asset.render_path?.trim();
+  if (renderPath) {
+    return {
+      status: "cut",
+      detail: "Cut on file.",
+      canRequest: false,
+      url: signed?.get(renderPath) ?? null,
+    };
   }
   const latest = jobs[0];
   if (latest && IN_FLIGHT.has(latest.status)) {
@@ -252,6 +266,7 @@ export function buildReelMasters(
   assets: ReelAssetReview[],
   frames: ReelFrameRow[],
   editJobs: ReelEditJob[] = [],
+  signedCuts?: ReadonlyMap<string, string>,
 ): ReelMasterView[] {
   return briefs.filter(isPhase1MotionBrief).map((brief) => {
     const plan = readShotPlan(brief.frame_plan);
@@ -277,7 +292,12 @@ export function buildReelMasters(
           shots,
           // Newest first, as the panel queries them: the latest job is the
           // one that says where this reel's cut has got to.
-          cut: cutState(asset, shots, editJobs.filter((job) => job.input_id === asset.id)),
+          cut: cutState(
+            asset,
+            shots,
+            editJobs.filter((job) => job.input_id === asset.id),
+            signedCuts,
+          ),
         };
       }),
     };

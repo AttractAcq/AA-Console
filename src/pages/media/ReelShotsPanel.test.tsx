@@ -8,7 +8,21 @@ vi.mock("react-router-dom", () => ({
 }));
 
 vi.mock("../../lib/supabase", () => ({
-  supabase: { from: (...args: unknown[]) => from(...args), rpc: vi.fn() },
+  supabase: {
+    from: (...args: unknown[]) => from(...args),
+    rpc: vi.fn(),
+    // The panel signs the finished cuts so the grid can play them. Without
+    // this the whole panel falls into its error path, which is how a missing
+    // storage stub reads as "the cut is not on file".
+    storage: {
+      from: () => ({
+        createSignedUrls: async (paths: string[]) => ({
+          data: paths.map((path) => ({ path, signedUrl: `https://signed/${path}`, error: null })),
+          error: null,
+        }),
+      }),
+    },
+  },
 }));
 
 import { ReelShotsPanel } from "./ReelShotsPanel";
@@ -112,11 +126,26 @@ describe("ReelShotsPanel", () => {
     expect(screen.queryByRole("button", { name: /cut the reel/i })).not.toBeInTheDocument();
   });
 
-  it("says the cut is on file once one exists", async () => {
+  it("says the cut is on file once one exists, and plays it", async () => {
     assets = [
       { id: "asset-1", brief_id: "brief-1", title: "How it works", ref_number: "MA-1", review_status: "approved", render_path: "cuts/a.mp4" },
     ];
     render(<ReelShotsPanel />);
     await waitFor(() => expect(screen.getByText("Cut on file.")).toBeInTheDocument());
+
+    // "Cut on file" with no way to watch it is a claim a reviewer has to
+    // take on trust.
+    const player = document.querySelector("video");
+    expect(player).not.toBeNull();
+    expect(player!.getAttribute("src")).toBe("https://signed/cuts/a.mp4");
+  });
+
+  it("offers no player for a reel that has not been cut", async () => {
+    assets = [
+      { id: "asset-1", brief_id: "brief-1", title: "How it works", ref_number: "MA-1", review_status: "approved", render_path: null },
+    ];
+    render(<ReelShotsPanel />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /cut the reel/i })).toBeInTheDocument());
+    expect(document.querySelector("video")).toBeNull();
   });
 });

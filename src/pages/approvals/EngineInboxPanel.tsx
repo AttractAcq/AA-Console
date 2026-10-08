@@ -76,7 +76,7 @@ export function EngineInboxPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [rows, setRows] = useState<InboxRow[]>([]);
   const [rejected, setRejected] = useState<RejectedRow[]>([]);
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const [urls, setUrls] = useState<Map<string, { url: string; mediaType: string | null }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -114,20 +114,26 @@ export function EngineInboxPanel() {
       if (assetIds.length > 0) {
         const { data: assets } = await supabase
           .from("client_media_assets")
-          .select("id, storage_path, render_path")
+          .select("id, storage_path, render_path, media_type")
           .in("id", assetIds);
-        const paths = (assets ?? []).map(
-          (a) => (a as { render_path?: string | null; storage_path?: string | null }).render_path ??
-            (a as { storage_path?: string | null }).storage_path ??
-            "",
+        type AssetFile = {
+          id: string;
+          render_path?: string | null;
+          storage_path?: string | null;
+          media_type?: string | null;
+        };
+        const files = (assets ?? []) as AssetFile[];
+        // render_path first: for a reel the cut is the thing being approved,
+        // and storage_path is the opening still.
+        const signed = await signPaths(
+          "client-media",
+          files.map((a) => a.render_path ?? a.storage_path ?? ""),
         );
-        const signed = await signPaths("client-media", paths);
         setUrls(
           new Map(
-            (assets ?? []).flatMap((a) => {
-              const row = a as { id: string; render_path?: string | null; storage_path?: string | null };
+            files.flatMap((row) => {
               const url = signed.get(row.render_path ?? row.storage_path ?? "");
-              return url ? [[row.id, url] as [string, string]] : [];
+              return url ? [[row.id, { url, mediaType: row.media_type ?? null }] as const] : [];
             }),
           ),
         );
@@ -226,15 +232,37 @@ export function EngineInboxPanel() {
                 </div>
               </div>
 
+              {/* The thing being approved, not a link to it. A reel reviewed
+                  from a filename is a reel nobody watched, and this card is
+                  the one place the decision is made. */}
               {card.assetId && urls.get(card.assetId) && (
-                <a
-                  href={urls.get(card.assetId)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-3 inline-block text-xs font-medium text-brand-strong underline"
-                >
-                  Open the asset
-                </a>
+                <div className="mt-3">
+                  {urls.get(card.assetId)!.mediaType === "video" ? (
+                    <video
+                      src={urls.get(card.assetId)!.url}
+                      controls
+                      // Not autoplay: a queue of reels all talking at once is
+                      // worse than a queue of still frames.
+                      preload="metadata"
+                      className="max-h-[320px] w-auto rounded-md border border-border bg-black"
+                    />
+                  ) : urls.get(card.assetId)!.mediaType === "image" ? (
+                    <img
+                      src={urls.get(card.assetId)!.url}
+                      alt={card.assetTitle}
+                      className="max-h-[320px] w-auto rounded-md border border-border"
+                    />
+                  ) : (
+                    <a
+                      href={urls.get(card.assetId)!.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-block text-xs font-medium text-brand-strong underline"
+                    >
+                      Open the asset
+                    </a>
+                  )}
+                </div>
               )}
 
               <div className="mt-3 space-y-2">

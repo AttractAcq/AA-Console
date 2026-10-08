@@ -94,7 +94,7 @@ function sec(value: number): string {
 export const CAPTION_LINE_CHARS = 22;
 export const END_CARD_LINE_CHARS = 16;
 
-export function wrapText(text: string, lineChars: number): string {
+export function wrapLines(text: string, lineChars: number): string[] {
   const lines: string[] = [];
   let line = "";
   for (const word of text.trim().split(/\s+/)) {
@@ -106,13 +106,33 @@ export function wrapText(text: string, lineChars: number): string {
     }
   }
   if (line) lines.push(line);
-  return lines.join("\n");
+  return lines;
 }
 
-function captionY(position: CaptionPosition): string {
+export function wrapText(text: string, lineChars: number): string {
+  return wrapLines(text, lineChars).join("\n");
+}
+
+/** Pixels between baselines, on top of the font size. */
+export const LINE_SPACING = 12;
+
+/** How tall a block of n lines is at this size, in pixels. */
+export function blockHeight(lineCount: number, size: number): number {
+  if (lineCount <= 0) return 0;
+  return lineCount * (size + LINE_SPACING) - LINE_SPACING;
+}
+
+/**
+ * Where the first line of a block starts.
+ *
+ * `text_h` is deliberately not used. Each line is drawn by its own drawtext
+ * so that each centres on its own width, which means text_h is one line's
+ * height rather than the block's — so the block is measured here instead.
+ */
+function captionY(position: CaptionPosition, lineCount: number, size: number): string {
   // Bottom sits above the Reels caption and button area, not at the edge.
   if (position === "top") return "h*0.12";
-  if (position === "middle") return "(h-text_h)/2";
+  if (position === "middle") return `(h-${blockHeight(lineCount, size)})/2`;
   return "h*0.70";
 }
 
@@ -172,21 +192,65 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
   }
 
   const textFiles: RenderPlan["textFiles"] = [];
-  const drawText = (file: string, y: string, size: number, start: number, end: number) =>
-    `drawtext=fontfile=${fontFile}:textfile=${file}:expansion=none:fontsize=${size}:line_spacing=12:` +
-    `fontcolor=${textColour}:borderw=5:bordercolor=black@0.85:x=(w-text_w)/2:y=${y}:` +
-    `enable='between(t,${sec(start)},${sec(end)})'`;
+
+  /**
+   * One drawtext per line, not one per block.
+   *
+   * `x=(w-text_w)/2` centres what the filter is drawing, and text_w is the
+   * width of the widest line in it. Given a whole block that leaves every
+   * line left-aligned inside a centred box, so a two-line caption with a
+   * short second line sits visibly off. Drawing each line separately makes
+   * text_w that line's own width, and each one centres.
+   *
+   * The cost is one text file per line rather than per caption. Still
+   * textfile= rather than text=, because inline text would need three
+   * layers of escaping and the caption comes from a model.
+   */
+  const drawBlock = (
+    name: string,
+    lines: readonly string[],
+    firstY: string,
+    size: number,
+    start: number,
+    end: number,
+  ): string[] =>
+    lines.map((line, index) => {
+      const file = `${workDir}/${name}-${index + 1}.txt`;
+      textFiles.push({ path: file, content: line });
+      const y = index === 0 ? firstY : `${firstY}+${index * (size + LINE_SPACING)}`;
+      return (
+        `drawtext=fontfile=${fontFile}:textfile=${file}:expansion=none:fontsize=${size}:` +
+        `fontcolor=${textColour}:borderw=5:bordercolor=black@0.85:x=(w-text_w)/2:y=${y}:` +
+        `enable='between(t,${sec(start)},${sec(end)})'`
+      );
+    });
 
   const overlays: string[] = [];
   edl.captions.forEach((caption, i) => {
-    const file = `${workDir}/caption-${i + 1}.txt`;
-    textFiles.push({ path: file, content: wrapText(caption.text, CAPTION_LINE_CHARS) });
-    overlays.push(drawText(file, captionY(caption.position), 64, caption.start_sec, caption.end_sec));
+    const lines = wrapLines(caption.text, CAPTION_LINE_CHARS);
+    overlays.push(
+      ...drawBlock(
+        `caption-${i + 1}`,
+        lines,
+        captionY(caption.position, lines.length, 64),
+        64,
+        caption.start_sec,
+        caption.end_sec,
+      ),
+    );
   });
   if (edl.end_card_text) {
-    const file = `${workDir}/end-card.txt`;
-    textFiles.push({ path: file, content: wrapText(edl.end_card_text, END_CARD_LINE_CHARS) });
-    overlays.push(drawText(file, "(h-text_h)/2", 80, cutSec, cutSec + edl.end_card_sec));
+    const lines = wrapLines(edl.end_card_text, END_CARD_LINE_CHARS);
+    overlays.push(
+      ...drawBlock(
+        "end-card",
+        lines,
+        `(h-${blockHeight(lines.length, 80)})/2`,
+        80,
+        cutSec,
+        cutSec + edl.end_card_sec,
+      ),
+    );
   }
   filters.push(`[${current}]${overlays.length ? overlays.join(",") : "null"}[vout]`);
 

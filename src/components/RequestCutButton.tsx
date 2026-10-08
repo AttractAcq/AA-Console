@@ -42,6 +42,14 @@ export function RequestCutButton({
 
   return (
     <span className="flex flex-wrap items-center gap-2">
+      {state.url && (
+        <video
+          src={state.url}
+          controls
+          preload="metadata"
+          className="max-h-[200px] w-auto rounded-md border border-border bg-black"
+        />
+      )}
       <span
         className={
           state.status === "failed"
