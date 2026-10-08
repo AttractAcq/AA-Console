@@ -220,7 +220,7 @@ beforeAll(async () => {
     "20261006140000_155_tick_queues_the_right_input.sql",
     "20261006200000_158_qa.sql",
     "20261006220000_159_approval_inbox.sql",
-    "20261006240000_160_publishing.sql",
+    "20261006235000_160_publishing.sql",
   ]) {
     await db.exec(await migration(f));
   }

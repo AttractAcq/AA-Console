@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { adapterFor, supportedPlatforms } from "./registry.js";
 
 const migration = () =>
-  readFile(new URL("../../../supabase/migrations/20261006240000_160_publishing.sql", import.meta.url), "utf8");
+  readFile(new URL("../../../supabase/migrations/20261006235000_160_publishing.sql", import.meta.url), "utf8");
 
 describe("which adapter posts where", () => {
   it("has one for each platform it claims to support", () => {
