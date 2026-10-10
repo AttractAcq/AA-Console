@@ -10,6 +10,7 @@ import { SmmWorkspace } from "./sections/SmmWorkspace";
 import { ProductionWorkspace } from "./sections/ProductionWorkspace";
 import { JobsTable } from "./sections/JobsTable";
 import { ClientsTable } from "./sections/ClientsTable";
+import { SmmVideoApprovals } from "./sections/SmmVideoApprovals";
 import { ChatView } from "../../components/chat/ChatView";
 
 /** Avatars work jobs; editors work projects. Same table, different word. */
@@ -68,6 +69,10 @@ export function EmployeeConsolePage() {
 
     if (page.id === "current-clients") {
       return <ClientsTable memberId={memberId!} scope="current" />;
+    }
+
+    if (page.id === "video-approvals" && category === "smm") {
+      return <SmmVideoApprovals memberId={memberId!} />;
     }
 
     if (page.id === "past-clients") {
