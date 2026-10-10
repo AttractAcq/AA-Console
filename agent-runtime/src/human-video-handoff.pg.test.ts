@@ -31,7 +31,7 @@ beforeAll(async () => {
     create type review_status as enum ('pending','approved','rejected');
     create type post_platform as enum ('facebook','instagram','tiktok','linkedin','youtube');
     create type idea_source as enum ('manual','auto','proof');
-    create type idea_status as enum ('draft','approved','rejected');
+    create type idea_status as enum ('draft','approved','rejected','briefed');
     create function format_fits_media(content_format, media_type) returns boolean
       language sql stable as $$ select true $$;
     create table storage.objects (bucket_id text, name text, owner uuid);
@@ -48,6 +48,8 @@ beforeAll(async () => {
       title text, body text, media_type media_type, content_format content_format,
       target_platform post_platform, source idea_source, status idea_status,
       created_by uuid, strategic_reason text);
+    create function approve_idea_and_generate_brief(uuid) returns uuid language plpgsql as $$
+    begin update client_ideas set status='briefed' where id=$1; return gen_random_uuid(); end $$;
     create table team_members (id uuid primary key, category team_category, active boolean, user_id uuid);
     create table client_assignments (member_id uuid, ended_at timestamptz);
     create table client_media_assets (
@@ -102,6 +104,7 @@ beforeAll(async () => {
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010190000_181_motion_design_projects.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010200000_182_video_repurpose_insights.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010210000_183_motion_design_attachments.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../supabase/migrations/20261010220000_184_video_repurpose_brief_reentry.sql", import.meta.url), "utf8"));
   await db.exec(`create trigger car_assignment_follows_review after insert on client_asset_reviews
     for each row execute function assignment_follows_review();`);
 });
@@ -281,6 +284,15 @@ it("branches an unapproved source-video quote into a draft idea with exact linea
   const lineage = await db.query<{ reentry_stage: string; source_asset_id: string }>(
     "select reentry_stage,source_asset_id from video_repurpose_derivatives where idea_id=$1", [first.rows[0]?.id]);
   expect(lineage.rows[0]).toMatchObject({ reentry_stage: "ideation", source_asset_id: intake });
+  const briefed = await db.query<{ id: string }>(
+    "select brief_video_repurpose_candidate($1,$2,$3::post_platform) as id",
+    [result.rows[0]?.id, 1, "facebook"]);
+  const briefedIdea = await db.query<{ status: string }>(
+    "select status from client_ideas where id=$1", [briefed.rows[0]?.id]);
+  expect(briefedIdea.rows[0]?.status).toBe("briefed");
+  const branch = await db.query<{ reentry_stage: string }>(
+    "select reentry_stage from video_repurpose_derivatives where idea_id=$1", [briefed.rows[0]?.id]);
+  expect(branch.rows[0]?.reentry_stage).toBe("brief");
 });
 
 it("attaches a finished motion render as a pending review asset", async () => {

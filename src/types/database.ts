@@ -8221,6 +8221,11 @@ export type Database = {
           p_target_platform: Database["public"]["Enums"]["post_platform"] }
         Returns: string
       }
+      brief_video_repurpose_candidate: {
+        Args: { p_request_id: string; p_candidate_index: number;
+          p_target_platform: Database["public"]["Enums"]["post_platform"] }
+        Returns: string
+      }
       request_motion_design: {
         Args: {
           p_client_id: string

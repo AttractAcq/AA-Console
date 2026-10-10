@@ -27,10 +27,20 @@ vi.mock("../../lib/supabase", () => ({ supabase: {
 import { VideoRepurposePanel } from "./VideoRepurposePanel";
 
 it("creates a draft idea from an evidenced quote candidate", async () => {
+  rpc.mockClear();
   render(<MemoryRouter><VideoRepurposePanel clientId="client-1" /></MemoryRouter>);
   expect(await screen.findByText("We made the process simpler.")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Send to Ideation" }));
   expect(rpc).toHaveBeenCalledWith("create_video_repurpose_idea", {
+    p_request_id: "request-1", p_candidate_index: 1, p_target_platform: "instagram",
+  });
+});
+
+it("queues a derivative brief from the selected source range", async () => {
+  rpc.mockClear();
+  render(<MemoryRouter><VideoRepurposePanel clientId="client-1" /></MemoryRouter>);
+  await userEvent.click(await screen.findByRole("button", { name: "Create brief" }));
+  expect(rpc).toHaveBeenCalledWith("brief_video_repurpose_candidate", {
     p_request_id: "request-1", p_candidate_index: 1, p_target_platform: "instagram",
   });
 });

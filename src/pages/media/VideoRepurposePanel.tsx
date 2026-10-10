@@ -11,7 +11,8 @@ type Candidate = { kind: "quote_image" | "short_clip"; title: string; reason: st
   start_sec: number; end_sec: number; exact_quote: string };
 type Request = { id: string; source_asset_id: string; direction: string;
   status: string; candidates: unknown; error: string | null; created_at: string };
-type Derivative = { request_id: string; candidate_index: number; target_platform: Platform; idea_id: string };
+type Derivative = { request_id: string; candidate_index: number; target_platform: Platform;
+  idea_id: string; reentry_stage: string };
 const PLATFORMS: Platform[] = ["instagram", "facebook", "tiktok", "linkedin", "youtube"];
 
 export function VideoRepurposePanel({ clientId }: { clientId: string | undefined }) {
@@ -47,7 +48,7 @@ export function VideoRepurposePanel({ clientId }: { clientId: string | undefined
       const requestRows = (requestResult.data ?? []) as Request[];
       const requestIds = requestRows.map((request) => request.id);
       const linked = requestIds.length ? await supabase.from("video_repurpose_derivatives")
-        .select("request_id, candidate_index, target_platform, idea_id")
+        .select("request_id, candidate_index, target_platform, idea_id, reentry_stage")
         .in("request_id", requestIds) : { data: [], error: null };
       if (linked.error) throw linked.error;
       setVideos(eligible); setRequests(requestRows);
@@ -72,15 +73,18 @@ export function VideoRepurposePanel({ clientId }: { clientId: string | undefined
     void refresh();
   }
 
-  async function branch(request: Request, candidateIndex: number, platform: Platform) {
+  async function branch(request: Request, candidateIndex: number, platform: Platform,
+    stage: "ideation" | "brief") {
     setBusy(true); setError(null); setNotice(null);
-    const result = await supabase.rpc("create_video_repurpose_idea", {
+    const result = await supabase.rpc(stage === "brief"
+      ? "brief_video_repurpose_candidate" : "create_video_repurpose_idea", {
       p_request_id: request.id, p_candidate_index: candidateIndex,
       p_target_platform: platform,
     });
     setBusy(false);
     if (result.error) { setError(result.error.message); return; }
-    setNotice("Draft derivative idea created. Continue in Ideation, then Brief and Create.");
+    setNotice(stage === "brief" ? "Derivative brief queued. Review it in Briefs before Create."
+      : "Draft derivative idea created. Continue in Ideation, then Brief and Create.");
     void refresh();
   }
 
@@ -136,12 +140,18 @@ export function VideoRepurposePanel({ clientId }: { clientId: string | undefined
                     {PLATFORMS.filter((item) => candidate.kind !== "short_clip" || item !== "linkedin")
                       .map((item) => <option key={item} value={item} className="capitalize">{item}</option>)}
                   </select>
-                  {linked ? <Link to={`/clients/${clientId}/delivery/ideation?tab=generation`}
-                    className="text-xs font-medium text-brand-strong hover:underline">Open draft idea</Link>
-                    : <button type="button" disabled={busy} onClick={() => void branch(request, index + 1, platform)}
+                  {linked && <Link to={`/clients/${clientId}/delivery/ideation?tab=${linked.reentry_stage === "brief" ? "briefs" : "generation"}`}
+                    className="text-xs font-medium text-brand-strong hover:underline">
+                    Open {linked.reentry_stage === "brief" ? "brief" : "draft idea"}</Link>}
+                  {!linked && <button type="button" disabled={busy} onClick={() => void branch(request, index + 1, platform, "ideation")}
                       className="text-xs font-medium text-brand-strong hover:underline disabled:opacity-50">
                       Send to Ideation
                     </button>}
+                  {linked?.reentry_stage !== "brief" && <button type="button" disabled={busy}
+                    onClick={() => void branch(request, index + 1, platform, "brief")}
+                    className="text-xs font-medium text-brand-strong hover:underline disabled:opacity-50">
+                    Create brief
+                  </button>}
                 </div>
               </div>;
             })}
