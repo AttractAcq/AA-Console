@@ -10,6 +10,7 @@ const { rpc, upload, remove, scenario } = vi.hoisted(() => ({
   scenario: { stage: "needs_edit", request: null } as { stage: string; request: Record<string, unknown> | null },
 }));
 vi.mock("../../lib/media", () => ({ signPaths: async () => new Map([["client-1/raw.mp4", "https://example.test/raw.mp4"]]) }));
+vi.mock("./VideoRepurposePanel", () => ({ VideoRepurposePanel: () => null }));
 vi.mock("../../lib/supabase", () => ({ supabase: {
   rpc,
   storage: { from: () => ({ upload, remove }) },

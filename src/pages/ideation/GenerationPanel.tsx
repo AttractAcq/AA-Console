@@ -25,6 +25,7 @@ type PostPlatformValue = Database["public"]["Enums"]["post_platform"];
 type Idea = {
   id: string;
   title: string;
+  body: string | null;
   media_type: string;
   content_format: string;
   target_platform: string | null;
@@ -120,7 +121,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
       if (!clientId) return;
       const { data, error } = await supabase
         .from("client_ideas")
-        .select("id, title, media_type, content_format, target_platform, source, status, campaign:client_campaigns!client_ideas_campaign_client_fkey(name)")
+        .select("id, title, body, media_type, content_format, target_platform, source, status, campaign:client_campaigns!client_ideas_campaign_client_fkey(name)")
         .eq("client_id", clientId)
         // An idea whose brief exists is record, not work. It lives in the
         // archive from that moment; leaving it here is how 300 drafts and 33
@@ -294,7 +295,13 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
         columns={["Idea", "Destination", "Format", "Type", "Campaign", "Status", ""]}
         emptyLabel={`No ${activeLabel.toLowerCase()} ideas yet`}
         rows={shown.map((i) => [
-          i.title,
+          <div key={i.id} className="space-y-1">
+            <span>{i.title}</span>
+            {i.body && <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer text-brand-strong">View source and direction</summary>
+              <p className="mt-1 whitespace-pre-wrap">{i.body}</p>
+            </details>}
+          </div>,
           platformLabel(i.target_platform),
           formatLabel(i.content_format),
           i.source,

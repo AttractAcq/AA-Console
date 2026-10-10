@@ -29,6 +29,11 @@ beforeAll(async () => {
     create type media_type as enum ('image','text','video');
     create type content_format as enum ('single','carousel','story','reel');
     create type review_status as enum ('pending','approved','rejected');
+    create type post_platform as enum ('facebook','instagram','tiktok','linkedin','youtube');
+    create type idea_source as enum ('manual','auto','proof');
+    create type idea_status as enum ('draft','approved','rejected');
+    create function format_fits_media(content_format, media_type) returns boolean
+      language sql stable as $$ select true $$;
     create table storage.objects (bucket_id text, name text, owner uuid);
     alter table storage.objects enable row level security;
     create function storage.foldername(text) returns text[] language sql immutable
@@ -39,10 +44,14 @@ beforeAll(async () => {
     create table client_briefs (id uuid primary key default gen_random_uuid(), client_id uuid,
       title text, body text, media_type media_type, content_format content_format,
       status text, production_method text, format_code text, editor_brief text);
+    create table client_ideas (id uuid primary key default gen_random_uuid(), client_id uuid,
+      title text, body text, media_type media_type, content_format content_format,
+      target_platform post_platform, source idea_source, status idea_status,
+      created_by uuid, strategic_reason text);
     create table team_members (id uuid primary key, category team_category, active boolean, user_id uuid);
     create table client_assignments (member_id uuid, ended_at timestamptz);
     create table client_media_assets (
-      id uuid primary key, client_id uuid, brief_id uuid, member_id uuid,
+      id uuid primary key default gen_random_uuid(), client_id uuid, brief_id uuid, member_id uuid,
       media_type media_type, content_format content_format, storage_path text,
       render_path text, title text, uploaded_by uuid, review_status review_status default 'pending',
       human_approved_at timestamptz, created_at timestamptz default now(),
@@ -91,6 +100,8 @@ beforeAll(async () => {
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010170000_179_source_video_ai_edit.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010180000_180_source_video_ai_revisions.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010190000_181_motion_design_projects.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../supabase/migrations/20261010200000_182_video_repurpose_insights.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../supabase/migrations/20261010210000_183_motion_design_attachments.sql", import.meta.url), "utf8"));
   await db.exec(`create trigger car_assignment_follows_review after insert on client_asset_reviews
     for each row execute function assignment_follows_review();`);
 });
@@ -243,4 +254,55 @@ it("queues a standalone motion project and keeps revisions linked", async () => 
   await db.exec("create or replace function active_video_approval_manager(uuid) returns uuid language sql stable as $$ select null::uuid $$;");
   await expect(db.query("select request_motion_design($1,$2,$3,$4,$5,$6)", args))
     .rejects.toThrow(/Only an admin or the assigned SMM/);
+});
+
+it("branches an unapproved source-video quote into a draft idea with exact lineage", async () => {
+  await db.exec("create or replace function active_video_approval_manager(uuid) returns uuid language sql stable as $$ select auth.uid() $$;");
+  const result = await db.query<{ id: string }>(
+    "select request_video_repurpose_insights($1,$2) as id",
+    [intake, "Extract a useful quote image and a short supporting clip."]);
+  expect(result.rows[0]?.id).toBeTruthy();
+  const candidates = [{ kind: "quote_image", title: "A useful client quote",
+    reason: "One clear point from the interview", start_sec: 4, end_sec: 10,
+    exact_quote: "We made the process simpler." }];
+  await db.query("update video_repurpose_requests set status='completed', candidates=$2 where id=$1",
+    [result.rows[0]?.id, candidates]);
+  const first = await db.query<{ id: string }>(
+    "select create_video_repurpose_idea($1,$2,$3::post_platform) as id",
+    [result.rows[0]?.id, 1, "instagram"]);
+  const second = await db.query<{ id: string }>(
+    "select create_video_repurpose_idea($1,$2,$3::post_platform) as id",
+    [result.rows[0]?.id, 1, "instagram"]);
+  expect(second.rows[0]?.id).toBe(first.rows[0]?.id);
+  const idea = await db.query<{ status: string; media_type: string; content_format: string; body: string }>(
+    "select status,media_type,content_format,body from client_ideas where id=$1", [first.rows[0]?.id]);
+  expect(idea.rows[0]).toMatchObject({ status: "draft", media_type: "image", content_format: "single" });
+  expect(idea.rows[0]?.body).toContain("We made the process simpler.");
+  const lineage = await db.query<{ reentry_stage: string; source_asset_id: string }>(
+    "select reentry_stage,source_asset_id from video_repurpose_derivatives where idea_id=$1", [first.rows[0]?.id]);
+  expect(lineage.rows[0]).toMatchObject({ reentry_stage: "ideation", source_asset_id: intake });
+});
+
+it("attaches a finished motion render as a pending review asset", async () => {
+  const project = await db.query<{ id: string }>(
+    "select request_motion_design($1,$2,$3,$4,$5,$6) as id",
+    [client, "A calm looping introduction to the client process.", "hero", "horizontal", 8, "on_brand"]);
+  const path = `${client}/motion-design/${project.rows[0]?.id}/motion.mp4`;
+  await db.query("insert into storage.objects(bucket_id,name) values ('client-media',$1)", [path]);
+  await db.query("update motion_design_projects set status='completed', render_path=$2 where id=$1",
+    [project.rows[0]?.id, path]);
+  const first = await db.query<{ id: string }>(
+    "select attach_motion_design($1) as id", [project.rows[0]?.id]);
+  const second = await db.query<{ id: string }>(
+    "select attach_motion_design($1) as id", [project.rows[0]?.id]);
+  expect(second.rows[0]?.id).toBe(first.rows[0]?.id);
+  const asset = await db.query<{ edit_stage: string; review_status: string; render_path: string }>(
+    "select edit_stage,review_status,render_path from client_media_assets where id=$1", [first.rows[0]?.id]);
+  expect(asset.rows[0]).toMatchObject({ edit_stage: "review_ready", review_status: "pending", render_path: path });
+  await db.query("update client_briefs set status='approved' where id=$1", [brief]);
+  const linked = await db.query<{ id: string }>(
+    "select attach_motion_design($1,$2) as id", [project.rows[0]?.id, brief]);
+  const linkedAsset = await db.query<{ brief_id: string }>(
+    "select brief_id from client_media_assets where id=$1", [linked.rows[0]?.id]);
+  expect(linkedAsset.rows[0]?.brief_id).toBe(brief);
 });

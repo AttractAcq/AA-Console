@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { signPaths } from "../../lib/media";
 import { supabase } from "../../lib/supabase";
 
@@ -9,6 +9,8 @@ type Project = { id: string; prompt: string; preset: Preset; aspect: Aspect;
   duration_sec: number; brand_mode: "on_brand" | "neutral"; status: string;
   scene_plan: unknown; render_path: string | null; poster_path: string | null;
   error: string | null; revision_of: string | null; created_at: string };
+type Brief = { id: string; title: string };
+type Attachment = { project_id: string; asset_id: string; brief_id: string | null };
 
 /** Independent prompt-to-motion page; output can later be attached to content or sites. */
 export function MotionDesignPanel() {
@@ -20,6 +22,9 @@ export function MotionDesignPanel() {
   const [brandMode, setBrandMode] = useState<"on_brand" | "neutral">("on_brand");
   const [revisionOf, setRevisionOf] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [briefs, setBriefs] = useState<Brief[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachSelections, setAttachSelections] = useState<Record<string, string>>({});
   const [urls, setUrls] = useState<ReadonlyMap<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -29,12 +34,25 @@ export function MotionDesignPanel() {
   const refresh = useCallback(async () => {
     if (!clientId) return;
     try {
-      const result = await supabase.from("motion_design_projects")
-        .select("id, prompt, preset, aspect, duration_sec, brand_mode, status, scene_plan, render_path, poster_path, error, revision_of, created_at")
-        .eq("client_id", clientId).order("created_at", { ascending: false }).limit(30);
+      const [result, briefResult] = await Promise.all([
+        supabase.from("motion_design_projects")
+          .select("id, prompt, preset, aspect, duration_sec, brand_mode, status, scene_plan, render_path, poster_path, error, revision_of, created_at")
+          .eq("client_id", clientId).order("created_at", { ascending: false }).limit(30),
+        supabase.from("client_briefs").select("id, title")
+          .eq("client_id", clientId).eq("media_type", "video").eq("status", "approved")
+          .order("created_at", { ascending: false }).limit(30),
+      ]);
       if (result.error) throw result.error;
+      if (briefResult.error) throw briefResult.error;
       const rows = (result.data ?? []) as Project[];
+      const ids = rows.map((project) => project.id);
+      const attachmentResult = ids.length ? await supabase.from("motion_design_attachments")
+        .select("project_id, asset_id, brief_id").in("project_id", ids)
+        : { data: [], error: null };
+      if (attachmentResult.error) throw attachmentResult.error;
       setProjects(rows);
+      setBriefs((briefResult.data ?? []) as Brief[]);
+      setAttachments((attachmentResult.data ?? []) as Attachment[]);
       setUrls(await signPaths("client-media", rows.flatMap((project) =>
         [project.render_path, project.poster_path].filter((path): path is string => !!path))));
       setError(null);
@@ -83,6 +101,18 @@ export function MotionDesignPanel() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not export the video.");
     }
+  }
+
+  async function attach(project: Project) {
+    const briefId = attachSelections[project.id] || null;
+    setBusy(true); setError(null); setNotice(null);
+    const result = await supabase.rpc("attach_motion_design", {
+      p_project_id: project.id, p_brief_id: briefId,
+    });
+    setBusy(false);
+    if (result.error) { setError(result.error.message); return; }
+    setNotice("Motion video attached as a pending asset. Owner and SMM review are still required.");
+    void refresh();
   }
 
   return <div className="space-y-6">
@@ -152,6 +182,22 @@ export function MotionDesignPanel() {
               <button type="button" onClick={() => revise(project)} className="hover:underline">Revise</button>
               {project.render_path && urls.get(project.render_path) && <button type="button"
                 onClick={() => void download(project)} className="hover:underline">Export MP4</button>}
+            </div>}
+            {project.status === "completed" && <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+              <select aria-label={`Attach ${project.preset} motion design`} value={attachSelections[project.id] ?? ""}
+                onChange={(event) => setAttachSelections({ ...attachSelections, [project.id]: event.target.value })}
+                className="rounded-md border border-input bg-background px-2 py-2 text-xs">
+                <option value="">Standalone video</option>
+                {briefs.map((brief) => <option key={brief.id} value={brief.id}>{brief.title}</option>)}
+              </select>
+              {attachments.some((item) => item.project_id === project.id
+                && item.brief_id === (attachSelections[project.id] || null))
+                ? <Link to={`/clients/${clientId}/delivery/approvals?tab=assets`}
+                  className="text-xs font-medium text-brand-strong hover:underline">Open approval asset</Link>
+                : <button type="button" disabled={busy} onClick={() => void attach(project)}
+                  className="rounded-md border border-border px-3 py-2 text-xs font-medium disabled:opacity-50">
+                  Send to approvals
+                </button>}
             </div>}
           </article>)}
     </section>
