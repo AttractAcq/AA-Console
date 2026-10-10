@@ -28,6 +28,7 @@ import { runCreativeBuildJob } from "../agents/creative_build/index.js";
 import { runVideoBuildJob } from "../agents/video_build/index.js";
 import { runVideoEditJob } from "../agents/video_edit/index.js";
 import { runSourceVideoEditJob } from "../agents/source_video_edit/index.js";
+import { runMotionDesignJob } from "../agents/motion_design/index.js";
 import { runIdeaSelectJob } from "../agents/idea_select/index.js";
 import { runCopywriterJob } from "../agents/copywriter/index.js";
 import { runTokenHealthJob } from "../agents/token_health/index.js";
@@ -110,6 +111,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // it against the clips and the brief's own claims, ffmpeg renders it.
   video_edit: runVideoEditJob,
   source_video_edit: runSourceVideoEditJob,
+  motion_design: runMotionDesignJob,
   idea_select: runIdeaSelectJob,
   copywriter: runCopywriterJob,
   token_health: runTokenHealthJob,

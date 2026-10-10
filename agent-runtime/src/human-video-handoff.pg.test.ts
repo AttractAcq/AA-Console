@@ -90,6 +90,7 @@ beforeAll(async () => {
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010160000_178_video_edit_intake.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010170000_179_source_video_ai_edit.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010180000_180_source_video_ai_revisions.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../supabase/migrations/20261010190000_181_motion_design_projects.sql", import.meta.url), "utf8"));
   await db.exec(`create trigger car_assignment_follows_review after insert on client_asset_reviews
     for each row execute function assignment_follows_review();`);
 });
@@ -219,4 +220,27 @@ it("lets the assigned SMM queue one guarded source edit", async () => {
   await db.query("update client_media_assets set review_status='approved' where id=$1", [retry.rows[0]?.id]);
   await expect(db.query("select request_source_video_edit($1,$2,$3,$4,$5,$6,$7,$8)", args))
     .rejects.toThrow(/unfinalized AI cut/);
+});
+
+it("queues a standalone motion project and keeps revisions linked", async () => {
+  const args = [client, "Explain our three-step production flow with clean typography.",
+    "explainer", "horizontal", 8, "on_brand"];
+  const first = await db.query<{ id: string }>(
+    "select request_motion_design($1,$2,$3,$4,$5,$6) as id", args);
+  expect(first.rows[0]?.id).toBeTruthy();
+  const queued = await db.query<{ status: string; job_id: string }>(
+    "select status,job_id from motion_design_projects where id=$1", [first.rows[0]?.id]);
+  expect(queued.rows[0]).toMatchObject({ status: "queued", job_id: expect.any(String) });
+  await expect(db.query("select request_motion_design($1,$2,$3,$4,$5,$6,$7)",
+    [...args, first.rows[0]?.id])).rejects.toThrow(/completed motion design/);
+  await db.query("update motion_design_projects set status='completed' where id=$1", [first.rows[0]?.id]);
+  const revision = await db.query<{ id: string }>(
+    "select request_motion_design($1,$2,$3,$4,$5,$6,$7) as id",
+    [...args, first.rows[0]?.id]);
+  const linked = await db.query<{ revision_of: string }>(
+    "select revision_of from motion_design_projects where id=$1", [revision.rows[0]?.id]);
+  expect(linked.rows[0]?.revision_of).toBe(first.rows[0]?.id);
+  await db.exec("create or replace function active_video_approval_manager(uuid) returns uuid language sql stable as $$ select null::uuid $$;");
+  await expect(db.query("select request_motion_design($1,$2,$3,$4,$5,$6)", args))
+    .rejects.toThrow(/Only an admin or the assigned SMM/);
 });

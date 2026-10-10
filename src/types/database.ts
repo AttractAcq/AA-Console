@@ -7947,6 +7947,70 @@ export type Database = {
           },
         ]
       }
+      motion_design_projects: {
+        Row: {
+          id: string
+          client_id: string
+          prompt: string
+          preset: string
+          aspect: string
+          duration_sec: number
+          brand_mode: string
+          revision_of: string | null
+          status: string
+          scene_plan: Json | null
+          render_path: string | null
+          poster_path: string | null
+          job_id: string | null
+          error: string | null
+          created_by: string | null
+          created_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          prompt: string
+          preset: string
+          aspect: string
+          duration_sec: number
+          brand_mode: string
+          revision_of?: string | null
+          status?: string
+          scene_plan?: Json | null
+          render_path?: string | null
+          poster_path?: string | null
+          job_id?: string | null
+          error?: string | null
+          created_by?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          prompt?: string
+          preset?: string
+          aspect?: string
+          duration_sec?: number
+          brand_mode?: string
+          revision_of?: string | null
+          status?: string
+          scene_plan?: Json | null
+          render_path?: string | null
+          poster_path?: string | null
+          job_id?: string | null
+          error?: string | null
+          created_by?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: "motion_design_projects_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
+          { foreignKeyName: "motion_design_projects_revision_of_fkey"; columns: ["revision_of"]; isOneToOne: false; referencedRelation: "motion_design_projects"; referencedColumns: ["id"] },
+          { foreignKeyName: "motion_design_projects_job_id_fkey"; columns: ["job_id"]; isOneToOne: false; referencedRelation: "agent_jobs"; referencedColumns: ["id"] },
+        ]
+      }
       video_source_edit_requests: {
         Row: {
           id: string
@@ -8078,6 +8142,18 @@ export type Database = {
       }
     }
     Functions: {
+      request_motion_design: {
+        Args: {
+          p_client_id: string
+          p_prompt: string
+          p_preset: string
+          p_aspect: string
+          p_duration_sec: number
+          p_brand_mode: string
+          p_revision_of?: string | null
+        }
+        Returns: string
+      }
       request_source_video_edit: {
         Args: {
           p_asset_id: string

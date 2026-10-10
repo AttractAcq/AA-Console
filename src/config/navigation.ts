@@ -8,6 +8,7 @@ import {
   Contact,
   CreditCard,
   FileText,
+  Clapperboard,
   FolderCheck,
   Globe,
   History,
@@ -175,6 +176,12 @@ export const clientNavGroups: NavNode[] = [
         path: "edit-repurpose",
         icon: Scissors,
         tabs: [{ id: "overview", label: "Video edits" }],
+      },
+      {
+        id: "motion-design",
+        label: "Motion Design",
+        path: "motion-design",
+        icon: Clapperboard,
       },
       {
         id: "approvals",
