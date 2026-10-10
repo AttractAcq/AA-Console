@@ -128,15 +128,28 @@ with a non-null `render_path`, and an uncut one cannot.
 
 ## Phase 2 — prove it is good, not merely working
 
-**2.1 The model comparison, now cheap.** Still the open question from the 1
-October doc, and the only one of its phases genuinely undone. `spike.ts
---model` already does it. At $0.19 per cut, 5 reels against two models is
-about **$2**, not the $20–40 the doc priced — which removes the sign-off that
-was holding it up.
+**2.1 The model comparison. Done on 10 October** —
+`model-comparison-2026-10-10.md`, total spend $1.56.
 
-Score on what matters rather than on taste: **approval rate unchanged**, cost
-per reel, and validator rejections per reel. The last one is the useful
-signal — a model that produces plans the validator refuses is expensive twice.
+Opus 5.5 $0.1422 per cut against Fable 5.1 $0.2188, and **stay on Opus** — but
+on evidence the cost table does not show. Fable started all six segments at
+0.00 in three runs out of three; Opus trimmed into the footage in all three.
+Fable is not using the sampled frames to pick in-points, which is most of what
+the editor is for.
+
+The useful result was not the ranking. Fable's first run drew two validator
+problems and cost 2.9× Opus — and both problems were defects in our prompt:
+`end_card_sec` had no description while sitting beside four fields where `_sec`
+means a timeline position, and the 60-character caption limit was enforced by
+`validateEdl` and stated nowhere. Fable was being graded on rules it had never
+been given. Stating them cut its cost 48% with no model change.
+
+Two caveats that matter for how much weight this carries: it is **one brief**,
+because all three reel assets share one and two have no clips — n=3 is runs per
+model, not reels. And **approval rate, the metric this phase was meant to
+produce, is still unmeasured**: it needs rendered files, and local ffmpeg has no
+`drawtext`. Phase 4.3 was supposed to be decided by that number and still is
+not.
 
 **2.2 Self-review of the render.** In the proposal, not built. Sample frames
 from the finished file and ask the model whether the captions are legible,
@@ -212,7 +225,7 @@ what puts it on the engine's path; until then every cut is a manual act.
 
 | | Per reel | Source |
 |---|---|---|
-| Planning + revise | **~$0.19** | 3 real cuts, $0.5707 total |
+| Planning + revise | **$0.14–0.19** | 3 production cuts ($0.5707); Opus measured at $0.1422 on 10 Oct |
 | Higgsfield clips | not in this repo | external billing |
 | Render compute | CPU seconds on Railway | ~5s wall for a 10.6s cut locally |
 | Whisper, if Phase 4.1 | cents | estimate |
@@ -228,9 +241,11 @@ in, "cheaper than an editor" is an assumption, not a finding.
 1. **Phase 1** — mine, start to finish. One enum migration, one pipeline row,
    a QA check and a one-row backfill. Nothing needs production credentials
    beyond the push.
-2. **Phase 2.1** — needs your sign-off on ~$2 and five briefed reels.
+2. ~~**Phase 2.1**~~ — done 10 October for $1.56. Still wants five briefed
+   reels, and an approval rate, neither of which exists yet.
 3. **Phase 2.2–2.3, Phase 3** — mine.
-4. **Phase 4** — decide after 2.1 produces an approval rate.
+4. **Phase 4** — still waiting on an approval rate. 2.1 did not produce one:
+   it compared plans, not finished cuts.
 
 Phase 1 is the only one that is blocking. The rest are improvements to
 something that will, after it, actually run.

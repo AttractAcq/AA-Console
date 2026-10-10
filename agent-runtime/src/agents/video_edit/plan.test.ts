@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { MAX_CAPTION_CHARS, MAX_END_CARD_SEC, TRANSITIONS } from "./edl.js";
 import { buildPlanContent, type PlanInput } from "./plan.js";
 
 const input: PlanInput = {
@@ -87,5 +88,31 @@ describe("shots that already carry their line", () => {
     const { SYSTEM } = await import("./plan.js");
     expect(SYSTEM).toMatch(/no captions is a good plan/i);
     expect(SYSTEM).toMatch(/already on screen/i);
+  });
+});
+
+// A limit the validator enforces but the prompt never states is only
+// discoverable by failing. That cost a full revise round in the 10 October
+// model comparison: Fable returned a 70-character end card and a 22.8s
+// end_card_sec, both against rules it had not been given. These assert the
+// prompt carries every limit validateEdl checks, so the two cannot drift.
+describe("the prompt states the limits the validator enforces", () => {
+  const stated = () => texts(buildPlanContent(input)).join("\n");
+
+  it("gives the caption and end card character limit", () => {
+    expect(stated()).toContain(`${MAX_CAPTION_CHARS} characters`);
+  });
+
+  it("gives the end card duration range", () => {
+    expect(stated()).toContain(`between 1 and ${MAX_END_CARD_SEC}s`);
+  });
+
+  // Asserting each name appears somewhere in the prompt passes without the
+  // list: "Client footage: cut only, no crossfade" already contains both.
+  // Match the line that enumerates them.
+  it("lists every transition the validator accepts", () => {
+    const line = texts(buildPlanContent(input)).join("\n").split("\n").find((l) => l.startsWith("Transitions available:"));
+    expect(line).toBeDefined();
+    for (const transition of TRANSITIONS) expect(line).toContain(transition);
   });
 });
