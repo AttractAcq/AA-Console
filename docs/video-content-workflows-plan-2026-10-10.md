@@ -135,6 +135,8 @@ The SMM employee console also exposes **Video Editing** for current clients. It 
 
 Before release, verify the current Railway values of `AGENT_RUNTIME_MODEL`, `OPENAI_IMAGE_MODEL`, `HIGGSFIELD_MODEL_DRAFT`, `HIGGSFIELD_MODEL_FINAL`, provider balances, and ffmpeg capabilities without printing secrets. The repo gives defaults, and the 8 October audit reports live clips, but neither proves current configuration or a new end-to-end run. The older `docs/completion-plan.md` and `docs/ai-video-edit.md` contain superseded status claims; use the current code and migrations for implementation decisions.
 
+On 10 October, a read-only Railway check found `HIGGSFIELD_API_KEY`, `HIGGSFIELD_API_SECRET`, `HIGGSFIELD_MODEL_DRAFT`, and `HIGGSFIELD_MODEL_FINAL` variable **names** on the connected production environment. Their values, balance, and ability to make a fresh clip were not inspected. No `RESEND_*` variable name appeared. That Railway project exposes only a production environment, so the new branch must not be proved by applying migrations or deploying there. Local Supabase could not be started with the machine at about 617 MiB free; keep the live provider and delivery proofs open until a safe test environment is available.
+
 ## Release boundary
 
 Prepare code, focused tests, and a reviewable PR. Do not merge, apply production migrations, or deploy to Railway without Alex via Chief of Staff, per `AGENTS.md`.
