@@ -51,6 +51,7 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
   const [uploading, setUploading] = useState(false);
   const [assignments, setAssignments] = useState<ReadonlyMap<string, Assignment>>(new Map());
   const [aiRequests, setAiRequests] = useState<ReadonlyMap<string, AiRequest>>(new Map());
+  const [restoredCuts, setRestoredCuts] = useState<ReadonlyMap<string, AiRequest>>(new Map());
   const [outputs, setOutputs] = useState<ReadonlyMap<string, string>>(new Map());
   const [editingAi, setEditingAi] = useState<string | null>(null);
   const [controls, setControls] = useState<EditControls>(defaultControls);
@@ -99,9 +100,14 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
       if (dispatches.error) throw dispatches.error;
       if (requests.error) throw requests.error;
       const latest = new Map<string, AiRequest>();
+      const completed = new Map<string, AiRequest>();
       for (const request of (requests.data ?? []) as AiRequest[]) {
         if (!latest.has(request.source_asset_id)) latest.set(request.source_asset_id, request);
+        if (request.status === "completed" && !completed.has(request.source_asset_id)) {
+          completed.set(request.source_asset_id, request);
+        }
       }
+      const restored = new Map([...completed].filter(([id]) => latest.get(id)?.status === "failed"));
       const bySource = new Map<string, Assignment>();
       for (const row of (assigned.data ?? []) as unknown as Assignment[]) {
         if (row.source_asset_id && !bySource.has(row.source_asset_id)) bySource.set(row.source_asset_id, row);
@@ -111,6 +117,7 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
       setBriefs((briefResult.data ?? []) as VideoBrief[]);
       setAssignments(bySource);
       setAiRequests(latest);
+      setRestoredCuts(restored);
       const byAssignmentEmail = new Map<string, string>();
       for (const dispatch of dispatches.data ?? []) {
         if (dispatch.assignment_id) {
@@ -119,7 +126,8 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
       }
       setEmailStatus(byAssignmentEmail);
       setUrls(await signPaths("client-media", rows.map((row) => row.storage_path)));
-      const outputIds = [...latest.values()].map((request) => request.output_asset_id).filter((id): id is string => !!id);
+      const outputIds = [...latest.values(), ...restored.values()]
+        .map((request) => request.output_asset_id).filter((id): id is string => !!id);
       if (outputIds.length) {
         const result = await supabase.from("client_media_assets").select("id, storage_path").in("id", outputIds);
         if (result.error) throw result.error;
@@ -290,6 +298,7 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
           const assignment = assignments.get(source.id);
           const active = assignment && ["assigned", "accepted", "rework", "delivered"].includes(assignment.stage);
           const ai = aiRequests.get(source.id);
+          const restored = restoredCuts.get(source.id);
           return <article key={source.id} className="space-y-3 rounded-lg border border-border p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">{source.title ?? "Video footage"}</h2>
@@ -315,6 +324,11 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
                 {ai.animated_title ? " · animated title" : ""}
               </p>
               {ai.error && <p role="alert" className="text-xs text-destructive">{ai.error}</p>}
+              {restored?.output_asset_id && outputs.get(restored.output_asset_id) && <div>
+                <p className="mb-1 text-xs font-medium">Previous cut restored after the failed revision</p>
+                <video controls preload="metadata" className="w-full max-w-xl rounded-md"
+                  src={outputs.get(restored.output_asset_id)} />
+              </div>}
               {ai.output_asset_id && outputs.get(ai.output_asset_id) && <div className="grid gap-3 md:grid-cols-2">
                 <div><p className="mb-1 text-xs font-medium">Original</p>
                   <video controls preload="metadata" className="w-full rounded-md" src={urls.get(source.storage_path)} /></div>
@@ -324,8 +338,8 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
               {ai.edit_plan != null && <details className="text-xs"><summary className="cursor-pointer">View edit plan</summary>
                 <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-2">
                   {JSON.stringify(ai.edit_plan, null, 2)}</pre></details>}
-              {ai.status === "completed" && <p className="text-xs text-brand-strong">
-                Edited version is ready for owner and SMM approval.{" "}
+              {(ai.status === "completed" || restored?.output_asset_id) && <p className="text-xs text-brand-strong">
+                {ai.status === "completed" ? "Edited version" : "Previous cut"} is ready for owner and SMM approval.{" "}
                 <Link className="font-medium underline" to={employeeMode ? "/employee/video-approvals"
                   : `/clients/${clientId}/delivery/approvals?tab=assets`}>
                   Open approvals
@@ -334,17 +348,21 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
             </section>}
             {source.edit_stage === "editing" && ai?.status !== "failed" && !active &&
               <p className="text-xs text-muted-foreground">AI edit in progress. Refresh to check the result.</p>}
-            {source.edit_stage === "edited" ? null : active ? <p className="text-xs text-muted-foreground">
+            {source.edit_stage === "edited" && ai?.status !== "completed" && ai?.status !== "failed" ? null : active ? <p className="text-xs text-muted-foreground">
               {assignment.team_members?.name ?? "Editor"}: {assignment.stage.replace(/_/g, " ")}
               {emailStatus.get(assignment.id) === "skipped" ? " · assigned, email not sent" : ""}
               {emailStatus.get(assignment.id) === "failed" ? " · email failed" : ""}
               {emailStatus.get(assignment.id) === "sent" ? " · email sent" : ""}
-            </p> : source.edit_stage === "needs_edit" && <div className="space-y-3">
+            </p> : (source.edit_stage === "needs_edit" || (source.edit_stage === "edited" && (ai?.status === "completed" || ai?.status === "failed"))) && <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <button type="button" disabled={busy === source.id || !urls.get(source.storage_path)}
-                  onClick={() => { setEditingAi(editingAi === source.id ? null : source.id); setControls(defaultControls); }}
+                  onClick={() => { setEditingAi(editingAi === source.id ? null : source.id);
+                    setControls(ai ? { direction: ai.direction, aspect: ai.aspect as EditControls["aspect"],
+                      removePauses: ai.remove_pauses, captions: ai.captions, animatedTitle: ai.animated_title,
+                      brandTreatment: ai.brand_treatment as EditControls["brandTreatment"],
+                      feel: ai.feel as EditControls["feel"] } : defaultControls); }}
                   className="rounded-md border border-border px-3 py-2 text-sm font-medium disabled:opacity-50">
-                  {editingAi === source.id ? "Close AI edit" : "Edit with AI"}
+                  {editingAi === source.id ? "Close AI edit" : source.edit_stage === "edited" ? "Revise AI edit" : "Edit with AI"}
                 </button>
                 <span className="text-xs text-muted-foreground">AI editing supports up to 3 minutes and 250 MB; captions and pause removal need spoken audio.</span>
               </div>
@@ -383,7 +401,7 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
                   {busy === source.id ? "Queuing…" : "Generate AI edit"}
                 </button>
               </div>}
-              <div className="flex flex-wrap items-center gap-2">
+              {source.edit_stage === "needs_edit" && <div className="flex flex-wrap items-center gap-2">
               <select aria-label={`Editor for ${source.title ?? "video"}`} value={selected.get(source.id) ?? ""}
                 onChange={(event) => setSelected(new Map(selected).set(source.id, event.target.value))}
                 className="rounded-md border border-input bg-background px-3 py-2 text-sm">
@@ -404,7 +422,7 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
                 className="rounded-md border border-border px-3 py-2 text-sm font-medium disabled:opacity-50">
                 Use as finished cut
               </button>
-              </div>
+              </div>}
             </div>}
           </article>;
         })}</div>}

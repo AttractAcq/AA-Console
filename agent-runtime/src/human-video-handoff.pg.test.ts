@@ -89,6 +89,7 @@ beforeAll(async () => {
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010140000_176_finish_human_video_without_edit.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010160000_178_video_edit_intake.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010170000_179_source_video_ai_edit.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../supabase/migrations/20261010180000_180_source_video_ai_revisions.sql", import.meta.url), "utf8"));
   await db.exec(`create trigger car_assignment_follows_review after insert on client_asset_reviews
     for each row execute function assignment_follows_review();`);
 });
@@ -189,4 +190,33 @@ it("lets the assigned SMM queue one guarded source edit", async () => {
   const completed = await db.query<{ status: string; output_asset_id: string }>(
     "select status,output_asset_id from video_source_edit_requests where id=$1", [result.rows[0]?.id]);
   expect(completed.rows[0]).toMatchObject({ status: "completed", output_asset_id: result.rows[0]?.id });
+  const revision = await db.query<{ id: string }>(
+    "select request_source_video_edit($1,$2,$3,$4,$5,$6,$7,$8) as id",
+    [aiSource, "Shorter hook, still keep the exact spoken claim.", "vertical", true, true, false, "on_brand", "expressive"]);
+  const old = await db.query<{ edit_stage: string }>(
+    "select edit_stage from client_media_assets where id=$1", [result.rows[0]?.id]);
+  expect(old.rows[0]?.edit_stage).toBe("superseded");
+  await db.query("select fail_source_video_edit($1,$2)", [revision.rows[0]?.id, "Provider unavailable"]);
+  const restored = await db.query<{ edit_stage: string }>(
+    "select edit_stage from client_media_assets where id=$1", [result.rows[0]?.id]);
+  expect(restored.rows[0]?.edit_stage).toBe("review_ready");
+  const sourceAfterFailure = await db.query<{ edit_stage: string }>(
+    "select edit_stage from client_media_assets where id=$1", [aiSource]);
+  expect(sourceAfterFailure.rows[0]?.edit_stage).toBe("edited");
+  const retry = await db.query<{ id: string }>(
+    "select request_source_video_edit($1,$2,$3,$4,$5,$6,$7,$8) as id",
+    [aiSource, "Shorter hook, still keep the exact spoken claim.", "vertical", true, true, false, "on_brand", "expressive"]);
+  const retryPath = `${client}/edits/${retry.rows[0]?.id}/cut.mp4`;
+  await db.query("insert into storage.objects(bucket_id,name) values ('client-media',$1)", [retryPath]);
+  await db.query("update video_source_edit_requests set status='running' where id=$1", [retry.rows[0]?.id]);
+  await db.query("select complete_source_video_edit($1,$2,$3,$4,$5,$6)",
+    [retry.rows[0]?.id, retryPath, { segments: [] }, 1080, 1920, 1.2]);
+  const versions = await db.query<{ id: string; edit_stage: string }>(
+    "select id,edit_stage from client_media_assets where id in ($1,$2) order by id",
+    [result.rows[0]?.id, retry.rows[0]?.id]);
+  expect(versions.rows).toContainEqual({ id: result.rows[0]?.id, edit_stage: "superseded" });
+  expect(versions.rows).toContainEqual({ id: retry.rows[0]?.id, edit_stage: "review_ready" });
+  await db.query("update client_media_assets set review_status='approved' where id=$1", [retry.rows[0]?.id]);
+  await expect(db.query("select request_source_video_edit($1,$2,$3,$4,$5,$6,$7,$8)", args))
+    .rejects.toThrow(/unfinalized AI cut/);
 });

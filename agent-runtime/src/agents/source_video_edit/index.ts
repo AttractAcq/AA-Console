@@ -52,10 +52,10 @@ function prompt(request: Request, transcript: Transcript, duration: number): str
 }
 
 async function failRequest(sb: SupabaseClient, request: Request, message: string): Promise<void> {
-  await sb.from("video_source_edit_requests").update({ status: "failed", error: message.slice(0, 1000) })
-    .eq("id", request.id);
-  await sb.from("client_media_assets").update({ edit_stage: "needs_edit" })
-    .eq("id", request.source_asset_id).eq("edit_stage", "editing");
+  const { error } = await sb.rpc("fail_source_video_edit", {
+    p_request_id: request.id, p_error: message.slice(0, 1000),
+  });
+  if (error) throw new Error(`Could not mark source edit failed: ${error.message}`);
 }
 
 export async function runSourceVideoEditJob(sb: SupabaseClient, config: RuntimeConfig,

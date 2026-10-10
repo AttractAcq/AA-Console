@@ -1,12 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { rpc, upload, remove } = vi.hoisted(() => ({
+const { rpc, upload, remove, scenario } = vi.hoisted(() => ({
   rpc: vi.fn(async () => ({ data: "assignment-1", error: null })),
   upload: vi.fn(async () => ({ error: null })),
   remove: vi.fn(async () => ({ error: null })),
+  scenario: { stage: "needs_edit", request: null } as { stage: string; request: Record<string, unknown> | null },
 }));
 vi.mock("../../lib/media", () => ({ signPaths: async () => new Map([["client-1/raw.mp4", "https://example.test/raw.mp4"]]) }));
 vi.mock("../../lib/supabase", () => ({ supabase: {
@@ -14,8 +15,9 @@ vi.mock("../../lib/supabase", () => ({ supabase: {
   storage: { from: () => ({ upload, remove }) },
   from: (table: string) => {
     const data = table === "client_media_assets" ? [{ id: "raw-1", title: "Founder footage",
-      brief_id: "brief-1", storage_path: "client-1/raw.mp4", edit_stage: "needs_edit", created_at: "2026-10-10" }]
-      : table === "team_members" ? [{ id: "editor-1", name: "Taylor" }] : [];
+      brief_id: "brief-1", storage_path: "client-1/raw.mp4", edit_stage: scenario.stage, created_at: "2026-10-10" }]
+      : table === "team_members" ? [{ id: "editor-1", name: "Taylor" }]
+        : table === "video_source_edit_requests" && scenario.request ? [scenario.request] : [];
     const chain = { select: () => chain, eq: () => chain, in: () => chain, is: () => chain,
       order: () => Promise.resolve({ data, error: null }) };
     return chain;
@@ -29,8 +31,8 @@ vi.mock("react-router-dom", async (original) => ({
 import { EditRepurposePanel } from "./EditRepurposePanel";
 
 describe("human video edit intake", () => {
+  beforeEach(() => { scenario.stage = "needs_edit"; scenario.request = null; rpc.mockClear(); });
   it("queues an AI edit with explicit direction and controlled effects", async () => {
-    rpc.mockClear();
     render(<MemoryRouter><EditRepurposePanel /></MemoryRouter>);
     await userEvent.click(await screen.findByRole("button", { name: "Edit with AI" }));
     await userEvent.type(screen.getByRole("textbox", { name: "Editing direction" }),
@@ -43,6 +45,20 @@ describe("human video edit intake", () => {
       p_aspect: "square", p_remove_pauses: true, p_captions: true,
       p_animated_title: true, p_brand_treatment: "on_brand", p_feel: "balanced",
     });
+  });
+  it("offers revision of an unfinalized AI cut with its prior settings", async () => {
+    scenario.stage = "edited";
+    scenario.request = { id: "edit-1", source_asset_id: "raw-1", output_asset_id: null,
+      direction: "Keep the useful explanation and remove pauses.", aspect: "square",
+      remove_pauses: true, captions: true, animated_title: false,
+      brand_treatment: "on_brand", feel: "calm", status: "completed",
+      error: null, edit_plan: null, created_at: "2026-10-10" };
+    render(<MemoryRouter><EditRepurposePanel /></MemoryRouter>);
+    await userEvent.click(await screen.findByRole("button", { name: "Revise AI edit" }));
+    expect(screen.getByRole("textbox", { name: "Editing direction" })).toHaveValue(
+      "Keep the useful explanation and remove pauses.");
+    expect(screen.getByRole("combobox", { name: "Crop / aspect" })).toHaveValue("square");
+    expect(screen.queryByRole("button", { name: "Send to editor" })).not.toBeInTheDocument();
   });
   it("previews source footage and assigns an editor before approval", async () => {
     render(<MemoryRouter><EditRepurposePanel /></MemoryRouter>);
