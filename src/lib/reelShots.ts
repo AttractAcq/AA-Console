@@ -47,6 +47,8 @@ export type ShotRow = {
   motion: string;
   still: "No still" | "Still on file";
   clip: "No clip" | "Submitted" | "Clip on file";
+  stillUrl?: string | null;
+  clipUrl?: string | null;
 };
 
 export type ReelAssetReview = {
@@ -232,7 +234,7 @@ function clipState(frame: ReelFrameRow | undefined): ShotRow["clip"] {
   return "No clip";
 }
 
-export function shotRows(plan: PlannedShot[], frames: ReelFrameRow[]): ShotRow[] {
+export function shotRows(plan: PlannedShot[], frames: ReelFrameRow[], signed?: ReadonlyMap<string, string>): ShotRow[] {
   const byPosition = new Map(frames.map((frame) => [frame.position, frame]));
   const frameMax = frames.reduce((max, frame) => Math.max(max, frame.position), 0);
   const count = Math.max(plan.length, frameMax);
@@ -252,6 +254,8 @@ export function shotRows(plan: PlannedShot[], frames: ReelFrameRow[]): ShotRow[]
       motion,
       still: frame?.storage_path?.trim() ? "Still on file" : "No still",
       clip: clipState(frame),
+      stillUrl: frame?.storage_path ? signed?.get(frame.storage_path) ?? null : null,
+      clipUrl: frame?.clip_path ? signed?.get(frame.clip_path) ?? null : null,
     });
   }
   return rows;
@@ -262,7 +266,7 @@ export function buildReelMasters(
   assets: ReelAssetReview[],
   frames: ReelFrameRow[],
   editJobs: ReelEditJob[] = [],
-  signedCuts?: ReadonlyMap<string, string>,
+  signedMedia?: ReadonlyMap<string, string>,
 ): ReelMasterView[] {
   return briefs.filter(isPhase1MotionBrief).map((brief) => {
     const plan = readShotPlan(brief.frame_plan);
@@ -278,7 +282,7 @@ export function buildReelMasters(
       assets: owned.map((asset) => {
         const shots = shotRows(
           plan.shots,
-          frames.filter((frame) => frame.asset_id === asset.id),
+          frames.filter((frame) => frame.asset_id === asset.id), signedMedia,
         );
         return {
           id: asset.id,
@@ -292,7 +296,7 @@ export function buildReelMasters(
             asset,
             shots,
             editJobs.filter((job) => job.input_id === asset.id),
-            signedCuts,
+            signedMedia,
           ),
         };
       }),

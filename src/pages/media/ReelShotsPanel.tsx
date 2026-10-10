@@ -102,19 +102,22 @@ export function ReelShotsPanel() {
       for (const row of buildRes.data ?? []) {
         if (row.input_id && !latestBuilds.has(row.input_id)) latestBuilds.set(row.input_id, { status: row.status, error: row.error });
       }
-      // The finished cuts, signed so the grid can play them rather than
-      // assert they exist.
-      const signedCuts = await signPaths(
+      // The shot media and finished cuts are private. Sign all visible files
+      // so the operator can inspect the actual sequence before approval.
+      const frameFiles = (frameRes.data ?? []) as ReelFrameRow[];
+      const signedMedia = await signPaths(
         "client-media",
-        assets.map((a) => a.render_path ?? "").filter(Boolean),
+        [...assets.map((a) => a.render_path),
+          ...frameFiles.flatMap((frame) => [frame.storage_path, frame.clip_path])]
+          .filter((path): path is string => Boolean(path)),
       );
       setMasters(
         buildReelMasters(
           briefs,
           assets,
-          (frameRes.data ?? []) as ReelFrameRow[],
+          frameFiles,
           (jobRes.data ?? []) as ReelEditJob[],
-          signedCuts,
+          signedMedia,
         ),
       );
       setBuildJobs(latestBuilds);

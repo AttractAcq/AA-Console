@@ -1,5 +1,4 @@
 import { DataTable } from "./DataTable";
-import { ApprovalActions } from "./ApprovalActions";
 import { RequestCutButton } from "./RequestCutButton";
 import { StatusBadge } from "./MediaCard";
 import { REVIEW_TONE } from "../lib/media";
@@ -38,8 +37,21 @@ function shotTable(shots: ShotRow[]) {
         <span key="d">{shot.durationLabel}</span>,
         <span key="s">{shot.source}</span>,
         <span key="m">{shot.motion}</span>,
-        pill(shot.still, STILL_TONE[shot.still]),
-        pill(shot.clip, CLIP_TONE[shot.clip]),
+        <div key="still" className="space-y-1">
+          {pill(shot.still, STILL_TONE[shot.still])}
+          {shot.stillUrl && <img src={shot.stillUrl} alt={`Opening still for shot ${shot.position}`}
+            loading="lazy" className="max-h-32 max-w-24 rounded border border-border object-contain" />}
+          {shot.still === "Still on file" && !shot.stillUrl &&
+            <span className="block text-xs text-destructive">Preview unavailable</span>}
+        </div>,
+        <div key="clip" className="space-y-1">
+          {pill(shot.clip, CLIP_TONE[shot.clip])}
+          {shot.clipUrl && <video src={shot.clipUrl} controls preload="none"
+            aria-label={`Higgsfield clip for shot ${shot.position}`}
+            className="max-h-32 max-w-24 rounded border border-border bg-black" />}
+          {shot.clip === "Clip on file" && !shot.clipUrl &&
+            <span className="block text-xs text-destructive">Preview unavailable</span>}
+        </div>,
       ])}
     />
   );
@@ -138,13 +150,11 @@ export function ReelShotGrid({
                     <Link className="text-xs font-medium text-brand-strong hover:underline"
                       to={`/clients/${clientId}/delivery/approvals?tab=engine-inbox`}>Approve in Engine</Link>
                   )}
-                  {asset.reviewStatus === "pending" && asset.cut.status === "cut" && asset.cut.url && !engineHeldIds.has(asset.id) && (
-                    <ApprovalActions
-                      assetId={asset.id}
-                      title={asset.title ?? master.title}
-                      onDone={onChanged}
-                      onError={onError}
-                    />
+                  {asset.reviewStatus === "pending" && asset.cut.status === "cut" && asset.cut.url && !engineHeldIds.has(asset.id) && clientId && (
+                    <Link className="text-xs font-medium text-brand-strong hover:underline"
+                      to={`/clients/${clientId}/delivery/approvals?tab=assets`}>
+                      Review sign-offs in Approvals
+                    </Link>
                   )}
                   <RequestCutButton
                     assetId={asset.id}

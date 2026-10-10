@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { ReelShotGrid } from "./ReelShotGrid";
 import type { ReelMasterView } from "../lib/reelShots";
@@ -36,9 +37,10 @@ describe("ReelShotGrid", () => {
     expect(screen.queryByRole("button", { name: /^Approve$/ })).not.toBeInTheDocument();
   });
 
-  it("offers approval and plays the finished cut", () => {
+  it("routes a finished cut to the sign-off queue and plays it", () => {
     render(
-      <ReelShotGrid
+      <MemoryRouter>
+        <ReelShotGrid
         masters={[
           master({
             assets: [
@@ -55,9 +57,13 @@ describe("ReelShotGrid", () => {
         ]}
         onChanged={vi.fn()}
         onError={vi.fn()}
-      />,
+        clientId="client-1"
+        />
+      </MemoryRouter>
     );
-    expect(screen.getByRole("button", { name: /^Approve$/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review sign-offs in Approvals" })).toHaveAttribute(
+      "href", "/clients/client-1/delivery/approvals?tab=assets",
+    );
     expect(screen.getByText("MD-1 · Cut")).toBeInTheDocument();
     expect(screen.getByLabelText("Finished cut of How it works")).toHaveAttribute("src", "https://example.com/cut.mp4");
   });

@@ -118,6 +118,8 @@ describe("ReelShotsPanel", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /cut the reel/i })).toBeInTheDocument());
     expect(from).toHaveBeenCalledWith("agent_jobs");
     expect(screen.getByText("All 1 clips on file.")).toBeInTheDocument();
+    expect(screen.getByAltText("Opening still for shot 1")).toHaveAttribute("src", "https://signed/stills/1.png");
+    expect(screen.getByLabelText("Higgsfield clip for shot 1")).toHaveAttribute("src", "https://signed/clips/1.mp4");
   });
 
   it("does not offer a second cut while one is running", async () => {

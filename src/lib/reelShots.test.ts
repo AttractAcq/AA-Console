@@ -79,8 +79,14 @@ describe("buildReelMasters", () => {
           provider_job_id: "req-1",
         },
       ],
+      [],
+      new Map([
+        ["c/still.png", "https://signed/still.png"],
+        ["c/clip.mp4", "https://signed/clip.mp4"],
+      ]),
     );
-    expect(master?.assets[0]?.shots[0]).toMatchObject({ still: "Still on file", clip: "Clip on file" });
+    expect(master?.assets[0]?.shots[0]).toMatchObject({ still: "Still on file", clip: "Clip on file",
+      stillUrl: "https://signed/still.png", clipUrl: "https://signed/clip.mp4" });
     expect(master?.assets[0]?.shots[1]).toMatchObject({ still: "No still", clip: "No clip" });
   });
 

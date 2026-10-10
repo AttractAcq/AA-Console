@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { rpc, from, useParams, fetchClientAssets, signPaths, fetchTextBodies } = vi.hoisted(() => ({
@@ -11,7 +12,9 @@ const { rpc, from, useParams, fetchClientAssets, signPaths, fetchTextBodies } = 
   fetchTextBodies: vi.fn(),
 }));
 vi.mock("../lib/supabase", () => ({ supabase: { rpc, from } }));
-vi.mock("react-router-dom", () => ({ useParams }));
+vi.mock("react-router-dom", async (original) => ({
+  ...(await original<typeof import("react-router-dom")>()), useParams,
+}));
 vi.mock("../lib/media", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/media")>()),
   fetchClientAssets,
@@ -55,6 +58,14 @@ beforeEach(() => {
 });
 
 describe("approving from the library", () => {
+  it("sends pending video to the owner and SMM sign-off queue", async () => {
+    fetchClientAssets.mockResolvedValue([asset({ media_type: "video", storage_path: "p/1.mp4" })]);
+    render(<MemoryRouter><MediaLibrary mediaType="video" /></MemoryRouter>);
+    expect(await screen.findByRole("link", { name: "Review sign-offs in Approvals" })).toHaveAttribute(
+      "href", "/clients/client-1/delivery/approvals?tab=assets",
+    );
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  });
   it("offers the decision on a pending asset", async () => {
     render(<MediaLibrary mediaType="image" />);
     expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
