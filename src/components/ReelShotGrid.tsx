@@ -5,6 +5,7 @@ import { StatusBadge } from "./MediaCard";
 import { REVIEW_TONE } from "../lib/media";
 import { cn } from "../lib/cn";
 import type { ReelMasterView, ShotRow } from "../lib/reelShots";
+import { Link } from "react-router-dom";
 
 const CLIP_TONE: Record<ShotRow["clip"], string> = {
   "Clip on file": "bg-primary/10 text-brand-strong",
@@ -52,10 +53,18 @@ function shotTable(shots: ShotRow[]) {
  */
 export function ReelShotGrid({
   masters,
+  buildJobs = new Map(),
+  engineHeldIds = new Set(),
+  clientId,
+  focusedBrief,
   onChanged,
   onError,
 }: {
   masters: ReelMasterView[];
+  buildJobs?: ReadonlyMap<string, { status: string; error: string | null }>;
+  engineHeldIds?: ReadonlySet<string>;
+  clientId?: string;
+  focusedBrief?: string | null;
   onChanged: () => void;
   onError: (message: string) => void;
 }) {
@@ -69,7 +78,7 @@ export function ReelShotGrid({
 
   return (
     <div className="space-y-6">
-      {masters.map((master) => (
+      {masters.filter((master) => !focusedBrief || master.briefId === focusedBrief).map((master) => (
         <section key={master.briefId} className="space-y-3">
           <header className="flex flex-wrap items-baseline gap-2">
             <h3 className="text-sm font-semibold text-foreground">{master.title}</h3>
@@ -83,6 +92,17 @@ export function ReelShotGrid({
               {master.briefStatus.replace(/_/g, " ")}
             </span>
           </header>
+
+          <p className="text-xs text-muted-foreground">
+            Ideation → Brief → Create {buildJobs.get(master.briefId)
+              ? `(${buildJobs.get(master.briefId)!.status})` : "(awaiting build)"}
+            {" → "}Edit / Repurpose → Approval
+          </p>
+          {buildJobs.get(master.briefId)?.status === "failed" && (
+            <p role="alert" className="text-xs text-destructive">
+              Video build failed: {buildJobs.get(master.briefId)?.error || "Open the job log for details."}
+            </p>
+          )}
 
           {master.planProblem && (
             <p role="alert" className="text-sm text-destructive">
@@ -106,7 +126,11 @@ export function ReelShotGrid({
                     {asset.title ? ` · ${asset.title}` : ""}
                   </span>
                   <StatusBadge status={asset.reviewStatus} tone={REVIEW_TONE[asset.reviewStatus]} />
-                  {asset.reviewStatus === "pending" && (
+                  {asset.reviewStatus === "pending" && asset.cut.status === "cut" && engineHeldIds.has(asset.id) && clientId && (
+                    <Link className="text-xs font-medium text-brand-strong hover:underline"
+                      to={`/clients/${clientId}/approvals?tab=engine-inbox`}>Approve in Engine</Link>
+                  )}
+                  {asset.reviewStatus === "pending" && asset.cut.status === "cut" && !engineHeldIds.has(asset.id) && (
                     <ApprovalActions
                       assetId={asset.id}
                       title={asset.title ?? master.title}
@@ -121,6 +145,8 @@ export function ReelShotGrid({
                     onError={onError}
                   />
                 </div>
+                {asset.cut.status === "cut" && <p className="text-xs text-muted-foreground">The finished cut is ready for human approval.</p>}
+                {asset.cut.status !== "cut" && <p className="text-xs text-muted-foreground">Approve after the cut has been rendered and previewed.</p>}
                 {shotTable(asset.shots.length > 0 ? asset.shots : master.plannedShots)}
               </div>
             ))

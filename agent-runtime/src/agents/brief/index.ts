@@ -99,7 +99,7 @@ export async function runBriefJob(
 
   const { data: idea, error: ideaError } = await sb
     .from("client_ideas")
-    .select("id, title, body, media_type, content_territory, source_question, strategic_reason, content_format")
+    .select("id, title, body, media_type, content_territory, source_question, strategic_reason, content_format, target_platform")
     .eq("id", ideaId)
     .maybeSingle();
   if (ideaError) throw new Error(`Failed to load idea: ${ideaError.message}`);
@@ -176,6 +176,8 @@ ABSOLUTE RULES
 - Be concrete. "Make it engaging" tells a maker nothing. "Open on the founder holding the failed implant that was removed, no talking, three seconds" tells them everything.`;
 
   const prompt = `Write a production brief for this approved idea.
+
+${idea.target_platform ? `DESTINATION\nThis piece is for ${idea.target_platform}. Keep its production direction suitable for that destination and its selected ${contentFormat} format.\n` : ""}
 
 THE IDEA
 Title: ${idea.title}
@@ -284,6 +286,7 @@ Call ${submitTool.name} once when you are done.`;
     // shape when it planned the piece; a brief that forgets it produces a
     // single image for something planned as a carousel.
     content_format: contentFormat,
+    target_platform: idea.target_platform ?? slot?.platform ?? null,
     status: "draft",
     job_id: job.id,
   });

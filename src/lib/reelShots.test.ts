@@ -136,12 +136,9 @@ describe("where a reel's cut has got to", () => {
     expect(cutState({}, [], []).detail).toBe("No shots on this reel.");
   });
 
-  it("still offers the cut with clips missing, and says what is missing", () => {
-    // request_video_edit says nothing about readiness either: the runner is
-    // what knows, and refusing here means the answer never reaches the
-    // person who pressed the button.
+  it("waits for clips before offering the cut, and says what is missing", () => {
     const state = cutState({}, shots(1), []);
-    expect(state).toMatchObject({ status: "incomplete", canRequest: true });
+    expect(state).toMatchObject({ status: "incomplete", canRequest: false });
     expect(state.detail).toContain("1 of 3");
   });
 

@@ -118,7 +118,7 @@ export interface CampaignIdea {
   /** The content pillar this piece sits in, when the campaign has any. */
   pillar_id: string | null;
   /** 'single', 'carousel' or 'story'. Decides how it is briefed and produced. */
-  content_format: "single" | "carousel" | "story";
+  content_format: "single" | "carousel" | "story" | "reel";
 }
 
 /** Reject incomplete batches rather than silently saving fewer ideas than promised. */
@@ -151,6 +151,7 @@ export const FORMAT_MEDIA: Record<string, readonly string[]> = {
   single: ["image", "text", "video"],
   carousel: ["image"],
   story: ["image", "video"],
+  reel: ["video"],
 };
 
 /**
@@ -174,7 +175,7 @@ function chosenFormat(raw: unknown, mediaType: string, title: string): CampaignI
     const advice =
       asked === "carousel"
         ? "a carousel is images, and a set of clips is a story"
-        : "a story is a still or a clip";
+        : asked === "reel" ? "a reel is a video" : "a story is a still or a clip";
     throw new Error(`"${title}" asks for a ${asked} of ${mediaType}; ${advice}.`);
   }
   return asked as CampaignIdea["content_format"];

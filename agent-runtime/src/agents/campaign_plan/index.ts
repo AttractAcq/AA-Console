@@ -92,9 +92,9 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
             strategic_reason: { type: "string", description: "Why this distinct piece helps achieve the campaign objective." },
             content_format: {
               type: "string",
-              enum: ["single", "carousel", "story"],
+              enum: ["single", "carousel", "story", "reel"],
               description:
-                "The shape this piece runs in. single is one image, one video or one piece of copy. carousel is images only, a swipeable set where frame one earns the swipe. story is a still or a clip, tapped through. Choose single unless the argument genuinely needs more than one frame — a carousel that restates one point five times is worse than the single image it should have been.",
+                "The shape this piece runs in. single is one image, one video or one piece of copy. carousel is images only; story is a still or clip; reel is a short video made of shots. Choose a multi-frame shape only when the argument genuinely needs it.",
             },
             ...(ids.length
               ? {

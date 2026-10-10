@@ -11,6 +11,18 @@
 export const CONTENT_FORMATS = ["single", "carousel", "story", "reel"] as const;
 export type ContentFormat = (typeof CONTENT_FORMATS)[number];
 
+export const PLATFORM_FORMATS: Record<string, readonly ContentFormat[]> = {
+  instagram: ["single", "carousel", "story", "reel"],
+  facebook: ["single", "carousel", "story", "reel"],
+  tiktok: ["single", "carousel", "reel"],
+  linkedin: ["single", "carousel"],
+  youtube: ["single", "reel"],
+};
+
+export function platformAllowsFormat(platform: string, format: string): boolean {
+  return Object.hasOwn(PLATFORM_FORMATS, platform) && PLATFORM_FORMATS[platform]!.includes(format as ContentFormat);
+}
+
 export function isContentFormat(value: unknown): value is ContentFormat {
   return typeof value === "string" && (CONTENT_FORMATS as readonly string[]).includes(value);
 }

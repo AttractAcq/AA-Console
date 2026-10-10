@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { FilterPills } from "../../components/FilterPills";
 import { DataTable } from "../../components/DataTable";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
@@ -11,6 +11,7 @@ import { ApproveAndBuildModal } from "../../components/briefs/ApproveAndBuildMod
 import { BriefDetailModal } from "../../components/briefs/BriefDetailModal";
 import { cn } from "../../lib/cn";
 import { formatFilters, formatLabel } from "../../lib/contentFormat";
+import { platformLabel } from "../../lib/postPlatform";
 import type { FormatFilterId } from "../../lib/contentFormat";
 
 type Brief = {
@@ -20,6 +21,9 @@ type Brief = {
   media_type: "image" | "text" | "video";
   content_format: string;
   format_code?: string | null;
+  target_platform?: string | null;
+  frame_plan?: string[] | null;
+  production_method?: string | null;
   brief_ref: string | null;
   status: string;
   source_idea_id: string | null;
@@ -36,6 +40,7 @@ const STATUS_TONE: Record<string, string> = {
 
 export function BriefsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
+  const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [activeFormat, setActiveFormat] = useState<FormatFilterId>("all");
   const [briefs, setBriefs] = useState<Brief[]>([]);
@@ -56,7 +61,7 @@ export function BriefsPanel() {
       const { data, error } = await supabase
         .from("client_briefs")
         .select(
-          "id, title, body, avatar_brief, editor_brief, media_type, content_format, format_code, brief_ref, status, source_idea_id, created_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
+          "id, title, body, avatar_brief, editor_brief, media_type, content_format, target_platform, format_code, frame_plan, brief_ref, status, source_idea_id, created_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
         )
         .eq("client_id", clientId)
         .neq("purpose", "recruitment")
@@ -108,7 +113,7 @@ export function BriefsPanel() {
       )}
 
       <DataTable
-        columns={["Brief", "Format", "Type", "Status", ""]}
+        columns={["Brief", "Destination", "Format", "Type", "Status", ""]}
         emptyLabel={
           loading
             ? "Loading briefs…"
@@ -128,6 +133,7 @@ export function BriefsPanel() {
             {b.title}
             {b.brief_ref && <span className="block text-xs text-muted-foreground">{b.brief_ref}</span>}
           </button>,
+          <span key="p">{platformLabel(b.target_platform)}</span>,
           <span key="f">{formatLabel(b.content_format)}</span>,
           <span key="m" className="capitalize">{b.media_type}</span>,
           <span
@@ -142,7 +148,10 @@ export function BriefsPanel() {
           // A brief already in production or finished has been actioned;
           // offering Build again would quietly queue a second one.
           b.status === "in_production" || b.status === "complete" ? (
-            <span key="a" className="text-xs text-muted-foreground">Actioned</span>
+            b.media_type === "video" && b.content_format === "reel" ?
+              <button key="a" type="button" className="text-xs font-medium text-brand-strong hover:underline"
+                onClick={() => navigate(`/clients/${clientId}/media?tab=reel-shots&brief=${b.id}`)}>Track reel</button>
+              : <span key="a" className="text-xs text-muted-foreground">Actioned</span>
           ) : (
             <button
               key="a"
@@ -164,7 +173,7 @@ export function BriefsPanel() {
         onClose={() => setBuilding(null)}
         onDone={() => {
           setNotice(
-            "Queued. Generated assets appear under Media; anything sent to a person is on their dashboard now.",
+            "Queued. Follow generated reels under Media → Reel shots. Human assignments appear on the recipient dashboard; email depends on Resend configuration.",
           );
           void refresh();
         }}

@@ -3,8 +3,7 @@
  *
  * The plan lives on the brief (frame_plan, one JSON object per shot).
  * Stills and clips, when they exist, live on client_media_frames. A reel
- * can be approved before either file exists, so the grid has to show the
- * plan on its own.
+ * may have a plan before any file exists, so the grid shows the plan on its own.
  */
 
 export function isPhase1MotionBrief(
@@ -87,11 +86,8 @@ const IN_FLIGHT = new Set(["queued", "claimed", "running"]);
 /**
  * Whether this reel has a cut, is getting one, or could ask for one.
  *
- * Asking is allowed with clips missing, on purpose: request_video_edit says
- * nothing about readiness either, because the runner is what knows whether
- * the clips have landed and refusing in SQL means the answer never reaches
- * the person who pressed the button. So the line below states the gap and
- * the button stays live.
+ * A cut requires every clip. The guarded RPC enforces the same readiness
+ * rule so a stale screen cannot queue an edit that is bound to fail.
  */
 export function cutState(
   asset: { render_path?: string | null },
@@ -132,14 +128,14 @@ export function cutState(
       // The reason the runner gave, not a generic one: it is the only part
       // of the failure anyone can act on.
       detail: `Last cut failed: ${latest.error?.trim() || "no reason recorded"}. ${gap}`,
-      canRequest: true,
+      canRequest: shots.length > 0 && withClips === shots.length,
     };
   }
 
   return {
     status: withClips === shots.length && shots.length > 0 ? "ready" : "incomplete",
     detail: gap,
-    canRequest: true,
+    canRequest: shots.length > 0 && withClips === shots.length,
   };
 }
 

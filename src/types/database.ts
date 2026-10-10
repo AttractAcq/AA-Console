@@ -1350,6 +1350,7 @@ export type Database = {
       }
       client_briefs: {
         Row: {
+          target_platform: Database["public"]["Enums"]["post_platform"] | null
           apply_url: string | null
           archived_at: string | null
           argument: string | null
@@ -1391,6 +1392,7 @@ export type Database = {
           visual_direction: string | null
         }
         Insert: {
+          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           apply_url?: string | null
           archived_at?: string | null
           argument?: string | null
@@ -1432,6 +1434,7 @@ export type Database = {
           visual_direction?: string | null
         }
         Update: {
+          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           apply_url?: string | null
           archived_at?: string | null
           argument?: string | null
@@ -2220,6 +2223,7 @@ export type Database = {
       }
       client_ideas: {
         Row: {
+          target_platform: Database["public"]["Enums"]["post_platform"] | null
           archived_at: string | null
           body: string | null
           campaign_id: string | null
@@ -2243,6 +2247,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -2266,6 +2271,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -8606,6 +8612,15 @@ export type Database = {
           p_client_id?: string
           p_input_id?: string
           p_input_table?: string
+        }
+        Returns: string
+      }
+      enqueue_format_ideation: {
+        Args: {
+          p_client_id: string
+          p_target_platform: Database["public"]["Enums"]["post_platform"]
+          p_media_type: Database["public"]["Enums"]["media_type"]
+          p_content_format: Database["public"]["Enums"]["content_format"]
         }
         Returns: string
       }

@@ -1,0 +1,126 @@
+# Video content workflows: repo audit and execution plan
+
+10 October 2026. Target review: end of the 10–11 October weekend.
+
+## What Alex wants
+
+1. **Motion Design as its own page.** Like Page Builder and Agents, Motion Design is a separate workspace in AA Console. Prompt it for a short motion graphic, with explainer, tutorial, and landing-page hero uses. Generate, preview, revise, and keep the video as a reusable asset.
+2. **Choose a format before auto-ideation.** The operator should be able to request a reel or another specific format, then carry that choice through idea approval, briefing, production, editing, and approval.
+3. **Make reel production usable in the Console.** From a reel brief, choose AI, see opening stills generated, see Higgsfield shots render, see the final cut, and review the finished video. The operator should not have to infer progress from jobs or know where a hidden tab lives.
+4. **Edit video before approval regardless of its source.** AI footage and footage delivered by an editor or avatar should be candidates for AI or human editing. AI instructions can include removing pauses, adding captions and motion graphics, and polishing a cut. The chosen finished version, rather than raw footage, goes to approval and then distribution.
+5. Keep the existing image and carousel work stable. AI avatar generation is a later project.
+
+## Operating model: one content journey
+
+```text
+Platform → compatible format → Ideation → Brief → Create [AI | Human]
+                                               ↓
+                                  Edit / Repurpose [AI | Human]
+                                     ├─ Edit → finished candidate → Internal approval
+                                     └─ Repurpose → derivative → Ideation / Brief / Create
+
+ Internal approval → Client approval when needed → Distribute → Track
+        ↑                                                 Analyze → Learn → Ideation
+        └── revisions return to Create or Edit
+```
+
+The operator sees one progress path. Route choices happen inside **Create** and **Edit / Repurpose**, not as separate products or dead-end screens. The platform determines which formats and output requirements are valid; the selected format stays attached to the idea, brief, asset, edit, and derivative. A website hero is a site destination rather than a social platform and needs its own output requirements.
+
+**Create:** AI-generated video uses the current opening-still → Higgsfield DoP image-to-video route for the MVP. Human video uses the existing assignment and dashboard route, with Resend notifying the chosen editor or avatar when configured. Both routes produce a source asset and converge before the next stage. The UI should show the same source, status, and next action in either case.
+
+**Edit / Repurpose:** These are two actions at one post-creation stage; an asset that needs neither can pass through to approval. Edit changes the current asset and yields a reviewable version. For video, offer AI or human editing. AI accepts a clear instruction package: free-text direction plus controls for crop/aspect ratio, pause removal, captions, simple motion graphics, brand treatment, and desired feel. The API model plans the edit; a renderer performs it. Human editing dispatches the source, brief, and instructions to an editor and waits for a delivered version. Repurpose branches from a source into one or more derivatives. Each derivative explicitly re-enters at Ideation, Brief, or Create according to how much is already specified. It must not silently skip the normal production and review gates.
+
+**Repurpose examples:** extract speech and timecoded transcript from a video; propose quote graphics or supporting images tied to actual spoken claims; produce a new image brief and run image creation; identify short clips from a longer video and send each through editing; propose a carousel, post, email, or new reel from the source. Keep lineage from every derivative to the source and its evidence. The first implementation can keep the existing brief-generating repurpose path while new media extraction and clip-making paths are added.
+
+**Approval:** AI can carry work up to the approval queue, but a person commits the approval decision. The owner and the client manager need an internal review path; the manager may then request client approval where that client's process requires it. Final approval applies to the exact rendered version that will be distributed. A rejection returns to the appropriate edit/create step with a reason. Distribution, tracking, analysis, and learning remain the downstream loop; their expansion is outside this video-focused work.
+
+**MCP delegation:** A Chief of Staff request should be able to start and monitor the journey, including delegated production actions, until the human approval gate. Existing bot boundaries still apply: the Chief of Staff currently has `delivery.*`, `campaign.*`, and `workflow.*`, while content selection and assignment are restricted to `bot_production`. The gateway also exposes `content.approve_asset` to that production bot; this new journey must prevent an autonomous run from using that decision tool to bypass the required owner/manager/client gate. The orchestration contract must make the handoff explicit and traceable rather than granting the Chief of Staff unrestricted content writes.
+
+**Later:** HeyGen AI avatars and full storyboard/prompt-to-video are future creation methods. Keep Create extensible for them, but the MVP video generator remains Higgsfield image-to-video so cost and quality can be measured on one route first.
+
+## What is actually in the repo
+
+| Area | Current behavior | Evidence and gap |
+|---|---|---|
+| Auto Idea | `GenerationPanel` offers a confirmation button that enqueues an unscoped ideation job. Manual Idea has media type and format inputs. The ideation agent can receive a format from an engine slot, but the manual Auto Idea call passes none. Its output schema describes only `single`, `carousel`, and `story` despite the runtime supporting `reel`. | `src/pages/ideation/GenerationPanel.tsx`; `agent-runtime/src/agents/ideation/index.ts`; `agent-runtime/src/content/format.ts`. User-directed reel ideation is missing. |
+| Reel brief | A `reel` idea makes the brief agent request an F6 or F7 generated-shot plan. | `agent-runtime/src/agents/brief/index.ts`; `agent-runtime/src/agents/brief/shots.ts`. The brief path exists, but its current AI production scope is generated-only F6/F7. |
+| Approve & Build | AI is enabled only when `isPhase1MotionBrief` is true: F6/F7, or a reel with no format code. All other video is sent to a person. That is why Alex can see a disabled AI choice. Eligible reels queue `creative_build` for opening stills and `video_build` for Higgsfield. The modal still says motion is paused, even though the 8 October production audit records six Higgsfield clips. | `src/lib/reelShots.ts`; `src/components/briefs/ApproveAndBuildModal.tsx`; `supabase/migrations/20261001143000_137_reel_opening_stills.sql`; `docs/video-roadmap-2026-10-08.md`. The restriction is real, and the status copy is stale. |
+| Generated reel | `creative_build` renders stills. `video_build` sends them to Higgsfield DoP, stores request IDs and clips, and moves a slot to editing after clips arrive. | `agent-runtime/src/agents/creative_build/openingStills.ts`; `agent-runtime/src/agents/video_build/index.ts`. The model ID is configured in the environment; the known motion preset is Zoom In. The final-model variable is required but the submission uses the draft-model variable. |
+| Reel cut | `video_edit` asks Claude to plan an edit from sampled clip frames; code validates the EDL and ffmpeg renders it. Migration 170 wires **engine-slot reels** through an `editing` stage; QA refuses a reel without a rendered cut. The manual brief action queues jobs outside that slot journey, so its cut still needs the separate `request_video_edit` RPC and “Cut the reel” button. | `agent-runtime/src/agents/video_edit/`; `supabase/migrations/20261008110000_170_the_engine_cuts_the_reel.sql`; `src/components/RequestCutButton.tsx`. This is a generated-shot reel cutter, not a general natural-language editor for arbitrary uploaded video. |
+| Review surfaces | Media → Reel shots shows the plan, still/clip state, request-cut action, and a cut player. The engine approval inbox can play `render_path`. The ordinary Video Library filters to `content_format = single`, so completed reels are absent there. | `src/pages/media/ReelShotsPanel.tsx`; `src/pages/approvals/EngineInboxPanel.tsx`; `src/pages/media/VideoLibraryPanel.tsx`. The stages exist but are fragmented across screens. |
+| Human video | An editor or avatar can upload a video asset linked to a brief. It is marked delivered and goes toward approval. The upload does not make `client_media_frames` shot rows, and `request_video_edit` accepts only reel assets with the expected shot-plan contract. | `src/pages/employee/sections/ProductionWorkspace.tsx`; `supabase/migrations/20261004100000_141_video_edit.sql`; `agent-runtime/src/agents/video_edit/handoff.ts`. Human footage does not yet flow through AI editing. |
+| Motion design | No dedicated prompt → composition → rendered-video job, asset type, editor, or UI is present. The roadmap discusses Remotion as a future option; the current video renderer is ffmpeg for reel cuts. | `docs/video-roadmap-2026-10-08.md`; `agent-runtime/src/agents/video_edit/render.ts`. |
+| Repurpose | The existing action starts from an **approved** asset and writes one derivative **brief** per selected format. It does not extract audio, transcribe, make supporting images, cut excerpts, or create finished clips. The format catalog and UI both say that video derivatives are briefs. | `agent-runtime/src/agents/repurpose/index.ts`; `agent-runtime/src/agents/repurpose/formats.ts`; `src/components/RepurposeModal.tsx`; `supabase/migrations/20260907190000_56_repurposing.sql`. Moving repurpose before final approval requires a new eligibility and lineage contract. |
+| Platform and format | The engine slot already stores platform and format, and platform-specific copy limits exist. Manual Auto Idea does not collect either. The campaign planner's own format list excludes `reel`. | `agent-runtime/src/engine/slot.ts`; `agent-runtime/src/content/platform-limits.ts`; `agent-runtime/src/agents/campaign_plan/plan.ts`. Platform-to-format compatibility needs one enforced rule across manual and automated entry points. |
+| Approval chain | The Console has a general asset approval queue and a separate engine-slot inbox. Human asset review is recorded, and engine approval advances the slot. There is no single owner → client manager → client request/decision chain for a finished version. | `src/pages/approvals/ApprovalsPanel.tsx`; `src/pages/approvals/EngineInboxPanel.tsx`; `supabase/migrations/20261006220000_159_approval_inbox.sql`. The queues must converge without losing their distinct transaction rules. |
+| MCP orchestration | Content idea, brief, production, status, approval-request, repurpose, and bot asset-decision tools exist. Chief of Staff has workflow/campaign/delivery grants; selected content writes are production-bot-only. | `aa-mcp-gateway/src/registry/tools.ts`; `aa-mcp-gateway/src/policy/permissions.ts`; `agent-runtime/src/mcp/content-route.ts`. End-to-end requests need delegated coordination and a hard stop at the new human approval gate. |
+
+## Motion Design page
+
+```text
+Prompt → scene plan → rendered MP4 → preview / revise → source asset
+                                                  └→ Edit / Repurpose or Approval
+```
+
+Motion Design has its own client-level page and navigation entry, comparable to Page Builder or Agents. It is not a tab inside the content production journey. The page owns prompt entry, presets, generation jobs, project history, preview, revision, and export. A motion design may start independently of an idea and brief, then attach its result to a campaign, landing page, or content asset. Once attached, it joins the shared asset, editing, version, and approval concepts. Explainers, tutorials, and hero loops need different output presets rather than three disconnected tools.
+
+Motion design is a separate production method, not a synonym for Higgsfield image-to-video. A Claude API call can plan scenes or write a composition, but the video must be rendered by code or an external video service. Claude's API code execution can create downloadable video files, but that is a tool-driven workflow with its own limits, storage, and billing; it is not a single native “generate motion video” model endpoint. The Pro desktop subscription is separate from Console API usage.
+
+## Weekend task list, ordered by dependency
+
+### P0 — make the existing generated-reel path visible and usable
+
+- [ ] **0. Shared platform/format contract.** Define compatible choices for each social destination in one domain model used by manual ideation, Auto Idea, campaign planning, briefing, and production. Include `reel` where supported. Preserve the selected choice end to end; refuse invalid pairs with a useful explanation. Website hero belongs to the separate Motion Design page rather than this content format selector.
+- [ ] **1. Format-directed Auto Idea.** Replace its confirmation-only dialog with media type and compatible format choices. Pass the requested format in a durable job parameter or equivalent explicit input; constrain the ideation prompt, validate output, and persist `video + reel` without a fallback to `single`. Keep the engine-slot format authority for scheduled ideas. Update the runtime schema text to include `reel`.
+- [ ] **2. Clear production eligibility.** In the brief, show format code, production method, and shot-plan readiness. For F6/F7 reels expose the AI action and explain the exact route. For other video explain why the AI route is unavailable and offer the human route; do not simply remove the guard, because the backend also refuses unsupported video. Fix the stale “motion stays paused” wording to show actual configuration/job status.
+- [ ] **3. One reel progress view and automatic manual cut.** Link the brief and Video Library directly to its reel detail. Show the stills, Higgsfield submission/rendering state, editing state, failures with retry actions, final cut, and approval state in order. Queue `video_edit` once clips from a manually approved brief are complete, with the same idempotency and readiness rules as the engine path. Keep job details available without making them the primary journey.
+- [ ] **4. Finish the reel library and approval handoff.** List `reel` assets with the final `render_path` in the video library; never present an opening still as the video. Make the approval card play the cut. Retain the existing engine QA guard and add an equivalent guard for manually requested reel approval, so no route can approve an uncut reel. Verify a completed reel reaches approval only after editing.
+- [ ] **5. End-to-end proof.** In a safe test environment, run one F6 and one F7 from selected Auto Idea through brief, stills, Higgsfield, automatic edit, approval preview, and ready-to-distribute state. Record the actual model IDs, costs, latency, and any provider/configuration failures. Do not treat mock-only tests as this proof.
+
+### P0 — make the revised journey understandable
+
+- [ ] **5a. One visible stage path.** Present Ideation, Brief, Create, Edit / Repurpose, Approval, and downstream states consistently on ideas, briefs, jobs, assets, and client views. Show the current stage, route, next action, blockers, and links to the same work item; avoid making users reconstruct progress from separate tabs.
+- [ ] **5b. Converge Create routes.** Keep AI Higgsfield creation and human editor/avatar assignment as distinct routes with one post-create handoff. Confirm the assignment is visible on the recipient dashboard and that missing Resend configuration is surfaced as “assigned, email not sent.” Human delivery must be selectable for editing before it is offered as final content.
+- [ ] **5c. Versioned approval handoff.** Make the original, edited cut, and any revisions distinct and traceable. Send only a chosen finished version to internal approval; add owner/manager routing and an optional manager-to-client request without granting a bot final approval. Reconcile general asset and engine-slot queues so either route advances correctly.
+
+### P1 — introduce editing of supplied or human-produced footage
+
+- [ ] **6. Video intake before approval.** Add an authorized upload or selection action for a client video, attach it to a brief or standalone job, record source and rights, and show the raw file as “needs editing” when AI edit is requested. Preserve the original.
+- [ ] **7. Define an AI edit request.** Offer AI or human for a video after Create. For AI, collect the source asset, free-text direction, crop/aspect ratio, pause removal, captions, simple motion graphics, on/off-brand treatment, and desired feel. Build a validated prompt package, sample frames and audio/transcript, ask Claude for a timecoded EDL, and render it with controlled tools. Expose unsupported effects before charging. Keep this path distinct from the existing generated-reel shot contract.
+- [ ] **7a. Human edit route.** Dispatch the source file, brief, instructions, and due date to an editor through the existing assignment/dashboard path; notify through Resend when available. The delivered edit re-enters the same preview and approval handoff as an AI edit.
+- [ ] **8. Route edited output to review.** Show raw and edited versions, the instructions and edit plan, a playable result, and a revise action. Approval must select the finished render. Human delivery needs a deliberate “edit first” route rather than automatically entering final approval.
+- [ ] **9. Prove on real footage.** Test a talking-head clip with pauses and captions and a multi-shot clip. Measure transcript quality, caption timing, render time, and whether the cut is actually usable. Where a requested effect is unsupported, show that in the UI before charging for a run.
+
+### P1 — repurpose from a created source
+
+- [ ] **9a. Source and derivative contract.** Permit a created source to enter Edit / Repurpose before final approval while forbidding unapproved derivatives from distribution. Record source/version, claims and evidence, derivative intent, destination format/platform, and re-entry stage. Do not silently treat the current approved-only `repurpose_asset` path as this new flow.
+- [ ] **9b. Video understanding.** Extract audio and a timecoded transcript from source video. Identify quotable lines and candidate clip ranges; present source timestamps and evidence to the operator. Do not invent a quote from a brief when it is claimed to come from footage.
+- [ ] **9c. Derivative production.** Support at least: quote/supporting image → image brief/Create, and long video → short clip → Edit. Existing carousel, text, email, and reel brief derivatives remain available, with their new branch visible in the same journey. Each new item re-enters Ideation, Brief, or Create according to what the repurpose output actually contains.
+- [ ] **9d. AI and human routes.** Let AI draft derivative ideas/briefs or clip selections; let a person take a repurpose assignment with source material and instructions. Both routes return a reviewable artifact or derivative brief with lineage, not a misleading “finished video” label.
+
+### P1 — motion design as a separate workflow
+
+- [ ] **10. Feasibility spike with three samples.** Use one short explainer, one tutorial, and one muted looping hero. Compare a constrained scene-spec + owned renderer with Anthropic API code execution for output quality, render time, reproducibility, downloadable MP4, cost, and ability to revise. Choose the renderer from the results; do not promise desktop-app parity before this proof.
+- [ ] **11. Dedicated Motion Design page and prompt-to-video job.** Add a client-level navigation page, comparable to Page Builder and Agents, with prompt, aspect ratio, duration, brand, target use, optional screenshots/logo, generation history, preview, revision, and export. Claude writes a validated scene plan/composition. A controlled renderer creates MP4 (and poster frame) and stores it in client media. Use a bounded template/effect vocabulary for the first release.
+- [ ] **12. Use the result.** Allow the rendered motion asset to be attached to a brief, selected as a landing-page hero, or used as a standalone approved asset, with the appropriate review and publishing constraints for each destination.
+
+### P1 — MCP orchestration to the human gate
+
+- [ ] **13. Chief of Staff request contract.** Translate a natural-language content request into client, destination/platform, compatible format, quality/cost bounds, and approval recipients. Delegate authorized content writes to the production bot, track one root request and all derivative jobs, and surface missing input before launching paid stages.
+- [ ] **14. Approval stop and trace.** MCP may read status and request review, but stops before the owner/manager/client decision. Constrain the existing bot `content.approve_asset` path for work in this journey so it cannot mark the final version approved by itself. Record who requested each stage and show the exact finished version, cost, source, and proposed destination in the human inbox. Resume distribution only after the required people have approved.
+
+## Definition of “working by end of weekend”
+
+### P0 implementation started on 10 October
+
+The first code slice now lets Auto Idea request a destination, media type, and format through a guarded, durable job; manual ideas carry the same destination; the ideation and brief agents preserve it; and campaign planning accepts video reels. The brief exposes the F6/F7 AI route and its shot-plan context. After manual Higgsfield clips complete, `video_build` queues `video_edit` once. Reel shots show build and cut state, the Video Library plays completed cuts, and the general approval view uses the cut rather than its opening still. A database guard refuses approval of an uncut reel. Local typechecks, focused UI/runtime tests, and a Postgres migration test pass.
+
+This is a **reviewable first slice**, not a claim that P0 is complete. The remaining P0 gates are: a single stage journey across all work items; campaign destination validation; a tested human Create return into Edit / Repurpose; versioned owner/manager/client approval routing; reconciliation of every engine and manual review path; and the real F6/F7 provider run with actual costs and latency. The migration is prepared only and has not been applied to production.
+
+The **minimum reviewable vertical slice** is tasks 0–5 plus 5a–5c for the AI reel route: choose a platform and reel format, create the idea and F6/F7 brief, make stills and Higgsfield clips, cut the reel, then show the finished version at the correct human approval gate and in the video library. The human Create route should reach the same visible post-create handoff. The full requested system additionally needs the real-footage edit, repurpose, motion-design, and MCP proofs above; those are separate acceptance gates, not implied by a working generated reel. A desktop Claude result alone is not proof that either API path is implemented in AA Console.
+
+Before release, verify the current Railway values of `AGENT_RUNTIME_MODEL`, `OPENAI_IMAGE_MODEL`, `HIGGSFIELD_MODEL_DRAFT`, `HIGGSFIELD_MODEL_FINAL`, provider balances, and ffmpeg capabilities without printing secrets. The repo gives defaults, and the 8 October audit reports live clips, but neither proves current configuration or a new end-to-end run. The older `docs/completion-plan.md` and `docs/ai-video-edit.md` contain superseded status claims; use the current code and migrations for implementation decisions.
+
+## Release boundary
+
+Prepare code, focused tests, and a reviewable PR. Do not merge, apply production migrations, or deploy to Railway without Alex via Chief of Staff, per `AGENTS.md`.

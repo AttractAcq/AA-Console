@@ -82,12 +82,10 @@ describe("ApproveAndBuildModal — routing", () => {
     expect(screen.getByRole("button", { name: /^Generate$/ })).toBeDisabled();
   });
 
-  // The rule the whole modal exists to enforce: AI makes text and images.
-  // Video is made by people.
-  it("never offers the AI route for video", () => {
+  it("keeps unsupported video on the human route", () => {
     show({ media_type: "video" });
     expect(screen.getByRole("button", { name: /AI/ })).toBeDisabled();
-    expect(screen.getByText(/video is made by people/i)).toBeInTheDocument();
+    expect(screen.getByText(/AI creation currently supports F6\/F7 reels/i)).toBeInTheDocument();
   });
 
   it("preselects the human route for video rather than leaving it unset", () => {
@@ -99,12 +97,11 @@ describe("ApproveAndBuildModal — routing", () => {
     const user = userEvent.setup();
     show({ media_type: "video", content_format: "reel", format_code: "F6" });
     expect(screen.getByRole("button", { name: /AI/ })).toBeEnabled();
-    expect(screen.getByText(/does not call Higgsfield/i)).toBeInTheDocument();
-    expect(screen.getByText(/opening stills as images/i)).toBeInTheDocument();
+    expect(screen.getByText(/animates them with Higgsfield/i)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /Send to/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /AI/ }));
-    expect(screen.getByText(/image build for each shot's opening still/i)).toBeInTheDocument();
+    expect(screen.getByText(/opening still for each planned shot/i)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /^Quality$/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/The set/i)).not.toBeInTheDocument();
 
@@ -126,7 +123,7 @@ describe("ApproveAndBuildModal — routing", () => {
   it("keeps a later-phase reel on the human route", () => {
     show({ media_type: "video", content_format: "reel", format_code: "F5" });
     expect(screen.getByRole("button", { name: /AI/ })).toBeDisabled();
-    expect(screen.getByText(/video is made by people/i)).toBeInTheDocument();
+    expect(screen.getByText(/AI creation currently supports F6\/F7 reels/i)).toBeInTheDocument();
   });
 
   it("cannot be talked into an AI build for video by clicking the disabled card", async () => {

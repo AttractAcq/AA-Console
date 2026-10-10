@@ -33,6 +33,7 @@ export function ApprovalsPanel() {
   const [loadError, setLoadError] = useState<string | null>(null);
   // How many were left out because the engine's own queue owns them.
   const [engineHeld, setEngineHeld] = useState(0);
+  const [uncutReels, setUncutReels] = useState(0);
 
   const refresh = useCallback(async () => {
     setLoadError(null);
@@ -73,10 +74,14 @@ export function ApprovalsPanel() {
     );
 
     const all = [...botApproved, ...pending];
-    const rows = all.filter((asset) => !heldByEngine.has(asset.id));
-    setEngineHeld(all.length - rows.length);
+    const rows = all.filter((asset) => !heldByEngine.has(asset.id)
+      && (asset.content_format !== "reel" || Boolean(asset.render_path)));
+    setEngineHeld(all.filter((asset) => heldByEngine.has(asset.id)).length);
+    setUncutReels(all.filter((asset) => !heldByEngine.has(asset.id)
+      && asset.content_format === "reel" && !asset.render_path).length);
     setAssets(rows);
-    const signed = await signPaths("client-media", rows.map((r) => r.storage_path));
+    const signed = await signPaths("client-media", rows.map((r) =>
+      r.content_format === "reel" ? r.render_path ?? "" : r.storage_path));
     setUrls(signed);
     // Same as Copy library: a text asset's file IS the content. Without this
     // the preview modal only has a signed URL and shows "could not be loaded".
@@ -137,6 +142,13 @@ export function ApprovalsPanel() {
         </p>
       )}
 
+      {uncutReels > 0 && (
+        <p className="mb-3 text-sm text-muted-foreground">
+          {uncutReels} reel{uncutReels === 1 ? " is" : "s are"} still in Create / Edit.
+          Approvals will show the finished cut when it is rendered.
+        </p>
+      )}
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading approvals…</p>
       ) : assets.length === 0 ? (
@@ -147,7 +159,7 @@ export function ApprovalsPanel() {
             <MediaCard
               key={asset.id}
               mediaType={asset.media_type}
-              url={urls.get(asset.storage_path)}
+              url={urls.get(asset.content_format === "reel" ? asset.render_path ?? "" : asset.storage_path)}
               body={bodies.get(asset.id)}
               title={asset.title ?? "Untitled"}
               meta={`${asset.ref_number ?? "—"} · ${shortDate(asset.created_at)}`}
@@ -249,7 +261,7 @@ export function ApprovalsPanel() {
 
       <MediaDetailModal
         asset={preview}
-        url={preview ? urls.get(preview.storage_path) : undefined}
+        url={preview ? urls.get(preview.content_format === "reel" ? preview.render_path ?? "" : preview.storage_path) : undefined}
         body={preview ? bodies.get(preview.id) : undefined}
         open={preview !== null}
         onClose={() => setPreview(null)}

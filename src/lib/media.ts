@@ -55,6 +55,7 @@ export type MediaAsset = {
   media_type: "image" | "text" | "video";
   title: string | null;
   storage_path: string;
+  render_path?: string | null;
   review_status: "pending" | "approved" | "rejected";
   /** Null unless a person approved it. A bot approval never sets this. */
   human_approved_at?: string | null;
@@ -90,7 +91,7 @@ export async function fetchClientAssets(
 ): Promise<MediaAsset[]> {
   let query = supabase
     .from("client_media_assets")
-    .select("id, client_id, brief_id, ref_number, media_type, title, storage_path, review_status, human_approved_at, content_format, member_id, created_at")
+    .select("id, client_id, brief_id, ref_number, media_type, title, storage_path, render_path, review_status, human_approved_at, content_format, member_id, created_at")
     .eq("client_id", clientId);
 
   if (opts.mediaType) query = query.eq("media_type", opts.mediaType);

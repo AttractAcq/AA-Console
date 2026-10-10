@@ -55,6 +55,7 @@ describe("manual idea campaign assignment", () => {
     const dialog = within(screen.getByRole("dialog"));
     await dialog.findByRole("option", { name: "Autumn launch · planning" });
     await userEvent.type(dialog.getByLabelText(/^Idea/), "A human idea");
+    await userEvent.selectOptions(dialog.getByLabelText(/^Destination/), "instagram");
     return dialog;
   }
 
@@ -62,7 +63,7 @@ describe("manual idea campaign assignment", () => {
     const dialog = await openManualIdea();
     await userEvent.click(dialog.getByRole("button", { name: "Add idea" }));
     await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      client_id: "client-1", title: "A human idea", source: "manual",
+      client_id: "client-1", title: "A human idea", source: "manual", target_platform: "instagram",
     })));
     expect(insert.mock.calls[0][0]).not.toHaveProperty("campaign_id");
     expect(campaignSingle).not.toHaveBeenCalled();
@@ -117,6 +118,18 @@ describe("manual idea campaign assignment", () => {
     expect(await screen.findByText("Autumn launch")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Campaign" })).toBeInTheDocument();
   });
+});
+it("queues format-directed Auto Idea with a reel destination", async () => {
+  render(<GenerationPanel />);
+  await userEvent.click(await screen.findByRole("button", { name: /Auto Idea/i }));
+  const dialog = within(screen.getByRole("dialog"));
+  await userEvent.selectOptions(dialog.getByLabelText(/^Destination/), "instagram");
+  await userEvent.selectOptions(dialog.getByLabelText(/^Media type/), "video");
+  await userEvent.selectOptions(dialog.getByLabelText(/^Format/), "reel");
+  await userEvent.click(dialog.getByRole("button", { name: "Generate ideas" }));
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("enqueue_format_ideation", {
+    p_client_id: "client-1", p_target_platform: "instagram", p_media_type: "video", p_content_format: "reel",
+  }));
 });
 it("scopes manual approval to the selected draft and client, then refreshes", async () => {
   render(<GenerationPanel />);

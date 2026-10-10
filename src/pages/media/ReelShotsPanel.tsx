@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { ReelShotGrid } from "../../components/ReelShotGrid";
 import { supabase } from "../../lib/supabase";
 import { buildReelMasters } from "../../lib/reelShots";
 import { signPaths } from "../../lib/media";
+import { useAgentJobs } from "../../lib/useAgentJobs";
+import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import type {
   ReelAssetReview,
   ReelBriefInput,
@@ -21,7 +23,11 @@ import type {
  */
 export function ReelShotsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
+  const [searchParams] = useSearchParams();
+  const focusedBrief = searchParams.get("brief");
   const [masters, setMasters] = useState<ReelMasterView[]>([]);
+  const [buildJobs, setBuildJobs] = useState<ReadonlyMap<string, { status: string; error: string | null }>>(new Map());
+  const [engineHeldIds, setEngineHeldIds] = useState<ReadonlySet<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -76,6 +82,26 @@ export function ReelShotsPanel() {
             .order("created_at", { ascending: false })
         : { data: [], error: null };
       if (jobRes.error) throw jobRes.error;
+      const slotRes = assetIds.length
+        ? await supabase.from("content_slots")
+            .select("asset_id")
+            .eq("client_id", clientId)
+            .eq("stage", "awaiting_approval")
+            .in("asset_id", assetIds)
+        : { data: [], error: null };
+      if (slotRes.error) throw slotRes.error;
+      const buildRes = ids.length
+        ? await supabase.from("agent_jobs")
+            .select("input_id, status, error")
+            .eq("agent_key", "video_build")
+            .in("input_id", ids)
+            .order("created_at", { ascending: false })
+        : { data: [], error: null };
+      if (buildRes.error) throw buildRes.error;
+      const latestBuilds = new Map<string, { status: string; error: string | null }>();
+      for (const row of buildRes.data ?? []) {
+        if (row.input_id && !latestBuilds.has(row.input_id)) latestBuilds.set(row.input_id, { status: row.status, error: row.error });
+      }
       // The finished cuts, signed so the grid can play them rather than
       // assert they exist.
       const signedCuts = await signPaths(
@@ -91,6 +117,8 @@ export function ReelShotsPanel() {
           signedCuts,
         ),
       );
+      setBuildJobs(latestBuilds);
+      setEngineHeldIds(new Set((slotRes.data ?? []).map((row) => row.asset_id).filter((id): id is string => Boolean(id))));
     } catch (error) {
       const message =
         error instanceof Error
@@ -105,6 +133,7 @@ export function ReelShotsPanel() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
   if (loadError) {
     return (
@@ -119,6 +148,7 @@ export function ReelShotsPanel() {
 
   return (
     <div>
+      <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
       {actionError && (
         <p role="alert" className="mb-3 text-sm text-destructive">
           {actionError}
@@ -127,7 +157,9 @@ export function ReelShotsPanel() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading reel shots…</p>
       ) : (
-        <ReelShotGrid masters={masters} onChanged={() => void refresh()} onError={setActionError} />
+        <ReelShotGrid masters={masters} buildJobs={buildJobs} engineHeldIds={engineHeldIds} clientId={clientId}
+          focusedBrief={focusedBrief}
+          onChanged={() => void refresh()} onError={setActionError} />
       )}
     </div>
   );
