@@ -429,6 +429,6 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
         })}</div>}
     <button type="button" className="mt-4 text-xs font-medium text-brand-strong hover:underline"
       onClick={() => void refresh()}>Refresh editing work</button>
-    <VideoRepurposePanel clientId={clientId} />
+    <VideoRepurposePanel clientId={clientId} employeeMode={employeeMode} />
   </div>;
 }

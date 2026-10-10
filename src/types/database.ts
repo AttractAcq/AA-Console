@@ -7947,6 +7947,34 @@ export type Database = {
           },
         ]
       }
+      video_repurpose_clip_requests: {
+        Row: {
+          id: string; derivative_id: string; client_id: string; source_asset_id: string
+          brief_id: string; source_in_sec: number; source_out_sec: number
+          output_asset_id: string | null; status: string; job_id: string | null
+          error: string | null; created_by: string | null; created_at: string; completed_at: string | null
+        }
+        Insert: {
+          id?: string; derivative_id: string; client_id: string; source_asset_id: string
+          brief_id: string; source_in_sec: number; source_out_sec: number
+          output_asset_id?: string | null; status?: string; job_id?: string | null
+          error?: string | null; created_by?: string | null; created_at?: string; completed_at?: string | null
+        }
+        Update: {
+          id?: string; derivative_id?: string; client_id?: string; source_asset_id?: string
+          brief_id?: string; source_in_sec?: number; source_out_sec?: number
+          output_asset_id?: string | null; status?: string; job_id?: string | null
+          error?: string | null; created_by?: string | null; created_at?: string; completed_at?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: "video_repurpose_clip_requests_derivative_id_fkey"; columns: ["derivative_id"]; isOneToOne: false; referencedRelation: "video_repurpose_derivatives"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_clip_requests_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"; columns: ["source_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_clip_requests_brief_id_fkey"; columns: ["brief_id"]; isOneToOne: false; referencedRelation: "client_briefs"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"; columns: ["output_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_clip_requests_job_id_fkey"; columns: ["job_id"]; isOneToOne: false; referencedRelation: "agent_jobs"; referencedColumns: ["id"] },
+        ]
+      }
       motion_design_attachments: {
         Row: {
           id: string; project_id: string; asset_id: string; brief_id: string | null
@@ -8208,6 +8236,10 @@ export type Database = {
       }
     }
     Functions: {
+      request_repurpose_clip: {
+        Args: { p_derivative_id: string; p_brief_id: string }
+        Returns: string
+      }
       attach_motion_design: {
         Args: { p_project_id: string; p_brief_id?: string | null }
         Returns: string

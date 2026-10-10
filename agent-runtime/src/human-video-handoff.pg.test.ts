@@ -42,6 +42,7 @@ beforeAll(async () => {
       as $$ select nullif($1, '')::uuid $$;
     create table clients(id uuid primary key);
     create table client_briefs (id uuid primary key default gen_random_uuid(), client_id uuid,
+      source_idea_id uuid,
       title text, body text, media_type media_type, content_format content_format,
       status text, production_method text, format_code text, editor_brief text);
     create table client_ideas (id uuid primary key default gen_random_uuid(), client_id uuid,
@@ -105,6 +106,7 @@ beforeAll(async () => {
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010200000_182_video_repurpose_insights.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010210000_183_motion_design_attachments.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010220000_184_video_repurpose_brief_reentry.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../supabase/migrations/20261010230000_185_repurpose_clip_extract.sql", import.meta.url), "utf8"));
   await db.exec(`create trigger car_assignment_follows_review after insert on client_asset_reviews
     for each row execute function assignment_follows_review();`);
 });
@@ -317,4 +319,36 @@ it("attaches a finished motion render as a pending review asset", async () => {
   const linkedAsset = await db.query<{ brief_id: string }>(
     "select brief_id from client_media_assets where id=$1", [linked.rows[0]?.id]);
   expect(linkedAsset.rows[0]?.brief_id).toBe(brief);
+});
+
+it("creates an audio-ready clip source only after its derivative brief is approved", async () => {
+  const insight = await db.query<{ id: string }>(
+    "select request_video_repurpose_insights($1,$2) as id", [intake, "Find the strongest short clip."]);
+  await db.query("update video_repurpose_requests set status='completed', candidates=$2 where id=$1",
+    [insight.rows[0]?.id, [{ kind: "short_clip", title: "Client's best answer", reason: "Clear explanation",
+      start_sec: 12, end_sec: 28, exact_quote: "We made the process simpler." }]]);
+  const idea = await db.query<{ id: string }>(
+    "select create_video_repurpose_idea($1,1,'instagram') as id", [insight.rows[0]?.id]);
+  const derivative = await db.query<{ id: string }>(
+    "select id from video_repurpose_derivatives where idea_id=$1", [idea.rows[0]?.id]);
+  const clipBrief = await db.query<{ id: string }>(
+    "insert into client_briefs(client_id,source_idea_id,title,media_type,content_format,status) values ($1,$2,'Clip brief','video','reel','draft') returning id",
+    [client, idea.rows[0]?.id]);
+  await expect(db.query("select request_repurpose_clip($1,$2)",
+    [derivative.rows[0]?.id, clipBrief.rows[0]?.id])).rejects.toThrow(/approved reel brief/);
+  await db.query("update client_briefs set status='approved' where id=$1", [clipBrief.rows[0]?.id]);
+  const request = await db.query<{ id: string }>(
+    "select request_repurpose_clip($1,$2) as id", [derivative.rows[0]?.id, clipBrief.rows[0]?.id]);
+  const queued = await db.query<{ status: string; job_id: string }>(
+    "select status,job_id from video_repurpose_clip_requests where id=$1", [request.rows[0]?.id]);
+  expect(queued.rows[0]).toMatchObject({ status: "queued", job_id: expect.any(String) });
+  const path = `${client}/repurpose-clips/${request.rows[0]?.id}/source.mp4`;
+  await db.query("insert into storage.objects(bucket_id,name) values ('client-media',$1)", [path]);
+  await db.query("update video_repurpose_clip_requests set status='running' where id=$1", [request.rows[0]?.id]);
+  const result = await db.query<{ asset_id: string }>(
+    "select complete_repurpose_clip($1,$2,$3) as asset_id", [request.rows[0]?.id, path, 16]);
+  const asset = await db.query<{ edit_stage: string; review_status: string; brief_id: string }>(
+    "select edit_stage,review_status,brief_id from client_media_assets where id=$1", [result.rows[0]?.asset_id]);
+  expect(asset.rows[0]).toMatchObject({ edit_stage: "needs_edit", review_status: "pending",
+    brief_id: clipBrief.rows[0]?.id });
 });

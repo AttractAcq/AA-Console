@@ -30,6 +30,7 @@ import { runVideoEditJob } from "../agents/video_edit/index.js";
 import { runSourceVideoEditJob } from "../agents/source_video_edit/index.js";
 import { runMotionDesignJob } from "../agents/motion_design/index.js";
 import { runVideoRepurposeJob } from "../agents/video_repurpose/index.js";
+import { runRepurposeClipJob } from "../agents/video_repurpose/clip-job.js";
 import { runIdeaSelectJob } from "../agents/idea_select/index.js";
 import { runCopywriterJob } from "../agents/copywriter/index.js";
 import { runTokenHealthJob } from "../agents/token_health/index.js";
@@ -114,6 +115,7 @@ const RUNNERS: Record<string, JobRunner> = {
   source_video_edit: runSourceVideoEditJob,
   motion_design: runMotionDesignJob,
   video_repurpose_insights: runVideoRepurposeJob,
+  repurpose_clip_extract: runRepurposeClipJob,
   idea_select: runIdeaSelectJob,
   copywriter: runCopywriterJob,
   token_health: runTokenHealthJob,

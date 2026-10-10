@@ -12,13 +12,19 @@ type Candidate = { kind: "quote_image" | "short_clip"; title: string; reason: st
 type Request = { id: string; source_asset_id: string; direction: string;
   status: string; candidates: unknown; error: string | null; created_at: string };
 type Derivative = { request_id: string; candidate_index: number; target_platform: Platform;
-  idea_id: string; reentry_stage: string };
+  id: string; idea_id: string; reentry_stage: string };
+type Brief = { id: string; source_idea_id: string | null; title: string };
+type ClipRequest = { id: string; derivative_id: string; brief_id: string;
+  status: string; error: string | null; output_asset_id: string | null };
 const PLATFORMS: Platform[] = ["instagram", "facebook", "tiktok", "linkedin", "youtube"];
 
-export function VideoRepurposePanel({ clientId }: { clientId: string | undefined }) {
+export function VideoRepurposePanel({ clientId, employeeMode = false }: {
+  clientId: string | undefined; employeeMode?: boolean }) {
   const [videos, setVideos] = useState<Video[]>([]);
   const [requests, setRequests] = useState<Request[]>([]);
   const [derivatives, setDerivatives] = useState<Derivative[]>([]);
+  const [briefs, setBriefs] = useState<Brief[]>([]);
+  const [clipRequests, setClipRequests] = useState<ClipRequest[]>([]);
   const [urls, setUrls] = useState<ReadonlyMap<string, string>>(new Map());
   const [sourceId, setSourceId] = useState("");
   const [direction, setDirection] = useState("");
@@ -31,7 +37,7 @@ export function VideoRepurposePanel({ clientId }: { clientId: string | undefined
   const refresh = useCallback(async () => {
     if (!clientId) return;
     try {
-      const [videoResult, requestResult] = await Promise.all([
+      const [videoResult, requestResult, briefResult] = await Promise.all([
         supabase.from("client_media_assets")
           .select("id, title, storage_path, render_path, edit_stage, review_status")
           .eq("client_id", clientId).eq("media_type", "video")
@@ -39,20 +45,33 @@ export function VideoRepurposePanel({ clientId }: { clientId: string | undefined
         supabase.from("video_repurpose_requests")
           .select("id, source_asset_id, direction, status, candidates, error, created_at")
           .eq("client_id", clientId).order("created_at", { ascending: false }).limit(30),
+        supabase.from("client_briefs")
+          .select("id, source_idea_id, title").eq("client_id", clientId)
+          .eq("media_type", "video").eq("content_format", "reel")
+          .eq("status", "approved").order("created_at", { ascending: false }).limit(60),
       ]);
       if (videoResult.error) throw videoResult.error;
       if (requestResult.error) throw requestResult.error;
+      if (briefResult.error) throw briefResult.error;
       const eligible = ((videoResult.data ?? []) as Video[]).filter((video) =>
         video.review_status !== "rejected" && video.edit_stage !== "superseded"
         && (video.render_path || ["needs_edit", "editing", "edited"].includes(video.edit_stage)));
       const requestRows = (requestResult.data ?? []) as Request[];
       const requestIds = requestRows.map((request) => request.id);
       const linked = requestIds.length ? await supabase.from("video_repurpose_derivatives")
-        .select("request_id, candidate_index, target_platform, idea_id, reentry_stage")
+        .select("id, request_id, candidate_index, target_platform, idea_id, reentry_stage")
         .in("request_id", requestIds) : { data: [], error: null };
       if (linked.error) throw linked.error;
+      const derivativeRows = (linked.data ?? []) as Derivative[];
+      const derivativeIds = derivativeRows.map((item) => item.id);
+      const clips = derivativeIds.length ? await supabase.from("video_repurpose_clip_requests")
+        .select("id, derivative_id, brief_id, status, error, output_asset_id")
+        .in("derivative_id", derivativeIds) : { data: [], error: null };
+      if (clips.error) throw clips.error;
       setVideos(eligible); setRequests(requestRows);
-      setDerivatives((linked.data ?? []) as Derivative[]);
+      setDerivatives(derivativeRows);
+      setBriefs((briefResult.data ?? []) as Brief[]);
+      setClipRequests((clips.data ?? []) as ClipRequest[]);
       setUrls(await signPaths("client-media", eligible.map((video) => video.render_path || video.storage_path)));
       setError(null);
     } catch (caught) {
@@ -85,6 +104,17 @@ export function VideoRepurposePanel({ clientId }: { clientId: string | undefined
     if (result.error) { setError(result.error.message); return; }
     setNotice(stage === "brief" ? "Derivative brief queued. Review it in Briefs before Create."
       : "Draft derivative idea created. Continue in Ideation, then Brief and Create.");
+    void refresh();
+  }
+
+  async function createClip(derivative: Derivative, brief: Brief) {
+    setBusy(true); setError(null); setNotice(null);
+    const result = await supabase.rpc("request_repurpose_clip", {
+      p_derivative_id: derivative.id, p_brief_id: brief.id,
+    });
+    setBusy(false);
+    if (result.error) { setError(result.error.message); return; }
+    setNotice("Source clip queued. It will enter Edit / Repurpose when ready.");
     void refresh();
   }
 
@@ -153,6 +183,23 @@ export function VideoRepurposePanel({ clientId }: { clientId: string | undefined
                     Create brief
                   </button>}
                 </div>
+                {candidate.kind === "short_clip" && linked && (() => {
+                  const brief = briefs.find((item) => item.source_idea_id === linked.idea_id);
+                  if (!brief) return <p className="text-xs text-muted-foreground">Approve the derivative video brief before cutting this clip.</p>;
+                  const clip = clipRequests.find((item) => item.derivative_id === linked.id && item.brief_id === brief.id);
+                  return <div className="text-xs">
+                    {clip?.status === "completed" ? <Link className="font-medium text-brand-strong hover:underline"
+                      to={employeeMode ? "/employee/video-editing"
+                        : `/clients/${clientId}/delivery/edit-repurpose?tab=overview&brief=${encodeURIComponent(brief.id)}`}>
+                      Open extracted clip in Edit / Repurpose</Link>
+                      : <button type="button" disabled={busy || (clip && clip.status !== "failed")}
+                        onClick={() => void createClip(linked, brief)}
+                        className="font-medium text-brand-strong hover:underline disabled:opacity-50">
+                        {clip?.status === "failed" ? "Retry clip extraction" : clip ? `Clip ${clip.status}` : "Create source clip"}
+                      </button>}
+                    {clip?.error && <p role="alert" className="mt-1 text-destructive">{clip.error}</p>}
+                  </div>;
+                })()}
               </div>;
             })}
           </article>;
