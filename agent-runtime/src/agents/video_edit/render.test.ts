@@ -95,11 +95,64 @@ describe("buildRenderPlan", () => {
   it("keeps caption text out of the filtergraph", () => {
     const plan = buildRenderPlan(edl, options);
     expect(filterOf(plan.args)).not.toContain("Here's");
-    expect(filterOf(plan.args)).toContain("textfile=/work/caption-1.txt:expansion=none");
+    expect(filterOf(plan.args)).toContain("textfile=/work/caption-1-1.txt:expansion=none");
+    // One file per line, not per caption: see the centring test below.
     expect(plan.textFiles).toEqual([
-      { path: "/work/caption-1.txt", content: "Here's the fix: 100%\nof it" },
-      { path: "/work/end-card.txt", content: "Book a call" },
+      { path: "/work/caption-1-1.txt", content: "Here's the fix: 100%" },
+      { path: "/work/caption-1-2.txt", content: "of it" },
+      { path: "/work/end-card-1.txt", content: "Book a call" },
     ]);
+  });
+
+  it("centres each line on its own width, not the block's", () => {
+    /**
+     * drawtext's x=(w-text_w)/2 centres what that filter draws, and text_w
+     * is the widest line in it. Handed a whole block, every line ends up
+     * left-aligned inside a centred box — so "Here's the fix: 100%" over
+     * "of it" put the short line hard left. One drawtext per line makes
+     * text_w that line's own width.
+     */
+    const filter = filterOf(buildRenderPlan(edl, options).args);
+    const draws = filter.match(/drawtext=/g) ?? [];
+    // Two caption lines and one end-card line.
+    expect(draws).toHaveLength(3);
+    for (const line of ["caption-1-1", "caption-1-2", "end-card-1"]) {
+      expect(filter).toContain(`textfile=/work/${line}.txt`);
+    }
+    // Every one of them centres itself.
+    expect(filter.match(/x=\(w-text_w\)\/2/g)).toHaveLength(3);
+  });
+
+  it("stacks the lines by a fixed step rather than by text_h", () => {
+    // text_h is now one line's height, so it cannot place the next line.
+    const filter = filterOf(buildRenderPlan(edl, options).args);
+    expect(filter).toContain("y=h*0.70:");          // first line
+    expect(filter).toContain("y=h*0.70+76:");       // second, 64px + 12 spacing
+    expect(filter).not.toContain("text_h");
+  });
+
+  it("centres a middle caption on the whole block, not on one line", () => {
+    // The block is measured here because text_h no longer describes it: two
+    // lines at 64px with 12px spacing is 140.
+    const plan = buildRenderPlan(
+      {
+        ...edl,
+        captions: [{ text: "Here's the fix: 100% of it", start_sec: 0.2, end_sec: 2, position: "middle" }],
+      },
+      options,
+    );
+    expect(filterOf(plan.args)).toContain("y=(h-140)/2:");
+  });
+
+  it("leaves a single-line caption exactly where it was", () => {
+    // The fix must not move text that was already centred correctly.
+    const plan = buildRenderPlan(
+      { ...edl, captions: [{ text: "Short", start_sec: 0.2, end_sec: 2, position: "bottom" }] },
+      options,
+    );
+    const filter = filterOf(plan.args);
+    expect(filter).toContain("y=h*0.70:");
+    expect(filter).not.toMatch(/y=h\*0\.70\+/);
   });
 
   it("appends a brand-coloured end card and times its text after the cut", () => {

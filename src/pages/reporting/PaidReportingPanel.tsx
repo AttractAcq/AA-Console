@@ -5,12 +5,13 @@ import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
 import { RangePicker } from "./RangePicker";
 import { RANGES, count, money, ratio, useMetrics } from "./useMetrics";
+import { TrendLine } from "./TrendLine";
 
 export function PaidReportingPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [range, setRange] = useState("30");
   const days = RANGES.find((r) => r.id === range)?.days ?? 30;
-  const { summary, loading, error } = useMetrics(clientId, days);
+  const { summary, trend, loading, error } = useMetrics(clientId, days);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading metrics…</p>;
   if (error) {
@@ -41,9 +42,11 @@ export function PaidReportingPanel() {
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Panel title="Spend">
           <p className="text-2xl font-semibold text-card-foreground">{money(paid.spend, currency)}</p>
+          {trend && <TrendLine comparison={trend.paid} label="Spend" />}
         </Panel>
         <Panel title="Impressions">
           <p className="text-2xl font-semibold text-card-foreground">{count(paid.impressions)}</p>
+          {trend && <TrendLine comparison={trend.paid} label="Impressions" />}
         </Panel>
         <Panel title="Clicks">
           <p className="text-2xl font-semibold text-card-foreground">{count(paid.clicks)}</p>
@@ -52,6 +55,7 @@ export function PaidReportingPanel() {
               ? `${((paid.clicks / paid.impressions) * 100).toFixed(2)}% of impressions`
               : ""}
           </p>
+          {trend && <TrendLine comparison={trend.paid} label="Clicks" />}
         </Panel>
         <Panel title="Conversions">
           <p className="text-2xl font-semibold text-card-foreground">{count(paid.conversions)}</p>
@@ -60,6 +64,7 @@ export function PaidReportingPanel() {
               ? `${money(Number(ratio(paid.spend, paid.conversions)), currency)} each`
               : "None recorded"}
           </p>
+          {trend && <TrendLine comparison={trend.paid} label="Conversions" />}
         </Panel>
       </div>
 
@@ -95,6 +100,9 @@ export function PaidReportingPanel() {
       <p className="mt-3 text-xs text-muted-foreground">
         Figures are the sum of daily rows across the window. Cost per click and cost per conversion
         are derived from those totals.
+        {trend
+          ? ` Changes compare this window against ${trend.window.since} to ${trend.window.until}, and are calculated by the same code the written commentary uses.`
+          : " There is no earlier window with data to compare against."}
       </p>
     </div>
   );

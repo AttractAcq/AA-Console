@@ -450,6 +450,11 @@ export async function runVideoBuildJob(
     return { ok: true, retryable: false };
   }
 
-  await handOffToSlot(sb, job, "video_build");
+  // To editing, not copywriting. This agent makes stills and submits the
+  // Higgsfield clips; it does not produce a video. Advancing straight to
+  // copywriting is what put uncut reels in front of people, because QA reads
+  // dimensions that only video_edit writes and treats a null as nothing to
+  // check.
+  await handOffToSlot(sb, job, "video_build", "editing");
   return { ok: true, retryable: false };
 }

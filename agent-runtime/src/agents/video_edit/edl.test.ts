@@ -218,3 +218,35 @@ describe("segmentWindows", () => {
     expect(windows[windows.length - 1]!.end).toBeCloseTo(totalDuration({ ...plan(), end_card_text: "" }), 5);
   });
 });
+
+describe("the plan schema", () => {
+  // Every `*_sec` field in this schema is a number of seconds, but they do not
+  // all mean the same thing: in_sec/out_sec/start_sec/end_sec are positions on
+  // a timeline and end_card_sec is a duration. A model reading an undescribed
+  // `_sec` field alongside four positional ones will read it as a position.
+  // That is exactly what happened: end_card_sec shipped with no description,
+  // and a planner returned the end card's start time as its length.
+  it("describes what every seconds field measures", () => {
+    const missing: string[] = [];
+    const walk = (node: unknown, path: string) => {
+      if (!node || typeof node !== "object") return;
+      const record = node as Record<string, unknown>;
+      const properties = record.properties as Record<string, unknown> | undefined;
+      for (const [name, value] of Object.entries(properties ?? {})) {
+        const field = value as Record<string, unknown>;
+        const here = path ? `${path}.${name}` : name;
+        if (name.endsWith("_sec") && !String(field.description ?? "").trim()) missing.push(here);
+        walk(field, here);
+        walk(field.items, `${here}[]`);
+      }
+      walk(record.items, `${path}[]`);
+    };
+    walk(EDL_SCHEMA, "");
+    expect(missing).toEqual([]);
+  });
+
+  it("says end_card_sec is a duration, because its name does not", () => {
+    const properties = EDL_SCHEMA.properties as Record<string, { description?: string } | undefined>;
+    expect(properties.end_card_sec?.description).toMatch(/duration, not a time/);
+  });
+});

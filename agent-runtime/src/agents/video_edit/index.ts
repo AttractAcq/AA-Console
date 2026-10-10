@@ -38,7 +38,8 @@ import {
 import { probeDurationSec, render, renderCapability, sampleFrames } from "./media.js";
 import { installFont } from "./font.js";
 import { planEdit, type PlanClip } from "./plan.js";
-import { buildRenderPlan } from "./render.js";
+import { advanceSlot, slotIdOf } from "../../engine/slot.js";
+import { buildRenderPlan, OUTPUT_HEIGHT, OUTPUT_WIDTH } from "./render.js";
 
 const BUCKET = "client-media";
 /** Enough to read the cut without paying for every frame of it. */
@@ -48,6 +49,21 @@ const SAMPLE_WIDTH = 384;
 const failed = (failureMessage: string, retryable = false): JobResult => ({
   ok: false,
   retryable,
+  failureMessage,
+});
+
+/**
+ * Held, not failed: a refusal that passes without anybody acting.
+ *
+ * Higgsfield clips take minutes. A reel whose footage is still rendering is
+ * in the same position as a client over its monthly cap — the thing in the
+ * way goes away on its own, and `failed` would both strand the slot and lose
+ * the work. resume_paused_jobs re-queues it hourly.
+ */
+const held = (failureMessage: string): JobResult => ({
+  ok: false,
+  retryable: false,
+  hold: true,
   failureMessage,
 });
 
@@ -116,7 +132,10 @@ export async function runVideoEditJob(
       stage: "readiness",
       reason: readiness.reason,
     });
-    return failed(readiness.message);
+    // The one reason that is a wait rather than a fault. Everything else
+    // here — no shot plan, a plan that does not match the frames, a shot
+    // nobody submitted — needs somebody to do something.
+    return readiness.reason === "clips_rendering" ? held(readiness.message) : failed(readiness.message);
   }
 
   const { data: brandRow } = await sb
@@ -256,7 +275,16 @@ async function cut(
 
   const { error: saveError } = await sb
     .from("client_media_assets")
-    .update({ edit_plan: edl as unknown as Record<string, unknown>, render_path: storagePath })
+    .update({
+      edit_plan: edl as unknown as Record<string, unknown>,
+      render_path: storagePath,
+      // The shape of what was just rendered. QA checks aspect ratio and
+      // duration, and this is the only moment either is known for certain —
+      // afterwards they would have to be probed back out of the file.
+      width: OUTPUT_WIDTH,
+      height: OUTPUT_HEIGHT,
+      duration_sec: Number(renderPlan.durationSec.toFixed(2)),
+    })
     .eq("id", asset.id);
   if (saveError) throw new Error(`Could not file the cut: ${saveError.message}`);
 
@@ -264,6 +292,22 @@ async function cut(
     stage: "done",
     render_path: storagePath,
   });
+
+  // The slot moves on only now, with a cut on the asset. Before this the
+  // engine advanced a reel to copywriting as soon as its clips were
+  // submitted, so a person could be asked to approve footage that had never
+  // been assembled. Does nothing for a hand-run job, which has no slot.
+  const slotId = slotIdOf(job);
+  if (slotId) {
+    await advanceSlot(sb, slotId, "copywriting", {
+      agentKey: "video_edit",
+      jobId: job.id,
+      assetId: asset.id,
+      costUsd: usage.costUsd,
+      note: `Cut at ${totalDuration(edl).toFixed(1)}s.`,
+    });
+  }
+
   return { ok: true, retryable: false, usage };
 }
 

@@ -3,7 +3,14 @@ import { useParams } from "react-router-dom";
 import { ReelShotGrid } from "../../components/ReelShotGrid";
 import { supabase } from "../../lib/supabase";
 import { buildReelMasters } from "../../lib/reelShots";
-import type { ReelAssetReview, ReelBriefInput, ReelFrameRow, ReelMasterView } from "../../lib/reelShots";
+import { signPaths } from "../../lib/media";
+import type {
+  ReelAssetReview,
+  ReelBriefInput,
+  ReelEditJob,
+  ReelFrameRow,
+  ReelMasterView,
+} from "../../lib/reelShots";
 
 /**
  * Shot review for a Phase 1 reel.
@@ -41,7 +48,7 @@ export function ReelShotsPanel() {
       const assetRes = ids.length
         ? await supabase
             .from("client_media_assets")
-            .select("id, brief_id, title, ref_number, review_status")
+            .select("id, brief_id, title, ref_number, review_status, render_path")
             .eq("client_id", clientId)
             .in("brief_id", ids)
         : { data: [], error: null };
@@ -58,7 +65,32 @@ export function ReelShotsPanel() {
             .order("position")
         : { data: [], error: null };
       if (frameRes.error) throw frameRes.error;
-      setMasters(buildReelMasters(briefs, assets, (frameRes.data ?? []) as ReelFrameRow[]));
+      // Newest first, so the first job for an asset is the one that says
+      // where its cut has got to.
+      const jobRes = assetIds.length
+        ? await supabase
+            .from("agent_jobs")
+            .select("input_id, status, error")
+            .eq("agent_key", "video_edit")
+            .in("input_id", assetIds)
+            .order("created_at", { ascending: false })
+        : { data: [], error: null };
+      if (jobRes.error) throw jobRes.error;
+      // The finished cuts, signed so the grid can play them rather than
+      // assert they exist.
+      const signedCuts = await signPaths(
+        "client-media",
+        assets.map((a) => a.render_path ?? "").filter(Boolean),
+      );
+      setMasters(
+        buildReelMasters(
+          briefs,
+          assets,
+          (frameRes.data ?? []) as ReelFrameRow[],
+          (jobRes.data ?? []) as ReelEditJob[],
+          signedCuts,
+        ),
+      );
     } catch (error) {
       const message =
         error instanceof Error

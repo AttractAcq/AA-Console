@@ -29,6 +29,9 @@ import { runVideoBuildJob } from "../agents/video_build/index.js";
 import { runVideoEditJob } from "../agents/video_edit/index.js";
 import { runIdeaSelectJob } from "../agents/idea_select/index.js";
 import { runCopywriterJob } from "../agents/copywriter/index.js";
+import { runTokenHealthJob } from "../agents/token_health/index.js";
+import { runQaJob } from "../agents/qa/index.js";
+import { runPublisherJob } from "../agents/publisher/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
 import { runRepurposeJob } from "../agents/repurpose/index.js";
@@ -46,6 +49,12 @@ export interface JobResult {
   ok: boolean;
   retryable: boolean;
   failureMessage?: string;
+  /**
+   * Not a failure: a refusal that will pass without anybody acting. The
+   * worker holds the job instead of failing it, and leaves the slot where it
+   * is. Only the budget cap sets this today.
+   */
+  hold?: boolean;
   usage?: { inputTokens: number; outputTokens: number; costUsd: number };
 }
 
@@ -100,6 +109,14 @@ const RUNNERS: Record<string, JobRunner> = {
   video_edit: runVideoEditJob,
   idea_select: runIdeaSelectJob,
   copywriter: runCopywriterJob,
+  token_health: runTokenHealthJob,
+  qa: runQaJob,
+  // The end of the chain, and the only thing here that makes a client's
+  // account say something in public. Does nothing at all unless
+  // PUBLISH_ENABLED is on in this runtime AND publishing is on for that
+  // client: two switches, so turning it on for one account is not turning
+  // it on for every account.
+  publisher: runPublisherJob,
   brief_dispatch: runBriefDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
   // a person in Ads Manager.
@@ -135,7 +152,11 @@ export async function dispatchJob(
   // three attempts at the same refusal is three lies about having tried.
   const budget = await checkClientBudget(sb, job.client_id);
   if (!budget.allowed) {
-    return { ok: false, retryable: false, failureMessage: budget.message };
+    // Held, not failed. The cap passes when somebody raises it or when the
+    // month rolls, and neither of those used to bring the work back: the
+    // job was failed non-retryably and its slot with it, so a cap reached
+    // on the 3rd threw away the rest of that client's month.
+    return { ok: false, retryable: false, hold: true, failureMessage: budget.message };
   }
   // Computed here rather than inside each runner so every agent is bounded by
   // construction, including any added later that forgets to ask.

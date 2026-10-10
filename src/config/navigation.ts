@@ -173,6 +173,15 @@ export const clientNavGroups: NavNode[] = [
         label: "Approvals",
         path: "approvals",
         icon: CheckSquare,
+        // Two queues, because they are two different acts. Assets signs an
+        // asset off; Engine is the one human commit the engine stops at,
+        // which also puts the post on the calendar. Approving engine work
+        // on the Assets tab would approve the asset and leave the slot
+        // where it was.
+        tabs: [
+          { id: "engine-inbox", label: "Engine" },
+          { id: "assets", label: "Assets" },
+        ],
       },
       {
         id: "distribution",

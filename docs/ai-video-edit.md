@@ -1,5 +1,13 @@
 # AI video edit — proposal, 1 October 2026
 
+> **Superseded in part.** The *Spike status* and *Suggested phasing* sections
+> below are out of date: the editor is registered, migrated, has ffmpeg in the
+> image, and has cut three reels, one of them approved. Real cost came in at
+> ~$0.19 per cut rather than the ~$1.20 estimated here. See
+> [video-roadmap-2026-10-08.md](video-roadmap-2026-10-08.md). The reasoning in
+> the rest of this document still holds and is why the roadmap is shaped as it
+> is.
+
 Status: **proposal only.** No code, migration or deploy is in this change.
 
 ## The question

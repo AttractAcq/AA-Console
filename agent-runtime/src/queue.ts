@@ -150,6 +150,31 @@ export async function markJobFailed(
   if (count !== 1) throw new Error(`Failed to fail job ${jobId}: lease ownership lost.`);
 }
 
+/**
+ * Hold a job rather than failing it.
+ *
+ * For a refusal that will pass on its own: a monthly cap, a paused agent.
+ * `failed` means something broke and a person should look; a cap reached on
+ * the 3rd is neither, and failing the job threw away the rest of that
+ * client's month because nothing resumed when the cap was raised or the
+ * month rolled.
+ *
+ * Through the RPC rather than a direct update, because the database is where
+ * "a hold is not an attempt" is written down — pause_agent_job deliberately
+ * leaves `attempts` alone, so waiting does not use up a job's retries.
+ */
+export async function markJobPaused(
+  sb: SupabaseClient,
+  jobId: string,
+  reason: string,
+): Promise<void> {
+  const { error } = await sb.rpc("pause_agent_job", {
+    p_job_id: jobId,
+    p_reason: reason.slice(0, 2000),
+  } as never);
+  if (error) throw new Error(`Failed to hold job ${jobId}: ${error.message}`);
+}
+
 export async function appendEvent(
   sb: SupabaseClient,
   jobId: string,

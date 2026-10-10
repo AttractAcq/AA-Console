@@ -15,7 +15,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import { ProviderError } from "../../tools/anthropic.js";
 import { unsupportedStrictKeywords } from "../../tools/schema.js";
 import { estimateCostUsd, type TokenUsage } from "../../usage/cost.js";
-import { EDL_SCHEMA, parseEdl, type Edl } from "./edl.js";
+import {
+  EDL_SCHEMA,
+  MAX_CAPTION_CHARS,
+  MAX_END_CARD_SEC,
+  parseEdl,
+  TRANSITIONS,
+  type Edl,
+} from "./edl.js";
 
 export const SUBMIT_TOOL_NAME = "submit_edit_plan";
 
@@ -67,6 +74,12 @@ export function buildPlanContent(input: PlanInput): Anthropic.Messages.ContentBl
     text: [
       `Reel: ${input.title}`,
       `Maximum length including any end card: ${input.maxTotalSec}s.`,
+      // Every limit here is checked by validateEdl. A limit that is enforced
+      // but not stated costs a whole revise round to discover, which is twice
+      // the tokens and the only reason the model comparison showed a gap.
+      `Captions and the end card: ${MAX_CAPTION_CHARS} characters each, at most.`,
+      `An end card holds between 1 and ${MAX_END_CARD_SEC}s, and that time counts towards the maximum.`,
+      `Transitions available: ${TRANSITIONS.join(", ")}.`,
       banned.length ? `The brand never uses: ${banned.join("; ")}.` : "The brand has no banned phrases on file.",
       "",
       "BRIEF",

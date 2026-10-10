@@ -31,6 +31,8 @@ export function ApprovalsPanel() {
   const [reason, setReason] = useState("");
 
   const [loadError, setLoadError] = useState<string | null>(null);
+  // How many were left out because the engine's own queue owns them.
+  const [engineHeld, setEngineHeld] = useState(0);
 
   const refresh = useCallback(async () => {
     setLoadError(null);
@@ -50,7 +52,29 @@ export function ApprovalsPanel() {
         humanApproved: false,
       }),
     ]);
-    const rows = [...botApproved, ...pending];
+    // An engine-made asset must not be approved here.
+    //
+    // review_media_asset signs the asset off and moves nothing. An asset
+    // whose slot is waiting on a person would therefore end up approved
+    // with the slot still at awaiting_approval, never scheduled and no
+    // longer in any queue — the exact fault migration 159 was written to
+    // fix, reintroduced by approving it on the wrong tab. approve_slot, on
+    // the Engine tab, does both.
+    const { data: engineOwned } = await supabase
+      .from("content_slots")
+      .select("asset_id")
+      .eq("client_id", clientId)
+      .eq("stage", "awaiting_approval")
+      .not("asset_id", "is", null);
+    const heldByEngine = new Set(
+      ((engineOwned ?? []) as Array<{ asset_id: string | null }>)
+        .map((row) => row.asset_id)
+        .filter((id): id is string => Boolean(id)),
+    );
+
+    const all = [...botApproved, ...pending];
+    const rows = all.filter((asset) => !heldByEngine.has(asset.id));
+    setEngineHeld(all.length - rows.length);
     setAssets(rows);
     const signed = await signPaths("client-media", rows.map((r) => r.storage_path));
     setUrls(signed);
@@ -102,6 +126,14 @@ export function ApprovalsPanel() {
       {error && (
         <p role="alert" className="mb-3 text-sm text-destructive">
           {error}
+        </p>
+      )}
+
+      {engineHeld > 0 && (
+        <p className="mb-3 text-sm text-muted-foreground">
+          {engineHeld} {engineHeld === 1 ? "piece is" : "pieces are"} waiting on the Engine tab.
+          Approving one there schedules the post as well; approving it here would sign the asset off
+          and leave the slot where it is.
         </p>
       )}
 

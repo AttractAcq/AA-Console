@@ -3,7 +3,7 @@
  *
  *   npx tsx src/agents/video_edit/spike.ts --brief reel.json --out reel.mp4 \
  *     --font /path/DejaVuSans-Bold.ttf [--edl plan.json | --model claude-opus-5-5] \
- *     [--effort high] [--music track.m4a] [--fps 2]
+ *     [--effort high] [--music track.m4a] [--fps 1] [--width 384]
  *
  * reel.json:
  *   { "title": "...", "brief_text": "...", "max_total_sec": 30,
@@ -45,7 +45,8 @@ async function main(): Promise<void> {
       model: { type: "string" },
       effort: { type: "string", default: "high" },
       music: { type: "string" },
-      fps: { type: "string", default: "2" },
+      fps: { type: "string", default: "1" },
+      width: { type: "string", default: "384" },
     },
   });
   if (!values.brief || !values.out || !values.font || (!values.edl && !values.model)) {
@@ -81,7 +82,11 @@ async function main(): Promise<void> {
     if (!parsed.ok) throw new Error(parsed.problem);
     edl = parsed.edl;
   } else {
-    const fps = Number.parseFloat(values.fps ?? "2");
+    // These default to what agents/video_edit/index.ts actually samples at
+    // (SAMPLE_FPS, SAMPLE_WIDTH). A spike that samples differently prices a
+    // different job, which is how the 1 October cost estimate went wrong.
+    const fps = Number.parseFloat(values.fps ?? "1");
+    const width = Number.parseInt(values.width ?? "384", 10);
     const clips: PlanClip[] = [];
     for (const shot of shots) {
       clips.push({
@@ -90,7 +95,7 @@ async function main(): Promise<void> {
         duration_sec: shot.duration_sec,
         shot_source_kind: shot.kind,
         burnedInText: shot.caption ?? "",
-        frames: await sampleFrames(shot.file, join(work, `frames-${shot.shot}`), { fps, width: 512 }),
+        frames: await sampleFrames(shot.file, join(work, `frames-${shot.shot}`), { fps, width }),
       });
     }
     const input = {
