@@ -4,7 +4,7 @@ import { signPaths } from "../../../lib/media";
 import { supabase } from "../../../lib/supabase";
 
 type Video = { id: string; client_id: string; title: string | null; content_format: string | null;
-  storage_path: string; render_path: string | null; created_at: string };
+  storage_path: string; render_path: string | null; review_status: string; created_at: string };
 type Slot = { id: string; asset_id: string | null };
 
 /** The assigned SMM's human gate, including engine reels that need approve_slot. */
@@ -15,6 +15,8 @@ export function SmmVideoApprovals({ memberId }: { memberId: string }) {
   const [slots, setSlots] = useState<ReadonlyMap<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -30,12 +32,12 @@ export function SmmVideoApprovals({ memberId }: { memberId: string }) {
         setVideos([]); setUrls(new Map()); setSlots(new Map()); return;
       }
       const { data: assets, error: assetError } = await supabase.from("client_media_assets")
-        .select("id, client_id, title, content_format, storage_path, render_path, created_at")
+        .select("id, client_id, title, content_format, storage_path, render_path, review_status, created_at")
         .in("client_id", ids).eq("media_type", "video").eq("edit_stage", "review_ready")
         .is("human_approved_at", null).order("created_at", { ascending: false });
       if (assetError) throw assetError;
       const rows = ((assets ?? []) as Video[]).filter((row) =>
-        row.content_format !== "reel" || Boolean(row.render_path));
+        row.review_status !== "rejected" && (row.content_format !== "reel" || Boolean(row.render_path)));
       const { data: engineSlots, error: slotError } = await supabase.from("content_slots")
         .select("id, asset_id").in("client_id", ids).eq("stage", "awaiting_approval");
       if (slotError) throw slotError;
@@ -62,6 +64,22 @@ export function SmmVideoApprovals({ memberId }: { memberId: string }) {
     void refresh();
   }
 
+  async function reject(video: Video) {
+    if (!reason.trim()) return;
+    setBusy(video.id);
+    setError(null);
+    const slotId = slots.get(video.id);
+    const result = slotId
+      ? await supabase.rpc("reject_slot", { p_slot_id: slotId, p_reason: reason.trim() })
+      : await supabase.rpc("review_media_asset", {
+        p_asset_id: video.id, p_decision: "rejected", p_reason: reason.trim(),
+      });
+    setBusy(null);
+    if (result.error) { setError(result.error.message); return; }
+    setRejecting(null); setReason("");
+    void refresh();
+  }
+
   return <section className="space-y-4">
     <p className="text-sm text-muted-foreground">Review the finished cut, sign as the assigned SMM, and request client approval when needed. The owner must also sign before final approval.</p>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
@@ -78,6 +96,19 @@ export function SmmVideoApprovals({ memberId }: { memberId: string }) {
               : <p role="alert" className="text-xs text-destructive">Video preview unavailable. Retry before signing.</p>}
             {urls.get(path) && <VideoApprovalRoute assetId={video.id}
               onFinalApprove={() => finalize(video)} />}
+            <div className="space-y-2">
+              <button type="button" onClick={() => { setRejecting(video.id); setReason(""); }}
+                className="rounded-md border border-border px-2 py-1 text-xs">Reject / request changes</button>
+              {rejecting === video.id && <div className="flex flex-wrap gap-2">
+                <input aria-label={`Changes for ${video.title ?? "video"}`} value={reason}
+                  onChange={(event) => setReason(event.target.value)} placeholder="What should change?"
+                  className="min-w-56 rounded-md border border-input bg-background px-2 py-1 text-xs" />
+                <button type="button" disabled={busy === video.id || !reason.trim()}
+                  onClick={() => void reject(video)} className="rounded-md border border-border px-2 py-1 text-xs disabled:opacity-50">
+                  Send changes</button>
+                <button type="button" onClick={() => setRejecting(null)} className="text-xs">Cancel</button>
+              </div>}
+            </div>
             {busy === video.id && <p className="text-xs text-muted-foreground">Finalizing…</p>}
           </article>;
         })}
