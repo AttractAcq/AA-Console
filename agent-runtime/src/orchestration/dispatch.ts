@@ -27,6 +27,7 @@ import { runReportingJob } from "../agents/reporting/index.js";
 import { runCreativeBuildJob } from "../agents/creative_build/index.js";
 import { runVideoBuildJob } from "../agents/video_build/index.js";
 import { runVideoEditJob } from "../agents/video_edit/index.js";
+import { runSourceVideoEditJob } from "../agents/source_video_edit/index.js";
 import { runIdeaSelectJob } from "../agents/idea_select/index.js";
 import { runCopywriterJob } from "../agents/copywriter/index.js";
 import { runTokenHealthJob } from "../agents/token_health/index.js";
@@ -108,6 +109,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // the other half. A model writes the edit decision list, code validates
   // it against the clips and the brief's own claims, ffmpeg renders it.
   video_edit: runVideoEditJob,
+  source_video_edit: runSourceVideoEditJob,
   idea_select: runIdeaSelectJob,
   copywriter: runCopywriterJob,
   token_health: runTokenHealthJob,

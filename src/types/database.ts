@@ -7947,6 +7947,77 @@ export type Database = {
           },
         ]
       }
+      video_source_edit_requests: {
+        Row: {
+          id: string
+          client_id: string
+          source_asset_id: string
+          output_asset_id: string | null
+          job_id: string | null
+          direction: string
+          aspect: string
+          remove_pauses: boolean
+          captions: boolean
+          animated_title: boolean
+          brand_treatment: string
+          feel: string
+          status: string
+          error: string | null
+          transcript: Json | null
+          edit_plan: Json | null
+          created_by: string | null
+          created_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          source_asset_id: string
+          output_asset_id?: string | null
+          job_id?: string | null
+          direction: string
+          aspect: string
+          remove_pauses?: boolean
+          captions?: boolean
+          animated_title?: boolean
+          brand_treatment: string
+          feel: string
+          status?: string
+          error?: string | null
+          transcript?: Json | null
+          edit_plan?: Json | null
+          created_by?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          source_asset_id?: string
+          output_asset_id?: string | null
+          job_id?: string | null
+          direction?: string
+          aspect?: string
+          remove_pauses?: boolean
+          captions?: boolean
+          animated_title?: boolean
+          brand_treatment?: string
+          feel?: string
+          status?: string
+          error?: string | null
+          transcript?: Json | null
+          edit_plan?: Json | null
+          created_by?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: "video_source_edit_requests_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"; columns: ["source_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"; columns: ["output_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_source_edit_requests_job_id_fkey"; columns: ["job_id"]; isOneToOne: false; referencedRelation: "agent_jobs"; referencedColumns: ["id"] },
+        ]
+      }
       work_submissions: {
         Row: {
           client_id: string | null
@@ -8007,6 +8078,19 @@ export type Database = {
       }
     }
     Functions: {
+      request_source_video_edit: {
+        Args: {
+          p_asset_id: string
+          p_direction: string
+          p_aspect: string
+          p_remove_pauses: boolean
+          p_captions: boolean
+          p_animated_title: boolean
+          p_brand_treatment: string
+          p_feel: string
+        }
+        Returns: string
+      }
       aa_house_client_id: { Args: never; Returns: string }
       accept_assignment: {
         Args: { p_assignment_id: string }

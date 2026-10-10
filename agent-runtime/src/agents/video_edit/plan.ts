@@ -122,7 +122,8 @@ export function buildPlanContent(input: PlanInput): Anthropic.Messages.ContentBl
 
 export async function planEdit(
   input: PlanInput,
-  options: { apiKey?: string; model: string; effort?: "low" | "medium" | "high" | "xhigh" | "max"; timeoutMs?: number },
+  options: { apiKey?: string; model: string; effort?: "low" | "medium" | "high" | "xhigh" | "max";
+    timeoutMs?: number; system?: string },
 ): Promise<PlanResult> {
   const unsupported = unsupportedStrictKeywords(EDL_SCHEMA);
   if (unsupported.length > 0) {
@@ -140,7 +141,7 @@ export async function planEdit(
       .stream({
         model: options.model,
         max_tokens: 32000,
-        system: SYSTEM,
+        system: options.system ?? SYSTEM,
         output_config: { effort: options.effort ?? "high" },
         // Forced tool_choice is refused on current models: auto plus the
         // instruction in SYSTEM, and the missing-call check below.

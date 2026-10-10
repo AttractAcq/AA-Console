@@ -29,6 +29,21 @@ vi.mock("react-router-dom", async (original) => ({
 import { EditRepurposePanel } from "./EditRepurposePanel";
 
 describe("human video edit intake", () => {
+  it("queues an AI edit with explicit direction and controlled effects", async () => {
+    rpc.mockClear();
+    render(<MemoryRouter><EditRepurposePanel /></MemoryRouter>);
+    await userEvent.click(await screen.findByRole("button", { name: "Edit with AI" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Editing direction" }),
+      "Keep the strongest answer and remove the long pauses.");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Crop / aspect" }), "square");
+    await userEvent.click(screen.getByRole("checkbox", { name: "Animated title" }));
+    await userEvent.click(screen.getByRole("button", { name: "Generate AI edit" }));
+    expect(rpc).toHaveBeenCalledWith("request_source_video_edit", {
+      p_asset_id: "raw-1", p_direction: "Keep the strongest answer and remove the long pauses.",
+      p_aspect: "square", p_remove_pauses: true, p_captions: true,
+      p_animated_title: true, p_brand_treatment: "on_brand", p_feel: "balanced",
+    });
+  });
   it("previews source footage and assigns an editor before approval", async () => {
     render(<MemoryRouter><EditRepurposePanel /></MemoryRouter>);
     expect(await screen.findByLabelText("Source footage for Founder footage")).toHaveAttribute(

@@ -10,6 +10,7 @@ const raw = "55555555-5555-4555-8555-555555555555";
 const cut = "66666666-6666-4666-8666-666666666666";
 const ready = "77777777-7777-4777-8777-777777777777";
 const intake = "88888888-8888-4888-8888-888888888888";
+const aiSource = "99999999-9999-4999-8999-999999999999";
 let db: PGlite;
 
 beforeAll(async () => {
@@ -17,8 +18,10 @@ beforeAll(async () => {
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
     create schema auth; create schema storage;
+    create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql stable as
       $$ select 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid $$;
+    create function auth.role() returns text language sql stable as $$ select 'service_role' $$;
     create function is_admin() returns boolean language sql stable as $$ select true $$;
     create function is_member(uuid) returns boolean language sql stable as $$ select true $$;
     create function can_access_client(uuid) returns boolean language sql stable as $$ select true $$;
@@ -42,7 +45,8 @@ beforeAll(async () => {
       id uuid primary key, client_id uuid, brief_id uuid, member_id uuid,
       media_type media_type, content_format content_format, storage_path text,
       render_path text, title text, uploaded_by uuid, review_status review_status default 'pending',
-      human_approved_at timestamptz, created_at timestamptz default now()
+      human_approved_at timestamptz, created_at timestamptz default now(),
+      edit_plan jsonb, width integer, height integer, duration_sec numeric
     );
     create table job_assignments (
       id uuid primary key default gen_random_uuid(), member_id uuid, client_id uuid,
@@ -63,10 +67,17 @@ beforeAll(async () => {
       id uuid primary key default gen_random_uuid(), agent_key text, client_id uuid,
       params jsonb, created_by uuid
     );
+    create table agents (agent_key text primary key, name text, initials text,
+      domain text, description text, requires_upstream text[], requires_input boolean);
+    create function enqueue_agent_job_internal(text, uuid, text, uuid, uuid, jsonb, text)
+      returns uuid language plpgsql as $$ declare v_id uuid; begin
+      insert into agent_jobs(agent_key,client_id,params,created_by) values ($1,$2,$6,$5)
+        returning id into v_id; return v_id; end $$;
     create table client_asset_reviews (asset_id uuid, decision review_status, reason text, reviewed_by uuid);
     create function advance_assignment(uuid, text, text, text, uuid) returns void
       language plpgsql as $$ begin update job_assignments set stage = $2, asset_id = coalesce($5,asset_id) where id = $1; end $$;
     insert into clients values ('${client}');
+    insert into auth.users values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     insert into client_briefs(id,client_id,title,media_type,content_format)
       values ('${brief}','${client}','Founder reel','video','reel');
     insert into team_members values ('${avatar}','avatars',true),('${editor}','editors',true);
@@ -77,6 +88,7 @@ beforeAll(async () => {
     language sql stable as $$ select auth.uid() $$;`);
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010140000_176_finish_human_video_without_edit.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010160000_178_video_edit_intake.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../supabase/migrations/20261010170000_179_source_video_ai_edit.sql", import.meta.url), "utf8"));
   await db.exec(`create trigger car_assignment_follows_review after insert on client_asset_reviews
     for each row execute function assignment_follows_review();`);
 });
@@ -143,4 +155,38 @@ it("registers supplied footage with rights and a standalone human brief", async 
   const smmAssignment = await db.query<{ id: string }>(
     "select request_human_video_edit($1,$2) as id", [intake, editor]);
   expect(smmAssignment.rows[0]?.id).toBeTruthy();
+});
+
+it("lets the assigned SMM queue one guarded source edit", async () => {
+  await db.exec(`insert into client_media_assets
+    (id,client_id,brief_id,media_type,content_format,storage_path,title,edit_stage)
+    values ('${aiSource}','${client}','${brief}','video','reel','${client}/ai-raw.mp4','AI source','needs_edit');`);
+  const args = [aiSource, "Cut pauses and keep the spoken point intact.", "vertical",
+    true, true, true, "on_brand", "balanced"];
+  const result = await db.query<{ id: string }>(
+    "select request_source_video_edit($1,$2,$3,$4,$5,$6,$7,$8) as id", args);
+  expect(result.rows[0]?.id).toBeTruthy();
+  const state = await db.query<{ edit_stage: string }>(
+    "select edit_stage from client_media_assets where id=$1", [aiSource]);
+  expect(state.rows[0]?.edit_stage).toBe("editing");
+  const request = await db.query<{ status: string; job_id: string }>(
+    "select status,job_id from video_source_edit_requests where id=$1", [result.rows[0]?.id]);
+  expect(request.rows[0]).toMatchObject({ status: "queued", job_id: expect.any(String) });
+  await expect(db.query("select request_source_video_edit($1,$2,$3,$4,$5,$6,$7,$8)", args))
+    .rejects.toThrow(/waiting for an edit/);
+  await expect(db.query(`insert into client_media_assets
+    (id,client_id,brief_id,media_type,content_format,storage_path,title,source_asset_id)
+    values (gen_random_uuid(),$1,$2,'video','reel',$3,'Premature cut',$4)`,
+  [client, brief, `${client}/premature.mp4`, aiSource])).rejects.toThrow(/Only the active AI edit/);
+  await db.query("update video_source_edit_requests set status='running' where id=$1", [result.rows[0]?.id]);
+  const path = `${client}/edits/${result.rows[0]?.id}/cut.mp4`;
+  await db.query("insert into storage.objects(bucket_id,name) values ('client-media',$1)", [path]);
+  await db.query("select complete_source_video_edit($1,$2,$3,$4,$5,$6)",
+    [result.rows[0]?.id, path, { segments: [] }, 1080, 1920, 1.5]);
+  const output = await db.query<{ edit_stage: string; render_path: string }>(
+    "select edit_stage,render_path from client_media_assets where id=$1", [result.rows[0]?.id]);
+  expect(output.rows[0]).toMatchObject({ edit_stage: "review_ready", render_path: path });
+  const completed = await db.query<{ status: string; output_asset_id: string }>(
+    "select status,output_asset_id from video_source_edit_requests where id=$1", [result.rows[0]?.id]);
+  expect(completed.rows[0]).toMatchObject({ status: "completed", output_asset_id: result.rows[0]?.id });
 });

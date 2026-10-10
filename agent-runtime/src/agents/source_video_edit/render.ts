@@ -18,6 +18,7 @@ export interface SourceRenderOptions {
   aspect: Aspect;
   hasAudio: boolean;
   animatedTitle?: string | null;
+  textColour?: string | null;
 }
 
 const SAFE_PATH = /^[A-Za-z0-9_./-]+$/;
@@ -36,6 +37,8 @@ export function buildSourceRenderPlan(edl: Edl, options: SourceRenderOptions): R
   const { width, height } = DIMENSIONS[options.aspect];
   const font = safePath(options.fontFile);
   const dir = safePath(options.workDir.replace(/\/+$/, ""));
+  const textColour = /^#?[0-9a-f]{6}$/i.test(options.textColour ?? "")
+    ? `0x${options.textColour!.replace(/^#/, "")}` : "white";
   const args = ["-hide_banner", "-loglevel", "error", "-y"];
   const filters: string[] = [];
   const textFiles: RenderPlan["textFiles"] = [];
@@ -59,8 +62,8 @@ export function buildSourceRenderPlan(edl: Edl, options: SourceRenderOptions): R
     const file = `${dir}/source-title.txt`;
     textFiles.push({ path: file, content: options.animatedTitle.trim().slice(0, 80) });
     overlays.push(`drawtext=fontfile=${font}:textfile=${file}:expansion=none:fontsize=64:` +
-      `fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=20:` +
-      `x=(w-text_w)/2:y=h*0.12+max(0\,(0.5-t)*h*0.2):enable='between(t,0,3)'`);
+      `fontcolor=${textColour}:box=1:boxcolor=black@0.55:boxborderw=20:` +
+      `x=(w-text_w)/2:y=h*0.12+max(0\\,(0.5-t)*h*0.2):enable='between(t,0,3)'`);
   }
   edl.captions.forEach((caption, i) => {
     const lines = wrapLines(caption.text, CAPTION_LINE_CHARS);
@@ -68,7 +71,7 @@ export function buildSourceRenderPlan(edl: Edl, options: SourceRenderOptions): R
       const file = `${dir}/source-caption-${i + 1}-${j + 1}.txt`;
       textFiles.push({ path: file, content: line });
       overlays.push(`drawtext=fontfile=${font}:textfile=${file}:expansion=none:fontsize=64:` +
-        `fontcolor=white:borderw=5:bordercolor=black@0.85:x=(w-text_w)/2:` +
+        `fontcolor=${textColour}:borderw=5:bordercolor=black@0.85:x=(w-text_w)/2:` +
         `y=h*0.70+${j * (64 + LINE_SPACING)}:` +
         `enable='between(t,${sec(caption.start_sec)},${sec(caption.end_sec)})'`);
     });
