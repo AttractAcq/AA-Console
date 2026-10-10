@@ -35,4 +35,10 @@ describe("human video edit intake", () => {
       p_asset_id: "raw-1", p_member_id: "editor-1",
     });
   });
+  it("can accept delivered footage as the finished cut without assigning an editor", async () => {
+    rpc.mockClear();
+    render(<MemoryRouter><EditRepurposePanel /></MemoryRouter>);
+    await userEvent.click(await screen.findByRole("button", { name: "Use as finished cut" }));
+    expect(rpc).toHaveBeenCalledWith("accept_video_as_finished", { p_asset_id: "raw-1" });
+  });
 });

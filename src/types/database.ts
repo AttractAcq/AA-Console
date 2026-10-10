@@ -9742,6 +9742,7 @@ export type Database = {
         Returns: string
       }
       request_video_edit: { Args: { p_asset_id: string }; Returns: string }
+      accept_video_as_finished: { Args: { p_asset_id: string }; Returns: undefined }
       set_content_approval_owner: { Args: { p_user_id: string }; Returns: undefined }
       video_approval_state: { Args: { p_asset_id: string }; Returns: Json }
       sign_video_approval: { Args: { p_asset_id: string; p_role: string }; Returns: undefined }

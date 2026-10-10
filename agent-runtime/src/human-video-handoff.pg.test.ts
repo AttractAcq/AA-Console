@@ -8,6 +8,7 @@ const avatar = "33333333-3333-4333-8333-333333333333";
 const editor = "44444444-4444-4444-8444-444444444444";
 const raw = "55555555-5555-4555-8555-555555555555";
 const cut = "66666666-6666-4666-8666-666666666666";
+const ready = "77777777-7777-4777-8777-777777777777";
 let db: PGlite;
 
 beforeAll(async () => {
@@ -60,6 +61,9 @@ beforeAll(async () => {
   `);
   const migration = await readFile(new URL("../../supabase/migrations/20261010120000_174_human_video_edit_handoff.sql", import.meta.url), "utf8");
   await db.exec(migration);
+  await db.exec(`create function active_video_approval_manager(uuid) returns uuid
+    language sql stable as $$ select auth.uid() $$;`);
+  await db.exec(await readFile(new URL("../../supabase/migrations/20261010140000_176_finish_human_video_without_edit.sql", import.meta.url), "utf8"));
   await db.exec(`create trigger car_assignment_follows_review after insert on client_asset_reviews
     for each row execute function assignment_follows_review();`);
 });
@@ -96,4 +100,14 @@ it("stores the edited video as a linked version and closes both assignments on a
   const original = await db.query<{ review_status: string; edit_stage: string }>(
     "select review_status,edit_stage from client_media_assets where id=$1", [raw]);
   expect(original.rows[0]).toMatchObject({ review_status: "pending", edit_stage: "edited" });
+});
+
+it("can send a delivered human cut straight to approval when editing is unnecessary", async () => {
+  await db.exec(`insert into client_media_assets
+    (id,client_id,brief_id,member_id,media_type,content_format,storage_path,title)
+    values ('${ready}','${client}','${brief}','${avatar}','video','reel','${client}/ready.mp4','Finished cut');`);
+  await db.query("select accept_video_as_finished($1)", [ready]);
+  const output = await db.query<{ edit_stage: string; render_path: string }>(
+    "select edit_stage, render_path from client_media_assets where id=$1", [ready]);
+  expect(output.rows[0]).toMatchObject({ edit_stage: "review_ready", render_path: `${client}/ready.mp4` });
 });

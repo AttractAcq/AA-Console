@@ -99,12 +99,23 @@ export function EditRepurposePanel() {
     void refresh();
   }
 
+  async function finish(source: Source) {
+    setBusy(source.id);
+    setError(null);
+    setNotice(null);
+    const { error: finishError } = await supabase.rpc("accept_video_as_finished", { p_asset_id: source.id });
+    setBusy(null);
+    if (finishError) { setError(finishError.message); return; }
+    setNotice("This cut is ready for owner and SMM review.");
+    void refresh();
+  }
+
   const shown = focusedBrief ? sources.filter((source) => source.brief_id === focusedBrief) : sources;
   return <div>
     <ContentJourney clientId={clientId} current="edit" briefId={focusedBrief} humanVideo />
     <p className="mb-4 text-sm text-muted-foreground">
-      Video footage delivered by an avatar stays here until an editor returns a finished version.
-      The source file remains available for comparison.
+      Review human footage, then choose an editor or send the existing cut to approval.
+      An edited version keeps the source available for comparison.
     </p>
     {error && <p role="alert" className="mb-3 text-sm text-destructive">{error}</p>}
     {notice && <p role="status" className="mb-3 text-sm text-brand-strong">{notice}</p>}
@@ -142,6 +153,11 @@ export function EditRepurposePanel() {
                 onClick={() => void assign(source)}
                 className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
                 {busy === source.id ? "Assigning…" : "Send to editor"}
+              </button>
+              <button type="button" disabled={busy === source.id || !urls.get(source.storage_path)}
+                onClick={() => void finish(source)}
+                className="rounded-md border border-border px-3 py-2 text-sm font-medium disabled:opacity-50">
+                Use as finished cut
               </button>
             </div>}
           </article>;
