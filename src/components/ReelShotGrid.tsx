@@ -130,7 +130,7 @@ export function ReelShotGrid({
                     <Link className="text-xs font-medium text-brand-strong hover:underline"
                       to={`/clients/${clientId}/approvals?tab=engine-inbox`}>Approve in Engine</Link>
                   )}
-                  {asset.reviewStatus === "pending" && asset.cut.status === "cut" && !engineHeldIds.has(asset.id) && (
+                  {asset.reviewStatus === "pending" && asset.cut.status === "cut" && asset.cut.url && !engineHeldIds.has(asset.id) && (
                     <ApprovalActions
                       assetId={asset.id}
                       title={asset.title ?? master.title}
@@ -147,6 +147,9 @@ export function ReelShotGrid({
                 </div>
                 {asset.cut.status === "cut" && <p className="text-xs text-muted-foreground">The finished cut is ready for human approval.</p>}
                 {asset.cut.status !== "cut" && <p className="text-xs text-muted-foreground">Approve after the cut has been rendered and previewed.</p>}
+                {asset.cut.status === "cut" && (asset.cut.url
+                  ? <video controls preload="metadata" className="w-full max-w-xl rounded-md" src={asset.cut.url} aria-label={`Finished cut of ${master.title}`} />
+                  : <p role="alert" className="text-xs text-destructive">The cut is stored, but its preview could not be opened. Review it in the Video Library before approval.</p>)}
                 {shotTable(asset.shots.length > 0 ? asset.shots : master.plannedShots)}
               </div>
             ))

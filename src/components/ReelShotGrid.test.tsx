@@ -36,7 +36,7 @@ describe("ReelShotGrid", () => {
     expect(screen.queryByRole("button", { name: /^Approve$/ })).not.toBeInTheDocument();
   });
 
-  it("offers approve on a pending master", () => {
+  it("offers approval and plays the finished cut", () => {
     render(
       <ReelShotGrid
         masters={[
@@ -48,7 +48,7 @@ describe("ReelShotGrid", () => {
                 refNumber: "MD-1",
                 reviewStatus: "pending",
                 shots: master().plannedShots,
-                cut: { status: "incomplete" as const, detail: "0 of 1 clips on file.", canRequest: true },
+                cut: { status: "cut" as const, detail: "Cut on file.", canRequest: false, url: "https://example.com/cut.mp4" },
               },
             ],
           }),
@@ -59,6 +59,17 @@ describe("ReelShotGrid", () => {
     );
     expect(screen.getByRole("button", { name: /^Approve$/ })).toBeInTheDocument();
     expect(screen.getByText("MD-1 · Cut")).toBeInTheDocument();
+    expect(screen.getByLabelText("Finished cut of How it works")).toHaveAttribute("src", "https://example.com/cut.mp4");
+  });
+
+  it("holds approval when the finished cut cannot be previewed", () => {
+    render(<ReelShotGrid masters={[master({ assets: [{
+      id: "asset-1", title: "Cut", refNumber: "MD-1", reviewStatus: "pending",
+      shots: master().plannedShots,
+      cut: { status: "cut", detail: "Cut on file.", canRequest: false, url: null },
+    }] })]} onChanged={vi.fn()} onError={vi.fn()} />);
+    expect(screen.getByText(/preview could not be opened/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Approve$/ })).not.toBeInTheDocument();
   });
 
   it("surfaces a plan that is not shots", () => {
