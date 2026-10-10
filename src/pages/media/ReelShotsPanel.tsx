@@ -54,7 +54,7 @@ export function ReelShotsPanel() {
       const assetRes = ids.length
         ? await supabase
             .from("client_media_assets")
-            .select("id, brief_id, title, ref_number, review_status, render_path")
+            .select("id, brief_id, title, ref_number, review_status, human_approved_at, render_path")
             .eq("client_id", clientId)
             .in("brief_id", ids)
         : { data: [], error: null };

@@ -58,7 +58,7 @@ function shotTable(shots: ShotRow[]) {
 }
 
 function stageFor(asset: ReelMasterView["assets"][number]): ContentStage {
-  if (asset.reviewStatus === "approved") return "distribution";
+  if (asset.humanApproved) return "distribution";
   if (asset.reviewStatus === "rejected") return "edit";
   if (asset.cut.status === "cut") return "approval";
   if (asset.cut.status === "running" || asset.cut.status === "failed" || asset.cut.status === "ready") return "edit";
@@ -146,11 +146,13 @@ export function ReelShotGrid({
                     {asset.title ? ` · ${asset.title}` : ""}
                   </span>
                   <StatusBadge status={asset.reviewStatus} tone={REVIEW_TONE[asset.reviewStatus]} />
-                  {asset.reviewStatus === "pending" && asset.cut.status === "cut" && engineHeldIds.has(asset.id) && clientId && (
+                  {asset.reviewStatus === "approved" && !asset.humanApproved &&
+                    <span className="text-xs text-muted-foreground">Waiting for human sign-off</span>}
+                  {asset.reviewStatus !== "rejected" && !asset.humanApproved && asset.cut.status === "cut" && engineHeldIds.has(asset.id) && clientId && (
                     <Link className="text-xs font-medium text-brand-strong hover:underline"
                       to={`/clients/${clientId}/delivery/approvals?tab=engine-inbox`}>Approve in Engine</Link>
                   )}
-                  {asset.reviewStatus === "pending" && asset.cut.status === "cut" && asset.cut.url && !engineHeldIds.has(asset.id) && clientId && (
+                  {asset.reviewStatus !== "rejected" && !asset.humanApproved && asset.cut.status === "cut" && asset.cut.url && !engineHeldIds.has(asset.id) && clientId && (
                     <Link className="text-xs font-medium text-brand-strong hover:underline"
                       to={`/clients/${clientId}/delivery/approvals?tab=assets`}>
                       Review sign-offs in Approvals

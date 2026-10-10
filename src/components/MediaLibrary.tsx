@@ -150,7 +150,7 @@ export function MediaLibrary({
                 ) : asset.edit_stage && asset.edit_stage !== "review_ready" ? (
                   <Link to={`/clients/${clientId}/delivery/edit-repurpose?tab=overview${asset.brief_id ? `&brief=${encodeURIComponent(asset.brief_id)}` : ""}`}
                     className="text-xs font-medium text-brand-strong hover:underline">Edit before approval</Link>
-                ) : asset.review_status === "pending" && asset.media_type === "video" ? (
+                ) : asset.media_type === "video" && !asset.human_approved_at && asset.review_status !== "rejected" ? (
                   <Link to={`/clients/${clientId}/delivery/approvals?tab=assets`}
                     className="text-xs font-medium text-brand-strong hover:underline">
                     Review sign-offs in Approvals

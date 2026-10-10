@@ -10,6 +10,7 @@ type Reel = {
   ref_number: string | null;
   render_path: string | null;
   review_status: string;
+  human_approved_at: string | null;
   brief_id: string | null;
   edit_stage?: string;
 };
@@ -29,7 +30,7 @@ export function VideoLibraryPanel() {
     void (async () => {
       try {
         const { data, error: queryError } = await supabase.from("client_media_assets")
-          .select("id, title, ref_number, render_path, review_status, brief_id, edit_stage")
+          .select("id, title, ref_number, render_path, review_status, human_approved_at, brief_id, edit_stage")
           .eq("client_id", clientId)
           .eq("media_type", "video")
           .eq("content_format", "reel")
@@ -76,7 +77,9 @@ export function VideoLibraryPanel() {
               <article key={reel.id} className="space-y-2 rounded-lg border border-border p-3">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-sm font-medium">{reel.title || reel.ref_number || "Reel"}</h3>
-                  <span className="text-xs capitalize text-muted-foreground">{reel.review_status}</span>
+                  <span className="text-xs capitalize text-muted-foreground">
+                    {reel.review_status === "approved" && !reel.human_approved_at ? "Awaiting sign-off" : reel.review_status}
+                  </span>
                 </div>
                 {cuts.get(reel.render_path!) ? (
                   <video controls preload="metadata" className="w-full rounded-md" src={cuts.get(reel.render_path!)} />

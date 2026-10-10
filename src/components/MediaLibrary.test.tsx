@@ -66,6 +66,12 @@ describe("approving from the library", () => {
     );
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
+  it("keeps bot-approved video in the human sign-off queue", async () => {
+    fetchClientAssets.mockResolvedValue([asset({ media_type: "video", storage_path: "p/1.mp4",
+      review_status: "approved", human_approved_at: null })]);
+    render(<MemoryRouter><MediaLibrary mediaType="video" /></MemoryRouter>);
+    expect(await screen.findByRole("link", { name: "Review sign-offs in Approvals" })).toBeInTheDocument();
+  });
   it("offers the decision on a pending asset", async () => {
     render(<MediaLibrary mediaType="image" />);
     expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();

@@ -68,6 +68,17 @@ describe("ReelShotGrid", () => {
     expect(screen.getByLabelText("Finished cut of How it works")).toHaveAttribute("src", "https://example.com/cut.mp4");
   });
 
+  it("keeps bot-approved reels at human approval until a person signs", () => {
+    render(<MemoryRouter><ReelShotGrid clientId="client-1" onChanged={vi.fn()} onError={vi.fn()}
+      masters={[master({ assets: [{ id: "asset-1", title: "Cut", refNumber: "MD-1",
+        reviewStatus: "approved", humanApproved: false, shots: master().plannedShots,
+        cut: { status: "cut", detail: "Cut on file.", canRequest: false, url: "https://example.com/cut.mp4" },
+      }] })]} /></MemoryRouter>);
+    expect(screen.getByText("Waiting for human sign-off")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review sign-offs in Approvals" })).toBeInTheDocument();
+    expect(screen.getByText("Approval")).toHaveAttribute("aria-current", "step");
+  });
+
   it("holds approval when the finished cut cannot be previewed", () => {
     render(<ReelShotGrid masters={[master({ assets: [{
       id: "asset-1", title: "Cut", refNumber: "MD-1", reviewStatus: "pending",

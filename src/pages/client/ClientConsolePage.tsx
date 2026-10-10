@@ -41,7 +41,7 @@ export function ClientConsolePage() {
     setLoadError(null);
     try {
     if (!clientId) return;
-    const [c, ctx, distributed, proof, waiting] = await Promise.all([
+    const [c, ctx, distributed, proof, waiting, botApproved] = await Promise.all([
       supabase.from("clients").select("id, name, sector, tier").eq("id", clientId).maybeSingle(),
       supabase
         .from("client_business_context")
@@ -58,13 +58,15 @@ export function ClientConsolePage() {
         .select("id", { count: "exact", head: true })
         .eq("client_id", clientId),
       fetchClientAssets(clientId, { reviewStatus: "pending" }),
+      fetchClientAssets(clientId, { mediaType: "video", reviewStatus: "approved", humanApproved: false }),
     ]);
     const failure = c.error ?? ctx.error ?? distributed.error ?? proof.error;
     if (failure) throw failure;
     setClient(c.data as ClientRow | null);
     setContext(ctx.data as ContextRow | null);
     setCounts({ distributed: distributed.count ?? 0, proof: proof.count ?? 0 });
-    const ready = waiting.filter((asset) => !asset.edit_stage || asset.edit_stage === "review_ready");
+    const ready = [...waiting, ...botApproved]
+      .filter((asset) => !asset.edit_stage || asset.edit_stage === "review_ready");
     const video = ready.filter((asset) => asset.media_type === "video");
     const states = await Promise.all(video.map((asset) =>
       supabase.rpc("video_approval_state", { p_asset_id: asset.id })));

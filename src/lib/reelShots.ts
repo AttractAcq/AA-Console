@@ -57,6 +57,7 @@ export type ReelAssetReview = {
   title: string | null;
   ref_number: string | null;
   review_status: "pending" | "approved" | "rejected";
+  human_approved_at?: string | null;
   /** Set once video_edit has rendered a cut. Null means nobody has asked, or it failed. */
   render_path?: string | null;
 };
@@ -165,6 +166,7 @@ export type ReelMasterView = {
     title: string | null;
     refNumber: string | null;
     reviewStatus: "pending" | "approved" | "rejected";
+    humanApproved?: boolean;
     shots: ShotRow[];
     cut: CutState;
   }>;
@@ -289,6 +291,7 @@ export function buildReelMasters(
           title: asset.title,
           refNumber: asset.ref_number,
           reviewStatus: asset.review_status,
+          humanApproved: Boolean(asset.human_approved_at),
           shots,
           // Newest first, as the panel queries them: the latest job is the
           // one that says where this reel's cut has got to.
