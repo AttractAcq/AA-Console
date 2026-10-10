@@ -33,6 +33,7 @@ import { runTokenHealthJob } from "../agents/token_health/index.js";
 import { runQaJob } from "../agents/qa/index.js";
 import { runPublisherJob } from "../agents/publisher/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
+import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
 import { runRepurposeJob } from "../agents/repurpose/index.js";
 import { runProofDiscoveryJob } from "../agents/proof_discovery/index.js";
@@ -118,6 +119,7 @@ const RUNNERS: Record<string, JobRunner> = {
   // it on for every account.
   publisher: runPublisherJob,
   brief_dispatch: runBriefDispatchJob,
+  client_approval_dispatch: runClientApprovalDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
   // a person in Ads Manager.
   meta_build: runMetaBuildJob,

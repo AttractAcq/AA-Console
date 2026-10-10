@@ -9754,6 +9754,7 @@ export type Database = {
         Args: { p_asset_id: string; p_reason: string }
         Returns: undefined
       }
+      video_client_approval_email_state: { Args: { p_asset_id: string }; Returns: Json }
       request_human_video_edit: {
         Args: { p_asset_id: string; p_member_id: string; p_due_date?: string }
         Returns: string

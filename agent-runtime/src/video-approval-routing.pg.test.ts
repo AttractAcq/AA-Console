@@ -51,6 +51,13 @@ beforeAll(async () => {
     insert into client_media_assets values ('${asset}','${client}','video','reel','review_ready','cut.mp4','opening.png','pending',null);
   `);
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010130000_175_video_approval_routing.sql", import.meta.url), "utf8"));
+  await db.exec(`
+    create table agents(agent_key text primary key, name text, initials text, domain text,
+      description text, requires_upstream text[], scheduled_only boolean);
+    create table agent_jobs(id uuid primary key default gen_random_uuid(), agent_key text,
+      client_id uuid, input_table text, input_id uuid, params jsonb, created_by uuid);
+  `);
+  await db.exec(await readFile(new URL("../../supabase/migrations/20261010150000_177_video_client_approval_email.sql", import.meta.url), "utf8"));
 });
 afterAll(async () => { await db?.close(); });
 
@@ -66,6 +73,12 @@ it("requires the configured owner and active SMM, then optional client", async (
   await as(manager);
   await db.query("select sign_video_approval($1,'manager')", [asset]);
   await db.query("select request_video_client_approval($1,$2)", [asset, clientUser]);
+  const queued = await db.query<{ agent_key: string; input_id: string }>(
+    "select agent_key,input_id from agent_jobs");
+  expect(queued.rows).toEqual([{ agent_key: "client_approval_dispatch", input_id: asset }]);
+  const email = await db.query<{ state: { status: string } }>(
+    "select video_client_approval_email_state($1) as state", [asset]);
+  expect(email.rows[0]?.state.status).toBe("pending");
   await expect(db.query("select review_media_asset($1,'approved')", [asset]))
     .rejects.toThrow(/sign-offs/);
 
@@ -75,6 +88,10 @@ it("requires the configured owner and active SMM, then optional client", async (
     .rejects.toThrow(/declined/);
   await as(manager);
   await db.query("select request_video_client_approval($1,$2)", [asset, clientUser]);
+  const requeued = await db.query<{ job_id: string; email_status: string }>(
+    "select job_id,email_status from video_client_approval_requests where asset_id=$1", [asset]);
+  expect(requeued.rows[0]?.email_status).toBe("pending");
+  expect(requeued.rows[0]?.job_id).not.toBeNull();
   await as(clientUser);
   await db.query("select sign_video_approval($1,'client')", [asset]);
   await expect(db.query("select review_media_asset($1,'approved')", [asset]))

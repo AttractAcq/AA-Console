@@ -25,6 +25,7 @@ export function VideoApprovalRoute({ assetId, onFinalApprove }: {
   const [ownerChoice, setOwnerChoice] = useState("");
   const [clientChoice, setClientChoice] = useState("");
   const [declineReason, setDeclineReason] = useState("");
+  const [notification, setNotification] = useState<{ status: string | null; error: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +37,12 @@ export function VideoApprovalRoute({ assetId, onFinalApprove }: {
     if (!data) { setError("Approval route unavailable."); return; }
     const next = data as unknown as State;
     setState(next);
+    if (next.client_user_id && (next.can_configure || next.current_user_id === next.manager_user_id)) {
+      const { data: email, error: emailError } = await supabase.rpc("video_client_approval_email_state",
+        { p_asset_id: assetId });
+      if (emailError) setError(emailError.message);
+      else setNotification(email as { status: string | null; error: string | null });
+    } else setNotification(null);
     if (next.can_configure) {
       setOwnerChoice(next.owner_user_id ?? "");
       const { data: profiles, error: profileError } = await supabase.from("profiles")
@@ -84,6 +91,12 @@ export function VideoApprovalRoute({ assetId, onFinalApprove }: {
       {state.client_user_id ? ` · Client: ${state.client_rejection_reason ? "changes requested" : state.client_approved ? "approved" : "waiting"}` : ""}
     </p>
     {state.client_rejection_reason && <p className="text-destructive">Client requested changes: {state.client_rejection_reason}</p>}
+    {notification?.status && <p className="text-muted-foreground">
+      Client email: {notification.status === "skipped" ? "request is in their dashboard; email not sent"
+        : notification.status === "failed" ? "delivery failed"
+          : notification.status === "sent" ? "sent" : "queued"}
+      {notification.status === "failed" && notification.error ? ` · ${notification.error}` : ""}
+    </p>}
     {state.can_configure && <div className="flex flex-wrap gap-2">
       <select aria-label="Owner account" value={ownerChoice} onChange={(e) => setOwnerChoice(e.target.value)}
         className="rounded border border-input bg-background px-2 py-1">

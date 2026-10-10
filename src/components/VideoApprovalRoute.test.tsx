@@ -50,3 +50,15 @@ it("lets an admin change the configured owner account", async () => {
   await userEvent.setup().click(screen.getByRole("button", { name: "Save owner" }));
   expect(rpc).toHaveBeenCalledWith("set_content_approval_owner", { p_user_id: "new" });
 });
+
+it("shows the SMM when the client request is in-app but email was skipped", async () => {
+  rpc.mockImplementation((name: string) => Promise.resolve(name === "video_approval_state"
+    ? { data: { owner_user_id: "owner", manager_user_id: "smm", client_user_id: "client",
+      owner_approved: true, manager_approved: true, client_approved: false,
+      client_rejection_reason: null, can_configure: false, current_user_id: "smm",
+      client_accounts: [] }, error: null }
+    : { data: { status: "skipped", error: "No RESEND_API_KEY" }, error: null }));
+  render(<VideoApprovalRoute assetId="video-1" onFinalApprove={vi.fn()} />);
+  expect(await screen.findByText(/request is in their dashboard; email not sent/i)).toBeInTheDocument();
+  expect(rpc).toHaveBeenCalledWith("video_client_approval_email_state", { p_asset_id: "video-1" });
+});
