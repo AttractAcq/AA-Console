@@ -20,8 +20,11 @@ type VideoBrief = { id: string; title: string; content_format: string | null };
 type Assignment = { id: string; source_asset_id: string | null; stage: string; team_members: { name: string } | null };
 
 /** Human footage lands here after Create, before a finished version can enter Approval. */
-export function EditRepurposePanel() {
-  const { clientId } = useParams<{ clientId: string }>();
+export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
+  clientIdOverride?: string; employeeMode?: boolean;
+} = {}) {
+  const { clientId: routeClientId } = useParams<{ clientId: string }>();
+  const clientId = clientIdOverride ?? routeClientId;
   const [params] = useSearchParams();
   const focusedBrief = params.get("brief");
   const [sources, setSources] = useState<Source[]>([]);
@@ -176,7 +179,7 @@ export function EditRepurposePanel() {
 
   const shown = focusedBrief ? sources.filter((source) => source.brief_id === focusedBrief) : sources;
   return <div>
-    <ContentJourney clientId={clientId} current="edit" briefId={focusedBrief} humanVideo />
+    {!employeeMode && <ContentJourney clientId={clientId} current="edit" briefId={focusedBrief} humanVideo />}
     <section className="mb-6 space-y-3 rounded-lg border border-border p-4" aria-label="Add video for editing">
       <h2 className="text-sm font-semibold">Add a video for editing</h2>
       <p className="text-xs text-muted-foreground">Upload supplied footage or an existing cut. The original is preserved.</p>

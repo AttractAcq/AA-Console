@@ -131,6 +131,8 @@ The Edit / Repurpose page now also has an agency-side supplied-video intake: an 
 
 The active assigned SMM now has **Video Approvals** in the employee console. It lists finished videos for current clients, plays the exact cut, and offers the same owner/SMM/client sign-off route as the admin console. Final approval uses `approve_slot` for an engine reel and `review_media_asset` for an ordinary cut, so an engine slot is not stranded after approval. The shared database guard still requires both owner and SMM sign-offs, plus a client sign-off when requested. This closes the manager-access gap in task 5c; a live SMM and client account run remains part of P0 proof.
 
+The SMM employee console also exposes **Video Editing** for current clients. It uses the shared Edit / Repurpose intake and human editor assignment page, scoped to the selected active client; editor dashboard work and notification status follow the same path as admin. This makes the SMM intake and routing rights usable in the actual employee UI. The AI edit action is still unbuilt; the existing Claude EDL renderer accepts only F6/F7 shot clips and strips source audio, so it cannot safely be presented as a supplied-footage editor yet.
+
 Before release, verify the current Railway values of `AGENT_RUNTIME_MODEL`, `OPENAI_IMAGE_MODEL`, `HIGGSFIELD_MODEL_DRAFT`, `HIGGSFIELD_MODEL_FINAL`, provider balances, and ffmpeg capabilities without printing secrets. The repo gives defaults, and the 8 October audit reports live clips, but neither proves current configuration or a new end-to-end run. The older `docs/completion-plan.md` and `docs/ai-video-edit.md` contain superseded status claims; use the current code and migrations for implementation decisions.
 
 ## Release boundary
