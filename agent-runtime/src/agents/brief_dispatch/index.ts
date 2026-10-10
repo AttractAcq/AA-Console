@@ -60,7 +60,7 @@ export async function runBriefDispatchJob(
 
   const { data: dispatch, error } = await sb
     .from("brief_dispatches")
-    .select("id, brief_id, member_id, client_id, assignment_id, email_status, brief_role")
+    .select("id, brief_id, member_id, client_id, assignment_id, source_asset_id, email_status, brief_role")
     .eq("id", dispatchId)
     .maybeSingle();
   if (error) throw new Error(`Could not load the dispatch: ${error.message}`);
@@ -110,6 +110,11 @@ export async function runBriefDispatchJob(
     ? await sb.from("profiles").select("email").eq("id", member.user_id).maybeSingle()
     : { data: null };
   const role = (dispatch as { brief_role?: string }).brief_role ?? "full";
+  const { data: source } = role === "edit" && dispatch.source_asset_id
+    ? await sb.from("client_media_assets")
+      .select("intake_notes, intake_source, usage_rights")
+      .eq("id", dispatch.source_asset_id).maybeSingle()
+    : { data: null };
   const roleBody =
     role === "avatar"
       ? (brief.avatar_brief ?? brief.body ?? "")
@@ -117,7 +122,10 @@ export async function runBriefDispatchJob(
         ? (brief.editor_brief ?? brief.body ?? "")
         : (brief.body ?? "");
   const editBody = role === "edit"
-    ? `${roleBody}\n\nSource footage is attached to your edit assignment in the console. Review it before delivering a finished cut.`
+    ? `${roleBody}${source?.intake_notes ? `\n\nSource-specific instructions: ${source.intake_notes}` : ""}`
+      + `${source?.intake_source ? `\nSource: ${source.intake_source.replace(/_/g, " ")}` : ""}`
+      + `${source?.usage_rights ? `\nUsage rights: ${source.usage_rights.replace(/_/g, " ")}` : ""}`
+      + "\n\nSource footage is attached to your edit assignment in the console. Review it before delivering a finished cut."
     : roleBody;
 
   const to = profile?.email;

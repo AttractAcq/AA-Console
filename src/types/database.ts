@@ -2818,6 +2818,8 @@ export type Database = {
           height: number | null
           human_approved_at: string | null
           id: string
+          intake_notes: string | null
+          intake_source: string | null
           media_type: Database["public"]["Enums"]["media_type"]
           member_id: string | null
           meta_ad_id: string | null
@@ -2832,6 +2834,7 @@ export type Database = {
           title: string | null
           updated_at: string
           uploaded_by: string | null
+          usage_rights: string | null
           width: number | null
         }
         Insert: {
@@ -2850,6 +2853,8 @@ export type Database = {
           height?: number | null
           human_approved_at?: string | null
           id?: string
+          intake_notes?: string | null
+          intake_source?: string | null
           media_type: Database["public"]["Enums"]["media_type"]
           member_id?: string | null
           meta_ad_id?: string | null
@@ -2864,6 +2869,7 @@ export type Database = {
           title?: string | null
           updated_at?: string
           uploaded_by?: string | null
+          usage_rights?: string | null
           width?: number | null
         }
         Update: {
@@ -2882,6 +2888,8 @@ export type Database = {
           height?: number | null
           human_approved_at?: string | null
           id?: string
+          intake_notes?: string | null
+          intake_source?: string | null
           media_type?: Database["public"]["Enums"]["media_type"]
           member_id?: string | null
           meta_ad_id?: string | null
@@ -2896,6 +2904,7 @@ export type Database = {
           title?: string | null
           updated_at?: string
           uploaded_by?: string | null
+          usage_rights?: string | null
           width?: number | null
         }
         Relationships: [
@@ -9742,6 +9751,12 @@ export type Database = {
         Returns: string
       }
       request_video_edit: { Args: { p_asset_id: string }; Returns: string }
+      intake_video_for_edit: {
+        Args: { p_asset_id: string; p_client_id: string; p_title: string; p_storage_path: string
+          p_format: Database["public"]["Enums"]["content_format"]; p_source: string; p_rights: string
+          p_brief_id?: string; p_notes?: string }
+        Returns: Json
+      }
       accept_video_as_finished: { Args: { p_asset_id: string }; Returns: undefined }
       set_content_approval_owner: { Args: { p_user_id: string }; Returns: undefined }
       video_approval_state: { Args: { p_asset_id: string }; Returns: Json }

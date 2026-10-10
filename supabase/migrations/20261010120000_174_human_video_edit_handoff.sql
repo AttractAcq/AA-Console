@@ -64,10 +64,12 @@ declare
   v_dispatch uuid;
   v_job uuid;
 begin
-  if not is_admin() then raise exception 'Only an admin may assign a video edit.'; end if;
   select * into v_source from client_media_assets where id = p_asset_id for update;
   if v_source.id is null or v_source.media_type <> 'video' or v_source.brief_id is null then
     raise exception 'Choose delivered video footage attached to a brief.';
+  end if;
+  if not is_admin() and auth.uid() is distinct from active_video_approval_manager(v_source.client_id) then
+    raise exception 'Only an admin or the assigned SMM may assign a video edit.';
   end if;
   if v_source.edit_stage not in ('needs_edit', 'editing') then
     raise exception 'This video is not waiting for a human edit.';

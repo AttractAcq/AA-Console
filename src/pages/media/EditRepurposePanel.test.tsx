@@ -3,15 +3,20 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
-const { rpc } = vi.hoisted(() => ({ rpc: vi.fn(async () => ({ data: "assignment-1", error: null })) }));
+const { rpc, upload, remove } = vi.hoisted(() => ({
+  rpc: vi.fn(async () => ({ data: "assignment-1", error: null })),
+  upload: vi.fn(async () => ({ error: null })),
+  remove: vi.fn(async () => ({ error: null })),
+}));
 vi.mock("../../lib/media", () => ({ signPaths: async () => new Map([["client-1/raw.mp4", "https://example.test/raw.mp4"]]) }));
 vi.mock("../../lib/supabase", () => ({ supabase: {
   rpc,
+  storage: { from: () => ({ upload, remove }) },
   from: (table: string) => {
     const data = table === "client_media_assets" ? [{ id: "raw-1", title: "Founder footage",
       brief_id: "brief-1", storage_path: "client-1/raw.mp4", edit_stage: "needs_edit", created_at: "2026-10-10" }]
       : table === "team_members" ? [{ id: "editor-1", name: "Taylor" }] : [];
-    const chain = { select: () => chain, eq: () => chain, in: () => chain,
+    const chain = { select: () => chain, eq: () => chain, in: () => chain, is: () => chain,
       order: () => Promise.resolve({ data, error: null }) };
     return chain;
   },
@@ -40,5 +45,20 @@ describe("human video edit intake", () => {
     render(<MemoryRouter><EditRepurposePanel /></MemoryRouter>);
     await userEvent.click(await screen.findByRole("button", { name: "Use as finished cut" }));
     expect(rpc).toHaveBeenCalledWith("accept_video_as_finished", { p_asset_id: "raw-1" });
+  });
+  it("uploads a supplied video with explicit source and rights", async () => {
+    rpc.mockClear(); upload.mockClear();
+    render(<MemoryRouter><EditRepurposePanel /></MemoryRouter>);
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText("Choose video or drop it here"),
+      new File(["video"], "founder-clip.mp4", { type: "video/mp4" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Video source" }), "client_supplied");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Usage rights" }), "client_owned");
+    await user.click(screen.getByRole("button", { name: "Add to Edit / Repurpose" }));
+    expect(upload).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith("intake_video_for_edit", expect.objectContaining({
+      p_client_id: "client-1", p_title: "founder clip", p_format: "reel",
+      p_source: "client_supplied", p_rights: "client_owned",
+    }));
   });
 });

@@ -9,6 +9,7 @@ const editor = "44444444-4444-4444-8444-444444444444";
 const raw = "55555555-5555-4555-8555-555555555555";
 const cut = "66666666-6666-4666-8666-666666666666";
 const ready = "77777777-7777-4777-8777-777777777777";
+const intake = "88888888-8888-4888-8888-888888888888";
 let db: PGlite;
 
 beforeAll(async () => {
@@ -25,13 +26,22 @@ beforeAll(async () => {
     create type media_type as enum ('image','text','video');
     create type content_format as enum ('single','carousel','story','reel');
     create type review_status as enum ('pending','approved','rejected');
-    create table storage.objects (bucket_id text, name text);
-    create table client_briefs (id uuid primary key);
-    create table team_members (id uuid primary key, category team_category, active boolean);
+    create table storage.objects (bucket_id text, name text, owner uuid);
+    alter table storage.objects enable row level security;
+    create function storage.foldername(text) returns text[] language sql immutable
+      as $$ select string_to_array($1, '/') $$;
+    create function try_uuid(text) returns uuid language sql immutable
+      as $$ select nullif($1, '')::uuid $$;
+    create table clients(id uuid primary key);
+    create table client_briefs (id uuid primary key default gen_random_uuid(), client_id uuid,
+      title text, body text, media_type media_type, content_format content_format,
+      status text, production_method text, format_code text, editor_brief text);
+    create table team_members (id uuid primary key, category team_category, active boolean, user_id uuid);
+    create table client_assignments (member_id uuid, ended_at timestamptz);
     create table client_media_assets (
       id uuid primary key, client_id uuid, brief_id uuid, member_id uuid,
       media_type media_type, content_format content_format, storage_path text,
-      render_path text, title text, review_status review_status default 'pending',
+      render_path text, title text, uploaded_by uuid, review_status review_status default 'pending',
       human_approved_at timestamptz, created_at timestamptz default now()
     );
     create table job_assignments (
@@ -56,7 +66,9 @@ beforeAll(async () => {
     create table client_asset_reviews (asset_id uuid, decision review_status, reason text, reviewed_by uuid);
     create function advance_assignment(uuid, text, text, text, uuid) returns void
       language plpgsql as $$ begin update job_assignments set stage = $2, asset_id = coalesce($5,asset_id) where id = $1; end $$;
-    insert into client_briefs values ('${brief}');
+    insert into clients values ('${client}');
+    insert into client_briefs(id,client_id,title,media_type,content_format)
+      values ('${brief}','${client}','Founder reel','video','reel');
     insert into team_members values ('${avatar}','avatars',true),('${editor}','editors',true);
   `);
   const migration = await readFile(new URL("../../supabase/migrations/20261010120000_174_human_video_edit_handoff.sql", import.meta.url), "utf8");
@@ -64,6 +76,7 @@ beforeAll(async () => {
   await db.exec(`create function active_video_approval_manager(uuid) returns uuid
     language sql stable as $$ select auth.uid() $$;`);
   await db.exec(await readFile(new URL("../../supabase/migrations/20261010140000_176_finish_human_video_without_edit.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../../supabase/migrations/20261010160000_178_video_edit_intake.sql", import.meta.url), "utf8"));
   await db.exec(`create trigger car_assignment_follows_review after insert on client_asset_reviews
     for each row execute function assignment_follows_review();`);
 });
@@ -110,4 +123,24 @@ it("can send a delivered human cut straight to approval when editing is unnecess
   const output = await db.query<{ edit_stage: string; render_path: string }>(
     "select edit_stage, render_path from client_media_assets where id=$1", [ready]);
   expect(output.rows[0]).toMatchObject({ edit_stage: "review_ready", render_path: `${client}/ready.mp4` });
+});
+
+it("registers supplied footage with rights and a standalone human brief", async () => {
+  const path = `${client}/${intake}.mp4`;
+  await db.query("insert into storage.objects(bucket_id,name) values ('client-media',$1)", [path]);
+  const result = await db.query<{ result: { asset_id: string; brief_id: string } }>(
+    "select intake_video_for_edit($1,$2,$3,$4,'reel','client_supplied','client_owned',null,$5) as result",
+    [intake, client, "Client interview", path, "Remove pauses and add captions."]);
+  expect(result.rows[0]?.result.asset_id).toBe(intake);
+  const asset = await db.query<{ edit_stage: string; usage_rights: string; intake_source: string }>(
+    "select edit_stage,usage_rights,intake_source from client_media_assets where id=$1", [intake]);
+  expect(asset.rows[0]).toMatchObject({ edit_stage: "needs_edit", usage_rights: "client_owned",
+    intake_source: "client_supplied" });
+  const linked = await db.query<{ format_code: string; production_method: string }>(
+    "select format_code,production_method from client_briefs where id=$1", [result.rows[0]?.result.brief_id]);
+  expect(linked.rows[0]).toMatchObject({ format_code: "HUMAN", production_method: "human" });
+  await db.exec("create or replace function is_admin() returns boolean language sql stable as $$ select false $$;");
+  const smmAssignment = await db.query<{ id: string }>(
+    "select request_human_video_edit($1,$2) as id", [intake, editor]);
+  expect(smmAssignment.rows[0]?.id).toBeTruthy();
 });

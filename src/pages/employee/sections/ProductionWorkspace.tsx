@@ -108,6 +108,7 @@ export function ProductionWorkspace({
   const [jobs, setJobs] = useState<Job[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [sourceUrls, setSourceUrls] = useState<ReadonlyMap<string, string>>(new Map());
+  const [sourceNotes, setSourceNotes] = useState<ReadonlyMap<string, string>>(new Map());
   const [rejectionReasons, setRejectionReasons] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -142,13 +143,15 @@ export function ProductionWorkspace({
     const sourceIds = jobs.map((job) => job.source_asset_id).filter((id): id is string => Boolean(id));
     if (sourceIds.length) {
       const { data: sources } = await supabase.from("client_media_assets")
-        .select("id, storage_path").in("id", sourceIds);
+        .select("id, storage_path, intake_notes").in("id", sourceIds);
       const signed = await signPaths("client-media", (sources ?? []).map((source) => source.storage_path));
       setSourceUrls(new Map((sources ?? []).flatMap((source) => {
         const url = signed.get(source.storage_path);
         return url ? [[source.id, url] as const] : [];
       })));
-    } else setSourceUrls(new Map());
+      setSourceNotes(new Map((sources ?? []).flatMap((source) =>
+        source.intake_notes ? [[source.id, source.intake_notes] as const] : [])));
+    } else { setSourceUrls(new Map()); setSourceNotes(new Map()); }
     const rows = (delivered.data ?? []) as Submission[];
     setSubmissions(rows);
 
@@ -478,6 +481,9 @@ export function ProductionWorkspace({
           {selected?.source_asset_id && (sourceUrls.get(selected.source_asset_id)
             ? <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground">Source footage to edit</p>
+                {sourceNotes.get(selected.source_asset_id) && <p className="whitespace-pre-wrap text-xs text-muted-foreground">
+                  Source-specific instructions: {sourceNotes.get(selected.source_asset_id)}
+                </p>}
                 <video controls preload="metadata" className="w-full max-w-xl rounded-md"
                   src={sourceUrls.get(selected.source_asset_id)} />
               </div>
