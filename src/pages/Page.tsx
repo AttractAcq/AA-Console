@@ -31,6 +31,8 @@ import { StoryLibraryPanel } from "./media/StoryLibraryPanel";
 import { CarouselLibraryPanel } from "./media/CarouselLibraryPanel";
 import { VideoLibraryPanel } from "./media/VideoLibraryPanel";
 import { ReelShotsPanel } from "./media/ReelShotsPanel";
+import { EditRepurposePanel } from "./media/EditRepurposePanel";
+import { MotionDesignPanel } from "./motion/MotionDesignPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { EngineInboxPanel } from "./approvals/EngineInboxPanel";
 import { OrganicPanel } from "./distribution/OrganicPanel";
@@ -114,6 +116,9 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "reel-shots": () => <ReelShotsPanel />,
     "copy-library": () => <CopyLibraryPanel />,
   },
+  "edit-repurpose": {
+    overview: () => <EditRepurposePanel />,
+  },
   distribution: {
     "distribution-assets": () => <AssetsPanel />,
     engine: () => <EnginePanel />,
@@ -164,6 +169,7 @@ const nodePanels: Record<string, () => ReactNode> = {
   // distinct id from the agency dashboard; both live at a path segment
   // called "dashboard" but they are different pages
   "delivery-dashboard": () => <ClientDashboardPanel />,
+  "motion-design": () => <MotionDesignPanel />,
   "proof-bank": () => <ProofBankPanel />,
   "prospects-leads": () => <ProspectsLeadsPanel />,
   onboarding: () => <OnboardingPanel />,

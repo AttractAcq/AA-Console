@@ -455,6 +455,27 @@ export async function runVideoBuildJob(
   // copywriting is what put uncut reels in front of people, because QA reads
   // dimensions that only video_edit writes and treats a null as nothing to
   // check.
-  await handOffToSlot(sb, job, "video_build", "editing");
+  const slotId = (job.params as { slot_id?: unknown } | null)?.slot_id;
+  if (typeof slotId === "string" && slotId.length > 0) {
+    await handOffToSlot(sb, job, "video_build", "editing");
+  } else {
+    // A manually approved brief has no engine slot to enqueue editing. Use
+    // the same guarded RPC as the UI, after all clips have landed. The RPC
+    // locks the asset and returns an in-flight cut if this job is retried.
+    const { data: latest, error: assetError } = await sb.from("client_media_assets")
+      .select("id")
+      .eq("brief_id", brief.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const assetId = latest?.[0]?.id;
+    if (assetError || !assetId) {
+      return failed(`Clips completed, but the reel asset could not be found: ${assetError?.message ?? "missing asset"}.`, true);
+    }
+    const { error: cutError } = await sb.rpc("request_video_edit", { p_asset_id: assetId });
+    if (cutError && !cutError.message.includes("already has a cut")) {
+      return failed(`Clips completed, but the cut could not be queued: ${cutError.message}.`, true);
+    }
+    await appendEvent(sb, job.id, "Clips complete. The reel cut is queued for editing.");
+  }
   return { ok: true, retryable: false };
 }

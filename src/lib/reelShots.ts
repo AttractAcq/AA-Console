@@ -3,8 +3,7 @@
  *
  * The plan lives on the brief (frame_plan, one JSON object per shot).
  * Stills and clips, when they exist, live on client_media_frames. A reel
- * can be approved before either file exists, so the grid has to show the
- * plan on its own.
+ * may have a plan before any file exists, so the grid shows the plan on its own.
  */
 
 export function isPhase1MotionBrief(
@@ -48,6 +47,8 @@ export type ShotRow = {
   motion: string;
   still: "No still" | "Still on file";
   clip: "No clip" | "Submitted" | "Clip on file";
+  stillUrl?: string | null;
+  clipUrl?: string | null;
 };
 
 export type ReelAssetReview = {
@@ -56,6 +57,7 @@ export type ReelAssetReview = {
   title: string | null;
   ref_number: string | null;
   review_status: "pending" | "approved" | "rejected";
+  human_approved_at?: string | null;
   /** Set once video_edit has rendered a cut. Null means nobody has asked, or it failed. */
   render_path?: string | null;
 };
@@ -87,11 +89,8 @@ const IN_FLIGHT = new Set(["queued", "claimed", "running"]);
 /**
  * Whether this reel has a cut, is getting one, or could ask for one.
  *
- * Asking is allowed with clips missing, on purpose: request_video_edit says
- * nothing about readiness either, because the runner is what knows whether
- * the clips have landed and refusing in SQL means the answer never reaches
- * the person who pressed the button. So the line below states the gap and
- * the button stays live.
+ * A cut requires every clip. The guarded RPC enforces the same readiness
+ * rule so a stale screen cannot queue an edit that is bound to fail.
  */
 export function cutState(
   asset: { render_path?: string | null },
@@ -132,14 +131,14 @@ export function cutState(
       // The reason the runner gave, not a generic one: it is the only part
       // of the failure anyone can act on.
       detail: `Last cut failed: ${latest.error?.trim() || "no reason recorded"}. ${gap}`,
-      canRequest: true,
+      canRequest: shots.length > 0 && withClips === shots.length,
     };
   }
 
   return {
     status: withClips === shots.length && shots.length > 0 ? "ready" : "incomplete",
     detail: gap,
-    canRequest: true,
+    canRequest: shots.length > 0 && withClips === shots.length,
   };
 }
 
@@ -167,6 +166,7 @@ export type ReelMasterView = {
     title: string | null;
     refNumber: string | null;
     reviewStatus: "pending" | "approved" | "rejected";
+    humanApproved?: boolean;
     shots: ShotRow[];
     cut: CutState;
   }>;
@@ -236,7 +236,7 @@ function clipState(frame: ReelFrameRow | undefined): ShotRow["clip"] {
   return "No clip";
 }
 
-export function shotRows(plan: PlannedShot[], frames: ReelFrameRow[]): ShotRow[] {
+export function shotRows(plan: PlannedShot[], frames: ReelFrameRow[], signed?: ReadonlyMap<string, string>): ShotRow[] {
   const byPosition = new Map(frames.map((frame) => [frame.position, frame]));
   const frameMax = frames.reduce((max, frame) => Math.max(max, frame.position), 0);
   const count = Math.max(plan.length, frameMax);
@@ -256,6 +256,8 @@ export function shotRows(plan: PlannedShot[], frames: ReelFrameRow[]): ShotRow[]
       motion,
       still: frame?.storage_path?.trim() ? "Still on file" : "No still",
       clip: clipState(frame),
+      stillUrl: frame?.storage_path ? signed?.get(frame.storage_path) ?? null : null,
+      clipUrl: frame?.clip_path ? signed?.get(frame.clip_path) ?? null : null,
     });
   }
   return rows;
@@ -266,7 +268,7 @@ export function buildReelMasters(
   assets: ReelAssetReview[],
   frames: ReelFrameRow[],
   editJobs: ReelEditJob[] = [],
-  signedCuts?: ReadonlyMap<string, string>,
+  signedMedia?: ReadonlyMap<string, string>,
 ): ReelMasterView[] {
   return briefs.filter(isPhase1MotionBrief).map((brief) => {
     const plan = readShotPlan(brief.frame_plan);
@@ -282,13 +284,14 @@ export function buildReelMasters(
       assets: owned.map((asset) => {
         const shots = shotRows(
           plan.shots,
-          frames.filter((frame) => frame.asset_id === asset.id),
+          frames.filter((frame) => frame.asset_id === asset.id), signedMedia,
         );
         return {
           id: asset.id,
           title: asset.title,
           refNumber: asset.ref_number,
           reviewStatus: asset.review_status,
+          humanApproved: Boolean(asset.human_approved_at),
           shots,
           // Newest first, as the panel queries them: the latest job is the
           // one that says where this reel's cut has got to.
@@ -296,7 +299,7 @@ export function buildReelMasters(
             asset,
             shots,
             editJobs.filter((job) => job.input_id === asset.id),
-            signedCuts,
+            signedMedia,
           ),
         };
       }),

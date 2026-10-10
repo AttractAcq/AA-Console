@@ -5,7 +5,10 @@ const from = vi.fn();
 
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ clientId: "client-1" }),
+  useSearchParams: () => [new URLSearchParams(), vi.fn()],
+  Link: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
+vi.mock("../../lib/useAgentJobs", () => ({ useAgentJobs: () => ({ inFlight: [], recentFailures: [] }) }));
 
 vi.mock("../../lib/supabase", () => ({
   supabase: {
@@ -78,6 +81,7 @@ beforeEach(() => {
     if (table === "client_media_assets") return chain({ data: assets, error: null });
     if (table === "client_media_frames") return chain({ data: frames, error: null });
     if (table === "agent_jobs") return chain({ data: editJobs, error: null });
+    if (table === "content_slots") return chain({ data: [], error: null });
     throw new Error(table);
   });
 });
@@ -114,6 +118,8 @@ describe("ReelShotsPanel", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /cut the reel/i })).toBeInTheDocument());
     expect(from).toHaveBeenCalledWith("agent_jobs");
     expect(screen.getByText("All 1 clips on file.")).toBeInTheDocument();
+    expect(screen.getByAltText("Opening still for shot 1")).toHaveAttribute("src", "https://signed/stills/1.png");
+    expect(screen.getByLabelText("Higgsfield clip for shot 1")).toHaveAttribute("src", "https://signed/clips/1.mp4");
   });
 
   it("does not offer a second cut while one is running", async () => {
@@ -145,7 +151,8 @@ describe("ReelShotsPanel", () => {
       { id: "asset-1", brief_id: "brief-1", title: "How it works", ref_number: "MA-1", review_status: "approved", render_path: null },
     ];
     render(<ReelShotsPanel />);
-    await waitFor(() => expect(screen.getByRole("button", { name: /cut the reel/i })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("0 of 1 clips on file.")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /cut the reel/i })).toBeNull();
     expect(document.querySelector("video")).toBeNull();
   });
 });

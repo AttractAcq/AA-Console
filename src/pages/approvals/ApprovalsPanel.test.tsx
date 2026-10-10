@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MediaAsset } from "../../lib/media";
 
@@ -92,7 +93,7 @@ afterEach(() => {
 describe("ApprovalsPanel — text preview", () => {
   it("loads the markdown body into the preview instead of the failure message", async () => {
     const user = userEvent.setup();
-    render(<ApprovalsPanel />);
+    render(<MemoryRouter><ApprovalsPanel /></MemoryRouter>);
 
     await user.click(await screen.findByRole("button", { name: "Text" }));
     expect(await screen.findByText("Shade guide follow-up")).toBeInTheDocument();
@@ -110,7 +111,7 @@ describe("ApprovalsPanel — text preview", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
-    render(<ApprovalsPanel />);
+    render(<MemoryRouter><ApprovalsPanel /></MemoryRouter>);
 
     await user.click(await screen.findByRole("button", { name: "Text" }));
     await user.click(await screen.findByRole("button", { name: /Preview Shade guide follow-up/ }));
@@ -123,11 +124,24 @@ describe("ApprovalsPanel — text preview", () => {
 describe("ApprovalsPanel — review controls stay intact", () => {
   it("still offers Approve and Reject on a pending text asset", async () => {
     const user = userEvent.setup();
-    render(<ApprovalsPanel />);
+    render(<MemoryRouter><ApprovalsPanel /></MemoryRouter>);
     await user.click(await screen.findByRole("button", { name: "Text" }));
     await screen.findByText("Shade guide follow-up");
     expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
+  });
+
+  it("links a finished reel back to its production history", async () => {
+    fetchClientAssets.mockImplementation(async (_clientId: string, opts?: { mediaType?: string; reviewStatus?: string }) =>
+      opts?.reviewStatus === "pending" && opts?.mediaType === "video"
+        ? [textAsset({ id: "reel-1", media_type: "video", content_format: "reel", title: "Launch reel",
+          render_path: "client-1/reels/cut.mp4" })] : [],
+    );
+    render(<MemoryRouter><ApprovalsPanel /></MemoryRouter>);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Video" }));
+    expect(await screen.findByRole("link", { name: "Production history" })).toHaveAttribute(
+      "href", "/clients/client-1/delivery/media?tab=reel-shots&brief=brief-1",
+    );
   });
 });
 
@@ -139,7 +153,7 @@ describe("an asset the engine's own queue owns", () => {
     // fault migration 159 exists to fix, reintroduced on the wrong tab.
     engineHeldRows.push({ asset_id: "asset-text-1" });
     const user = userEvent.setup();
-    render(<ApprovalsPanel />);
+    render(<MemoryRouter><ApprovalsPanel /></MemoryRouter>);
 
     await user.click(await screen.findByRole("button", { name: "Text" }));
     expect(await screen.findByText(/waiting on the Engine tab/i)).toBeInTheDocument();
@@ -150,14 +164,14 @@ describe("an asset the engine's own queue owns", () => {
   it("counts them so nobody thinks the queue is empty", async () => {
     engineHeldRows.push({ asset_id: "asset-text-1" });
     const user = userEvent.setup();
-    render(<ApprovalsPanel />);
+    render(<MemoryRouter><ApprovalsPanel /></MemoryRouter>);
     await user.click(await screen.findByRole("button", { name: "Text" }));
     expect(await screen.findByText(/^1 piece is waiting on the Engine tab\./)).toBeInTheDocument();
   });
 
   it("says nothing when the engine holds nothing", async () => {
     const user = userEvent.setup();
-    render(<ApprovalsPanel />);
+    render(<MemoryRouter><ApprovalsPanel /></MemoryRouter>);
     await user.click(await screen.findByRole("button", { name: "Text" }));
     await screen.findByText("Shade guide follow-up");
     expect(screen.queryByText(/Engine tab/i)).not.toBeInTheDocument();
@@ -166,7 +180,7 @@ describe("an asset the engine's own queue owns", () => {
   it("ignores a slot with no asset on it", async () => {
     engineHeldRows.push({ asset_id: null });
     const user = userEvent.setup();
-    render(<ApprovalsPanel />);
+    render(<MemoryRouter><ApprovalsPanel /></MemoryRouter>);
     await user.click(await screen.findByRole("button", { name: "Text" }));
     expect(await screen.findByText("Shade guide follow-up")).toBeInTheDocument();
   });

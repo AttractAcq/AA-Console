@@ -428,6 +428,7 @@ export type Database = {
           job_id: string | null
           member_id: string
           sent_by: string | null
+          source_asset_id: string | null
         }
         Insert: {
           assignment_id?: string | null
@@ -442,6 +443,7 @@ export type Database = {
           job_id?: string | null
           member_id: string
           sent_by?: string | null
+          source_asset_id?: string | null
         }
         Update: {
           assignment_id?: string | null
@@ -456,6 +458,7 @@ export type Database = {
           job_id?: string | null
           member_id?: string
           sent_by?: string | null
+          source_asset_id?: string | null
         }
         Relationships: [
           {
@@ -1350,6 +1353,7 @@ export type Database = {
       }
       client_briefs: {
         Row: {
+          target_platform: Database["public"]["Enums"]["post_platform"] | null
           apply_url: string | null
           archived_at: string | null
           argument: string | null
@@ -1391,6 +1395,7 @@ export type Database = {
           visual_direction: string | null
         }
         Insert: {
+          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           apply_url?: string | null
           archived_at?: string | null
           argument?: string | null
@@ -1432,6 +1437,7 @@ export type Database = {
           visual_direction?: string | null
         }
         Update: {
+          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           apply_url?: string | null
           archived_at?: string | null
           argument?: string | null
@@ -2220,6 +2226,7 @@ export type Database = {
       }
       client_ideas: {
         Row: {
+          target_platform: Database["public"]["Enums"]["post_platform"] | null
           archived_at: string | null
           body: string | null
           campaign_id: string | null
@@ -2243,6 +2250,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -2266,6 +2274,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -2805,9 +2814,12 @@ export type Database = {
           created_at: string
           duration_sec: number | null
           edit_plan: Json | null
+          edit_stage: string
           height: number | null
           human_approved_at: string | null
           id: string
+          intake_notes: string | null
+          intake_source: string | null
           media_type: Database["public"]["Enums"]["media_type"]
           member_id: string | null
           meta_ad_id: string | null
@@ -2817,10 +2829,12 @@ export type Database = {
           ref_number: string | null
           render_path: string | null
           review_status: Database["public"]["Enums"]["review_status"]
+          source_asset_id: string | null
           storage_path: string
           title: string | null
           updated_at: string
           uploaded_by: string | null
+          usage_rights: string | null
           width: number | null
         }
         Insert: {
@@ -2835,9 +2849,12 @@ export type Database = {
           created_at?: string
           duration_sec?: number | null
           edit_plan?: Json | null
+          edit_stage?: string
           height?: number | null
           human_approved_at?: string | null
           id?: string
+          intake_notes?: string | null
+          intake_source?: string | null
           media_type: Database["public"]["Enums"]["media_type"]
           member_id?: string | null
           meta_ad_id?: string | null
@@ -2847,10 +2864,12 @@ export type Database = {
           ref_number?: string | null
           render_path?: string | null
           review_status?: Database["public"]["Enums"]["review_status"]
+          source_asset_id?: string | null
           storage_path: string
           title?: string | null
           updated_at?: string
           uploaded_by?: string | null
+          usage_rights?: string | null
           width?: number | null
         }
         Update: {
@@ -2865,9 +2884,12 @@ export type Database = {
           created_at?: string
           duration_sec?: number | null
           edit_plan?: Json | null
+          edit_stage?: string
           height?: number | null
           human_approved_at?: string | null
           id?: string
+          intake_notes?: string | null
+          intake_source?: string | null
           media_type?: Database["public"]["Enums"]["media_type"]
           member_id?: string | null
           meta_ad_id?: string | null
@@ -2877,10 +2899,12 @@ export type Database = {
           ref_number?: string | null
           render_path?: string | null
           review_status?: Database["public"]["Enums"]["review_status"]
+          source_asset_id?: string | null
           storage_path?: string
           title?: string | null
           updated_at?: string
           uploaded_by?: string | null
+          usage_rights?: string | null
           width?: number | null
         }
         Relationships: [
@@ -4864,6 +4888,7 @@ export type Database = {
           member_id: string
           stage: Database["public"]["Enums"]["assignment_stage"]
           stage_reason: string | null
+          source_asset_id: string | null
           title: string
           updated_at: string
         }
@@ -4881,6 +4906,7 @@ export type Database = {
           member_id: string
           stage?: Database["public"]["Enums"]["assignment_stage"]
           stage_reason?: string | null
+          source_asset_id?: string | null
           title: string
           updated_at?: string
         }
@@ -4898,6 +4924,7 @@ export type Database = {
           member_id?: string
           stage?: Database["public"]["Enums"]["assignment_stage"]
           stage_reason?: string | null
+          source_asset_id?: string | null
           title?: string
           updated_at?: string
         }
@@ -7920,6 +7947,235 @@ export type Database = {
           },
         ]
       }
+      video_repurpose_clip_requests: {
+        Row: {
+          id: string; derivative_id: string; client_id: string; source_asset_id: string
+          brief_id: string; source_in_sec: number; source_out_sec: number
+          output_asset_id: string | null; status: string; job_id: string | null
+          error: string | null; created_by: string | null; created_at: string; completed_at: string | null
+        }
+        Insert: {
+          id?: string; derivative_id: string; client_id: string; source_asset_id: string
+          brief_id: string; source_in_sec: number; source_out_sec: number
+          output_asset_id?: string | null; status?: string; job_id?: string | null
+          error?: string | null; created_by?: string | null; created_at?: string; completed_at?: string | null
+        }
+        Update: {
+          id?: string; derivative_id?: string; client_id?: string; source_asset_id?: string
+          brief_id?: string; source_in_sec?: number; source_out_sec?: number
+          output_asset_id?: string | null; status?: string; job_id?: string | null
+          error?: string | null; created_by?: string | null; created_at?: string; completed_at?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: "video_repurpose_clip_requests_derivative_id_fkey"; columns: ["derivative_id"]; isOneToOne: false; referencedRelation: "video_repurpose_derivatives"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_clip_requests_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"; columns: ["source_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_clip_requests_brief_id_fkey"; columns: ["brief_id"]; isOneToOne: false; referencedRelation: "client_briefs"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"; columns: ["output_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_clip_requests_job_id_fkey"; columns: ["job_id"]; isOneToOne: false; referencedRelation: "agent_jobs"; referencedColumns: ["id"] },
+        ]
+      }
+      motion_design_attachments: {
+        Row: {
+          id: string; project_id: string; asset_id: string; brief_id: string | null
+          destination: string; created_by: string | null; created_at: string
+        }
+        Insert: {
+          id?: string; project_id: string; asset_id: string; brief_id?: string | null
+          destination: string; created_by?: string | null; created_at?: string
+        }
+        Update: {
+          id?: string; project_id?: string; asset_id?: string; brief_id?: string | null
+          destination?: string; created_by?: string | null; created_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "motion_design_attachments_project_id_fkey"; columns: ["project_id"]; isOneToOne: false; referencedRelation: "motion_design_projects"; referencedColumns: ["id"] },
+          { foreignKeyName: "motion_design_attachments_asset_id_fkey"; columns: ["asset_id"]; isOneToOne: true; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
+          { foreignKeyName: "motion_design_attachments_brief_id_fkey"; columns: ["brief_id"]; isOneToOne: false; referencedRelation: "client_briefs"; referencedColumns: ["id"] },
+        ]
+      }
+      video_repurpose_requests: {
+        Row: {
+          id: string; client_id: string; source_asset_id: string; direction: string
+          status: string; transcript: Json | null; candidates: Json | null; error: string | null
+          job_id: string | null; created_by: string | null; created_at: string; completed_at: string | null
+        }
+        Insert: {
+          id?: string; client_id: string; source_asset_id: string; direction?: string
+          status?: string; transcript?: Json | null; candidates?: Json | null; error?: string | null
+          job_id?: string | null; created_by?: string | null; created_at?: string; completed_at?: string | null
+        }
+        Update: {
+          id?: string; client_id?: string; source_asset_id?: string; direction?: string
+          status?: string; transcript?: Json | null; candidates?: Json | null; error?: string | null
+          job_id?: string | null; created_by?: string | null; created_at?: string; completed_at?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: "video_repurpose_requests_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"; columns: ["source_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_requests_job_id_fkey"; columns: ["job_id"]; isOneToOne: false; referencedRelation: "agent_jobs"; referencedColumns: ["id"] },
+        ]
+      }
+      video_repurpose_derivatives: {
+        Row: {
+          id: string; request_id: string; source_asset_id: string; candidate_index: number
+          target_platform: Database["public"]["Enums"]["post_platform"]
+          reentry_stage: string; idea_id: string; source_in_sec: number; source_out_sec: number
+          exact_quote: string; created_at: string
+        }
+        Insert: {
+          id?: string; request_id: string; source_asset_id: string; candidate_index: number
+          target_platform: Database["public"]["Enums"]["post_platform"]
+          reentry_stage?: string; idea_id: string; source_in_sec: number; source_out_sec: number
+          exact_quote: string; created_at?: string
+        }
+        Update: {
+          id?: string; request_id?: string; source_asset_id?: string; candidate_index?: number
+          target_platform?: Database["public"]["Enums"]["post_platform"]
+          reentry_stage?: string; idea_id?: string; source_in_sec?: number; source_out_sec?: number
+          exact_quote?: string; created_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "video_repurpose_derivatives_request_id_fkey"; columns: ["request_id"]; isOneToOne: false; referencedRelation: "video_repurpose_requests"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"; columns: ["source_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_repurpose_derivatives_idea_id_fkey"; columns: ["idea_id"]; isOneToOne: false; referencedRelation: "client_ideas"; referencedColumns: ["id"] },
+        ]
+      }
+      motion_design_projects: {
+        Row: {
+          id: string
+          client_id: string
+          prompt: string
+          preset: string
+          aspect: string
+          duration_sec: number
+          brand_mode: string
+          revision_of: string | null
+          status: string
+          scene_plan: Json | null
+          render_path: string | null
+          poster_path: string | null
+          job_id: string | null
+          error: string | null
+          created_by: string | null
+          created_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          prompt: string
+          preset: string
+          aspect: string
+          duration_sec: number
+          brand_mode: string
+          revision_of?: string | null
+          status?: string
+          scene_plan?: Json | null
+          render_path?: string | null
+          poster_path?: string | null
+          job_id?: string | null
+          error?: string | null
+          created_by?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          prompt?: string
+          preset?: string
+          aspect?: string
+          duration_sec?: number
+          brand_mode?: string
+          revision_of?: string | null
+          status?: string
+          scene_plan?: Json | null
+          render_path?: string | null
+          poster_path?: string | null
+          job_id?: string | null
+          error?: string | null
+          created_by?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: "motion_design_projects_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
+          { foreignKeyName: "motion_design_projects_revision_of_fkey"; columns: ["revision_of"]; isOneToOne: false; referencedRelation: "motion_design_projects"; referencedColumns: ["id"] },
+          { foreignKeyName: "motion_design_projects_job_id_fkey"; columns: ["job_id"]; isOneToOne: false; referencedRelation: "agent_jobs"; referencedColumns: ["id"] },
+        ]
+      }
+      video_source_edit_requests: {
+        Row: {
+          id: string
+          client_id: string
+          source_asset_id: string
+          output_asset_id: string | null
+          job_id: string | null
+          direction: string
+          aspect: string
+          remove_pauses: boolean
+          captions: boolean
+          animated_title: boolean
+          brand_treatment: string
+          feel: string
+          status: string
+          error: string | null
+          transcript: Json | null
+          edit_plan: Json | null
+          created_by: string | null
+          created_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          source_asset_id: string
+          output_asset_id?: string | null
+          job_id?: string | null
+          direction: string
+          aspect: string
+          remove_pauses?: boolean
+          captions?: boolean
+          animated_title?: boolean
+          brand_treatment: string
+          feel: string
+          status?: string
+          error?: string | null
+          transcript?: Json | null
+          edit_plan?: Json | null
+          created_by?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          source_asset_id?: string
+          output_asset_id?: string | null
+          job_id?: string | null
+          direction?: string
+          aspect?: string
+          remove_pauses?: boolean
+          captions?: boolean
+          animated_title?: boolean
+          brand_treatment?: string
+          feel?: string
+          status?: string
+          error?: string | null
+          transcript?: Json | null
+          edit_plan?: Json | null
+          created_by?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+        Relationships: [
+          { foreignKeyName: "video_source_edit_requests_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"; columns: ["source_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"; columns: ["output_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
+          { foreignKeyName: "video_source_edit_requests_job_id_fkey"; columns: ["job_id"]; isOneToOne: false; referencedRelation: "agent_jobs"; referencedColumns: ["id"] },
+        ]
+      }
       work_submissions: {
         Row: {
           client_id: string | null
@@ -7980,6 +8236,53 @@ export type Database = {
       }
     }
     Functions: {
+      request_repurpose_clip: {
+        Args: { p_derivative_id: string; p_brief_id: string }
+        Returns: string
+      }
+      attach_motion_design: {
+        Args: { p_project_id: string; p_brief_id?: string | null }
+        Returns: string
+      }
+      request_video_repurpose_insights: {
+        Args: { p_asset_id: string; p_direction?: string }
+        Returns: string
+      }
+      create_video_repurpose_idea: {
+        Args: { p_request_id: string; p_candidate_index: number;
+          p_target_platform: Database["public"]["Enums"]["post_platform"] }
+        Returns: string
+      }
+      brief_video_repurpose_candidate: {
+        Args: { p_request_id: string; p_candidate_index: number;
+          p_target_platform: Database["public"]["Enums"]["post_platform"] }
+        Returns: string
+      }
+      request_motion_design: {
+        Args: {
+          p_client_id: string
+          p_prompt: string
+          p_preset: string
+          p_aspect: string
+          p_duration_sec: number
+          p_brand_mode: string
+          p_revision_of?: string | null
+        }
+        Returns: string
+      }
+      request_source_video_edit: {
+        Args: {
+          p_asset_id: string
+          p_direction: string
+          p_aspect: string
+          p_remove_pauses: boolean
+          p_captions: boolean
+          p_animated_title: boolean
+          p_brand_treatment: string
+          p_feel: string
+        }
+        Returns: string
+      }
       aa_house_client_id: { Args: never; Returns: string }
       accept_assignment: {
         Args: { p_assignment_id: string }
@@ -8606,6 +8909,15 @@ export type Database = {
           p_client_id?: string
           p_input_id?: string
           p_input_table?: string
+        }
+        Returns: string
+      }
+      enqueue_format_ideation: {
+        Args: {
+          p_client_id: string
+          p_target_platform: Database["public"]["Enums"]["post_platform"]
+          p_media_type: Database["public"]["Enums"]["media_type"]
+          p_content_format: Database["public"]["Enums"]["content_format"]
         }
         Returns: string
       }
@@ -9715,6 +10027,29 @@ export type Database = {
         Returns: string
       }
       request_video_edit: { Args: { p_asset_id: string }; Returns: string }
+      intake_video_for_edit: {
+        Args: { p_asset_id: string; p_client_id: string; p_title: string; p_storage_path: string
+          p_format: Database["public"]["Enums"]["content_format"]; p_source: string; p_rights: string
+          p_brief_id?: string; p_notes?: string }
+        Returns: Json
+      }
+      accept_video_as_finished: { Args: { p_asset_id: string }; Returns: undefined }
+      set_content_approval_owner: { Args: { p_user_id: string }; Returns: undefined }
+      video_approval_state: { Args: { p_asset_id: string }; Returns: Json }
+      sign_video_approval: { Args: { p_asset_id: string; p_role: string }; Returns: undefined }
+      request_video_client_approval: {
+        Args: { p_asset_id: string; p_client_user_id: string }
+        Returns: undefined
+      }
+      decline_video_client_approval: {
+        Args: { p_asset_id: string; p_reason: string }
+        Returns: undefined
+      }
+      video_client_approval_email_state: { Args: { p_asset_id: string }; Returns: Json }
+      request_human_video_edit: {
+        Args: { p_asset_id: string; p_member_id: string; p_due_date?: string }
+        Returns: string
+      }
       rerender_generation: {
         Args: { p_generation_id: string; p_quality?: string; p_size?: string }
         Returns: string

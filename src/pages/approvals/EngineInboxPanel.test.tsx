@@ -12,6 +12,9 @@ let inboxRows: unknown[] = [];
 let rejectedRows: unknown[] = [];
 let assetRows: unknown[] = [];
 let inboxError: { message: string } | null = null;
+const routeState = { owner_user_id: "owner-1", manager_user_id: "smm-1", client_user_id: null,
+  owner_approved: true, manager_approved: true, client_approved: false,
+  can_configure: false, current_user_id: "owner-1", client_accounts: [] };
 
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
@@ -80,7 +83,8 @@ beforeEach(() => {
   ];
   inboxError = null;
   useParams.mockReturnValue({ clientId: "client-1" });
-  rpc.mockResolvedValue({ data: null, error: null });
+  rpc.mockImplementation((fn: string) => Promise.resolve(fn === "video_approval_state"
+    ? { data: routeState, error: null } : { data: null, error: null }));
   signPaths.mockResolvedValue(new Map([["client-1/a.mp4", "https://signed/a.mp4"]]));
 });
 
@@ -182,14 +186,16 @@ describe("approving", () => {
   it("calls approve_slot, which is the only thing that also schedules the post", async () => {
     // review_media_asset would sign the asset off and move nothing.
     render(<EngineInboxPanel />);
-    await userEvent.click(await screen.findByRole("button", { name: /approve and schedule/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /final approve/i }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_slot", { p_slot_id: "slot-1" }));
   });
 
   it("shows what the database said when it refused", async () => {
-    rpc.mockResolvedValue({ data: null, error: { message: "That slot is qa, not waiting for approval." } });
+    rpc.mockImplementation((fn: string) => Promise.resolve(fn === "video_approval_state"
+      ? { data: routeState, error: null }
+      : { data: null, error: { message: "That slot is qa, not waiting for approval." } }));
     render(<EngineInboxPanel />);
-    await userEvent.click(await screen.findByRole("button", { name: /approve and schedule/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /final approve/i }));
     expect(await screen.findByText(/not waiting for approval/)).toBeInTheDocument();
   });
 });
@@ -203,7 +209,7 @@ describe("rejecting", () => {
     const dialog = await screen.findByRole("dialog");
     const confirm = within(dialog).getByRole("button", { name: "Reject" });
     expect(confirm).toBeDisabled();
-    expect(rpc).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalledWith("reject_slot", expect.anything());
   });
 
   it("sends the reason with it", async () => {

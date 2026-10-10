@@ -79,8 +79,14 @@ describe("buildReelMasters", () => {
           provider_job_id: "req-1",
         },
       ],
+      [],
+      new Map([
+        ["c/still.png", "https://signed/still.png"],
+        ["c/clip.mp4", "https://signed/clip.mp4"],
+      ]),
     );
-    expect(master?.assets[0]?.shots[0]).toMatchObject({ still: "Still on file", clip: "Clip on file" });
+    expect(master?.assets[0]?.shots[0]).toMatchObject({ still: "Still on file", clip: "Clip on file",
+      stillUrl: "https://signed/still.png", clipUrl: "https://signed/clip.mp4" });
     expect(master?.assets[0]?.shots[1]).toMatchObject({ still: "No still", clip: "No clip" });
   });
 
@@ -136,12 +142,9 @@ describe("where a reel's cut has got to", () => {
     expect(cutState({}, [], []).detail).toBe("No shots on this reel.");
   });
 
-  it("still offers the cut with clips missing, and says what is missing", () => {
-    // request_video_edit says nothing about readiness either: the runner is
-    // what knows, and refusing here means the answer never reaches the
-    // person who pressed the button.
+  it("waits for clips before offering the cut, and says what is missing", () => {
     const state = cutState({}, shots(1), []);
-    expect(state).toMatchObject({ status: "incomplete", canRequest: true });
+    expect(state).toMatchObject({ status: "incomplete", canRequest: false });
     expect(state.detail).toContain("1 of 3");
   });
 

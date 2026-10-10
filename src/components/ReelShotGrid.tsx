@@ -1,10 +1,11 @@
 import { DataTable } from "./DataTable";
-import { ApprovalActions } from "./ApprovalActions";
 import { RequestCutButton } from "./RequestCutButton";
 import { StatusBadge } from "./MediaCard";
 import { REVIEW_TONE } from "../lib/media";
 import { cn } from "../lib/cn";
 import type { ReelMasterView, ShotRow } from "../lib/reelShots";
+import { Link } from "react-router-dom";
+import { ContentJourney, type ContentStage } from "./ContentJourney";
 
 const CLIP_TONE: Record<ShotRow["clip"], string> = {
   "Clip on file": "bg-primary/10 text-brand-strong",
@@ -36,11 +37,32 @@ function shotTable(shots: ShotRow[]) {
         <span key="d">{shot.durationLabel}</span>,
         <span key="s">{shot.source}</span>,
         <span key="m">{shot.motion}</span>,
-        pill(shot.still, STILL_TONE[shot.still]),
-        pill(shot.clip, CLIP_TONE[shot.clip]),
+        <div key="still" className="space-y-1">
+          {pill(shot.still, STILL_TONE[shot.still])}
+          {shot.stillUrl && <img src={shot.stillUrl} alt={`Opening still for shot ${shot.position}`}
+            loading="lazy" className="max-h-32 max-w-24 rounded border border-border object-contain" />}
+          {shot.still === "Still on file" && !shot.stillUrl &&
+            <span className="block text-xs text-destructive">Preview unavailable</span>}
+        </div>,
+        <div key="clip" className="space-y-1">
+          {pill(shot.clip, CLIP_TONE[shot.clip])}
+          {shot.clipUrl && <video src={shot.clipUrl} controls preload="none"
+            aria-label={`Higgsfield clip for shot ${shot.position}`}
+            className="max-h-32 max-w-24 rounded border border-border bg-black" />}
+          {shot.clip === "Clip on file" && !shot.clipUrl &&
+            <span className="block text-xs text-destructive">Preview unavailable</span>}
+        </div>,
       ])}
     />
   );
+}
+
+function stageFor(asset: ReelMasterView["assets"][number]): ContentStage {
+  if (asset.humanApproved) return "distribution";
+  if (asset.reviewStatus === "rejected") return "edit";
+  if (asset.cut.status === "cut") return "approval";
+  if (asset.cut.status === "running" || asset.cut.status === "failed" || asset.cut.status === "ready") return "edit";
+  return "create";
 }
 
 /**
@@ -52,10 +74,18 @@ function shotTable(shots: ShotRow[]) {
  */
 export function ReelShotGrid({
   masters,
+  buildJobs = new Map(),
+  engineHeldIds = new Set(),
+  clientId,
+  focusedBrief,
   onChanged,
   onError,
 }: {
   masters: ReelMasterView[];
+  buildJobs?: ReadonlyMap<string, { status: string; error: string | null }>;
+  engineHeldIds?: ReadonlySet<string>;
+  clientId?: string;
+  focusedBrief?: string | null;
   onChanged: () => void;
   onError: (message: string) => void;
 }) {
@@ -69,7 +99,7 @@ export function ReelShotGrid({
 
   return (
     <div className="space-y-6">
-      {masters.map((master) => (
+      {masters.filter((master) => !focusedBrief || master.briefId === focusedBrief).map((master) => (
         <section key={master.briefId} className="space-y-3">
           <header className="flex flex-wrap items-baseline gap-2">
             <h3 className="text-sm font-semibold text-foreground">{master.title}</h3>
@@ -83,6 +113,14 @@ export function ReelShotGrid({
               {master.briefStatus.replace(/_/g, " ")}
             </span>
           </header>
+
+          {master.assets.length === 0 && <ContentJourney clientId={clientId} current="create" briefId={master.briefId} reelEdit />}
+          <p className="text-xs text-muted-foreground">Create job: {buildJobs.get(master.briefId)?.status ?? "awaiting build"}</p>
+          {buildJobs.get(master.briefId)?.status === "failed" && (
+            <p role="alert" className="text-xs text-destructive">
+              Video build failed: {buildJobs.get(master.briefId)?.error || "Open the job log for details."}
+            </p>
+          )}
 
           {master.planProblem && (
             <p role="alert" className="text-sm text-destructive">
@@ -100,19 +138,25 @@ export function ReelShotGrid({
           ) : (
             master.assets.map((asset) => (
               <div key={asset.id} className="space-y-2">
+                <ContentJourney clientId={clientId} current={stageFor(asset)} briefId={master.briefId}
+                  engineApproval={engineHeldIds.has(asset.id)} reelEdit />
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground">
                     {asset.refNumber ?? "Master"}
                     {asset.title ? ` · ${asset.title}` : ""}
                   </span>
                   <StatusBadge status={asset.reviewStatus} tone={REVIEW_TONE[asset.reviewStatus]} />
-                  {asset.reviewStatus === "pending" && (
-                    <ApprovalActions
-                      assetId={asset.id}
-                      title={asset.title ?? master.title}
-                      onDone={onChanged}
-                      onError={onError}
-                    />
+                  {asset.reviewStatus === "approved" && !asset.humanApproved &&
+                    <span className="text-xs text-muted-foreground">Waiting for human sign-off</span>}
+                  {asset.reviewStatus !== "rejected" && !asset.humanApproved && asset.cut.status === "cut" && engineHeldIds.has(asset.id) && clientId && (
+                    <Link className="text-xs font-medium text-brand-strong hover:underline"
+                      to={`/clients/${clientId}/delivery/approvals?tab=engine-inbox`}>Approve in Engine</Link>
+                  )}
+                  {asset.reviewStatus !== "rejected" && !asset.humanApproved && asset.cut.status === "cut" && asset.cut.url && !engineHeldIds.has(asset.id) && clientId && (
+                    <Link className="text-xs font-medium text-brand-strong hover:underline"
+                      to={`/clients/${clientId}/delivery/approvals?tab=assets`}>
+                      Review sign-offs in Approvals
+                    </Link>
                   )}
                   <RequestCutButton
                     assetId={asset.id}
@@ -121,6 +165,11 @@ export function ReelShotGrid({
                     onError={onError}
                   />
                 </div>
+                {asset.cut.status === "cut" && <p className="text-xs text-muted-foreground">The finished cut is ready for human approval.</p>}
+                {asset.cut.status !== "cut" && <p className="text-xs text-muted-foreground">Approve after the cut has been rendered and previewed.</p>}
+                {asset.cut.status === "cut" && (asset.cut.url
+                  ? <video controls preload="metadata" className="w-full max-w-xl rounded-md" src={asset.cut.url} aria-label={`Finished cut of ${master.title}`} />
+                  : <p role="alert" className="text-xs text-destructive">The cut is stored, but its preview could not be opened. Review it in the Video Library before approval.</p>)}
                 {shotTable(asset.shots.length > 0 ? asset.shots : master.plannedShots)}
               </div>
             ))

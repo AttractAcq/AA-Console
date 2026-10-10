@@ -121,7 +121,7 @@ function database(options: { slot?: unknown; pillar?: unknown } = {}) {
 }
 
 /** What the model hands back: one well-formed idea, in the wrong shape. */
-function modelReturns(count: number, format = "single") {
+function modelReturns(count: number, format = "single", media = "image") {
   model.mockResolvedValue({
     submitted: {
       ideas: Array.from({ length: count }, (_, i) => ({
@@ -130,7 +130,7 @@ function modelReturns(count: number, format = "single") {
         content_territory: "Proof",
         source_question: "Why does content not compound?",
         strategic_reason: "It answers the question.",
-        media_type: "image",
+        media_type: media,
         content_format: format,
       })),
     },
@@ -208,6 +208,31 @@ describe("ideation for a slot", () => {
 });
 
 describe("ideation when a person asked for it", () => {
+  it("keeps a requested video reel and destination on every idea", async () => {
+    modelReturns(25, "reel", "video");
+    const directed = { ...handJob, params: {
+      target_platform: "instagram", media_type: "video", content_format: "reel",
+    } } as AgentJobRow;
+    const { sb, inserted } = database();
+    const result = await runIdeationJob(sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(true);
+    expect(inserted).toHaveLength(25);
+    expect(inserted.every((row) => row.media_type === "video" && row.content_format === "reel"
+      && row.target_platform === "instagram")).toBe(true);
+    expect((model.mock.calls[0]![0] as { prompt: string }).prompt).toContain("Every idea is for instagram as video in reel format");
+  });
+
+  it("drops the model's wrong shape instead of silently making singles", async () => {
+    modelReturns(25, "single", "image");
+    const directed = { ...handJob, params: {
+      target_platform: "instagram", media_type: "video", content_format: "reel",
+    } } as AgentJobRow;
+    const { sb, inserted } = database();
+    const result = await runIdeationJob(sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(false);
+    expect(inserted).toHaveLength(0);
+  });
+
   it("still fills a bank, at the unscoped count", async () => {
     modelReturns(25);
     const { sb, inserted } = database();

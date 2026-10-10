@@ -10,11 +10,8 @@ import type { CutState } from "../lib/reelShots";
  * could only be started by someone with SQL access, which is the same as the
  * cut not existing for everybody else.
  *
- * The state line always says what is actually on file, including when the
- * clips are not all there. The button stays live in that case on purpose:
- * request_video_edit says nothing about readiness either, because the runner
- * is what knows, and refusing in SQL means the answer never reaches the
- * person who pressed the button.
+ * The state line says what is on file. The action appears only when all
+ * clips have landed, matching the database readiness guard.
  */
 export function RequestCutButton({
   assetId,

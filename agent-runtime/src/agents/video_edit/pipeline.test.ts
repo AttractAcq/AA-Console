@@ -108,7 +108,8 @@ describe.skipIf(!hasFfmpeg())("video_build to video_edit, end to end", () => {
 
   it("will not edit while a clip is missing, then will once it lands", () => {
     const waiting = frames.map((frame, i) => (i === 1 ? { ...frame, clip_path: null } : frame));
-    expect(editReadiness(brief, waiting)).toMatchObject({ ready: false, reason: "clips_missing" });
+    // The provider job exists, so this is a submitted clip still rendering.
+    expect(editReadiness(brief, waiting)).toMatchObject({ ready: false, reason: "clips_rendering" });
     expect(editReadiness(brief, frames).ready).toBe(true);
   });
 

@@ -39,6 +39,8 @@ export const CONSOLE_NAV: Record<ConsoleKind, ConsolePage[]> = {
   smm: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "current-clients", label: "Current Clients", icon: Users },
+    { id: "video-editing", label: "Video Editing", icon: FolderOpen },
+    { id: "video-approvals", label: "Video Approvals", icon: ClipboardCheck },
     { id: "past-clients", label: "Past Clients", icon: UsersRound },
     { id: "chat", label: "Chat", icon: MessagesSquare },
     { id: "account", label: "Account", icon: UserCog },

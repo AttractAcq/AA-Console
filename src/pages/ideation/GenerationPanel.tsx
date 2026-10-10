@@ -4,26 +4,31 @@ import { PenLine, Sparkles, BadgeCheck, Columns3, Trash2 } from "lucide-react";
 import { ActionCard } from "../../components/ActionCard";
 import { FilterPills } from "../../components/FilterPills";
 import { DataTable } from "../../components/DataTable";
-import { FormModal, ConfirmModal } from "../../components/forms/FormModal";
+import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
 import { CONTENT_FORMAT_OPTIONS, MEDIA_TYPE_OPTIONS, loadContentPillars, loadProofAssets, useOptions } from "../../lib/options";
 import { mediaFilters } from "../../data/mediaFilters";
 import type { MediaFilterId } from "../../data/mediaFilters";
 import { formatFilters, formatAllows, formatLabel } from "../../lib/contentFormat";
+import { POST_PLATFORMS, platformAllowsFormat, platformLabel } from "../../lib/postPlatform";
 import type { FormatFilterId } from "../../lib/contentFormat";
 import { supabase } from "../../lib/supabase";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
+import { ContentJourney } from "../../components/ContentJourney";
 import type { Database } from "../../types/database";
 
 type MediaType = Database["public"]["Enums"]["media_type"];
 type ContentFormatValue = Database["public"]["Enums"]["content_format"];
+type PostPlatformValue = Database["public"]["Enums"]["post_platform"];
 
 type Idea = {
   id: string;
   title: string;
+  body: string | null;
   media_type: string;
   content_format: string;
+  target_platform: string | null;
   source: string;
   status: string;
   campaign: { name: string } | null;
@@ -37,6 +42,7 @@ type CampaignChoice = {
 
 const MANUAL_FIELDS: FieldDef[] = [
   { name: "title", label: "Idea", kind: "text", required: true },
+  { name: "target_platform", label: "Destination", kind: "select", required: true, options: [...POST_PLATFORMS] },
   { name: "media_type", label: "Media type", kind: "select", options: MEDIA_TYPE_OPTIONS },
   // Hidden for text, which has no shape other than single. Shown for image
   // and video, where the options differ — a carousel is images only — so the
@@ -50,6 +56,13 @@ const MANUAL_FIELDS: FieldDef[] = [
     hint: "Carousel and story are made of ordered frames. A carousel is images only.",
   },
   { name: "body", label: "Detail", kind: "textarea", rows: 3 },
+];
+
+const AUTO_FIELDS: FieldDef[] = [
+  { name: "target_platform", label: "Destination", kind: "select", required: true, options: [...POST_PLATFORMS] },
+  { name: "media_type", label: "Media type", kind: "select", required: true, options: MEDIA_TYPE_OPTIONS },
+  { name: "content_format", label: "Format", kind: "select", required: true, options: CONTENT_FORMAT_OPTIONS,
+    hint: "Choose Reel + Video to ideate a generated short video. The destination must support the format." },
 ];
 
 export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?: boolean; refreshToken?: unknown } = {}) {
@@ -108,7 +121,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
       if (!clientId) return;
       const { data, error } = await supabase
         .from("client_ideas")
-        .select("id, title, media_type, content_format, source, status, campaign:client_campaigns!client_ideas_campaign_client_fkey(name)")
+        .select("id, title, body, media_type, content_format, target_platform, source, status, campaign:client_campaigns!client_ideas_campaign_client_fkey(name)")
         .eq("client_id", clientId)
         // An idea whose brief exists is record, not work. It lives in the
         // archive from that moment; leaving it here is how 300 drafts and 33
@@ -252,6 +265,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
 
   return (
     <div>
+      <ContentJourney clientId={clientId} current="ideation" />
       <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
 
       {notice && (
@@ -278,10 +292,17 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
         <FilterPills options={formatFilters} activeId={activeFormat} onChange={setActiveFormat} />
       </div>
       <DataTable
-        columns={["Idea", "Format", "Type", "Campaign", "Status", ""]}
+        columns={["Idea", "Destination", "Format", "Type", "Campaign", "Status", ""]}
         emptyLabel={`No ${activeLabel.toLowerCase()} ideas yet`}
         rows={shown.map((i) => [
-          i.title,
+          <div key={i.id} className="space-y-1">
+            <span>{i.title}</span>
+            {i.body && <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer text-brand-strong">View source and direction</summary>
+              <p className="mt-1 whitespace-pre-wrap">{i.body}</p>
+            </details>}
+          </div>,
+          platformLabel(i.target_platform),
           formatLabel(i.content_format),
           i.source,
           i.campaign?.name ?? "—",
@@ -342,6 +363,10 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
           if (!formatAllows(format, mediaType)) {
             throw new Error(`A ${formatLabel(format).toLowerCase()} cannot be ${mediaType}. Change one of the two.`);
           }
+          const platform = v.target_platform as PostPlatformValue;
+          if (!platformAllowsFormat(platform, format)) {
+            throw new Error(`${platformLabel(platform)} does not support ${formatLabel(format).toLowerCase()} in this workflow.`);
+          }
           const campaignId = (v.campaign_id as string) || null;
           let campaignPosition: number | null = null;
           if (campaignId) {
@@ -378,6 +403,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
             body: (v.body as string)?.trim() || null,
             media_type: mediaType,
             content_format: format,
+            target_platform: platform,
             source: "manual",
             ...(campaignId ? { campaign_id: campaignId, campaign_position: campaignPosition } : {}),
           });
@@ -394,21 +420,33 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
         onSaved={refresh}
       />
 
-      <ConfirmModal
+      <FormModal
         open={openCardId === "auto-idea"}
         onClose={() => setOpenCardId(null)}
         title="Auto Idea"
-        body="Queues the Ideation agent. It reads your ICP question universe, brand strategy and proof bank — no input needed. It will refuse to run until those exist."
-        confirmLabel="Run agent"
-        onConfirm={async () => {
+        intro="Choose where this content will go and what shape to ideate. The agent uses the client's question universe, brand strategy and proof bank."
+        fields={AUTO_FIELDS}
+        submitLabel="Generate ideas"
+        onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
-          const { error } = await supabase.rpc("enqueue_agent_job", {
-            p_agent_key: "ideation",
+          const platform = v.target_platform as PostPlatformValue;
+          const mediaType = v.media_type as MediaType;
+          const format = v.content_format as ContentFormatValue;
+          if (!formatAllows(format, mediaType)) {
+            throw new Error(`A ${formatLabel(format).toLowerCase()} cannot be ${mediaType}. Change one of the two.`);
+          }
+          if (!platformAllowsFormat(platform, format)) {
+            throw new Error(`${platformLabel(platform)} does not support ${formatLabel(format).toLowerCase()} in this workflow.`);
+          }
+          const { error } = await supabase.rpc("enqueue_format_ideation", {
             p_client_id: clientId,
+            p_target_platform: platform,
+            p_media_type: mediaType,
+            p_content_format: format,
           });
           if (error) throw new Error(error.message);
         }}
-        onDone={refresh}
+        onSaved={refresh}
       />
 
       <FormModal

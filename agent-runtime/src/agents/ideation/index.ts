@@ -29,7 +29,7 @@ import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords, type UpstreamRecord } from "../shared.js";
 import { logger } from "../../logging/logger.js";
 import { ideaSource, pillarBrief, pillarFields, type PillarScope } from "../../pillars/scope.js";
-import { coerceFormat } from "../../content/format.js";
+import { coerceFormat, formatFitsMedia, isContentFormat, platformAllowsFormat } from "../../content/format.js";
 import type { ContentFormat } from "../../content/format.js";
 import { loadSlot, SLOT_IDEA_COUNT, type SlotContext } from "../../engine/slot.js";
 
@@ -122,6 +122,20 @@ export async function runIdeationJob(
       retryable: false,
       failureMessage: error instanceof Error ? error.message : String(error),
     };
+  }
+
+  const requested = !slot && job.params && Object.hasOwn(job.params, "target_platform")
+    ? job.params : null;
+  const targetPlatform = requested?.target_platform;
+  const requestedMedia = requested?.media_type;
+  const requestedFormat = requested?.content_format;
+  if (requested && (
+    typeof targetPlatform !== "string" || !isContentFormat(requestedFormat)
+    || !["image", "text", "video"].includes(String(requestedMedia))
+    || !formatFitsMedia(requestedFormat, String(requestedMedia))
+    || !platformAllowsFormat(targetPlatform, requestedFormat)
+  )) {
+    return { ok: false, retryable: false, failureMessage: "The requested destination, media type and format do not form a supported idea." };
   }
 
   const records = await loadUpstreamRecords(sb, job.client_id, [
@@ -256,7 +270,7 @@ export async function runIdeationJob(
               source_question: { type: "string", description: "The ICP question or tension this answers, taken from the question universe." },
               strategic_reason: { type: "string", description: "Why this is worth saying for this business specifically." },
               media_type: { type: "string", description: "One of: image, text, video." },
-              content_format: { type: "string", description: "The shape it runs in: single, carousel or story. A carousel is an image set only; a story is an image or a video; text is always single. Most ideas are single — choose carousel only when the idea is genuinely a sequence of points, and story only when it is made for a full-screen vertical slot." },
+              content_format: { type: "string", description: "The shape it runs in: single, carousel, story or reel. A carousel is an image set; a story is an image or video; a reel is video; text is always single. Follow any requested format exactly." },
             },
             required: ["title", "core_idea", "content_territory", "source_question", "strategic_reason", "media_type", "content_format"],
             additionalProperties: false,
@@ -302,7 +316,9 @@ ${seededProof ? `\nSEED THIS RUN FROM THIS PROOF ITEM SPECIFICALLY\n${seededProo
 ${pillar ? `\n${pillarBrief(pillar, siblings)}` : ""}${
     slot
       ? `\nTHE SLOT THIS IS FOR\nThis is for one post, going out on ${slot.platform} as a ${slot.format}. Every idea must work in that shape: do not propose an idea whose point only lands as something else. The shape is already decided and is not yours to change.`
-      : ""
+      : requested
+        ? `\nTHE REQUESTED DESTINATION AND SHAPE\nEvery idea is for ${targetPlatform} as ${requestedMedia} in ${requestedFormat} format. Keep both media_type and content_format exactly as requested. A different shape is not usable for this run.`
+        : ""
   }
 
 Call ${submitTool.name} once when you are done.`;
@@ -365,7 +381,8 @@ Call ${submitTool.name} once when you are done.`;
     }))
     // An idea with no title or no source question is not an idea by this
     // architecture's definition, so it is dropped rather than stored.
-    .filter((idea) => idea.title.length > 0 && idea.core_idea.length > 20 && idea.source_question.length > 0);
+    .filter((idea) => idea.title.length > 0 && idea.core_idea.length > 20 && idea.source_question.length > 0)
+    .filter((idea) => !requested || (idea.media_type === requestedMedia && idea.content_format === requestedFormat));
 
   if (valid.length === 0) {
     return {
@@ -393,6 +410,7 @@ Call ${submitTool.name} once when you are done.`;
       // and the calendar; an idea that arrives as something else is the
       // model having a view about a decision already taken.
       content_format: slot ? slot.format : idea.content_format,
+      target_platform: slot?.platform ?? (typeof targetPlatform === "string" ? targetPlatform : null),
       source,
       job_id: job.id,
       slot_id: slot?.id ?? null,
