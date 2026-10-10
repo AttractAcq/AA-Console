@@ -407,6 +407,15 @@ describe("the format a campaign piece runs in", () => {
     expect(() => campaignIdeas([piece({ content_format: "reel", media_type: "image" })], 1)).toThrow(/a reel is a video/);
   });
 
+  it("refuses formats a named social destination cannot publish", () => {
+    expect(() => campaignIdeas([piece({ channel: "linkedin", content_format: "reel", media_type: "video" })], 1))
+      .toThrow(/not a supported destination and format pair/);
+    expect(() => campaignIdeas([piece({ channel: "youtube", content_format: "story" })], 1))
+      .toThrow(/not a supported destination and format pair/);
+    expect(campaignIdeas([piece({ channel: "tiktok", content_format: "reel", media_type: "video" })], 1)[0]!.content_format)
+      .toBe("reel");
+  });
+
   it("names the piece, so the failure is actionable", () => {
     expect(() =>
       campaignIdeas([piece({ title: "The veneer door", content_format: "carousel", media_type: "video" })], 1),

@@ -88,7 +88,7 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
             title: { type: "string", description: "At most 300 characters." },
             body: { type: "string", description: "The concrete angle, buyer question, intended response and call to action for this piece. Respect campaign constraints." },
             media_type: { type: "string", enum: ["image", "text", "video"] },
-            channel: { type: "string", description: "Which of the campaign's channels this piece is for." },
+            channel: { type: "string", description: "Which of the campaign's channels this piece is for. For a social destination, use the exact platform name: instagram, facebook, tiktok, linkedin or youtube. This determines the saved destination." },
             strategic_reason: { type: "string", description: "Why this distinct piece helps achieve the campaign objective." },
             content_format: {
               type: "string",

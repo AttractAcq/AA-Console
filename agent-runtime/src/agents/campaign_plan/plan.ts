@@ -1,4 +1,5 @@
 import { derivedNeeds, type CampaignTemplate } from "../../campaigns/templates.js";
+import { platformAllowsFormat, PLATFORM_FORMATS } from "../../content/format.js";
 
 // What a campaign plan has to contain before anything is built from it.
 //
@@ -117,7 +118,7 @@ export interface CampaignIdea {
   strategic_reason: string;
   /** The content pillar this piece sits in, when the campaign has any. */
   pillar_id: string | null;
-  /** 'single', 'carousel' or 'story'. Decides how it is briefed and produced. */
+  /** The production shape, including video reels. */
   content_format: "single" | "carousel" | "story" | "reel";
 }
 
@@ -203,6 +204,11 @@ export function campaignIdeas(
       throw new Error("Each campaign idea needs a distinct title, angle, channel, media type and reason.");
     }
     titles.add(title.toLowerCase());
+    const content_format = chosenFormat(item?.content_format, String(media_type), title);
+    const platform = channel.toLowerCase();
+    if (Object.hasOwn(PLATFORM_FORMATS, platform) && !platformAllowsFormat(platform, content_format)) {
+      throw new Error(`"${title}" asks for ${content_format} on ${channel}, which is not a supported destination and format pair.`);
+    }
     return {
       title,
       body,
@@ -210,7 +216,7 @@ export function campaignIdeas(
       strategic_reason,
       media_type: media_type as CampaignIdea["media_type"],
       pillar_id: assignedPillar(item?.pillar_id, pillarIds, title),
-      content_format: chosenFormat(item?.content_format, String(media_type), title),
+      content_format,
     };
   });
 }
