@@ -36,7 +36,8 @@ export function VideoApprovalRoute({ assetId, onFinalApprove }: {
     if (!data) { setError("Approval route unavailable."); return; }
     const next = data as unknown as State;
     setState(next);
-    if (next.can_configure && !next.owner_user_id) {
+    if (next.can_configure) {
+      setOwnerChoice(next.owner_user_id ?? "");
       const { data: profiles, error: profileError } = await supabase.from("profiles")
         .select("id, full_name, email").eq("role", "admin").order("full_name");
       if (profileError) { setError(profileError.message); return; }
@@ -83,13 +84,13 @@ export function VideoApprovalRoute({ assetId, onFinalApprove }: {
       {state.client_user_id ? ` · Client: ${state.client_rejection_reason ? "changes requested" : state.client_approved ? "approved" : "waiting"}` : ""}
     </p>
     {state.client_rejection_reason && <p className="text-destructive">Client requested changes: {state.client_rejection_reason}</p>}
-    {!state.owner_user_id && state.can_configure && <div className="flex flex-wrap gap-2">
+    {state.can_configure && <div className="flex flex-wrap gap-2">
       <select aria-label="Owner account" value={ownerChoice} onChange={(e) => setOwnerChoice(e.target.value)}
         className="rounded border border-input bg-background px-2 py-1">
         <option value="">Choose owner account…</option>
         {admins.map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}
       </select>
-      <button type="button" disabled={busy || !ownerChoice}
+      <button type="button" disabled={busy || !ownerChoice || ownerChoice === state.owner_user_id}
         onClick={() => void act({ kind: "owner", userId: ownerChoice })}
         className="rounded border border-border px-2 py-1 disabled:opacity-50">Save owner</button>
     </div>}

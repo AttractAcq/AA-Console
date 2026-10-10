@@ -2,11 +2,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
-vi.mock("../lib/supabase", () => ({ supabase: { rpc, from: vi.fn() } }));
+const { rpc, from } = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
+vi.mock("../lib/supabase", () => ({ supabase: { rpc, from } }));
 import { VideoApprovalRoute } from "./VideoApprovalRoute";
 
-beforeEach(() => { rpc.mockReset(); });
+beforeEach(() => { rpc.mockReset(); from.mockReset(); });
 
 it("requires the assigned owner sign-off before final approval appears", async () => {
   let signed = false;
@@ -30,4 +30,23 @@ it("requires the assigned owner sign-off before final approval appears", async (
   await userEvent.setup().click(screen.getByRole("button", { name: "Final approve" }));
   expect(finalApprove).toHaveBeenCalledOnce();
   expect(rpc).toHaveBeenCalledWith("sign_video_approval", { p_asset_id: "video-1", p_role: "owner" });
+});
+
+it("lets an admin change the configured owner account", async () => {
+  rpc.mockImplementation((name: string) => Promise.resolve(name === "video_approval_state"
+    ? { data: { owner_user_id: "old", manager_user_id: "smm", client_user_id: null,
+      owner_approved: false, manager_approved: false, client_approved: false,
+      can_configure: true, current_user_id: "old", client_accounts: [] }, error: null }
+    : { data: null, error: null }));
+  const chain: Record<string, unknown> = {};
+  Object.assign(chain, { select: () => chain, eq: () => chain,
+    order: () => Promise.resolve({ data: [
+      { id: "old", full_name: "Old owner", email: null },
+      { id: "new", full_name: "New owner", email: null },
+    ], error: null }) });
+  from.mockReturnValue(chain);
+  render(<VideoApprovalRoute assetId="video-1" onFinalApprove={vi.fn()} />);
+  await userEvent.setup().selectOptions(await screen.findByRole("combobox", { name: "Owner account" }), "new");
+  await userEvent.setup().click(screen.getByRole("button", { name: "Save owner" }));
+  expect(rpc).toHaveBeenCalledWith("set_content_approval_owner", { p_user_id: "new" });
 });
