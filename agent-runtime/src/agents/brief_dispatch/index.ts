@@ -113,9 +113,12 @@ export async function runBriefDispatchJob(
   const roleBody =
     role === "avatar"
       ? (brief.avatar_brief ?? brief.body ?? "")
-      : role === "editor"
+      : role === "editor" || role === "edit"
         ? (brief.editor_brief ?? brief.body ?? "")
         : (brief.body ?? "");
+  const editBody = role === "edit"
+    ? `${roleBody}\n\nSource footage is attached to your edit assignment in the console. Review it before delivering a finished cut.`
+    : roleBody;
 
   const to = profile?.email;
   if (!to) {
@@ -132,12 +135,13 @@ export async function runBriefDispatchJob(
     body: JSON.stringify({
       from: config.resendFrom,
       to: [to],
-      subject: `New ${brief.media_type}${role === "full" ? "" : ` (${role})`} brief — ${brief.title}`,
+      subject: role === "edit" ? `Video edit assigned — ${brief.title}`
+        : `New ${brief.media_type}${role === "full" ? "" : ` (${role})`} brief — ${brief.title}`,
       html: body({
         memberName: member.name,
         clientName: client?.name ?? "a client",
         briefTitle: brief.title,
-        briefBody: roleBody,
+        briefBody: editBody,
         mediaType: brief.media_type,
         dueDate: (assignment as { due_date?: string } | null)?.due_date ?? null,
         consoleUrl: config.consoleUrl,

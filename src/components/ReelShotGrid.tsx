@@ -6,6 +6,7 @@ import { REVIEW_TONE } from "../lib/media";
 import { cn } from "../lib/cn";
 import type { ReelMasterView, ShotRow } from "../lib/reelShots";
 import { Link } from "react-router-dom";
+import { ContentJourney, type ContentStage } from "./ContentJourney";
 
 const CLIP_TONE: Record<ShotRow["clip"], string> = {
   "Clip on file": "bg-primary/10 text-brand-strong",
@@ -42,6 +43,14 @@ function shotTable(shots: ShotRow[]) {
       ])}
     />
   );
+}
+
+function stageFor(asset: ReelMasterView["assets"][number]): ContentStage {
+  if (asset.reviewStatus === "approved") return "distribution";
+  if (asset.reviewStatus === "rejected") return "edit";
+  if (asset.cut.status === "cut") return "approval";
+  if (asset.cut.status === "running" || asset.cut.status === "failed" || asset.cut.status === "ready") return "edit";
+  return "create";
 }
 
 /**
@@ -93,11 +102,8 @@ export function ReelShotGrid({
             </span>
           </header>
 
-          <p className="text-xs text-muted-foreground">
-            Ideation → Brief → Create {buildJobs.get(master.briefId)
-              ? `(${buildJobs.get(master.briefId)!.status})` : "(awaiting build)"}
-            {" → "}Edit / Repurpose → Approval
-          </p>
+          {master.assets.length === 0 && <ContentJourney clientId={clientId} current="create" briefId={master.briefId} reelEdit />}
+          <p className="text-xs text-muted-foreground">Create job: {buildJobs.get(master.briefId)?.status ?? "awaiting build"}</p>
           {buildJobs.get(master.briefId)?.status === "failed" && (
             <p role="alert" className="text-xs text-destructive">
               Video build failed: {buildJobs.get(master.briefId)?.error || "Open the job log for details."}
@@ -120,6 +126,8 @@ export function ReelShotGrid({
           ) : (
             master.assets.map((asset) => (
               <div key={asset.id} className="space-y-2">
+                <ContentJourney clientId={clientId} current={stageFor(asset)} briefId={master.briefId}
+                  engineApproval={engineHeldIds.has(asset.id)} reelEdit />
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground">
                     {asset.refNumber ?? "Master"}
@@ -128,7 +136,7 @@ export function ReelShotGrid({
                   <StatusBadge status={asset.reviewStatus} tone={REVIEW_TONE[asset.reviewStatus]} />
                   {asset.reviewStatus === "pending" && asset.cut.status === "cut" && engineHeldIds.has(asset.id) && clientId && (
                     <Link className="text-xs font-medium text-brand-strong hover:underline"
-                      to={`/clients/${clientId}/approvals?tab=engine-inbox`}>Approve in Engine</Link>
+                      to={`/clients/${clientId}/delivery/approvals?tab=engine-inbox`}>Approve in Engine</Link>
                   )}
                   {asset.reviewStatus === "pending" && asset.cut.status === "cut" && asset.cut.url && !engineHeldIds.has(asset.id) && (
                     <ApprovalActions

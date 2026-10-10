@@ -428,6 +428,7 @@ export type Database = {
           job_id: string | null
           member_id: string
           sent_by: string | null
+          source_asset_id: string | null
         }
         Insert: {
           assignment_id?: string | null
@@ -442,6 +443,7 @@ export type Database = {
           job_id?: string | null
           member_id: string
           sent_by?: string | null
+          source_asset_id?: string | null
         }
         Update: {
           assignment_id?: string | null
@@ -456,6 +458,7 @@ export type Database = {
           job_id?: string | null
           member_id?: string
           sent_by?: string | null
+          source_asset_id?: string | null
         }
         Relationships: [
           {
@@ -2811,6 +2814,7 @@ export type Database = {
           created_at: string
           duration_sec: number | null
           edit_plan: Json | null
+          edit_stage: string
           height: number | null
           human_approved_at: string | null
           id: string
@@ -2823,6 +2827,7 @@ export type Database = {
           ref_number: string | null
           render_path: string | null
           review_status: Database["public"]["Enums"]["review_status"]
+          source_asset_id: string | null
           storage_path: string
           title: string | null
           updated_at: string
@@ -2841,6 +2846,7 @@ export type Database = {
           created_at?: string
           duration_sec?: number | null
           edit_plan?: Json | null
+          edit_stage?: string
           height?: number | null
           human_approved_at?: string | null
           id?: string
@@ -2853,6 +2859,7 @@ export type Database = {
           ref_number?: string | null
           render_path?: string | null
           review_status?: Database["public"]["Enums"]["review_status"]
+          source_asset_id?: string | null
           storage_path: string
           title?: string | null
           updated_at?: string
@@ -2871,6 +2878,7 @@ export type Database = {
           created_at?: string
           duration_sec?: number | null
           edit_plan?: Json | null
+          edit_stage?: string
           height?: number | null
           human_approved_at?: string | null
           id?: string
@@ -2883,6 +2891,7 @@ export type Database = {
           ref_number?: string | null
           render_path?: string | null
           review_status?: Database["public"]["Enums"]["review_status"]
+          source_asset_id?: string | null
           storage_path?: string
           title?: string | null
           updated_at?: string
@@ -4870,6 +4879,7 @@ export type Database = {
           member_id: string
           stage: Database["public"]["Enums"]["assignment_stage"]
           stage_reason: string | null
+          source_asset_id: string | null
           title: string
           updated_at: string
         }
@@ -4887,6 +4897,7 @@ export type Database = {
           member_id: string
           stage?: Database["public"]["Enums"]["assignment_stage"]
           stage_reason?: string | null
+          source_asset_id?: string | null
           title: string
           updated_at?: string
         }
@@ -4904,6 +4915,7 @@ export type Database = {
           member_id?: string
           stage?: Database["public"]["Enums"]["assignment_stage"]
           stage_reason?: string | null
+          source_asset_id?: string | null
           title?: string
           updated_at?: string
         }
@@ -9730,6 +9742,21 @@ export type Database = {
         Returns: string
       }
       request_video_edit: { Args: { p_asset_id: string }; Returns: string }
+      set_content_approval_owner: { Args: { p_user_id: string }; Returns: undefined }
+      video_approval_state: { Args: { p_asset_id: string }; Returns: Json }
+      sign_video_approval: { Args: { p_asset_id: string; p_role: string }; Returns: undefined }
+      request_video_client_approval: {
+        Args: { p_asset_id: string; p_client_user_id: string }
+        Returns: undefined
+      }
+      decline_video_client_approval: {
+        Args: { p_asset_id: string; p_reason: string }
+        Returns: undefined
+      }
+      request_human_video_edit: {
+        Args: { p_asset_id: string; p_member_id: string; p_due_date?: string }
+        Returns: string
+      }
       rerender_generation: {
         Args: { p_generation_id: string; p_quality?: string; p_size?: string }
         Returns: string

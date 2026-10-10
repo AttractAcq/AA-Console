@@ -12,9 +12,10 @@ import { AddProofModal } from "../../components/proof/AddProofModal";
 import { ActiveCampaignsView, ActiveOrganicView, ActiveConversionView } from "./ClientViews";
 import { findConsolePage } from "../../config/consoleNav";
 import { useAuth } from "../../context/auth";
-import { fetchClientAssets, shortDate } from "../../lib/media";
+import { fetchClientAssets, shortDate, signPaths } from "../../lib/media";
 import type { MediaAsset } from "../../lib/media";
 import { supabase } from "../../lib/supabase";
+import { VideoApprovalRoute } from "../../components/VideoApprovalRoute";
 
 type ClientRow = { id: string; name: string; sector: string | null; tier: string | null };
 type ContextRow = { business_overview: string | null; main_offer: string | null };
@@ -28,6 +29,7 @@ export function ClientConsolePage() {
   const [client, setClient] = useState<ClientRow | null>(null);
   const [context, setContext] = useState<ContextRow | null>(null);
   const [pending, setPending] = useState<MediaAsset[]>([]);
+  const [videoUrls, setVideoUrls] = useState<ReadonlyMap<string, string>>(new Map());
   const [counts, setCounts] = useState({ distributed: 0, proof: 0 });
   const [proofOpen, setProofOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -62,11 +64,21 @@ export function ClientConsolePage() {
     setClient(c.data as ClientRow | null);
     setContext(ctx.data as ContextRow | null);
     setCounts({ distributed: distributed.count ?? 0, proof: proof.count ?? 0 });
-    setPending(waiting);
+    const ready = waiting.filter((asset) => !asset.edit_stage || asset.edit_stage === "review_ready");
+    const video = ready.filter((asset) => asset.media_type === "video");
+    const states = await Promise.all(video.map((asset) =>
+      supabase.rpc("video_approval_state", { p_asset_id: asset.id })));
+    const requested = new Set(video.filter((_, index) =>
+      !states[index].error && (states[index].data as { client_user_id?: string } | null)?.client_user_id === profile?.id)
+      .map((asset) => asset.id));
+    const visible = ready.filter((asset) => asset.media_type !== "video" || requested.has(asset.id));
+    setPending(visible);
+    setVideoUrls(await signPaths("client-media", video.filter((asset) => requested.has(asset.id))
+      .map((asset) => asset.render_path ?? asset.storage_path)));
     } catch (error) {
       setLoadError("Failed to load client overview: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
     }
-  }, [clientId]);
+  }, [clientId, profile?.id]);
 
   useEffect(() => {
     void refresh();
@@ -127,7 +139,12 @@ export function ClientConsolePage() {
               asset.ref_number ?? "—",
               asset.media_type,
               shortDate(asset.created_at),
-              <button
+              asset.media_type === "video" ? <div key={asset.id} className="space-y-2">
+                {videoUrls.get(asset.render_path ?? asset.storage_path) && <video controls preload="metadata"
+                  className="max-h-52 max-w-xs rounded-md" aria-label={`Review ${asset.title ?? "video"}`}
+                  src={videoUrls.get(asset.render_path ?? asset.storage_path)} />}
+                <VideoApprovalRoute assetId={asset.id} onFinalApprove={() => approve(asset)} />
+              </div> : <button
                 key={asset.id}
                 type="button"
                 disabled={busyId === asset.id}

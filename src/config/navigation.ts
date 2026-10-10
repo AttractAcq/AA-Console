@@ -19,6 +19,7 @@ import {
   Palette,
   Plug,
   Settings2,
+  Scissors,
   Share2,
   ShieldCheck,
   Target,
@@ -167,6 +168,13 @@ export const clientNavGroups: NavNode[] = [
           { id: "story-library", label: "Story Library" },
           { id: "carousel-library", label: "Carousel Library" },
         ],
+      },
+      {
+        id: "edit-repurpose",
+        label: "Edit / Repurpose",
+        path: "edit-repurpose",
+        icon: Scissors,
+        tabs: [{ id: "overview", label: "Video edits" }],
       },
       {
         id: "approvals",

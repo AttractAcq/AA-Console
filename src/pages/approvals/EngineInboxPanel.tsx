@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { Modal } from "../../components/Modal";
+import { VideoApprovalRoute } from "../../components/VideoApprovalRoute";
 import { signPaths } from "../../lib/media";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
@@ -284,14 +285,16 @@ export function EngineInboxPanel() {
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <button
+                {card.assetId && urls.get(card.assetId)?.mediaType === "video"
+                  ? <VideoApprovalRoute assetId={card.assetId}
+                    onFinalApprove={() => act("approve_slot", card.slotId)} /> : <button
                   type="button"
                   disabled={busy === card.slotId}
                   onClick={() => void act("approve_slot", card.slotId)}
                   className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   Approve and schedule
-                </button>
+                </button>}
                 <button
                   type="button"
                   disabled={busy === card.slotId}

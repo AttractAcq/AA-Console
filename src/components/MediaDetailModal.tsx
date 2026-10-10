@@ -37,12 +37,14 @@ type Provenance = {
 export function MediaDetailModal({
   asset,
   url,
+  sourceUrl,
   body,
   open,
   onClose,
 }: {
   asset: MediaAsset | null;
   url?: string;
+  sourceUrl?: string;
   body?: string | null;
   open: boolean;
   onClose: () => void;
@@ -197,6 +199,13 @@ export function MediaDetailModal({
               <p className="py-12 text-sm text-muted-foreground">Preview unavailable.</p>
             )}
           </div>
+
+          {asset.source_asset_id && <section className="border-b border-border px-5 py-4">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Original footage</h3>
+            {sourceUrl ? <video src={sourceUrl} controls preload="metadata" className="w-full max-w-xl rounded-md"
+              aria-label="Original footage before editing" />
+              : <p className="text-xs text-muted-foreground">Original footage preview unavailable.</p>}
+          </section>}
 
           <dl className="grid gap-x-6 gap-y-2 px-5 py-4 sm:grid-cols-2">
             {rows.map(([label, value]) =>

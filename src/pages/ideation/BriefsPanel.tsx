@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { FilterPills } from "../../components/FilterPills";
 import { DataTable } from "../../components/DataTable";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
@@ -13,6 +13,7 @@ import { cn } from "../../lib/cn";
 import { formatFilters, formatLabel } from "../../lib/contentFormat";
 import { platformLabel } from "../../lib/postPlatform";
 import type { FormatFilterId } from "../../lib/contentFormat";
+import { ContentJourney } from "../../components/ContentJourney";
 
 type Brief = {
   id: string;
@@ -30,6 +31,14 @@ type Brief = {
   created_at: string;
 };
 
+type Assignment = {
+  id: string;
+  brief_id: string | null;
+  stage: string;
+  asset_id: string | null;
+  team_members: { name: string } | null;
+};
+
 const STATUS_TONE: Record<string, string> = {
   draft: "bg-secondary text-secondary-foreground",
   approved: "bg-secondary text-secondary-foreground",
@@ -41,9 +50,13 @@ const STATUS_TONE: Record<string, string> = {
 export function BriefsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusedBrief = searchParams.get("brief");
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [activeFormat, setActiveFormat] = useState<FormatFilterId>("all");
   const [briefs, setBriefs] = useState<Brief[]>([]);
+  const [assignments, setAssignments] = useState<ReadonlyMap<string, Assignment[]>>(new Map());
+  const [emailStatus, setEmailStatus] = useState<ReadonlyMap<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [building, setBuilding] = useState<Brief | null>(null);
   const [viewing, setViewing] = useState<Brief | null>(null);
@@ -72,7 +85,28 @@ export function BriefsPanel() {
         // is finished, and reads from the archive instead.
         .order("created_at", { ascending: false });
       if (error) throw error;
-      setBriefs((data ?? []) as Brief[]);
+      const rows = (data ?? []) as Brief[];
+      const briefIds = rows.map((row) => row.id);
+      const [assigned, dispatches] = briefIds.length ? await Promise.all([
+        supabase.from("job_assignments")
+          .select("id, brief_id, stage, asset_id, team_members(name)")
+          .in("brief_id", briefIds),
+        supabase.from("brief_dispatches")
+          .select("assignment_id, email_status")
+          .in("brief_id", briefIds),
+      ]) : [{ data: [], error: null }, { data: [], error: null }];
+      if (assigned.error) throw assigned.error;
+      if (dispatches.error) throw dispatches.error;
+      const byBrief = new Map<string, Assignment[]>();
+      for (const assignment of (assigned.data ?? []) as unknown as Assignment[]) {
+        if (!assignment.brief_id) continue;
+        byBrief.set(assignment.brief_id, [...(byBrief.get(assignment.brief_id) ?? []), assignment]);
+      }
+      setBriefs(rows);
+      setAssignments(byBrief);
+      setEmailStatus(new Map((dispatches.data ?? [])
+        .filter((row) => row.assignment_id)
+        .map((row) => [row.assignment_id!, row.email_status])));
       setLoading(false);
     } catch (error) {
       setLoadError("Failed to load briefs: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
@@ -92,7 +126,8 @@ export function BriefsPanel() {
 
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
   const shown = briefs.filter(
-    (b) => b.media_type === activeFilter && (activeFormat === "all" || b.content_format === activeFormat),
+    (b) => focusedBrief ? b.id === focusedBrief
+      : b.media_type === activeFilter && (activeFormat === "all" || b.content_format === activeFormat),
   );
   const elsewhere = briefs.length - shown.length;
 
@@ -100,12 +135,21 @@ export function BriefsPanel() {
 
   return (
     <div>
+      <ContentJourney clientId={clientId} current="brief" briefId={focusedBrief} />
       <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
 
-      <div className="mb-4 flex flex-col gap-2">
-        <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
-        <FilterPills options={formatFilters} activeId={activeFormat} onChange={setActiveFormat} />
-      </div>
+      {focusedBrief ? (
+        <p className="mb-4 text-xs text-muted-foreground">
+          Following one brief from its production view.{" "}
+          <button type="button" className="font-medium text-brand-strong hover:underline"
+            onClick={() => setSearchParams({ tab: "briefs" })}>Show all briefs</button>
+        </p>
+      ) : (
+        <div className="mb-4 flex flex-col gap-2">
+          <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
+          <FilterPills options={formatFilters} activeId={activeFormat} onChange={setActiveFormat} />
+        </div>
+      )}
       {notice && (
         <p role="status" className="mb-4 text-sm text-brand-strong">
           {notice}
@@ -132,6 +176,13 @@ export function BriefsPanel() {
           >
             {b.title}
             {b.brief_ref && <span className="block text-xs text-muted-foreground">{b.brief_ref}</span>}
+            {(assignments.get(b.id) ?? []).map((assignment) => (
+              <span key={assignment.id} className="block text-xs text-muted-foreground">
+                {assignment.team_members?.name ?? "Team member"}: {assignment.stage.replace(/_/g, " ")}
+                {emailStatus.get(assignment.id) === "skipped" ? " · assigned, email not sent" : ""}
+                {emailStatus.get(assignment.id) === "failed" ? " · email failed" : ""}
+              </span>
+            ))}
           </button>,
           <span key="p">{platformLabel(b.target_platform)}</span>,
           <span key="f">{formatLabel(b.content_format)}</span>,
@@ -150,7 +201,12 @@ export function BriefsPanel() {
           b.status === "in_production" || b.status === "complete" ? (
             b.media_type === "video" && b.content_format === "reel" ?
               <button key="a" type="button" className="text-xs font-medium text-brand-strong hover:underline"
-                onClick={() => navigate(`/clients/${clientId}/media?tab=reel-shots&brief=${b.id}`)}>Track reel</button>
+                onClick={() => navigate(`/clients/${clientId}/delivery/media?tab=reel-shots&brief=${b.id}`)}>Track reel</button>
+              : (assignments.get(b.id) ?? []).some((assignment) => assignment.asset_id) ?
+                <button key="a" type="button" className="text-xs font-medium text-brand-strong hover:underline"
+                  onClick={() => navigate(`/clients/${clientId}/delivery/media?tab=${b.media_type === "video" ? "video-library" : b.media_type === "image" ? "image-library" : "copy-library"}`)}>
+                  View delivery
+                </button>
               : <span key="a" className="text-xs text-muted-foreground">Actioned</span>
           ) : (
             <button

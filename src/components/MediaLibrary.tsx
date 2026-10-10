@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { FilterPills } from "./FilterPills";
 import { EmptyState } from "./EmptyState";
 import { MediaCard, StatusBadge } from "./MediaCard";
@@ -145,7 +145,12 @@ export function MediaLibrary({
                 <StatusBadge status={asset.review_status} tone={REVIEW_TONE[asset.review_status]} />
               }
               actions={
-                asset.review_status === "pending" ? (
+                asset.edit_stage === "edited" ? (
+                  <span className="text-xs text-muted-foreground">Source footage preserved</span>
+                ) : asset.edit_stage && asset.edit_stage !== "review_ready" ? (
+                  <Link to={`/clients/${clientId}/delivery/edit-repurpose?tab=overview${asset.brief_id ? `&brief=${encodeURIComponent(asset.brief_id)}` : ""}`}
+                    className="text-xs font-medium text-brand-strong hover:underline">Edit before approval</Link>
+                ) : asset.review_status === "pending" ? (
                   <ApprovalActions
                     assetId={asset.id}
                     title={asset.title ?? "Untitled"}

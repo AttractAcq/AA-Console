@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Eye } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { FilterPills } from "../../components/FilterPills";
 import { EmptyState } from "../../components/EmptyState";
 import { MediaCard, StatusBadge } from "../../components/MediaCard";
@@ -10,6 +10,8 @@ import type { MediaFilterId } from "../../data/mediaFilters";
 import { REVIEW_TONE, fetchClientAssets, fetchTextBodies, shortDate, signPaths } from "../../lib/media";
 import type { MediaAsset } from "../../lib/media";
 import { supabase } from "../../lib/supabase";
+import { ContentJourney } from "../../components/ContentJourney";
+import { VideoApprovalRoute } from "../../components/VideoApprovalRoute";
 
 /**
  * The gate between "made" and "shippable". Only approved assets can be
@@ -20,6 +22,7 @@ export function ApprovalsPanel() {
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const [sourceUrls, setSourceUrls] = useState<Map<string, string>>(new Map());
   const [bodies, setBodies] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -75,6 +78,7 @@ export function ApprovalsPanel() {
 
     const all = [...botApproved, ...pending];
     const rows = all.filter((asset) => !heldByEngine.has(asset.id)
+      && (!asset.edit_stage || asset.edit_stage === "review_ready")
       && (asset.content_format !== "reel" || Boolean(asset.render_path)));
     setEngineHeld(all.filter((asset) => heldByEngine.has(asset.id)).length);
     setUncutReels(all.filter((asset) => !heldByEngine.has(asset.id)
@@ -83,6 +87,17 @@ export function ApprovalsPanel() {
     const signed = await signPaths("client-media", rows.map((r) =>
       r.content_format === "reel" ? r.render_path ?? "" : r.storage_path));
     setUrls(signed);
+    const sourceIds = [...new Set(rows.map((row) => row.source_asset_id).filter((id): id is string => Boolean(id)))];
+    if (sourceIds.length) {
+      const { data: sources, error: sourceError } = await supabase.from("client_media_assets")
+        .select("id, storage_path").in("id", sourceIds);
+      if (sourceError) throw sourceError;
+      const signedSources = await signPaths("client-media", (sources ?? []).map((source) => source.storage_path));
+      setSourceUrls(new Map((sources ?? []).flatMap((source) => {
+        const url = signedSources.get(source.storage_path);
+        return url ? [[source.id, url] as const] : [];
+      })));
+    } else setSourceUrls(new Map());
     // Same as Copy library: a text asset's file IS the content. Without this
     // the preview modal only has a signed URL and shows "could not be loaded".
     setBodies(await fetchTextBodies(rows.filter((r) => r.media_type === "text"), signed));
@@ -124,6 +139,7 @@ export function ApprovalsPanel() {
 
   return (
     <div>
+      <ContentJourney clientId={clientId} current="approval" />
       <div className="mb-4">
         <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
       </div>
@@ -168,6 +184,12 @@ export function ApprovalsPanel() {
               }
               actions={
                 <>
+                  {asset.content_format === "reel" && asset.brief_id && (
+                    <Link to={`/clients/${clientId}/delivery/media?tab=reel-shots&brief=${encodeURIComponent(asset.brief_id)}`}
+                      className="rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-brand-strong hover:bg-accent">
+                      Production history
+                    </Link>
+                  )}
                   {/* An explicit control rather than a clickable tile: these
                       cards already carry buttons, and a button cannot contain
                       another one. */}
@@ -179,14 +201,15 @@ export function ApprovalsPanel() {
                   >
                     <Eye className="h-4 w-4" aria-hidden="true" />
                   </button>
-                  <button
+                  {asset.media_type === "video" ? <VideoApprovalRoute assetId={asset.id}
+                    onFinalApprove={() => review(asset, "approved")} /> : <button
                     type="button"
                     disabled={busyId === asset.id}
                     onClick={() => void review(asset, "approved")}
                     className="flex-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     Approve
-                  </button>
+                  </button>}
                   <button
                     type="button"
                     disabled={busyId === asset.id}
@@ -262,6 +285,7 @@ export function ApprovalsPanel() {
       <MediaDetailModal
         asset={preview}
         url={preview ? urls.get(preview.content_format === "reel" ? preview.render_path ?? "" : preview.storage_path) : undefined}
+        sourceUrl={preview?.source_asset_id ? sourceUrls.get(preview.source_asset_id) : undefined}
         body={preview ? bodies.get(preview.id) : undefined}
         open={preview !== null}
         onClose={() => setPreview(null)}

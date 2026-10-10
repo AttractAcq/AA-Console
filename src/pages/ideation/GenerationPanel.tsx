@@ -15,6 +15,7 @@ import type { FormatFilterId } from "../../lib/contentFormat";
 import { supabase } from "../../lib/supabase";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
+import { ContentJourney } from "../../components/ContentJourney";
 import type { Database } from "../../types/database";
 
 type MediaType = Database["public"]["Enums"]["media_type"];
@@ -263,6 +264,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
 
   return (
     <div>
+      <ContentJourney clientId={clientId} current="ideation" />
       <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
 
       {notice && (

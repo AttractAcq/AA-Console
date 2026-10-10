@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { MediaLibrary } from "../../components/MediaLibrary";
 import { supabase } from "../../lib/supabase";
 import { signPaths } from "../../lib/media";
@@ -11,11 +11,13 @@ type Reel = {
   render_path: string | null;
   review_status: string;
   brief_id: string | null;
+  edit_stage?: string;
 };
 
 /** Finished reels play their cut; in-progress reels lead to shot review. */
 export function VideoLibraryPanel() {
   const { clientId } = useParams<{ clientId: string }>();
+  const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
   const [reels, setReels] = useState<Reel[]>([]);
   const [cuts, setCuts] = useState<ReadonlyMap<string, string>>(new Map());
@@ -27,7 +29,7 @@ export function VideoLibraryPanel() {
     void (async () => {
       try {
         const { data, error: queryError } = await supabase.from("client_media_assets")
-          .select("id, title, ref_number, render_path, review_status, brief_id")
+          .select("id, title, ref_number, render_path, review_status, brief_id, edit_stage")
           .eq("client_id", clientId)
           .eq("media_type", "video")
           .eq("content_format", "reel")
@@ -46,11 +48,19 @@ export function VideoLibraryPanel() {
     return () => { cancelled = true; };
   }, [clientId]);
 
-  const finished = reels.filter((r) => r.render_path);
-  const inProgress = reels.length - finished.length;
+  const finished = reels.filter((r) => r.render_path && r.edit_stage !== "edited");
+  const rawFootage = reels.filter((r) => r.edit_stage === "needs_edit" || r.edit_stage === "editing");
+  const inProgress = reels.filter((r) => (!r.edit_stage || r.edit_stage === "review_ready") && !r.render_path).length;
   return (
     <div>
       {error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
+      {rawFootage.length > 0 && <p className="mb-4 text-sm text-muted-foreground">
+        {rawFootage.length} source video{rawFootage.length === 1 ? " is" : "s are"} in Edit / Repurpose.{" "}
+        <button type="button" className="font-medium text-brand-strong hover:underline"
+          onClick={() => navigate(`/clients/${clientId}/delivery/edit-repurpose?tab=overview`)}>
+          Open editing work
+        </button>
+      </p>}
       {inProgress > 0 && (
         <p className="mb-4 text-sm text-muted-foreground">
           {inProgress} reel{inProgress === 1 ? " is" : "s are"} in Create / Edit. Follow its clips and cut under{" "}

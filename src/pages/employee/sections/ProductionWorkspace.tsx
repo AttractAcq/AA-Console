@@ -5,6 +5,7 @@ import { DataTable } from "../../../components/DataTable";
 import { EmptyState } from "../../../components/EmptyState";
 import { Modal } from "../../../components/Modal";
 import { supabase } from "../../../lib/supabase";
+import { signPaths } from "../../../lib/media";
 
 type Job = {
   id: string;
@@ -25,8 +26,9 @@ type Job = {
   // and falls out of attribution entirely. That was the case for every asset
   // an editor or avatar had ever delivered.
   brief_id: string | null;
+  source_asset_id: string | null;
   clients: { name: string } | null;
-  client_briefs: { title: string; brief_ref: string | null; body: string | null; avatar_brief?: string | null; editor_brief?: string | null } | null;
+  client_briefs: { title: string; brief_ref: string | null; body: string | null; content_format?: string | null; avatar_brief?: string | null; editor_brief?: string | null } | null;
   brief_role?: string | null;
 };
 
@@ -105,6 +107,7 @@ export function ProductionWorkspace({
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [sourceUrls, setSourceUrls] = useState<ReadonlyMap<string, string>>(new Map());
   const [rejectionReasons, setRejectionReasons] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -123,7 +126,7 @@ export function ProductionWorkspace({
       supabase
         .from("job_assignments")
         .select(
-          "id, title, due_date, compensation, completed_at, stage, stage_reason, client_id, brief_id, clients(name), client_briefs(title, brief_ref, body, avatar_brief, editor_brief)",
+          "id, title, due_date, compensation, completed_at, stage, stage_reason, client_id, brief_id, source_asset_id, clients(name), client_briefs(title, brief_ref, body, content_format, avatar_brief, editor_brief)",
         )
         .eq("member_id", memberId)
         .order("due_date", { nullsFirst: false }),
@@ -134,7 +137,18 @@ export function ProductionWorkspace({
         .order("created_at", { ascending: false })
         .limit(20),
     ]);
-    setJobs((assigned.data ?? []) as unknown as Job[]);
+    const jobs = (assigned.data ?? []) as unknown as Job[];
+    setJobs(jobs);
+    const sourceIds = jobs.map((job) => job.source_asset_id).filter((id): id is string => Boolean(id));
+    if (sourceIds.length) {
+      const { data: sources } = await supabase.from("client_media_assets")
+        .select("id, storage_path").in("id", sourceIds);
+      const signed = await signPaths("client-media", (sources ?? []).map((source) => source.storage_path));
+      setSourceUrls(new Map((sources ?? []).flatMap((source) => {
+        const url = signed.get(source.storage_path);
+        return url ? [[source.id, url] as const] : [];
+      })));
+    } else setSourceUrls(new Map());
     const rows = (delivered.data ?? []) as Submission[];
     setSubmissions(rows);
 
@@ -176,6 +190,10 @@ export function ProductionWorkspace({
       setError("Pick a job that is attached to a client.");
       return;
     }
+    if (job.source_asset_id && !file.type.startsWith("video/")) {
+      setError("Deliver a video file for this edit assignment.");
+      return;
+    }
 
     setError(null);
     setNotice(null);
@@ -209,6 +227,8 @@ export function ProductionWorkspace({
       // The brief, not just the client. This is the link the whole chain hangs
       // on: asset -> brief -> idea, and later performance -> idea.
       brief_id: job.brief_id,
+      source_asset_id: job.source_asset_id,
+      content_format: job.client_briefs?.content_format === "reel" ? "reel" : "single",
       // Named after the work, not after whatever the camera called the file.
       // "IMG_4032.mov" tells a reviewer nothing about what they are approving.
       title: job.client_briefs?.title ?? job.title ?? file.name,
@@ -238,7 +258,11 @@ export function ProductionWorkspace({
     setNotice(
       closeError
         ? "Delivered and waiting for approval — but the job could not be marked delivered. Tell the agency."
-        : "Delivered. It is now waiting for approval.",
+        : job.source_asset_id
+          ? "Edited version delivered. It is now waiting for approval; the original footage remains on file."
+          : variant === "avatars" && file.type.startsWith("video/")
+            ? "Footage delivered to Edit / Repurpose. Approval follows the finished edit."
+          : "Delivered. It is now waiting for approval.",
     );
     void refresh();
   }
@@ -445,12 +469,19 @@ export function ProductionWorkspace({
                   // Fall back to master body for legacy / full dispatches.
                   const role = (selected as { brief_role?: string }).brief_role;
                   if (role === "avatar" && cb.avatar_brief) return cb.avatar_brief;
-                  if (role === "editor" && cb.editor_brief) return cb.editor_brief;
+                  if ((role === "editor" || selected.source_asset_id) && cb.editor_brief) return cb.editor_brief;
                   return cb.body ?? "This brief has no detail beyond its title.";
                 })()}
               </p>
             </details>
           )}
+          {selected?.source_asset_id && (sourceUrls.get(selected.source_asset_id)
+            ? <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Source footage to edit</p>
+                <video controls preload="metadata" className="w-full max-w-xl rounded-md"
+                  src={sourceUrls.get(selected.source_asset_id)} />
+              </div>
+            : <p role="alert" className="text-xs text-destructive">Source footage preview unavailable. Ask the agency before delivering an edit.</p>)}
           {selected && !selected.brief_id && (
             <p className="text-xs text-muted-foreground">
               This job has no brief attached — deliver against its title.
@@ -467,7 +498,7 @@ export function ProductionWorkspace({
           <button
             type="button"
             onClick={handleUpload}
-            disabled={uploading}
+            disabled={uploading || Boolean(selected?.source_asset_id && !sourceUrls.get(selected.source_asset_id))}
             className="flex items-center gap-2 rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Upload className="h-4 w-4" aria-hidden="true" />
