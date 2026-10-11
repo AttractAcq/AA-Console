@@ -40,14 +40,17 @@ export function ReelShotsPanel() {
       return;
     }
     try {
-      const briefRes = await supabase
+      let briefQuery = supabase
         .from("client_briefs")
         .select("id, title, brief_ref, status, content_format, format_code, frame_plan, media_type")
         .eq("client_id", clientId)
         .eq("media_type", "video")
         .or("content_format.eq.reel,format_code.in.(F6,F7)")
-        .is("archived_at", null)
         .order("created_at", { ascending: false });
+      // Creating the first asset archives its brief. A reel remains in
+      // production and review after that point, so its shots must stay here.
+      briefQuery = focusedBrief ? briefQuery.eq("id", focusedBrief) : briefQuery.limit(100);
+      const briefRes = await briefQuery;
       if (briefRes.error) throw briefRes.error;
       const briefs = (briefRes.data ?? []) as ReelBriefInput[];
       const ids = briefs.map((brief) => brief.id);
@@ -131,7 +134,7 @@ export function ReelShotsPanel() {
     } finally {
       setLoading(false);
     }
-  }, [clientId]);
+  }, [clientId, focusedBrief]);
 
   useEffect(() => {
     void refresh();
