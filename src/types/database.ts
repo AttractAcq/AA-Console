@@ -8921,6 +8921,19 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_scoped_ideation: {
+        Args: {
+          p_client_id: string
+          p_target_platform: Database["public"]["Enums"]["post_platform"]
+          p_media_type: Database["public"]["Enums"]["media_type"]
+          p_content_format: Database["public"]["Enums"]["content_format"]
+          p_campaign_id: string | null
+          p_idea_count: number | null
+          p_input_table: string | null
+          p_input_id: string | null
+        }
+        Returns: string
+      }
       enqueue_agent_job_as: {
         Args: {
           p_actor: string

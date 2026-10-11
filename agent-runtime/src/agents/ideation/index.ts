@@ -243,11 +243,14 @@ export async function runIdeationJob(
   }
 
   const configured = Number((agent.config as { idea_count?: unknown })?.idea_count);
+  const requestedCount = requested?.idea_count;
   // A slot needs a few candidates to choose between, not a bank. Twenty-five
   // ideas for one post is twenty-one ideas nobody reads and a bill for all
   // of them, and the selector is choosing by score rather than by stamina.
   const ideaCount = slot
     ? SLOT_IDEA_COUNT
+    : typeof requestedCount === "number" && Number.isInteger(requestedCount) && requestedCount >= 1 && requestedCount <= 60
+      ? requestedCount
     : Number.isFinite(configured) && configured > 0
       ? Math.min(configured, 60)
       : DEFAULT_IDEA_COUNT;
@@ -382,7 +385,8 @@ Call ${submitTool.name} once when you are done.`;
     // An idea with no title or no source question is not an idea by this
     // architecture's definition, so it is dropped rather than stored.
     .filter((idea) => idea.title.length > 0 && idea.core_idea.length > 20 && idea.source_question.length > 0)
-    .filter((idea) => !requested || (idea.media_type === requestedMedia && idea.content_format === requestedFormat));
+    .filter((idea) => !requested || (idea.media_type === requestedMedia && idea.content_format === requestedFormat))
+    .slice(0, ideaCount);
 
   if (valid.length === 0) {
     return {
