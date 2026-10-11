@@ -69,6 +69,7 @@ import { ChatPanel } from "./team/ChatPanel";
 import { AgentsPanel } from "./team/AgentsPanel";
 import { FinancialsPanel } from "./admin/FinancialsPanel";
 import { SopsPanel } from "./admin/SopsPanel";
+import { ContentJourney } from "../components/ContentJourney";
 
 const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   admin: {
@@ -169,6 +170,7 @@ const nodePanels: Record<string, () => ReactNode> = {
   // distinct id from the agency dashboard; both live at a path segment
   // called "dashboard" but they are different pages
   "delivery-dashboard": () => <ClientDashboardPanel />,
+  create: () => <BriefsPanel stage="create" />,
   "motion-design": () => <MotionDesignPanel />,
   "proof-bank": () => <ProofBankPanel />,
   "prospects-leads": () => <ProspectsLeadsPanel />,
@@ -243,6 +245,7 @@ export function Page({ node }: { node: NavNode }) {
           </Button>
         </div>
       ) : <PageHeader title={node.label} />}
+      {node.id === "distribution" && <ContentJourney clientId={clientId} current="distribution" />}
       {tabs && activeTab && (
         <div className="mb-6">
           <Tabs tabs={tabs} activeId={activeTab.id} onChange={handleTabChange} />

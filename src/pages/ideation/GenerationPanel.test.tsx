@@ -56,6 +56,8 @@ describe("manual idea campaign assignment", () => {
     await dialog.findByRole("option", { name: "Autumn launch · planning" });
     await userEvent.type(dialog.getByLabelText(/^Idea/), "A human idea");
     await userEvent.selectOptions(dialog.getByLabelText(/^Destination/), "instagram");
+    await userEvent.selectOptions(dialog.getByLabelText(/^Media type/), "image");
+    await userEvent.selectOptions(dialog.getByLabelText(/^Format/), "single");
     return dialog;
   }
 
@@ -127,9 +129,26 @@ it("queues format-directed Auto Idea with a reel destination", async () => {
   await userEvent.selectOptions(dialog.getByLabelText(/^Media type/), "video");
   await userEvent.selectOptions(dialog.getByLabelText(/^Format/), "reel");
   await userEvent.click(dialog.getByRole("button", { name: "Generate ideas" }));
-  await waitFor(() => expect(rpc).toHaveBeenCalledWith("enqueue_format_ideation", {
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("enqueue_scoped_ideation", {
     p_client_id: "client-1", p_target_platform: "instagram", p_media_type: "video", p_content_format: "reel",
+    p_campaign_id: null, p_idea_count: 5, p_input_table: null, p_input_id: null,
   }));
+});
+it("queues the chosen Auto Idea quantity and campaign", async () => {
+  render(<GenerationPanel />);
+  await userEvent.click(await screen.findByRole("button", { name: /Auto Idea/i }));
+  const dialog = within(screen.getByRole("dialog"));
+  await dialog.findByRole("option", { name: "Autumn launch · planning" });
+  await userEvent.selectOptions(dialog.getByLabelText(/^Destination/), "instagram");
+  await userEvent.selectOptions(dialog.getByLabelText(/^Media type/), "video");
+  await userEvent.selectOptions(dialog.getByLabelText(/^Format/), "reel");
+  await userEvent.selectOptions(dialog.getByLabelText(/Assign to campaign/), "campaign-1");
+  await userEvent.clear(dialog.getByLabelText(/Number of ideas/));
+  await userEvent.type(dialog.getByLabelText(/Number of ideas/), "8");
+  await userEvent.click(dialog.getByRole("button", { name: "Generate ideas" }));
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("enqueue_scoped_ideation", expect.objectContaining({
+    p_idea_count: 8, p_campaign_id: "campaign-1",
+  })));
 });
 it("scopes manual approval to the selected draft and client, then refreshes", async () => {
   render(<GenerationPanel />);
@@ -178,12 +197,16 @@ describe("running ideation inside one pillar", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Pillar Idea/i }));
     const dialog = within(screen.getByRole("dialog"));
     await userEvent.selectOptions(dialog.getByLabelText(/^Pillar/), "pil-1");
+    await userEvent.selectOptions(dialog.getByLabelText(/^Destination/), "instagram");
+    await userEvent.selectOptions(dialog.getByLabelText(/^Media type/), "video");
+    await userEvent.selectOptions(dialog.getByLabelText(/^Format/), "reel");
     await userEvent.click(dialog.getByRole("button", { name: "Run agent" }));
 
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", {
-        p_agent_key: "ideation",
+      expect(rpc).toHaveBeenCalledWith("enqueue_scoped_ideation", {
         p_client_id: "client-1",
+        p_target_platform: "instagram", p_media_type: "video", p_content_format: "reel",
+        p_campaign_id: null, p_idea_count: null,
         p_input_table: "client_content_pillars",
         p_input_id: "pil-1",
       }),

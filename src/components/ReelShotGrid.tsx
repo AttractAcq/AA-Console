@@ -114,7 +114,7 @@ export function ReelShotGrid({
             </span>
           </header>
 
-          {master.assets.length === 0 && <ContentJourney clientId={clientId} current="create" briefId={master.briefId} reelEdit />}
+          {master.assets.length === 0 && <ContentJourney clientId={clientId} current="create" briefId={master.briefId} />}
           <p className="text-xs text-muted-foreground">Create job: {buildJobs.get(master.briefId)?.status ?? "awaiting build"}</p>
           {buildJobs.get(master.briefId)?.status === "failed" && (
             <p role="alert" className="text-xs text-destructive">
@@ -139,7 +139,7 @@ export function ReelShotGrid({
             master.assets.map((asset) => (
               <div key={asset.id} className="space-y-2">
                 <ContentJourney clientId={clientId} current={stageFor(asset)} briefId={master.briefId}
-                  engineApproval={engineHeldIds.has(asset.id)} reelEdit />
+                  engineApproval={engineHeldIds.has(asset.id)} />
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground">
                     {asset.refNumber ?? "Master"}

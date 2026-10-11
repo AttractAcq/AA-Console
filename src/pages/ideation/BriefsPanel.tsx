@@ -47,7 +47,7 @@ const STATUS_TONE: Record<string, string> = {
   rejected: "bg-destructive/10 text-destructive",
 };
 
-export function BriefsPanel() {
+export function BriefsPanel({ stage = "brief" }: { stage?: "brief" | "create" } = {}) {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -71,19 +71,19 @@ export function BriefsPanel() {
         setLoading(false);
         return;
       }
-      const { data, error } = await supabase
+      let query = supabase
         .from("client_briefs")
         .select(
           "id, title, body, avatar_brief, editor_brief, media_type, content_format, target_platform, format_code, frame_plan, brief_ref, status, source_idea_id, created_at, hook, premise, argument, proof, script, visual_direction, shot_requirements, b_roll, call_to_action, channel_intent, production_method, proof_asset_id",
         )
         .eq("client_id", clientId)
         .neq("purpose", "recruitment")
-        // Only briefs still being worked on. One that has produced its asset
-        // is finished, and reads from the archive instead.
-        .is("archived_at", null)
-        // Only briefs still being worked on. One that has produced its asset
-        // is finished, and reads from the archive instead.
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(100);
+      // Asset creation archives the brief immediately. Create must still
+      // show it while a reel renders or human footage is being returned.
+      if (stage === "brief") query = query.is("archived_at", null);
+      const { data, error } = await query;
       if (error) throw error;
       const rows = (data ?? []) as Brief[];
       const briefIds = rows.map((row) => row.id);
@@ -113,7 +113,7 @@ export function BriefsPanel() {
     } finally {
       setLoading(false);
     }
-  }, [clientId]);
+  }, [clientId, stage]);
 
   useEffect(() => {
     void refresh();
@@ -135,14 +135,17 @@ export function BriefsPanel() {
 
   return (
     <div>
-      <ContentJourney clientId={clientId} current="brief" briefId={focusedBrief} />
+      <ContentJourney clientId={clientId} current={stage} briefId={focusedBrief} />
+      {stage === "create" && <p className="mb-4 text-sm text-muted-foreground">
+        Choose a brief to create with AI or assign to a person. Track generated reels in Media → Reel shots and returned footage in Edit / Repurpose.
+      </p>}
       <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
 
       {focusedBrief ? (
         <p className="mb-4 text-xs text-muted-foreground">
           Following one brief from its production view.{" "}
           <button type="button" className="font-medium text-brand-strong hover:underline"
-            onClick={() => setSearchParams({ tab: "briefs" })}>Show all briefs</button>
+            onClick={() => setSearchParams(stage === "create" ? {} : { tab: "briefs" })}>Show all briefs</button>
         </p>
       ) : (
         <div className="mb-4 flex flex-col gap-2">
@@ -165,7 +168,7 @@ export function BriefsPanel() {
               // "No image briefs" while three video briefs sit one pill away
               // reads as "nothing worked". Say where they actually are.
               ? `No ${activeLabel.toLowerCase()} briefs — ${elsewhere} brief${elsewhere === 1 ? "" : "s"} under another type`
-              : "No briefs yet — approve an idea on the Generation tab"
+              : stage === "create" ? "No briefs ready to create yet — brief an idea first" : "No briefs yet — approve an idea on the Generation tab"
         }
         rows={shown.map((b) => [
           <button

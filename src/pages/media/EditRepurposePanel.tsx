@@ -238,7 +238,7 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
   const shown = sources.filter((source) => (source.edit_stage !== "edited" || aiRequests.has(source.id))
     && (!focusedBrief || source.brief_id === focusedBrief));
   return <div>
-    {!employeeMode && <ContentJourney clientId={clientId} current="edit" briefId={focusedBrief} humanVideo />}
+    {!employeeMode && <ContentJourney clientId={clientId} current="edit" briefId={focusedBrief} />}
     <section className="mb-6 space-y-3 rounded-lg border border-border p-4" aria-label="Add video for editing">
       <h2 className="text-sm font-semibold">Add a video for editing</h2>
       <p className="text-xs text-muted-foreground">Upload supplied footage or an existing cut. The original is preserved.</p>

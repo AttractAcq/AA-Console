@@ -22,10 +22,16 @@ describe("ContentJourney", () => {
     );
   });
 
-  it("routes human footage back to the video library", () => {
-    render(<MemoryRouter><ContentJourney clientId="client-1" current="edit" briefId="brief-1" humanVideo /></MemoryRouter>);
+  it("routes Create to its own page with the brief in focus", () => {
+    render(<MemoryRouter><ContentJourney clientId="client-1" current="edit" briefId="brief-1" /></MemoryRouter>);
     expect(screen.getByRole("link", { name: "Create" })).toHaveAttribute(
-      "href", "/clients/client-1/delivery/media?tab=video-library&brief=brief-1",
+      "href", "/clients/client-1/delivery/create?brief=brief-1",
     );
+  });
+
+  it("keeps Create and Edit / Repurpose available before a brief is selected", () => {
+    render(<MemoryRouter><ContentJourney clientId="client-1" current="ideation" /></MemoryRouter>);
+    expect(screen.getByRole("link", { name: "Create" })).toHaveAttribute("href", "/clients/client-1/delivery/create");
+    expect(screen.getByRole("link", { name: "Edit / Repurpose" })).toHaveAttribute("href", "/clients/client-1/delivery/edit-repurpose?tab=overview");
   });
 });

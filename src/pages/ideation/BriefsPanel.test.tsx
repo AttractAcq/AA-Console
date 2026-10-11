@@ -17,7 +17,8 @@ vi.mock("../../lib/supabase", () => ({
       const result = { data, error: null };
       const chain = {
         select: () => chain, eq: () => chain, neq: () => chain, is: () => chain,
-        order: () => Promise.resolve(result), in: () => Promise.resolve(result),
+        order: () => chain, limit: () => chain, in: () => Promise.resolve(result),
+        then: (resolve: (value: typeof result) => unknown) => Promise.resolve(result).then(resolve),
       };
       return chain;
     },
@@ -36,5 +37,10 @@ describe("BriefsPanel human Create handoff", () => {
     expect(await screen.findByText(/Taylor: delivered/)).toBeInTheDocument();
     expect(screen.getByText(/assigned, email not sent/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "View delivery" })).toBeInTheDocument();
+  });
+  it("shows an archived production brief on Create", async () => {
+    render(<MemoryRouter initialEntries={["/?brief=brief-1"]}><BriefsPanel stage="create" /></MemoryRouter>);
+    expect(await screen.findByText(/Taylor: delivered/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Content production stages")).toHaveTextContent("Create");
   });
 });

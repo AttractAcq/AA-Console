@@ -43,7 +43,7 @@ type CampaignChoice = {
 const MANUAL_FIELDS: FieldDef[] = [
   { name: "title", label: "Idea", kind: "text", required: true },
   { name: "target_platform", label: "Destination", kind: "select", required: true, options: [...POST_PLATFORMS] },
-  { name: "media_type", label: "Media type", kind: "select", options: MEDIA_TYPE_OPTIONS },
+  { name: "media_type", label: "Media type", kind: "select", required: true, options: MEDIA_TYPE_OPTIONS },
   // Hidden for text, which has no shape other than single. Shown for image
   // and video, where the options differ — a carousel is images only — so the
   // pairing is checked on submit rather than by narrowing the list here.
@@ -51,6 +51,7 @@ const MANUAL_FIELDS: FieldDef[] = [
     name: "content_format",
     label: "Format",
     kind: "select",
+    required: true,
     options: CONTENT_FORMAT_OPTIONS,
     showIf: { field: "media_type", equals: ["image", "video"] },
     hint: "Carousel and story are made of ordered frames. A carousel is images only.",
@@ -64,6 +65,7 @@ const AUTO_FIELDS: FieldDef[] = [
   { name: "content_format", label: "Format", kind: "select", required: true, options: CONTENT_FORMAT_OPTIONS,
     hint: "Choose Reel + Video to ideate a generated short video. The destination must support the format." },
 ];
+const AUTO_INITIAL = { idea_count: "5" };
 
 export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?: boolean; refreshToken?: unknown } = {}) {
   const { clientId } = useParams<{ clientId: string }>();
@@ -89,7 +91,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
   );
 
   useEffect(() => {
-    if (openCardId !== "manual-idea" || !clientId) return;
+    if (!openCardId || !clientId) return;
     let cancelled = false;
     setCampaigns([]);
     setCampaignsLoading(true);
@@ -219,6 +221,20 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
     }
   }
 
+  const campaignField: FieldDef = {
+    name: "campaign_id",
+    label: "Assign to campaign (optional)",
+    kind: "select",
+    options: campaigns.map((campaign) => ({ value: campaign.id, label: `${campaign.name} · ${campaign.status}` })),
+    hint: campaignsError
+      ? `Could not load campaigns: ${campaignsError}`
+      : campaignsLoading
+        ? "Loading built campaigns…"
+        : campaigns.length === 0
+          ? "No built campaigns available for this client. You can still save an unassigned idea."
+          : "The idea will appear under Content production in the chosen campaign. Leave blank to keep it unassigned.",
+  };
+
   const pillarFields: FieldDef[] = [
     {
       name: "pillar_id",
@@ -231,6 +247,8 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
           ? "This client has no active content pillars yet. Define them under Strategy first."
           : "Every idea in the run will sit inside this pillar, including the ones that would be better somewhere else.",
     },
+    ...AUTO_FIELDS,
+    campaignField,
   ];
 
   const proofFields: FieldDef[] = [
@@ -242,24 +260,42 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
       options: proofOptions,
       hint: "Proof Bank has no writer in the admin console yet — add proof from the Client console.",
     },
+    ...AUTO_FIELDS,
+    campaignField,
   ];
 
   const manualFields: FieldDef[] = [
     ...MANUAL_FIELDS,
-    {
-      name: "campaign_id",
-      label: "Assign to campaign (optional)",
-      kind: "select",
-      options: campaigns.map((campaign) => ({ value: campaign.id, label: `${campaign.name} · ${campaign.status}` })),
-      hint: campaignsError
-        ? `Could not load campaigns: ${campaignsError}`
-        : campaignsLoading
-          ? "Loading built campaigns…"
-          : campaigns.length === 0
-            ? "No built campaigns available for this client. You can still save an unassigned idea."
-            : "The idea will appear under Content production in the chosen campaign. Leave blank to keep it unassigned.",
-    },
+    campaignField,
   ];
+
+  async function queueIdeas(v: Record<string, string | boolean | File | null>, inputTable: string | null, inputId: string | null, count: number | null) {
+    if (!clientId) throw new Error("No client selected.");
+    const platform = v.target_platform as PostPlatformValue;
+    const mediaType = v.media_type as MediaType;
+    const format = v.content_format as ContentFormatValue;
+    if (!formatAllows(format, mediaType)) {
+      throw new Error(`A ${formatLabel(format).toLowerCase()} cannot be ${mediaType}. Change one of the two.`);
+    }
+    if (!platformAllowsFormat(platform, format)) {
+      throw new Error(`${platformLabel(platform)} does not support ${formatLabel(format).toLowerCase()} in this workflow.`);
+    }
+    const campaignId = (v.campaign_id as string) || null;
+    if (campaignId && !campaigns.some((campaign) => campaign.id === campaignId)) {
+      throw new Error("This campaign is no longer available. Close and reopen the form to refresh the list.");
+    }
+    const { error } = await supabase.rpc("enqueue_scoped_ideation", {
+      p_client_id: clientId,
+      p_target_platform: platform,
+      p_media_type: mediaType,
+      p_content_format: format,
+      p_campaign_id: campaignId,
+      p_idea_count: count,
+      p_input_table: inputTable,
+      p_input_id: inputId,
+    });
+    if (error) throw new Error(error.message);
+  }
 
   if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
@@ -425,26 +461,16 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
         onClose={() => setOpenCardId(null)}
         title="Auto Idea"
         intro="Choose where this content will go and what shape to ideate. The agent uses the client's question universe, brand strategy and proof bank."
-        fields={AUTO_FIELDS}
+        fields={[...AUTO_FIELDS, campaignField, {
+          name: "idea_count", label: "Number of ideas", kind: "number", required: true,
+          hint: "Choose 1 to 60. Each idea uses the selected destination and format.",
+        }]}
+        initialValues={AUTO_INITIAL}
         submitLabel="Generate ideas"
         onSubmit={async (v) => {
-          if (!clientId) throw new Error("No client selected.");
-          const platform = v.target_platform as PostPlatformValue;
-          const mediaType = v.media_type as MediaType;
-          const format = v.content_format as ContentFormatValue;
-          if (!formatAllows(format, mediaType)) {
-            throw new Error(`A ${formatLabel(format).toLowerCase()} cannot be ${mediaType}. Change one of the two.`);
-          }
-          if (!platformAllowsFormat(platform, format)) {
-            throw new Error(`${platformLabel(platform)} does not support ${formatLabel(format).toLowerCase()} in this workflow.`);
-          }
-          const { error } = await supabase.rpc("enqueue_format_ideation", {
-            p_client_id: clientId,
-            p_target_platform: platform,
-            p_media_type: mediaType,
-            p_content_format: format,
-          });
-          if (error) throw new Error(error.message);
+          const count = Number(v.idea_count);
+          if (!Number.isInteger(count) || count < 1 || count > 60) throw new Error("Choose between 1 and 60 ideas.");
+          await queueIdeas(v, null, null, count);
         }}
         onSaved={refresh}
       />
@@ -458,14 +484,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
         fields={pillarFields}
         submitLabel="Run agent"
         onSubmit={async (v) => {
-          if (!clientId) throw new Error("No client selected.");
-          const { error } = await supabase.rpc("enqueue_agent_job", {
-            p_agent_key: "ideation",
-            p_client_id: clientId,
-            p_input_table: "client_content_pillars",
-            p_input_id: v.pillar_id as string,
-          });
-          if (error) throw new Error(error.message);
+          await queueIdeas(v, "client_content_pillars", v.pillar_id as string, null);
         }}
         onSaved={refresh}
       />
@@ -479,14 +498,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
         fields={proofFields}
         submitLabel="Run agent"
         onSubmit={async (v) => {
-          if (!clientId) throw new Error("No client selected.");
-          const { error } = await supabase.rpc("enqueue_agent_job", {
-            p_agent_key: "ideation",
-            p_client_id: clientId,
-            p_input_table: "client_proof_assets",
-            p_input_id: v.proof_id as string,
-          });
-          if (error) throw new Error(error.message);
+          await queueIdeas(v, "client_proof_assets", v.proof_id as string, null);
         }}
         onSaved={refresh}
       />
