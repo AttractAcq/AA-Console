@@ -402,10 +402,18 @@ describe("the format a campaign piece runs in", () => {
     );
   });
 
-  it("refuses a format that does not exist", () => {
-    expect(() => campaignIdeas([piece({ content_format: "reel" })], 1)).toThrow(
-      /a format that does not exist: reel/,
-    );
+  it("accepts video reels and refuses image reels", () => {
+    expect(campaignIdeas([piece({ content_format: "reel", media_type: "video" })], 1)[0]!.content_format).toBe("reel");
+    expect(() => campaignIdeas([piece({ content_format: "reel", media_type: "image" })], 1)).toThrow(/a reel is a video/);
+  });
+
+  it("refuses formats a named social destination cannot publish", () => {
+    expect(() => campaignIdeas([piece({ channel: "linkedin", content_format: "reel", media_type: "video" })], 1))
+      .toThrow(/not a supported destination and format pair/);
+    expect(() => campaignIdeas([piece({ channel: "youtube", content_format: "story" })], 1))
+      .toThrow(/not a supported destination and format pair/);
+    expect(campaignIdeas([piece({ channel: "tiktok", content_format: "reel", media_type: "video" })], 1)[0]!.content_format)
+      .toBe("reel");
   });
 
   it("names the piece, so the failure is actionable", () => {
@@ -421,10 +429,10 @@ describe("the submit tool asks for a format", () => {
       items: { properties: Record<string, unknown>; required: string[] };
     }).items;
 
-  it("offers exactly the three formats, as an enum", () => {
+  it("offers the four supported formats, as an enum", () => {
     expect(items(submitToolFor()).properties.content_format).toMatchObject({
       type: "string",
-      enum: ["single", "carousel", "story"],
+      enum: ["single", "carousel", "story", "reel"],
     });
   });
 
@@ -441,7 +449,7 @@ describe("the submit tool asks for a format", () => {
     const description = String(
       (items(submitToolFor()).properties.content_format as { description: string }).description,
     );
-    expect(description).toContain("restates one point five times");
+    expect(description).toContain("only when the argument genuinely needs it");
   });
 
   it("stays free of the keywords a strict schema rejects", () => {

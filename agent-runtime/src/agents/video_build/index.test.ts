@@ -374,7 +374,7 @@ describe("video_build", () => {
         status: 200,
       });
     });
-    const { sb, frameUpdates, uploads } = harness(ready, {
+    const { sb, frameUpdates, uploads, rpcCalls } = harness(ready, {
       assets: [{ id: "asset-1" }],
       frames: [
         { id: "frame-1", position: 1, storage_path: "client-1/generated/r/01.png", provider_job_id: null },
@@ -386,6 +386,7 @@ describe("video_build", () => {
     const result = await runVideoBuildJob(sb, runtime, agent, job);
 
     expect(result.ok).toBe(true);
+    expect(rpcCalls).toContainEqual({ name: "request_video_edit", args: { p_asset_id: "asset-1" } });
     expect(fetchSpy).toHaveBeenCalled();
     const apiCalls = fetchSpy.mock.calls.filter((call) => String(call[0]) !== clipUrl);
     expect(apiCalls.length).toBeGreaterThan(0);

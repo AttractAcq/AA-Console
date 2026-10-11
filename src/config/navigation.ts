@@ -8,6 +8,7 @@ import {
   Contact,
   CreditCard,
   FileText,
+  Clapperboard,
   FolderCheck,
   Globe,
   History,
@@ -19,6 +20,7 @@ import {
   Palette,
   Plug,
   Settings2,
+  Scissors,
   Share2,
   ShieldCheck,
   Target,
@@ -169,10 +171,32 @@ export const clientNavGroups: NavNode[] = [
         ],
       },
       {
+        id: "edit-repurpose",
+        label: "Edit / Repurpose",
+        path: "edit-repurpose",
+        icon: Scissors,
+        tabs: [{ id: "overview", label: "Video edits" }],
+      },
+      {
+        id: "motion-design",
+        label: "Motion Design",
+        path: "motion-design",
+        icon: Clapperboard,
+      },
+      {
         id: "approvals",
         label: "Approvals",
         path: "approvals",
         icon: CheckSquare,
+        // Two queues, because they are two different acts. Assets signs an
+        // asset off; Engine is the one human commit the engine stops at,
+        // which also puts the post on the calendar. Approving engine work
+        // on the Assets tab would approve the asset and leave the slot
+        // where it was.
+        tabs: [
+          { id: "engine-inbox", label: "Engine" },
+          { id: "assets", label: "Assets" },
+        ],
       },
       {
         id: "distribution",

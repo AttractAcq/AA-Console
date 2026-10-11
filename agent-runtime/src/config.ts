@@ -45,6 +45,12 @@ export interface RuntimeConfig {
   allowedOrigins: string[];
 
   /** Image rendering. Absent means the AI build route reports itself unavailable. */
+  /**
+   * Whether this runtime may post to clients' own accounts. Off unless set,
+   * and the second of two switches: client_engine_settings.publishing_enabled
+   * is the first. Both, or nothing goes out.
+   */
+  publishEnabled: boolean;
   openaiApiKey: string | null;
   imageModel: string;
   /** Which provider writes the creative concept. */
@@ -191,6 +197,11 @@ export function loadConfig(): RuntimeConfig {
     // that reports itself unavailable, not a process that refuses to boot —
     // the rest of the runtime has no business failing because nobody has
     // connected an image renderer yet.
+    // Deliberately off by default, and deliberately not `?? "true"` like
+    // AGENT_RUNTIME_ENABLED. A runtime that is up is meant to run agents; a
+    // runtime that is up is not meant to post on a client's behalf until
+    // somebody has said it should.
+    publishEnabled: (optionalEnv("PUBLISH_ENABLED") ?? "false").toLowerCase() === "true",
     openaiApiKey: optionalEnv("OPENAI_API_KEY") ?? null,
     // Not pinned in code: the correct id is a provider fact that changes
     // faster than this repo does, so a wrong one is a config edit.

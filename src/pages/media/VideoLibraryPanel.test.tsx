@@ -2,28 +2,27 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, useParams, setSearchParams } = vi.hoisted(() => ({
-  from: vi.fn(), useParams: vi.fn(), setSearchParams: vi.fn(),
+const { from, signPaths, useParams, setSearchParams, navigate } = vi.hoisted(() => ({
+  from: vi.fn(), signPaths: vi.fn(), useParams: vi.fn(), setSearchParams: vi.fn(), navigate: vi.fn(),
 }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from } }));
+vi.mock("../../lib/media", () => ({ signPaths }));
 vi.mock("react-router-dom", () => ({
   useParams,
+  useNavigate: () => navigate,
   useSearchParams: () => [new URLSearchParams(), setSearchParams],
 }));
-// The library itself has its own tests. This is about what happens when a
-// reel is in production and the shelf is otherwise empty.
 vi.mock("../../components/MediaLibrary", () => ({
   MediaLibrary: ({ mediaType }: { mediaType: string }) => <div>library:{mediaType}</div>,
 }));
 
 import { VideoLibraryPanel } from "./VideoLibraryPanel";
 
-function withReelCount(count: number) {
+function show(rows: Array<Record<string, unknown>>) {
   const query = {
     select: () => query,
     eq: () => query,
-    then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
-      Promise.resolve({ count, error: null }).then(resolve, reject),
+    order: () => Promise.resolve({ data: rows, error: null }),
   };
   from.mockReturnValue(query);
   return render(<VideoLibraryPanel />);
@@ -32,42 +31,32 @@ function withReelCount(count: number) {
 beforeEach(() => {
   vi.clearAllMocks();
   useParams.mockReturnValue({ clientId: "client-1" });
+  signPaths.mockResolvedValue(new Map([["client-1/reel/cut.mp4", "https://example.test/cut.mp4"]]));
 });
 
-describe("a reel in production is not silently absent", () => {
-  it("says how many there are and where they went", async () => {
-    withReelCount(2);
-    expect(await screen.findByText(/2 reels are in production/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Reel shots" })).toBeInTheDocument();
-    // The library still renders underneath; the note is an addition, not a takeover.
+describe("reels in the video library", () => {
+  it("routes avatar footage to Edit / Repurpose instead of calling it an unfinished AI cut", async () => {
+    show([{ id: "r1", title: "Raw footage", render_path: null, edit_stage: "needs_edit",
+      review_status: "pending", brief_id: "b1" }]);
+    expect(await screen.findByText(/1 source video is in Edit \/ Repurpose/)).toBeInTheDocument();
+    expect(screen.queryByText(/in Create \/ Edit/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Open editing work" }));
+    expect(navigate).toHaveBeenCalledWith("/clients/client-1/delivery/edit-repurpose?tab=overview");
+  });
+  it("links an unfinished reel to its production view", async () => {
+    show([{ id: "r1", title: "Idea", render_path: null, review_status: "pending", brief_id: "b1" }]);
+    expect(await screen.findByText(/1 reel is in Create \/ Edit/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Reel shots" }));
+    expect(setSearchParams).toHaveBeenCalledWith({ tab: "reel-shots" });
     expect(screen.getByText("library:video")).toBeInTheDocument();
   });
 
-  it("reads correctly for one", async () => {
-    withReelCount(1);
-    expect(await screen.findByText(/One reel is in production/)).toBeInTheDocument();
-    expect(screen.getByText(/It is\s+reviewed shot by shot/)).toBeInTheDocument();
-  });
-
-  it("stays quiet when there are none", async () => {
-    withReelCount(0);
-    await screen.findByText("library:video");
-    expect(screen.queryByText(/in production/)).toBeNull();
-    expect(screen.queryByRole("button", { name: "Reel shots" })).toBeNull();
-  });
-
-  it("takes you to the tab that does show them", async () => {
-    withReelCount(1);
-    await userEvent.click(await screen.findByRole("button", { name: "Reel shots" }));
-    await waitFor(() => expect(setSearchParams).toHaveBeenCalledWith({ tab: "reel-shots" }));
-  });
-
-  it("does not promise the reel will turn up here once it is finished", async () => {
-    // It will not. An assembled reel is still content_format 'reel' and still
-    // filtered out, so softening this copy into a reassurance would bury a
-    // real gap rather than close it.
-    withReelCount(1);
-    const note = await screen.findByText(/One reel is in production/);
-    expect(note.textContent).not.toMatch(/once|when .*(finished|assembled|ready)|will appear|later/i);
+  it("plays the rendered cut and links back to the brief", async () => {
+    show([{ id: "r1", title: "Finished reel", render_path: "client-1/reel/cut.mp4", review_status: "pending", brief_id: "b1" }]);
+    const video = await screen.findByRole("region", { name: "Finished reels" });
+    await waitFor(() => expect(video.querySelector("video")?.getAttribute("src")).toBe("https://example.test/cut.mp4"));
+    expect(screen.queryByText(/in Create \/ Edit/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "View production and approval" }));
+    expect(setSearchParams).toHaveBeenCalledWith({ tab: "reel-shots", brief: "b1" });
   });
 });

@@ -88,6 +88,32 @@ describe("the spend cap stops a job before the runner, not inside it", () => {
     expect(result.failureMessage).toMatch(/cap for the month/);
   });
 
+  it("holds the job rather than failing it", async () => {
+    // A cap is "not now", not "something broke". Failed meant the slot
+    // failed with it and nothing came back when the cap was raised or the
+    // month rolled, so a cap reached on the 3rd threw away the rest of that
+    // client's engine work.
+    const { dispatchJob } = await import("./dispatch.js");
+    const result = await dispatchJob(
+      sbWithCap(true, 25, 25),
+      { model: "claude-opus-5" } as never,
+      { agent_key: "ideation" } as never,
+      jobFor("client-over"),
+    );
+    expect(result.hold).toBe(true);
+  });
+
+  it("does not hold a job that failed for any other reason", async () => {
+    const { dispatchJob } = await import("./dispatch.js");
+    const result = await dispatchJob(
+      sbWithCap(false, 0, 0),
+      { model: "claude-opus-5" } as never,
+      { agent_key: "not_a_real_agent" } as never,
+      jobFor("client-uncapped"),
+    ).catch((error: unknown) => ({ hold: undefined, failureMessage: String(error) }));
+    expect(result.hold).toBeFalsy();
+  });
+
   it("does not refuse a client with no cap set", async () => {
     const { dispatchJob } = await import("./dispatch.js");
     // No cap means the runner is reached. ideation then fails on its own

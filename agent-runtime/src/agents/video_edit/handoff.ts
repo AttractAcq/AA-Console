@@ -72,6 +72,14 @@ export type EditBlockReason =
   | "not_a_reel"
   | "no_shot_plan"
   | "no_frames"
+  /**
+   * Every missing clip is at Higgsfield with a request id against it. This
+   * will pass without anybody acting, so the caller holds rather than fails:
+   * on 4 October a job reported "shot 1..6 never submitted" when the honest
+   * answer was "not back yet", and the two want opposite responses.
+   */
+  | "clips_rendering"
+  /** At least one shot was never submitted. Nothing is coming. */
   | "clips_missing"
   | "plan_frame_mismatch";
 
@@ -161,6 +169,16 @@ export function editReadiness(brief: BriefForEdit, frames: readonly FrameRowForE
   });
 
   if (waiting.length > 0 || neverSubmitted.length > 0) {
+    // Only waiting, nothing unsubmitted: the clips are coming. Said as a wait
+    // rather than a fault, because the caller holds on one and fails on the
+    // other.
+    if (neverSubmitted.length === 0) {
+      return {
+        ready: false,
+        reason: "clips_rendering",
+        message: `Waiting on Higgsfield: ${list(waiting)} submitted and no clip back yet.`,
+      };
+    }
     const parts = [
       waiting.length > 0 ? `${list(waiting)} submitted to Higgsfield but no clip has come back` : null,
       neverSubmitted.length > 0 ? `${list(neverSubmitted)} never submitted` : null,

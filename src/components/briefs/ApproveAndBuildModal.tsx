@@ -16,6 +16,8 @@ type Brief = {
   media_type: "image" | "text" | "video";
   content_format?: string | null;
   format_code?: string | null;
+  frame_plan?: string[] | null;
+  production_method?: string | null;
   brief_ref: string | null;
   status: string;
 };
@@ -71,8 +73,7 @@ export function ApproveAndBuildModal({
 
   const phase1Motion = isPhase1MotionBrief(brief);
   // A video that is not an F6/F7 reel is still made by a person. A Phase 1
-  // reel may take the AI route, which queues video_build and does not call
-  // Higgsfield.
+  // reel may take the AI route through still generation and Higgsfield.
   const peopleOnlyVideo = brief?.media_type === "video" && !phase1Motion;
   const isVideoBrief = brief?.media_type === "video";
   // Only a carousel or a story has frames to ask about. A reel's shot plan
@@ -243,6 +244,10 @@ export function ApproveAndBuildModal({
           {/* the brief itself, so nobody builds from a title alone */}
           <section>
             <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">The brief</h3>
+            <p className="mb-2 text-xs text-muted-foreground">
+              {brief.format_code ?? formatLabel(brief.content_format)} · {brief.production_method ?? "Production route not specified"}
+              {phase1Motion ? ` · ${brief.frame_plan?.length ?? 0} planned shots` : ""}
+            </p>
             <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-muted/40 p-3">
               <p className="whitespace-pre-wrap text-sm text-foreground">{brief.body ?? "(no detail on this brief)"}</p>
             </div>
@@ -266,9 +271,9 @@ export function ApproveAndBuildModal({
                 </span>
                 <span className="mt-1 block text-xs text-muted-foreground">
                   {peopleOnlyVideo
-                    ? "Not available for video — video is made by people."
+                    ? "AI creation currently supports F6/F7 reels with a shot plan. Assign this video to a person."
                     : phase1Motion
-                      ? "Queues opening stills as images, then a video build. Motion stays paused and does not call Higgsfield."
+                      ? "Builds shot stills, animates them with Higgsfield, then queues an AI cut for review."
                       : "Writes the creative concept, then renders it. Text and image only."}
                 </span>
               </button>
@@ -285,7 +290,7 @@ export function ApproveAndBuildModal({
                   <Users className="h-4 w-4" aria-hidden="true" /> Human
                 </span>
                 <span className="mt-1 block text-xs text-muted-foreground">
-                  Send it to an editor or an avatar. Lands on their dashboard and emails them.
+                  Assign it to an editor or avatar dashboard. Email is sent when Resend is configured.
                 </span>
               </button>
             </div>
@@ -294,9 +299,9 @@ export function ApproveAndBuildModal({
           {route === "ai" && phase1Motion && (
             <section>
               <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-                This queues an image build for each shot's opening still, and a video build against
-                the shot plan already on the brief. Motion does not run until Higgsfield is enabled,
-                and this click does not call it. Review the shots under Media → Reel shots.
+                This queues an opening still for each planned shot, then Higgsfield clips and an edited cut.
+                Higgsfield must be configured for the video build to run. Follow progress under Media → Reel shots;
+                approve the finished cut there.
               </p>
             </section>
           )}

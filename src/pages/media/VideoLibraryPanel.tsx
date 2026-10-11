@@ -1,67 +1,97 @@
 import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { MediaLibrary } from "../../components/MediaLibrary";
 import { supabase } from "../../lib/supabase";
+import { signPaths } from "../../lib/media";
 
-/**
- * Finished single videos.
- *
- * MediaLibrary asks for content_format 'single', the same way the carousel
- * and story libraries ask for theirs, so a reel never appears here — it is
- * content_format 'reel'. That filter is deliberate and this panel does not
- * change it.
- *
- * What it does change is the silence. A reel in production rendered six
- * stills, cost real money and sat in the one place nobody thinks to look,
- * while the library a person actually opens for a video showed nothing and
- * gave no reason. This says where it went.
- *
- * Deliberately does not promise that an assembled reel will show up here
- * later. It will not: assembly does not exist yet, and when it does the
- * finished file is still content_format 'reel' and still filtered out by
- * the same line. So there is currently no library that will ever list a
- * finished reel. That is a real gap and it needs deciding — either this
- * panel stops asking for 'single', or Reel shots becomes the reel library.
- * A reassuring sentence here would bury the question instead of posing it.
- */
+type Reel = {
+  id: string;
+  title: string | null;
+  ref_number: string | null;
+  render_path: string | null;
+  review_status: string;
+  human_approved_at: string | null;
+  brief_id: string | null;
+  edit_stage?: string;
+};
+
+/** Finished reels play their cut; in-progress reels lead to shot review. */
 export function VideoLibraryPanel() {
   const { clientId } = useParams<{ clientId: string }>();
+  const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
-  const [reels, setReels] = useState(0);
+  const [reels, setReels] = useState<Reel[]>([]);
+  const [cuts, setCuts] = useState<ReadonlyMap<string, string>>(new Map());
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!clientId) return;
     let cancelled = false;
     void (async () => {
-      const { count } = await supabase
-        .from("client_media_assets")
-        .select("id", { count: "exact" as const, head: true })
-        .eq("client_id", clientId)
-        .eq("media_type", "video")
-        .eq("content_format", "reel");
-      if (!cancelled) setReels(count ?? 0);
+      try {
+        const { data, error: queryError } = await supabase.from("client_media_assets")
+          .select("id, title, ref_number, render_path, review_status, human_approved_at, brief_id, edit_stage")
+          .eq("client_id", clientId)
+          .eq("media_type", "video")
+          .eq("content_format", "reel")
+          .order("created_at", { ascending: false });
+        if (queryError) throw queryError;
+        const rows = (data ?? []) as Reel[];
+        const signed = await signPaths("client-media", rows.map((r) => r.render_path ?? "").filter(Boolean));
+        if (!cancelled) {
+          setReels(rows);
+          setCuts(signed);
+        }
+      } catch (caught) {
+        if (!cancelled) setError(caught instanceof Error ? caught.message : "Could not load reels.");
+      }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [clientId]);
 
+  const finished = reels.filter((r) => r.render_path && r.edit_stage !== "edited");
+  const rawFootage = reels.filter((r) => r.edit_stage === "needs_edit" || r.edit_stage === "editing");
+  const inProgress = reels.filter((r) => (!r.edit_stage || r.edit_stage === "review_ready") && !r.render_path).length;
   return (
     <div>
-      {reels > 0 && (
+      {error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
+      {rawFootage.length > 0 && <p className="mb-4 text-sm text-muted-foreground">
+        {rawFootage.length} source video{rawFootage.length === 1 ? " is" : "s are"} in Edit / Repurpose.{" "}
+        <button type="button" className="font-medium text-brand-strong hover:underline"
+          onClick={() => navigate(`/clients/${clientId}/delivery/edit-repurpose?tab=overview`)}>
+          Open editing work
+        </button>
+      </p>}
+      {inProgress > 0 && (
         <p className="mb-4 text-sm text-muted-foreground">
-          {reels === 1 ? "One reel is" : `${reels} reels are`} in production for this client and not
-          listed here — this library holds single videos. {reels === 1 ? "It is" : "They are"}{" "}
-          reviewed shot by shot under{" "}
-          <button
-            type="button"
-            className="font-medium text-brand-strong hover:underline"
-            onClick={() => setSearchParams({ tab: "reel-shots" })}
-          >
-            Reel shots
-          </button>
-          .
+          {inProgress} reel{inProgress === 1 ? " is" : "s are"} in Create / Edit. Follow its clips and cut under{" "}
+          <button type="button" className="font-medium text-brand-strong hover:underline"
+            onClick={() => setSearchParams({ tab: "reel-shots" })}>Reel shots</button>.
         </p>
+      )}
+      {finished.length > 0 && (
+        <section className="mb-6 space-y-3" aria-label="Finished reels">
+          <h2 className="text-sm font-semibold text-foreground">Finished reels</h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            {finished.map((reel) => (
+              <article key={reel.id} className="space-y-2 rounded-lg border border-border p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-medium">{reel.title || reel.ref_number || "Reel"}</h3>
+                  <span className="text-xs capitalize text-muted-foreground">
+                    {reel.review_status === "approved" && !reel.human_approved_at ? "Awaiting sign-off" : reel.review_status}
+                  </span>
+                </div>
+                {cuts.get(reel.render_path!) ? (
+                  <video controls preload="metadata" className="w-full rounded-md" src={cuts.get(reel.render_path!)} />
+                ) : <p className="text-xs text-muted-foreground">Preview unavailable. Open Reel shots to review the cut.</p>}
+                <button type="button" className="text-xs font-medium text-brand-strong hover:underline"
+                  onClick={() => setSearchParams({ tab: "reel-shots", brief: reel.brief_id ?? "" })}>
+                  View production and approval
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
       )}
       <MediaLibrary mediaType="video" />
     </div>

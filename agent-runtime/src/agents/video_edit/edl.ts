@@ -102,14 +102,19 @@ export const EDL_SCHEMA: Record<string, unknown> = {
         required: ["text", "start_sec", "end_sec", "position"],
         properties: {
           text: { type: "string" },
-          start_sec: { type: "number" },
-          end_sec: { type: "number" },
+          start_sec: { type: "number", description: "When it appears, in seconds from the start of the finished reel." },
+          end_sec: { type: "number", description: "When it disappears, in seconds from the start of the finished reel." },
           position: { type: "string", enum: [...CAPTION_POSITIONS] },
         },
       },
     },
     end_card_text: { type: "string", description: "Call to action on a closing card, or empty for none." },
-    end_card_sec: { type: "number" },
+    end_card_sec: {
+      type: "number",
+      description:
+        `How long the end card holds, in seconds — a duration, not a time on the reel. ` +
+        `Between 1 and ${MAX_END_CARD_SEC}, and it counts towards the runtime cap. Use 0 when there is no end card.`,
+    },
     notes: { type: "string", description: "Why this cut, for the human reviewer." },
   },
 };

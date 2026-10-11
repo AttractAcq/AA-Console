@@ -31,7 +31,10 @@ import { StoryLibraryPanel } from "./media/StoryLibraryPanel";
 import { CarouselLibraryPanel } from "./media/CarouselLibraryPanel";
 import { VideoLibraryPanel } from "./media/VideoLibraryPanel";
 import { ReelShotsPanel } from "./media/ReelShotsPanel";
+import { EditRepurposePanel } from "./media/EditRepurposePanel";
+import { MotionDesignPanel } from "./motion/MotionDesignPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
+import { EngineInboxPanel } from "./approvals/EngineInboxPanel";
 import { OrganicPanel } from "./distribution/OrganicPanel";
 import { AssetsPanel } from "./distribution/AssetsPanel";
 import { EnginePanel } from "./distribution/EnginePanel";
@@ -113,6 +116,9 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "reel-shots": () => <ReelShotsPanel />,
     "copy-library": () => <CopyLibraryPanel />,
   },
+  "edit-repurpose": {
+    overview: () => <EditRepurposePanel />,
+  },
   distribution: {
     "distribution-assets": () => <AssetsPanel />,
     engine: () => <EnginePanel />,
@@ -150,6 +156,12 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     attribution: () => <AttributionPanel />,
     commentary: () => <CommentaryPanel />,
   },
+  approvals: {
+    // First, because it is the queue that stops a machine rather than a
+    // person's backlog.
+    "engine-inbox": () => <EngineInboxPanel />,
+    assets: () => <ApprovalsPanel />,
+  },
 };
 
 const nodePanels: Record<string, () => ReactNode> = {
@@ -157,8 +169,8 @@ const nodePanels: Record<string, () => ReactNode> = {
   // distinct id from the agency dashboard; both live at a path segment
   // called "dashboard" but they are different pages
   "delivery-dashboard": () => <ClientDashboardPanel />,
+  "motion-design": () => <MotionDesignPanel />,
   "proof-bank": () => <ProofBankPanel />,
-  approvals: () => <ApprovalsPanel />,
   "prospects-leads": () => <ProspectsLeadsPanel />,
   onboarding: () => <OnboardingPanel />,
   contact: () => <ContactPanel />,

@@ -95,6 +95,11 @@ describe("editReadiness", () => {
     });
   });
 
+  it("holds the edit when every missing clip has an active provider job", () => {
+    expect(editReadiness(brief, [frame(1), frame(2, { clip_path: null }), frame(3)]))
+      .toMatchObject({ ready: false, reason: "clips_rendering" });
+  });
+
   it("refuses to edit part of a reel when the plan and the frames disagree", () => {
     const result = editReadiness(brief, [frame(1), frame(2)]);
     expect(result).toMatchObject({
