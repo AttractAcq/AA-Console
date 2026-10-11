@@ -27,9 +27,9 @@ beforeAll(async () => {
     create table creative_generations (id uuid primary key, brief_id uuid not null);
     create table creative_renders (id uuid primary key, generation_id uuid not null);
     create table client_briefs (id uuid primary key, client_id uuid, media_type text, content_format text, format_code text);
-    create table client_media_assets (id uuid primary key, brief_id uuid);
-    create table client_media_frames (asset_id uuid, storage_path text);
-    create table agent_job_events (job_id uuid, description text);
+    create table client_media_assets (id uuid primary key, brief_id uuid, render_path text);
+    create table client_media_frames (asset_id uuid, storage_path text, provider_job_id text, clip_path text);
+    create table agent_job_events (job_id uuid, description text, payload jsonb);
     insert into agents(agent_key) values ('creative_build'), ('video_build');
     insert into creative_generations values
       ('10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001');
@@ -37,7 +37,8 @@ beforeAll(async () => {
       ('30000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001');
     insert into client_briefs values
       ('20000000-0000-4000-8000-000000000001', '50000000-0000-4000-8000-000000000001', 'video', 'reel', 'F7'),
-      ('20000000-0000-4000-8000-000000000003', '50000000-0000-4000-8000-000000000001', 'video', 'reel', 'F6');
+      ('20000000-0000-4000-8000-000000000003', '50000000-0000-4000-8000-000000000001', 'video', 'reel', 'F6'),
+      ('20000000-0000-4000-8000-000000000004', '50000000-0000-4000-8000-000000000001', 'video', 'reel', 'F7');
     insert into agent_jobs(id, agent_key, client_id, input_table, input_id, params, created_at) values
       ('40000000-0000-4000-8000-000000000001', 'creative_build', '50000000-0000-4000-8000-000000000001',
        'creative_renders', '30000000-0000-4000-8000-000000000001', '{"opening_stills":true}', now()),
@@ -51,6 +52,11 @@ beforeAll(async () => {
     "utf8",
   );
   await db.exec(migration);
+  const followUp = await readFile(
+    new URL("../../../../supabase/migrations/20261011130000_189_higgsfield_follow_up.sql", import.meta.url),
+    "utf8",
+  );
+  await db.exec(followUp);
 });
 
 afterAll(async () => db?.close());
@@ -91,6 +97,34 @@ describe("reel stills before motion claim", () => {
     );
     expect(result.rows[0]?.retry_reel_video_build).toBeTruthy();
     await expect(db.query("select retry_reel_video_build('20000000-0000-4000-8000-000000000003')"))
-      .rejects.toThrow(/not failed/);
+      .rejects.toThrow(/already in progress/);
+  });
+
+  it("schedules a distinct follow-up while the current job is running", async () => {
+    const args = ["video_build", "50000000-0000-4000-8000-000000000001",
+      "client_briefs", "20000000-0000-4000-8000-000000000001", 30,
+      "Collect clips", "{}", "40000000-0000-4000-8000-000000000002"];
+    const first = await db.query<{ id: string }>(
+      "select schedule_agent_follow_up($1,$2,$3,$4,$5,$6,$7,$8) as id", args);
+    expect(first.rows[0]?.id).not.toBe(args[7]);
+    const second = await db.query<{ id: string }>(
+      "select schedule_agent_follow_up($1,$2,$3,$4,$5,$6,$7,$8) as id", args);
+    expect(second.rows[0]?.id).toBe(first.rows[0]?.id);
+  });
+
+  it("can recover an accepted Higgsfield request with no collected clip", async () => {
+    await db.exec(`
+      insert into agent_jobs(id, agent_key, client_id, input_table, input_id, status)
+      values ('40000000-0000-4000-8000-000000000005', 'video_build',
+        '50000000-0000-4000-8000-000000000001', 'client_briefs',
+        '20000000-0000-4000-8000-000000000004', 'completed');
+      insert into client_media_assets values
+        ('70000000-0000-4000-8000-000000000004', '20000000-0000-4000-8000-000000000004', null);
+      insert into client_media_frames values
+        ('70000000-0000-4000-8000-000000000004', 'still.png', 'provider-request', null);
+    `);
+    const result = await db.query<{ retry_reel_video_build: string }>(
+      "select retry_reel_video_build('20000000-0000-4000-8000-000000000004')");
+    expect(result.rows[0]?.retry_reel_video_build).toBeTruthy();
   });
 });

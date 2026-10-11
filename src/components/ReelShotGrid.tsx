@@ -134,6 +134,18 @@ export function ReelShotGrid({
               )}
             </div>
           )}
+          {buildJobs.get(master.briefId)?.status === "completed"
+            && master.assets.some((asset) => asset.shots.some((shot) => shot.clip === "Submitted"))
+            && onRetryBuild && (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-xs text-muted-foreground">Higgsfield accepted the shots; their clips still need collecting.</p>
+                <button type="button" className="text-xs font-medium text-brand-strong hover:underline disabled:opacity-50"
+                  disabled={retryingBrief === master.briefId}
+                  onClick={() => onRetryBuild(master.briefId)}>
+                  {retryingBrief === master.briefId ? "Queuing…" : "Collect Higgsfield clips"}
+                </button>
+              </div>
+            )}
 
           {master.planProblem && (
             <p role="alert" className="text-sm text-destructive">
