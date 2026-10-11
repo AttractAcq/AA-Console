@@ -10,7 +10,7 @@ import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { estimateCostUsd } from "../../usage/cost.js";
-import { applyPromptPalette, motionCanvas, motionCapability, motionPalette, renderMotion, validateMotionPlan, type MotionAspect } from "./render.js";
+import { applyPromptPalette, fitMotionPlan, motionCanvas, motionCapability, motionPalette, renderMotion, validateMotionPlan, type MotionAspect } from "./render.js";
 
 const BUCKET = "client-media";
 const TOOL_NAME = "submit_motion_scenes";
@@ -130,7 +130,13 @@ export async function runMotionDesignJob(sb: SupabaseClient, config: RuntimeConf
       usage = { inputTokens: usage.inputTokens + planned.usage.inputTokens,
         outputTokens: usage.outputTokens + planned.usage.outputTokens,
         costUsd: usage.costUsd + planned.usage.costUsd };
-      plan = validateMotionPlan(planned.raw, project.duration_sec, project.preset, project.aspect);
+      try { plan = validateMotionPlan(planned.raw, project.duration_sec, project.preset, project.aspect); }
+      catch (retryError) {
+        if (!(retryError instanceof Error) || !retryError.message.includes("fully within")) throw retryError;
+        plan = fitMotionPlan(validateMotionPlan(planned.raw, project.duration_sec,
+          project.preset, project.aspect, true), project.aspect);
+        plan = validateMotionPlan(plan, project.duration_sec, project.preset, project.aspect);
+      }
     }
     const directed = applyPromptPalette(plan, project.prompt, palette);
     plan = directed.plan;
