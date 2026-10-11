@@ -118,7 +118,7 @@ export function MotionDesignPanel() {
   return <div className="space-y-6">
     <section className="space-y-3 rounded-lg border border-border p-4" aria-label="Create motion design">
       <h2 className="text-sm font-semibold">Create motion design</h2>
-      <p className="text-xs text-muted-foreground">Describe a short motion graphic. Claude plans bounded typography and abstract shapes; the renderer returns a muted MP4 and poster. Explainers, tutorials, and looping heroes use one workflow.</p>
+      <p className="text-xs text-muted-foreground">Describe the motion graphic as you would to a designer. Claude Opus 5 lays out the visuals and timing, then the Console renders a muted MP4. Include the story, visual metaphor, on-screen words, and desired feel.</p>
       {revisionOf && <p className="text-xs text-brand-strong">Revising an earlier design. The previous MP4 stays in project history.</p>}
       <label className="block text-xs font-medium">Prompt
         <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} maxLength={4000} rows={5}
@@ -150,7 +150,7 @@ export function MotionDesignPanel() {
             <option value="on_brand">Client brand</option><option value="neutral">Neutral</option>
           </select></label>
       </div>
-      <p className="text-xs text-muted-foreground">Available animation: orbit, bars, cards, rise, slide, and pulse. This version has no voiceover, stock footage, or free-form effects.</p>
+      <p className="text-xs text-muted-foreground">Claude can arrange and animate typography, shapes, cards, and connecting lines. Voiceover and footage are not included in this workflow.</p>
       <div className="flex gap-2">
         <button type="button" disabled={busy || prompt.trim().length < 15} onClick={() => void generate()}
           className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">

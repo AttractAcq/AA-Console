@@ -10,18 +10,31 @@ import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { estimateCostUsd } from "../../usage/cost.js";
-import { motionCapability, motionPalette, renderMotion, validateMotionPlan, type MotionAspect } from "./render.js";
+import { motionCanvas, motionCapability, motionPalette, renderMotion, validateMotionPlan, type MotionAspect } from "./render.js";
 
 const BUCKET = "client-media";
 const TOOL_NAME = "submit_motion_scenes";
+const MOTION_MODEL = process.env.MOTION_DESIGN_MODEL?.trim() || "claude-opus-5";
 const SCHEMA: Anthropic.Messages.Tool.InputSchema = {
   type: "object", additionalProperties: false, required: ["scenes"],
   properties: { scenes: { type: "array", items: { type: "object", additionalProperties: false,
-    required: ["duration_sec", "headline", "body", "motif", "motion"],
+    required: ["duration_sec", "background", "elements"],
     properties: {
-      duration_sec: { type: "number" }, headline: { type: "string" }, body: { type: "string" },
-      motif: { type: "string", enum: ["orbit", "bars", "cards"] },
-      motion: { type: "string", enum: ["rise", "slide", "pulse"] },
+      duration_sec: { type: "number" }, background: { type: "string" },
+      elements: { type: "array", items: { type: "object", additionalProperties: false,
+        required: ["kind", "x", "y", "color", "at_sec", "enter"],
+        properties: {
+          kind: { type: "string", enum: ["text", "rect", "circle", "line"] },
+          x: { type: "number" }, y: { type: "number" }, x2: { type: "number" }, y2: { type: "number" },
+          width: { type: "number" }, height: { type: "number" }, radius: { type: "number" },
+          size: { type: "number" }, text: { type: "string" }, weight: { type: "number" },
+          align: { type: "string", enum: ["start", "middle", "end"] },
+          color: { type: "string" }, stroke: { type: "string" }, stroke_width: { type: "number" },
+          at_sec: { type: "number" },
+          enter: { type: "string", enum: ["none", "fade", "rise", "slide_left", "slide_right", "scale", "draw"] },
+          motion: { type: "string", enum: ["still", "float", "pulse"] },
+        },
+      } },
     } } } },
 };
 type Project = { id: string; client_id: string; prompt: string; preset: string;
@@ -32,27 +45,36 @@ async function askScenes(config: RuntimeConfig, project: Project, brandNotes: st
   correction?: string): Promise<{ raw: unknown; usage: { inputTokens: number; outputTokens: number; costUsd: number } }> {
   const client = new Anthropic({ ...(anthropicKeyForAgent(config, "motion_design")
     ? { apiKey: anthropicKeyForAgent(config, "motion_design") } : {}),
-  maxRetries: 2, timeout: 120_000 });
-  const response = await client.messages.stream({ model: config.model, max_tokens: 4000,
-    system: `You are a motion designer. Produce short, tasteful typography and abstract-shape scenes.
-    The renderer supports orbit, bars, or cards motifs and rise, slide, or pulse motion only.
-    Do not claim to create characters, footage, voiceover, 3D, or arbitrary effects.
-    Keep headlines legible and make the on-screen copy factual. Submit only the scene plan.
-    A hero is one seamless pulse scene with very little copy.`,
-    tool_choice: { type: "auto" }, tools: [{ name: TOOL_NAME,
-      description: "Submit bounded motion scenes for the controlled renderer.",
-      input_schema: SCHEMA, strict: true } as Anthropic.Messages.ToolUnion],
+  maxRetries: 2, timeout: 180_000 });
+  const canvas = motionCanvas(project.aspect);
+  const response = await client.messages.stream({ model: MOTION_MODEL, max_tokens: 12000,
+    system: `You are a senior motion designer making a finished, polished motion graphic from the user's own prompt.
+    Art-direct the entire composition and timing. Do not reduce the request to generic title cards.
+    Use shapes, typography, lines, spatial hierarchy, sequencing, and animation to SHOW the requested idea.
+    Each element is authored by you: text, rectangle, circle, or line. Coordinates are on a ${canvas.width}×${canvas.height} canvas.
+    Multiple elements can appear at different at_sec times in each scene. A line with enter=draw reveals progressively.
+    Put words in separate text elements when they need distinct placement or timing. Keep them readable and within canvas.
+    Colour is a brand token (background, primary, accent, text, surface) or a six-digit hex colour.
+    Motion choices are none, fade, rise, slide_left, slide_right, scale and draw for entering; still, float or pulse for continuous motion.
+    The supplied prompt is the creative brief. Preserve its visual metaphor, exact meaningful copy, and intended use.
+    Do not invent metrics, client proof, logos, footage, audio, or unsupported effects.
+    Submit only the fully designed scene plan through the tool.`,
+    tool_choice: { type: "tool", name: TOOL_NAME }, tools: [{ name: TOOL_NAME,
+      description: "Submit a fully designed motion graphic with individually placed and timed visual elements.",
+      input_schema: SCHEMA } as Anthropic.Messages.ToolUnion],
     messages: [{ role: "user", content: [
       `Create a ${project.preset} motion design, ${project.aspect}, exactly ${project.duration_sec} seconds.`,
-      `User request: ${project.prompt}`, `Brand guidance: ${brandNotes || "None supplied."}`,
-      `Use 1 to 5 scenes. Each scene is 1 to 12 seconds; total duration must equal ${project.duration_sec}.`,
-      project.preset === "hero" ? "Use exactly one pulse scene; it must loop naturally." : "Use concise on-screen copy.",
+      `Creative brief: ${project.prompt}`, `Brand guidance: ${brandNotes || "None supplied."}`,
+      `Canvas: ${canvas.width}×${canvas.height} coordinates. Use 1 to 5 scenes, 1 to 12 seconds each, with total duration ${project.duration_sec}. Each scene may have up to 40 elements.`,
+      `For text, set text and size (12–140). For rect, set width and height; radius is optional. For circle, set radius. For line, set x2 and y2; stroke_width is optional. Set x, y, color, at_sec and enter on every element.`,
+      `Use a deliberate composition with enough visual detail and animation to explain the subject. Include a clear beginning, visual development, and ending. Avoid repeating one layout.`,
+      project.preset === "hero" ? "Use exactly one scene and make movement return smoothly to its starting position so it loops." : "Keep on-screen copy concise, but do not omit the visual mechanism the user requested.",
       correction ? `Fix this validation problem: ${correction}` : "",
     ].join("\n") }],
   }).finalMessage();
   const usage = { inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
-    costUsd: estimateCostUsd(config.model, { inputTokens: response.usage.input_tokens,
+    costUsd: estimateCostUsd(MOTION_MODEL, { inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
       cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
       cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0 }) };
@@ -91,7 +113,7 @@ export async function runMotionDesignJob(sb: SupabaseClient, config: RuntimeConf
       accent: brand?.colour_accent, text: brand?.colour_text,
     } : {});
     const brandNotes = project.brand_mode === "on_brand"
-      ? `Mood: ${brand?.mood ?? "not specified"}. Never do: ${brand?.never_do ?? "not specified"}.`
+      ? `Colours: background ${palette.background}, primary ${palette.primary}, accent ${palette.accent}, text ${palette.text}, surface #FFFFFF. Mood: ${brand?.mood ?? "not specified"}. Never do: ${brand?.never_do ?? "not specified"}.`
       : "Use a clean neutral treatment.";
     let planned = await askScenes(config, project, brandNotes);
     usage = planned.usage;
