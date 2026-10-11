@@ -30,3 +30,43 @@ it("renders a playable MP4 and poster from a one-scene loop", async () => {
     expect(probe.streams.map((stream) => stream.codec_type)).toContain("video");
   } finally { await rm(dir, { recursive: true, force: true }); }
 }, 60_000);
+
+it("keeps authored card placement and progressively draws a connection", () => {
+  const plan = validateMotionPlan({ scenes: [{ duration_sec: 2, background: "background", elements: [
+    { kind: "rect", x: 100, y: 140, width: 190, height: 120, radius: 12,
+      color: "surface", at_sec: 0, enter: "fade" },
+    { kind: "text", x: 125, y: 210, size: 36, text: "Idea & Proof", weight: 700,
+      color: "primary", at_sec: 0, enter: "rise" },
+    { kind: "line", x: 290, y: 200, x2: 600, y2: 200, stroke_width: 6,
+      color: "accent", at_sec: .5, enter: "draw" },
+  ] }] }, 2, "explainer");
+  const before = motionFrame(plan.scenes[0]!, .1, "horizontal", motionPalette({}));
+  const drawing = motionFrame(plan.scenes[0]!, .4, "horizontal", motionPalette({}));
+  expect(before).toContain("Idea &amp; Proof");
+  expect(before).not.toContain("stroke-dasharray");
+  expect(drawing).toContain("stroke-dasharray");
+  expect(drawing).toContain('x2="600"');
+  expect(() => validateMotionPlan({ scenes: [{ duration_sec: 2, background: "url(http://bad)", elements: [] }] },
+    2, "explainer")).toThrow(/background/);
+});
+
+it("renders an authored multi-element scene as MP4", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "motion-designed-test-"));
+  try {
+    const plan = validateMotionPlan({ scenes: [{ duration_sec: 1, background: "background", elements: [
+      { kind: "rect", x: 100, y: 100, width: 280, height: 160, radius: 16,
+        color: "surface", at_sec: 0, enter: "scale" },
+      { kind: "text", x: 125, y: 190, size: 48, text: "IDEA", color: "primary",
+        at_sec: 0, enter: "rise" },
+      { kind: "line", x: 380, y: 180, x2: 760, y2: 180, color: "accent",
+        at_sec: .2, enter: "draw" },
+    ] }] }, 1, "explainer");
+    const result = await renderMotion(plan, { aspect: "horizontal", palette: motionPalette({}),
+      workDir: dir, outputPath: join(dir, "motion.mp4"), posterPath: join(dir, "poster.jpg"),
+      testSize: { width: 320, height: 180 } });
+    expect(result.durationSec).toBe(1);
+    const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_streams", "-of", "json",
+      join(dir, "motion.mp4")], { encoding: "utf8" })) as { streams: Array<{ codec_type: string }> };
+    expect(probe.streams.map((stream) => stream.codec_type)).toContain("video");
+  } finally { await rm(dir, { recursive: true, force: true }); }
+}, 60_000);

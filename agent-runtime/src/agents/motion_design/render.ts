@@ -7,8 +7,19 @@ import sharp from "sharp";
 const run = promisify(execFile);
 const FPS = 24;
 export type MotionAspect = "vertical" | "square" | "horizontal";
-export type MotionScene = { duration_sec: number; headline: string; body: string;
+type LegacyScene = { duration_sec: number; headline: string; body: string;
   motif: "orbit" | "bars" | "cards"; motion: "rise" | "slide" | "pulse" };
+export type MotionElement = {
+  kind: "text" | "rect" | "circle" | "line";
+  x?: number; y?: number; x2?: number; y2?: number;
+  width?: number; height?: number; radius?: number; size?: number;
+  text?: string; weight?: number; align?: "start" | "middle" | "end";
+  color: string; stroke?: string; stroke_width?: number;
+  at_sec: number; enter: "none" | "fade" | "rise" | "slide_left" | "slide_right" | "scale" | "draw";
+  motion?: "still" | "float" | "pulse";
+};
+export type DesignedScene = { duration_sec: number; background: string; elements: MotionElement[] };
+export type MotionScene = LegacyScene | DesignedScene;
 export type MotionPlan = { scenes: MotionScene[] };
 export type MotionPalette = { background: string; primary: string; accent: string; text: string };
 
@@ -38,6 +49,49 @@ function xml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
+export function motionCanvas(aspect: MotionAspect): { width: number; height: number } {
+  return aspect === "horizontal" ? { width: 1000, height: 563 }
+    : aspect === "vertical" ? { width: 563, height: 1000 } : { width: 1000, height: 1000 };
+}
+function validColor(value: unknown): value is string {
+  return typeof value === "string" &&
+    (/^#[0-9a-f]{6}$/i.test(value) || ["background", "primary", "accent", "text", "surface"].includes(value));
+}
+function finite(value: unknown, min: number, max: number): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
+}
+function validateElement(value: unknown, duration: number): asserts value is MotionElement {
+  if (!value || typeof value !== "object") throw new Error("A motion element is missing.");
+  const e = value as MotionElement;
+  if (!["text", "rect", "circle", "line"].includes(e.kind)
+    || !validColor(e.color) || !finite(e.at_sec, 0, duration)
+    || !["none", "fade", "rise", "slide_left", "slide_right", "scale", "draw"].includes(e.enter)
+    || (e.motion !== undefined && !["still", "float", "pulse"].includes(e.motion))
+    || (e.stroke !== undefined && !validColor(e.stroke))
+    || (e.stroke_width !== undefined && !finite(e.stroke_width, 0, 30))) {
+    throw new Error("A motion element has an unsupported colour, timing, or effect.");
+  }
+  if (!finite(e.x, -100, 1100) || !finite(e.y, -100, 1100)) {
+    throw new Error("A motion element needs finite canvas coordinates.");
+  }
+  if (e.kind === "text" && (typeof e.text !== "string" || e.text.length < 1 || e.text.length > 100
+    || !finite(e.size, 12, 140) || (e.weight !== undefined && !finite(e.weight, 100, 900))
+    || (e.align !== undefined && !["start", "middle", "end"].includes(e.align)))) {
+    throw new Error("A text element has unsupported copy or typography.");
+  }
+  if (e.kind === "rect" && (!finite(e.width, 1, 1200) || !finite(e.height, 1, 1200)
+    || (e.radius !== undefined && !finite(e.radius, 0, 200)))) {
+    throw new Error("A rectangle needs valid dimensions.");
+  }
+  if (e.kind === "circle" && !finite(e.radius, 1, 800)) {
+    throw new Error("A circle needs a valid radius.");
+  }
+  if (e.kind === "line" && (!finite(e.x2, -100, 1100) || !finite(e.y2, -100, 1100)
+    || e.enter === "scale")) {
+    throw new Error("A line needs valid endpoints.");
+  }
+  if (e.enter === "draw" && e.kind !== "line") throw new Error("Draw is only supported for lines.");
+}
 function lines(value: string, maxChars: number): string[] {
   const out: string[] = []; let line = "";
   for (const word of value.split(/\s+/).filter(Boolean)) {
@@ -57,8 +111,16 @@ export function validateMotionPlan(raw: unknown, targetSeconds: number, preset: 
   }
   let total = 0;
   for (const scene of scenes) {
-    if (!Number.isFinite(scene.duration_sec) || scene.duration_sec < 1 || scene.duration_sec > 12
-      || typeof scene.headline !== "string" || scene.headline.length > 80
+    if (!Number.isFinite(scene.duration_sec) || scene.duration_sec < 1 || scene.duration_sec > 12) {
+      throw new Error("A motion scene has unsupported text, timing, or effects.");
+    }
+    if ("elements" in scene) {
+      if (!validColor(scene.background) || !Array.isArray(scene.elements)
+        || scene.elements.length < 1 || scene.elements.length > 40) {
+        throw new Error("A designed scene needs a background and 1 to 40 elements.");
+      }
+      for (const element of scene.elements) validateElement(element, scene.duration_sec);
+    } else if (typeof scene.headline !== "string" || scene.headline.length > 80
       || typeof scene.body !== "string" || scene.body.length > 180
       || !["orbit", "bars", "cards"].includes(scene.motif)
       || !["rise", "slide", "pulse"].includes(scene.motion)) {
@@ -69,7 +131,7 @@ export function validateMotionPlan(raw: unknown, targetSeconds: number, preset: 
   if (total > targetSeconds + 0.1 || total < targetSeconds - 1.5) {
     throw new Error("The motion plan duration does not match the requested video length.");
   }
-  if (preset === "hero" && scenes[0]?.motion !== "pulse") {
+  if (preset === "hero" && scenes[0] && !("elements" in scenes[0]) && scenes[0].motion !== "pulse") {
     throw new Error("A looping hero needs a pulse scene.");
   }
   return { scenes };
@@ -77,6 +139,7 @@ export function validateMotionPlan(raw: unknown, targetSeconds: number, preset: 
 
 export function motionFrame(scene: MotionScene, progress: number, aspect: MotionAspect,
   palette: MotionPalette, size = DIMENSIONS[aspect]): string {
+  if ("elements" in scene) return designedFrame(scene, progress, aspect, palette, size);
   const { width: w, height: h } = size;
   const short = Math.min(w, h);
   const phase = Math.sin(Math.PI * 2 * progress);
@@ -105,6 +168,51 @@ export function motionFrame(scene: MotionScene, progress: number, aspect: Motion
     ${motif}<g opacity="${opacity}" font-family="DejaVu Sans, sans-serif">${text}</g>
     <rect x="${w * .085}" y="${h * .11}" width="${short * .11}" height="${short * .012}" rx="5" fill="${palette.accent}"/>
   </svg>`;
+}
+
+function resolveColor(value: string, palette: MotionPalette): string {
+  if (value === "surface") return "#FFFFFF";
+  if (value in palette) return palette[value as keyof MotionPalette];
+  return value;
+}
+function designedFrame(scene: DesignedScene, progress: number, aspect: MotionAspect,
+  palette: MotionPalette, size: { width: number; height: number }): string {
+  const canvas = motionCanvas(aspect);
+  const t = Math.max(0, Math.min(1, progress)) * scene.duration_sec;
+  const parts = scene.elements.map((e) => {
+    const elapsed = t - e.at_sec;
+    if (elapsed < 0) return "";
+    const arrival = Math.min(1, elapsed / .45);
+    const eased = 1 - (1 - arrival) ** 3;
+    const opacity = e.enter === "none" || e.enter === "draw" ? 1 : eased;
+    const loop = Math.sin(2 * Math.PI * progress);
+    const dx = e.enter === "slide_left" ? (1 - eased) * 48
+      : e.enter === "slide_right" ? -(1 - eased) * 48 : 0;
+    const dy = e.enter === "rise" ? (1 - eased) * 36
+      : e.motion === "float" ? loop * 6 : 0;
+    const scale = e.enter === "scale" ? .84 + .16 * eased
+      : e.motion === "pulse" ? 1 + .025 * loop : 1;
+    const cx = e.kind === "rect" ? e.x! + e.width! / 2 : e.x!;
+    const cy = e.kind === "rect" ? e.y! + e.height! / 2 : e.y!;
+    const transform = `translate(${dx} ${dy}) translate(${cx} ${cy}) scale(${scale}) translate(${-cx} ${-cy})`;
+    const fill = resolveColor(e.color, palette);
+    let shape = "";
+    if (e.kind === "text") shape = `<text x="${e.x}" y="${e.y}" font-size="${e.size}" font-weight="${e.weight ?? 600}"
+      text-anchor="${e.align ?? "start"}" fill="${fill}" font-family="DejaVu Sans, sans-serif">${xml(e.text!)}</text>`;
+    if (e.kind === "rect") shape = `<rect x="${e.x}" y="${e.y}" width="${e.width}" height="${e.height}"
+      rx="${e.radius ?? 0}" fill="${fill}"${e.stroke ? ` stroke="${resolveColor(e.stroke, palette)}" stroke-width="${e.stroke_width ?? 1}"` : ""}/>`;
+    if (e.kind === "circle") shape = `<circle cx="${e.x}" cy="${e.y}" r="${e.radius}" fill="${fill}"/>`;
+    if (e.kind === "line") {
+      const length = Math.hypot(e.x2! - e.x!, e.y2! - e.y!);
+      const draw = e.enter === "draw" ? ` stroke-dasharray="${length}" stroke-dashoffset="${length * (1 - eased)}"` : "";
+      shape = `<line x1="${e.x}" y1="${e.y}" x2="${e.x2}" y2="${e.y2}"
+        stroke="${fill}" stroke-width="${e.stroke_width ?? 4}" stroke-linecap="round"${draw}/>`;
+    }
+    return `<g opacity="${opacity}" transform="${transform}">${shape}</g>`;
+  }).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}"
+    viewBox="0 0 ${canvas.width} ${canvas.height}"><rect width="100%" height="100%"
+    fill="${resolveColor(scene.background, palette)}"/>${parts}</svg>`;
 }
 
 /** Render finite, validated SVG frames; no model-authored code reaches FFmpeg. */
