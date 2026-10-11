@@ -62,7 +62,7 @@ function finite(value: unknown, min: number, max: number): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
 }
 function validateElement(value: unknown, duration: number,
-  canvas: { width: number; height: number }): asserts value is MotionElement {
+  canvas: { width: number; height: number }, allowOverflow = false): asserts value is MotionElement {
   if (!value || typeof value !== "object") throw new Error("A motion element is missing.");
   const e = value as MotionElement;
   if (!["text", "rect", "circle", "line"].includes(e.kind)
@@ -99,12 +99,12 @@ function validateElement(value: unknown, duration: number,
     throw new Error("A line needs valid endpoints.");
   }
   if (e.enter === "draw" && e.kind !== "line") throw new Error("Draw is only supported for lines.");
-  if (e.x! < 0 || e.y! < 0 || e.x! > canvas.width || e.y! > canvas.height
+  if (!allowOverflow && (e.x! < 0 || e.y! < 0 || e.x! > canvas.width || e.y! > canvas.height
     || (e.kind === "rect" && (e.x! + e.width! > canvas.width || e.y! + e.height! > canvas.height))
     || (e.kind === "circle" && (e.x! - e.radius! < 0 || e.x! + e.radius! > canvas.width
       || e.y! - e.radius! < 0 || e.y! + e.radius! > canvas.height))
     || (e.kind === "line" && (e.x2! < 0 || e.x2! > canvas.width
-      || e.y2! < 0 || e.y2! > canvas.height))) {
+      || e.y2! < 0 || e.y2! > canvas.height)))) {
     throw new Error(`Keep every final element fully within the ${canvas.width}×${canvas.height} canvas.`);
   }
 }
@@ -118,7 +118,7 @@ function lines(value: string, maxChars: number): string[] {
   return out.slice(0, 4);
 }
 export function validateMotionPlan(raw: unknown, targetSeconds: number, preset: string,
-  aspect: MotionAspect = "horizontal"): MotionPlan {
+  aspect: MotionAspect = "horizontal", allowOverflow = false): MotionPlan {
   if (!raw || typeof raw !== "object" || !Array.isArray((raw as MotionPlan).scenes)) {
     throw new Error("Claude did not return motion scenes.");
   }
@@ -136,7 +136,8 @@ export function validateMotionPlan(raw: unknown, targetSeconds: number, preset: 
         || scene.elements.length < 1 || scene.elements.length > 40) {
         throw new Error("A designed scene needs a background and 1 to 40 elements.");
       }
-      for (const element of scene.elements) validateElement(element, scene.duration_sec, motionCanvas(aspect));
+      for (const element of scene.elements) validateElement(element, scene.duration_sec,
+        motionCanvas(aspect), allowOverflow);
     } else if (typeof scene.headline !== "string" || scene.headline.length > 80
       || typeof scene.body !== "string" || scene.body.length > 180
       || !["orbit", "bars", "cards"].includes(scene.motif)
@@ -152,6 +153,53 @@ export function validateMotionPlan(raw: unknown, targetSeconds: number, preset: 
     throw new Error("A looping hero needs a pulse scene.");
   }
   return { scenes };
+}
+
+/** Fit a valid composition that extends past the canvas without changing its timing. */
+export function fitMotionPlan(plan: MotionPlan, aspect: MotionAspect): MotionPlan {
+  const canvas = motionCanvas(aspect);
+  const margin = 16;
+  return { scenes: plan.scenes.map((scene) => {
+    if (!("elements" in scene)) return scene;
+    const fixed = (e: MotionElement) => e.kind === "rect" && e.x === 0 && e.y === 0
+      && e.width! >= canvas.width * .95 && e.height! <= 12;
+    const movable = scene.elements.filter((e) => !fixed(e));
+    if (!movable.length) return scene;
+    const boxes = movable.map((e) => {
+      if (e.kind === "rect") return [e.x!, e.y!, e.x! + e.width!, e.y! + e.height!];
+      if (e.kind === "circle") return [e.x! - e.radius!, e.y! - e.radius!,
+        e.x! + e.radius!, e.y! + e.radius!];
+      if (e.kind === "line") return [Math.min(e.x!, e.x2!), Math.min(e.y!, e.y2!),
+        Math.max(e.x!, e.x2!), Math.max(e.y!, e.y2!)];
+      return [e.x!, e.y!, e.x!, e.y!];
+    });
+    const minX = Math.min(...boxes.map((b) => b[0]!));
+    const minY = Math.min(...boxes.map((b) => b[1]!));
+    const maxX = Math.max(...boxes.map((b) => b[2]!));
+    const maxY = Math.max(...boxes.map((b) => b[3]!));
+    if (minX >= 0 && minY >= 0 && maxX <= canvas.width && maxY <= canvas.height) return scene;
+    const scale = Math.min(1, (canvas.width - 2 * margin) / Math.max(1, maxX - minX),
+      (canvas.height - 2 * margin) / Math.max(1, maxY - minY));
+    const left = Math.max(margin, Math.min(canvas.width - margin - (maxX - minX) * scale,
+      minX * scale));
+    const top = Math.max(margin, Math.min(canvas.height - margin - (maxY - minY) * scale,
+      minY * scale));
+    const x = (v: number) => +(left + (v - minX) * scale).toFixed(3);
+    const y = (v: number) => +(top + (v - minY) * scale).toFixed(3);
+    const n = (v: number) => +(v * scale).toFixed(3);
+    return { ...scene, elements: scene.elements.map((e) => fixed(e) ? e : {
+      ...e, x: x(e.x!), y: y(e.y!),
+      ...(e.x2 !== undefined ? { x2: x(e.x2) } : {}),
+      ...(e.y2 !== undefined ? { y2: y(e.y2) } : {}),
+      ...(e.from_x !== undefined ? { from_x: x(e.from_x) } : {}),
+      ...(e.from_y !== undefined ? { from_y: y(e.from_y) } : {}),
+      ...(e.width !== undefined ? { width: n(e.width) } : {}),
+      ...(e.height !== undefined ? { height: n(e.height) } : {}),
+      ...(e.radius !== undefined ? { radius: n(e.radius) } : {}),
+      ...(e.size !== undefined ? { size: Math.max(12, n(e.size)) } : {}),
+      ...(e.stroke_width !== undefined ? { stroke_width: n(e.stroke_width) } : {}),
+    }) };
+  }) };
 }
 
 /** Give named colours in the user's brief priority over a stored client palette. */

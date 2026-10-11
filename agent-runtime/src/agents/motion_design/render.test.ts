@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 import { expect, it } from "vitest";
-import { applyPromptPalette, motionFrame, motionPalette, renderMotion, validateMotionPlan } from "./render.js";
+import { applyPromptPalette, fitMotionPlan, motionFrame, motionPalette, renderMotion, validateMotionPlan } from "./render.js";
 
 const scene = { duration_sec: 1, headline: "Explain <the> idea & grow", body: "A clear next step",
   motif: "orbit" as const, motion: "pulse" as const };
@@ -85,6 +85,25 @@ it("rejects off-canvas cards and honours explicit named colours", () => {
     accent: "#1A4FD6", text: "#14243A" });
   expect(directed.plan.scenes[0]).toMatchObject({ background: "#F7F5EF",
     elements: [{ color: "#FFFFFF" }, { color: "#14243A" }] });
+});
+
+it("fits an otherwise valid off-canvas card row after a failed model correction", () => {
+  const raw = { scenes: [{ duration_sec: 2, background: "background", elements: [
+    { kind: "rect", x: 0, y: 0, width: 1000, height: 8, color: "accent",
+      at_sec: 0, enter: "none" },
+    { kind: "rect", x: 880, y: 300, from_x: 880, from_y: 420,
+      width: 150, height: 120, color: "surface", at_sec: 0, enter: "move" },
+    { kind: "text", x: 900, y: 370, from_x: 900, from_y: 490,
+      size: 24, text: "CAMPAIGN", color: "primary", at_sec: 0, enter: "move" },
+  ] }] };
+  const loose = validateMotionPlan(raw, 2, "explainer", "horizontal", true);
+  const fitted = fitMotionPlan(loose, "horizontal");
+  expect(() => validateMotionPlan(fitted, 2, "explainer", "horizontal")).not.toThrow();
+  const scene = fitted.scenes[0]!;
+  if (!("elements" in scene)) throw new Error("Expected designed scene.");
+  expect(scene.elements[0]).toMatchObject({ x: 0, width: 1000 });
+  expect(scene.elements[1]!.x! + scene.elements[1]!.width!).toBeLessThanOrEqual(1000);
+  expect(scene.elements[1]!.from_y! - scene.elements[1]!.y!).toBeGreaterThan(0);
 });
 
 it("renders an authored multi-element scene as MP4", async () => {
