@@ -31,6 +31,7 @@ export function ReelShotsPanel() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [retryingBrief, setRetryingBrief] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoadError(null);
@@ -141,6 +142,20 @@ export function ReelShotsPanel() {
   }, [refresh]);
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
+  const retryBuild = async (briefId: string) => {
+    setActionError(null);
+    setRetryingBrief(briefId);
+    try {
+      const { error } = await supabase.rpc("retry_reel_video_build", { p_brief_id: briefId });
+      if (error) throw error;
+      await refresh();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not retry the reel build.");
+    } finally {
+      setRetryingBrief(null);
+    }
+  };
+
   if (loadError) {
     return (
       <div role="alert">
@@ -165,7 +180,8 @@ export function ReelShotsPanel() {
       ) : (
         <ReelShotGrid masters={masters} buildJobs={buildJobs} engineHeldIds={engineHeldIds} clientId={clientId}
           focusedBrief={focusedBrief}
-          onChanged={() => void refresh()} onError={setActionError} />
+          onChanged={() => void refresh()} onError={setActionError}
+          onRetryBuild={(briefId) => void retryBuild(briefId)} retryingBrief={retryingBrief} />
       )}
     </div>
   );
