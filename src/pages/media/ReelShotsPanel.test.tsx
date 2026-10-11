@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const from = vi.fn();
+const archivedFilter = vi.fn();
 
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ clientId: "client-1" }),
@@ -42,9 +43,10 @@ function chain(result: unknown) {
     select: () => query,
     eq: () => query,
     or: () => query,
-    is: () => query,
+    is: (...args: unknown[]) => { archivedFilter(...args); return query; },
     in: () => query,
-    order: () => Promise.resolve(result),
+    order: () => query,
+    limit: () => query,
     then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
       Promise.resolve(result).then(resolve, reject),
   };
@@ -60,6 +62,7 @@ beforeEach(() => {
   frames = [];
   editJobs = [];
   from.mockReset();
+  archivedFilter.mockReset();
   from.mockImplementation((table: string) => {
     if (table === "client_briefs") {
       return chain({
@@ -91,6 +94,7 @@ describe("ReelShotsPanel", () => {
     render(<ReelShotsPanel />);
     await waitFor(() => expect(screen.getByText("Name the mechanism")).toBeInTheDocument());
     expect(from).toHaveBeenCalledWith("client_briefs");
+    expect(archivedFilter).not.toHaveBeenCalledWith("archived_at", null);
     expect(screen.getByText(/Nothing to approve until a master exists/i)).toBeInTheDocument();
   });
 
