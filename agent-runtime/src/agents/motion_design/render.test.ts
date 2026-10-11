@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 import { expect, it } from "vitest";
-import { motionFrame, motionPalette, renderMotion, validateMotionPlan } from "./render.js";
+import { applyPromptPalette, motionFrame, motionPalette, renderMotion, validateMotionPlan } from "./render.js";
 
 const scene = { duration_sec: 1, headline: "Explain <the> idea & grow", body: "A clear next step",
   motif: "orbit" as const, motion: "pulse" as const };
@@ -65,6 +65,26 @@ it("moves a card from authored starting coordinates into place", () => {
     { kind: "rect", x: 400, y: 200, width: 200, height: 100,
       color: "surface", at_sec: 0, enter: "move" },
   ] }] }, 2, "explainer")).toThrow(/starting coordinates/);
+});
+
+it("rejects off-canvas cards and honours explicit named colours", () => {
+  const brand = motionPalette({ background: "#F5F7F3", primary: "#142B23",
+    accent: "#D8EDB4", text: "#192925" });
+  const scene = { duration_sec: 2, background: "#F5F7F3", elements: [
+    { kind: "rect" as const, x: 800, y: 200, width: 150, height: 120,
+      color: "#FFFFFF", at_sec: 0, enter: "fade" as const },
+    { kind: "text" as const, x: 100, y: 100, size: 32, text: "A chain",
+      color: "#142B23", at_sec: 0, enter: "fade" as const },
+  ] };
+  expect(() => validateMotionPlan({ scenes: [{ ...scene, elements: [
+    { ...scene.elements[0], x: 880 }, scene.elements[1],
+  ] }] }, 2, "explainer")).toThrow(/fully within/);
+  const plan = validateMotionPlan({ scenes: [scene] }, 2, "explainer");
+  const directed = applyPromptPalette(plan, "Use warm off-white paper, deep navy and vivid blue.", brand);
+  expect(directed.palette).toEqual({ background: "#F7F5EF", primary: "#14243A",
+    accent: "#1A4FD6", text: "#14243A" });
+  expect(directed.plan.scenes[0]).toMatchObject({ background: "#F7F5EF",
+    elements: [{ color: "#FFFFFF" }, { color: "#14243A" }] });
 });
 
 it("renders an authored multi-element scene as MP4", async () => {
