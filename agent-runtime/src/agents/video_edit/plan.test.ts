@@ -105,6 +105,13 @@ describe("silent reel communication", () => {
   it("keeps lettered legacy footage eligible for a caption-free cut", () => {
     expect(communicationProblems(edl, [{ ...input.clips[0]!, burnedInText: "A hook" }])).toEqual([]);
   });
+  it("asks for a revision when silent-footage captions cover too much of the frame", () => {
+    const problems = communicationProblems({ ...edl, captions: [
+      { text: "Before you raise the budget read your own offer as a stranger would", start_sec: 0, end_sec: 3, position: "middle" },
+      { text: "Fix the offer first", start_sec: 4, end_sec: 6, position: "bottom" },
+    ] }, input.clips);
+    expect(problems).toContainEqual(expect.stringContaining("more than two lines"));
+  });
 });
 
 // A limit the validator enforces but the prompt never states is only

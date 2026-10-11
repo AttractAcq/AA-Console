@@ -5,7 +5,7 @@ import type { AgentRow } from "../../orchestration/registry.js";
 import type { AgentJobRow } from "../../queue.js";
 import { MOTION_PRESET_PLACEHOLDER, serializeShot } from "../brief/shots.js";
 import { ZOOM_IN_MOTION_ID } from "../video_build/motions.js";
-import { reelKeyframePrompt, runCreativeBuildJob } from "./index.js";
+import { framesConceptTool, reelKeyframePrompt, runCreativeBuildJob } from "./index.js";
 import { openingStillsRoute, withOpeningShotFields } from "./openingStills.js";
 
 function line(beat: string): string {
@@ -30,11 +30,19 @@ it("writes a filmed keyframe prompt without carrying concept headlines into the 
     art_direction: "Natural morning light",
     headline: "BUY TRAFFIC NOW",
     call_to_action: "BOOK A CALL",
-  }, 3, "Example Client", null);
+  }, 3, "Example Client", null, "Middle-aged Black workshop owner with closely cropped hair and navy work shirt");
   expect(prompt).toContain("A founder sorting real customer notes");
+  expect(prompt).toContain("Middle-aged Black workshop owner with closely cropped hair");
   expect(prompt).toContain("No text, typography");
   expect(prompt).not.toContain("BUY TRAFFIC NOW");
   expect(prompt).not.toContain("BOOK A CALL");
+});
+
+it("requires a stable cast anchor only for reel concepts", () => {
+  const reel = framesConceptTool("reel").inputSchema;
+  const carousel = framesConceptTool("carousel").inputSchema;
+  expect(reel.required).toContain("cast_anchor");
+  expect(carousel.required).not.toContain("cast_anchor");
 });
 
 describe("openingStillsRoute", () => {

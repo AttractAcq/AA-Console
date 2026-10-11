@@ -81,6 +81,28 @@ function colour(value: string | null | undefined, fallback: string): string {
   return `0x${(match?.[1] ?? fallback).toLowerCase()}`;
 }
 
+function luminance(hex: string): number {
+  const channels = [2, 4, 6].map((offset) => {
+    const value = Number.parseInt(hex.slice(offset, offset + 2), 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722;
+}
+
+function contrast(a: string, b: string): number {
+  const first = luminance(a);
+  const second = luminance(b);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+/** Preserve a brand end-card colour when it is legible; otherwise use the clearest neutral. */
+export function readableEndCardColour(background: string, requested: string): string {
+  if (contrast(background, requested) >= 4.5) return requested;
+  const white = "0xffffff";
+  const black = "0x000000";
+  return contrast(background, white) >= contrast(background, black) ? white : black;
+}
+
 /** Seconds as ffmpeg reads them. Fixed precision so the argv is stable in tests. */
 function sec(value: number): string {
   return (Math.round(value * 1000) / 1000).toString();
@@ -140,7 +162,7 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
   const fontFile = safePath(options.fontFile, "font");
   const workDir = safePath(options.workDir.replace(/\/+$/, ""), "work directory");
   const background = colour(options.backgroundColour, "000000");
-  const textColour = colour(options.textColour, "ffffff");
+  const endCardColour = readableEndCardColour(background, colour(options.textColour, "ffffff"));
 
   const args: string[] = ["-hide_banner", "-loglevel", "error", "-y"];
   const filters: string[] = [];
@@ -213,6 +235,8 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
     size: number,
     start: number,
     end: number,
+    fontColour: string,
+    captionBox: boolean,
   ): string[] =>
     lines.map((line, index) => {
       const file = `${workDir}/${name}-${index + 1}.txt`;
@@ -220,7 +244,9 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
       const y = index === 0 ? firstY : `${firstY}+${index * (size + LINE_SPACING)}`;
       return (
         `drawtext=fontfile=${fontFile}:textfile=${file}:expansion=none:fontsize=${size}:` +
-        `fontcolor=${textColour}:borderw=5:bordercolor=black@0.85:x=(w-text_w)/2:y=${y}:` +
+        `fontcolor=${fontColour}:borderw=5:bordercolor=black@0.85:` +
+        (captionBox ? `box=1:boxcolor=black@0.58:boxborderw=16:` : "") +
+        `x=(w-text_w)/2:y=${y}:` +
         `enable='between(t,${sec(start)},${sec(end)})'`
       );
     });
@@ -236,6 +262,8 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
         64,
         caption.start_sec,
         caption.end_sec,
+        "0xffffff",
+        true,
       ),
     );
   });
@@ -249,6 +277,8 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
         80,
         cutSec,
         cutSec + edl.end_card_sec,
+        endCardColour,
+        false,
       ),
     );
   }

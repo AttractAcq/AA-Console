@@ -23,6 +23,7 @@ import {
   TRANSITIONS,
   type Edl,
 } from "./edl.js";
+import { CAPTION_LINE_CHARS, wrapLines } from "./render.js";
 
 export const SUBMIT_TOOL_NAME = "submit_edit_plan";
 
@@ -61,6 +62,11 @@ export function communicationProblems(edl: Edl, clips: readonly PlanClip[]): str
   if (!edl.captions.some((caption) => caption.start_sec < 2)) {
     problems.push("The silent reel needs a readable hook caption in its first two seconds.");
   }
+  edl.captions.forEach((caption, index) => {
+    if (wrapLines(caption.text, CAPTION_LINE_CHARS).length > 2) {
+      problems.push(`Caption ${index + 1} fills more than two lines. Shorten it to one clear thought without dropping the brief's meaning.`);
+    }
+  });
   return problems;
 }
 
@@ -71,6 +77,7 @@ Cut the clips into one reel that delivers the brief:
 - Cut on movement where you can see it. Drop frames that warp, smear or show artefacts.
 - Captions say what the brief says. Never add a figure, claim or promise the brief does not make.
 - One idea per caption, short enough to read in the time it is on screen.
+- Keep generated-footage captions to at most two rendered lines (about ${CAPTION_LINE_CHARS} characters per line). Place them in clear negative space; never cover a face, hand or key action. Prefer a safe upper or lower third, using the middle only when it is truly empty.
 - Generated footage has no narration in the current render. When it has no burned-in text, use captions to carry the hook and key argument; do not leave the reel as silent, unexplained visuals. Put the first caption in the first two seconds.
 - A shot marked "already on screen" has its line burned into the artwork. Never put a caption over
   one: a second text in a second typeface lands on top of the first. A reel with fully lettered
