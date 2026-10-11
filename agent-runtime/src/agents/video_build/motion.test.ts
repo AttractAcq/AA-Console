@@ -101,6 +101,23 @@ describe("motion without Higgsfield credentials", () => {
 });
 
 describe("prepareMotionCalls", () => {
+  it("directs Kling footage from the beat without a DoP motion id", () => {
+    const plan = prepareMotionCalls({
+      shots: [shot("A founder opens a workshop door", "not-a-catalog-id")],
+      frames: [frames[0]!],
+      stillUrlByPosition: urls,
+      modelId: "kling-video/v3.0/4k/image-to-video",
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.calls[0]).toMatchObject({
+      kind: "submit",
+      modelId: "kling-video/v3.0/4k/image-to-video",
+      motionId: null,
+      durationSec: 3,
+      prompt: expect.stringContaining("A founder opens a workshop door"),
+    });
+  });
   const frames: MotionFrameRef[] = [
     { id: "frame-1", position: 1, providerJobId: null },
     { id: "frame-2", position: 2, providerJobId: null },
@@ -166,11 +183,12 @@ describe("prepareMotionCalls", () => {
     expect(plan.calls[0]).toMatchObject({
       kind: "submit",
       position: 1,
-      prompt: "Name it",
+      prompt: expect.stringContaining("Narrative purpose: Name it"),
       imageUrl: "https://cdn.example.test/1.png",
       motionId: MOTION,
       strength: 1,
       modelId: "higgsfield-ai/dop/lite",
+      durationSec: 3,
     });
   });
 
@@ -248,9 +266,10 @@ describe("motionFollowUp", () => {
     });
   });
 
-  it("does not retry a failed or nsfw shot", () => {
+  it("does not retry a failed, nsfw or canceled shot", () => {
     expect(motionFollowUp(["nsfw"])).toMatchObject({ outcome: "failed", retryable: false });
     expect(motionFollowUp(["failed"])).toMatchObject({ outcome: "failed", retryable: false });
+    expect(motionFollowUp(["canceled"])).toMatchObject({ outcome: "failed", retryable: false });
   });
 });
 

@@ -392,12 +392,13 @@ describe("video_build", () => {
     const apiCalls = fetchSpy.mock.calls.filter((call) => String(call[0]) !== clipUrl);
     expect(apiCalls.length).toBeGreaterThan(0);
     for (const call of apiCalls) {
-      expect(String(call[0])).toMatch(/^https:\/\/platform\.higgsfield\.ai\//);
+      expect(String(call[0])).toMatch(/^https:\/\/(?:platform|api)\.higgsfield\.ai\//);
     }
     expect(fetchSpy.mock.calls.filter((call) => String(call[0]) === clipUrl)).toHaveLength(2);
     const post = fetchSpy.mock.calls.find((call) => call[1]?.method === "POST");
+    expect(String(post?.[0])).toContain("/higgsfield-ai/dop/standard");
     const body = JSON.parse(String(post?.[1]?.body));
-    expect(body.prompt).toBe("Name the mechanism");
+    expect(body.prompt).toContain("Narrative purpose: Name the mechanism");
     expect(body.image_url).toBe("https://cdn.example.test/still.png");
     expect(body.motions).toEqual([{ id: motion, strength: 1 }]);
     expect(frameUpdates.map((row) => row.provider_job_id).filter(Boolean)).toEqual(["req_abc12345", "req_abc12345"]);

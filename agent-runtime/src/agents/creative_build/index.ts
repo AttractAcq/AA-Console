@@ -344,6 +344,31 @@ function composePrompt(
   ].join("\n");
 }
 
+/** Film input gets visual direction, never the static ad's type layout. */
+export function reelKeyframePrompt(
+  frame: Record<string, unknown>,
+  total: number,
+  clientName: string,
+  brand: BrandProfile | null,
+): string {
+  const value = (key: string) => String(frame[key] ?? "").trim();
+  return [
+    `Create the opening keyframe for shot ${value("position")} of ${total} in a vertical cinematic reel for ${clientName}.`,
+    `Narrative job: ${value("purpose")}`,
+    `Visible subject: ${value("subject")}`,
+    `Real environment: ${value("background")}`,
+    `Treatment: ${value("visual_treatment").replace(/_/g, " ")}`,
+    `Composition: ${value("composition")}`,
+    `Art direction: ${value("art_direction")}`,
+    brandRenderBlock(brand),
+    "This is footage input, not a finished static advertisement. Show a tangible scene with depth and plausible physical motion. Keep room for captions to be added in the edit.",
+    "No text, typography, graphic layout, diagrams, cards, badges, interface elements, logos or wordmarks anywhere in the image.",
+    `Avoid: ${value("avoid") || "stock-photo cliches, distorted people, warped geometry and watermarks"}.`,
+    "Do not invent any business identity, product detail, price, result or claim.",
+    REEL_SAFE_AREA_NOTE,
+  ].join("\n\n");
+}
+
 const RECRUITMENT_ROLE_LABEL: Record<string, string> = {
   editor: "Editor",
   smm: "Social Media Manager",
@@ -619,7 +644,7 @@ ${
     : ""
 }${remake ? "" : remakeBlock(remakeFeedback)}${isRecruitment ? recruitmentBlock(roleLabel) : ""}${
   openingShots
-    ? "\nOPENING STILLS\nEach frame is the opening still of one shot. Describe the picture. Do not describe a camera move. Motion is applied later and is not part of this image.\n"
+    ? "\nVIDEO KEYFRAMES\nEach frame is the opening image of one filmed shot, not a finished ad or title card. Show a concrete person, object, action or environment that can visibly change during the shot. Keep the same visual world across the sequence. Set headline, subhead and call_to_action to empty strings for every frame: the video editor will add readable copy after animation. No typography, diagrams, UI mockups, labels, logo or wordmark in the source image. Describe the opening composition, not a camera move; motion is directed later.\n"
     : ""
 }${isFramed && !remake ? `\nTHE SET\n${frameAskInstruction(frameAsk)}\n` : ""}
 THE BRIEF
@@ -947,19 +972,17 @@ Call ${submitTool.name} once when you are done.`;
         pathFor: (frame) => framePath(String(job.client_id), renderId, frame.position, "png"),
         onProgress: (note) => void appendEvent(sb, job.id, note),
         renderOne: async (frame, total) => {
-          const composed = composePrompt(
+          const composed = openingShots ? "" : composePrompt(
             frame as unknown as Record<string, unknown>,
             typed,
             clientName,
             identity,
             brand,
           );
-          // A reel frame is 9:16 and the image API cannot render one, so the
-          // still is composed for the crop and then cropped. Both halves
-          // matter: without the note the crop takes the ends off a headline,
-          // and without the crop Higgsfield animates a 2:3 rectangle.
+          // The image API cannot render 9:16 directly. The film prompt keeps
+          // its edges clear for the padding that makes a true reel frame.
           const prompt = openingShots
-            ? `${framePrompt(frame, total, composed)}\n\n${REEL_SAFE_AREA_NOTE}`
+            ? reelKeyframePrompt(frame as unknown as Record<string, unknown>, total, clientName, brand)
             : framePrompt(frame, total, composed);
           const out = await renderImage(config, prompt, {
             size: renderSize,
@@ -987,7 +1010,11 @@ Call ${submitTool.name} once when you are done.`;
     }
 
     const filedFormat = openingShots ? "reel" : typed.content_format;
-    const filedFrames = openingShots ? withOpeningShotFields(frames, openingShots) : frames;
+    // Reel keyframes contain no lettering. Do not tell the cut planner that
+    // a headline was burned into them just because the concept named one.
+    const filedFrames = openingShots
+      ? withOpeningShotFields(frames.map((frame) => ({ ...frame, caption: null })), openingShots)
+      : frames;
     const { data: framedId, error: saveError } = await sb.rpc("save_framed_asset", {
       p_client_id: job.client_id,
       p_brief_id: typed.id,

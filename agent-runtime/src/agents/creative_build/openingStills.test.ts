@@ -5,7 +5,7 @@ import type { AgentRow } from "../../orchestration/registry.js";
 import type { AgentJobRow } from "../../queue.js";
 import { MOTION_PRESET_PLACEHOLDER, serializeShot } from "../brief/shots.js";
 import { ZOOM_IN_MOTION_ID } from "../video_build/motions.js";
-import { runCreativeBuildJob } from "./index.js";
+import { reelKeyframePrompt, runCreativeBuildJob } from "./index.js";
 import { openingStillsRoute, withOpeningShotFields } from "./openingStills.js";
 
 function line(beat: string): string {
@@ -18,6 +18,24 @@ function line(beat: string): string {
 }
 
 const plan = [line("Name the mechanism"), line("Show the step")];
+
+it("writes a filmed keyframe prompt without carrying concept headlines into the pixels", () => {
+  const prompt = reelKeyframePrompt({
+    position: 1,
+    purpose: "Show the offer being diagnosed",
+    subject: "A founder sorting real customer notes",
+    background: "A sunlit workshop desk",
+    visual_treatment: "photorealistic",
+    composition: "Medium shot with depth",
+    art_direction: "Natural morning light",
+    headline: "BUY TRAFFIC NOW",
+    call_to_action: "BOOK A CALL",
+  }, 3, "Example Client", null);
+  expect(prompt).toContain("A founder sorting real customer notes");
+  expect(prompt).toContain("No text, typography");
+  expect(prompt).not.toContain("BUY TRAFFIC NOW");
+  expect(prompt).not.toContain("BOOK A CALL");
+});
 
 describe("openingStillsRoute", () => {
   it("leaves a carousel, a story and a single on the standard route", () => {

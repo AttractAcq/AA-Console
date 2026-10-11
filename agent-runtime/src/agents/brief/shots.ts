@@ -59,9 +59,10 @@ export function reelPlannerNote(): string {
   return [
     "Format: video — produced as a reel.",
     "Phase 1 formats are F6 (mechanism explainer) and F7 (problem cold-open).",
-    "Both are generated stills with motion applied. They need no client assets and no proof footage.",
+    "Both are generated visual keyframes animated into video shots. They need no client assets and no proof footage.",
+    "Each beat must specify what the viewer sees and what visibly changes: a subject action, an environmental change, or a reveal. Do not write a headline, graphic card, diagram or abstract lesson as a shot. Carry the argument in the brief so the editor can caption it after animation.",
     "Submit a shot plan. Each shot has a beat, a duration in seconds, shot_source_kind ai_generated,",
-    `and a motion_preset. The Phase 1 motion is ${ZOOM_IN_MOTION_NAME}, catalog id ${ZOOM_IN_MOTION_ID}.`,
+    `and a motion_preset. For compatibility with the original DoP route use ${ZOOM_IN_MOTION_NAME}, catalog id ${ZOOM_IN_MOTION_ID}; the selected video model will direct motion from the beat rather than force a digital zoom.`,
     `Write that id. "${MOTION_PRESET_PLACEHOLDER}" and "${ZOOM_IN_MOTION_NAME}" are accepted and stored as that id.`,
     "Do not invent a motion UUID. Any other name is stored as written, and motion pauses until a catalog confirms it.",
     "Do not mark any shot as a client asset or as proof.",
@@ -90,7 +91,7 @@ export function reelSubmitProperties(): {
           properties: {
             beat: {
               type: "string",
-              description: "What this shot does in the reel. One line. No invented statistics, prices, or quotes.",
+              description: "One line naming the shot's narrative purpose, visible subject and physical change over time. No title cards, abstract diagrams, invented statistics, prices, or quotes.",
             },
             duration_sec: {
               type: "number",

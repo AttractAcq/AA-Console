@@ -297,7 +297,7 @@ export async function runVideoBuildJob(
     shots: plan.shots,
     frames: frameRefs,
     stillUrlByPosition: stillUrls,
-    modelId: decision.modelDraft,
+    modelId: decision.modelFinal,
   });
   if (!prepared.ok) {
     await appendEvent(sb, job.id, prepared.message, "warn", {
@@ -350,7 +350,8 @@ export async function runVideoBuildJob(
         modelId: call.modelId,
         prompt: call.prompt,
         imageUrl: call.imageUrl,
-        motions: [{ id: call.motionId, strength: call.strength }],
+        durationSec: call.durationSec,
+        motions: call.motionId ? [{ id: call.motionId, strength: call.strength }] : undefined,
       });
       const { error: saveError } = await sb
         .from("client_media_frames")
@@ -370,6 +371,14 @@ export async function runVideoBuildJob(
         });
         return failed(message);
       }
+      await appendEvent(sb, job.id, `Submitted shot ${call.position} to Higgsfield.`, "info", {
+        stage: "motion",
+        position: call.position,
+        model_id: call.modelId,
+        request_id: accepted.requestId,
+        prompt: call.prompt,
+        duration_sec: call.durationSec,
+      });
       const polled = await client.pollStatus(accepted.requestId);
       const clipPath = await persistCompletedClip(sb, {
         clientId: job.client_id,

@@ -110,9 +110,10 @@ export interface MotionSubmitCall {
   frameId: string;
   prompt: string;
   imageUrl: string;
-  motionId: string;
+  motionId: string | null;
   strength: number;
   modelId: string;
+  durationSec: number;
 }
 
 export interface MotionPollCall {
@@ -131,6 +132,21 @@ export type MotionPlan =
       reason: "stills_not_ready" | "motion_preset_pending";
       message: string;
     };
+
+/** Kling image-to-video has no DoP motions parameter in its model contract. */
+export function usesDopMotion(modelId: string): boolean {
+  return !modelId.trim().startsWith("kling-video/");
+}
+
+export function directedShotPrompt(beat: string, position: number, total: number): string {
+  return [
+    `Shot ${position} of ${total}. Narrative purpose: ${beat.trim()}`,
+    "Animate the supplied opening frame as a continuous, realistic vertical film shot.",
+    "Make the scene visibly develop through subject action and natural environmental movement; maintain identity, geometry, lighting and visual continuity with the opening frame.",
+    "Use a motivated camera move only if it helps reveal the action. Avoid a generic digital zoom, static hold, warping, morphing and sudden scene changes.",
+    "Do not add text, logos, subtitles, graphics or invented products. The editor will add copy later.",
+  ].join(" ");
+}
 
 function httpsUrl(value: string | undefined): string | null {
   const trimmed = value?.trim() ?? "";
@@ -180,7 +196,7 @@ export function prepareMotionCalls(input: {
       stillProblems.push(position);
       return;
     }
-    if (!motionId) {
+    if (!motionId && usesDopMotion(input.modelId)) {
       motionProblems.push({ position, preset: shot.motion_preset.trim() || "(blank)" });
       return;
     }
@@ -188,11 +204,12 @@ export function prepareMotionCalls(input: {
       kind: "submit",
       position,
       frameId: frame.id,
-      prompt: shot.beat,
+      prompt: directedShotPrompt(shot.beat, position, input.shots.length),
       imageUrl,
-      motionId,
+      motionId: usesDopMotion(input.modelId) ? motionId : null,
       strength,
       modelId: input.modelId,
+      durationSec: Math.max(3, Math.min(15, Math.ceil(shot.duration_sec))),
     });
   });
 
@@ -254,7 +271,7 @@ export function motionFollowUp(statuses: readonly string[]): MotionFollowUp {
       message: "Motion paused: nothing was submitted. No Higgsfield request was sent.",
     };
   }
-  if (normalized.some((status) => status === "failed" || status === "nsfw")) {
+  if (normalized.some((status) => status === "failed" || status === "nsfw" || status === "canceled")) {
     return {
       outcome: "failed",
       retryable: false,

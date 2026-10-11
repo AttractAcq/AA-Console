@@ -37,7 +37,7 @@ import {
 } from "./handoff.js";
 import { probeDurationSec, render, renderCapability, sampleFrames } from "./media.js";
 import { installFont } from "./font.js";
-import { planEdit, type PlanClip } from "./plan.js";
+import { communicationProblems, planEdit, type PlanClip } from "./plan.js";
 import { advanceSlot, slotIdOf } from "../../engine/slot.js";
 import { buildRenderPlan, OUTPUT_HEIGHT, OUTPUT_WIDTH } from "./render.js";
 
@@ -227,7 +227,7 @@ async function cut(
   let plan = await planEdit(planInput, { model: config.model, timeoutMs });
   let usage = { ...plan.usage };
   let edl: Edl = plan.edl;
-  let problems = validateEdl(edl, context);
+  let problems = [...validateEdl(edl, context), ...communicationProblems(edl, clips)];
 
   if (problems.length > 0) {
     // One revise, with every problem named. A second failure is a refusal,
@@ -243,7 +243,7 @@ async function cut(
       costUsd: usage.costUsd + plan.usage.costUsd,
     };
     edl = plan.edl;
-    problems = validateEdl(edl, context);
+    problems = [...validateEdl(edl, context), ...communicationProblems(edl, clips)];
   }
 
   if (problems.length > 0) {

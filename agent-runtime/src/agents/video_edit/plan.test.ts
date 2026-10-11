@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { MAX_CAPTION_CHARS, MAX_END_CARD_SEC, TRANSITIONS } from "./edl.js";
-import { buildPlanContent, type PlanInput } from "./plan.js";
+import { buildPlanContent, communicationProblems, type PlanInput } from "./plan.js";
 
 const input: PlanInput = {
   title: "Spike reel",
@@ -86,8 +86,24 @@ describe("shots that already carry their line", () => {
 
   it("tells the editor in the system prompt that no captions is a valid plan", async () => {
     const { SYSTEM } = await import("./plan.js");
-    expect(SYSTEM).toMatch(/no captions is a good plan/i);
+    expect(SYSTEM).toMatch(/fully lettered\s+artwork can need no captions/i);
     expect(SYSTEM).toMatch(/already on screen/i);
+  });
+});
+
+describe("silent reel communication", () => {
+  const edl = {
+    segments: [], captions: [], end_card_text: "", end_card_sec: 0, notes: "",
+  };
+  it("requires an opening hook and a second beat when source clips have no text", () => {
+    expect(communicationProblems(edl, input.clips)).toHaveLength(2);
+    expect(communicationProblems({ ...edl, captions: [
+      { text: "Hook", start_sec: 0.5, end_sec: 2, position: "bottom" },
+      { text: "Argument", start_sec: 4, end_sec: 6, position: "bottom" },
+    ] }, input.clips)).toEqual([]);
+  });
+  it("keeps lettered legacy footage eligible for a caption-free cut", () => {
+    expect(communicationProblems(edl, [{ ...input.clips[0]!, burnedInText: "A hook" }])).toEqual([]);
   });
 });
 
