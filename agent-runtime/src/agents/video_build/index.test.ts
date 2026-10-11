@@ -297,6 +297,7 @@ describe("video_build", () => {
     expect(scheduled!.args).toMatchObject({
       p_agent_key: "video_build",
       p_input_table: "client_briefs",
+      p_current_job_id: job.id,
     });
     expect(Number(scheduled!.args.p_after_seconds)).toBeGreaterThan(0);
   });

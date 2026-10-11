@@ -435,6 +435,7 @@ export async function runVideoBuildJob(
       // slot_has_job_in_flight, and an hour later the tick starts a second
       // build while these clips are still rendering and already paid for.
       p_params: job.params ?? {},
+      p_current_job_id: job.id,
     });
     if (scheduleError) {
       // Nothing will collect them if this did not land, so say so loudly and
