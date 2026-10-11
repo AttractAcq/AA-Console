@@ -12,10 +12,11 @@ type LegacyScene = { duration_sec: number; headline: string; body: string;
 export type MotionElement = {
   kind: "text" | "rect" | "circle" | "line";
   x?: number; y?: number; x2?: number; y2?: number;
+  from_x?: number; from_y?: number; enter_duration_sec?: number;
   width?: number; height?: number; radius?: number; size?: number;
   text?: string; weight?: number; align?: "start" | "middle" | "end";
   color: string; stroke?: string; stroke_width?: number;
-  at_sec: number; enter: "none" | "fade" | "rise" | "slide_left" | "slide_right" | "scale" | "draw";
+  at_sec: number; enter: "none" | "fade" | "rise" | "slide_left" | "slide_right" | "scale" | "draw" | "move";
   motion?: "still" | "float" | "pulse";
 };
 export type DesignedScene = { duration_sec: number; background: string; elements: MotionElement[] };
@@ -65,7 +66,7 @@ function validateElement(value: unknown, duration: number): asserts value is Mot
   const e = value as MotionElement;
   if (!["text", "rect", "circle", "line"].includes(e.kind)
     || !validColor(e.color) || !finite(e.at_sec, 0, duration)
-    || !["none", "fade", "rise", "slide_left", "slide_right", "scale", "draw"].includes(e.enter)
+    || !["none", "fade", "rise", "slide_left", "slide_right", "scale", "draw", "move"].includes(e.enter)
     || (e.motion !== undefined && !["still", "float", "pulse"].includes(e.motion))
     || (e.stroke !== undefined && !validColor(e.stroke))
     || (e.stroke_width !== undefined && !finite(e.stroke_width, 0, 30))) {
@@ -73,6 +74,12 @@ function validateElement(value: unknown, duration: number): asserts value is Mot
   }
   if (!finite(e.x, -100, 1100) || !finite(e.y, -100, 1100)) {
     throw new Error("A motion element needs finite canvas coordinates.");
+  }
+  if ((e.from_x !== undefined && !finite(e.from_x, -100, 1100))
+    || (e.from_y !== undefined && !finite(e.from_y, -100, 1100))
+    || (e.enter_duration_sec !== undefined && !finite(e.enter_duration_sec, .1, duration))
+    || (e.enter === "move" && (e.kind === "line" || e.from_x === undefined || e.from_y === undefined))) {
+    throw new Error("A moving element needs valid starting coordinates and timing.");
   }
   if (e.kind === "text" && (typeof e.text !== "string" || e.text.length < 1 || e.text.length > 100
     || !finite(e.size, 12, 140) || (e.weight !== undefined && !finite(e.weight, 100, 900))
@@ -182,13 +189,15 @@ function designedFrame(scene: DesignedScene, progress: number, aspect: MotionAsp
   const parts = scene.elements.map((e) => {
     const elapsed = t - e.at_sec;
     if (elapsed < 0) return "";
-    const arrival = Math.min(1, elapsed / .45);
+    const arrival = Math.min(1, elapsed / (e.enter_duration_sec ?? .45));
     const eased = 1 - (1 - arrival) ** 3;
-    const opacity = e.enter === "none" || e.enter === "draw" ? 1 : eased;
+    const opacity = e.enter === "none" || e.enter === "draw" || e.enter === "move" ? 1 : eased;
     const loop = Math.sin(2 * Math.PI * progress);
-    const dx = e.enter === "slide_left" ? (1 - eased) * 48
+    const dx = e.enter === "move" ? (e.from_x! - e.x!) * (1 - eased)
+      : e.enter === "slide_left" ? (1 - eased) * 48
       : e.enter === "slide_right" ? -(1 - eased) * 48 : 0;
-    const dy = e.enter === "rise" ? (1 - eased) * 36
+    const dy = e.enter === "move" ? (e.from_y! - e.y!) * (1 - eased)
+      : e.enter === "rise" ? (1 - eased) * 36
       : e.motion === "float" ? loop * 6 : 0;
     const scale = e.enter === "scale" ? .84 + .16 * eased
       : e.motion === "pulse" ? 1 + .025 * loop : 1;
@@ -232,8 +241,12 @@ export async function renderMotion(plan: MotionPlan, options: { aspect: MotionAs
     }
   }
   if (index === 0) throw new Error("The motion plan rendered no frames.");
-  const first = await readFile(join(framesDir, "00000.png"));
-  await sharp(first).jpeg({ quality: 88 }).toFile(options.posterPath);
+  // A designed opening often deliberately starts empty. Pick a representative
+  // frame after the first scene has established its composition for the poster.
+  const posterIndex = Math.min(index - 1,
+    Math.floor(Math.round(plan.scenes[0]!.duration_sec * FPS) * .65));
+  const posterFrame = await readFile(join(framesDir, `${String(posterIndex).padStart(5, "0")}.png`));
+  await sharp(posterFrame).jpeg({ quality: 88 }).toFile(options.posterPath);
   await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-framerate", String(FPS),
     "-i", join(framesDir, "%05d.png"), "-c:v", "libx264", "-preset", "veryfast",
     "-pix_fmt", "yuv420p", "-movflags", "+faststart", options.outputPath],
