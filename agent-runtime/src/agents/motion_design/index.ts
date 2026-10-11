@@ -26,12 +26,13 @@ const SCHEMA: Anthropic.Messages.Tool.InputSchema = {
         properties: {
           kind: { type: "string", enum: ["text", "rect", "circle", "line"] },
           x: { type: "number" }, y: { type: "number" }, x2: { type: "number" }, y2: { type: "number" },
+          from_x: { type: "number" }, from_y: { type: "number" }, enter_duration_sec: { type: "number" },
           width: { type: "number" }, height: { type: "number" }, radius: { type: "number" },
           size: { type: "number" }, text: { type: "string" }, weight: { type: "number" },
           align: { type: "string", enum: ["start", "middle", "end"] },
           color: { type: "string" }, stroke: { type: "string" }, stroke_width: { type: "number" },
           at_sec: { type: "number" },
-          enter: { type: "string", enum: ["none", "fade", "rise", "slide_left", "slide_right", "scale", "draw"] },
+          enter: { type: "string", enum: ["none", "fade", "rise", "slide_left", "slide_right", "scale", "draw", "move"] },
           motion: { type: "string", enum: ["still", "float", "pulse"] },
         },
       } },
@@ -55,8 +56,10 @@ async function askScenes(config: RuntimeConfig, project: Project, brandNotes: st
     Multiple elements can appear at different at_sec times in each scene. A line with enter=draw reveals progressively.
     Put words in separate text elements when they need distinct placement or timing. Keep them readable and within canvas.
     Colour is a brand token (background, primary, accent, text, surface) or a six-digit hex colour.
-    Motion choices are none, fade, rise, slide_left, slide_right, scale and draw for entering; still, float or pulse for continuous motion.
+    Motion choices are none, fade, rise, slide_left, slide_right, scale, draw and move for entering; still, float or pulse for continuous motion.
+    To move an object across the canvas, set enter=move, final x/y, initial from_x/from_y, and enter_duration_sec. Give a card's rectangle and label the same movement so they stay together.
     The supplied prompt is the creative brief. Preserve its visual metaphor, exact meaningful copy, and intended use.
+    If the creative brief explicitly names colours, use those colours in the design even when the brand guidance differs. Brand colours are a fallback for colours the brief does not specify.
     Do not invent metrics, client proof, logos, footage, audio, or unsupported effects.
     Submit only the fully designed scene plan through the tool.`,
     tool_choice: { type: "tool", name: TOOL_NAME }, tools: [{ name: TOOL_NAME,
@@ -64,9 +67,11 @@ async function askScenes(config: RuntimeConfig, project: Project, brandNotes: st
       input_schema: SCHEMA } as Anthropic.Messages.ToolUnion],
     messages: [{ role: "user", content: [
       `Create a ${project.preset} motion design, ${project.aspect}, exactly ${project.duration_sec} seconds.`,
-      `Creative brief: ${project.prompt}`, `Brand guidance: ${brandNotes || "None supplied."}`,
+      `Creative brief (highest priority for composition and colours): ${project.prompt}`,
+      `Brand guidance (fallback where the creative brief is silent): ${brandNotes || "None supplied."}`,
       `Canvas: ${canvas.width}×${canvas.height} coordinates. Use 1 to 5 scenes, 1 to 12 seconds each, with total duration ${project.duration_sec}. Each scene may have up to 40 elements.`,
       `For text, set text and size (12–140). For rect, set width and height; radius is optional. For circle, set radius. For line, set x2 and y2; stroke_width is optional. Set x, y, color, at_sec and enter on every element.`,
+      `When the brief calls for objects to move into place, use enter=move with from_x, from_y, and enter_duration_sec (0.1 to scene duration). Keep linked shapes and text synchronized.`,
       `Use a deliberate composition with enough visual detail and animation to explain the subject. Include a clear beginning, visual development, and ending. Avoid repeating one layout.`,
       project.preset === "hero" ? "Use exactly one scene and make movement return smoothly to its starting position so it loops." : "Keep on-screen copy concise, but do not omit the visual mechanism the user requested.",
       correction ? `Fix this validation problem: ${correction}` : "",
