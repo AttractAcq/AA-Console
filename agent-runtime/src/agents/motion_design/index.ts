@@ -10,7 +10,7 @@ import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { estimateCostUsd } from "../../usage/cost.js";
-import { motionCanvas, motionCapability, motionPalette, renderMotion, validateMotionPlan, type MotionAspect } from "./render.js";
+import { applyPromptPalette, motionCanvas, motionCapability, motionPalette, renderMotion, validateMotionPlan, type MotionAspect } from "./render.js";
 
 const BUCKET = "client-media";
 const TOOL_NAME = "submit_motion_scenes";
@@ -123,20 +123,22 @@ export async function runMotionDesignJob(sb: SupabaseClient, config: RuntimeConf
     let planned = await askScenes(config, project, brandNotes);
     usage = planned.usage;
     let plan;
-    try { plan = validateMotionPlan(planned.raw, project.duration_sec, project.preset); }
+    try { plan = validateMotionPlan(planned.raw, project.duration_sec, project.preset, project.aspect); }
     catch (validationError) {
       planned = await askScenes(config, project, brandNotes,
         validationError instanceof Error ? validationError.message : String(validationError));
       usage = { inputTokens: usage.inputTokens + planned.usage.inputTokens,
         outputTokens: usage.outputTokens + planned.usage.outputTokens,
         costUsd: usage.costUsd + planned.usage.costUsd };
-      plan = validateMotionPlan(planned.raw, project.duration_sec, project.preset);
+      plan = validateMotionPlan(planned.raw, project.duration_sec, project.preset, project.aspect);
     }
+    const directed = applyPromptPalette(plan, project.prompt, palette);
+    plan = directed.plan;
     await sb.from("motion_design_projects").update({ scene_plan: plan }).eq("id", project.id);
     await appendEvent(sb, job.id, `Planned ${plan.scenes.length} motion scenes.`);
     const output = join(workDir, "motion.mp4");
     const poster = join(workDir, "poster.jpg");
-    const result = await renderMotion(plan, { aspect: project.aspect, palette,
+    const result = await renderMotion(plan, { aspect: project.aspect, palette: directed.palette,
       workDir, outputPath: output, posterPath: poster });
     const renderPath = `${project.client_id}/motion-design/${project.id}/motion.mp4`;
     const posterPath = `${project.client_id}/motion-design/${project.id}/poster.jpg`;

@@ -61,7 +61,8 @@ function validColor(value: unknown): value is string {
 function finite(value: unknown, min: number, max: number): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
 }
-function validateElement(value: unknown, duration: number): asserts value is MotionElement {
+function validateElement(value: unknown, duration: number,
+  canvas: { width: number; height: number }): asserts value is MotionElement {
   if (!value || typeof value !== "object") throw new Error("A motion element is missing.");
   const e = value as MotionElement;
   if (!["text", "rect", "circle", "line"].includes(e.kind)
@@ -98,6 +99,14 @@ function validateElement(value: unknown, duration: number): asserts value is Mot
     throw new Error("A line needs valid endpoints.");
   }
   if (e.enter === "draw" && e.kind !== "line") throw new Error("Draw is only supported for lines.");
+  if (e.x! < 0 || e.y! < 0 || e.x! > canvas.width || e.y! > canvas.height
+    || (e.kind === "rect" && (e.x! + e.width! > canvas.width || e.y! + e.height! > canvas.height))
+    || (e.kind === "circle" && (e.x! - e.radius! < 0 || e.x! + e.radius! > canvas.width
+      || e.y! - e.radius! < 0 || e.y! + e.radius! > canvas.height))
+    || (e.kind === "line" && (e.x2! < 0 || e.x2! > canvas.width
+      || e.y2! < 0 || e.y2! > canvas.height))) {
+    throw new Error(`Keep every final element fully within the ${canvas.width}×${canvas.height} canvas.`);
+  }
 }
 function lines(value: string, maxChars: number): string[] {
   const out: string[] = []; let line = "";
@@ -108,7 +117,8 @@ function lines(value: string, maxChars: number): string[] {
   if (line) out.push(line);
   return out.slice(0, 4);
 }
-export function validateMotionPlan(raw: unknown, targetSeconds: number, preset: string): MotionPlan {
+export function validateMotionPlan(raw: unknown, targetSeconds: number, preset: string,
+  aspect: MotionAspect = "horizontal"): MotionPlan {
   if (!raw || typeof raw !== "object" || !Array.isArray((raw as MotionPlan).scenes)) {
     throw new Error("Claude did not return motion scenes.");
   }
@@ -126,7 +136,7 @@ export function validateMotionPlan(raw: unknown, targetSeconds: number, preset: 
         || scene.elements.length < 1 || scene.elements.length > 40) {
         throw new Error("A designed scene needs a background and 1 to 40 elements.");
       }
-      for (const element of scene.elements) validateElement(element, scene.duration_sec);
+      for (const element of scene.elements) validateElement(element, scene.duration_sec, motionCanvas(aspect));
     } else if (typeof scene.headline !== "string" || scene.headline.length > 80
       || typeof scene.body !== "string" || scene.body.length > 180
       || !["orbit", "bars", "cards"].includes(scene.motif)
@@ -142,6 +152,29 @@ export function validateMotionPlan(raw: unknown, targetSeconds: number, preset: 
     throw new Error("A looping hero needs a pulse scene.");
   }
   return { scenes };
+}
+
+/** Give named colours in the user's brief priority over a stored client palette. */
+export function applyPromptPalette(plan: MotionPlan, prompt: string, brand: MotionPalette): {
+  plan: MotionPlan; palette: MotionPalette;
+} {
+  const palette = { ...brand };
+  if (/\bnavy\b/i.test(prompt)) {
+    palette.primary = "#14243A";
+    palette.text = "#14243A";
+  }
+  if (/\bblue\b/i.test(prompt)) palette.accent = "#1A4FD6";
+  if (/\boff[ -]?white\b/i.test(prompt)) palette.background = "#F7F5EF";
+  const replacements = new Map<string, string>();
+  for (const key of Object.keys(palette) as Array<keyof MotionPalette>) {
+    if (palette[key] !== brand[key]) replacements.set(brand[key].toLowerCase(), palette[key]);
+  }
+  const recolor = (value: string) => replacements.get(value.toLowerCase()) ?? value;
+  return { palette, plan: { scenes: plan.scenes.map((scene) => "elements" in scene
+    ? { ...scene, background: recolor(scene.background),
+      elements: scene.elements.map((element) => ({ ...element, color: recolor(element.color),
+        ...(element.stroke ? { stroke: recolor(element.stroke) } : {}) })) }
+    : scene) } };
 }
 
 export function motionFrame(scene: MotionScene, progress: number, aspect: MotionAspect,
