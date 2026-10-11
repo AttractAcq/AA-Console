@@ -10040,6 +10040,7 @@ export type Database = {
         Returns: string
       }
       request_video_edit: { Args: { p_asset_id: string }; Returns: string }
+      retry_reel_video_build: { Args: { p_brief_id: string }; Returns: string }
       intake_video_for_edit: {
         Args: { p_asset_id: string; p_client_id: string; p_title: string; p_storage_path: string
           p_format: Database["public"]["Enums"]["content_format"]; p_source: string; p_rights: string

@@ -80,6 +80,8 @@ export function ReelShotGrid({
   focusedBrief,
   onChanged,
   onError,
+  onRetryBuild,
+  retryingBrief,
 }: {
   masters: ReelMasterView[];
   buildJobs?: ReadonlyMap<string, { status: string; error: string | null }>;
@@ -88,6 +90,8 @@ export function ReelShotGrid({
   focusedBrief?: string | null;
   onChanged: () => void;
   onError: (message: string) => void;
+  onRetryBuild?: (briefId: string) => void;
+  retryingBrief?: string | null;
 }) {
   if (masters.length === 0) {
     return (
@@ -117,9 +121,18 @@ export function ReelShotGrid({
           {master.assets.length === 0 && <ContentJourney clientId={clientId} current="create" briefId={master.briefId} />}
           <p className="text-xs text-muted-foreground">Create job: {buildJobs.get(master.briefId)?.status ?? "awaiting build"}</p>
           {buildJobs.get(master.briefId)?.status === "failed" && (
-            <p role="alert" className="text-xs text-destructive">
-              Video build failed: {buildJobs.get(master.briefId)?.error || "Open the job log for details."}
-            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <p role="alert" className="text-xs text-destructive">
+                Video build failed: {buildJobs.get(master.briefId)?.error || "Open the job log for details."}
+              </p>
+              {onRetryBuild && (
+                <button type="button" className="text-xs font-medium text-brand-strong hover:underline disabled:opacity-50"
+                  disabled={retryingBrief === master.briefId}
+                  onClick={() => onRetryBuild(master.briefId)}>
+                  {retryingBrief === master.briefId ? "Retrying…" : "Retry video build"}
+                </button>
+              )}
+            </div>
           )}
 
           {master.planProblem && (
