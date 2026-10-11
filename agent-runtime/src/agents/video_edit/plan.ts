@@ -51,6 +51,19 @@ export interface PlanResult {
   model: string;
 }
 
+/** Silent generated footage needs enough copy to carry its argument. */
+export function communicationProblems(edl: Edl, clips: readonly PlanClip[]): string[] {
+  if (clips.length === 0 || clips.some((clip) => clip.burnedInText.trim())) return [];
+  const problems: string[] = [];
+  if (edl.captions.length < 2) {
+    problems.push("This reel has no narration or text in its footage. Add at least two captions that carry the hook and key argument.");
+  }
+  if (!edl.captions.some((caption) => caption.start_sec < 2)) {
+    problems.push("The silent reel needs a readable hook caption in its first two seconds.");
+  }
+  return problems;
+}
+
 export const SYSTEM = `You are the editor for short vertical social video (Reels, TikTok).
 You are given a brief and stills sampled from each generated clip, labelled with the time inside that clip.
 Cut the clips into one reel that delivers the brief:
@@ -58,10 +71,10 @@ Cut the clips into one reel that delivers the brief:
 - Cut on movement where you can see it. Drop frames that warp, smear or show artefacts.
 - Captions say what the brief says. Never add a figure, claim or promise the brief does not make.
 - One idea per caption, short enough to read in the time it is on screen.
+- Generated footage has no narration in the current render. When it has no burned-in text, use captions to carry the hook and key argument; do not leave the reel as silent, unexplained visuals. Put the first caption in the first two seconds.
 - A shot marked "already on screen" has its line burned into the artwork. Never put a caption over
-  one: a second text in a second typeface lands on top of the first. Most reels here need no
-  captions at all, and no captions is a good plan, not an unfinished one. Caption only a shot with
-  no text of its own, and only to say something the artwork does not.
+  one: a second text in a second typeface lands on top of the first. A reel with fully lettered
+  artwork can need no captions. Caption shots with no text so the story remains understandable on mute.
 - End on the call to action from the brief as an end card, or no end card if the brief has none.
 Submit the plan with ${SUBMIT_TOOL_NAME}. Put your reasons in notes for the human who approves it.`;
 

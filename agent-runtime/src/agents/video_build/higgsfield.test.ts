@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createHiggsfieldClient, HIGGSFIELD_BASE_URL, HIGGSFIELD_MOTIONS_PATH, HiggsfieldError, listMotions } from "./higgsfield.js";
+import { createHiggsfieldClient, HIGGSFIELD_API_URL, HIGGSFIELD_BASE_URL, HIGGSFIELD_MOTIONS_PATH, HiggsfieldError, listMotions } from "./higgsfield.js";
 import { resolveMotionPreset, ZOOM_IN_MOTION_ID } from "./motions.js";
 
 const MOTION = "11111111-1111-4111-8111-111111111111";
@@ -16,6 +16,26 @@ afterEach(() => {
 });
 
 describe("Higgsfield adapter", () => {
+  it("submits a Kling 3.0 film shot with the documented parameters instead of DoP motions", async () => {
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+      jsonResponse({ request_id: "req_kling1234", status: "queued" }));
+    const client = createHiggsfieldClient({ apiKey: "k", apiSecret: "s" }, fetchImpl as typeof fetch);
+    await client.submitI2V({
+      modelId: "kling-video/v3.0/4k/image-to-video",
+      prompt: "A person lifts a product from a table",
+      imageUrl: "https://cdn.example.test/still.png",
+      durationSec: 4.2,
+    });
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toBe(`${HIGGSFIELD_API_URL}/kling-video/v3.0/4k/image-to-video`);
+    expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body))).toEqual({
+      prompt: "A person lifts a product from a table",
+      image_url: "https://cdn.example.test/still.png",
+      duration: 5,
+      sound: "off",
+      cfg_scale: 0.5,
+      multi_shots: false,
+    });
+  });
   it("submits DoP image-to-video and polls status without leaving the mock", async () => {
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       const href = String(url);
@@ -27,7 +47,7 @@ describe("Higgsfield adapter", () => {
           cancel_url: `${HIGGSFIELD_BASE_URL}/requests/req_abc12345/cancel`,
         });
       }
-      expect(href).toBe(`${HIGGSFIELD_BASE_URL}/requests/req_abc12345/status`);
+      expect(href).toBe(`${HIGGSFIELD_API_URL}/requests/req_abc12345/status`);
       return jsonResponse({
         status: "completed",
         video: { url: "https://cdn.example.test/clip.mp4" },
@@ -63,9 +83,7 @@ describe("Higgsfield adapter", () => {
       image_url: "https://cdn.example.test/still.png",
       motions: [{ id: MOTION, strength: 1 }],
     });
-    for (const call of fetchImpl.mock.calls) {
-      expect(String(call[0])).toMatch(/^https:\/\/platform\.higgsfield\.ai\//);
-    }
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toMatch(/^https:\/\/platform\.higgsfield\.ai\//);
   });
 
   it("reads a still from images when the status payload has no video", async () => {

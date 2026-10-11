@@ -19,6 +19,7 @@ import type { MotionCatalogEntry } from "./motions.js";
  */
 
 export const HIGGSFIELD_BASE_URL = "https://platform.higgsfield.ai";
+export const HIGGSFIELD_API_URL = "https://api.higgsfield.ai";
 
 const MOTION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REQUEST_ID = /^[A-Za-z0-9_-]{8,128}$/;
@@ -42,7 +43,8 @@ export interface I2VSubmitInput {
   modelId: string;
   prompt: string;
   imageUrl: string;
-  motions: HiggsfieldMotion[];
+  motions?: HiggsfieldMotion[];
+  durationSec?: number;
   endImageUrl?: string | null;
 }
 
@@ -161,18 +163,37 @@ export function createHiggsfieldClient(
       const prompt = input.prompt.trim();
       if (!prompt) throw new HiggsfieldError("Image-to-video needs a prompt.", false);
       assertImageUrl(input.imageUrl.trim());
-      assertMotions(input.motions);
+      const isKling = input.modelId.trim().startsWith("kling-video/");
+      if (!isKling) assertMotions(input.motions ?? []);
       const payload: Record<string, unknown> = {
         prompt,
         image_url: input.imageUrl.trim(),
-        motions: input.motions.map((motion) => ({ id: motion.id.trim(), strength: motion.strength })),
       };
+      if (isKling) {
+        // Kling model endpoints accept duration and a text prompt, not the
+        // DoP motion UUIDs. Silence is deliberate until our editor can keep
+        // and mix model audio instead of discarding it.
+        const requested = Math.ceil(input.durationSec ?? 5);
+        payload.duration = input.modelId.includes("/v2.5-turbo/")
+          ? (requested > 5 ? 10 : 5)
+          : Math.max(3, Math.min(15, requested));
+        if (input.modelId.includes("/v3.0/")) {
+          payload.sound = "off";
+          payload.cfg_scale = 0.5;
+          payload.multi_shots = false;
+        } else {
+          payload.cfg_scale = 0.5;
+          payload.negative_prompt = "text, subtitles, logos, distortion, morphing, static digital zoom";
+        }
+      } else {
+        payload.motions = (input.motions ?? []).map((motion) => ({ id: motion.id.trim(), strength: motion.strength }));
+      }
       const endImage = input.endImageUrl?.trim();
       if (endImage) {
         assertImageUrl(endImage);
-        payload.end_image = endImage;
+        payload[isKling ? "last_image_url" : "end_image"] = endImage;
       }
-      const body = await call(`${HIGGSFIELD_BASE_URL}/${modelPath(input.modelId)}`, {
+      const body = await call(`${isKling ? HIGGSFIELD_API_URL : HIGGSFIELD_BASE_URL}/${modelPath(input.modelId)}`, {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -193,7 +214,14 @@ export function createHiggsfieldClient(
       if (!REQUEST_ID.test(id)) {
         throw new HiggsfieldError("That Higgsfield request id cannot be polled.", false);
       }
-      const body = await call(`${HIGGSFIELD_BASE_URL}/requests/${id}/status`, { method: "GET" });
+      let body: Record<string, unknown>;
+      try {
+        body = await call(`${HIGGSFIELD_API_URL}/requests/${id}/status`, { method: "GET" });
+      } catch (error) {
+        if (!(error instanceof HiggsfieldError) || error.message !== "Higgsfield returned 404.") throw error;
+        // Old DoP requests can still live on platform.higgsfield.ai.
+        body = await call(`${HIGGSFIELD_BASE_URL}/requests/${id}/status`, { method: "GET" });
+      }
       return {
         requestId: id,
         status: typeof body.status === "string" ? body.status : "unknown",
