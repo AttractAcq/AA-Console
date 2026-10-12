@@ -100,6 +100,12 @@ This is backend packaging and quality work. It reuses the existing agent runners
 
 Each PR should include migration and RLS tests for new tables/RPCs, one restart/idempotency test for orchestration changes, and only the media/integration tests needed to prove its acceptance gate. The Phase 6 boundary applies at every release: prepare code, tests and reviewable PR; merge, production migrations and Railway deploys happen with Alex via Chief of Staff.
 
+### Implementation checkpoint — 12 October 2026
+
+Reviewable, unmerged slices now cover the persisted workflow spine (#154), exact daily production plan (#155), retained video render candidates and final-cut QA (#156, stacked on the video-quality branch), launch preflight and review manifest (#157), approved reserve selection and cutoff accounting (#158), and manager recovery-alert delivery (#159). These are code and local test evidence, not a completed live v5 service; the workflow runtime remains opt-in. The outcome-attribution slice adds a first reviewable run report with evidence-validated source links and separate observed, estimated and unknown values. Its coverage denominator is **leads explicitly linked to the run**; it must not be described as coverage of every client lead.
+
+The remaining acceptance work is concrete: sound treatment and controlled reel regeneration, a permitted paid Higgsfield comparison with full-cut owner/SMM acceptance for F6 and F7, seven consecutive complete pilot client-days, live launch conversion probes and agent scenarios, a 24-hour complete-input dry run, and an evidence-fed next-campaign learning loop. None of those can be marked successful from database migrations or unit tests alone. Production rollout and migrations remain behind the Phase 6 release boundary.
+
 ## Acceptance evidence required
 
 - One daily client-day produces exactly four complete, internally QA-passed assets before cutoff; each has correct campaign/pillar/proof links, copy and final files. Simulate a provider failure and prove an approved backup is selected or a clear blocker is raised.

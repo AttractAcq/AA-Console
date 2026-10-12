@@ -5,6 +5,9 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 const migration = () => readFile(new URL(
   "../../supabase/migrations/20261012090000_190_v5_workflow_spine.sql", import.meta.url,
 ), "utf8");
+const attributionMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261012150000_196_v5_outcome_attribution.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -47,14 +50,20 @@ beforeAll(async () => {
       $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
     create table clients (id uuid primary key);
     create table profiles (id uuid primary key);
-    create table client_campaigns (id uuid primary key, client_id uuid not null);
+    create table client_campaigns (id uuid primary key, client_id uuid not null, ad_campaign_id uuid);
     create table client_agent_records (id uuid primary key, client_id uuid not null, job_id uuid, body text);
     create table client_ideas (id uuid primary key, client_id uuid not null, job_id uuid, title text);
     create table client_briefs (id uuid primary key, client_id uuid not null, job_id uuid, body text);
     create table client_media_assets (id uuid primary key, client_id uuid not null, brief_id uuid,
       created_at timestamptz default now(), updated_at timestamptz default now(),
-      storage_path text, render_path text);
+      storage_path text, render_path text, human_approved_at timestamptz);
     create table client_media_frames (asset_id uuid, clip_path text);
+    create table scheduled_posts (id uuid primary key, asset_id uuid);
+    create table campaign_artifacts (campaign_id uuid, page_id uuid, asset_id uuid);
+    create table client_leads (id uuid primary key, client_id uuid not null,
+      source_asset_id uuid, source_post_id uuid, source_page_id uuid,
+      source_campaign_id uuid, cash_collected numeric);
+    create table client_asset_reviews (asset_id uuid, decision text);
     create table client_pages (id uuid primary key, client_id uuid not null, job_id uuid, body text);
     create table client_sales_agents (id uuid primary key, client_id uuid not null, job_id uuid,
       built_at timestamptz, system_prompt text);
@@ -64,6 +73,7 @@ beforeAll(async () => {
       client_id uuid, input_table text, input_id uuid, params jsonb,
       created_by uuid, run_id uuid, status text not null default 'queued',
       terminal boolean not null default false, attempts integer not null default 0,
+      cost_usd numeric not null default 0,
       max_attempts integer not null default 3, error text, created_at timestamptz default now());
     create function can_access_client(p_client_id uuid) returns boolean language sql stable as
       $$ select p_client_id = '${CLIENT}' $$;
@@ -81,12 +91,13 @@ beforeAll(async () => {
     end; $$;
     insert into clients values ('${CLIENT}'), ('${OTHER}');
     insert into profiles values ('${ADMIN}');
-    insert into client_campaigns values ('${CAMPAIGN}', '${CLIENT}');
+    insert into client_campaigns (id, client_id) values ('${CAMPAIGN}', '${CLIENT}');
     insert into client_briefs (id, client_id, body) values ('${OUTPUT}', '${CLIENT}', 'A real brief');
     insert into client_briefs (id, client_id, body) values ('${OTHER_OUTPUT}', '${OTHER}', 'Other brief');
     insert into agents values ('brief', false), ('ideation', false);
   `);
   await db.exec(await migration());
+  await db.exec(await attributionMigration());
 });
 
 beforeEach(async () => {
@@ -222,5 +233,53 @@ describe("v5 workflow spine", () => {
       select j.input_id, s.resolved_input_id from workflow_steps s
       join agent_jobs j on j.id = s.job_id where s.id = '${briefStep.id}'`);
     expect(linked).toEqual({ input_id: IDEA, resolved_input_id: IDEA });
+  });
+
+  it("reports observed, unknown and missing attribution without inventing revenue", async () => {
+    const run = await makeRun("outcome-report");
+    const step = await addStep(run.id, "asset");
+    const noData = await service<{ workflow_run_outcomes: Record<string, unknown> }>(
+      `select workflow_run_outcomes('${run.id}')`,
+    );
+    expect(noData.workflow_run_outcomes.attribution_coverage).toBeNull();
+    expect(noData.workflow_run_outcomes.observed_cash).toBeNull();
+    expect(noData.workflow_run_outcomes.deadline_met).toBeNull();
+    const first = "00000000-0000-4000-8000-000000000001";
+    const second = "00000000-0000-4000-8000-000000000002";
+    await db.exec(`insert into client_media_assets (id, client_id)
+      values ('${INPUT}', '${CLIENT}');
+      insert into workflow_artifacts (run_id, artifact_kind, record_id, version_key,
+        qa_evidence, step_id) values ('${run.id}', 'asset', '${INPUT}', 'v1',
+        '{}'::jsonb, '${step.id}');
+      insert into client_leads (id, client_id, source_asset_id, cash_collected)
+      values ('${first}', '${CLIENT}', '${INPUT}', 100),
+        ('${second}', '${CLIENT}', null, 200);`);
+    await expect(service(`select * from record_workflow_lead_attribution(
+      '${run.id}', '${second}', 'observed',
+      '{"source":"asset","source_id":"${INPUT}"}'::jsonb)`))
+      .rejects.toThrow(/linked source/);
+    await service(`select * from record_workflow_lead_attribution(
+      '${run.id}', '${first}', 'observed',
+      '{"source":"asset","source_id":"${INPUT}"}'::jsonb)`);
+    await service(`select * from record_workflow_lead_attribution(
+      '${run.id}', '${second}', 'unknown', '{"reason":"No tracked source"}'::jsonb)`);
+    await expect(service(`select * from record_workflow_lead_attribution(
+      '${run.id}', '${first}', 'estimated',
+      '{"method":"model","source_ids":["x"]}'::jsonb)`))
+      .rejects.toThrow(/idempotency_conflict/);
+    const result = await service<{ workflow_run_outcomes: Record<string, unknown> }>(
+      `select workflow_run_outcomes('${run.id}')`,
+    );
+    expect(result.workflow_run_outcomes).toMatchObject({
+      linked_leads: 2, observed_leads: 1, unknown_leads: 1,
+      attribution_coverage: 0.5, observed_cash: 100, estimated_cash: 0,
+    });
+    await db.exec(`update workflow_runs set status = 'awaiting_human_approval'
+      where id = '${run.id}'`);
+    const ready = await service<{ workflow_run_outcomes: Record<string, unknown> }>(
+      `select workflow_run_outcomes('${run.id}')`,
+    );
+    expect(ready.workflow_run_outcomes.review_ready_at).toBeTruthy();
+    expect(ready.workflow_run_outcomes.deadline_met).toBe(true);
   });
 });
