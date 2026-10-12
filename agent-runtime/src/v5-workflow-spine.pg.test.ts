@@ -8,6 +8,9 @@ const migration = () => readFile(new URL(
 const attributionMigration = () => readFile(new URL(
   "../../supabase/migrations/20261012150000_196_v5_outcome_attribution.sql", import.meta.url,
 ), "utf8");
+const learningMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261012160000_197_v5_ideation_learning.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -52,18 +55,21 @@ beforeAll(async () => {
     create table profiles (id uuid primary key);
     create table client_campaigns (id uuid primary key, client_id uuid not null, ad_campaign_id uuid);
     create table client_agent_records (id uuid primary key, client_id uuid not null, job_id uuid, body text);
-    create table client_ideas (id uuid primary key, client_id uuid not null, job_id uuid, title text);
-    create table client_briefs (id uuid primary key, client_id uuid not null, job_id uuid, body text);
+    create table client_ideas (id uuid primary key, client_id uuid not null, job_id uuid,
+      title text, source_question text, strategic_reason text);
+    create table client_briefs (id uuid primary key, client_id uuid not null, job_id uuid,
+      title text, body text, source_idea_id uuid);
     create table client_media_assets (id uuid primary key, client_id uuid not null, brief_id uuid,
       created_at timestamptz default now(), updated_at timestamptz default now(),
-      storage_path text, render_path text, human_approved_at timestamptz);
+      storage_path text, render_path text, human_approved_at timestamptz, title text);
     create table client_media_frames (asset_id uuid, clip_path text);
     create table scheduled_posts (id uuid primary key, asset_id uuid);
     create table campaign_artifacts (campaign_id uuid, page_id uuid, asset_id uuid);
     create table client_leads (id uuid primary key, client_id uuid not null,
       source_asset_id uuid, source_post_id uuid, source_page_id uuid,
       source_campaign_id uuid, cash_collected numeric);
-    create table client_asset_reviews (asset_id uuid, decision text);
+    create table client_asset_reviews (asset_id uuid, decision text, reason text,
+      created_at timestamptz default now());
     create table client_pages (id uuid primary key, client_id uuid not null, job_id uuid, body text);
     create table client_sales_agents (id uuid primary key, client_id uuid not null, job_id uuid,
       built_at timestamptz, system_prompt text);
@@ -92,12 +98,15 @@ beforeAll(async () => {
     insert into clients values ('${CLIENT}'), ('${OTHER}');
     insert into profiles values ('${ADMIN}');
     insert into client_campaigns (id, client_id) values ('${CAMPAIGN}', '${CLIENT}');
-    insert into client_briefs (id, client_id, body) values ('${OUTPUT}', '${CLIENT}', 'A real brief');
-    insert into client_briefs (id, client_id, body) values ('${OTHER_OUTPUT}', '${OTHER}', 'Other brief');
+    insert into client_briefs (id, client_id, body, title)
+      values ('${OUTPUT}', '${CLIENT}', 'A real brief', 'Brief');
+    insert into client_briefs (id, client_id, body, title)
+      values ('${OTHER_OUTPUT}', '${OTHER}', 'Other brief', 'Other brief');
     insert into agents values ('brief', false), ('ideation', false);
   `);
   await db.exec(await migration());
   await db.exec(await attributionMigration());
+  await db.exec(await learningMigration());
 });
 
 beforeEach(async () => {
@@ -281,5 +290,45 @@ describe("v5 workflow spine", () => {
     );
     expect(ready.workflow_run_outcomes.review_ready_at).toBeTruthy();
     expect(ready.workflow_run_outcomes.deadline_met).toBe(true);
+  });
+
+  it("freezes review feedback and observed links for one ideation job", async () => {
+    const run = await makeRun("learning-source");
+    const step = await addStep(run.id, "asset");
+    const asset = "00000000-0000-4000-8000-000000000011";
+    const lead = "00000000-0000-4000-8000-000000000012";
+    await db.exec(`insert into client_media_assets
+      (id, client_id, brief_id, human_approved_at, title)
+      values ('${asset}', '${CLIENT}', '${OUTPUT}', now(), 'A specific asset');
+      insert into workflow_artifacts (run_id, step_id, artifact_kind, record_id,
+        version_key, qa_evidence)
+      values ('${run.id}', '${step.id}', 'asset', '${asset}', 'v1', '{}'::jsonb);
+      insert into client_leads (id, client_id, source_asset_id, cash_collected)
+      values ('${lead}', '${CLIENT}', '${asset}', 50);
+      update workflow_runs set status = 'awaiting_human_approval' where id = '${run.id}';`);
+    await service(`select * from record_workflow_lead_attribution(
+      '${run.id}', '${lead}', 'observed',
+      '{"source":"asset","source_id":"${asset}"}'::jsonb)`);
+    const job = await one<{ id: string }>(`insert into agent_jobs (agent_key, client_id)
+      values ('ideation', '${CLIENT}') returning id`);
+    const first = await service<{ capture_ideation_learning_context: {
+      creative: Array<{ asset_id: string; observed_linked_leads: number }>;
+      runs: Array<{ observed_leads: number }>;
+    } }>(`select capture_ideation_learning_context('${job.id}')`);
+    expect(first.capture_ideation_learning_context.creative).toEqual(
+      expect.arrayContaining([expect.objectContaining({
+        asset_id: asset, observed_linked_leads: 1,
+      })]),
+    );
+    expect(first.capture_ideation_learning_context.runs[0]?.observed_leads).toBe(1);
+    await db.exec(`insert into client_asset_reviews (asset_id, decision, reason)
+      values ('${asset}', 'rejected', 'The caption overstated the evidence.');`);
+    const second = await service<typeof first>(
+      `select capture_ideation_learning_context('${job.id}')`,
+    );
+    expect(second).toEqual(first);
+    await db.exec("select set_config('request.jwt.claim.role', 'authenticated', false)");
+    await expect(one(`select capture_ideation_learning_context('${job.id}')`))
+      .rejects.toThrow(/service role/);
   });
 });
