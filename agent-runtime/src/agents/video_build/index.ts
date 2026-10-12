@@ -14,6 +14,7 @@
 // A completed poll copies the clip into client-media and sets clip_path.
 // Nothing here sets agents.paused: that would stop the agent for every client.
 
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../../config.js";
 import type { AgentRow } from "../../orchestration/registry.js";
@@ -352,6 +353,15 @@ export async function runVideoBuildJob(
         imageUrl: call.imageUrl,
         durationSec: call.durationSec,
         motions: call.motionId ? [{ id: call.motionId, strength: call.strength }] : undefined,
+        idempotencyKey: createHash("sha256").update(JSON.stringify({
+          frameId: call.frameId,
+          modelId: call.modelId,
+          prompt: call.prompt,
+          imageUrl: call.imageUrl,
+          durationSec: call.durationSec,
+          motionId: call.motionId,
+          strength: call.strength,
+        })).digest("hex"),
       });
       const { error: saveError } = await sb
         .from("client_media_frames")

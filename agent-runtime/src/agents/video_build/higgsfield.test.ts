@@ -36,6 +36,25 @@ describe("Higgsfield adapter", () => {
       multi_shots: false,
     });
   });
+  it("sends a stable idempotency key for a generation intent", async () => {
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+      jsonResponse({ request_id: "req_kling1234", status: "queued" }));
+    const client = createHiggsfieldClient({ apiKey: "k", apiSecret: "s" }, fetchImpl as typeof fetch);
+    await client.submitI2V({
+      modelId: "kling-video/v3.0/4k/image-to-video",
+      prompt: "Move the vase",
+      imageUrl: "https://cdn.example.test/still.png",
+      idempotencyKey: "one-generation-intent",
+    });
+    expect(fetchImpl.mock.calls[0]?.[1]?.headers).toMatchObject({ "Idempotency-Key": "one-generation-intent" });
+    await expect(client.submitI2V({
+      modelId: "kling-video/v3.0/4k/image-to-video",
+      prompt: "Move the vase",
+      imageUrl: "https://cdn.example.test/still.png",
+      idempotencyKey: "bad key",
+    })).rejects.toThrow(/idempotency key/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
   it("submits DoP image-to-video and polls status without leaving the mock", async () => {
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       const href = String(url);
