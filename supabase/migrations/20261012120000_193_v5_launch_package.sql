@@ -174,6 +174,12 @@ begin
       or jsonb_array_length(p_evidence->'checks') = 0 then
     raise exception 'A dynamic launch check needs a record and passing evidence.';
   end if;
+  -- The current page builder produces static HTML and the launch workflow has
+  -- no trusted form/lead/consent/event probe. A caller-supplied list of labels
+  -- cannot certify a working conversion path or unlock human approval.
+  if p_check_key = 'conversion_path' then
+    raise exception 'Conversion path requires a recorded end-to-end probe; checklist labels are not verification.';
+  end if;
   v_ok := case p_check_key
     when 'page' then exists (select 1 from client_pages p
       join campaign_artifacts a on a.page_id = p.id
@@ -202,10 +208,6 @@ begin
     when 'measurement' then p_record_id = v_package.campaign_id
     else false end;
   if not v_ok then raise exception 'Evidence record is missing, unbuilt or belongs to another campaign.'; end if;
-  if p_check_key = 'conversion_path' and not p_evidence->'checks' @>
-      '["links", "lead_form", "lead_routing", "consent", "events"]'::jsonb then
-    raise exception 'Conversion checks must cover links, form, routing, consent and events.';
-  end if;
   update client_launch_checks set status = 'pass', record_id = p_record_id,
     evidence = p_evidence, blocker = null, checked_at = now()
     where package_id = p_package_id and check_key = p_check_key returning * into v_check;

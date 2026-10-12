@@ -114,11 +114,12 @@ describe("client launch package", () => {
     }
     await expect(service(`select check_key from record_client_launch_check('${result.id}',
       'conversion_path', '${PAGE}', '{"result":"pass","checks":["links"]}'::jsonb)`))
-      .rejects.toThrow(/Conversion checks/);
-    await service(`select check_key from record_client_launch_check('${result.id}',
+      .rejects.toThrow(/end-to-end probe/);
+    await expect(service(`select check_key from record_client_launch_check('${result.id}',
       'conversion_path', '${PAGE}',
-      '{"result":"pass","checks":["links","lead_form","lead_routing","consent","events"]}'::jsonb)`);
+      '{"result":"pass","checks":["links","lead_form","lead_routing","consent","events"]}'::jsonb)`))
+      .rejects.toThrow(/checklist labels are not verification/);
     expect((await db.query<{ status: string }>(`select status from workflow_runs
-      where id = '${result.run_id}'`)).rows[0]?.status).toBe("awaiting_human_approval");
+      where id = '${result.run_id}'`)).rows[0]?.status).toBe("needs_internal_qa");
   });
 });
