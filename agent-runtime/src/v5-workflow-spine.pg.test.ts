@@ -26,6 +26,9 @@ const dailyQaMigration = () => readFile(new URL(
 const dailySequenceMigration = () => readFile(new URL(
   "../../supabase/migrations/20261012210000_202_v5_daily_idea_sequence.sql", import.meta.url,
 ), "utf8");
+const creativeRoutingMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261012220000_203_v5_daily_creative_routing.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -90,7 +93,7 @@ beforeAll(async () => {
     create table client_briefs (id uuid primary key, client_id uuid not null, job_id uuid, body text, title text,
       created_at timestamptz default now(),
       source_idea_id uuid, content_format content_format, media_type media_type,
-      target_platform post_platform);
+      target_platform post_platform, format_code text);
     create table client_media_assets (id uuid primary key, client_id uuid not null, brief_id uuid,
       created_at timestamptz default now(), updated_at timestamptz default now(),
       storage_path text, render_path text, content_format content_format,
@@ -118,6 +121,12 @@ beforeAll(async () => {
       terminal boolean not null default false, attempts integer not null default 0,
       cost_usd numeric not null default 0,
       max_attempts integer not null default 3, error text, created_at timestamptz default now());
+    create table creative_generations (id uuid primary key default gen_random_uuid(),
+      client_id uuid not null, brief_id uuid not null, media_type media_type not null,
+      quality text not null, size text not null, job_id uuid, created_by uuid);
+    create table creative_renders (id uuid primary key default gen_random_uuid(),
+      generation_id uuid not null, client_id uuid not null, quality text not null,
+      size text not null, job_id uuid, created_by uuid);
     create function can_access_client(p_client_id uuid) returns boolean language sql stable as
       $$ select p_client_id = '${CLIENT}' $$;
     create function lock_down_definer_functions() returns integer language sql as $$ select 0 $$;
@@ -139,8 +148,10 @@ beforeAll(async () => {
     insert into client_campaigns (id, client_id, name, audience, offer_summary)
       values ('${CAMPAIGN}', '${CLIENT}', 'Launch campaign', 'Founders', 'Premium service');
     insert into client_content_pillars values ('${PILLAR}', '${CLIENT}', true, 'Trusted expertise');
-    insert into client_briefs (id, client_id, body) values ('${OUTPUT}', '${CLIENT}', 'A real brief');
-    insert into client_briefs (id, client_id, body) values ('${OTHER_OUTPUT}', '${OTHER}', 'Other brief');
+    insert into client_briefs (id, client_id, body, content_format, media_type)
+      values ('${OUTPUT}', '${CLIENT}', 'A real brief', 'single', 'image');
+    insert into client_briefs (id, client_id, body, content_format, media_type)
+      values ('${OTHER_OUTPUT}', '${OTHER}', 'Other brief', 'single', 'image');
     insert into agents values ('brief', false), ('ideation', false),
       ('creative_build', false), ('video_build', false), ('video_edit', false);
   `);
@@ -152,6 +163,7 @@ beforeAll(async () => {
   await db.exec(await learningMigration());
   await db.exec(await dailyQaMigration());
   await db.exec(await dailySequenceMigration());
+  await db.exec(await creativeRoutingMigration());
 });
 
 beforeEach(async () => {
@@ -161,6 +173,60 @@ beforeEach(async () => {
 });
 
 describe("v5 workflow spine", () => {
+  it("queues creative build with a persisted render for still and reel opening frames", async () => {
+    const imageBrief = "33333333-3333-4333-8333-333333333331";
+    const reelBrief = "33333333-3333-4333-8333-333333333332";
+    await db.exec(`insert into client_briefs (id,client_id,body,content_format,media_type)
+      values ('${imageBrief}','${CLIENT}','Static asset brief','single','image'),
+        ('${reelBrief}','${CLIENT}','Reel opening frames','reel','video')`);
+    const run = await makeRun("creative-routing");
+    await service(`select id from add_workflow_agent_step('${run.id}','static_create','{}',
+      'creative_build','client_briefs','${imageBrief}')`);
+    await service(`select id from add_workflow_agent_step('${run.id}','reel_create','{}',
+      'creative_build','client_briefs','${reelBrief}')`);
+    await seal(run.id);
+    expect((await service<{ steps_queued: number }>(
+      "select * from reconcile_workflow_runs()")).steps_queued).toBe(2);
+    const jobs = await db.query<{ input_id: string; render_id: string; media_type: string }>(`
+      select j.input_id,j.params->>'render_id' as render_id,g.media_type::text
+      from workflow_steps s join agent_jobs j on j.id=s.job_id
+      join creative_renders r on r.id=(j.params->>'render_id')::uuid
+      join creative_generations g on g.id=r.generation_id
+      where s.run_id='${run.id}' order by s.step_key`);
+    expect(jobs.rows).toEqual([
+      { input_id: reelBrief, render_id: expect.any(String), media_type: "image" },
+      { input_id: imageBrief, render_id: expect.any(String), media_type: "image" },
+    ]);
+    expect((await service<{ steps_queued: number }>(
+      "select * from reconcile_workflow_runs()")).steps_queued).toBe(0);
+    expect((await one<{ n: number }>("select count(*)::integer as n from creative_renders")).n).toBe(2);
+  });
+
+  it("recovers the missing-render failure without losing the failed job history", async () => {
+    const run = await makeRun("creative-recovery");
+    const step = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','static_create','{}','creative_build','client_briefs','${OUTPUT}')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    const oldJob = await one<{ job_id: string }>(`select job_id from workflow_steps where id='${step.id}'`);
+    await db.exec(`update agent_jobs set status='failed',error='No render to produce.',
+      terminal=true where id='${oldJob.job_id}'`);
+    await service("select * from reconcile_workflow_runs()");
+    expect((await one<{ status: string }>(`select status from workflow_runs where id='${run.id}'`)).status)
+      .toBe("blocked");
+    await service(`select id from retry_missing_render_workflow_step('${step.id}')`);
+    expect((await service<{ steps_queued: number }>(
+      "select * from reconcile_workflow_runs()")).steps_queued).toBe(1);
+    const newJob = await one<{ job_id: string; render_id: string }>(`
+      select s.job_id,j.params->>'render_id' as render_id from workflow_steps s
+      join agent_jobs j on j.id=s.job_id where s.id='${step.id}'`);
+    expect(newJob.job_id).not.toBe(oldJob.job_id);
+    expect(newJob.render_id).toEqual(expect.any(String));
+    expect((await one<{ status: string }>(`select status from agent_jobs where id='${oldJob.job_id}'`)).status)
+      .toBe("failed");
+    await expect(service(`select id from retry_missing_render_workflow_step('${step.id}')`))
+      .rejects.toThrow(/not eligible/);
+  });
   it("creates one root run for a repeated request and refuses changed inputs", async () => {
     const first = await makeRun();
     const second = await makeRun();
