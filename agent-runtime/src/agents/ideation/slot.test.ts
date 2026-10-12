@@ -230,6 +230,31 @@ describe("ideation when a person asked for it", () => {
     expect(refused.failureMessage).toMatch(/not active for this client/);
   });
 
+  it("uses frozen evidence for a v5 run and stops if that snapshot cannot be captured", async () => {
+    const directed = { ...handJob, params: { v5_workflow_run_id: "run-1" } } as AgentJobRow;
+    const first = database();
+    const rpc = vi.fn(async () => ({ data: {
+      creative: [{ asset_id: "asset-1", observed_linked_leads: 2,
+        rejection_reason: "Caption lacked evidence" }], runs: [],
+    }, error: null }));
+    (first.sb as unknown as { rpc: typeof rpc }).rpc = rpc;
+    const result = await runIdeationJob(first.sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("capture_ideation_learning_context", { p_job_id: directed.id });
+    expect((model.mock.calls[0]![0] as { prompt: string }).prompt)
+      .toContain("Caption lacked evidence");
+
+    model.mockClear();
+    const second = database();
+    (second.sb as unknown as { rpc: typeof rpc }).rpc = vi.fn(async () => ({
+      data: null, error: { message: "Snapshot unavailable" },
+    })) as unknown as typeof rpc;
+    const failed = await runIdeationJob(second.sb, config, agent, directed, Date.now() + 60_000);
+    expect(failed.ok).toBe(false);
+    expect(failed.failureMessage).toContain("Snapshot unavailable");
+    expect(model).not.toHaveBeenCalled();
+  });
+
   it("keeps a requested video reel and destination on every idea", async () => {
     modelReturns(25, "reel", "video");
     const directed = { ...handJob, params: {
