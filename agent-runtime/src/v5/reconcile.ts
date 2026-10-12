@@ -31,6 +31,14 @@ export function startWorkflowReconciler(sb: SupabaseClient, config: RuntimeConfi
         if (counts && (counts.steps_queued || counts.steps_for_qa || counts.steps_blocked)) {
           logger.info("v5_workflow_reconciled", counts);
         }
+        const { data: qaData, error: qaError } = await sb.rpc("accept_ready_daily_workflow_steps", { p_limit: 20 });
+        if (qaError) throw new Error(qaError.message);
+        const qa = (Array.isArray(qaData) ? qaData[0] : qaData) as {
+          steps_accepted?: number; steps_blocked?: number;
+        } | null;
+        if (qa && (qa.steps_accepted || qa.steps_blocked)) {
+          logger.info("v5_daily_internal_qa", qa);
+        }
         await dispatchOneRecoveryAlert(sb, config, workerId);
       } catch (error) {
         logger.error("v5_workflow_reconcile_failed", {
