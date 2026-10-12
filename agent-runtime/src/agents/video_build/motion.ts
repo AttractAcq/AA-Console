@@ -142,6 +142,7 @@ export function directedShotPrompt(beat: string, position: number, total: number
   return [
     `Shot ${position} of ${total}. Narrative purpose: ${beat.trim()}`,
     "Animate the supplied opening frame as a continuous, realistic vertical film shot.",
+    "Treat the opening frame as the factual source for the subject, objects, materials and their current physical state. If the narrative beat conflicts with what is visible, continue a plausible action from the frame instead of changing an object's material, shape or position abruptly.",
     "Make the scene visibly develop through subject action and natural environmental movement; maintain identity, geometry, lighting and visual continuity with the opening frame.",
     "Use a motivated camera move only if it helps reveal the action. Avoid a generic digital zoom, static hold, warping, morphing and sudden scene changes.",
     "Do not add text, logos, subtitles, graphics or invented products. The editor will add copy later.",
