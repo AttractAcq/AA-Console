@@ -352,6 +352,10 @@ export async function runVideoBuildJob(
         imageUrl: call.imageUrl,
         durationSec: call.durationSec,
         motions: call.motionId ? [{ id: call.motionId, strength: call.strength }] : undefined,
+        // A frame row is one generation intent. If code changes the payload
+        // after an ambiguous timeout, Higgsfield returns a mismatch instead
+        // of accepting and charging for a second shot.
+        idempotencyKey: `aa-video-frame-${call.frameId}`,
       });
       const { error: saveError } = await sb
         .from("client_media_frames")

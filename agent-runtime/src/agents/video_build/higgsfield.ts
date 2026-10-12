@@ -46,6 +46,7 @@ export interface I2VSubmitInput {
   motions?: HiggsfieldMotion[];
   durationSec?: number;
   endImageUrl?: string | null;
+  idempotencyKey?: string;
 }
 
 export interface I2VSubmitResult {
@@ -134,7 +135,7 @@ export function createHiggsfieldClient(
   }
   const authorization = `Key ${apiKey}:${apiSecret}`;
 
-  async function call(url: string, init: { method: string; body?: string }): Promise<Record<string, unknown>> {
+  async function call(url: string, init: { method: string; body?: string; idempotencyKey?: string }): Promise<Record<string, unknown>> {
     let response: Response;
     try {
       response = await fetchImpl(url, {
@@ -143,6 +144,7 @@ export function createHiggsfieldClient(
           Authorization: authorization,
           Accept: "application/json",
           ...(init.body ? { "Content-Type": "application/json" } : {}),
+          ...(init.idempotencyKey ? { "Idempotency-Key": init.idempotencyKey } : {}),
         },
         body: init.body,
         signal: AbortSignal.timeout(20_000),
@@ -163,6 +165,9 @@ export function createHiggsfieldClient(
       const prompt = input.prompt.trim();
       if (!prompt) throw new HiggsfieldError("Image-to-video needs a prompt.", false);
       assertImageUrl(input.imageUrl.trim());
+      if (input.idempotencyKey && !/^[!-~]{1,255}$/.test(input.idempotencyKey)) {
+        throw new HiggsfieldError("Higgsfield idempotency key is not usable.", false);
+      }
       const isKling = input.modelId.trim().startsWith("kling-video/");
       if (!isKling) assertMotions(input.motions ?? []);
       const payload: Record<string, unknown> = {
@@ -196,6 +201,7 @@ export function createHiggsfieldClient(
       const body = await call(`${isKling ? HIGGSFIELD_API_URL : HIGGSFIELD_BASE_URL}/${modelPath(input.modelId)}`, {
         method: "POST",
         body: JSON.stringify(payload),
+        idempotencyKey: input.idempotencyKey,
       });
       const requestId = typeof body.request_id === "string" ? body.request_id.trim() : "";
       if (!REQUEST_ID.test(requestId)) {

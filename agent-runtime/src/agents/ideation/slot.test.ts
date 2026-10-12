@@ -54,6 +54,7 @@ const SLOT = {
 
 const PILLAR = {
   id: "pillar-1",
+  client_id: "client-1",
   name: "Proof",
   premise: "Show the work.",
   belongs: "Evidence.",
@@ -80,7 +81,7 @@ const handJob = {
   params: {},
 } as unknown as AgentJobRow;
 
-function database(options: { slot?: unknown; pillar?: unknown } = {}) {
+function database(options: { slot?: unknown; pillar?: unknown; campaign?: unknown } = {}) {
   const inserted: Record<string, unknown>[] = [];
   const from = vi.fn((table: string) => {
     if (table === "client_ideas") {
@@ -107,6 +108,9 @@ function database(options: { slot?: unknown; pillar?: unknown } = {}) {
             ? ("slot" in options ? options.slot : SLOT)
             : table === "client_content_pillars"
               ? ("pillar" in options ? options.pillar : PILLAR)
+              : table === "client_campaigns"
+                ? ("campaign" in options ? options.campaign :
+                  { id: "campaign-1", client_id: "client-1", status: "planning" })
               : null,
       }),
       then: (resolve: (v: unknown) => unknown) =>
@@ -208,6 +212,49 @@ describe("ideation for a slot", () => {
 });
 
 describe("ideation when a person asked for it", () => {
+  it("binds a directed package idea to its validated campaign and pillar", async () => {
+    modelReturns(1, "reel", "video");
+    const directed = { ...handJob, params: {
+      target_platform: "instagram", media_type: "video", content_format: "reel",
+      idea_count: 1, campaign_id: "campaign-1", pillar_id: "pillar-1",
+    } } as AgentJobRow;
+    const { sb, inserted } = database();
+    const result = await runIdeationJob(sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(true);
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({ campaign_id: "campaign-1", pillar_id: "pillar-1",
+      target_platform: "instagram", content_format: "reel" });
+    const wrong = database({ campaign: { id: "campaign-1", client_id: "other", status: "planning" } });
+    const refused = await runIdeationJob(wrong.sb, config, agent, directed, Date.now() + 60_000);
+    expect(refused.ok).toBe(false);
+    expect(refused.failureMessage).toMatch(/not active for this client/);
+  });
+
+  it("uses frozen evidence for a v5 run and stops if that snapshot cannot be captured", async () => {
+    const directed = { ...handJob, params: { v5_workflow_run_id: "run-1" } } as AgentJobRow;
+    const first = database();
+    const rpc = vi.fn(async () => ({ data: {
+      creative: [{ asset_id: "asset-1", observed_linked_leads: 2,
+        rejection_reason: "Caption lacked evidence" }], runs: [],
+    }, error: null }));
+    (first.sb as unknown as { rpc: typeof rpc }).rpc = rpc;
+    const result = await runIdeationJob(first.sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("capture_ideation_learning_context", { p_job_id: directed.id });
+    expect((model.mock.calls[0]![0] as { prompt: string }).prompt)
+      .toContain("Caption lacked evidence");
+
+    model.mockClear();
+    const second = database();
+    (second.sb as unknown as { rpc: typeof rpc }).rpc = vi.fn(async () => ({
+      data: null, error: { message: "Snapshot unavailable" },
+    })) as unknown as typeof rpc;
+    const failed = await runIdeationJob(second.sb, config, agent, directed, Date.now() + 60_000);
+    expect(failed.ok).toBe(false);
+    expect(failed.failureMessage).toContain("Snapshot unavailable");
+    expect(model).not.toHaveBeenCalled();
+  });
+
   it("keeps a requested video reel and destination on every idea", async () => {
     modelReturns(25, "reel", "video");
     const directed = { ...handJob, params: {
