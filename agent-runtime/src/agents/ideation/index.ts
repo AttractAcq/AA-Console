@@ -137,6 +137,19 @@ export async function runIdeationJob(
   )) {
     return { ok: false, retryable: false, failureMessage: "The requested destination, media type and format do not form a supported idea." };
   }
+  let campaignId: string | null = null;
+  if (requested?.campaign_id !== undefined) {
+    if (typeof requested.campaign_id !== "string") {
+      return { ok: false, retryable: false, failureMessage: "The requested campaign is invalid." };
+    }
+    const { data: campaign } = await sb.from("client_campaigns")
+      .select("id, client_id, status").eq("id", requested.campaign_id).maybeSingle();
+    if (!campaign || campaign.client_id !== job.client_id
+        || !["planning", "live"].includes(String(campaign.status))) {
+      return { ok: false, retryable: false, failureMessage: "The requested campaign is not active for this client." };
+    }
+    campaignId = String(campaign.id);
+  }
 
   const records = await loadUpstreamRecords(sb, job.client_id, [
     "icp",
@@ -193,14 +206,19 @@ export async function runIdeationJob(
   // fills a pillar, which is a different job with a different shape.
   let pillar: PillarScope | null = null;
   let siblings: PillarScope[] = [];
-  const pillarId = slot?.pillar_id ?? (job.input_table === "client_content_pillars" ? job.input_id : null);
+  const pillarId = slot?.pillar_id
+    ?? (job.input_table === "client_content_pillars" ? job.input_id : null)
+    ?? (typeof requested?.pillar_id === "string" ? requested.pillar_id : null);
+  if (requested?.pillar_id !== undefined && typeof requested.pillar_id !== "string") {
+    return { ok: false, retryable: false, failureMessage: "The requested content pillar is invalid." };
+  }
   if (pillarId) {
     const { data } = await sb
       .from("client_content_pillars")
-      .select("id, name, premise, belongs, does_not_belong, active")
+      .select("id, client_id, name, premise, belongs, does_not_belong, active")
       .eq("id", pillarId)
       .maybeSingle();
-    if (!data) {
+    if (!data || data.client_id !== job.client_id) {
       return {
         ok: false,
         retryable: false,
@@ -400,7 +418,7 @@ Call ${submitTool.name} once when you are done.`;
   // A slot run is scoped to a pillar, so that is what it is. The engine
   // showing up in this column would be a fourth kind of source that means
   // the same as the third.
-  const source = slot ? "pillar" : ideaSource(job.input_table);
+  const source = pillar ? "pillar" : ideaSource(job.input_table);
   const { error } = await sb.from("client_ideas").insert(
     valid.map((idea) => ({
       client_id: job.client_id,
@@ -415,6 +433,7 @@ Call ${submitTool.name} once when you are done.`;
       // model having a view about a decision already taken.
       content_format: slot ? slot.format : idea.content_format,
       target_platform: slot?.platform ?? (typeof targetPlatform === "string" ? targetPlatform : null),
+      campaign_id: campaignId,
       source,
       job_id: job.id,
       slot_id: slot?.id ?? null,

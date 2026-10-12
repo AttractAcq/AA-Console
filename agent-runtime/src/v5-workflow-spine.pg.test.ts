@@ -8,6 +8,9 @@ const migration = () => readFile(new URL(
 const dailyMigration = () => readFile(new URL(
   "../../supabase/migrations/20261012100000_191_v5_daily_package.sql", import.meta.url,
 ), "utf8");
+const recoveryMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261012130000_194_v5_daily_recovery.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -63,12 +66,18 @@ beforeAll(async () => {
     create table client_engine_settings (client_id uuid primary key, enabled boolean not null default false);
     create table content_slots (id uuid primary key, client_id uuid);
     create table client_agent_records (id uuid primary key, client_id uuid not null, job_id uuid, body text);
-    create table client_ideas (id uuid primary key, client_id uuid not null, job_id uuid, title text);
-    create table client_briefs (id uuid primary key, client_id uuid not null, job_id uuid, body text);
+    create table client_ideas (id uuid primary key, client_id uuid not null, job_id uuid, title text,
+      campaign_id uuid, pillar_id uuid, target_platform post_platform,
+      content_format content_format, media_type media_type);
+    create table client_briefs (id uuid primary key, client_id uuid not null, job_id uuid, body text,
+      source_idea_id uuid, content_format content_format, media_type media_type,
+      target_platform post_platform);
     create table client_media_assets (id uuid primary key, client_id uuid not null, brief_id uuid,
       created_at timestamptz default now(), updated_at timestamptz default now(),
-      storage_path text, render_path text);
+      storage_path text, render_path text, content_format content_format,
+      media_type media_type, review_status text default 'pending', human_approved_at timestamptz);
     create table client_media_frames (asset_id uuid, clip_path text);
+    create table post_copy (asset_id uuid, platform post_platform, caption text);
     create table client_pages (id uuid primary key, client_id uuid not null, job_id uuid, body text);
     create table client_sales_agents (id uuid primary key, client_id uuid not null, job_id uuid,
       built_at timestamptz, system_prompt text);
@@ -105,6 +114,7 @@ beforeAll(async () => {
   `);
   await db.exec(await migration());
   await db.exec(await dailyMigration());
+  await db.exec(await recoveryMigration());
 });
 
 beforeEach(async () => {
@@ -272,6 +282,21 @@ describe("v5 workflow spine", () => {
     expect(readiness.result).toMatchObject({
       planned_count: 4, accepted_count: 0, ready_for_review: false,
     });
+    await service("select * from reconcile_workflow_runs()");
+    const reelIdeaStep = await service<{ id: string }>(`select id from workflow_steps
+      where run_id = '${first.run_id}' and step_key = 'reel_idea'`);
+    const wrongIdea = "66666666-6666-4666-8666-666666666666";
+    await db.exec(`insert into client_ideas (id, client_id, job_id, title,
+      campaign_id, pillar_id, target_platform, content_format, media_type)
+      values ('${wrongIdea}', '${CLIENT}',
+        (select job_id from workflow_steps where id = '${reelIdeaStep.id}'),
+        'Wrong campaign idea', '${OTHER}', '${PILLAR}', 'instagram', 'reel', 'video');
+      update agent_jobs set status = 'completed' where id =
+        (select job_id from workflow_steps where id = '${reelIdeaStep.id}')`);
+    await service("select * from reconcile_workflow_runs()");
+    await expect(service(`select id from accept_workflow_step('${reelIdeaStep.id}',
+      'idea', '${wrongIdea}', 'v1', '{"result":"pass","checks":["scope"]}'::jsonb)`))
+      .rejects.toThrow(/does not match its role/);
     await db.exec(`insert into client_engine_settings values ('${CLIENT}', true)`);
     await expect(service(`select id from plan_daily_package('${CLIENT}', date '2099-01-03')`))
       .rejects.toThrow(/legacy engine/);
@@ -317,5 +342,59 @@ describe("v5 workflow spine", () => {
       .rejects.toThrow(/same-client active pillar/);
     expect((await one<{ n: number }>("select count(*)::integer as n from workflow_runs")).n)
       .toBe(0);
+  });
+
+  it("uses only a compatible human-approved reserve for a blocked final item", async () => {
+    const reserve = "88888888-8888-4888-8888-888888888888";
+    const reserveIdea = "77777777-7777-4777-8777-777777777777";
+    await db.exec(`insert into client_daily_package_settings
+      (client_id, enabled, campaign_id, pillar_id)
+      values ('${CLIENT}', true, '${CAMPAIGN}', '${PILLAR}')`);
+    const pkg = await service<{ id: string; run_id: string }>(`
+      select id, run_id from plan_daily_package('${CLIENT}', date '2099-01-05')`);
+    const item = await service<{ id: string; final_step_id: string }>(`
+      select id, final_step_id from daily_package_items where package_id = '${pkg.id}' and role = 'reel'`);
+    await db.exec(`update workflow_steps set status = 'blocked', blocker = 'Motion failed.'
+      where id = '${item.final_step_id}';
+      update workflow_runs set status = 'blocked', blocker = 'Motion failed.'
+      where id = '${pkg.run_id}';
+      insert into client_ideas (id, client_id, title, campaign_id, pillar_id,
+        target_platform, content_format, media_type)
+        values ('${reserveIdea}', '${CLIENT}', 'Evergreen proof', '${CAMPAIGN}',
+          '${PILLAR}', 'instagram', 'reel', 'video');
+      update client_briefs set source_idea_id = '${reserveIdea}',
+        content_format = 'reel', media_type = 'video', target_platform = 'instagram'
+        where id = '${OUTPUT}';
+      insert into client_media_assets (id, client_id, brief_id, storage_path, render_path,
+        content_format, media_type, review_status, created_at)
+        values ('${reserve}', '${CLIENT}', '${OUTPUT}', 'client/reserve/still.png',
+          'client/reserve/cut.mp4', 'reel', 'video', 'approved', now() - interval '1 day');
+      insert into post_copy values ('${reserve}', 'instagram', 'A finished reserve caption');`);
+    const missing = await service<{ result: unknown }>(`
+      select recover_daily_package_item('${item.id}', 'Provider failure') as result`);
+    expect(missing.result).toBeNull();
+    expect((await service<{ n: number }>(`select count(*)::integer as n
+      from daily_package_recovery_alerts where item_id = '${item.id}' and resolved_at is null`)).n).toBe(1);
+    await db.exec(`update client_media_assets set human_approved_at = now()
+      where id = '${reserve}'`);
+    await db.exec("select set_config('request.jwt.claim.role', 'authenticated', false)");
+    await expect(one(`select id from recover_daily_package_item('${item.id}', 'Provider failure')`))
+      .rejects.toThrow(/service role/);
+    expect((await service<{ available: number; shortfall: number }>(`
+      select available, shortfall from daily_reserve_coverage('${CLIENT}')
+      where role = 'reel'`))).toEqual({ available: 1, shortfall: 6 });
+    const selected = await service<{ reserve_asset_id: string }>(`
+      select reserve_asset_id from recover_daily_package_item('${item.id}', 'Provider failure')`);
+    expect(selected.reserve_asset_id).toBe(reserve);
+    expect((await service<{ asset_id: string }>(`select asset_id from daily_package_items
+      where id = '${item.id}'`)).asset_id).toBe(reserve);
+    expect((await service<{ status: string }>(`select status from workflow_steps
+      where id = '${item.final_step_id}'`)).status).toBe("completed");
+    expect((await service<{ n: number }>(`select count(*)::integer as n
+      from daily_package_recovery_alerts where item_id = '${item.id}' and resolved_at is null`)).n).toBe(0);
+    expect((await service<{ available: number }>(`
+      select available from daily_reserve_coverage('${CLIENT}') where role = 'reel'`)).available).toBe(0);
+    await expect(service(`select id from recover_daily_package_item('${item.id}', 'Different reason')`))
+      .rejects.toThrow(/idempotency_conflict/);
   });
 });
