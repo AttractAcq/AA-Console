@@ -11,6 +11,9 @@ const dailyMigration = () => readFile(new URL(
 const recoveryMigration = () => readFile(new URL(
   "../../supabase/migrations/20261012130000_194_v5_daily_recovery.sql", import.meta.url,
 ), "utf8");
+const alertMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261012140000_195_v5_recovery_alert_delivery.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -55,8 +58,9 @@ beforeAll(async () => {
       $$ select nullif(current_setting('request.jwt.claim.role', true), '') $$;
     create function auth.uid() returns uuid language sql stable as
       $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-    create table clients (id uuid primary key, timezone text not null default 'Europe/London');
-    create table profiles (id uuid primary key);
+    create table clients (id uuid primary key, name text not null default 'Test client',
+      timezone text not null default 'Europe/London');
+    create table profiles (id uuid primary key, email text);
     create table client_campaigns (id uuid primary key, client_id uuid not null,
       name text, audience text, offer_summary text, core_message text,
       status text not null default 'planning');
@@ -91,6 +95,8 @@ beforeAll(async () => {
     create function can_access_client(p_client_id uuid) returns boolean language sql stable as
       $$ select p_client_id = '${CLIENT}' $$;
     create function lock_down_definer_functions() returns integer language sql as $$ select 0 $$;
+    create function active_video_approval_manager(uuid) returns uuid language sql stable as
+      $$ select '${ADMIN}'::uuid $$;
     create function enqueue_agent_job_internal(
       p_agent_key text, p_client_id uuid, p_input_table text, p_input_id uuid,
       p_actor uuid, p_params jsonb, p_description text
@@ -103,7 +109,7 @@ beforeAll(async () => {
       return v_id;
     end; $$;
     insert into clients values ('${CLIENT}'), ('${OTHER}');
-    insert into profiles values ('${ADMIN}');
+    insert into profiles values ('${ADMIN}', 'manager@example.com');
     insert into client_campaigns (id, client_id, name, audience, offer_summary)
       values ('${CAMPAIGN}', '${CLIENT}', 'Launch campaign', 'Founders', 'Premium service');
     insert into client_content_pillars values ('${PILLAR}', '${CLIENT}', true, 'Trusted expertise');
@@ -115,6 +121,7 @@ beforeAll(async () => {
   await db.exec(await migration());
   await db.exec(await dailyMigration());
   await db.exec(await recoveryMigration());
+  await db.exec(await alertMigration());
 });
 
 beforeEach(async () => {
@@ -375,6 +382,17 @@ describe("v5 workflow spine", () => {
     expect(missing.result).toBeNull();
     expect((await service<{ n: number }>(`select count(*)::integer as n
       from daily_package_recovery_alerts where item_id = '${item.id}' and resolved_at is null`)).n).toBe(1);
+    const alert = await service<{ alert_id: string; manager_email: string; item_role: string }>(`
+      select alert_id, manager_email, item_role from claim_daily_recovery_alert('worker-a')`);
+    expect(alert.manager_email).toBe('manager@example.com');
+    expect(alert.item_role).toBe('reel');
+    await expect(service(`select id from complete_daily_recovery_alert(
+      '${alert.alert_id}', 'another-worker', true, 'resend-1')`))
+      .rejects.toThrow(/not leased/);
+    await service(`select id from complete_daily_recovery_alert(
+      '${alert.alert_id}', 'worker-a', true, 'resend-1')`);
+    expect((await service<{ delivery_status: string }>(`select delivery_status
+      from daily_package_recovery_alerts where id = '${alert.alert_id}'`)).delivery_status).toBe('sent');
     await db.exec(`update client_media_assets set human_approved_at = now()
       where id = '${reserve}'`);
     await db.exec("select set_config('request.jwt.claim.role', 'authenticated', false)");

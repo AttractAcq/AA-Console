@@ -63,6 +63,8 @@ create table daily_package_recovery_alerts (
 );
 create index daily_package_alerts_open_idx on daily_package_recovery_alerts (created_at)
   where resolved_at is null;
+create unique index daily_package_one_open_alert
+  on daily_package_recovery_alerts (item_id) where resolved_at is null;
 alter table daily_package_recoveries enable row level security;
 alter table daily_package_recovery_alerts enable row level security;
 create policy daily_recoveries_read on daily_package_recoveries for select to authenticated
@@ -124,7 +126,8 @@ begin
   for update of m skip locked limit 1;
   if not found then
     insert into daily_package_recovery_alerts (item_id, reason)
-    values (p_item_id, 'No compatible human-approved reserve: ' || btrim(p_reason));
+    values (p_item_id, 'No compatible human-approved reserve: ' || btrim(p_reason))
+    on conflict (item_id) where resolved_at is null do nothing;
     update workflow_runs set status = 'blocked',
       blocker = 'No compatible human-approved reserve for ' || v_item.role || '.',
       updated_at = now() where id = v_run.id;

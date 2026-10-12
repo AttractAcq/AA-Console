@@ -67,7 +67,7 @@ if (config.enabled) {
 }
 
 const heartbeat = startHeartbeat(sb, config, workers.length);
-const workflows = config.enabled && config.workflowEnabled ? startWorkflowReconciler(sb) : null;
+const workflows = config.enabled && config.workflowEnabled ? startWorkflowReconciler(sb, config) : null;
 
 const server = http.createServer((req, res) => {
   const json = (status: number, body: unknown): void => {
