@@ -15,7 +15,8 @@
 // person's decision — brief_dispatch sends to a real inbox and Resend is
 // not configured. Failing loudly with the reasons is the honest outcome.
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -39,7 +40,8 @@ import { probeDurationSec, render, renderCapability, sampleFrames } from "./medi
 import { installFont } from "./font.js";
 import { communicationProblems, planEdit, type PlanClip } from "./plan.js";
 import { advanceSlot, slotIdOf } from "../../engine/slot.js";
-import { buildRenderPlan, OUTPUT_HEIGHT, OUTPUT_WIDTH } from "./render.js";
+import { buildRenderPlan } from "./render.js";
+import { probeRenderedVideo, reviewRenderedVideo } from "./acceptance.js";
 
 const BUCKET = "client-media";
 /** Enough to read the cut without paying for every frame of it. */
@@ -67,8 +69,9 @@ const held = (failureMessage: string): JobResult => ({
   failureMessage,
 });
 
-export function renderStoragePath(clientId: string, assetId: string): string {
-  return `${clientId}/reels/${assetId}/cut.mp4`;
+export function renderStoragePath(clientId: string, assetId: string, jobId: string, attempt: number,
+  digest: string): string {
+  return `${clientId}/reels/${assetId}/candidates/${jobId}-${attempt}-${digest}.mp4`;
 }
 
 interface AssetRow {
@@ -115,6 +118,35 @@ export async function runVideoEditJob(
   if (briefError) return failed(`Could not load the brief: ${briefError.message}`, true);
   const brief = briefRow as BriefForEdit | null;
   if (!brief) return failed("That reel's brief no longer exists.");
+
+  // A worker may lose its lease after the candidate was accepted but before
+  // it reported job completion. Resume from the accepted exact file instead
+  // of paying for another edit or overwriting it.
+  const { data: acceptedCandidate, error: priorError } = await sb
+    .from("video_render_candidates")
+    .select("id, render_path")
+    .eq("job_id", job.id)
+    .eq("verdict", "accepted")
+    .order("attempt", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (priorError) return failed(`Could not check prior accepted cut: ${priorError.message}`, true);
+  if (acceptedCandidate) {
+    const slotId = slotIdOf(job);
+    if (slotId) {
+      const { data: slot, error: slotError } = await sb.from("content_slots")
+        .select("stage, asset_id").eq("id", slotId).maybeSingle();
+      if (slotError || !slot) return failed(`Could not inspect resumed slot: ${slotError?.message ?? "missing"}`, true);
+      if (slot.asset_id === asset.id && ["copywriting", "qa", "awaiting_approval",
+        "scheduled", "published"].includes(slot.stage)) return { ok: true, retryable: false };
+      if (slot.stage !== "building") return failed(`Accepted cut is attached to a slot at ${slot.stage}; manual review is needed.`);
+      await advanceSlot(sb, slotId, "copywriting", {
+        agentKey: "video_edit", jobId: job.id, assetId: asset.id,
+        note: "Resumed the already accepted exact cut.",
+      });
+    }
+    return { ok: true, retryable: false };
+  }
 
   const { data: frameRows, error: frameError } = await sb
     .from("client_media_frames")
@@ -163,8 +195,7 @@ export async function runVideoEditJob(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await appendEvent(sb, job.id, `The cut failed: ${message}`, "error", { stage: "cut" });
-    // Retryable: a download, an ffmpeg timeout or a provider blip are all
-    // worth a second attempt, and nothing durable has been written yet.
+    // A retry uses a new attempt number and therefore a distinct candidate.
     return failed(message, true);
   } finally {
     await rm(work, { recursive: true, force: true });
@@ -266,31 +297,60 @@ async function cut(
   await render(renderPlan);
   await appendEvent(sb, job.id, `Rendered ${totalDuration(edl).toFixed(1)}s at 1080x1920.`);
 
-  const storagePath = renderStoragePath(asset.client_id, asset.id);
-  const { readFile } = await import("node:fs/promises");
+  const bytes = await readFile(outputPath);
+  const digest = createHash("sha256").update(bytes).digest("hex").slice(0, 24);
+  const storagePath = renderStoragePath(asset.client_id, asset.id, job.id, job.attempts, digest);
+  const probe = await probeRenderedVideo(outputPath);
   const { error: upError } = await sb.storage
     .from(BUCKET)
-    .upload(storagePath, await readFile(outputPath), { contentType: "video/mp4", upsert: true });
+    .upload(storagePath, bytes, { contentType: "video/mp4", upsert: true });
   if (upError) throw new Error(`Could not store the cut: ${upError.message}`);
-
-  const { error: saveError } = await sb
-    .from("client_media_assets")
-    .update({
-      edit_plan: edl as unknown as Record<string, unknown>,
-      render_path: storagePath,
-      // The shape of what was just rendered. QA checks aspect ratio and
-      // duration, and this is the only moment either is known for certain —
-      // afterwards they would have to be probed back out of the file.
-      width: OUTPUT_WIDTH,
-      height: OUTPUT_HEIGHT,
-      duration_sec: Number(renderPlan.durationSec.toFixed(2)),
-    })
-    .eq("id", asset.id);
-  if (saveError) throw new Error(`Could not file the cut: ${saveError.message}`);
-
+  const { data: candidate, error: recordError } = await sb.rpc("record_video_render_candidate", {
+    p_job_id: job.id, p_attempt: job.attempts, p_asset_id: asset.id,
+    p_render_path: storagePath, p_media_probe: probe,
+  });
+  if (recordError || !candidate) throw new Error(`Could not record candidate: ${recordError?.message ?? "empty result"}`);
+  const candidateId = (candidate as { id: string }).id;
+  if (probe.result === "fail") {
+    const reason = probe.checks.join(" ");
+    const { error } = await sb.rpc("decide_video_render_candidate", {
+      p_candidate_id: candidateId, p_verdict: "rejected",
+      p_creative_review: { result: "fail", checks: [{ area: "media_probe", verdict: "fail", reason }] },
+      p_rejection_reason: reason,
+    });
+    if (error) throw new Error(`Could not reject candidate: ${error.message}`);
+    await appendEvent(sb, job.id, `The rendered candidate failed media inspection: ${reason}`, "warn", {
+      candidate_id: candidateId, stage: "media_probe", probe,
+    });
+    return failed(`Rendered candidate failed media inspection: ${reason}`);
+  }
+  const creative = await reviewRenderedVideo({
+    path: outputPath, workDir: work, brief: briefTextForEdit(brief),
+    brandNeverDo: brand?.never_do ?? "",
+    soundTreatment: probe.has_audio ? "audio_present" : "captions_only",
+  }, { model: config.model, timeoutMs: deadlineMs ? Math.max(30_000, deadlineMs - Date.now()) : undefined });
+  usage = {
+    inputTokens: usage.inputTokens + creative.usage.inputTokens,
+    outputTokens: usage.outputTokens + creative.usage.outputTokens,
+    costUsd: usage.costUsd + creative.usage.costUsd,
+  };
+  const verdict = creative.result === "pass" ? "accepted" : "rejected";
+  const { error: decisionError } = await sb.rpc("decide_video_render_candidate", {
+    p_candidate_id: candidateId, p_verdict: verdict,
+    p_creative_review: creative,
+    p_rejection_reason: creative.result === "fail" ? creative.summary : null,
+    p_edit_plan: creative.result === "pass" ? edl : null,
+  });
+  if (decisionError) throw new Error(`Could not file creative review: ${decisionError.message}`);
+  if (verdict === "rejected") {
+    await appendEvent(sb, job.id, `The rendered candidate failed visual review: ${creative.summary}`, "warn", {
+      candidate_id: candidateId, stage: "creative_review", review: creative,
+    });
+    return { ok: false, retryable: false, failureMessage: creative.summary, usage };
+  }
   await appendEvent(sb, job.id, "The cut is on the reel and waiting for a person.", "info", {
     stage: "done",
-    render_path: storagePath,
+    render_path: storagePath, candidate_id: candidateId, internal_review: creative,
   });
 
   // The slot moves on only now, with a cut on the asset. Before this the

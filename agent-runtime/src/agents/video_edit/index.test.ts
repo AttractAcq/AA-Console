@@ -61,6 +61,11 @@ function harness(options: {
       if (table === "client_briefs") {
         return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: brief, error: null }) }) }) };
       }
+      if (table === "video_render_candidates") {
+        return { select: () => ({ eq: () => ({ eq: () => ({ order: () => ({
+          limit: () => ({ maybeSingle: async () => ({ data: null, error: null }) }),
+        }) }) }) }) };
+      }
       if (table === "client_media_frames") {
         return { select: () => ({ eq: () => ({ order: async () => ({ data: frames, error: null }) }) }) };
       }
