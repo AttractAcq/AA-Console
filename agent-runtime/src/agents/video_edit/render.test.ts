@@ -8,7 +8,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import type { Edl } from "./edl.js";
 import { probeDurationSec, render } from "./media.js";
-import { buildRenderPlan, RenderPlanError, wrapText } from "./render.js";
+import { buildRenderPlan, readableEndCardColour, RenderPlanError, wrapText } from "./render.js";
 import { fontSource, installFont } from "./font.js";
 
 const edl: Edl = {
@@ -102,6 +102,19 @@ describe("buildRenderPlan", () => {
       { path: "/work/caption-1-2.txt", content: "of it" },
       { path: "/work/end-card-1.txt", content: "Book a call" },
     ]);
+  });
+
+  it("keeps captions legible over both dark and bright footage", () => {
+    const filter = filterOf(buildRenderPlan(edl, { ...options, textColour: "#142B23" }).args);
+    const caption = filter.slice(filter.indexOf("textfile=/work/caption-1-1.txt"));
+    expect(caption).toContain("fontcolor=0xffffff");
+    expect(caption).toContain("box=1:boxcolor=black@0.58:boxborderw=16");
+    expect(caption).toContain("bordercolor=black@0.85");
+  });
+
+  it("uses a readable end-card colour when brand text matches its background", () => {
+    expect(readableEndCardColour("0x142b23", "0x254d38")).toBe("0xffffff");
+    expect(readableEndCardColour("0xffffff", "0x254d38")).toBe("0x254d38");
   });
 
   it("centres each line on its own width, not the block's", () => {

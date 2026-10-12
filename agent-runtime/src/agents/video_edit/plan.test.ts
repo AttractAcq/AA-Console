@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_CAPTION_CHARS, MAX_END_CARD_SEC, TRANSITIONS } from "./edl.js";
-import { buildPlanContent, communicationProblems, type PlanInput } from "./plan.js";
+import { MAX_CAPTION_CHARS, MAX_END_CARD_SEC, TRANSITIONS, type Edl } from "./edl.js";
+import { buildPlanContent, communicationProblems, sameRenderedCut, type PlanInput } from "./plan.js";
 
 const input: PlanInput = {
   title: "Spike reel",
@@ -56,6 +56,28 @@ describe("buildPlanContent", () => {
     expect(last).toContain("- Caption 1 is empty.");
     expect(last).toContain('"segments":[]');
   });
+
+  it("passes the exact failed candidate's reason into the next cut", () => {
+    const all = texts(buildPlanContent({ ...input, priorCandidateFailure: {
+      candidateId: "candidate-1", reason: "Caption obscured the owner's face at 4 seconds.",
+      editPlan: { segments: [{ shot: 1 }] },
+    } })).join("\n");
+    expect(all).toContain("PRIOR FINAL-CUT FAILURE (candidate-1)");
+    expect(all).toContain("Caption obscured the owner's face at 4 seconds.");
+    expect(all).toContain('Rejected edit plan: {"segments":[{"shot":1}]}');
+  });
+
+  it("refuses a renamed rationale when the rendered cut is identical", () => {
+    const prior: Edl = { segments: [{ shot: 1, in_sec: 0, out_sec: 3,
+      transition: "cut" }], captions: [{ text: "A caption", start_sec: 0,
+      end_sec: 2, position: "bottom" }], end_card_text: "CTA", end_card_sec: 1,
+    notes: "first rationale" };
+    const candidate: Edl = { ...prior, notes: "new rationale" };
+    expect(sameRenderedCut(candidate, prior)).toBe(true);
+    expect(sameRenderedCut({ ...candidate, captions: [{ ...candidate.captions[0]!,
+      text: "A better caption" }] }, prior))
+      .toBe(false);
+  });
 });
 
 /**
@@ -104,6 +126,13 @@ describe("silent reel communication", () => {
   });
   it("keeps lettered legacy footage eligible for a caption-free cut", () => {
     expect(communicationProblems(edl, [{ ...input.clips[0]!, burnedInText: "A hook" }])).toEqual([]);
+  });
+  it("asks for a revision when silent-footage captions cover too much of the frame", () => {
+    const problems = communicationProblems({ ...edl, captions: [
+      { text: "Before you raise the budget read your own offer as a stranger would", start_sec: 0, end_sec: 3, position: "middle" },
+      { text: "Fix the offer first", start_sec: 4, end_sec: 6, position: "bottom" },
+    ] }, input.clips);
+    expect(problems).toContainEqual(expect.stringContaining("more than two lines"));
   });
 });
 

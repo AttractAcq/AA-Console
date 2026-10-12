@@ -43,6 +43,8 @@ export interface BriefForEdit {
   call_to_action: string | null;
   proof: string | null;
   channel_intent: string | null;
+  sound_treatment?: "captions_only" | "licensed_music" | "approved_narration";
+  sound_asset_id?: string | null;
 }
 
 export interface EditShot {

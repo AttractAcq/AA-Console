@@ -148,6 +148,7 @@ export const IMAGE_CONCEPT_TOOL = {
  * checked in framePlanProblem instead, the same way campaignIdeas does.
  */
 export function framesConceptTool(format: string, ask: FrameAsk = NO_FRAME_ASK) {
+  const isReel = format === "reel";
   const required = requiredFrameCount(ask);
   const howMany =
     required === null
@@ -182,8 +183,14 @@ export function framesConceptTool(format: string, ask: FrameAsk = NO_FRAME_ASK) 
           },
         },
         rationale: { type: "string", description: "Why this set and this order. For the operator, not the renderer." },
+        ...(isReel ? {
+          cast_anchor: {
+            type: "string",
+            description: "One precise, fictional lead-person appearance reused verbatim in every shot: complexion, age, hair, facial features, build and wardrobe. Name stable props and location cues too. Do not write only 'same person'.",
+          },
+        } : {}),
       },
-      required: ["frames", "rationale"],
+      required: isReel ? ["frames", "rationale", "cast_anchor"] : ["frames", "rationale"],
       additionalProperties: false,
     },
   };
@@ -350,10 +357,12 @@ export function reelKeyframePrompt(
   total: number,
   clientName: string,
   brand: BrandProfile | null,
+  castAnchor = "",
 ): string {
   const value = (key: string) => String(frame[key] ?? "").trim();
   return [
     `Create the opening keyframe for shot ${value("position")} of ${total} in a vertical cinematic reel for ${clientName}.`,
+    ...(castAnchor.trim() ? [`Continuity anchor for every shot: ${castAnchor.trim()}`] : []),
     `Narrative job: ${value("purpose")}`,
     `Visible subject: ${value("subject")}`,
     `Real environment: ${value("background")}`,
@@ -644,7 +653,7 @@ ${
     : ""
 }${remake ? "" : remakeBlock(remakeFeedback)}${isRecruitment ? recruitmentBlock(roleLabel) : ""}${
   openingShots
-    ? "\nVIDEO KEYFRAMES\nEach frame is the opening image of one filmed shot, not a finished ad or title card. Show a concrete person, object, action or environment that can visibly change during the shot. Keep the same visual world across the sequence. Set headline, subhead and call_to_action to empty strings for every frame: the video editor will add readable copy after animation. No typography, diagrams, UI mockups, labels, logo or wordmark in the source image. Describe the opening composition, not a camera move; motion is directed later.\n"
+    ? "\nVIDEO KEYFRAMES\nEach frame is the opening image of one filmed shot, not a finished ad or title card. Show a concrete person, object, action or environment that can visibly change during the shot. Define one specific fictional lead-person appearance in cast_anchor, including complexion, hair, age, face, build and wardrobe; repeat those traits in every frame's subject. 'The same owner' without those traits is insufficient: separate image calls will cast different people. Keep the same props and visual world across the sequence. Set headline, subhead and call_to_action to empty strings for every frame: the video editor will add readable copy after animation. No typography, diagrams, UI mockups, labels, logo or wordmark in the source image. Describe the opening composition, not a camera move; motion is directed later.\n"
     : ""
 }${isFramed && !remake ? `\nTHE SET\n${frameAskInstruction(frameAsk)}\n` : ""}
 THE BRIEF
@@ -979,10 +988,10 @@ Call ${submitTool.name} once when you are done.`;
             identity,
             brand,
           );
-          // The image API cannot render 9:16 directly. The film prompt keeps
-          // its edges clear for the padding that makes a true reel frame.
+          // The image API cannot render 9:16 directly. Keep the action inside
+          // the safe area for the centred crop that makes a true reel frame.
           const prompt = openingShots
-            ? reelKeyframePrompt(frame as unknown as Record<string, unknown>, total, clientName, brand)
+            ? reelKeyframePrompt(frame as unknown as Record<string, unknown>, total, clientName, brand, String(concept.cast_anchor ?? ""))
             : framePrompt(frame, total, composed);
           const out = await renderImage(config, prompt, {
             size: renderSize,
