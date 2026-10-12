@@ -107,3 +107,9 @@ Each PR should include migration and RLS tests for new tables/RPCs, one restart/
 - A new client with complete inputs reaches one reviewable launch package containing an approved campaign plan, tested page and conversion route, configured sales agent, organic assets, paused Meta creative and measurement checks. Human activation remains separate.
 - Restart and duplicate-trigger tests prove no lost run and no duplicate paid provider submissions. Every blocker identifies the failed step and what action can resolve it.
 - Track the v5 metrics: complete client-days, first-pass approval, repair time, launch-readiness hours, package completeness, run/recovery success, backlog age and attribution coverage.
+
+## Implementation ledger
+
+- **Workflow spine (PR #154):** persisted run, sealed dependency graph, queue reconciliation, accepted artefact provenance and internal QA evidence. The reconciler is opt-in with `V5_WORKFLOW_ENABLED`; it stops at `awaiting_human_approval`. It does not yet make daily or launch outcomes ready by itself.
+- **Daily package planner (stacked branch):** client-local date and cutoff, exact four-role demand, frozen campaign and pillar context, dependency graph, idempotency and a derived readiness result. It requires explicit per-client enablement and refuses to run alongside the legacy engine planner. The story defaults to a still; video is configurable. This is production demand, not a publishing schedule or an accepted quality claim.
+- **Open acceptance work:** internal video inspection and sound policy; approved reserve selection and manager alerting; real launch preflight, conversion testing and activation package; run-level recovery and attribution. The existing visual failure on AA-0127 remains unresolved until a new full-cut video is reviewed and accepted by owner/SMM.

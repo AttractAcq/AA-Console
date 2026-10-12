@@ -5,11 +5,15 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 const migration = () => readFile(new URL(
   "../../supabase/migrations/20261012090000_190_v5_workflow_spine.sql", import.meta.url,
 ), "utf8");
+const dailyMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261012100000_191_v5_daily_package.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 const ADMIN = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const CAMPAIGN = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const PILLAR = "99999999-9999-4999-8999-999999999999";
 const INPUT = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const OUTPUT = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const IDEA = "ffffffff-ffff-4fff-8fff-ffffffffffff";
@@ -40,14 +44,24 @@ beforeAll(async () => {
   db = new PGlite();
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
+    create type post_platform as enum ('facebook', 'instagram', 'tiktok', 'linkedin', 'youtube');
+    create type media_type as enum ('image', 'text', 'video');
+    create type content_format as enum ('single', 'carousel', 'story', 'reel');
     create schema auth;
     create function auth.role() returns text language sql stable as
       $$ select nullif(current_setting('request.jwt.claim.role', true), '') $$;
     create function auth.uid() returns uuid language sql stable as
       $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-    create table clients (id uuid primary key);
+    create table clients (id uuid primary key, timezone text not null default 'Europe/London');
     create table profiles (id uuid primary key);
-    create table client_campaigns (id uuid primary key, client_id uuid not null);
+    create table client_campaigns (id uuid primary key, client_id uuid not null,
+      name text, audience text, offer_summary text, core_message text,
+      status text not null default 'planning');
+    create table client_content_pillars (id uuid primary key, client_id uuid not null,
+      active boolean not null default true, premise text);
+    create table client_proof_assets (id uuid primary key, client_id uuid not null);
+    create table client_engine_settings (client_id uuid primary key, enabled boolean not null default false);
+    create table content_slots (id uuid primary key, client_id uuid);
     create table client_agent_records (id uuid primary key, client_id uuid not null, job_id uuid, body text);
     create table client_ideas (id uuid primary key, client_id uuid not null, job_id uuid, title text);
     create table client_briefs (id uuid primary key, client_id uuid not null, job_id uuid, body text);
@@ -81,15 +95,20 @@ beforeAll(async () => {
     end; $$;
     insert into clients values ('${CLIENT}'), ('${OTHER}');
     insert into profiles values ('${ADMIN}');
-    insert into client_campaigns values ('${CAMPAIGN}', '${CLIENT}');
+    insert into client_campaigns (id, client_id, name, audience, offer_summary)
+      values ('${CAMPAIGN}', '${CLIENT}', 'Launch campaign', 'Founders', 'Premium service');
+    insert into client_content_pillars values ('${PILLAR}', '${CLIENT}', true, 'Trusted expertise');
     insert into client_briefs (id, client_id, body) values ('${OUTPUT}', '${CLIENT}', 'A real brief');
     insert into client_briefs (id, client_id, body) values ('${OTHER_OUTPUT}', '${OTHER}', 'Other brief');
-    insert into agents values ('brief', false), ('ideation', false);
+    insert into agents values ('brief', false), ('ideation', false),
+      ('creative_build', false), ('video_build', false), ('video_edit', false);
   `);
   await db.exec(await migration());
+  await db.exec(await dailyMigration());
 });
 
 beforeEach(async () => {
+  await db.exec("delete from client_daily_package_settings; delete from client_engine_settings");
   await db.exec("delete from workflow_runs; delete from agent_jobs");
   await db.exec("select set_config('request.jwt.claim.role', 'service_role', false)");
 });
@@ -222,5 +241,81 @@ describe("v5 workflow spine", () => {
       select j.input_id, s.resolved_input_id from workflow_steps s
       join agent_jobs j on j.id = s.job_id where s.id = '${briefStep.id}'`);
     expect(linked).toEqual({ input_id: IDEA, resolved_input_id: IDEA });
+  });
+
+  it("plans exactly four roles once, freezes context, and seals the dependency graph", async () => {
+    await db.exec(`insert into client_daily_package_settings
+      (client_id, enabled, campaign_id, pillar_id)
+      values ('${CLIENT}', true, '${CAMPAIGN}', '${PILLAR}')`);
+    const first = await service<{ id: string; run_id: string }>(`
+      select id, run_id from plan_daily_package('${CLIENT}', date '2099-01-02')`);
+    const second = await service<{ id: string; run_id: string }>(`
+      select id, run_id from plan_daily_package('${CLIENT}', date '2099-01-02')`);
+    expect(second).toEqual(first);
+    const roles = await db.query<{ role: string; content_format: string; media_type: string }>(`
+      select role, content_format, media_type from daily_package_items
+      where package_id = '${first.id}' order by role`);
+    expect(roles.rows).toEqual([
+      { role: "reel", content_format: "reel", media_type: "video" },
+      { role: "static_a", content_format: "single", media_type: "image" },
+      { role: "static_b", content_format: "single", media_type: "image" },
+      { role: "story", content_format: "story", media_type: "image" },
+    ]);
+    const graph = await one<{ n: number; sealed: boolean; audience: string }>(`
+      select (select count(*)::integer from workflow_steps where run_id = '${first.run_id}') as n,
+        sealed_at is not null as sealed, input_snapshot->>'audience' as audience
+      from workflow_runs where id = '${first.run_id}'`);
+    expect(graph).toEqual({ n: 14, sealed: true, audience: "Founders" });
+    const readiness = await service<{ result: {
+      planned_count: number; accepted_count: number; ready_for_review: boolean;
+    } }>(`select daily_package_readiness('${first.id}') as result`);
+    expect(readiness.result).toMatchObject({
+      planned_count: 4, accepted_count: 0, ready_for_review: false,
+    });
+    await db.exec(`insert into client_engine_settings values ('${CLIENT}', true)`);
+    await expect(service(`select id from plan_daily_package('${CLIENT}', date '2099-01-03')`))
+      .rejects.toThrow(/legacy engine/);
+  });
+
+  it("accepts video motion only for the prior accepted still asset with every clip present", async () => {
+    const run = await makeRun("video-chain");
+    const still = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}', 'still', '{}', 'creative_build', 'client_briefs', '${OUTPUT}')`);
+    const motion = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}', 'motion', array['still']::text[], 'video_build',
+      'client_briefs', '${OUTPUT}')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec(`insert into client_media_assets
+      (id, client_id, brief_id, storage_path) values
+      ('${IDEA}', '${CLIENT}', '${OUTPUT}', 'client/generated/still.png')`);
+    await db.exec(`update agent_jobs set status = 'completed' where id =
+      (select job_id from workflow_steps where id = '${still.id}')`);
+    await service("select * from reconcile_workflow_runs()");
+    await service(`select id from accept_workflow_step('${still.id}', 'asset', '${IDEA}',
+      'still-v1', '{"result":"pass","checks":["still"]}'::jsonb)`);
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec(`insert into client_media_frames (asset_id, clip_path)
+      values ('${IDEA}', 'client/generated/clip-1.mp4'), ('${IDEA}', null)`);
+    await db.exec(`update agent_jobs set status = 'completed' where id =
+      (select job_id from workflow_steps where id = '${motion.id}')`);
+    await service("select * from reconcile_workflow_runs()");
+    await expect(service(`select id from accept_workflow_step('${motion.id}', 'asset', '${IDEA}',
+      'motion-v1', '{"result":"pass","checks":["clips"]}'::jsonb)`))
+      .rejects.toThrow(/missing or belongs/);
+    await db.exec(`update client_media_frames set clip_path = 'client/generated/clip-2.mp4'
+      where asset_id = '${IDEA}' and clip_path is null`);
+    await service(`select id from accept_workflow_step('${motion.id}', 'asset', '${IDEA}',
+      'motion-v1', '{"result":"pass","checks":["clips"]}'::jsonb)`);
+  });
+
+  it("rejects a daily package configured with another client's campaign", async () => {
+    await db.exec(`insert into client_daily_package_settings
+      (client_id, enabled, campaign_id, pillar_id)
+      values ('${OTHER}', true, '${CAMPAIGN}', '${PILLAR}')`);
+    await expect(service(`select id from plan_daily_package('${OTHER}', date '2099-01-04')`))
+      .rejects.toThrow(/same-client active pillar/);
+    expect((await one<{ n: number }>("select count(*)::integer as n from workflow_runs")).n)
+      .toBe(0);
   });
 });

@@ -351,14 +351,24 @@ begin
     when 'asset' then exists (select 1 from client_media_assets a
       where a.id = p_record_id and a.client_id = v_run.client_id
         and (
-          (v_step.input_table = 'client_briefs' and a.brief_id = v_step.resolved_input_id
+          (v_step.agent_key = 'video_build' and v_step.input_table = 'client_briefs'
+            and a.brief_id = v_step.resolved_input_id
+            and exists (select 1 from workflow_steps prior_step
+              join workflow_artifacts prior_asset on prior_asset.step_id = prior_step.id
+              where prior_step.run_id = v_run.id
+                and prior_step.step_key = any(v_step.dependencies)
+                and prior_asset.artifact_kind = 'asset'
+                and prior_asset.record_id = a.id))
+          or (v_step.agent_key <> 'video_build'
+            and v_step.input_table = 'client_briefs' and a.brief_id = v_step.resolved_input_id
             and a.created_at >= v_job.created_at)
           or (v_step.input_table = 'client_media_assets' and a.id = v_step.resolved_input_id
             and a.updated_at >= v_job.created_at)
         ) and (
           (v_step.agent_key = 'video_build' and exists (
-            select 1 from client_media_frames f where f.asset_id = a.id
-              and nullif(btrim(f.clip_path), '') is not null))
+            select 1 from client_media_frames f where f.asset_id = a.id)
+            and not exists (select 1 from client_media_frames f
+              where f.asset_id = a.id and nullif(btrim(f.clip_path), '') is null))
           or (v_step.agent_key in ('video_edit', 'source_video_edit')
             and nullif(btrim(a.render_path), '') is not null)
           or (v_step.agent_key not in ('video_build', 'video_edit', 'source_video_edit')
