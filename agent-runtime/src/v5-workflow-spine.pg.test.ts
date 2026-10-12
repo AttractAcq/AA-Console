@@ -20,6 +20,9 @@ const attributionMigration = () => readFile(new URL(
 const learningMigration = () => readFile(new URL(
   "../../supabase/migrations/20261012160000_197_v5_ideation_learning.sql", import.meta.url,
 ), "utf8");
+const dailyQaMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261012200000_201_v5_daily_internal_qa.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -77,10 +80,12 @@ beforeAll(async () => {
     create table content_slots (id uuid primary key, client_id uuid);
     create table client_agent_records (id uuid primary key, client_id uuid not null, job_id uuid, body text);
     create table client_ideas (id uuid primary key, client_id uuid not null, job_id uuid, title text,
+      body text, created_at timestamptz default now(),
       campaign_id uuid, pillar_id uuid, target_platform post_platform,
       content_format content_format, media_type media_type,
       source_question text, strategic_reason text);
     create table client_briefs (id uuid primary key, client_id uuid not null, job_id uuid, body text, title text,
+      created_at timestamptz default now(),
       source_idea_id uuid, content_format content_format, media_type media_type,
       target_platform post_platform);
     create table client_media_assets (id uuid primary key, client_id uuid not null, brief_id uuid,
@@ -89,6 +94,8 @@ beforeAll(async () => {
       media_type media_type, review_status text default 'pending', human_approved_at timestamptz,
       title text);
     create table client_media_frames (asset_id uuid, clip_path text);
+    create table video_render_candidates (id uuid primary key, asset_id uuid, job_id uuid,
+      attempt integer, verdict text, render_path text, media_probe jsonb, creative_review jsonb);
     create table post_copy (asset_id uuid, platform post_platform, caption text);
     create table scheduled_posts (id uuid primary key, asset_id uuid);
     create table campaign_artifacts (campaign_id uuid, page_id uuid, asset_id uuid);
@@ -140,6 +147,7 @@ beforeAll(async () => {
   await db.exec(await alertMigration());
   await db.exec(await attributionMigration());
   await db.exec(await learningMigration());
+  await db.exec(await dailyQaMigration());
 });
 
 beforeEach(async () => {
@@ -276,6 +284,123 @@ describe("v5 workflow spine", () => {
       select j.input_id, s.resolved_input_id from workflow_steps s
       join agent_jobs j on j.id = s.job_id where s.id = '${briefStep.id}'`);
     expect(linked).toEqual({ input_id: IDEA, resolved_input_id: IDEA });
+  });
+
+  it("automatically accepts one correctly scoped daily idea with persisted QA evidence", async () => {
+    const ideaId = "88888888-8888-4888-8888-888888888888";
+    const briefId = "99999999-9999-4999-8999-999999999998";
+    const run = await makeRun("daily-auto-qa", `'{"pillar_id":"${PILLAR}"}'::jsonb`);
+    const step = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}', 'reel_idea', '{}'::text[], 'ideation', 'clients', '${CLIENT}',
+      '{"target_platform":"instagram","content_format":"reel","media_type":"video"}'::jsonb)`);
+    const briefStep = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_brief',array['reel_idea'],'brief','client_ideas',null,
+      '{}'::jsonb,'reel_idea')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec(`insert into client_ideas (id,client_id,job_id,title,body,campaign_id,
+      pillar_id,target_platform,content_format,media_type,source_question)
+      values ('${ideaId}','${CLIENT}',
+        (select job_id from workflow_steps where id='${step.id}'),
+        'Show the proof mechanism', 'An inspectable explanation of how the measurement works.',
+        '${CAMPAIGN}','${PILLAR}','instagram','reel','video',
+        'How will you prove which customers came from this?');
+      update agent_jobs set status='completed' where id=
+        (select job_id from workflow_steps where id='${step.id}')`);
+    await service("select * from reconcile_workflow_runs()");
+    const result = await service<{ steps_accepted: number; steps_blocked: number }>(
+      "select * from accept_ready_daily_workflow_steps()");
+    expect(result).toEqual({ steps_accepted: 1, steps_blocked: 0 });
+    const accepted = await one<{ status: string; record_id: string; result: string }>(`
+      select s.status,a.record_id,a.qa_evidence->>'result' as result
+      from workflow_steps s join workflow_artifacts a on a.step_id=s.id
+      where s.id='${step.id}'`);
+    expect(accepted).toEqual({ status: "completed", record_id: ideaId, result: "pass" });
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec(`insert into client_briefs
+      (id,client_id,job_id,source_idea_id,body,content_format,media_type,target_platform)
+      values ('${briefId}','${CLIENT}',
+        (select job_id from workflow_steps where id='${briefStep.id}'),
+        '${ideaId}',
+        'The reel opens with the buyer asking to inspect the attribution report, then shows each count and ends with a concrete request to see the method.',
+        'reel','video','instagram');
+      update agent_jobs set status='completed' where id=
+        (select job_id from workflow_steps where id='${briefStep.id}')`);
+    await service("select * from reconcile_workflow_runs()");
+    expect((await service<{ steps_accepted: number }>(
+      "select * from accept_ready_daily_workflow_steps()")).steps_accepted).toBe(1);
+    expect((await service<{ steps_accepted: number }>(
+      "select * from accept_ready_daily_workflow_steps()")).steps_accepted).toBe(0);
+  });
+
+  it("advances a daily reel only through stored opening, clips and accepted final review", async () => {
+    const briefId = "33333333-3333-4333-8333-333333333333";
+    const assetId = "44444444-4444-4444-8444-444444444444";
+    const candidateId = "55555555-5555-4555-8555-555555555555";
+    await db.exec(`insert into client_briefs (id,client_id,body,content_format,media_type)
+      values ('${briefId}','${CLIENT}','A complete reel brief with a clear hook, mechanism, proof limitation and call to action.','reel','video')`);
+    const run = await makeRun("daily-video-qa");
+    await service(`select id from add_workflow_agent_step('${run.id}','reel_create','{}'::text[],
+      'creative_build','client_briefs','${briefId}')`);
+    await service(`select id from add_workflow_agent_step('${run.id}','reel_motion',
+      array['reel_create'],'video_build','client_briefs','${briefId}')`);
+    await service(`select id from add_workflow_agent_step('${run.id}','reel_edit',
+      array['reel_motion'],'video_edit','client_media_assets',null,
+      '{}'::jsonb,'reel_motion')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec(`insert into client_media_assets
+      (id,client_id,brief_id,storage_path,content_format,media_type,created_at)
+      values ('${assetId}','${CLIENT}','${briefId}','client/opening.jpg','reel','video',now());
+      update agent_jobs set status='completed' where id=(select job_id from workflow_steps
+        where run_id='${run.id}' and step_key='reel_create')`);
+    await service("select * from reconcile_workflow_runs()");
+    expect((await service<{ steps_accepted: number }>(
+      "select * from accept_ready_daily_workflow_steps()")).steps_accepted).toBe(1);
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec(`insert into client_media_frames (asset_id,clip_path)
+      values ('${assetId}','clip-one.mp4'),('${assetId}','clip-two.mp4');
+      update agent_jobs set status='completed' where id=(select job_id from workflow_steps
+        where run_id='${run.id}' and step_key='reel_motion')`);
+    await service("select * from reconcile_workflow_runs()");
+    expect((await service<{ steps_accepted: number }>(
+      "select * from accept_ready_daily_workflow_steps()")).steps_accepted).toBe(1);
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec(`update client_media_assets set render_path='client/final.mp4',updated_at=now()
+      where id='${assetId}';
+      insert into video_render_candidates
+      (id,asset_id,job_id,attempt,verdict,render_path,media_probe,creative_review)
+      values ('${candidateId}','${assetId}',
+        (select job_id from workflow_steps where run_id='${run.id}' and step_key='reel_edit'),
+        1,'accepted','client/final.mp4','{"result":"pass"}','{"result":"pass"}');
+      update agent_jobs set status='completed' where id=(select job_id from workflow_steps
+        where run_id='${run.id}' and step_key='reel_edit')`);
+    await service("select * from reconcile_workflow_runs()");
+    expect((await service<{ steps_accepted: number }>(
+      "select * from accept_ready_daily_workflow_steps()")).steps_accepted).toBe(1);
+    const final = await one<{ status: string; candidate_id: string }>(`
+      select r.status,a.qa_evidence->>'candidate_id' as candidate_id
+      from workflow_runs r join workflow_artifacts a on a.run_id=r.id
+      join workflow_steps s on s.id=a.step_id and s.step_key='reel_edit'
+      where r.id='${run.id}'`);
+    expect(final).toEqual({ status: "awaiting_human_approval", candidate_id: candidateId });
+  });
+
+  it("blocks a completed daily job with no output instead of advancing its graph", async () => {
+    const run = await makeRun("daily-empty-output");
+    const step = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_idea','{}'::text[],'ideation','clients','${CLIENT}')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec(`update agent_jobs set status='completed' where id=
+      (select job_id from workflow_steps where id='${step.id}')`);
+    await service("select * from reconcile_workflow_runs()");
+    const result = await service<{ steps_accepted: number; steps_blocked: number }>(
+      "select * from accept_ready_daily_workflow_steps()");
+    expect(result).toEqual({ steps_accepted: 0, steps_blocked: 1 });
+    const state = await one<{ status: string; blocker: string }>(`
+      select status,blocker from workflow_runs where id='${run.id}'`);
+    expect(state).toEqual({ status: "blocked", blocker: "Daily ideation must produce exactly one idea." });
   });
 
   it("plans exactly four roles once, freezes context, and seals the dependency graph", async () => {
