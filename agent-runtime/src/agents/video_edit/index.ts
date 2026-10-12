@@ -36,7 +36,7 @@ import {
   type EditShot,
   type FrameRowForEdit,
 } from "./handoff.js";
-import { probeDurationSec, render, renderCapability, sampleFrames } from "./media.js";
+import { hasAudioStream, probeDurationSec, render, renderCapability, sampleFrames } from "./media.js";
 import { installFont } from "./font.js";
 import { communicationProblems, planEdit, type PlanClip } from "./plan.js";
 import { advanceSlot, slotIdOf } from "../../engine/slot.js";
@@ -111,13 +111,16 @@ export async function runVideoEditJob(
   const { data: briefRow, error: briefError } = await sb
     .from("client_briefs")
     .select(
-      "id, title, media_type, content_format, format_code, frame_plan, hook, script, call_to_action, proof, channel_intent",
+      "id, title, media_type, content_format, format_code, frame_plan, hook, script, call_to_action, proof, channel_intent, sound_treatment, sound_asset_id",
     )
     .eq("id", asset.brief_id)
     .maybeSingle();
   if (briefError) return failed(`Could not load the brief: ${briefError.message}`, true);
   const brief = briefRow as BriefForEdit | null;
   if (!brief) return failed("That reel's brief no longer exists.");
+  if (brief.sound_treatment && brief.sound_treatment !== "captions_only" && !brief.sound_asset_id) {
+    return failed("The requested sound treatment has no approved audio source.");
+  }
 
   // A worker may lose its lease after the candidate was accepted but before
   // it reported job completion. Resume from the accepted exact file instead
@@ -286,11 +289,34 @@ async function cut(
   }
 
   const outputPath = join(work, "cut.mp4");
+  let soundPath: string | null = null;
+  const soundTreatment = brief.sound_treatment ?? "captions_only";
+  if (soundTreatment !== "captions_only") {
+    const { data: sound, error: soundError } = await sb.from("video_sound_assets")
+      .select("client_id, kind, storage_path, rights_reference, attested_at")
+      .eq("id", brief.sound_asset_id!).maybeSingle();
+    if (soundError || !sound || sound.client_id !== asset.client_id
+      || sound.kind !== soundTreatment || !sound.rights_reference || !sound.attested_at) {
+      return failed(`The ${soundTreatment} source is unavailable or lacks rights attestation.`);
+    }
+    const { data, error } = await sb.storage.from(BUCKET).download(sound.storage_path);
+    if (error || !data) return failed(`Could not download the approved ${soundTreatment} source.`, true);
+    soundPath = join(work, "approved-sound.m4a");
+    await writeFile(soundPath, Buffer.from(await data.arrayBuffer()));
+    if (!await hasAudioStream(soundPath)) {
+      return failed(`The approved ${soundTreatment} file has no decodable audio stream.`);
+    }
+    const soundDuration = await probeDurationSec(soundPath);
+    if (soundDuration + 0.1 < totalDuration(edl)) {
+      return failed(`The approved ${soundTreatment} file ends before this cut; choose a longer source.`);
+    }
+  }
   const renderPlan = buildRenderPlan(edl, {
     clipPaths,
     outputPath,
     fontFile: await installFont(work),
     workDir: work,
+    musicPath: soundPath,
     backgroundColour: brand?.colour_background ?? null,
     textColour: brand?.colour_text ?? null,
   });
@@ -300,7 +326,7 @@ async function cut(
   const bytes = await readFile(outputPath);
   const digest = createHash("sha256").update(bytes).digest("hex").slice(0, 24);
   const storagePath = renderStoragePath(asset.client_id, asset.id, job.id, job.attempts, digest);
-  const probe = await probeRenderedVideo(outputPath);
+  const probe = await probeRenderedVideo(outputPath, soundTreatment !== "captions_only");
   const { error: upError } = await sb.storage
     .from(BUCKET)
     .upload(storagePath, bytes, { contentType: "video/mp4", upsert: true });

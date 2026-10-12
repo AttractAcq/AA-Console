@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { expect, it } from "vitest";
 
 import { probeRenderedVideo } from "./acceptance.js";
+import { hasAudioStream } from "./media.js";
 
 const run = promisify(execFile);
 
@@ -23,6 +24,32 @@ it("rejects an actual exported file with black frames", async () => {
     expect(probe.width).toBe(1080);
     expect(probe.height).toBe(1920);
     expect(probe.black_intervals.length).toBeGreaterThan(0);
+  } finally {
+    await rm(work, { recursive: true, force: true });
+  }
+}, 60_000);
+
+it("checks that a requested soundtrack is actually audible in the exported file", async () => {
+  const work = await mkdtemp(join(tmpdir(), "video-audio-test-"));
+  try {
+    const silent = join(work, "silent.mp4");
+    const withTone = join(work, "tone.mp4");
+    await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y",
+      "-f", "lavfi", "-i", "color=c=blue:s=360x640:r=15:d=3",
+      "-c:v", "mpeg4", silent], { timeout: 30_000 });
+    await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y",
+      "-i", silent, "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
+      "-c:v", "copy", "-c:a", "aac", "-shortest", withTone], { timeout: 30_000 });
+    const missing = await probeRenderedVideo(silent, true);
+    const audible = await probeRenderedVideo(withTone, true);
+    expect(await hasAudioStream(silent)).toBe(false);
+    expect(await hasAudioStream(withTone)).toBe(true);
+    expect(missing.checks).toContain("The requested soundtrack is missing from the export.");
+    expect(audible.has_audio).toBe(true);
+    expect(audible.audio_mean_db).not.toBeNull();
+    expect(audible.checks).not.toContain("The requested soundtrack is silent or too quiet to verify.");
+    expect((await probeRenderedVideo(withTone)).checks)
+      .toContain("Captions-only export unexpectedly contains audio.");
   } finally {
     await rm(work, { recursive: true, force: true });
   }

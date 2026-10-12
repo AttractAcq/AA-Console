@@ -129,6 +129,15 @@ export async function probeDurationSec(path: string): Promise<number> {
   }
 }
 
+/** Reject a rights-attested file that contains no decodable audio stream. */
+export async function hasAudioStream(path: string): Promise<boolean> {
+  const { stdout } = await run("ffprobe", [
+    "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_type",
+    "-of", "default=noprint_wrappers=1:nokey=1", path,
+  ], { timeout: PROBE_TIMEOUT_MS });
+  return stdout.trim() === "audio";
+}
+
 /**
  * Stills the planner looks at. The model never sees video: it sees these,
  * labelled with their time inside the clip, so it can name in/out points.

@@ -16,6 +16,7 @@ export interface MediaProbe {
   height: number;
   duration_sec: number;
   has_audio: boolean;
+  audio_mean_db: number | null;
   black_intervals: Array<{ start_sec: number; end_sec: number }>;
   checks: string[];
 }
@@ -30,7 +31,7 @@ export interface CreativeReview {
 }
 
 /** Inspect the actual exported file, rather than trusting the EDL's intended dimensions. */
-export async function probeRenderedVideo(path: string): Promise<MediaProbe> {
+export async function probeRenderedVideo(path: string, requireAudio = false): Promise<MediaProbe> {
   const { stdout } = await run("ffprobe", [
     "-v", "error", "-show_entries", "stream=codec_type,width,height:format=duration",
     "-of", "json", path,
@@ -45,6 +46,20 @@ export async function probeRenderedVideo(path: string): Promise<MediaProbe> {
   const height = Number(video?.height ?? 0);
   const hasAudio = Boolean(parsed.streams?.some((stream) => stream.codec_type === "audio"));
   const checks: string[] = [];
+  if (!requireAudio && hasAudio) checks.push("Captions-only export unexpectedly contains audio.");
+  let audioMeanDb: number | null = null;
+  if (requireAudio && !hasAudio) checks.push("The requested soundtrack is missing from the export.");
+  if (requireAudio && hasAudio) {
+    const { stderr: audioLog } = await run("ffmpeg", [
+      "-hide_banner", "-nostats", "-i", path, "-af", "volumedetect",
+      "-vn", "-f", "null", "-",
+    ], { timeout: 5 * 60_000, maxBuffer: 4 * 1024 * 1024 });
+    const match = audioLog.match(/mean_volume:\s*(-?\d+(?:\.\d+)?|-inf) dB/);
+    audioMeanDb = match && match[1] !== "-inf" ? Number(match[1]) : null;
+    if (audioMeanDb === null || audioMeanDb < -45) {
+      checks.push("The requested soundtrack is silent or too quiet to verify.");
+    }
+  }
   if (width !== 1080 || height !== 1920) checks.push(`Expected 1080x1920; got ${width}x${height}.`);
   if (!Number.isFinite(duration) || duration < 3 || duration > 90) {
     checks.push(`Invalid reel duration: ${duration}s.`);
@@ -60,7 +75,7 @@ export async function probeRenderedVideo(path: string): Promise<MediaProbe> {
   return {
     result: checks.length === 0 ? "pass" : "fail",
     width, height, duration_sec: Number(duration.toFixed(3)),
-    has_audio: hasAudio, black_intervals: blackIntervals, checks,
+    has_audio: hasAudio, audio_mean_db: audioMeanDb, black_intervals: blackIntervals, checks,
   };
 }
 
