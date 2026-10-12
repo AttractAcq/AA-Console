@@ -81,7 +81,9 @@ const handJob = {
   params: {},
 } as unknown as AgentJobRow;
 
-function database(options: { slot?: unknown; pillar?: unknown; campaign?: unknown } = {}) {
+function database(options: { slot?: unknown; pillar?: unknown; campaign?: unknown;
+  priorArtifacts?: Array<{ record_id: string }>;
+  priorIdeas?: Array<{ id: string; title: string; body: string; source_question: string }> } = {}) {
   const inserted: Record<string, unknown>[] = [];
   const from = vi.fn((table: string) => {
     if (table === "client_ideas") {
@@ -90,6 +92,7 @@ function database(options: { slot?: unknown; pillar?: unknown; campaign?: unknow
           inserted.push(...rows);
           return { error: null };
         }),
+        select: () => ({ in: async () => ({ data: options.priorIdeas ?? [], error: null }) }),
       };
     }
     const query: Record<string, unknown> = {};
@@ -115,7 +118,7 @@ function database(options: { slot?: unknown; pillar?: unknown; campaign?: unknow
       }),
       then: (resolve: (v: unknown) => unknown) =>
         Promise.resolve({
-          data: table === "client_content_pillars" ? [] : [],
+          data: table === "workflow_artifacts" ? options.priorArtifacts ?? [] : [],
           error: null,
         }).then(resolve),
     });
@@ -253,6 +256,26 @@ describe("ideation when a person asked for it", () => {
     expect(failed.ok).toBe(false);
     expect(failed.failureMessage).toContain("Snapshot unavailable");
     expect(model).not.toHaveBeenCalled();
+  });
+
+  it("shows the next daily idea its already accepted angles so it cannot restate them", async () => {
+    modelReturns(1, "single", "image");
+    const directed = { ...handJob, params: {
+      target_platform: "instagram", media_type: "image", content_format: "single",
+      idea_count: 1, campaign_id: "campaign-1", pillar_id: "pillar-1",
+      v5_workflow_run_id: "run-1",
+    } } as AgentJobRow;
+    const { sb } = database({
+      priorArtifacts: [{ record_id: "prior-1" }],
+      priorIdeas: [{ id: "prior-1", title: "Show the counting", body: "Define each step before spending.",
+        source_question: "How will you prove which customers came from this?" }],
+    });
+    (sb as unknown as { rpc: unknown }).rpc = vi.fn(async () => ({ data: { creative: [], runs: [] }, error: null }));
+    const result = await runIdeationJob(sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(true);
+    const prompt = (model.mock.calls[0]![0] as { prompt: string }).prompt;
+    expect(prompt).toContain("Show the counting");
+    expect(prompt).toContain("different buyer question, mechanism and conclusion");
   });
 
   it("keeps a requested video reel and destination on every idea", async () => {

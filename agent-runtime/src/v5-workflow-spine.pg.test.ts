@@ -23,6 +23,9 @@ const learningMigration = () => readFile(new URL(
 const dailyQaMigration = () => readFile(new URL(
   "../../supabase/migrations/20261012200000_201_v5_daily_internal_qa.sql", import.meta.url,
 ), "utf8");
+const dailySequenceMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261012210000_202_v5_daily_idea_sequence.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -148,6 +151,7 @@ beforeAll(async () => {
   await db.exec(await attributionMigration());
   await db.exec(await learningMigration());
   await db.exec(await dailyQaMigration());
+  await db.exec(await dailySequenceMigration());
 });
 
 beforeEach(async () => {
@@ -426,6 +430,15 @@ describe("v5 workflow spine", () => {
         sealed_at is not null as sealed, input_snapshot->>'audience' as audience
       from workflow_runs where id = '${first.run_id}'`);
     expect(graph).toEqual({ n: 14, sealed: true, audience: "Founders" });
+    const ideaDependencies = await db.query<{ step_key: string; dependencies: string[] }>(`
+      select step_key,dependencies from workflow_steps
+      where run_id='${first.run_id}' and agent_key='ideation' order by step_key`);
+    expect(ideaDependencies.rows).toEqual([
+      { step_key: "reel_idea", dependencies: [] },
+      { step_key: "static_a_idea", dependencies: ["story_idea"] },
+      { step_key: "static_b_idea", dependencies: ["static_a_idea"] },
+      { step_key: "story_idea", dependencies: ["reel_idea"] },
+    ]);
     const readiness = await service<{ result: {
       planned_count: number; accepted_count: number; ready_for_review: boolean;
     } }>(`select daily_package_readiness('${first.id}') as result`);
