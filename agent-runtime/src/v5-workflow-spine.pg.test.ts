@@ -12,6 +12,7 @@ const ADMIN = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const CAMPAIGN = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const INPUT = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const OUTPUT = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+const IDEA = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 const OTHER_OUTPUT = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 let db: PGlite;
 
@@ -83,7 +84,7 @@ beforeAll(async () => {
     insert into client_campaigns values ('${CAMPAIGN}', '${CLIENT}');
     insert into client_briefs (id, client_id, body) values ('${OUTPUT}', '${CLIENT}', 'A real brief');
     insert into client_briefs (id, client_id, body) values ('${OTHER_OUTPUT}', '${OTHER}', 'Other brief');
-    insert into agents values ('brief', false);
+    insert into agents values ('brief', false), ('ideation', false);
   `);
   await db.exec(await migration());
 });
@@ -196,5 +197,30 @@ describe("v5 workflow spine", () => {
       from workflow_runs where id = '${run.id}'`);
     expect(state).toEqual({ status: "blocked", blocker: "Provider failed." });
     expect((await one<{ n: number }>("select count(*)::integer as n from agent_jobs")).n).toBe(1);
+  });
+
+  it("passes only the accepted prior output into a dependent job", async () => {
+    const run = await makeRun("derived-input");
+    const ideaStep = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}', 'idea', array[]::text[], 'ideation', 'clients', '${CLIENT}')`);
+    const briefStep = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}', 'brief', array['idea']::text[], 'brief', 'client_ideas', null,
+      '{}'::jsonb, 'idea')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec(`insert into client_ideas (id, client_id, job_id, title)
+      values ('${IDEA}', '${CLIENT}', (select job_id from workflow_steps where id = '${ideaStep.id}'),
+      'An accepted idea')`);
+    await db.exec(`update agent_jobs set status = 'completed' where id =
+      (select job_id from workflow_steps where id = '${ideaStep.id}')`);
+    await service("select * from reconcile_workflow_runs()");
+    await service(`select id from accept_workflow_step('${ideaStep.id}', 'idea', '${IDEA}',
+      'v1', '{"result":"pass","checks":["angle"]}'::jsonb)`);
+    const queued = await service<{ steps_queued: number }>("select * from reconcile_workflow_runs()");
+    expect(queued.steps_queued).toBe(1);
+    const linked = await one<{ input_id: string; resolved_input_id: string }>(`
+      select j.input_id, s.resolved_input_id from workflow_steps s
+      join agent_jobs j on j.id = s.job_id where s.id = '${briefStep.id}'`);
+    expect(linked).toEqual({ input_id: IDEA, resolved_input_id: IDEA });
   });
 });

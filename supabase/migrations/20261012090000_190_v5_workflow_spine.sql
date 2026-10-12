@@ -33,7 +33,9 @@ create table workflow_steps (
   dependencies text[] not null default '{}',
   agent_key text not null references agents(agent_key),
   input_table text not null check (length(btrim(input_table)) between 1 and 100),
-  input_id uuid not null,
+  input_id uuid,
+  input_from_step_key text,
+  resolved_input_id uuid,
   input_params jsonb not null default '{}'::jsonb check (jsonb_typeof(input_params) = 'object'),
   status text not null default 'pending' check (status in
     ('pending', 'queued', 'running', 'needs_internal_qa', 'completed', 'blocked', 'failed')),
@@ -44,6 +46,7 @@ create table workflow_steps (
   completed_at timestamptz,
   unique (run_id, step_key),
   unique (id, run_id),
+  check ((input_id is not null) <> (input_from_step_key is not null)),
   check (not step_key = any(dependencies)),
   check (not (input_params ? 'v5_workflow_run_id' or input_params ? 'v5_step_key'))
 );
@@ -59,6 +62,7 @@ create table workflow_artifacts (
   qa_evidence jsonb not null check (jsonb_typeof(qa_evidence) = 'object'),
   accepted_at timestamptz not null default now(),
   unique (step_id, artifact_kind, record_id, version_key),
+  unique (step_id),
   foreign key (step_id, run_id) references workflow_steps(id, run_id) on delete cascade
 );
 create index workflow_artifacts_run_idx on workflow_artifacts (run_id, step_id);
@@ -129,7 +133,8 @@ $$;
 -- construction and prevents a typo from becoming a permanently queued step.
 create function add_workflow_agent_step(
   p_run_id uuid, p_step_key text, p_dependencies text[], p_agent_key text,
-  p_input_table text, p_input_id uuid, p_input_params jsonb default '{}'::jsonb
+  p_input_table text, p_input_id uuid, p_input_params jsonb default '{}'::jsonb,
+  p_input_from_step_key text default null
 ) returns workflow_steps
 language plpgsql security definer set search_path to 'public' as $$
 declare v_run workflow_runs; v_step workflow_steps; v_dep text;
@@ -138,7 +143,8 @@ begin
   select * into v_run from workflow_runs where id = p_run_id for update;
   if not found then raise exception 'No such workflow run.'; end if;
   if p_step_key is null or p_step_key !~ '^[a-z][a-z0-9_]{0,79}$'
-     or p_agent_key is null or p_input_id is null
+     or p_agent_key is null
+     or ((p_input_id is not null) = (p_input_from_step_key is not null))
      or nullif(btrim(coalesce(p_input_table, '')), '') is null
      or p_input_params is null or jsonb_typeof(p_input_params) <> 'object'
      or p_input_params ? 'v5_workflow_run_id' or p_input_params ? 'v5_step_key' then
@@ -153,6 +159,7 @@ begin
        or v_step.agent_key is distinct from p_agent_key
        or v_step.input_table is distinct from btrim(p_input_table)
        or v_step.input_id is distinct from p_input_id
+       or v_step.input_from_step_key is distinct from p_input_from_step_key
        or v_step.input_params is distinct from p_input_params then
       raise exception 'idempotency_conflict';
     end if;
@@ -166,11 +173,16 @@ begin
       select 1 from workflow_steps where run_id = p_run_id and step_key = v_dep
     ) then raise exception 'Unknown or circular dependency: %', v_dep; end if;
   end loop;
+  if p_input_from_step_key is not null and (
+    p_input_from_step_key !~ '^[a-z][a-z0-9_]{0,79}$'
+    or not p_input_from_step_key = any(coalesce(p_dependencies, '{}'))
+  ) then raise exception 'Input source must be a direct dependency.'; end if;
   insert into workflow_steps (
-    run_id, step_key, dependencies, agent_key, input_table, input_id, input_params
+    run_id, step_key, dependencies, agent_key, input_table, input_id,
+    input_from_step_key, input_params
   ) values (
     p_run_id, p_step_key, coalesce(p_dependencies, '{}'), p_agent_key,
-    btrim(p_input_table), p_input_id, p_input_params
+    btrim(p_input_table), p_input_id, p_input_from_step_key, p_input_params
   ) returning * into v_step;
   return v_step;
 end;
@@ -203,6 +215,7 @@ returns table (steps_queued integer, steps_for_qa integer, steps_blocked integer
 language plpgsql security definer set search_path to 'public' as $$
 declare v_run workflow_runs; v_step workflow_steps; v_job agent_jobs;
   v_queued integer := 0; v_qa integer := 0; v_blocked integer := 0; v_job_id uuid;
+  v_resolved_input uuid; v_source_kind text;
 begin
   if auth.role() <> 'service_role' then raise exception 'AUTH: service role required'; end if;
   if p_limit not between 1 and 500 then raise exception 'Limit must be 1..500.'; end if;
@@ -224,14 +237,30 @@ begin
             and prerequisite.status = 'completed')
       ) then
         begin
+          v_resolved_input := v_step.input_id;
+          if v_step.input_from_step_key is not null then
+            select a.record_id, a.artifact_kind into v_resolved_input, v_source_kind
+            from workflow_steps source_step
+            join workflow_artifacts a on a.step_id = source_step.id
+            where source_step.run_id = v_run.id
+              and source_step.step_key = v_step.input_from_step_key;
+            if v_resolved_input is null or
+              (v_source_kind, v_step.input_table) not in (
+                ('idea', 'client_ideas'), ('brief', 'client_briefs'),
+                ('asset', 'client_media_assets'), ('page', 'client_pages'),
+                ('sales_agent', 'client_sales_agents')) then
+              raise exception 'Accepted input artefact does not match %.', v_step.input_table;
+            end if;
+          end if;
           v_job_id := enqueue_agent_job_internal(
-            v_step.agent_key, v_run.client_id, v_step.input_table, v_step.input_id,
+            v_step.agent_key, v_run.client_id, v_step.input_table, v_resolved_input,
             v_run.created_by,
             v_step.input_params || jsonb_build_object(
               'v5_workflow_run_id', v_run.id, 'v5_step_key', v_step.step_key),
             'V5 workflow step queued.');
           update agent_jobs set run_id = v_run.id where id = v_job_id;
-          update workflow_steps set status = 'queued', job_id = v_job_id, updated_at = now()
+          update workflow_steps set status = 'queued', resolved_input_id = v_resolved_input,
+            job_id = v_job_id, updated_at = now()
           where id = v_step.id;
           v_queued := v_queued + 1;
         exception when others then
@@ -322,9 +351,9 @@ begin
     when 'asset' then exists (select 1 from client_media_assets a
       where a.id = p_record_id and a.client_id = v_run.client_id
         and (
-          (v_step.input_table = 'client_briefs' and a.brief_id = v_step.input_id
+          (v_step.input_table = 'client_briefs' and a.brief_id = v_step.resolved_input_id
             and a.created_at >= v_job.created_at)
-          or (v_step.input_table = 'client_media_assets' and a.id = v_step.input_id
+          or (v_step.input_table = 'client_media_assets' and a.id = v_step.resolved_input_id
             and a.updated_at >= v_job.created_at)
         ) and (
           (v_step.agent_key = 'video_build' and exists (
@@ -359,7 +388,7 @@ $$;
 
 revoke all on function create_workflow_run(uuid, text, text, text, jsonb, timestamptz, uuid, text, uuid)
   from public, anon, authenticated;
-revoke all on function add_workflow_agent_step(uuid, text, text[], text, text, uuid, jsonb)
+revoke all on function add_workflow_agent_step(uuid, text, text[], text, text, uuid, jsonb, text)
   from public, anon, authenticated;
 revoke all on function seal_workflow_run(uuid) from public, anon, authenticated;
 revoke all on function reconcile_workflow_runs(integer) from public, anon, authenticated;
@@ -367,7 +396,7 @@ revoke all on function accept_workflow_step(uuid, text, uuid, text, jsonb)
   from public, anon, authenticated;
 grant execute on function create_workflow_run(uuid, text, text, text, jsonb, timestamptz, uuid, text, uuid)
   to service_role;
-grant execute on function add_workflow_agent_step(uuid, text, text[], text, text, uuid, jsonb)
+grant execute on function add_workflow_agent_step(uuid, text, text[], text, text, uuid, jsonb, text)
   to service_role;
 grant execute on function seal_workflow_run(uuid) to service_role;
 grant execute on function reconcile_workflow_runs(integer) to service_role;
