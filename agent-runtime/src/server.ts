@@ -30,6 +30,7 @@ import { loadConfig } from "./config.js";
 import { serviceClient } from "./db.js";
 import { startWorker, type WorkerHandle } from "./worker.js";
 import { startHeartbeat } from "./heartbeat.js";
+import { startWorkflowReconciler } from "./v5/reconcile.js";
 import { registeredAgentKeys } from "./orchestration/dispatch.js";
 import { handleMasterChat } from "./master/route.js";
 import { handleBriefDraft } from "./briefs/draft-route.js";
@@ -50,6 +51,7 @@ logger.info("agent_runtime_starting", {
   model: config.model,
   leaseSeconds: config.leaseSeconds,
   agents: registeredAgentKeys(),
+  workflowEnabled: config.workflowEnabled,
   pid: process.pid,
 });
 
@@ -65,6 +67,7 @@ if (config.enabled) {
 }
 
 const heartbeat = startHeartbeat(sb, config, workers.length);
+const workflows = config.enabled && config.workflowEnabled ? startWorkflowReconciler(sb) : null;
 
 const server = http.createServer((req, res) => {
   const json = (status: number, body: unknown): void => {
@@ -247,6 +250,7 @@ const server = http.createServer((req, res) => {
       ok: true,
       enabled: config.enabled,
       workers: workers.length,
+      workflowEnabled: Boolean(workflows),
       pid: process.pid,
     });
     return;
@@ -264,6 +268,7 @@ const server = http.createServer((req, res) => {
       leaseSeconds: config.leaseSeconds,
       model: config.model,
       agents: registeredAgentKeys(),
+      workflowEnabled: Boolean(workflows),
     });
     return;
   }
@@ -282,6 +287,7 @@ async function shutdown(signal: string): Promise<void> {
   logger.info("agent_runtime_stopping", { signal });
 
   heartbeat.stop();
+  await workflows?.stop();
   server.close();
   // Let in-flight jobs finish their current iteration rather than killing
   // them; anything still running will have its lease expire and be

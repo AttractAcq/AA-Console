@@ -1,0 +1,50 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { logger } from "../logging/logger.js";
+
+const INTERVAL_MS = 15_000;
+
+export interface WorkflowReconcilerHandle {
+  stop: () => Promise<void>;
+}
+
+/** Bounded DB reconciliation; agent_jobs remains the only execution queue. */
+export function startWorkflowReconciler(sb: SupabaseClient): WorkflowReconcilerHandle {
+  let stopped = false;
+  let current: Promise<void> | null = null;
+
+  function tick(): void {
+    if (stopped || current) return;
+    current = (async () => {
+      try {
+        const { data, error } = await sb.rpc("reconcile_workflow_runs", { p_limit: 100 });
+        if (error) throw new Error(error.message);
+        const row = Array.isArray(data) ? data[0] : data;
+        const counts = row as {
+          steps_queued?: number;
+          steps_for_qa?: number;
+          steps_blocked?: number;
+        } | null;
+        if (counts && (counts.steps_queued || counts.steps_for_qa || counts.steps_blocked)) {
+          logger.info("v5_workflow_reconciled", counts);
+        }
+      } catch (error) {
+        logger.error("v5_workflow_reconcile_failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      } finally {
+        current = null;
+      }
+    })();
+  }
+
+  tick();
+  const interval = setInterval(tick, INTERVAL_MS);
+  interval.unref();
+  return {
+    stop: async () => {
+      stopped = true;
+      clearInterval(interval);
+      await current;
+    },
+  };
+}
