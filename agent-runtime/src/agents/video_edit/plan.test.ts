@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_CAPTION_CHARS, MAX_END_CARD_SEC, TRANSITIONS } from "./edl.js";
-import { buildPlanContent, communicationProblems, type PlanInput } from "./plan.js";
+import { MAX_CAPTION_CHARS, MAX_END_CARD_SEC, TRANSITIONS, type Edl } from "./edl.js";
+import { buildPlanContent, communicationProblems, sameRenderedCut, type PlanInput } from "./plan.js";
 
 const input: PlanInput = {
   title: "Spike reel",
@@ -55,6 +55,28 @@ describe("buildPlanContent", () => {
     expect(last).toContain("- The reel runs 20.0s. This format allows 15s.");
     expect(last).toContain("- Caption 1 is empty.");
     expect(last).toContain('"segments":[]');
+  });
+
+  it("passes the exact failed candidate's reason into the next cut", () => {
+    const all = texts(buildPlanContent({ ...input, priorCandidateFailure: {
+      candidateId: "candidate-1", reason: "Caption obscured the owner's face at 4 seconds.",
+      editPlan: { segments: [{ shot: 1 }] },
+    } })).join("\n");
+    expect(all).toContain("PRIOR FINAL-CUT FAILURE (candidate-1)");
+    expect(all).toContain("Caption obscured the owner's face at 4 seconds.");
+    expect(all).toContain('Rejected edit plan: {"segments":[{"shot":1}]}');
+  });
+
+  it("refuses a renamed rationale when the rendered cut is identical", () => {
+    const prior: Edl = { segments: [{ shot: 1, in_sec: 0, out_sec: 3,
+      transition: "cut" }], captions: [{ text: "A caption", start_sec: 0,
+      end_sec: 2, position: "bottom" }], end_card_text: "CTA", end_card_sec: 1,
+    notes: "first rationale" };
+    const candidate: Edl = { ...prior, notes: "new rationale" };
+    expect(sameRenderedCut(candidate, prior)).toBe(true);
+    expect(sameRenderedCut({ ...candidate, captions: [{ ...candidate.captions[0]!,
+      text: "A better caption" }] }, prior))
+      .toBe(false);
   });
 });
 

@@ -38,7 +38,7 @@ import {
 } from "./handoff.js";
 import { hasAudioStream, probeDurationSec, render, renderCapability, sampleFrames } from "./media.js";
 import { installFont } from "./font.js";
-import { communicationProblems, planEdit, type PlanClip } from "./plan.js";
+import { communicationProblems, planEdit, sameRenderedCut, type PlanClip } from "./plan.js";
 import { advanceSlot, slotIdOf } from "../../engine/slot.js";
 import { buildRenderPlan } from "./render.js";
 import { probeRenderedVideo, reviewRenderedVideo } from "./acceptance.js";
@@ -255,6 +255,28 @@ async function cut(
     maxTotalSec: maxReelSeconds(shots),
     bannedPhrases: bannedPhrases(brand?.never_do),
     clips,
+    priorCandidateFailure: (() => {
+      const prior = job.params?.v5_video_revision;
+      if (!prior || typeof prior !== "object") return null;
+      const feedback = prior as Record<string, unknown>;
+      return typeof feedback.candidate_id === "string" && typeof feedback.reason === "string"
+        ? { candidateId: feedback.candidate_id, reason: feedback.reason,
+          editPlan: feedback.edit_plan }
+        : null;
+    })(),
+  };
+
+  const rejected = async (candidateId: string, reason: string): Promise<JobResult> => {
+    if (typeof job.params?.v5_workflow_run_id !== "string"
+      || job.attempts >= job.max_attempts) return failed(reason);
+    const { error } = await sb.rpc("stage_video_candidate_revision", {
+      p_candidate_id: candidateId,
+    });
+    if (error) throw new Error(`Could not stage a controlled reel revision: ${error.message}`);
+    await appendEvent(sb, job.id, "A revised cut will use the rejected candidate's findings.", "info", {
+      candidate_id: candidateId, next_attempt: job.attempts + 1,
+    });
+    return failed(reason, true);
   };
 
   const timeoutMs = deadlineMs ? Math.max(30_000, deadlineMs - Date.now()) : undefined;
@@ -262,6 +284,8 @@ async function cut(
   let usage = { ...plan.usage };
   let edl: Edl = plan.edl;
   let problems = [...validateEdl(edl, context), ...communicationProblems(edl, clips)];
+  if (sameRenderedCut(edl, planInput.priorCandidateFailure?.editPlan))
+    problems.push("The cut repeats the rejected edit plan exactly.");
 
   if (problems.length > 0) {
     // One revise, with every problem named. A second failure is a refusal,
@@ -278,6 +302,8 @@ async function cut(
     };
     edl = plan.edl;
     problems = [...validateEdl(edl, context), ...communicationProblems(edl, clips)];
+    if (sameRenderedCut(edl, planInput.priorCandidateFailure?.editPlan))
+      problems.push("The cut repeats the rejected edit plan exactly.");
   }
 
   if (problems.length > 0) {
@@ -343,12 +369,13 @@ async function cut(
       p_candidate_id: candidateId, p_verdict: "rejected",
       p_creative_review: { result: "fail", checks: [{ area: "media_probe", verdict: "fail", reason }] },
       p_rejection_reason: reason,
+      p_edit_plan: edl,
     });
     if (error) throw new Error(`Could not reject candidate: ${error.message}`);
     await appendEvent(sb, job.id, `The rendered candidate failed media inspection: ${reason}`, "warn", {
       candidate_id: candidateId, stage: "media_probe", probe,
     });
-    return failed(`Rendered candidate failed media inspection: ${reason}`);
+    return rejected(candidateId, `Rendered candidate failed media inspection: ${reason}`);
   }
   const creative = await reviewRenderedVideo({
     path: outputPath, workDir: work, brief: briefTextForEdit(brief),
@@ -365,14 +392,14 @@ async function cut(
     p_candidate_id: candidateId, p_verdict: verdict,
     p_creative_review: creative,
     p_rejection_reason: creative.result === "fail" ? creative.summary : null,
-    p_edit_plan: creative.result === "pass" ? edl : null,
+    p_edit_plan: edl,
   });
   if (decisionError) throw new Error(`Could not file creative review: ${decisionError.message}`);
   if (verdict === "rejected") {
     await appendEvent(sb, job.id, `The rendered candidate failed visual review: ${creative.summary}`, "warn", {
       candidate_id: candidateId, stage: "creative_review", review: creative,
     });
-    return { ok: false, retryable: false, failureMessage: creative.summary, usage };
+    return { ...await rejected(candidateId, creative.summary), usage };
   }
   await appendEvent(sb, job.id, "The cut is on the reel and waiting for a person.", "info", {
     stage: "done",

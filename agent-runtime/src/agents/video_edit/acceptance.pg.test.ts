@@ -32,7 +32,8 @@ beforeAll(async () => {
       media_type text, updated_at timestamptz);
     create table agent_jobs (id uuid primary key, client_id uuid, agent_key text,
       input_table text, input_id uuid, attempts integer,
-      status text not null default 'completed');
+      status text not null default 'completed', max_attempts integer not null default 3,
+      params jsonb);
     create table client_media_assets (id uuid primary key, client_id uuid, brief_id uuid,
       render_path text, human_approved_at timestamptz,
       width integer, height integer, duration_sec numeric, edit_plan jsonb);
@@ -56,6 +57,10 @@ beforeAll(async () => {
   ), "utf8"));
   await db.exec(await readFile(new URL(
     "../../../../supabase/migrations/20261012170000_198_video_sound_policy.sql",
+    import.meta.url,
+  ), "utf8"));
+  await db.exec(await readFile(new URL(
+    "../../../../supabase/migrations/20261012180000_199_video_candidate_revision.sql",
     import.meta.url,
   ), "utf8"));
 });
@@ -134,5 +139,47 @@ describe("video sound treatment", () => {
     await db.exec(`update client_media_assets set brief_id = '${BRIEF}' where id = '${ASSET}'`);
     await expect(db.query(`select sound_treatment from set_brief_sound_treatment(
       '${BRIEF}', 'captions_only')`)).rejects.toThrow(/finished cut/);
+  });
+});
+
+describe("controlled candidate revision", () => {
+  it("records rejected exact-file feedback on a bounded v5 job", async () => {
+    const asset = "00000000-0000-4000-8000-000000000021";
+    const job = "00000000-0000-4000-8000-000000000022";
+    await db.exec(`insert into client_media_assets(id, client_id) values ('${asset}', '${CLIENT}');
+      insert into agent_jobs(id, client_id, agent_key, input_table, input_id,
+        attempts, status, max_attempts, params)
+      values ('${job}', '${CLIENT}', 'video_edit', 'client_media_assets', '${asset}',
+        1, 'running', 3, '{"v5_workflow_run_id":"run-1"}'::jsonb);`);
+    const path = `${CLIENT}/reels/${asset}/candidates/${job}-1-digest.mp4`;
+    const candidate = await service<{ id: string }>(`select id from record_video_render_candidate(
+      '${job}', 1, '${asset}', '${path}', '{"result":"pass"}'::jsonb)`);
+    await service(`select id from decide_video_render_candidate('${candidate.id}',
+      'rejected', '{"result":"fail","checks":["crop"]}'::jsonb,
+      'Caption covers the face.', '{"segments":[{"shot":1}]}'::jsonb)`);
+    const feedback = await service<{ stage_video_candidate_revision: {
+      candidate_id: string; reason: string;
+    } }>(`select stage_video_candidate_revision('${candidate.id}')`);
+    expect(feedback.stage_video_candidate_revision).toMatchObject({
+      candidate_id: candidate.id, reason: "Caption covers the face.",
+    });
+    expect(await service<typeof feedback>(`select stage_video_candidate_revision('${candidate.id}')`))
+      .toEqual(feedback);
+    const stored = (await db.query<{ params: { v5_video_revision: { candidate_id: string } } }>(
+      `select params from agent_jobs where id = '${job}'`,
+    )).rows[0]!;
+    expect(stored.params.v5_video_revision.candidate_id).toBe(candidate.id);
+    await db.exec(`update agent_jobs set attempts = 3 where id = '${job}'`);
+    await expect(service(`select stage_video_candidate_revision('${candidate.id}')`))
+      .resolves.toEqual(feedback);
+    const last = await service<{ id: string }>(`select id from record_video_render_candidate(
+      '${job}', 3, '${asset}',
+      '${CLIENT}/reels/${asset}/candidates/${job}-3-digest.mp4',
+      '{"result":"pass"}'::jsonb)`);
+    await service(`select id from decide_video_render_candidate('${last.id}',
+      'rejected', '{"result":"fail","checks":["continuity"]}'::jsonb,
+      'Still changes character.')`);
+    await expect(service(`select stage_video_candidate_revision('${last.id}')`))
+      .rejects.toThrow(/no active revision attempt/);
   });
 });
