@@ -10,6 +10,8 @@ export interface RuntimeConfig {
   anthropicApiKeyByAgent: Record<string, string>;
   model: string;
   enabled: boolean;
+  /** Starts the v5 outcome reconciler after its schema is installed. */
+  workflowEnabled: boolean;
   concurrency: number;
   leaseSeconds: number;
   emptyQueueBackoffMs: number;
@@ -153,6 +155,7 @@ export function loadConfig(): RuntimeConfig {
     anthropicApiKeyByAgent,
     model: optionalEnv("AGENT_RUNTIME_MODEL") ?? "claude-opus-5",
     enabled: (optionalEnv("AGENT_RUNTIME_ENABLED") ?? "true").toLowerCase() === "true",
+    workflowEnabled: (optionalEnv("V5_WORKFLOW_ENABLED") ?? "false").toLowerCase() === "true",
     concurrency: intEnv("AGENT_RUNTIME_CONCURRENCY", 2),
     leaseSeconds,
     emptyQueueBackoffMs: intEnv("AGENT_RUNTIME_EMPTY_QUEUE_BACKOFF_MS", 5000),
