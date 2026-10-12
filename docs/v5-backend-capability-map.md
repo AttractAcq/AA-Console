@@ -107,3 +107,9 @@ Each PR should include migration and RLS tests for new tables/RPCs, one restart/
 - A new client with complete inputs reaches one reviewable launch package containing an approved campaign plan, tested page and conversion route, configured sales agent, organic assets, paused Meta creative and measurement checks. Human activation remains separate.
 - Restart and duplicate-trigger tests prove no lost run and no duplicate paid provider submissions. Every blocker identifies the failed step and what action can resolve it.
 - Track the v5 metrics: complete client-days, first-pass approval, repair time, launch-readiness hours, package completeness, run/recovery success, backlog age and attribution coverage.
+
+## Implementation checkpoint
+
+The workflow spine is in PR #154. The exact four-role daily planner is stacked in PR #155. The retained video render and internal visual screen are stacked on the separate continuity work in PR #156.
+
+The client launch package review branch adds a frozen campaign, audience, offer, brand/ICP and cleared-proof snapshot. Missing facts become explicit `needs_input` blockers. It requires same-campaign page and sales-agent records, individually checked organic assets, a paused Meta identifier, conversion-path evidence and measurement evidence before `awaiting_human_approval`. That review state is separate from `client_campaigns.status = live`. The live form/routing/consent/event probes, activation handoff and new-client 24-hour dry run remain open acceptance work.
