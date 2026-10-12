@@ -1,6 +1,6 @@
 -- creative_build needs a generation and render before the worker can start.
 -- Keep these rows in the same transaction as queueing so retries cannot pay for
--- an orphaned render. Video briefs use image media for opening stills only.
+-- an orphaned render. Phase 1 reel briefs use image media for opening stills.
 create function enqueue_workflow_step_job(
   p_run workflow_runs, p_step workflow_steps, p_resolved_input uuid
 ) returns uuid language plpgsql security definer set search_path = public as $$
@@ -22,8 +22,10 @@ begin
     if not found or v_brief.client_id <> p_run.client_id then
       raise exception 'Creative brief is missing or belongs to another client.';
     end if;
-    if v_brief.media_type = 'video' and v_brief.content_format not in ('reel', 'story') then
-      raise exception 'Only a reel or story may use a video brief for opening stills.';
+    if v_brief.media_type = 'video' and
+      (v_brief.content_format <> 'reel' or
+        coalesce(v_brief.format_code, 'F6') not in ('F6', 'F7')) then
+      raise exception 'Only a Phase 1 reel may use a video brief for opening stills.';
     end if;
     insert into creative_generations
       (client_id, brief_id, media_type, quality, size, created_by)

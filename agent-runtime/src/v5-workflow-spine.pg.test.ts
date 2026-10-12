@@ -93,7 +93,7 @@ beforeAll(async () => {
     create table client_briefs (id uuid primary key, client_id uuid not null, job_id uuid, body text, title text,
       created_at timestamptz default now(),
       source_idea_id uuid, content_format content_format, media_type media_type,
-      target_platform post_platform);
+      target_platform post_platform, format_code text);
     create table client_media_assets (id uuid primary key, client_id uuid not null, brief_id uuid,
       created_at timestamptz default now(), updated_at timestamptz default now(),
       storage_path text, render_path text, content_format content_format,
