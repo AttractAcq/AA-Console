@@ -8,12 +8,15 @@ const secret = variables.HIGGSFIELD_API_SECRET;
 if (!key || !secret) throw new Error("Higgsfield credentials are unavailable");
 
 const imageUrl = "https://raw.githubusercontent.com/AttractAcq/AA-Console/codex/v5-higgsfield-benchmark/agent-runtime/benchmarks/higgsfield/fictional-potter.png";
-const prompt = "Single continuous cinematic shot. A fictional ceramic artist in her studio lifts the same dark handmade vase shown in the opening image, turns it slowly toward soft window light, and traces one carved line with her fingertip. Natural hand and object movement, physically coherent fingers, stable facial identity, realistic clay texture, quiet documentary camera movement. Keep the vase, clothing, studio, and person's features consistent with the source image. Portrait 9:16 composition. No text, logos, cuts, extra people, or new objects.";
+const variant = process.env.BENCHMARK_VARIANT === "anchored" ? "anchored" : "initial";
+const prompt = variant === "anchored"
+  ? "Single continuous cinematic documentary shot from the supplied opening image. The ceramic artist keeps both hands on the same unfinished terracotta vase while it turns slowly on the pottery wheel. Her fingers gently refine its rim; the vase stays on the wheel throughout. Soft window light, subtle breathing and eye movement, slow stable camera push. Preserve the exact person, hand count, natural finger anatomy, terracotta color and texture, vase silhouette, clothing, studio, and portrait framing. No lifting, finished or dark vase, cuts, text, logos, extra people, or new objects."
+  : "Single continuous cinematic shot. A fictional ceramic artist in her studio lifts the same dark handmade vase shown in the opening image, turns it slowly toward soft window light, and traces one carved line with her fingertip. Natural hand and object movement, physically coherent fingers, stable facial identity, realistic clay texture, quiet documentary camera movement. Keep the vase, clothing, studio, and person's features consistent with the source image. Portrait 9:16 composition. No text, logos, cuts, extra people, or new objects.";
 const models = [
   { key: "v25", id: "kling-video/v2.5-turbo/pro/image-to-video", payload: { negative_prompt: "text, subtitles, logos, distortion, morphing, static digital zoom" } },
   { key: "v30", id: "kling-video/v3.0/4k/image-to-video", payload: { sound: "off", multi_shots: false } },
 ];
-const statePath = "/private/tmp/aa-higgsfield-compare-2026-10-12.json";
+const statePath = `/private/tmp/aa-higgsfield-compare-2026-10-12${variant === "anchored" ? "-anchored" : ""}.json`;
 const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : {};
 const auth = `Key ${key}:${secret}`;
 
@@ -24,7 +27,7 @@ function save() {
 for (const model of models) {
   if (!state[model.key]?.requestId) {
     const body = { image_url: imageUrl, prompt, duration: 5, cfg_scale: 0.5, ...model.payload };
-    const idempotency = createHash("sha256").update(`aa-v5-synthetic-benchmark-2026-10-12:${model.id}:${imageUrl}:${prompt}`).digest("hex");
+    const idempotency = createHash("sha256").update(`aa-v5-synthetic-benchmark-2026-10-12:${variant}:${model.id}:${imageUrl}:${prompt}`).digest("hex");
     const startedAt = new Date().toISOString();
     const response = await fetch(`https://api.higgsfield.ai/${model.id}`, {
       method: "POST",
