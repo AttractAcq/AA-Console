@@ -55,6 +55,8 @@ export interface RuntimeConfig {
   publishEnabled: boolean;
   openaiApiKey: string | null;
   imageModel: string;
+  /** Reel keyframes can use a precision-first model without changing static creative. */
+  reelImageModel: string;
   /** Which provider writes the creative concept. */
   conceptProvider: "openai" | "anthropic";
   conceptModel: string;
@@ -209,6 +211,7 @@ export function loadConfig(): RuntimeConfig {
     // Not pinned in code: the correct id is a provider fact that changes
     // faster than this repo does, so a wrong one is a config edit.
     imageModel: optionalEnv("OPENAI_IMAGE_MODEL") ?? "gpt-image-2",
+    reelImageModel: optionalEnv("OPENAI_REEL_IMAGE_MODEL") ?? "gpt-image-2.5-sunburst",
     // Explicit rather than inferred from the model name: reading the
     // provider out of a string is the kind of cleverness that breaks
     // silently the first time a model is named differently.
