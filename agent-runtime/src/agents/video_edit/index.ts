@@ -38,7 +38,7 @@ import {
 } from "./handoff.js";
 import { hasAudioStream, probeDurationSec, render, renderCapability, sampleFrames } from "./media.js";
 import { installFont } from "./font.js";
-import { communicationProblems, planEdit, sameRenderedCut, type PlanClip } from "./plan.js";
+import { briefCopyProblems, communicationProblems, planEdit, sameRenderedCut, type PlanClip } from "./plan.js";
 import { advanceSlot, slotIdOf } from "../../engine/slot.js";
 import { buildRenderPlan } from "./render.js";
 import { probeRenderedVideo, reviewRenderedVideo } from "./acceptance.js";
@@ -284,7 +284,13 @@ async function cut(
   let plan = await planEdit(planInput, { model: config.model, timeoutMs });
   let usage = { ...plan.usage };
   let edl: Edl = plan.edl;
-  let problems = [...validateEdl(edl, context), ...communicationProblems(edl, clips)];
+  // Legacy artwork can already carry a line in its pixels. The exact-copy
+  // gate applies to the new text-free generated footage, whose words are all
+  // supplied by the editor and therefore checkable before rendering.
+  const copyProblems = (cut: Edl) => clips.some((clip) => clip.burnedInText.trim())
+    ? [] : briefCopyProblems(cut, brief);
+  let problems = [...validateEdl(edl, context), ...communicationProblems(edl, clips),
+    ...copyProblems(edl)];
   if (sameRenderedCut(edl, planInput.priorCandidateFailure?.editPlan))
     problems.push("The cut repeats the rejected edit plan exactly.");
 
@@ -302,7 +308,8 @@ async function cut(
       costUsd: usage.costUsd + plan.usage.costUsd,
     };
     edl = plan.edl;
-    problems = [...validateEdl(edl, context), ...communicationProblems(edl, clips)];
+    problems = [...validateEdl(edl, context), ...communicationProblems(edl, clips),
+      ...copyProblems(edl)];
     if (sameRenderedCut(edl, planInput.priorCandidateFailure?.editPlan))
       problems.push("The cut repeats the rejected edit plan exactly.");
   }

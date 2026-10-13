@@ -22,7 +22,8 @@ import { briefSubmitTool, composeBody, composeAvatarBody, composeEditorBody, bri
 import { isMultiFrame } from "../../content/format.js";
 import { loadIdentity, identityWriterBlock } from "../identity.js";
 import { loadUsableProof, renderProof, proofIdForRef } from "../proof.js";
-import { reelBriefProblem, reelPlannerNote } from "./shots.js";
+import { reelBriefProblem, reelCopyProblem, reelPlannerNote } from "./shots.js";
+import { loadBrandProfile } from "../creative_build/brand.js";
 
 export async function runBriefJob(
   sb: SupabaseClient,
@@ -152,6 +153,7 @@ export async function runBriefJob(
   const contentFormat = idea.content_format ?? "single";
   const reelProblem = reelBriefProblem(contentFormat, idea.media_type);
   if (reelProblem) return { ok: false, retryable: false, failureMessage: reelProblem };
+  const visualBrand = contentFormat === "reel" ? await loadBrandProfile(sb, job.client_id) : null;
 
   const submitTool = briefSubmitTool(
     idea.media_type,
@@ -191,6 +193,7 @@ ${contentFormat === "reel"
 
 BRAND STRATEGY — hold this point of view, respect what it says to avoid
 ${strategy || "(none on file)"}
+${visualBrand?.never_do ? `\nVISUAL BRAND EXCLUSIONS — these override any idea or shot suggestion\n${visualBrand.never_do}\n` : ""}
 
 BUYER LANGUAGE, OBJECTIONS AND FEARS — speak to these, in their words
 ${voice || "(none on file)"}
@@ -258,6 +261,9 @@ Call ${submitTool.name} once when you are done.`;
     // this is here to stop, and nothing downstream would notice.
     return { ok: false, retryable: true, failureMessage: frames.problem, usage };
   }
+  const copyProblem = contentFormat === "reel"
+    ? reelCopyProblem(result.submitted, visualBrand?.never_do ?? "") : null;
+  if (copyProblem) return { ok: false, retryable: true, failureMessage: copyProblem, usage };
 
   const body = composeBody(idea.media_type, result.submitted, contentFormat);
   if (body.length < 200) {

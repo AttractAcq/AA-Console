@@ -5,6 +5,7 @@ import {
   MOTION_PRESET_PLACEHOLDER,
   parseStoredShotPlan,
   reelBriefProblem,
+  reelCopyProblem,
   reelPlannerNote,
   serializeShot,
 } from "./shots.js";
@@ -41,6 +42,29 @@ describe("a reel brief", () => {
     expect(note).toContain(MOTION_PRESET_PLACEHOLDER);
     expect(note).toContain(ZOOM_IN_MOTION_ID);
     expect(note).toMatch(/do not invent a motion uuid/i);
+    expect(note).toMatch(/silent with editor-added captions/i);
+  });
+
+  it("refuses an exact hook or CTA that cannot fit the reel caption contract", () => {
+    expect(reelCopyProblem({ hook: `First caption: "${"A".repeat(61)}"`, call_to_action: "Read the plan." }))
+      .toMatch(/first caption/);
+    expect(reelCopyProblem({ hook: "Open on the owner", call_to_action: "A".repeat(61) }))
+      .toMatch(/call to action/);
+    expect(reelCopyProblem({ hook: "Open on the owner", call_to_action: "Voiceover: read the plan." }))
+      .toMatch(/no voiceover source/);
+    expect(reelCopyProblem({ hook: 'First caption: "Show the rule."', call_to_action: "Read it at attractacq.com." }))
+      .toBeNull();
+  });
+
+  it("rejects a handshake beat when the client's visual brand forbids it", () => {
+    const submission = reelSubmission({
+      hook: "The workshop is quiet.", call_to_action: "Read the rule.",
+      frames: [shot("Show the empty bay"),
+        shot("The owner shakes hands with a customer arriving at the door")],
+    });
+    expect(reelCopyProblem(submission, "No generic handshake/startup stock."))
+      .toMatch(/Shot 2 depicts a handshake/);
+    expect(reelCopyProblem(submission, "No neon greens.")).toBeNull();
   });
 
   it("asks for a shot plan and a format code, and leaves a carousel on string frames", () => {
