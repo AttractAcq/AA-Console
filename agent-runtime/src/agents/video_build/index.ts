@@ -464,6 +464,14 @@ export async function runVideoBuildJob(
     return { ok: true, retryable: false };
   }
 
+  // A v5 run owns its edit step and exact QA evidence. The generic brief
+  // route below must not create a second, unlinked video_edit job.
+  if (typeof job.params?.v5_workflow_run_id === "string"
+    && typeof job.params?.v5_step_key === "string") {
+    await appendEvent(sb, job.id, "Clips complete. The v5 workflow will queue the reel edit.");
+    return { ok: true, retryable: false };
+  }
+
   // To editing, not copywriting. This agent makes stills and submits the
   // Higgsfield clips; it does not produce a video. Advancing straight to
   // copywriting is what put uncut reels in front of people, because QA reads

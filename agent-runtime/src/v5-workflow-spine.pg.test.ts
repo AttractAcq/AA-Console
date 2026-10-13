@@ -29,6 +29,9 @@ const dailySequenceMigration = () => readFile(new URL(
 const creativeRoutingMigration = () => readFile(new URL(
   "../../supabase/migrations/20261012220000_203_v5_daily_creative_routing.sql", import.meta.url,
 ), "utf8");
+const motionFollowupMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261013090000_204_v5_motion_followup_qa.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -164,6 +167,7 @@ beforeAll(async () => {
   await db.exec(await dailyQaMigration());
   await db.exec(await dailySequenceMigration());
   await db.exec(await creativeRoutingMigration());
+  await db.exec(await motionFollowupMigration());
 });
 
 beforeEach(async () => {
@@ -226,6 +230,51 @@ describe("v5 workflow spine", () => {
       .toBe("failed");
     await expect(service(`select id from retry_missing_render_workflow_step('${step.id}')`))
       .rejects.toThrow(/not eligible/);
+  });
+
+  it("waits for a paid clip follow-up and repairs the earlier premature motion block", async () => {
+    const briefId = "33333333-3333-4333-8333-333333333334";
+    const assetId = "44444444-4444-4444-8444-444444444445";
+    await db.exec(`insert into client_briefs (id,client_id,body,content_format,media_type,format_code)
+      values ('${briefId}','${CLIENT}','Six complete opening shots for a reel.','reel','video','F7')`);
+    const run = await makeRun("motion-follow-up");
+    await service(`select id from add_workflow_agent_step('${run.id}','reel_create','{}',
+      'creative_build','client_briefs','${briefId}')`);
+    await service(`select id from add_workflow_agent_step('${run.id}','reel_motion',
+      array['reel_create'],'video_build','client_briefs','${briefId}')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec(`insert into client_media_assets
+      (id,client_id,brief_id,storage_path,content_format,media_type)
+      values ('${assetId}','${CLIENT}','${briefId}','opening.jpg','reel','video');
+      update agent_jobs set status='completed' where id=(select job_id from workflow_steps
+        where run_id='${run.id}' and step_key='reel_create')`);
+    await service("select * from reconcile_workflow_runs()");
+    await service(`select id from accept_workflow_step(
+      (select id from workflow_steps where run_id='${run.id}' and step_key='reel_create'),
+      'asset','${assetId}','opening-v1','{"result":"pass","checks":["stills"]}'::jsonb)`);
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec(`insert into client_media_frames (asset_id,clip_path)
+      values ('${assetId}','one.mp4'),('${assetId}',null);
+      update agent_jobs set status='completed' where id=(select job_id from workflow_steps
+        where run_id='${run.id}' and step_key='reel_motion');
+      insert into agent_jobs(agent_key,client_id,input_table,input_id,params)
+      values ('video_build','${CLIENT}','client_briefs','${briefId}',
+        '{"v5_workflow_run_id":"${run.id}","v5_step_key":"reel_motion"}'::jsonb)`);
+    await service("select * from reconcile_workflow_runs()");
+    expect(await service<{ steps_accepted: number; steps_blocked: number }>(
+      "select * from accept_ready_daily_workflow_steps()")).toEqual({ steps_accepted: 0, steps_blocked: 0 });
+    await db.exec(`update client_media_frames set clip_path='two.mp4'
+      where asset_id='${assetId}' and clip_path is null;
+      update workflow_steps set status='blocked',
+        blocker='Video build has no accepted opening asset or complete clips.'
+        where run_id='${run.id}' and step_key='reel_motion';
+      update workflow_runs set status='blocked' where id='${run.id}'`);
+    await service(`select id from resume_completed_daily_motion_qa('${run.id}')`);
+    expect((await service<{ steps_accepted: number }>(
+      "select * from accept_ready_daily_workflow_steps()")).steps_accepted).toBe(1);
+    await expect(service(`select id from resume_completed_daily_motion_qa('${run.id}')`))
+      .rejects.toThrow(/No premature motion QA block/);
   });
   it("creates one root run for a repeated request and refuses changed inputs", async () => {
     const first = await makeRun();
