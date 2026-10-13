@@ -25,6 +25,7 @@ import {
   type Edl,
 } from "./edl.js";
 import { CAPTION_LINE_CHARS, wrapLines } from "./render.js";
+import type { BriefForEdit } from "./handoff.js";
 
 export const SUBMIT_TOOL_NAME = "submit_edit_plan";
 
@@ -84,12 +85,37 @@ export function communicationProblems(edl: Edl, clips: readonly PlanClip[]): str
   return problems;
 }
 
+const quoted = (text: string | null | undefined): string | null =>
+  /["“]([^"”]+)["”]/.exec(text ?? "")?.[1]?.trim() ?? null;
+const cleanSpace = (text: string): string => text.replace(/\s+/g, " ").trim();
+
+/** Refuse a cut that silently rewrites the exact hook or quoted CTA in its brief. */
+export function briefCopyProblems(edl: Edl, brief: BriefForEdit): string[] {
+  const problems: string[] = [];
+  const onScreen = cleanSpace([
+    ...[...edl.captions].sort((a, b) => a.start_sec - b.start_sec).map((caption) => caption.text),
+    edl.end_card_text,
+  ].join(" "));
+  const hook = /(?:first caption|first line)\s*:/i.test(brief.hook ?? "")
+    ? quoted(brief.hook) : null;
+  if (hook && !onScreen.startsWith(cleanSpace(hook))) {
+    problems.push(`The brief locks the first caption to "${hook}". Preserve its exact wording and order.`);
+  }
+  const plainCta = brief.call_to_action?.trim() ?? "";
+  const cta = quoted(plainCta) ?? (plainCta.length <= MAX_CAPTION_CHARS ? plainCta : null);
+  if (cta && !onScreen.includes(cleanSpace(cta))) {
+    problems.push(`The quoted call to action is missing or rewritten. Preserve "${cta}" in order across the final captions or end card.`);
+  }
+  return problems;
+}
+
 export const SYSTEM = `You are the editor for short vertical social video (Reels, TikTok).
 You are given a brief and stills sampled from each generated clip, labelled with the time inside that clip.
 Cut the clips into one reel that delivers the brief:
 - The hook lands in the first two seconds. Open on the strongest frame, not the first one.
 - Cut on movement where you can see it. Drop frames that warp, smear or show artefacts.
 - Captions say what the brief says. Never add a figure, claim or promise the brief does not make.
+- A quoted first caption/line and a quoted call to action are locked copy. Preserve every word, punctuation mark and its order on screen. Split a long line across timed captions if needed; never paraphrase or drop it.
 - One idea per caption, short enough to read in the time it is on screen.
 - Keep generated-footage captions to at most two rendered lines (about ${CAPTION_LINE_CHARS} characters per line). Place them in clear negative space; never cover a face, hand or key action. Prefer a safe upper or lower third, using the middle only when it is truly empty.
 - Generated footage has no narration in the current render. When it has no burned-in text, use captions to carry the hook and key argument; do not leave the reel as silent, unexplained visuals. Put the first caption in the first two seconds.

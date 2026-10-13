@@ -22,7 +22,7 @@ import { briefSubmitTool, composeBody, composeAvatarBody, composeEditorBody, bri
 import { isMultiFrame } from "../../content/format.js";
 import { loadIdentity, identityWriterBlock } from "../identity.js";
 import { loadUsableProof, renderProof, proofIdForRef } from "../proof.js";
-import { reelBriefProblem, reelPlannerNote } from "./shots.js";
+import { reelBriefProblem, reelCopyProblem, reelPlannerNote } from "./shots.js";
 
 export async function runBriefJob(
   sb: SupabaseClient,
@@ -258,6 +258,8 @@ Call ${submitTool.name} once when you are done.`;
     // this is here to stop, and nothing downstream would notice.
     return { ok: false, retryable: true, failureMessage: frames.problem, usage };
   }
+  const copyProblem = contentFormat === "reel" ? reelCopyProblem(result.submitted) : null;
+  if (copyProblem) return { ok: false, retryable: true, failureMessage: copyProblem, usage };
 
   const body = composeBody(idea.media_type, result.submitted, contentFormat);
   if (body.length < 200) {

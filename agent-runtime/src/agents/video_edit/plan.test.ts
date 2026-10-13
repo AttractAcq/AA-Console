@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { MAX_CAPTION_CHARS, MAX_END_CARD_SEC, TRANSITIONS, type Edl } from "./edl.js";
-import { buildPlanContent, communicationProblems, sameRenderedCut, type PlanInput } from "./plan.js";
+import { briefCopyProblems, buildPlanContent, communicationProblems, sameRenderedCut, type PlanInput } from "./plan.js";
+import type { BriefForEdit } from "./handoff.js";
 
 const input: PlanInput = {
   title: "Spike reel",
@@ -134,6 +135,27 @@ describe("silent reel communication", () => {
     ] }, input.clips);
     expect(problems).toContainEqual(expect.stringContaining("more than two lines"));
   });
+});
+
+it("catches the live reel's rewritten hook and truncated CTA before rendering", () => {
+  const brief = {
+    hook: 'First caption: "Three weeks. A report you can\'t put your name to."',
+    call_to_action: 'Caption: "Ask every provider — including us. Ours is written down. attractacq.com, or DM @attractacq and ask Alex Thomas for it."',
+  } as BriefForEdit;
+  const cut: Edl = { segments: [], captions: [
+    { text: "Three weeks. A report you can't defend.", start_sec: 0, end_sec: 3, position: "bottom" },
+    { text: "Ours is written down.", start_sec: 10, end_sec: 12, position: "bottom" },
+    { text: "attractacq.com or DM @attractacq", start_sec: 17, end_sec: 20, position: "bottom" },
+  ], end_card_text: "Ask every provider — including us.", end_card_sec: 2, notes: "" };
+  expect(briefCopyProblems(cut, brief)).toHaveLength(2);
+  const exact: Edl = { ...cut, captions: [
+    { text: "Three weeks. A report you can't put your name to.", start_sec: 0, end_sec: 4, position: "bottom" },
+    { text: "Ask every provider — including us. Ours is written down.", start_sec: 12, end_sec: 15, position: "bottom" },
+    { text: "attractacq.com, or DM @attractacq and ask Alex Thomas for it.", start_sec: 15, end_sec: 20, position: "bottom" },
+  ], end_card_text: "", end_card_sec: 0 };
+  expect(briefCopyProblems(exact, brief)).toEqual([]);
+  expect(briefCopyProblems({ ...exact, end_card_text: "Read the plan.", end_card_sec: 2 },
+    { call_to_action: "Read the plan." } as BriefForEdit)).toEqual([]);
 });
 
 // A limit the validator enforces but the prompt never states is only

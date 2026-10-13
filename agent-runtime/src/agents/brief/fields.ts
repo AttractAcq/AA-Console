@@ -55,7 +55,7 @@ const REEL_DESCRIPTIONS: Partial<Record<BriefField, string>> = {
   script: "The words across the reel, in order, marked by shot. Each shot carries its own line.",
   visual_direction: "How the generated stills should look. One treatment across the reel: these shots are one piece.",
   shot_requirements: "What each generated shot must show. Phase 1 does not capture client footage.",
-  call_to_action: "The action asked for, which lands on the last shot.",
+  call_to_action: "One exact viewer-facing line of at most 60 characters, which lands on the last shot or end card. No edit instructions or voiceover notes.",
 };
 
 export function fieldsFor(
