@@ -413,6 +413,32 @@ describe("video_build", () => {
     expect(JSON.stringify(result)).not.toContain("not-a-real-secret");
   });
 
+  it("leaves the edit handoff to the v5 workflow after clip collection", async () => {
+    setHiggsfieldEnv();
+    const motion = "11111111-1111-4111-8111-111111111111";
+    const ready = {
+      ...reel,
+      frame_plan: [shotLine("Name the mechanism").replace('"pending"', `"${motion}"`),
+        shotLine("Show the step").replace('"pending"', `"${motion}"`)],
+    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      status: "completed", video: { url: "https://cdn.example.test/clip.mp4" },
+    }), { status: 200 }));
+    const { sb, rpcCalls } = harness(ready, {
+      assets: [{ id: "asset-1" }],
+      frames: [
+        { id: "frame-1", position: 1, storage_path: "a/01.png", provider_job_id: "req_abc12345", clip_path: "a/01.mp4" },
+        { id: "frame-2", position: 2, storage_path: "a/02.png", provider_job_id: "req_abc12346", clip_path: "a/02.mp4" },
+      ],
+      signedUrl: "https://cdn.example.test/still.png",
+    });
+    const result = await runVideoBuildJob(sb, runtime, agent, {
+      ...job, params: { v5_workflow_run_id: "run-1", v5_step_key: "reel_motion" },
+    });
+    expect(result.ok).toBe(true);
+    expect(rpcCalls).not.toContainEqual({ name: "request_video_edit", args: { p_asset_id: "asset-1" } });
+  });
+
   it("pauses an unknown motion name and does not invent a catalog id", async () => {
     setHiggsfieldEnv();
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network disabled"));
