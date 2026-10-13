@@ -35,6 +35,9 @@ const motionFollowupMigration = () => readFile(new URL(
 const videoUploadRecoveryMigration = () => readFile(new URL(
   "../../supabase/migrations/20261013120000_205_v5_video_upload_recovery.sql", import.meta.url,
 ), "utf8");
+const videoCreativeRecoveryMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261013150000_206_v5_video_creative_recovery.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -173,6 +176,7 @@ beforeAll(async () => {
   await db.exec(await creativeRoutingMigration());
   await db.exec(await motionFollowupMigration());
   await db.exec(await videoUploadRecoveryMigration());
+  await db.exec(await videoCreativeRecoveryMigration());
 });
 
 beforeEach(async () => {
@@ -327,6 +331,45 @@ describe("v5 workflow spine", () => {
     expect((await one<{ status: string }>(`select status from agent_jobs where id='${old.job_id}'`)).status)
       .toBe("failed");
     await expect(service(`select id from retry_failed_video_upload_workflow_step('${step.id}')`))
+      .rejects.toThrow(/not eligible/);
+  });
+  it("re-edits one rejected reel from the existing asset and keeps candidate history", async () => {
+    const assetId = "44444444-4444-4444-8444-444444444448";
+    const candidateId = "55555555-5555-4555-8555-555555555558";
+    await db.exec(`insert into client_media_assets (id,client_id,brief_id,storage_path,content_format,media_type)
+      values ('${assetId}','${CLIENT}','${OUTPUT}','opening.jpg','reel','video')`);
+    const run = await makeRun("video-creative-recovery");
+    const step = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_edit','{}','video_edit','client_media_assets','${assetId}')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    const old = await one<{ job_id: string }>(`select job_id from workflow_steps where id='${step.id}'`);
+    await db.exec(`insert into video_render_candidates
+      (id,client_id,asset_id,job_id,attempt,verdict,render_path,media_probe,rejection_reason,edit_plan)
+      values ('${candidateId}','${CLIENT}','${assetId}','${old.job_id}',3,'rejected','rejected.mp4',
+        '{"result":"pass"}'::jsonb,'The end card is illegible','{"segments":[{"shot":1}]}'::jsonb);
+      update agent_jobs set status='failed',terminal=true,attempts=3,
+        error='The end card is illegible' where id='${old.job_id}'`);
+    await service("select * from reconcile_workflow_runs()");
+    expect((await one<{ status: string }>(`select status from workflow_steps where id='${step.id}'`)).status)
+      .toBe("blocked");
+    await db.exec("select set_config('request.jwt.claim.role', 'authenticated', false)");
+    await expect(db.query(`select id from retry_failed_video_creative_workflow_step('${step.id}')`))
+      .rejects.toThrow(/service role required/);
+    await service(`select id from retry_failed_video_creative_workflow_step('${step.id}')`);
+    expect((await service<{ steps_queued: number }>("select * from reconcile_workflow_runs()" )).steps_queued)
+      .toBe(1);
+    const next = await one<{ job_id: string; input_id: string; feedback: { candidate_id: string } }>(`
+      select j.id as job_id, j.input_id, j.params->'v5_video_revision' as feedback
+      from workflow_steps s join agent_jobs j on j.id = s.job_id where s.id='${step.id}'`);
+    expect(next.job_id).not.toBe(old.job_id);
+    expect(next.input_id).toBe(assetId);
+    expect(next.feedback.candidate_id).toBe(candidateId);
+    expect((await one<{ status: string }>(`select status from agent_jobs where id='${old.job_id}'`)).status)
+      .toBe("failed");
+    expect((await one<{ verdict: string }>(`select verdict from video_render_candidates
+      where id='${candidateId}'`)).verdict).toBe("rejected");
+    await expect(service(`select id from retry_failed_video_creative_workflow_step('${step.id}')`))
       .rejects.toThrow(/not eligible/);
   });
   it("creates one root run for a repeated request and refuses changed inputs", async () => {
