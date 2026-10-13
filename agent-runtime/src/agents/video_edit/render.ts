@@ -264,7 +264,7 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
       const y = index === 0 ? firstY : `${firstY}+${index * (size + LINE_SPACING)}`;
       return (
         `drawtext=fontfile=${fontFile}:textfile=${file}:expansion=none:fontsize=${size}:` +
-        `fontcolor=${fontColour}:borderw=${captionBox && brandCaptionPlate ? 0 : 5}:bordercolor=black@0.85:` +
+        `fontcolor=${fontColour}:borderw=${!captionBox || brandCaptionPlate ? 0 : 5}:bordercolor=black@0.85:` +
         (captionBox ? `box=1:boxcolor=${captionPlate}:boxborderw=16:` : "") +
         `x=(w-text_w)/2:y=${y}:` +
         `enable='between(t,${sec(start)},${sec(end)})'`
