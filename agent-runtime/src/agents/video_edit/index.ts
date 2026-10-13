@@ -42,6 +42,7 @@ import { communicationProblems, planEdit, sameRenderedCut, type PlanClip } from 
 import { advanceSlot, slotIdOf } from "../../engine/slot.js";
 import { buildRenderPlan } from "./render.js";
 import { probeRenderedVideo, reviewRenderedVideo } from "./acceptance.js";
+import { uploadRenderedCut } from "./upload.js";
 
 const BUCKET = "client-media";
 /** Enough to read the cut without paying for every frame of it. */
@@ -353,10 +354,11 @@ async function cut(
   const digest = createHash("sha256").update(bytes).digest("hex").slice(0, 24);
   const storagePath = renderStoragePath(asset.client_id, asset.id, job.id, job.attempts, digest);
   const probe = await probeRenderedVideo(outputPath, soundTreatment !== "captions_only");
-  const { error: upError } = await sb.storage
-    .from(BUCKET)
-    .upload(storagePath, bytes, { contentType: "video/mp4", upsert: true });
-  if (upError) throw new Error(`Could not store the cut: ${upError.message}`);
+  await uploadRenderedCut(
+    () => sb.storage.from(BUCKET).upload(storagePath, bytes, { contentType: "video/mp4", upsert: true }),
+    { onRetry: (attempt, reason) => void appendEvent(sb, job.id,
+      `Storage returned a temporary error after rendering. Retrying this exact cut (${attempt}/3): ${reason}`, "warn") },
+  );
   const { data: candidate, error: recordError } = await sb.rpc("record_video_render_candidate", {
     p_job_id: job.id, p_attempt: job.attempts, p_asset_id: asset.id,
     p_render_path: storagePath, p_media_probe: probe,
