@@ -73,7 +73,7 @@ export function reelPlannerNote(): string {
 }
 
 /** The editor cannot faithfully fit an overlong exact line into one caption. */
-export function reelCopyProblem(submitted: Record<string, unknown>, brandNeverDo = ""): string | null {
+export function reelCopyProblem(submitted: Record<string, unknown>, brandNeverDo = "", allowedColours: string[] | null = null): string | null {
   const hook = String(submitted.hook ?? "");
   const cta = String(submitted.call_to_action ?? "").trim();
   const firstLine = /(?:first caption|first line)\s*:\s*["“]([^"”]+)["”]/i.exec(hook)?.[1];
@@ -85,6 +85,16 @@ export function reelCopyProblem(submitted: Record<string, unknown>, brandNeverDo
   }
   if (/\bvoice\s*-?over\b|\bnarrat(?:ion|e|or)\b/i.test(cta)) {
     return "A Phase 1 reel has no voiceover source. Write the call to action as on-screen text.";
+  }
+  if (allowedColours) {
+    const allowed = new Set(allowedColours.map((value) => value.toLowerCase()));
+    const creativeText = [submitted.script, submitted.visual_direction, submitted.editor_notes,
+      ...((Array.isArray(submitted.frames) ? submitted.frames : []) as Array<Record<string, unknown>>)
+        .flatMap((frame) => [frame.beat, frame.subject, frame.composition, frame.background])]
+      .map((value) => String(value ?? "")).join(" ");
+    const invented = [...creativeText.matchAll(/#[0-9a-f]{6}\b/gi)]
+      .map((match) => match[0].toLowerCase()).find((value) => !allowed.has(value));
+    if (invented) return `The reel brief specifies ${invented}, which is not in the client's recorded visual brand palette.`;
   }
   if (/hand\s*-?shake/i.test(brandNeverDo)) {
     const frames = Array.isArray(submitted.frames) ? submitted.frames : [];

@@ -154,6 +154,12 @@ it("catches the live reel's rewritten hook and truncated CTA before rendering", 
     { text: "attractacq.com, or DM @attractacq and ask Alex Thomas for it.", start_sec: 15, end_sec: 20, position: "bottom" },
   ], end_card_text: "", end_card_sec: 0 };
   expect(briefCopyProblems(exact, brief)).toEqual([]);
+  const splitHook: Edl = { ...exact, captions: [
+    { text: "Three weeks.", start_sec: 0, end_sec: 1, position: "bottom" },
+    { text: "A report you can't put your name to.", start_sec: 1, end_sec: 4, position: "bottom" },
+    ...exact.captions.slice(1),
+  ] };
+  expect(briefCopyProblems(splitHook, brief)[0]).toMatch(/one caption plate/);
   expect(briefCopyProblems({ ...exact, end_card_text: "Read the plan.", end_card_sec: 2 },
     { call_to_action: "Read the plan." } as BriefForEdit)).toEqual([]);
 });

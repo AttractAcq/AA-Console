@@ -8,7 +8,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import type { Edl } from "./edl.js";
 import { probeDurationSec, render } from "./media.js";
-import { buildRenderPlan, readableEndCardColour, RenderPlanError, wrapText } from "./render.js";
+import { buildRenderPlan, captionLayout, readableEndCardColour, RenderPlanError, wrapText } from "./render.js";
 import { fontSource, installFont } from "./font.js";
 
 const edl: Edl = {
@@ -58,6 +58,11 @@ describe("wrapText", () => {
   it("breaks on words and never splits one", () => {
     expect(wrapText("Most gyms lose 30% of members by March", 22)).toBe("Most gyms lose 30% of\nmembers by March");
     expect(wrapText("supercalifragilistic expialidocious", 10)).toBe("supercalifragilistic\nexpialidocious");
+  });
+  it("fits the live 48-character hook on one two-line caption plate", () => {
+    expect(captionLayout("Three weeks. Fee spent. A report he can't trust.")).toEqual({
+      lines: ["Three weeks. Fee spent. A", "report he can't trust."], size: 54,
+    });
   });
 });
 
@@ -110,6 +115,16 @@ describe("buildRenderPlan", () => {
     expect(caption).toContain("fontcolor=0xffffff");
     expect(caption).toContain("box=1:boxcolor=black@0.58:boxborderw=16");
     expect(caption).toContain("bordercolor=black@0.85");
+  });
+
+  it("uses the approved brand ink and plate when both are recorded", () => {
+    const filter = filterOf(buildRenderPlan(edl, { ...options,
+      backgroundColour: "#F5F7F3", textColour: "#192925",
+    }).args);
+    const caption = filter.slice(filter.indexOf("textfile=/work/caption-1-1.txt"));
+    expect(caption).toContain("fontcolor=0x192925");
+    expect(caption).toContain("box=1:boxcolor=0xf5f7f3@0.90");
+    expect(caption).toContain("borderw=0");
   });
 
   it("uses a readable end-card colour when brand text matches its background", () => {

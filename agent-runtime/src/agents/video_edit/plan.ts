@@ -24,7 +24,7 @@ import {
   TRANSITIONS,
   type Edl,
 } from "./edl.js";
-import { CAPTION_LINE_CHARS, wrapLines } from "./render.js";
+import { captionLayout } from "./render.js";
 import type { BriefForEdit } from "./handoff.js";
 
 export const SUBMIT_TOOL_NAME = "submit_edit_plan";
@@ -78,7 +78,7 @@ export function communicationProblems(edl: Edl, clips: readonly PlanClip[]): str
     problems.push("The silent reel needs a readable hook caption in its first two seconds.");
   }
   edl.captions.forEach((caption, index) => {
-    if (wrapLines(caption.text, CAPTION_LINE_CHARS).length > 2) {
+    if (captionLayout(caption.text).lines.length > 2) {
       problems.push(`Caption ${index + 1} fills more than two lines. Shorten it to one clear thought without dropping the brief's meaning.`);
     }
   });
@@ -92,14 +92,15 @@ const cleanSpace = (text: string): string => text.replace(/\s+/g, " ").trim();
 /** Refuse a cut that silently rewrites the exact hook or quoted CTA in its brief. */
 export function briefCopyProblems(edl: Edl, brief: BriefForEdit): string[] {
   const problems: string[] = [];
+  const ordered = [...edl.captions].sort((a, b) => a.start_sec - b.start_sec);
   const onScreen = cleanSpace([
-    ...[...edl.captions].sort((a, b) => a.start_sec - b.start_sec).map((caption) => caption.text),
+    ...ordered.map((caption) => caption.text),
     edl.end_card_text,
   ].join(" "));
   const hook = /(?:first caption|first line)\s*:/i.test(brief.hook ?? "")
     ? quoted(brief.hook) : null;
-  if (hook && !onScreen.startsWith(cleanSpace(hook))) {
-    problems.push(`The brief locks the first caption to "${hook}". Preserve its exact wording and order.`);
+  if (hook && cleanSpace(ordered[0]?.text ?? "") !== cleanSpace(hook)) {
+    problems.push(`The brief locks the first caption to "${hook}". Show it intact on one caption plate; do not split it across timed captions.`);
   }
   const plainCta = brief.call_to_action?.trim() ?? "";
   const cta = quoted(plainCta) ?? (plainCta.length <= MAX_CAPTION_CHARS ? plainCta : null);
@@ -115,9 +116,9 @@ Cut the clips into one reel that delivers the brief:
 - The hook lands in the first two seconds. Open on the strongest frame, not the first one.
 - Cut on movement where you can see it. Drop frames that warp, smear or show artefacts.
 - Captions say what the brief says. Never add a figure, claim or promise the brief does not make.
-- A quoted first caption/line and a quoted call to action are locked copy. Preserve every word, punctuation mark and its order on screen. Split a long line across timed captions if needed; never paraphrase or drop it.
+- A quoted first caption/line is locked copy. Put the exact entire line on the first caption plate; the renderer scales longer lines to fit two lines. Never split it into timed captions. Preserve a quoted call to action in order on screen.
 - One idea per caption, short enough to read in the time it is on screen.
-- Keep generated-footage captions to at most two rendered lines (about ${CAPTION_LINE_CHARS} characters per line). Place them in clear negative space; never cover a face, hand or key action. Prefer a safe upper or lower third, using the middle only when it is truly empty.
+- Keep generated-footage captions to at most two rendered lines. The renderer adapts type size for up to ${MAX_CAPTION_CHARS} characters. Place them in clear negative space; never cover a face, hand or key action. Prefer a safe upper or lower third, using the middle only when it is truly empty.
 - Generated footage has no narration in the current render. When it has no burned-in text, use captions to carry the hook and key argument; do not leave the reel as silent, unexplained visuals. Put the first caption in the first two seconds.
 - A shot marked "already on screen" has its line burned into the artwork. Never put a caption over
   one: a second text in a second typeface lands on top of the first. A reel with fully lettered

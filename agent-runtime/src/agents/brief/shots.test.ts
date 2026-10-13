@@ -67,6 +67,15 @@ describe("a reel brief", () => {
     expect(reelCopyProblem(submission, "No neon greens.")).toBeNull();
   });
 
+  it("refuses an invented reel palette outside the recorded visual brand", () => {
+    const submission = reelSubmission({ script: "End card navy #07192f on paper #fbfaf7.",
+      call_to_action: "Read the report." });
+    expect(reelCopyProblem(submission, "", ["#142B23", "#F5F7F3"]))
+      .toMatch(/#07192f.*not in/);
+    expect(reelCopyProblem({ ...submission, script: "Use #142B23 on #F5F7F3." },
+      "", ["#142B23", "#F5F7F3"])).toBeNull();
+  });
+
   it("asks for a shot plan and a format code, and leaves a carousel on string frames", () => {
     const reel = briefSubmitTool("video", [], "reel");
     expect(reel.inputSchema.required).toEqual(expect.arrayContaining(["frames", "format_code"]));
