@@ -279,7 +279,7 @@ export function validateEdl(edl: Edl, context: EdlContext): string[] {
       problems.push(`${label} is on screen for under ${MIN_CAPTION_SEC}s, too short to read.`);
     }
     if (caption.start_sec < 0 || caption.end_sec > total + 0.05) {
-      problems.push(`${label} runs outside the reel.`);
+      problems.push(`${label} runs outside the reel (${caption.start_sec.toFixed(1)}–${caption.end_sec.toFixed(1)}s; export ends ${total.toFixed(1)}s). Shorten or move it within the actual cut.`);
     }
     if (edl.end_card_text && caption.end_sec > cutEnd + 0.05) {
       problems.push(`${label} overlaps the separate end card. End captions at ${cutEnd.toFixed(1)}s or place the call to action over the final shot without an end card.`);

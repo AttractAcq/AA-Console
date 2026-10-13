@@ -290,29 +290,29 @@ async function cut(
   // supplied by the editor and therefore checkable before rendering.
   const copyProblems = (cut: Edl) => clips.some((clip) => clip.burnedInText.trim())
     ? [] : briefCopyProblems(cut, brief);
-  let problems = [...validateEdl(edl, context), ...communicationProblems(edl, clips),
-    ...copyProblems(edl)];
-  if (sameRenderedCut(edl, planInput.priorCandidateFailure?.editPlan))
-    problems.push("The cut repeats the rejected edit plan exactly.");
-
-  if (problems.length > 0) {
-    // One revise, with every problem named. A second failure is a refusal,
-    // not a third attempt: the planner has now been told twice.
-    await appendEvent(sb, job.id, `The first cut had ${problems.length} problem(s). Asking for a revision.`, "warn", {
-      stage: "validate",
-      problems,
+  const planProblems = (candidate: Edl): string[] => {
+    const found = [...validateEdl(candidate, context), ...communicationProblems(candidate, clips),
+      ...copyProblems(candidate)];
+    if (sameRenderedCut(candidate, planInput.priorCandidateFailure?.editPlan))
+      found.push("The cut repeats the rejected edit plan exactly.");
+    return found;
+  };
+  let problems = planProblems(edl);
+  for (let revision = 1; problems.length > 0 && revision <= 2; revision += 1) {
+    await appendEvent(sb, job.id,
+      `The edit plan had ${problems.length} problem(s). Asking for revision ${revision}/2.`, "warn",
+      { stage: "validate", revision, problems });
+    plan = await planEdit({ ...planInput, revise: { edl, problems } }, {
+      model: config.model,
+      timeoutMs: deadlineMs ? Math.max(30_000, deadlineMs - Date.now()) : timeoutMs,
     });
-    plan = await planEdit({ ...planInput, revise: { edl, problems } }, { model: config.model, timeoutMs });
     usage = {
       inputTokens: usage.inputTokens + plan.usage.inputTokens,
       outputTokens: usage.outputTokens + plan.usage.outputTokens,
       costUsd: usage.costUsd + plan.usage.costUsd,
     };
     edl = plan.edl;
-    problems = [...validateEdl(edl, context), ...communicationProblems(edl, clips),
-      ...copyProblems(edl)];
-    if (sameRenderedCut(edl, planInput.priorCandidateFailure?.editPlan))
-      problems.push("The cut repeats the rejected edit plan exactly.");
+    problems = planProblems(edl);
   }
 
   if (problems.length > 0) {
