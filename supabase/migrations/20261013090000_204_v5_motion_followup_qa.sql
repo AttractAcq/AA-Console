@@ -1,3 +1,67 @@
+-- Carry the latest rejected cut feedback into a workflow-owned edit.
+create or replace function enqueue_workflow_step_job(
+  p_run workflow_runs, p_step workflow_steps, p_resolved_input uuid
+) returns uuid language plpgsql security definer set search_path = public as $$
+declare
+  v_brief client_briefs;
+  v_prior video_render_candidates;
+  v_generation_id uuid;
+  v_render_id uuid;
+  v_job_id uuid;
+  v_params jsonb;
+begin
+  if auth.role() <> 'service_role' then raise exception 'AUTH: service role required'; end if;
+  v_params := p_step.input_params || jsonb_build_object(
+    'v5_workflow_run_id', p_run.id, 'v5_step_key', p_step.step_key);
+  if p_step.agent_key = 'creative_build' then
+    if p_step.input_table <> 'client_briefs' then
+      raise exception 'Creative workflow step requires a brief.';
+    end if;
+    select * into v_brief from client_briefs where id = p_resolved_input;
+    if not found or v_brief.client_id <> p_run.client_id then
+      raise exception 'Creative brief is missing or belongs to another client.';
+    end if;
+    if v_brief.media_type = 'video' and
+      (v_brief.content_format <> 'reel' or
+        coalesce(v_brief.format_code, 'F6') not in ('F6', 'F7')) then
+      raise exception 'Only a Phase 1 reel may use a video brief for opening stills.';
+    end if;
+    insert into creative_generations
+      (client_id, brief_id, media_type, quality, size, created_by)
+    values (p_run.client_id, p_resolved_input,
+      case when v_brief.media_type = 'video' then 'image'::media_type else v_brief.media_type end,
+      'high', '1024x1536', p_run.created_by)
+    returning id into v_generation_id;
+    insert into creative_renders
+      (generation_id, client_id, quality, size, created_by)
+    values (v_generation_id, p_run.client_id, 'high', '1024x1536', p_run.created_by)
+    returning id into v_render_id;
+    v_params := v_params || jsonb_build_object('render_id', v_render_id);
+  elsif p_step.agent_key = 'video_edit' and p_step.input_table = 'client_media_assets' then
+    -- A prior unlinked cut may already have failed visual review. Give the
+    -- workflow editor that exact feedback instead of spending on a blind repeat.
+    select * into v_prior from video_render_candidates c
+      where c.asset_id = p_resolved_input and c.client_id = p_run.client_id
+        and c.verdict = 'rejected'
+      order by c.created_at desc limit 1;
+    if found then
+      v_params := v_params || jsonb_build_object('v5_video_revision',
+        jsonb_build_object('candidate_id', v_prior.id,
+          'reason', left(v_prior.rejection_reason, 1000),
+          'edit_plan', v_prior.edit_plan));
+    end if;
+  end if;
+  v_job_id := enqueue_agent_job_internal(
+    p_step.agent_key, p_run.client_id, p_step.input_table, p_resolved_input,
+    p_run.created_by, v_params, 'V5 workflow step queued.');
+  if v_generation_id is not null then
+    update creative_generations set job_id = v_job_id where id = v_generation_id;
+    update creative_renders set job_id = v_job_id where id = v_render_id;
+  end if;
+  return v_job_id;
+end;
+$$;
+
 create or replace function accept_ready_daily_workflow_steps(p_limit integer default 20)
 returns table (steps_accepted integer, steps_blocked integer)
 language plpgsql security definer set search_path = public as $$

@@ -103,8 +103,9 @@ beforeAll(async () => {
       media_type media_type, review_status text default 'pending', human_approved_at timestamptz,
       title text);
     create table client_media_frames (asset_id uuid, clip_path text);
-    create table video_render_candidates (id uuid primary key, asset_id uuid, job_id uuid,
-      attempt integer, verdict text, render_path text, media_probe jsonb, creative_review jsonb);
+    create table video_render_candidates (id uuid primary key, client_id uuid, asset_id uuid, job_id uuid,
+      attempt integer, verdict text, render_path text, media_probe jsonb, creative_review jsonb,
+      rejection_reason text, edit_plan jsonb, created_at timestamptz default now());
     create table post_copy (asset_id uuid, platform post_platform, caption text);
     create table scheduled_posts (id uuid primary key, asset_id uuid);
     create table campaign_artifacts (campaign_id uuid, page_id uuid, asset_id uuid);
@@ -275,6 +276,29 @@ describe("v5 workflow spine", () => {
       "select * from accept_ready_daily_workflow_steps()")).steps_accepted).toBe(1);
     await expect(service(`select id from resume_completed_daily_motion_qa('${run.id}')`))
       .rejects.toThrow(/No premature motion QA block/);
+  });
+
+  it("carries a rejected cut's exact feedback into the workflow edit job", async () => {
+    const assetId = "44444444-4444-4444-8444-444444444446";
+    const candidateId = "55555555-5555-4555-8555-555555555557";
+    await db.exec(`insert into client_media_assets (id,client_id,brief_id,storage_path,content_format,media_type)
+      values ('${assetId}','${CLIENT}','${OUTPUT}','opening.jpg','reel','video');
+      insert into video_render_candidates
+        (id,client_id,asset_id,attempt,verdict,render_path,media_probe,
+          rejection_reason,edit_plan)
+      values ('${candidateId}','${CLIENT}','${assetId}',1,'rejected','old.mp4',
+        '{"result":"pass"}'::jsonb,'Pillarboxed crop and missing CTA',
+        '{"clips":[1,2]}'::jsonb)`);
+    const run = await makeRun("edit-feedback");
+    await service(`select id from add_workflow_agent_step('${run.id}','reel_edit','{}',
+      'video_edit','client_media_assets','${assetId}')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    const row = await one<{ feedback: { candidate_id: string; reason: string } }>(`
+      select j.params->'v5_video_revision' as feedback from workflow_steps s
+      join agent_jobs j on j.id=s.job_id where s.run_id='${run.id}'`);
+    expect(row.feedback).toMatchObject({ candidate_id: candidateId,
+      reason: "Pillarboxed crop and missing CTA" });
   });
   it("creates one root run for a repeated request and refuses changed inputs", async () => {
     const first = await makeRun();
