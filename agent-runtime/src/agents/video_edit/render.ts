@@ -116,6 +116,23 @@ function sec(value: number): string {
 export const CAPTION_LINE_CHARS = 22;
 export const END_CARD_LINE_CHARS = 16;
 
+/** Keep exact short-form copy together while scaling longer lines within safe margins. */
+export function captionLayout(text: string): { lines: string[]; size: number } {
+  for (const [lineChars, size] of [[22, 64], [28, 54], [32, 48]] as const) {
+    const lines = wrapLines(text, lineChars);
+    if (lines.length <= 2) return { lines, size };
+  }
+  return { lines: wrapLines(text, 32), size: 48 };
+}
+
+export function endCardLayout(text: string): { lines: string[]; size: number } {
+  for (const [lineChars, size] of [[END_CARD_LINE_CHARS, 80], [22, 64], [28, 54], [32, 48]] as const) {
+    const lines = wrapLines(text, lineChars);
+    if (lines.length <= 2) return { lines, size };
+  }
+  return { lines: wrapLines(text, 32), size: 48 };
+}
+
 export function wrapLines(text: string, lineChars: number): string[] {
   const lines: string[] = [];
   let line = "";
@@ -163,6 +180,9 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
   const workDir = safePath(options.workDir.replace(/\/+$/, ""), "work directory");
   const background = colour(options.backgroundColour, "000000");
   const endCardColour = readableEndCardColour(background, colour(options.textColour, "ffffff"));
+  const brandCaptionPlate = Boolean(options.backgroundColour && options.textColour);
+  const captionInk = brandCaptionPlate ? endCardColour : "0xffffff";
+  const captionPlate = brandCaptionPlate ? `${background}@0.90` : "black@0.58";
 
   const args: string[] = ["-hide_banner", "-loglevel", "error", "-y"];
   const filters: string[] = [];
@@ -244,8 +264,8 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
       const y = index === 0 ? firstY : `${firstY}+${index * (size + LINE_SPACING)}`;
       return (
         `drawtext=fontfile=${fontFile}:textfile=${file}:expansion=none:fontsize=${size}:` +
-        `fontcolor=${fontColour}:borderw=5:bordercolor=black@0.85:` +
-        (captionBox ? `box=1:boxcolor=black@0.58:boxborderw=16:` : "") +
+        `fontcolor=${fontColour}:borderw=${captionBox && brandCaptionPlate ? 0 : 5}:bordercolor=black@0.85:` +
+        (captionBox ? `box=1:boxcolor=${captionPlate}:boxborderw=16:` : "") +
         `x=(w-text_w)/2:y=${y}:` +
         `enable='between(t,${sec(start)},${sec(end)})'`
       );
@@ -253,28 +273,28 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
 
   const overlays: string[] = [];
   edl.captions.forEach((caption, i) => {
-    const lines = wrapLines(caption.text, CAPTION_LINE_CHARS);
+    const { lines, size } = captionLayout(caption.text);
     overlays.push(
       ...drawBlock(
         `caption-${i + 1}`,
         lines,
-        captionY(caption.position, lines.length, 64),
-        64,
+        captionY(caption.position, lines.length, size),
+        size,
         caption.start_sec,
         caption.end_sec,
-        "0xffffff",
+        captionInk,
         true,
       ),
     );
   });
   if (edl.end_card_text) {
-    const lines = wrapLines(edl.end_card_text, END_CARD_LINE_CHARS);
+    const { lines, size } = endCardLayout(edl.end_card_text);
     overlays.push(
       ...drawBlock(
         "end-card",
         lines,
-        `(h-${blockHeight(lines.length, 80)})/2`,
-        80,
+        `(h-${blockHeight(lines.length, size)})/2`,
+        size,
         cutSec,
         cutSec + edl.end_card_sec,
         endCardColour,

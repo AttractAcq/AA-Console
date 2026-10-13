@@ -194,6 +194,12 @@ ${contentFormat === "reel"
 BRAND STRATEGY — hold this point of view, respect what it says to avoid
 ${strategy || "(none on file)"}
 ${visualBrand?.never_do ? `\nVISUAL BRAND EXCLUSIONS — these override any idea or shot suggestion\n${visualBrand.never_do}\n` : ""}
+${contentFormat === "reel" && visualBrand ? `
+VISUAL BRAND PROFILE — authoritative for the rendered reel
+Primary: ${visualBrand.colour_primary ?? "unspecified"}; secondary: ${visualBrand.colour_secondary ?? "unspecified"}; accent: ${visualBrand.colour_accent ?? "unspecified"}; background: ${visualBrand.colour_background ?? "unspecified"}; text: ${visualBrand.colour_text ?? "unspecified"}.
+Heading font: ${visualBrand.font_heading ?? "unspecified"}; body font: ${visualBrand.font_body ?? "unspecified"}.
+Use only these recorded colours. Do not invent hex colours, typefaces, logo treatments or end-card rules. The video editor applies the caption treatment from this profile; describe the words and visual placement, not an unapproved font or palette.
+` : ""}
 
 BUYER LANGUAGE, OBJECTIONS AND FEARS — speak to these, in their words
 ${voice || "(none on file)"}
@@ -262,7 +268,10 @@ Call ${submitTool.name} once when you are done.`;
     return { ok: false, retryable: true, failureMessage: frames.problem, usage };
   }
   const copyProblem = contentFormat === "reel"
-    ? reelCopyProblem(result.submitted, visualBrand?.never_do ?? "") : null;
+    ? reelCopyProblem(result.submitted, visualBrand?.never_do ?? "", visualBrand
+      ? [visualBrand.colour_primary, visualBrand.colour_secondary, visualBrand.colour_accent,
+        visualBrand.colour_background, visualBrand.colour_text].filter((value): value is string => Boolean(value))
+      : null) : null;
   if (copyProblem) return { ok: false, retryable: true, failureMessage: copyProblem, usage };
 
   const body = composeBody(idea.media_type, result.submitted, contentFormat);
