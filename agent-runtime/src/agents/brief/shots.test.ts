@@ -3,6 +3,7 @@ import { briefSubmitTool, composeBody, framePlanColumns } from "./fields.js";
 import { ZOOM_IN_MOTION_ID } from "../video_build/motions.js";
 import {
   MOTION_PRESET_PLACEHOLDER,
+  exactFirstCaption,
   parseStoredShotPlan,
   reelBriefProblem,
   reelCopyProblem,
@@ -54,6 +55,15 @@ describe("a reel brief", () => {
       .toMatch(/no voiceover source/);
     expect(reelCopyProblem({ hook: 'First caption: "Show the rule."', call_to_action: "Read it at attractacq.com." }))
       .toBeNull();
+  });
+
+  it("recognises both live ways a brief names its exact opening caption", () => {
+    expect(exactFirstCaption('The first caption reads: "Read the report before you spend a rand."'))
+      .toBe("Read the report before you spend a rand.");
+    expect(exactFirstCaption('Exact first caption, burned in: "Three weeks. Fee spent."'))
+      .toBe("Three weeks. Fee spent.");
+    expect(reelCopyProblem({ hook: `The first caption reads: "${"A".repeat(61)}"`,
+      call_to_action: "Read the plan." })).toMatch(/exact first caption/);
   });
 
   it("rejects a handshake beat when the client's visual brand forbids it", () => {

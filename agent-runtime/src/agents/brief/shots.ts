@@ -73,10 +73,14 @@ export function reelPlannerNote(): string {
 }
 
 /** The editor cannot faithfully fit an overlong exact line into one caption. */
+export function exactFirstCaption(hook: string): string | null {
+  return /\bfirst\s+(?:caption|line)\b[^\n:"“]{0,40}:\s*["“]([^"”]+)["”]/i.exec(hook)?.[1]?.trim() ?? null;
+}
+
 export function reelCopyProblem(submitted: Record<string, unknown>, brandNeverDo = "", allowedColours: string[] | null = null): string | null {
   const hook = String(submitted.hook ?? "");
   const cta = String(submitted.call_to_action ?? "").trim();
-  const firstLine = /(?:first caption|first line)\s*:\s*["“]([^"”]+)["”]/i.exec(hook)?.[1];
+  const firstLine = exactFirstCaption(hook);
   if (firstLine && firstLine.length > MAX_CAPTION_CHARS) {
     return `The reel's exact first caption is ${firstLine.length} characters; keep it within ${MAX_CAPTION_CHARS}.`;
   }

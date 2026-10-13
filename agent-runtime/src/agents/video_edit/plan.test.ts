@@ -160,6 +160,12 @@ it("catches the live reel's rewritten hook and truncated CTA before rendering", 
     ...exact.captions.slice(1),
   ] };
   expect(briefCopyProblems(splitHook, brief)[0]).toMatch(/one caption plate/);
+  expect(briefCopyProblems(exact, { ...brief,
+    hook: 'The first caption reads: "Three weeks. A report you can\'t put your name to."',
+  })).toEqual([]);
+  expect(briefCopyProblems(splitHook, { ...brief,
+    hook: 'Exact first caption, burned in: "Three weeks. A report you can\'t put your name to."',
+  })[0]).toMatch(/one caption plate/);
   expect(briefCopyProblems({ ...exact, end_card_text: "Read the plan.", end_card_sec: 2 },
     { call_to_action: "Read the plan." } as BriefForEdit)).toEqual([]);
 });

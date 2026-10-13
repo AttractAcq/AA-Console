@@ -26,6 +26,7 @@ import {
 } from "./edl.js";
 import { captionLayout } from "./render.js";
 import type { BriefForEdit } from "./handoff.js";
+import { exactFirstCaption } from "../brief/shots.js";
 
 export const SUBMIT_TOOL_NAME = "submit_edit_plan";
 
@@ -97,8 +98,7 @@ export function briefCopyProblems(edl: Edl, brief: BriefForEdit): string[] {
     ...ordered.map((caption) => caption.text),
     edl.end_card_text,
   ].join(" "));
-  const hook = /(?:first caption|first line)\s*:/i.test(brief.hook ?? "")
-    ? quoted(brief.hook) : null;
+  const hook = exactFirstCaption(brief.hook ?? "");
   if (hook && cleanSpace(ordered[0]?.text ?? "") !== cleanSpace(hook)) {
     problems.push(`The brief locks the first caption to "${hook}". Show it intact on one caption plate; do not split it across timed captions.`);
   }
