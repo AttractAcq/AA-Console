@@ -125,6 +125,14 @@ export function captionLayout(text: string): { lines: string[]; size: number } {
   return { lines: wrapLines(text, 32), size: 48 };
 }
 
+export function endCardLayout(text: string): { lines: string[]; size: number } {
+  for (const [lineChars, size] of [[END_CARD_LINE_CHARS, 80], [22, 64], [28, 54], [32, 48]] as const) {
+    const lines = wrapLines(text, lineChars);
+    if (lines.length <= 2) return { lines, size };
+  }
+  return { lines: wrapLines(text, 32), size: 48 };
+}
+
 export function wrapLines(text: string, lineChars: number): string[] {
   const lines: string[] = [];
   let line = "";
@@ -280,13 +288,13 @@ export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
     );
   });
   if (edl.end_card_text) {
-    const lines = wrapLines(edl.end_card_text, END_CARD_LINE_CHARS);
+    const { lines, size } = endCardLayout(edl.end_card_text);
     overlays.push(
       ...drawBlock(
         "end-card",
         lines,
-        `(h-${blockHeight(lines.length, 80)})/2`,
-        80,
+        `(h-${blockHeight(lines.length, size)})/2`,
+        size,
         cutSec,
         cutSec + edl.end_card_sec,
         endCardColour,

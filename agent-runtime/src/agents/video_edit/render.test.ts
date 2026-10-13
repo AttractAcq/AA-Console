@@ -8,7 +8,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import type { Edl } from "./edl.js";
 import { probeDurationSec, render } from "./media.js";
-import { buildRenderPlan, captionLayout, readableEndCardColour, RenderPlanError, wrapText } from "./render.js";
+import { buildRenderPlan, captionLayout, endCardLayout, readableEndCardColour, RenderPlanError, wrapText } from "./render.js";
 import { fontSource, installFont } from "./font.js";
 
 const edl: Edl = {
@@ -62,6 +62,11 @@ describe("wrapText", () => {
   it("fits the live 48-character hook on one two-line caption plate", () => {
     expect(captionLayout("Three weeks. Fee spent. A report he can't trust.")).toEqual({
       lines: ["Three weeks. Fee spent. A", "report he can't trust."], size: 54,
+    });
+  });
+  it("keeps the live end-card call to action in two balanced lines", () => {
+    expect(endCardLayout("Read the specimen report first — attractacq.com")).toEqual({
+      lines: ["Read the specimen report", "first — attractacq.com"], size: 54,
     });
   });
 });
