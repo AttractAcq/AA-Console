@@ -56,6 +56,17 @@ describe("a reel brief", () => {
       .toBeNull();
   });
 
+  it("rejects a handshake beat when the client's visual brand forbids it", () => {
+    const submission = reelSubmission({
+      hook: "The workshop is quiet.", call_to_action: "Read the rule.",
+      frames: [shot("Show the empty bay"),
+        shot("The owner shakes hands with a customer arriving at the door")],
+    });
+    expect(reelCopyProblem(submission, "No generic handshake/startup stock."))
+      .toMatch(/Shot 2 depicts a handshake/);
+    expect(reelCopyProblem(submission, "No neon greens.")).toBeNull();
+  });
+
   it("asks for a shot plan and a format code, and leaves a carousel on string frames", () => {
     const reel = briefSubmitTool("video", [], "reel");
     expect(reel.inputSchema.required).toEqual(expect.arrayContaining(["frames", "format_code"]));

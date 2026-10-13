@@ -73,7 +73,7 @@ export function reelPlannerNote(): string {
 }
 
 /** The editor cannot faithfully fit an overlong exact line into one caption. */
-export function reelCopyProblem(submitted: Record<string, unknown>): string | null {
+export function reelCopyProblem(submitted: Record<string, unknown>, brandNeverDo = ""): string | null {
   const hook = String(submitted.hook ?? "");
   const cta = String(submitted.call_to_action ?? "").trim();
   const firstLine = /(?:first caption|first line)\s*:\s*["“]([^"”]+)["”]/i.exec(hook)?.[1];
@@ -85,6 +85,18 @@ export function reelCopyProblem(submitted: Record<string, unknown>): string | nu
   }
   if (/\bvoice\s*-?over\b|\bnarrat(?:ion|e|or)\b/i.test(cta)) {
     return "A Phase 1 reel has no voiceover source. Write the call to action as on-screen text.";
+  }
+  if (/hand\s*-?shake/i.test(brandNeverDo)) {
+    const frames = Array.isArray(submitted.frames) ? submitted.frames : [];
+    for (const [index, raw] of frames.entries()) {
+      if (!raw || typeof raw !== "object") continue;
+      const frame = raw as Record<string, unknown>;
+      const scene = [frame.beat, frame.subject, frame.composition, frame.background]
+        .map((part) => String(part ?? "")).join(" ");
+      if (/hand\s*-?shake|hands?\b.{0,60}\b(?:meet|greet|shake)|\bshak(?:e|es|ing)\s+hands?\b|\bextend(?:s|ing)?\s+(?:his|her|their|a)\s+hand\b/i.test(scene)) {
+        return `Shot ${index + 1} depicts a handshake, which this client's visual brand forbids. Choose a different visible action.`;
+      }
+    }
   }
   return null;
 }
