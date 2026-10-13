@@ -137,6 +137,12 @@ describe("silent reel communication", () => {
   });
 });
 
+it("tells the editor to close on the footage when the final shot carries the CTA", async () => {
+  const { SYSTEM } = await import("./plan.js");
+  expect(SYSTEM).toMatch(/Prefer one clear caption over the final footage/);
+  expect(SYSTEM).toMatch(/no caption may overlap it/);
+});
+
 it("catches the live reel's rewritten hook and truncated CTA before rendering", () => {
   const brief = {
     hook: 'First caption: "Three weeks. A report you can\'t put your name to."',

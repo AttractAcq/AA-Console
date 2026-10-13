@@ -192,6 +192,8 @@ describe("buildRenderPlan", () => {
     const plan = buildRenderPlan(edl, { ...options, backgroundColour: "#1A2B3C", textColour: "nonsense" });
     expect(plan.args).toContain("color=c=0x1a2b3c:s=1080x1920:r=30");
     expect(filterOf(plan.args)).toContain("fontcolor=0xffffff");
+    const endCard = filterOf(plan.args).slice(filterOf(plan.args).indexOf("textfile=/work/end-card-1.txt"));
+    expect(endCard).toContain("borderw=0");
     expect(filterOf(plan.args)).toContain("enable='between(t,5.1,6.6)'");
     expect(plan.durationSec).toBeCloseTo(6.6);
   });

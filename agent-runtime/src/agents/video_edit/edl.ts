@@ -247,6 +247,7 @@ export function validateEdl(edl: Edl, context: EdlContext): string[] {
   }
 
   const total = totalDuration(edl);
+  const cutEnd = segmentsDuration(edl.segments);
   if (total > context.max_total_sec) {
     problems.push(`The reel runs ${total.toFixed(1)}s. This format allows ${context.max_total_sec}s.`);
   }
@@ -279,6 +280,9 @@ export function validateEdl(edl: Edl, context: EdlContext): string[] {
     }
     if (caption.start_sec < 0 || caption.end_sec > total + 0.05) {
       problems.push(`${label} runs outside the reel.`);
+    }
+    if (edl.end_card_text && caption.end_sec > cutEnd + 0.05) {
+      problems.push(`${label} overlaps the separate end card. End captions at ${cutEnd.toFixed(1)}s or place the call to action over the final shot without an end card.`);
     }
   });
   // A caption over a shot that already carries its line puts two texts in two

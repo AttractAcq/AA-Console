@@ -80,6 +80,12 @@ describe("validateEdl", () => {
     expect(validateEdl(plan(), context)).toEqual([]);
   });
 
+  it("refuses a caption that duplicates the CTA over a separate end card", () => {
+    const problems = validateEdl(plan({ captions: [{ text: "Book a call", start_sec: 5,
+      end_sec: 6.5, position: "top" }] }), context);
+    expect(problems).toContainEqual(expect.stringMatching(/overlaps the separate end card/));
+  });
+
   it("flags a segment past the end of its clip", () => {
     const problems = validateEdl(plan({ segments: [{ shot: 1, in_sec: 2, out_sec: 6, transition: "cut" }] }), context);
     expect(problems).toContain("Segment 1 (shot 1) runs outside the clip, which is 5.00s long.");
