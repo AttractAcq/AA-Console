@@ -135,7 +135,7 @@ describe("validateEdl", () => {
     const problems = validateEdl(plan({ captions }), context);
     expect(problems).toContain("Caption 1 is on screen for under 0.8s, too short to read.");
     expect(problems).toContain("Two bottom captions overlap at 0.2s.");
-    expect(problems).toContain("Caption 3 runs outside the reel.");
+    expect(problems).toContainEqual(expect.stringMatching(/Caption 3 runs outside the reel.*export ends/));
   });
 
   it("flags captions too long to fit the frame", () => {

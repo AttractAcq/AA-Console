@@ -78,12 +78,23 @@ describe("a reel brief", () => {
   });
 
   it("refuses an invented reel palette outside the recorded visual brand", () => {
-    const submission = reelSubmission({ script: "End card navy #07192f on paper #fbfaf7.",
+    const submission = reelSubmission({ script: "SHOT 1: Read the report.\nSHOT 2: Check the source.",
+      visual_direction: "End card navy #07192f on paper #fbfaf7.",
       call_to_action: "Read the report." });
     expect(reelCopyProblem(submission, "", ["#142B23", "#F5F7F3"]))
       .toMatch(/#07192f.*not in/);
-    expect(reelCopyProblem({ ...submission, script: "Use #142B23 on #F5F7F3." },
+    expect(reelCopyProblem({ ...submission, visual_direction: "Use #142B23 on #F5F7F3." },
       "", ["#142B23", "#F5F7F3"])).toBeNull();
+  });
+
+  it("keeps silent shot captions within one readable line each", () => {
+    const base = reelSubmission({ call_to_action: "Read the report.", script:
+      `SHOT 1: Read the report.\nSHOT 2: ${"A".repeat(61)}` });
+    expect(reelCopyProblem(base)).toMatch(/SHOT 2 has 61 caption characters/);
+    expect(reelCopyProblem({ ...base, script: "SHOT 1: Read the report." }))
+      .toMatch(/exactly one SHOT n/);
+    expect(reelCopyProblem({ ...base, script:
+      "SHOT 1: Read the report.\nSHOT 2: Check the source." })).toBeNull();
   });
 
   it("asks for a shot plan and a format code, and leaves a carousel on string frames", () => {
