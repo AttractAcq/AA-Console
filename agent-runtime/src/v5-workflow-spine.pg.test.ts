@@ -32,6 +32,9 @@ const creativeRoutingMigration = () => readFile(new URL(
 const motionFollowupMigration = () => readFile(new URL(
   "../../supabase/migrations/20261013090000_204_v5_motion_followup_qa.sql", import.meta.url,
 ), "utf8");
+const videoUploadRecoveryMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261013120000_205_v5_video_upload_recovery.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -169,6 +172,7 @@ beforeAll(async () => {
   await db.exec(await dailySequenceMigration());
   await db.exec(await creativeRoutingMigration());
   await db.exec(await motionFollowupMigration());
+  await db.exec(await videoUploadRecoveryMigration());
 });
 
 beforeEach(async () => {
@@ -299,6 +303,31 @@ describe("v5 workflow spine", () => {
       join agent_jobs j on j.id=s.job_id where s.run_id='${run.id}'`);
     expect(row.feedback).toMatchObject({ candidate_id: candidateId,
       reason: "Pillarboxed crop and missing CTA" });
+  });
+  it("retries one failed Storage upload without losing the failed edit job", async () => {
+    const assetId = "44444444-4444-4444-8444-444444444447";
+    await db.exec(`insert into client_media_assets (id,client_id,brief_id,storage_path,content_format,media_type)
+      values ('${assetId}','${CLIENT}','${OUTPUT}','opening.jpg','reel','video')`);
+    const run = await makeRun("video-upload-recovery");
+    const step = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_edit','{}','video_edit','client_media_assets','${assetId}')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    const old = await one<{ job_id: string }>(`select job_id from workflow_steps where id='${step.id}'`);
+    await db.exec(`update agent_jobs set status='failed',terminal=true,attempts=3,
+      error='Could not store the cut: Internal Server Error' where id='${old.job_id}'`);
+    await service("select * from reconcile_workflow_runs()");
+    expect((await one<{ status: string }>(`select status from workflow_steps where id='${step.id}'`)).status)
+      .toBe("blocked");
+    await service(`select id from retry_failed_video_upload_workflow_step('${step.id}')`);
+    expect((await service<{ steps_queued: number }>("select * from reconcile_workflow_runs()")).steps_queued)
+      .toBe(1);
+    const next = await one<{ job_id: string }>(`select job_id from workflow_steps where id='${step.id}'`);
+    expect(next.job_id).not.toBe(old.job_id);
+    expect((await one<{ status: string }>(`select status from agent_jobs where id='${old.job_id}'`)).status)
+      .toBe("failed");
+    await expect(service(`select id from retry_failed_video_upload_workflow_step('${step.id}')`))
+      .rejects.toThrow(/not eligible/);
   });
   it("creates one root run for a repeated request and refuses changed inputs", async () => {
     const first = await makeRun();
