@@ -358,11 +358,15 @@ export function reelKeyframePrompt(
   clientName: string,
   brand: BrandProfile | null,
   castAnchor = "",
+  hasVisualReference = false,
 ): string {
   const value = (key: string) => String(frame[key] ?? "").trim();
   return [
     `Create the opening keyframe for shot ${value("position")} of ${total} in a vertical cinematic reel for ${clientName}.`,
     ...(castAnchor.trim() ? [`Continuity anchor for every shot: ${castAnchor.trim()}`] : []),
+    ...(hasVisualReference ? [
+      "The attached first-shot image is the visual identity reference. Keep the same person's face, age, hair, build and clothing, and the same room layout, furniture and lighting. Change the pose and action to serve this shot; do not copy the first shot's framing or action.",
+    ] : []),
     `Narrative job: ${value("purpose")}`,
     `Visible subject: ${value("subject")}`,
     `Real environment: ${value("background")}`,
@@ -973,6 +977,19 @@ Call ${submitTool.name} once when you are done.`;
       if (position !== null) done.add(position);
     }
 
+    // A reel's first stored opening still anchors the cast and room for the
+    // remaining shots. If a retry resumes after frame one, restore the same
+    // reference before making another paid image call.
+    let reelReference: ReferenceImage | null = null;
+    if (openingShots && done.has(1)) {
+      const path = framePath(String(job.client_id), renderId, 1, "png");
+      const { data, error } = await sb.storage.from(BUCKET).download(path);
+      if (error || !data) throw new Error(`Could not restore reel continuity frame: ${error?.message ?? "missing image"}`);
+      reelReference = {
+        bytes: Buffer.from(await data.arrayBuffer()), contentType: "image/png", filename: "reel-shot-1.png",
+      };
+    }
+
     let frames;
     try {
       frames = await renderFrames({
@@ -990,15 +1007,28 @@ Call ${submitTool.name} once when you are done.`;
           );
           // The image API cannot render 9:16 directly. Keep the action inside
           // the safe area for the centred crop that makes a true reel frame.
+          const visualReference = openingShots && frame.position > 1 ? reelReference : null;
+          if (openingShots && frame.position > 1 && !visualReference) {
+            throw new Error("The first reel frame is required before later shots can be rendered.");
+          }
           const prompt = openingShots
-            ? reelKeyframePrompt(frame as unknown as Record<string, unknown>, total, clientName, brand, String(concept.cast_anchor ?? ""))
+            ? reelKeyframePrompt(frame as unknown as Record<string, unknown>, total, clientName, brand,
+              String(concept.cast_anchor ?? ""), Boolean(visualReference))
             : framePrompt(frame, total, composed);
           const out = await renderImage(config, prompt, {
             size: renderSize,
             quality: renderQuality,
-            reference: null,
+            reference: visualReference,
           });
-          if (openingShots) return toReelFrame(out.bytes);
+          if (openingShots) {
+            const vertical = await toReelFrame(out.bytes);
+            if (frame.position === 1) {
+              reelReference = {
+                bytes: vertical.bytes, contentType: vertical.contentType, filename: "reel-shot-1.png",
+              };
+            }
+            return vertical;
+          }
           return { bytes: out.bytes, contentType: out.contentType, extension: out.extension };
         },
         store: async (frame, out) => {

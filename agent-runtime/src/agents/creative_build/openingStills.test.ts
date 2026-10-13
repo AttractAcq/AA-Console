@@ -38,6 +38,18 @@ it("writes a filmed keyframe prompt without carrying concept headlines into the 
   expect(prompt).not.toContain("BOOK A CALL");
 });
 
+it("uses the first reel shot as a visual identity reference while allowing a new action", () => {
+  const prompt = reelKeyframePrompt({
+    position: 2,
+    purpose: "Show the founder reviewing a lead",
+    subject: "The same founder at the desk",
+    background: "The same workshop",
+  }, 3, "Example Client", null, "Founder in a navy shirt", true);
+  expect(prompt).toContain("attached first-shot image is the visual identity reference");
+  expect(prompt).toContain("same person's face");
+  expect(prompt).toContain("Change the pose and action");
+});
+
 it("requires a stable cast anchor only for reel concepts", () => {
   const reel = framesConceptTool("reel").inputSchema;
   const carousel = framesConceptTool("carousel").inputSchema;
