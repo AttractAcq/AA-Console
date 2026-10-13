@@ -960,7 +960,7 @@ Call ${submitTool.name} once when you are done.`;
         stage: "render",
         concept,
         concept_model: conceptModel,
-        image_model: config.imageModel,
+        image_model: openingShots ? config.reelImageModel : config.imageModel,
         cost_usd: usage.costUsd,
         updated_at: new Date().toISOString(),
       })
@@ -1019,6 +1019,7 @@ Call ${submitTool.name} once when you are done.`;
             size: renderSize,
             quality: renderQuality,
             reference: visualReference,
+            model: openingShots ? config.reelImageModel : undefined,
           });
           if (openingShots) {
             const vertical = await toReelFrame(out.bytes);
@@ -1069,7 +1070,7 @@ Call ${submitTool.name} once when you are done.`;
       .update({
         status: "done",
         asset_id: framedId as string,
-        model: config.imageModel,
+        model: openingShots ? config.reelImageModel : config.imageModel,
         cost_usd: usage.costUsd + estimateImageCostUsd(renderQuality) * frames.length,
         error: null,
         updated_at: new Date().toISOString(),
