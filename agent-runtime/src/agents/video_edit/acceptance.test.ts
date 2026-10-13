@@ -3,9 +3,22 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { probeRenderedVideo } from "./acceptance.js";
+import { missingReviewAreas, probeRenderedVideo } from "./acceptance.js";
+
+describe("creative review contract", () => {
+  const areas = ["continuity", "visual_defects", "caption_readability", "crop", "narrative", "brand_fit"];
+  const check = (area: string) => ({ area, verdict: "pass", reason: "Visible in sampled frames.", at_sec: null });
+
+  it("requires one substantive verdict per area", () => {
+    expect(missingReviewAreas({ checks: areas.map(check) })).toEqual([]);
+    expect(missingReviewAreas({ checks: [...areas.slice(0, 5).map(check), check("continuity")] }))
+      .toEqual(["continuity", "brand_fit"]);
+    expect(missingReviewAreas({ checks: areas.map((area) => area === "brand_fit"
+      ? { ...check(area), reason: "" } : check(area)) })).toEqual(["brand_fit"]);
+  });
+});
 import { hasAudioStream } from "./media.js";
 
 const run = promisify(execFile);

@@ -42,6 +42,7 @@ import { briefCopyProblems, communicationProblems, planEdit, sameRenderedCut, ty
 import { advanceSlot, slotIdOf } from "../../engine/slot.js";
 import { buildRenderPlan } from "./render.js";
 import { probeRenderedVideo, reviewRenderedVideo } from "./acceptance.js";
+import { ProviderError } from "../../tools/anthropic.js";
 import { uploadRenderedCut } from "./upload.js";
 
 const BUCKET = "client-media";
@@ -386,11 +387,27 @@ async function cut(
     });
     return rejected(candidateId, `Rendered candidate failed media inspection: ${reason}`);
   }
-  const creative = await reviewRenderedVideo({
-    path: outputPath, workDir: work, brief: briefTextForEdit(brief),
-    brandNeverDo: brand?.never_do ?? "",
-    soundTreatment: probe.has_audio ? "audio_present" : "captions_only",
-  }, { model: config.model, timeoutMs: deadlineMs ? Math.max(30_000, deadlineMs - Date.now()) : undefined });
+  let creative;
+  try {
+    creative = await reviewRenderedVideo({
+      path: outputPath, workDir: work, brief: briefTextForEdit(brief),
+      brandNeverDo: brand?.never_do ?? "",
+      soundTreatment: probe.has_audio ? "audio_present" : "captions_only",
+    }, { model: config.model, timeoutMs: deadlineMs ? Math.max(30_000, deadlineMs - Date.now()) : undefined });
+  } catch (error) {
+    if (!(error instanceof ProviderError) || error.retryable) throw error;
+    const reason = `Creative review unavailable: ${error.message}`;
+    const { error: decisionError } = await sb.rpc("decide_video_render_candidate", {
+      p_candidate_id: candidateId, p_verdict: "rejected",
+      p_creative_review: { result: "fail", checks: [
+        { area: "review_contract", verdict: "fail", reason, at_sec: null },
+      ], summary: reason },
+      p_rejection_reason: reason, p_edit_plan: edl,
+    });
+    if (decisionError) throw new Error(`Could not close unreviewed candidate: ${decisionError.message}`);
+    await appendEvent(sb, job.id, reason, "error", { candidate_id: candidateId, stage: "creative_review" });
+    return failed(reason);
+  }
   usage = {
     inputTokens: usage.inputTokens + creative.usage.inputTokens,
     outputTokens: usage.outputTokens + creative.usage.outputTokens,

@@ -30,6 +30,13 @@ export interface CreativeReview {
   usage: TokenUsage & { costUsd: number };
 }
 
+export function missingReviewAreas(raw: Record<string, unknown>): string[] {
+  const checks = Array.isArray(raw.checks) ? raw.checks as Array<Record<string, unknown>> : [];
+  return AREAS.filter((area) => checks.filter((check) => check.area === area
+    && (check.verdict === "pass" || check.verdict === "fail")
+    && typeof check.reason === "string" && check.reason.trim().length > 0).length !== 1);
+}
+
 /** Inspect the actual exported file, rather than trusting the EDL's intended dimensions. */
 export async function probeRenderedVideo(path: string, requireAudio = false): Promise<MediaProbe> {
   const { stdout } = await run("ffprobe", [
@@ -128,41 +135,50 @@ export async function reviewRenderedVideo(input: {
     ...(options.apiKey ? { apiKey: options.apiKey } : {}),
     maxRetries: 2, timeout: options.timeoutMs ?? 600_000,
   });
-  let response: Anthropic.Messages.Message;
-  try {
-    response = await client.messages.stream({
-      model: options.model, max_tokens: 4096,
-      system: "You are a rigorous creative director screening a finished video. Call submit_video_review with an honest verdict and all six checks.",
-      tool_choice: { type: "auto" },
-      tools: [{ name: "submit_video_review", description: "Submit final-cut quality review.",
-        input_schema: REVIEW_SCHEMA as unknown as Anthropic.Messages.Tool.InputSchema,
-        strict: true } as Anthropic.Messages.ToolUnion],
-      messages: [{ role: "user", content }],
-    } as Anthropic.Messages.MessageStreamParams).finalMessage();
-  } catch (error) {
-    if (error instanceof Anthropic.APIError) {
-      const status = error.status ?? 0;
-      throw new ProviderError(`Anthropic ${status}: ${error.message}`, status === 429 || status === 408 || status >= 500);
+  let spent: TokenUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
+  let correction = "";
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    let response: Anthropic.Messages.Message;
+    try {
+      response = await client.messages.stream({
+        model: options.model, max_tokens: 4096,
+        system: "You are a rigorous creative director screening a finished video. Submit an honest verdict with exactly one substantive check for each of: continuity, visual_defects, caption_readability, crop, narrative, brand_fit.",
+        tool_choice: { type: "tool", name: "submit_video_review" },
+        tools: [{ name: "submit_video_review", description: "Submit final-cut quality review.",
+          input_schema: REVIEW_SCHEMA as unknown as Anthropic.Messages.Tool.InputSchema,
+          strict: true } as Anthropic.Messages.ToolUnion],
+        messages: [{ role: "user", content: correction
+          ? [...content, { type: "text", text: correction }] : content }],
+      } as Anthropic.Messages.MessageStreamParams).finalMessage();
+    } catch (error) {
+      if (error instanceof Anthropic.APIError) {
+        const status = error.status ?? 0;
+        throw new ProviderError(`Anthropic ${status}: ${error.message}`, status === 429 || status === 408 || status >= 500,
+          { ...spent, costUsd: estimateCostUsd(options.model, spent) });
+      }
+      throw new ProviderError(error instanceof Error ? error.message : String(error), true,
+        { ...spent, costUsd: estimateCostUsd(options.model, spent) });
     }
-    throw new ProviderError(error instanceof Error ? error.message : String(error), true);
+    spent = {
+      inputTokens: spent.inputTokens + response.usage.input_tokens,
+      outputTokens: spent.outputTokens + response.usage.output_tokens,
+      cacheReadTokens: (spent.cacheReadTokens ?? 0) + (response.usage.cache_read_input_tokens ?? 0),
+      cacheWriteTokens: (spent.cacheWriteTokens ?? 0) + (response.usage.cache_creation_input_tokens ?? 0),
+    };
+    const call = response.content.find((block): block is Anthropic.Messages.ToolUseBlock =>
+      block.type === "tool_use" && block.name === "submit_video_review");
+    const raw = (call?.input ?? {}) as Record<string, unknown>;
+    const checks = Array.isArray(raw.checks) ? raw.checks as CreativeReview["checks"] : [];
+    const missing = missingReviewAreas(raw);
+    if (call && (raw.result === "pass" || raw.result === "fail")
+        && typeof raw.summary === "string" && raw.summary.trim()
+        && checks.length === AREAS.length && missing.length === 0) {
+      const result = checks.some((check) => check.verdict === "fail") ? "fail" : raw.result;
+      return { result, summary: raw.summary, checks, model: response.model, sampled_fps: 1,
+        usage: { ...spent, costUsd: estimateCostUsd(options.model, spent) } };
+    }
+    correction = `The prior response was incomplete. Review all six areas exactly once; missing or invalid: ${missing.join(", ") || "verdict or summary"}. Submit the tool response again.`;
   }
-  const usage: TokenUsage = {
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-    cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
-    cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
-  };
-  const priced = { ...usage, costUsd: estimateCostUsd(options.model, usage) };
-  const call = response.content.find((block): block is Anthropic.Messages.ToolUseBlock =>
-    block.type === "tool_use" && block.name === "submit_video_review");
-  if (!call) throw new ProviderError("The creative review did not submit a verdict.", true, priced);
-  const raw = call.input as Record<string, unknown>;
-  const checks = Array.isArray(raw.checks) ? raw.checks as CreativeReview["checks"] : [];
-  if ((raw.result !== "pass" && raw.result !== "fail") || typeof raw.summary !== "string"
-      || checks.length !== AREAS.length || AREAS.some((area) => !checks.some((check) => check.area === area))
-      || checks.some((check) => check.verdict !== "pass" && check.verdict !== "fail")) {
-    throw new ProviderError("The creative review omitted a required quality check.", true, priced);
-  }
-  const result = checks.some((check) => check.verdict === "fail") ? "fail" : raw.result;
-  return { result, summary: raw.summary, checks, model: response.model, sampled_fps: 1, usage: priced };
+  throw new ProviderError("The creative review omitted a required quality check after three review calls.", false,
+    { ...spent, costUsd: estimateCostUsd(options.model, spent) });
 }
