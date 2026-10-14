@@ -29,6 +29,13 @@ const reelSubmission = (extra: Record<string, unknown> = {}) => ({
 });
 
 describe("a reel brief", () => {
+  it("refuses a generated reel whose visual proof depends on fake lettering", () => {
+    expect(reelCopyProblem({ frames: [shot("A pen writes the rule on a report")],
+      hook: "Read the rule", call_to_action: "Read more" }))
+      .toMatch(/generated writing or printed words/);
+    expect(reelCopyProblem({ frames: [shot("An unmarked card slides onto a blank desk")],
+      hook: "Read the rule", call_to_action: "Read more" })).toBeNull();
+  });
   it("is only briefed when the idea is video", () => {
     expect(reelBriefProblem("reel", "video")).toBeNull();
     expect(reelBriefProblem("carousel", "image")).toBeNull();

@@ -62,6 +62,7 @@ export function reelPlannerNote(): string {
     "Phase 1 formats are F6 (mechanism explainer) and F7 (problem cold-open).",
     "Both are generated visual keyframes animated into video shots. They need no client assets and no proof footage.",
     "Each beat must specify what the viewer sees and what visibly changes: a subject action, an environmental change, or a reveal. Do not write a headline, graphic card, diagram or abstract lesson as a shot. Carry the argument in the brief so the editor can caption it after animation.",
+    "For this generated-video route, prefer an object-led visual treatment with two or three repeatable, unlabelled physical elements. Avoid visible hands, fingers and other anatomy as the continuing subject; current motion generation struggles to preserve them across shots. Avoid writing actions and close views of printed documents: the model can invent fake handwriting, pseudo-text, figures and logos. Keep any paper completely blank or show only its shape and movement. Never make a viewer's understanding depend on AI-rendered letters, numbers, page counts or a readable object label. Put all exact wording, evidence and numbers in the script for real editor captions instead.",
     "Keep the cast, location and physical props consistent across the visual direction and every shot. If the visual direction specifies one person or one pair of hands, no later shot may introduce another person or pair.",
     `The Phase 1 export is silent with editor-added captions. Do not write voiceover or narration instructions. The script has exactly one SHOT n: caption for each planned shot, each at most ${MAX_CAPTION_CHARS} characters; do not pack several sentences into a shot. If the hook names an exact first caption, keep that line within ${MAX_CAPTION_CHARS} characters. The call_to_action field must be one exact viewer-facing line within ${MAX_CAPTION_CHARS} characters, not a paragraph of edit directions; it must fit on the last shot or end card.`,
     "Submit a shot plan. Each shot has a beat, a duration in seconds, shot_source_kind ai_generated,",
@@ -83,6 +84,13 @@ export function reelCopyProblem(submitted: Record<string, unknown>, brandNeverDo
   const cta = String(submitted.call_to_action ?? "").trim();
   const visualDirection = String(submitted.visual_direction ?? "");
   const frames = Array.isArray(submitted.frames) ? submitted.frames : [];
+  for (const [index, raw] of frames.entries()) {
+    if (!raw || typeof raw !== "object") continue;
+    const beat = String((raw as Record<string, unknown>).beat ?? "");
+    if (/\b(?:writ(?:e|es|ing|ten)|handwrit(?:ing|ten)|printed|paragraphs?|words?|letters?|glyphs?)\b/i.test(beat)) {
+      return `Shot ${index + 1} depends on generated writing or printed words. Keep the physical object unlettered and put exact language in the editor's captions.`;
+    }
+  }
   if (/\b(?:same|single|one|only)\s+(?:pair\s+of\s+(?:[\w-]+\s+){0,3}hands|person|actor|subject|character)\b/i.test(visualDirection)) {
     for (const [index, raw] of frames.entries()) {
       if (!raw || typeof raw !== "object") continue;
