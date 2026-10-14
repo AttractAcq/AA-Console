@@ -32,6 +32,7 @@ import {
   editContext,
   editReadiness,
   maxReelSeconds,
+  visualBriefForReview,
   type BriefForEdit,
   type EditShot,
   type FrameRowForEdit,
@@ -113,7 +114,7 @@ export async function runVideoEditJob(
   const { data: briefRow, error: briefError } = await sb
     .from("client_briefs")
     .select(
-      "id, title, media_type, content_format, format_code, frame_plan, hook, script, call_to_action, proof, channel_intent, sound_treatment, sound_asset_id",
+      "id, title, media_type, content_format, format_code, frame_plan, visual_direction, hook, script, call_to_action, proof, channel_intent, sound_treatment, sound_asset_id",
     )
     .eq("id", asset.brief_id)
     .maybeSingle();
@@ -391,6 +392,7 @@ async function cut(
   try {
     creative = await reviewRenderedVideo({
       path: outputPath, workDir: work, brief: briefTextForEdit(brief),
+      visualBrief: visualBriefForReview(brief),
       brandNeverDo: brand?.never_do ?? "",
       soundTreatment: probe.has_audio ? "audio_present" : "captions_only",
     }, { model: config.model, timeoutMs: deadlineMs ? Math.max(30_000, deadlineMs - Date.now()) : undefined });

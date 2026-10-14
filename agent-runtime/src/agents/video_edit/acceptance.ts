@@ -86,7 +86,7 @@ export async function probeRenderedVideo(path: string, requireAudio = false): Pr
   };
 }
 
-const AREAS = ["continuity", "visual_defects", "caption_readability", "crop", "narrative", "brand_fit"] as const;
+const AREAS = ["continuity", "visual_defects", "caption_readability", "crop", "narrative", "brand_fit", "brief_execution"] as const;
 const REVIEW_SCHEMA = {
   type: "object",
   properties: {
@@ -107,7 +107,7 @@ const REVIEW_SCHEMA = {
 
 /** A model-led screen across the final cut; owner/SMM approval remains separate. */
 export async function reviewRenderedVideo(input: {
-  path: string; workDir: string; brief: string; brandNeverDo: string;
+  path: string; workDir: string; brief: string; visualBrief: string; brandNeverDo: string;
   soundTreatment: "audio_present" | "captions_only";
 }, options: { model: string; timeoutMs?: number; apiKey?: string }): Promise<CreativeReview> {
   const frameDir = join(input.workDir, "final-review");
@@ -119,10 +119,12 @@ export async function reviewRenderedVideo(input: {
     text: [
       "Review the actual final vertical reel from time-ordered frames. This is an internal quality screen before human approval.",
       "Fail for cast/product/location drift, visual artefacts, clipped or unreadable captions, bad crop, weak or incoherent narrative, or off-brand imagery.",
+      "For brief_execution, check whether the required visible actions actually happen, especially the opening action. A caption describing an action does not substitute for seeing it. If a required action is missing, softened into a different action, or cannot be verified in sampled frames, fail that area and cite the closest timestamp. Do not treat a missing required action as a minor note in an otherwise passing result.",
       "Check every listed area. Cite the timestamp for a visible defect. Do not claim to have heard audio or seen motion between sampled frames.",
       `Sound treatment recorded by the media probe: ${input.soundTreatment}.`,
       `Brand restrictions: ${input.brandNeverDo || "none recorded"}.`,
       `Brief: ${input.brief}`,
+      `Visual direction and required shot beats: ${input.visualBrief || "No visual requirements recorded."}`,
     ].join("\n"),
   }];
   for (const frame of frames) {
@@ -142,7 +144,7 @@ export async function reviewRenderedVideo(input: {
     try {
       response = await client.messages.stream({
         model: options.model, max_tokens: 4096,
-        system: "You are a rigorous creative director screening a finished video. Submit an honest verdict with exactly one substantive check for each of: continuity, visual_defects, caption_readability, crop, narrative, brand_fit.",
+        system: "You are a rigorous creative director screening a finished video. Submit an honest verdict with exactly one substantive check for each of: continuity, visual_defects, caption_readability, crop, narrative, brand_fit, brief_execution. A visible action required by the brief must be performed, not merely suggested by a caption.",
         tool_choice: { type: "tool", name: "submit_video_review" },
         tools: [{ name: "submit_video_review", description: "Submit final-cut quality review.",
           input_schema: REVIEW_SCHEMA as unknown as Anthropic.Messages.Tool.InputSchema,
@@ -177,7 +179,7 @@ export async function reviewRenderedVideo(input: {
       return { result, summary: raw.summary, checks, model: response.model, sampled_fps: 1,
         usage: { ...spent, costUsd: estimateCostUsd(options.model, spent) } };
     }
-    correction = `The prior response was incomplete. Review all six areas exactly once; missing or invalid: ${missing.join(", ") || "verdict or summary"}. Submit the tool response again.`;
+    correction = `The prior response was incomplete. Review all seven areas exactly once; missing or invalid: ${missing.join(", ") || "verdict or summary"}. Submit the tool response again.`;
   }
   throw new ProviderError("The creative review omitted a required quality check after three review calls.", false,
     { ...spent, costUsd: estimateCostUsd(options.model, spent) });

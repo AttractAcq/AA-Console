@@ -8,13 +8,13 @@ import { describe, expect, it } from "vitest";
 import { missingReviewAreas, probeRenderedVideo } from "./acceptance.js";
 
 describe("creative review contract", () => {
-  const areas = ["continuity", "visual_defects", "caption_readability", "crop", "narrative", "brand_fit"];
+  const areas = ["continuity", "visual_defects", "caption_readability", "crop", "narrative", "brand_fit", "brief_execution"];
   const check = (area: string) => ({ area, verdict: "pass", reason: "Visible in sampled frames.", at_sec: null });
 
   it("requires one substantive verdict per area", () => {
     expect(missingReviewAreas({ checks: areas.map(check) })).toEqual([]);
     expect(missingReviewAreas({ checks: [...areas.slice(0, 5).map(check), check("continuity")] }))
-      .toEqual(["continuity", "brand_fit"]);
+      .toEqual(["continuity", "brand_fit", "brief_execution"]);
     expect(missingReviewAreas({ checks: areas.map((area) => area === "brand_fit"
       ? { ...check(area), reason: "" } : check(area)) })).toEqual(["brand_fit"]);
   });
