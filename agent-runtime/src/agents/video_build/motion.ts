@@ -138,15 +138,17 @@ export function usesDopMotion(modelId: string): boolean {
   return !modelId.trim().startsWith("kling-video/");
 }
 
-export function directedShotPrompt(beat: string, position: number, total: number): string {
+export function directedShotPrompt(beat: string, position: number, total: number, visualDirection?: string | null): string {
+  const sharedDirection = visualDirection?.trim().slice(0, 1800);
   return [
     `Shot ${position} of ${total}. Narrative purpose: ${beat.trim()}`,
+    sharedDirection ? `Shared visual continuity for every shot: ${sharedDirection}` : "",
     "Animate the supplied opening frame as a continuous, realistic vertical film shot.",
-    "Treat the opening frame as the factual source for the subject, objects, materials and their current physical state. If the narrative beat conflicts with what is visible, continue a plausible action from the frame instead of changing an object's material, shape or position abruptly.",
+    "Treat the opening frame as the factual source for the subject, objects, materials and their current physical state. Execute the beat's visible action during this shot; do not hold the opening pose when an action is specified. If that action cannot be completed from the frame, keep the scene physically plausible rather than changing an object's material, shape or position abruptly.",
     "Make the scene visibly develop through subject action and natural environmental movement; maintain identity, geometry, lighting and visual continuity with the opening frame.",
     "Use a motivated camera move only if it helps reveal the action. Avoid a generic digital zoom, static hold, warping, morphing and sudden scene changes.",
     "Do not add text, logos, subtitles, graphics or invented products. The editor will add copy later.",
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 }
 
 function httpsUrl(value: string | undefined): string | null {
@@ -169,6 +171,7 @@ export function prepareMotionCalls(input: {
   stillUrlByPosition: ReadonlyMap<number, string>;
   modelId: string;
   strength?: number;
+  visualDirection?: string | null;
 }): MotionPlan {
   const strength = input.strength ?? 1;
   const calls: MotionCall[] = [];
@@ -205,7 +208,7 @@ export function prepareMotionCalls(input: {
       kind: "submit",
       position,
       frameId: frame.id,
-      prompt: directedShotPrompt(shot.beat, position, input.shots.length),
+      prompt: directedShotPrompt(shot.beat, position, input.shots.length, input.visualDirection),
       imageUrl,
       motionId: usesDopMotion(input.modelId) ? motionId : null,
       strength,

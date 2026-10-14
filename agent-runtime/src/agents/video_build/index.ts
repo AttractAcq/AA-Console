@@ -43,6 +43,7 @@ interface ReelBrief {
   content_format: string | null;
   format_code: string | null;
   frame_plan: string[] | null;
+  visual_direction: string | null;
 }
 
 interface FrameRow {
@@ -157,7 +158,7 @@ export async function runVideoBuildJob(
 
   const { data, error } = await sb
     .from("client_briefs")
-    .select("id, client_id, title, media_type, content_format, format_code, frame_plan")
+    .select("id, client_id, title, media_type, content_format, format_code, frame_plan, visual_direction")
     .eq("id", job.input_id)
     .maybeSingle();
   if (error) throw new Error(`Failed to load brief: ${error.message}`);
@@ -298,6 +299,7 @@ export async function runVideoBuildJob(
     frames: frameRefs,
     stillUrlByPosition: stillUrls,
     modelId: decision.modelFinal,
+    visualDirection: brief.visual_direction,
   });
   if (!prepared.ok) {
     await appendEvent(sb, job.id, prepared.message, "warn", {
