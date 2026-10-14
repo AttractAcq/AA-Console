@@ -110,6 +110,16 @@ Remaining acceptance work: finish and inspect the paid F7 reel, obtain full-cut 
 
 The learning slice freezes up to twelve human-reviewed creative examples and five prior run outcomes when a v5 ideation job starts. It carries observed lead links and rejection reasons into the next idea prompt as bounded evidence, and a retry reuses the same snapshot. This is a hypothesis input; it does not certify causation or replace a measured campaign review. The source IDs remain in the saved snapshot for audit.
 
+### Production checkpoint — 14 October 2026
+
+Main includes PRs #172–#183; Railway reports a successful deployment of `06c56e103d6b59bd5d694297c5d0bfc9eac941e7`, with two workers and the v5 workflow enabled. Production migrations 205 and 206 are applied. These releases added one-time failed-upload and exhausted-edit recovery, stronger reel brief and brand continuity, Sunburst opening stills, retained creative-review failures, deterministic first-caption and end-card handling, and bounded editor-plan revisions with timestamped EDL errors. Code and deployment success do not establish reel acceptance.
+
+The 14 October pilot (`601c4e04-777f-4d11-a059-9dbc8bb14dfe`), 15 October pilot (`1aff8a1d-33bb-4b2b-b72c-304628b43c0a`), 16 October pilot (`da852185-8c86-42e5-8400-4c56f648d0da`) and 17 October pilot (`93685317-1334-47d2-9ab7-80fac819df9e`) each reached three of four internally accepted assets. The reel remained blocked. Failures exposed a Storage upload error, model review incompleteness, malformed or off-brand reel text, and later end-card defects. The 17 October reel generated six opening stills and six Higgsfield clips; its three retained edits failed creative QA. Migration 206 recovered its exhausted edit once without replacing the footage, but the new job failed before rendering because its EDL caption exceeded the cut. PR #183 now addresses that planning failure for future runs. None of these reels is an accepted premium video.
+
+An 18 October package (`444aa455-2a39-4a41-a1a0-8e1c1f7e5062`, run `d79ed6fd-e27c-476d-89ec-20b8c7c67aea`) was planned at 13:08 UTC on 14 October with an 08:00 UTC cutoff on 18 October. At creation it had four planned roles, zero accepted assets and no blocker; observe its final state before claiming it as a successful client-day.
+
+**Open release gates:** obtain a full-cut reel accepted by internal creative QA and owner/SMM; prove seven consecutive four-asset days before their cutoff; verify the client launch package through a trusted form or conversation-to-lead, routing, consent and measurement probe plus sales-agent scenarios; complete a 24-hour launch dry run; and evaluate attribution and evidence-fed learning against observed outcomes. The launch check still deliberately refuses caller-provided `conversion_path` labels. No complete v5 service claim is justified yet.
+
 ## Acceptance evidence required
 
 - One daily client-day produces exactly four complete, internally QA-passed assets before cutoff; each has correct campaign/pillar/proof links, copy and final files. Simulate a provider failure and prove an approved backup is selected or a clear blocker is raised.
