@@ -41,6 +41,9 @@ const videoCreativeRecoveryMigration = () => readFile(new URL(
 const reelSourceRebuildMigration = () => readFile(new URL(
   "../../supabase/migrations/20261014140000_207_v5_reel_source_rebuild.sql", import.meta.url,
 ), "utf8");
+const higgsfieldRecoveryMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261014190000_208_v5_higgsfield_submit_recovery.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -111,7 +114,7 @@ beforeAll(async () => {
       storage_path text, render_path text, content_format content_format,
       media_type media_type, review_status text default 'pending', human_approved_at timestamptz,
       title text);
-    create table client_media_frames (asset_id uuid, clip_path text);
+    create table client_media_frames (asset_id uuid, provider_job_id text, clip_path text);
     create table video_render_candidates (id uuid primary key, client_id uuid, asset_id uuid, job_id uuid,
       attempt integer, verdict text, render_path text, media_probe jsonb, creative_review jsonb,
       rejection_reason text, edit_plan jsonb, created_at timestamptz default now());
@@ -182,9 +185,11 @@ beforeAll(async () => {
   await db.exec(await videoUploadRecoveryMigration());
   await db.exec(await videoCreativeRecoveryMigration());
   await db.exec(await reelSourceRebuildMigration());
+  await db.exec(await higgsfieldRecoveryMigration());
 });
 
 beforeEach(async () => {
+  await db.exec("delete from client_media_frames");
   await db.exec("delete from client_daily_package_settings; delete from client_engine_settings");
   await db.exec("delete from workflow_runs; delete from agent_jobs");
   await db.exec("select set_config('request.jwt.claim.role', 'service_role', false)");
@@ -336,6 +341,46 @@ describe("v5 workflow spine", () => {
     expect((await one<{ status: string }>(`select status from agent_jobs where id='${old.job_id}'`)).status)
       .toBe("failed");
     await expect(service(`select id from retry_failed_video_upload_workflow_step('${step.id}')`))
+      .rejects.toThrow(/not eligible/);
+  });
+  it("resumes one partial Higgsfield 403 without losing accepted request IDs", async () => {
+    const briefId = "33333333-3333-4333-8333-333333333338";
+    const assetId = "44444444-4444-4444-8444-444444444458";
+    await db.exec(`insert into client_briefs (id,client_id,body,content_format,media_type)
+      values ('${briefId}','${CLIENT}','Six shot reel','reel','video');
+      insert into client_media_assets (id,client_id,brief_id,storage_path,content_format,media_type)
+      values ('${assetId}','${CLIENT}','${briefId}','opening.jpg','reel','video');
+      insert into client_media_frames (asset_id,provider_job_id)
+      values ('${assetId}','accepted-request-1'),('${assetId}','accepted-request-2'),
+        ('${assetId}',null)`);
+    const run = await makeRun("higgsfield-partial-recovery");
+    const source = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_create','{}','creative_build','client_briefs','${briefId}')`);
+    const motion = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_motion',array['reel_create'],'video_build',
+      'client_briefs','${briefId}')`);
+    await db.exec(`update workflow_steps set status='completed' where id='${source.id}';
+      insert into workflow_artifacts (run_id,step_id,artifact_kind,record_id,version_key,qa_evidence)
+      values ('${run.id}','${source.id}','asset','${assetId}','source-v1','{"result":"pass"}')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    const old = await one<{ job_id: string }>(`select job_id from workflow_steps where id='${motion.id}'`);
+    await db.exec(`update agent_jobs set status='failed',terminal=true,attempts=1,
+      error='Higgsfield returned 403.' where id='${old.job_id}'`);
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec("select set_config('request.jwt.claim.role', 'authenticated', false)");
+    await expect(db.query(`select id from retry_partial_higgsfield_motion_step('${motion.id}')`))
+      .rejects.toThrow(/service role required/);
+    await service(`select id from retry_partial_higgsfield_motion_step('${motion.id}')`);
+    expect((await service<{ steps_queued: number }>("select * from reconcile_workflow_runs()" )).steps_queued)
+      .toBe(1);
+    const next = await one<{ job_id: string }>(`select job_id from workflow_steps where id='${motion.id}'`);
+    expect(next.job_id).not.toBe(old.job_id);
+    expect((await one<{ count: number }>(`select count(*) from client_media_frames
+      where asset_id='${assetId}' and provider_job_id is not null`)).count).toBe(2);
+    expect((await one<{ status: string }>(`select status from agent_jobs where id='${old.job_id}'`)).status)
+      .toBe("failed");
+    await expect(service(`select id from retry_partial_higgsfield_motion_step('${motion.id}')`))
       .rejects.toThrow(/not eligible/);
   });
   it("re-edits one rejected reel from the existing asset and keeps candidate history", async () => {

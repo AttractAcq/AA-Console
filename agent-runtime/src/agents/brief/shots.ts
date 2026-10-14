@@ -79,6 +79,19 @@ export function exactFirstCaption(hook: string): string | null {
   return /\bfirst\s+(?:caption|line)\b[^\n:"“]{0,40}:\s*["“]([^"”]+)["”]/i.exec(hook)?.[1]?.trim() ?? null;
 }
 
+/** Fill only an omitted final caption from the model's separately approved CTA. */
+export function completeMissingFinalReelCaption(submitted: Record<string, unknown>): Record<string, unknown> {
+  const frames = Array.isArray(submitted.frames) ? submitted.frames : [];
+  const script = String(submitted.script ?? "").trim();
+  const cta = String(submitted.call_to_action ?? "").trim();
+  if (frames.length < MIN_FRAMES || frames.length > MAX_FRAMES || !script || !cta
+      || cta.length > MAX_CAPTION_CHARS || script.includes(cta)) return submitted;
+  const captions = [...script.matchAll(/^\s*SHOT\s+(\d+)\s*:\s*(.+)$/gim)];
+  if (captions.length !== frames.length - 1
+      || captions.some((caption, index) => Number(caption[1]) !== index + 1)) return submitted;
+  return { ...submitted, script: `${script}\nSHOT ${frames.length}: ${cta}` };
+}
+
 export function reelCopyProblem(submitted: Record<string, unknown>, brandNeverDo = "", allowedColours: string[] | null = null): string | null {
   const hook = String(submitted.hook ?? "");
   const cta = String(submitted.call_to_action ?? "").trim();
