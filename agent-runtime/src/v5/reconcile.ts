@@ -39,6 +39,11 @@ export function startWorkflowReconciler(sb: SupabaseClient, config: RuntimeConfi
         if (qa && (qa.steps_accepted || qa.steps_blocked)) {
           logger.info("v5_daily_internal_qa", qa);
         }
+        const { data: rebuilt, error: rebuildError } = await sb.rpc("auto_rebuild_rejected_reel_sources", { p_limit: 3 });
+        if (rebuildError) throw new Error(rebuildError.message);
+        if (typeof rebuilt === "number" && rebuilt > 0) {
+          logger.info("v5_reel_sources_rebuilt", { count: rebuilt });
+        }
         await dispatchOneRecoveryAlert(sb, config, workerId);
       } catch (error) {
         logger.error("v5_workflow_reconcile_failed", {

@@ -38,6 +38,9 @@ const videoUploadRecoveryMigration = () => readFile(new URL(
 const videoCreativeRecoveryMigration = () => readFile(new URL(
   "../../supabase/migrations/20261013150000_206_v5_video_creative_recovery.sql", import.meta.url,
 ), "utf8");
+const reelSourceRebuildMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261014140000_207_v5_reel_source_rebuild.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -133,7 +136,8 @@ beforeAll(async () => {
       max_attempts integer not null default 3, error text, created_at timestamptz default now());
     create table creative_generations (id uuid primary key default gen_random_uuid(),
       client_id uuid not null, brief_id uuid not null, media_type media_type not null,
-      quality text not null, size text not null, job_id uuid, created_by uuid);
+      quality text not null, size text not null, job_id uuid, created_by uuid,
+      remake_feedback text);
     create table creative_renders (id uuid primary key default gen_random_uuid(),
       generation_id uuid not null, client_id uuid not null, quality text not null,
       size text not null, job_id uuid, created_by uuid);
@@ -177,6 +181,7 @@ beforeAll(async () => {
   await db.exec(await motionFollowupMigration());
   await db.exec(await videoUploadRecoveryMigration());
   await db.exec(await videoCreativeRecoveryMigration());
+  await db.exec(await reelSourceRebuildMigration());
 });
 
 beforeEach(async () => {
@@ -371,6 +376,89 @@ describe("v5 workflow spine", () => {
       where id='${candidateId}'`)).verdict).toBe("rejected");
     await expect(service(`select id from retry_failed_video_creative_workflow_step('${step.id}')`))
       .rejects.toThrow(/not eligible/);
+  });
+  it("rebuilds a rejected reel source once, preserving the prior artefacts and review", async () => {
+    const briefId = "33333333-3333-4333-8333-333333333337";
+    const assetId = "44444444-4444-4444-8444-444444444449";
+    const jobIds = ["66666666-6666-4666-8666-666666666661",
+      "66666666-6666-4666-8666-666666666662", "66666666-6666-4666-8666-666666666663"];
+    await db.exec(`insert into client_briefs (id,client_id,body,content_format,media_type)
+      values ('${briefId}','${CLIENT}','Six continuous document shots','reel','video');
+      insert into client_media_assets (id,client_id,brief_id,storage_path,content_format,media_type)
+      values ('${assetId}','${CLIENT}','${briefId}','original-still.png','reel','video')`);
+    const run = await makeRun("reel-source-rebuild");
+    const brief = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_brief','{}','brief','client_ideas','${INPUT}')`);
+    const create = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_create',array['reel_brief'],'creative_build','client_briefs',null,
+      '{}'::jsonb,'reel_brief')`);
+    const motion = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_motion',array['reel_brief','reel_create'],'video_build','client_briefs',null,
+      '{}'::jsonb,'reel_brief')`);
+    const edit = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_edit',array['reel_motion'],'video_edit','client_media_assets',null,
+      '{}'::jsonb,'reel_motion')`);
+    await seal(run.id);
+    await db.exec(`insert into agent_jobs (id,agent_key,client_id,input_table,input_id,status,attempts,error)
+      values ('${jobIds[0]}','creative_build','${CLIENT}','client_briefs','${briefId}','completed',1,null),
+        ('${jobIds[1]}','video_build','${CLIENT}','client_briefs','${briefId}','completed',1,null),
+        ('${jobIds[2]}','video_edit','${CLIENT}','client_media_assets','${assetId}',
+         'failed',3,'Source footage lacks the hook and the hero prop jumps');
+      update workflow_steps set status='completed',completed_at=now() where id='${brief.id}';
+      update workflow_steps set status='completed',job_id='${jobIds[0]}',
+        resolved_input_id='${briefId}',completed_at=now() where id='${create.id}';
+      update workflow_steps set status='completed',job_id='${jobIds[1]}',
+        resolved_input_id='${briefId}',completed_at=now() where id='${motion.id}';
+      update workflow_steps set status='blocked',job_id='${jobIds[2]}',
+        resolved_input_id='${assetId}',blocker='Source footage lacks the hook and the hero prop jumps'
+        where id='${edit.id}';
+      update workflow_runs set status='blocked',blocker='Source footage lacks the hook and the hero prop jumps'
+        where id='${run.id}';
+      insert into workflow_artifacts (run_id,step_id,artifact_kind,record_id,version_key,qa_evidence)
+      values ('${run.id}','${brief.id}','brief','${briefId}','v1','{"result":"pass","checks":["brief"]}'),
+        ('${run.id}','${create.id}','asset','${assetId}','v1','{"result":"pass","checks":["stills"]}'),
+        ('${run.id}','${motion.id}','asset','${assetId}','v1','{"result":"pass","checks":["clips"]}');
+      insert into video_render_candidates
+        (id,client_id,asset_id,job_id,attempt,verdict,render_path,media_probe,
+          creative_review,rejection_reason)
+      values ('55555555-5555-4555-8555-555555555571','${CLIENT}','${assetId}','${jobIds[2]}',
+        1,'rejected','first-cut.mp4','{"result":"pass"}',
+        '{"result":"fail","checks":[{"area":"continuity","verdict":"fail"}]}',
+        'The report never slides away and the prop changes'),
+        ('55555555-5555-4555-8555-555555555572','${CLIENT}','${assetId}','${jobIds[2]}',
+        2,'rejected','second-cut.mp4','{"result":"pass"}',
+        '{"result":"fail","checks":[{"area":"narrative","verdict":"fail"}]}',
+        'The hero report changes identity midway through the cut')`);
+    await db.exec("update v5_reel_source_rebuild_activation set activated_at=now()+interval '1 day'");
+    expect((await service<{ n: number }>("select auto_rebuild_rejected_reel_sources() as n")).n).toBe(0);
+    await db.exec("update v5_reel_source_rebuild_activation set activated_at=now()-interval '1 minute'");
+    await db.exec("select set_config('request.jwt.claim.role', 'authenticated', false)");
+    await expect(one(`select id from retry_rejected_reel_source('${edit.id}',
+      'Replace the defective opening action and preserve the hero document.')`))
+      .rejects.toThrow(/service role required/);
+    expect((await service<{ n: number }>("select auto_rebuild_rejected_reel_sources() as n")).n).toBe(1);
+    const history = await one<{ source_asset_id: string; prior_artifacts: unknown[]; feedback: string }>(`
+      select source_asset_id,prior_artifacts,feedback from workflow_reel_source_rebuilds
+      where run_id='${run.id}'`);
+    expect(history.source_asset_id).toBe(assetId);
+    expect(history.prior_artifacts).toHaveLength(2);
+    expect(history.feedback).toContain("hero report changes identity");
+    expect((await one<{ n: number }>(`select count(*)::integer as n from workflow_artifacts
+      where step_id in ('${create.id}','${motion.id}')`)).n).toBe(0);
+    expect((await one<{ n: number }>(`select count(*)::integer as n from video_render_candidates
+      where job_id='${jobIds[2]}'`)).n).toBe(2);
+    expect((await service<{ n: number }>("select auto_rebuild_rejected_reel_sources() as n")).n).toBe(0);
+    await expect(service(`select id from retry_rejected_reel_source('${edit.id}',
+      'Replace the defective opening action and preserve the hero document.')`))
+      .rejects.toThrow(/not eligible/);
+    expect((await service<{ steps_queued: number }>("select * from reconcile_workflow_runs()")).steps_queued).toBe(1);
+    const fresh = await one<{ feedback: string; media_type: string }>(`
+      select g.remake_feedback as feedback,g.media_type::text
+      from workflow_steps s join agent_jobs j on j.id=s.job_id
+      join creative_renders r on r.id=(j.params->>'render_id')::uuid
+      join creative_generations g on g.id=r.generation_id where s.id='${create.id}'`);
+    expect(fresh.feedback).toContain("hero report changes identity");
+    expect(fresh.media_type).toBe("image");
   });
   it("creates one root run for a repeated request and refuses changed inputs", async () => {
     const first = await makeRun();
