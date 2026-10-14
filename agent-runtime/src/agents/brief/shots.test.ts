@@ -77,6 +77,17 @@ describe("a reel brief", () => {
     expect(reelCopyProblem(submission, "No neon greens.")).toBeNull();
   });
 
+  it("rejects a second performer when the reel's shared visual direction specifies one", () => {
+    const submission = reelSubmission({
+      visual_direction: "One desk and the same pair of weathered hands across all shots.",
+      frames: [shot("The first hands slide a report away"),
+        shot("A second pair of hands enters and takes the folder")],
+    });
+    expect(reelCopyProblem(submission)).toMatch(/Shot 2 introduces another person or pair of hands/);
+    expect(reelCopyProblem({ ...submission, frames: [shot("The same hands slide a report away"),
+      shot("The hands open the blank specimen")]})).toBeNull();
+  });
+
   it("refuses an invented reel palette outside the recorded visual brand", () => {
     const submission = reelSubmission({ script: "SHOT 1: Read the report.\nSHOT 2: Check the source.",
       visual_direction: "End card navy #07192f on paper #fbfaf7.",

@@ -62,6 +62,7 @@ export function reelPlannerNote(): string {
     "Phase 1 formats are F6 (mechanism explainer) and F7 (problem cold-open).",
     "Both are generated visual keyframes animated into video shots. They need no client assets and no proof footage.",
     "Each beat must specify what the viewer sees and what visibly changes: a subject action, an environmental change, or a reveal. Do not write a headline, graphic card, diagram or abstract lesson as a shot. Carry the argument in the brief so the editor can caption it after animation.",
+    "Keep the cast, location and physical props consistent across the visual direction and every shot. If the visual direction specifies one person or one pair of hands, no later shot may introduce another person or pair.",
     `The Phase 1 export is silent with editor-added captions. Do not write voiceover or narration instructions. The script has exactly one SHOT n: caption for each planned shot, each at most ${MAX_CAPTION_CHARS} characters; do not pack several sentences into a shot. If the hook names an exact first caption, keep that line within ${MAX_CAPTION_CHARS} characters. The call_to_action field must be one exact viewer-facing line within ${MAX_CAPTION_CHARS} characters, not a paragraph of edit directions; it must fit on the last shot or end card.`,
     "Submit a shot plan. Each shot has a beat, a duration in seconds, shot_source_kind ai_generated,",
     `and a motion_preset. For compatibility with the original DoP route use ${ZOOM_IN_MOTION_NAME}, catalog id ${ZOOM_IN_MOTION_ID}; the selected video model will direct motion from the beat rather than force a digital zoom.`,
@@ -80,6 +81,17 @@ export function exactFirstCaption(hook: string): string | null {
 export function reelCopyProblem(submitted: Record<string, unknown>, brandNeverDo = "", allowedColours: string[] | null = null): string | null {
   const hook = String(submitted.hook ?? "");
   const cta = String(submitted.call_to_action ?? "").trim();
+  const visualDirection = String(submitted.visual_direction ?? "");
+  const frames = Array.isArray(submitted.frames) ? submitted.frames : [];
+  if (/\b(?:same|single|one|only)\s+(?:pair\s+of\s+(?:[\w-]+\s+){0,3}hands|person|actor|subject|character)\b/i.test(visualDirection)) {
+    for (const [index, raw] of frames.entries()) {
+      if (!raw || typeof raw !== "object") continue;
+      const beat = String((raw as Record<string, unknown>).beat ?? "");
+      if (/\b(?:a|the)\s+(?:second|another|additional)\s+(?:pair\s+of\s+(?:[\w-]+\s+){0,3}hands|person|actor|subject|character)\b/i.test(beat)) {
+        return `Shot ${index + 1} introduces another person or pair of hands, contradicting the reel's single-cast visual direction.`;
+      }
+    }
+  }
   const firstLine = exactFirstCaption(hook);
   if (firstLine && firstLine.length > MAX_CAPTION_CHARS) {
     return `The reel's exact first caption is ${firstLine.length} characters; keep it within ${MAX_CAPTION_CHARS}.`;

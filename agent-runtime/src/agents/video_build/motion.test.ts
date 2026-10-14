@@ -118,6 +118,27 @@ describe("prepareMotionCalls", () => {
       prompt: expect.stringContaining("A founder opens a workshop door"),
     });
   });
+  it("carries the shared visual direction into every submitted shot prompt", () => {
+    const plan = prepareMotionCalls({
+      shots: [shot("Slide the report fully out of frame", MOTION), shot("Open the blank specimen", MOTION)],
+      frames: [
+        { id: "frame-1", position: 1, providerJobId: null },
+        { id: "frame-2", position: 2, providerJobId: null },
+      ],
+      stillUrlByPosition: new Map([[1, "https://cdn.example.test/1.png"], [2, "https://cdn.example.test/2.png"]]),
+      modelId: "higgsfield-ai/dop/lite",
+      visualDirection: "One desk, one pair of weathered hands; no other person enters.",
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    for (const call of plan.calls) {
+      expect(call.kind).toBe("submit");
+      if (call.kind === "submit") {
+        expect(call.prompt).toContain("One desk, one pair of weathered hands");
+        expect(call.prompt).toContain("Execute the beat's visible action");
+      }
+    }
+  });
   const frames: MotionFrameRef[] = [
     { id: "frame-1", position: 1, providerJobId: null },
     { id: "frame-2", position: 2, providerJobId: null },

@@ -354,6 +354,7 @@ describe("video_build", () => {
     const motion = "11111111-1111-4111-8111-111111111111";
     const ready = {
       ...reel,
+      visual_direction: "One workshop and one founder in every shot.",
       frame_plan: [shotLine("Name the mechanism").replace('"pending"', `"${motion}"`), shotLine("Show the step").replace('"pending"', `"${motion}"`)],
     };
     const clipUrl = "https://cdn.example.test/clip.mp4";
@@ -399,6 +400,7 @@ describe("video_build", () => {
     expect(String(post?.[0])).toContain("/higgsfield-ai/dop/standard");
     const body = JSON.parse(String(post?.[1]?.body));
     expect(body.prompt).toContain("Narrative purpose: Name the mechanism");
+    expect(body.prompt).toContain("One workshop and one founder in every shot.");
     expect(body.image_url).toBe("https://cdn.example.test/still.png");
     expect(body.motions).toEqual([{ id: motion, strength: 1 }]);
     expect(frameUpdates.map((row) => row.provider_job_id).filter(Boolean)).toEqual(["req_abc12345", "req_abc12345"]);
