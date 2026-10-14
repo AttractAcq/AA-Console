@@ -3,6 +3,7 @@ import { briefSubmitTool, composeBody, framePlanColumns } from "./fields.js";
 import { ZOOM_IN_MOTION_ID } from "../video_build/motions.js";
 import {
   MOTION_PRESET_PLACEHOLDER,
+  completeMissingFinalReelCaption,
   exactFirstCaption,
   parseStoredShotPlan,
   reelBriefProblem,
@@ -29,6 +30,20 @@ const reelSubmission = (extra: Record<string, unknown> = {}) => ({
 });
 
 describe("a reel brief", () => {
+  it("repairs only a missing last caption using the exact call to action", () => {
+    const base = {
+      frames: [shot("Opening object moves"), shot("Second object appears"), shot("Closing invitation")],
+      script: "SHOT 1: First claim.\nSHOT 2: Second claim.",
+      call_to_action: "Read the method — attractacq.com",
+    };
+    const repaired = completeMissingFinalReelCaption(base);
+    expect(repaired.script).toBe(`${base.script}\nSHOT 3: ${base.call_to_action}`);
+    expect(reelCopyProblem(repaired)).toBeNull();
+    expect(completeMissingFinalReelCaption({ ...base, script: `${base.script}\nSHOT 3: Done.` }))
+      .toEqual({ ...base, script: `${base.script}\nSHOT 3: Done.` });
+    expect(completeMissingFinalReelCaption({ ...base, script: "SHOT 1: First.\nSHOT 3: Third." }))
+      .toEqual({ ...base, script: "SHOT 1: First.\nSHOT 3: Third." });
+  });
   it("refuses a generated reel whose visual proof depends on fake lettering", () => {
     expect(reelCopyProblem({ frames: [shot("A pen writes the rule on a report")],
       hook: "Read the rule", call_to_action: "Read more" }))
