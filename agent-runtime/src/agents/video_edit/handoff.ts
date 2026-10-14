@@ -38,6 +38,7 @@ export interface BriefForEdit {
   content_format: string | null;
   format_code: string | null;
   frame_plan: string[] | null;
+  visual_direction?: string | null;
   hook: string | null;
   script: string | null;
   call_to_action: string | null;
@@ -222,6 +223,15 @@ export function briefTextForEdit(brief: BriefForEdit): string {
     .filter(([, value]) => value?.trim())
     .map(([label, value]) => `${label}: ${value!.trim()}`)
     .join("\n");
+}
+
+/** Visual requirements are reviewed on the final cut, not used to license caption claims. */
+export function visualBriefForReview(brief: BriefForEdit): string {
+  const plan = parseStoredShotPlan(brief.frame_plan);
+  return [
+    brief.visual_direction?.trim() ? `Shared visual direction: ${brief.visual_direction.trim()}` : "",
+    ...(!plan.problem ? plan.shots.map((shot, index) => `Shot ${index + 1}: ${shot.beat}`) : []),
+  ].filter(Boolean).join("\n");
 }
 
 /** Brand never_do as phrases the validator can match. One per line or comma. */

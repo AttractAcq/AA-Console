@@ -8,6 +8,7 @@ import {
   editContext,
   editReadiness,
   maxReelSeconds,
+  visualBriefForReview,
   type BriefForEdit,
   type FrameRowForEdit,
 } from "./handoff.js";
@@ -148,6 +149,17 @@ describe("briefTextForEdit", () => {
     expect(text).toContain("Call to action: Book a call.");
     expect(text).not.toContain("Proof:");
   });
+});
+
+it("gives creative review the required visual action without licensing it as caption copy", () => {
+  const directed = {
+    ...brief,
+    visual_direction: "One pair of hands at one desk.",
+    frame_plan: [planLine("The hand visibly shoves the report away."), planLine("The same hand opens the method."), planLine("The pen rests on the page.")],
+  };
+  expect(visualBriefForReview(directed)).toContain("Shot 1: The hand visibly shoves the report away.");
+  expect(visualBriefForReview(directed)).toContain("Shared visual direction: One pair of hands at one desk.");
+  expect(briefTextForEdit(directed)).not.toContain("shoves the report");
 });
 
 describe("bannedPhrases", () => {
