@@ -17,6 +17,7 @@ const shot = (
   extra: Record<string, unknown> = {},
 ) => ({
   beat,
+  opening_state: "The physical scene is ready before the action begins.",
   duration_sec: 3,
   shot_source_kind: "ai_generated",
   motion_preset: MOTION_PRESET_PLACEHOLDER,
@@ -66,6 +67,7 @@ describe("a reel brief", () => {
     expect(note).toContain(ZOOM_IN_MOTION_ID);
     expect(note).toMatch(/do not invent a motion uuid/i);
     expect(note).toMatch(/silent with editor-added captions/i);
+    expect(note).toContain("opening_state");
   });
 
   it("refuses an exact hook or CTA that cannot fit the reel caption contract", () => {
@@ -134,15 +136,33 @@ describe("a reel brief", () => {
     const reel = briefSubmitTool("video", [], "reel");
     expect(reel.inputSchema.required).toEqual(expect.arrayContaining(["frames", "format_code"]));
     const frames = reel.inputSchema.properties.frames as unknown as {
-      items: { properties: { shot_source_kind: { enum: string[] } } };
+      items: { properties: { shot_source_kind: { enum: string[] } }; required: string[] };
     };
     expect(frames.items.properties.shot_source_kind.enum).toEqual(["ai_generated"]);
+    expect(frames.items.required).toContain("opening_state");
 
     const carousel = briefSubmitTool("image", [], "carousel");
     const carouselFrames = carousel.inputSchema.properties.frames as { items: { type: string } };
     expect(carouselFrames.items.type).toBe("string");
     expect(carousel.inputSchema.properties).not.toHaveProperty("format_code");
     expect(carousel.inputSchema.required).not.toContain("format_code");
+  });
+
+  it("stores a frame-zero state for new reels while reading older shot plans", () => {
+    const opening = "A blank sheet is half in shadow; the lit area is empty.";
+    const submitted = framePlanColumns(reelSubmission({ frames: [
+      shot("The sheet slides into light", { opening_state: opening }),
+      shot("The sheet leaves the light", { opening_state: "The sheet rests in the lit area." }),
+    ] }), "reel");
+    expect(submitted.problem).toBeNull();
+    const lines = submitted.columns.frame_plan as string[];
+    expect(parseStoredShotPlan(lines).shots[0]?.opening_state).toBe(opening);
+    expect(framePlanColumns(reelSubmission({ frames: [
+      shot("The sheet slides into light", { opening_state: " " }), shot("Payoff"),
+    ] }), "reel").problem).toMatch(/opening state/);
+    expect(parseStoredShotPlan([serializeShot({ beat: "Legacy shot", duration_sec: 3,
+      motion_preset: MOTION_PRESET_PLACEHOLDER, shot_source_kind: "ai_generated" }), lines[1]!]).problem)
+      .toBeNull();
   });
 
   it("stores a shot-shaped frame plan for F6 and F7", () => {
@@ -154,6 +174,7 @@ describe("a reel brief", () => {
       const lines = out.columns.frame_plan as string[];
       expect(JSON.parse(lines[0] ?? "")).toEqual({
         beat: "Name the mechanism",
+        opening_state: "The physical scene is ready before the action begins.",
         duration_sec: 3,
         motion_preset: ZOOM_IN_MOTION_ID,
         shot_source_kind: "ai_generated",
@@ -204,7 +225,7 @@ describe("a reel brief", () => {
       ...reelSubmission(),
     }, "reel");
     expect(body).toContain("## Shots");
-    expect(body).toContain(`1. Name the mechanism (3s, generated, motion Zoom In ${ZOOM_IN_MOTION_ID})`);
+    expect(body).toContain(`1. Name the mechanism Start: The physical scene is ready before the action begins. (3s, generated, motion Zoom In ${ZOOM_IN_MOTION_ID})`);
     expect(body).not.toContain("motion pending");
     expect(body).not.toContain("shot_source_kind");
   });

@@ -35,6 +35,8 @@ export { ZOOM_IN_MOTION_ID, ZOOM_IN_MOTION_NAME };
 
 export interface ShotPlanEntry {
   beat: string;
+  /** Frame zero, before the beat's action. Absent on briefs saved before this contract. */
+  opening_state?: string;
   duration_sec: number;
   shot_source_kind: typeof SHOT_SOURCE_GENERATED;
   motion_preset: string;
@@ -62,10 +64,11 @@ export function reelPlannerNote(): string {
     "Phase 1 formats are F6 (mechanism explainer) and F7 (problem cold-open).",
     "Both are generated visual keyframes animated into video shots. They need no client assets and no proof footage.",
     "Each beat must specify what the viewer sees and what visibly changes: a subject action, an environmental change, or a reveal. Do not write a headline, graphic card, diagram or abstract lesson as a shot. Carry the argument in the brief so the editor can caption it after animation.",
+    "For every beat, also write opening_state: the exact visible composition at frame zero BEFORE that beat's movement. An entering object starts at the frame edge with its destination empty; an exiting object starts fully visible; a counted group starts with the exact count visible. Never describe the completed action as the opening state. Do not invent a device, hand or third prop to cause the movement.",
     "For this generated-video route, prefer an object-led visual treatment with two or three repeatable, unlabelled physical elements. Avoid visible hands, fingers and other anatomy as the continuing subject; current motion generation struggles to preserve them across shots. Avoid writing actions and close views of printed documents: the model can invent fake handwriting, pseudo-text, figures and logos. Keep any paper completely blank or show only its shape and movement. Never make a viewer's understanding depend on AI-rendered letters, numbers, page counts or a readable object label. Put all exact wording, evidence and numbers in the script for real editor captions instead.",
     "Keep the cast, location and physical props consistent across the visual direction and every shot. If the visual direction specifies one person or one pair of hands, no later shot may introduce another person or pair.",
     `The Phase 1 export is silent with editor-added captions. Do not write voiceover or narration instructions. The script has exactly one SHOT n: caption for each planned shot, each at most ${MAX_CAPTION_CHARS} characters; do not pack several sentences into a shot. If the hook names an exact first caption, keep that line within ${MAX_CAPTION_CHARS} characters. The call_to_action field must be one exact viewer-facing line within ${MAX_CAPTION_CHARS} characters, not a paragraph of edit directions; it must fit on the last shot or end card.`,
-    "Submit a shot plan. Each shot has a beat, a duration in seconds, shot_source_kind ai_generated,",
+    "Submit a shot plan. Each shot has a beat, an opening_state, a duration in seconds, shot_source_kind ai_generated,",
     `and a motion_preset. For compatibility with the original DoP route use ${ZOOM_IN_MOTION_NAME}, catalog id ${ZOOM_IN_MOTION_ID}; the selected video model will direct motion from the beat rather than force a digital zoom.`,
     `Write that id. "${MOTION_PRESET_PLACEHOLDER}" and "${ZOOM_IN_MOTION_NAME}" are accepted and stored as that id.`,
     "Do not invent a motion UUID. Any other name is stored as written, and motion pauses until a catalog confirms it.",
@@ -187,6 +190,10 @@ export function reelSubmitProperties(): {
               type: "string",
               description: "One line naming the shot's narrative purpose, visible subject and physical change over time. No title cards, abstract diagrams, invented statistics, prices, or quotes.",
             },
+            opening_state: {
+              type: "string",
+              description: "What is visibly present at frame zero, before the beat's action. Name exact object count and position. For an entrance, leave the destination clear; for an exit, show the object fully present. No new prop or mechanism.",
+            },
             duration_sec: {
               type: "number",
               description: "Length of this shot in seconds. A positive number, typically 2 to 6.",
@@ -202,7 +209,7 @@ export function reelSubmitProperties(): {
               description: `Higgsfield motions-catalog id. Phase 1 default is ${ZOOM_IN_MOTION_NAME} (${ZOOM_IN_MOTION_ID}). "${MOTION_PRESET_PLACEHOLDER}" and "${ZOOM_IN_MOTION_NAME}" are stored as that id. Do not invent a UUID.`,
             },
           },
-          required: ["beat", "duration_sec", "shot_source_kind", "motion_preset"],
+          required: ["beat", "opening_state", "duration_sec", "shot_source_kind", "motion_preset"],
           additionalProperties: false,
         },
       },
@@ -217,7 +224,7 @@ function shotCountProblem(count: number): string | null {
   return null;
 }
 
-function asShot(raw: unknown, index: number): { shot: ShotPlanEntry | null; problem: string } {
+function asShot(raw: unknown, index: number, requireOpeningState = false): { shot: ShotPlanEntry | null; problem: string } {
   const label = `Shot ${index + 1}`;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return {
@@ -228,6 +235,13 @@ function asShot(raw: unknown, index: number): { shot: ShotPlanEntry | null; prob
   const row = raw as Record<string, unknown>;
   const beat = typeof row.beat === "string" ? row.beat.trim() : "";
   if (!beat) return { shot: null, problem: `${label} has no beat.` };
+  const openingState = typeof row.opening_state === "string" ? row.opening_state.trim() : "";
+  if (requireOpeningState && !openingState) {
+    return { shot: null, problem: `${label} needs an opening state before its visible action.` };
+  }
+  if (row.opening_state !== undefined && !openingState) {
+    return { shot: null, problem: `${label} has no usable opening state.` };
+  }
 
   const duration = row.duration_sec;
   if (typeof duration !== "number" || !Number.isFinite(duration) || duration <= 0) {
@@ -258,6 +272,7 @@ function asShot(raw: unknown, index: number): { shot: ShotPlanEntry | null; prob
   return {
     shot: {
       beat,
+      ...(openingState ? { opening_state: openingState } : {}),
       duration_sec: duration,
       shot_source_kind: SHOT_SOURCE_GENERATED,
       motion_preset: resolved.ok ? resolved.id : motion,
@@ -270,6 +285,7 @@ function asShot(raw: unknown, index: number): { shot: ShotPlanEntry | null; prob
 export function serializeShot(shot: ShotPlanEntry): string {
   return JSON.stringify({
     beat: shot.beat,
+    ...(shot.opening_state ? { opening_state: shot.opening_state } : {}),
     duration_sec: shot.duration_sec,
     motion_preset: shot.motion_preset,
     shot_source_kind: shot.shot_source_kind,
@@ -287,7 +303,7 @@ export function shotsFromSubmitted(submitted: Record<string, unknown>): {
 
   const shots: ShotPlanEntry[] = [];
   for (let i = 0; i < raw.length; i++) {
-    const parsed = asShot(raw[i], i);
+    const parsed = asShot(raw[i], i, true);
     if (!parsed.shot) return { shots: [], problem: parsed.problem };
     shots.push(parsed.shot);
   }
@@ -366,7 +382,7 @@ export function readableShotPlan(submitted: Record<string, unknown>): string | n
   const plan = shotsFromSubmitted(submitted);
   if (plan.problem || plan.shots.length === 0) return null;
   return plan.shots
-    .map((shot, i) => `${i + 1}. ${shot.beat} (${shot.duration_sec}s, generated, motion ${motionForReader(shot.motion_preset)})`)
+    .map((shot, i) => `${i + 1}. ${shot.beat}${shot.opening_state ? ` Start: ${shot.opening_state}` : ""} (${shot.duration_sec}s, generated, motion ${motionForReader(shot.motion_preset)})`)
     .join("\n");
 }
 
