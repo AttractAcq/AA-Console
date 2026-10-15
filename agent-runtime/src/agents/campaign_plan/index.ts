@@ -388,6 +388,15 @@ Call ${submitTool.name} once when you are done.`;
     if (error) throw new Error(`Failed to write campaign plan: ${error.message}`);
   }
 
+  if (campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "paid") {
+    const { error } = await sb.rpc("create_campaign_manifest_v6", {
+      p_campaign_id: campaign.id,
+      p_idempotency_key: `campaign-plan:${job.id}`,
+      p_needs_lead_magnet: false,
+    });
+    if (error) throw new Error(`Failed to version v6 campaign package: ${error.message}`);
+  }
+
   await appendEvent(sb, job.id, `Planned "${campaign.name}".\n\n${planSummary(plan)}`, "info", {
     cost_usd: usage.costUsd,
   });

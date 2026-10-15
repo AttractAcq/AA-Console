@@ -90,6 +90,8 @@ beforeAll(async () => {
   `);
   const mcpMigration = await readFile(new URL("../../supabase/migrations/20261015210000_204_v6_mcp_campaign_create.sql", import.meta.url), "utf8");
   await db.exec(mcpMigration);
+  const manifestMigration = await readFile(new URL("../../supabase/migrations/20261015220000_205_v6_campaign_manifest.sql", import.meta.url), "utf8");
+  await db.exec(manifestMigration);
   await db.exec(`
     insert into clients(id) values ('${clientA}'), ('${clientB}');
     insert into client_campaigns(id,client_id,name,brief,meta_campaign_id,approved_at)
@@ -186,4 +188,49 @@ it("requires a valid route and rejects every v6 launch path before approval exec
   await expect(db.query("update client_campaigns set status='live' where id=$1", [v6.rows[0]!.id]))
     .rejects.toThrow(/human approval/);
   await db.query("update client_campaigns set status='live' where id=$1", [source]);
+});
+
+it("versions a route-bound campaign package with honest module dependencies", async () => {
+  await expect(db.query("select create_campaign_manifest_v6($1,$2,$3)",
+    [source, "legacy-package", false])).rejects.toThrow(/route-bound, built campaign plan/);
+  const campaign = await db.query<{ id: string }>(`
+    insert into client_campaigns (
+      client_id,name,brief,acquisition_mode,paid_platform,built_at,objective,audience,
+      offer_summary,needs_landing_page
+    ) values ($1,'Acquisition','Brief','paid','meta',now(),'Booked consultations',
+      'Local homeowners','Inspection offer',true) returning id`, [clientA]);
+  const id = campaign.rows[0]!.id;
+  const manifest = await db.query<{ manifest: {
+    id: string; version: number; plan_hash: string; acquisition_mode: string; paid_platform: string;
+  } }>("select to_jsonb(create_campaign_manifest_v6($1,$2,$3)) as manifest", [id, "package-1", true]);
+  const first = manifest.rows[0]!.manifest;
+  expect(first).toMatchObject({ version: 1, acquisition_mode: "paid", paid_platform: "meta" });
+  const items = await db.query<{ item_key: string; module_key: string; required: boolean; depends_on: string[] }>(
+    "select item_key,module_key,required,depends_on from campaign_manifest_items where manifest_id=$1", [first.id]);
+  expect(items.rows).toHaveLength(10);
+  expect(items.rows).toEqual(expect.arrayContaining([
+    expect.objectContaining({ item_key: "distribution", module_key: "meta_ads_studio",
+      required: true, depends_on: ["creative", "website", "sales_path"] }),
+    expect.objectContaining({ item_key: "lead_magnet", required: true,
+      depends_on: ["offer", "website"] }),
+  ]));
+  await db.query("update client_campaigns set built_at=now() + interval '1 second' where id=$1", [id]);
+  const replay = await db.query<{ manifest: { id: string } }>(
+    "select to_jsonb(create_campaign_manifest_v6($1,$2,$3)) as manifest", [id, "package-1", true]);
+  expect(replay.rows[0]!.manifest.id).toBe(first.id);
+  await expect(db.query("select create_campaign_manifest_v6($1,$2,$3)", [id, "package-1", false]))
+    .rejects.toThrow(/Idempotency key/);
+  await expect(db.query("update campaign_manifest_items set required=false where manifest_id=$1", [first.id]))
+    .rejects.toThrow(/immutable/);
+  const next = await db.query<{ manifest: { version: number; id: string } }>(
+    "select to_jsonb(create_campaign_manifest_v6($1,$2,$3)) as manifest", [id, "package-2", false]);
+  expect(next.rows[0]!.manifest.version).toBe(2);
+  expect(next.rows[0]!.manifest.id).not.toBe(first.id);
+  await db.exec("select set_config('request.jwt.claim.role','authenticated',false)");
+  try {
+    await expect(db.query("select create_campaign_manifest_v6($1,$2,$3)",
+      [id, "untrusted", false])).rejects.toThrow(/Service role required/);
+  } finally {
+    await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+  }
 });
