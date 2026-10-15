@@ -142,6 +142,8 @@ The 22 October AA pilot package (`d091d17e-f5f0-41e3-828e-4831c30a710e`, run `dd
 
 ## Acceptance evidence required
 
+**22 October pilot recovery:** the seven opening stills completed, but every Higgsfield Kling 2.5 request failed because the shot prompt exceeded the model's 2,500-character limit. The first still showed the intended frame-zero envelope state; shot five's still cropped the first and last of eight blocks, so its visual quality remains a separate open issue. The motion adapter now caps prompt material below 2,000 characters while retaining the visible action and opening physical state. A service-only, one-time failed-batch recovery preserves each failed provider ID and rotates the frame idempotency keys before a new submission. The 22 October reel is not accepted until its replacement clips, assembled cut and creative QA pass.
+
 - One daily client-day produces exactly four complete, internally QA-passed assets before cutoff; each has correct campaign/pillar/proof links, copy and final files. Simulate a provider failure and prove an approved backup is selected or a clear blocker is raised.
 - A generated reel passes visual review across the entire cut, including cast continuity, captions, crop, motion and sound. Record every candidate, rejection and regeneration; do not count an MP4 alone as success.
 - A new client with complete inputs reaches one reviewable launch package containing an approved campaign plan, tested page and conversion route, configured sales agent, organic assets, paused Meta creative and measurement checks. Human activation remains separate.

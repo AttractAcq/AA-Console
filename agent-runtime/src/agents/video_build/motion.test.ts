@@ -224,8 +224,24 @@ describe("prepareMotionCalls", () => {
     expect(plan.ok).toBe(true);
     if (!plan.ok || plan.calls[0]?.kind !== "submit") return;
     expect(plan.calls[0].prompt).toContain(`Frame-zero physical state: ${opening}`);
-    expect(plan.calls[0].prompt).toContain("action must be visible on screen");
-    expect(plan.calls[0].prompt).toContain("not implied by a camera move");
+    expect(plan.calls[0].prompt).toContain("perform the action visibly");
+    expect(plan.calls[0].prompt).toContain("replace the action with a camera move");
+  });
+
+  it("keeps even a long branded shot below Kling's provider prompt cap", () => {
+    const plan = prepareMotionCalls({
+      shots: [{ ...shot(`Slide the document ${"carefully ".repeat(100)}`, MOTION),
+        opening_state: `At frame zero ${"unmarked document ".repeat(100)}` }],
+      frames: [frames[0]!],
+      stillUrlByPosition: new Map([[1, "https://cdn.example.test/1.png"]]),
+      modelId: "kling-video/v2.5-turbo/pro/image-to-video",
+      visualDirection: `Same physical set ${"green desk and paper ".repeat(150)}`,
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok || plan.calls[0]?.kind !== "submit") return;
+    expect(plan.calls[0].prompt.length).toBeLessThanOrEqual(2_000);
+    expect(plan.calls[0].prompt).toContain("Frame-zero physical state");
+    expect(plan.calls[0].prompt).toContain("Visible action to perform");
   });
 
   it("polls a shot that already has a request id instead of submitting it again", () => {

@@ -51,6 +51,7 @@ interface FrameRow {
   position: number;
   storage_path: string | null;
   provider_job_id: string | null;
+  provider_retry_count: number;
   clip_path: string | null;
 }
 
@@ -123,7 +124,7 @@ async function framesForBrief(sb: SupabaseClient, briefId: string): Promise<Fram
   if (!newest) return [];
   const { data, error: frameError } = await sb
     .from("client_media_frames")
-    .select("id, position, storage_path, provider_job_id, clip_path")
+    .select("id, position, storage_path, provider_job_id, provider_retry_count, clip_path")
     .eq("asset_id", newest.id);
   if (frameError) throw new Error(`Could not load shot frames: ${frameError.message}`);
   return (data ?? []) as FrameRow[];
@@ -348,6 +349,7 @@ export async function runVideoBuildJob(
         });
         continue;
       }
+      const retryCount = frames.find((frame) => frame.id === call.frameId)?.provider_retry_count ?? 0;
       const accepted = await client.submitI2V({
         modelId: call.modelId,
         prompt: call.prompt,
@@ -357,7 +359,7 @@ export async function runVideoBuildJob(
         // A frame row is one generation intent. If code changes the payload
         // after an ambiguous timeout, Higgsfield returns a mismatch instead
         // of accepting and charging for a second shot.
-        idempotencyKey: `aa-video-frame-${call.frameId}`,
+        idempotencyKey: `aa-video-frame-${call.frameId}${retryCount > 0 ? `-r${retryCount}` : ""}`,
       });
       const { error: saveError } = await sb
         .from("client_media_frames")
