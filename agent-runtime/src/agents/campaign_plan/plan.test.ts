@@ -9,11 +9,26 @@ import {
   campaignIdeas,
   normaliseChannels,
   planProblem,
+  planRouteProblem,
   planSummary,
   resolveNeeds,
   MAX_CONTENT,
   type CampaignPlan,
 } from "./plan.js";
+
+describe("v6 campaign route validation", () => {
+  it("keeps organic campaigns out of ad channels", () => {
+    expect(planRouteProblem("organic", null, ["instagram", "google_business_profile"])).toBeNull();
+    expect(planRouteProblem("organic", null, ["meta_ads"])).toMatch(/organic/i);
+  });
+
+  it("keeps paid campaigns on their selected platform", () => {
+    expect(planRouteProblem("paid", "meta", ["facebook", "instagram"])).toBeNull();
+    expect(planRouteProblem("paid", "meta", ["google_ads"])).toMatch(/Meta/i);
+    expect(planRouteProblem("paid", "google", ["search"])).toBeNull();
+    expect(planRouteProblem("paid", "google", ["facebook"])).toMatch(/Google/i);
+  });
+});
 
 const good = (over: Partial<CampaignPlan> = {}): CampaignPlan => ({
   objective: "Book 40 full-arch consultations in January",

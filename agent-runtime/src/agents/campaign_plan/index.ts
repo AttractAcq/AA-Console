@@ -26,6 +26,7 @@ import {
   asDate,
   normaliseChannels,
   planProblem,
+  planRouteProblem,
   planSummary,
   resolveNeeds,
   MAX_CONTENT,
@@ -220,6 +221,13 @@ export async function runCampaignPlanJob(
 
   const includeIdeas = campaign.built_at != null || campaign.ideate_on_plan !== false;
   const submitTool = submitToolFor(pillars, includeIdeas);
+  const routeInstruction = campaign.acquisition_mode === "organic"
+    ? "This is an ORGANIC campaign. Plan organic distribution only. No advertising, paid search, boosts or ad spend."
+    : campaign.acquisition_mode === "paid" && campaign.paid_platform === "meta"
+      ? "This is a PAID META campaign. Route creative to Meta/Facebook/Instagram ads only. Do not add Google or organic publication as campaign distribution."
+      : campaign.acquisition_mode === "paid" && campaign.paid_platform === "google"
+        ? "This is a PAID GOOGLE campaign. Route creative to Google search ads only. Do not add Meta or organic publication as campaign distribution."
+        : "This is a legacy campaign. Preserve its historical routing without inferring a v6 mode.";
 
   const system = `You plan marketing campaigns for Attract Acquisition, a marketing agency.
 
@@ -232,6 +240,7 @@ WHAT MAKES A PLAN GOOD
 - A single KPI. A campaign scored on five numbers cannot be stopped, because there is always one going up.
 
 ABSOLUTE RULES
+- ${routeInstruction}
 - Never invent a budget, a price, a date or a target you have no basis for. Omitting a number is honest; inventing one becomes a commitment somebody else has to meet.
 - Take the audience from the ICP and the offer from the offer strategy. Do not invent either.
 - ${includeIdeas
@@ -244,6 +253,9 @@ ABSOLUTE RULES
 
 WHAT THIS CAMPAIGN IS FOR — the operator's brief
 ${campaign.brief}
+
+CAMPAIGN ROUTE — fixed by the operator; do not change it
+${routeInstruction}
 
 ${pillars.length ? `THE CONTENT PILLARS THIS CAMPAIGN RUNS WITHIN — every idea sits in one of these
 ${pillars.map((p) => `**${p.name}** (${p.id})
@@ -344,6 +356,10 @@ Call ${submitTool.name} once when you are done.`;
   const problem = planProblem(plan);
   if (problem) {
     return { ok: false, retryable: true, failureMessage: problem, usage };
+  }
+  const routeProblem = planRouteProblem(campaign.acquisition_mode, campaign.paid_platform, plan.channels);
+  if (routeProblem) {
+    return { ok: false, retryable: true, failureMessage: routeProblem, usage };
   }
 
   if (includeIdeas) {

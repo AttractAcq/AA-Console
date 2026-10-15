@@ -38,6 +38,9 @@ import { CampaignExecutionPanel, type Requirement } from "./CampaignExecutionPan
 
 const planned = (over: Record<string, unknown> = {}) => ({
   id: "camp-1",
+  acquisition_mode: "legacy",
+  paid_platform: null,
+  cloned_from_campaign_id: null,
   name: "Winter full-arch push",
   brief: "Fill the January consult diary",
   status: "planning",
@@ -151,6 +154,36 @@ describe("the plan", () => {
 });
 
 describe("campaign pages", () => {
+  it("clones a legacy campaign into an explicit route without reusing its activation", async () => {
+    show();
+    rpc.mockImplementation((name: string) => name === "clone_campaign_for_route"
+      ? Promise.resolve({ data: "new-paid", error: null })
+      : Promise.resolve({ data: READY, error: null }));
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Clone to another route" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "New route" }), "paid");
+    await userEvent.selectOptions(screen.getByLabelText(/Paid platform/i), "meta");
+    await userEvent.click(screen.getByRole("button", { name: "Create separate campaign" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("clone_campaign_for_route", {
+      p_source_campaign_id: "camp-1",
+      p_target_mode: "paid",
+      p_paid_platform: "meta",
+      p_name: "Winter full-arch push · New route",
+    }));
+  });
+
+  it("shows a paid route, its source, and blocks unapproved external activation", async () => {
+    show([planned({ acquisition_mode: "paid", paid_platform: "google", cloned_from_campaign_id: "source-1" })], READY);
+    await open();
+    expect(screen.getByText("Paid · Google Ads")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Source campaign" })).toHaveAttribute(
+      "href", "/clients/client-1/delivery/campaign-factory/source-1",
+    );
+    expect(screen.queryByRole("button", { name: "Launch" })).not.toBeInTheDocument();
+    expect(screen.getByText(/External activation waits for version-bound human approval/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Meta build")).not.toBeInTheDocument();
+  });
+
   it("links each list name to its own page without expanding a card", async () => {
     useParams.mockReturnValue({ clientId: "client-1" });
     show([planned(), planned({ id: "camp-2", name: "Spring whitening" })]);
@@ -468,13 +501,34 @@ describe("proposing a campaign", () => {
     render(<CampaignExecutionPanel />);
     await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
     await userEvent.type(screen.getByLabelText(/Campaign name/i), "Editor hiring");
+    await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "organic");
     await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Plan the campaign first");
     const toggle = screen.getByRole("checkbox", { name: /Generate content ideas with this plan/i });
     expect(toggle).toBeChecked();
     await userEvent.click(toggle);
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
-    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({ ideate_on_plan: false })));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({ ideate_on_plan: false, acquisition_mode: "organic", paid_platform: null })));
     expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", expect.objectContaining({ p_input_id: "new-1" }));
+  });
+
+  it("stores a paid Google route without applying Meta's campaign template", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    const insert = vi.fn((_values: Record<string, unknown>) => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "new-google" }, error: null }) }) }));
+    from.mockImplementation((table: string) => table === "client_content_pillars"
+      ? rows([]) : table === "client_campaigns" ? { ...rows([]), insert } : rows([]));
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.type(screen.getByLabelText(/Campaign name/i), "Search consults");
+    await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "paid");
+    await userEvent.selectOptions(screen.getByLabelText(/Paid platform/i), "google");
+    expect(screen.queryByLabelText(/Campaign template/i)).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Book consultations from search");
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      acquisition_mode: "paid", paid_platform: "google",
+    })));
+    expect(insert.mock.calls[0]?.[0]).not.toHaveProperty("template");
   });
 
   async function openProposer() {
@@ -581,6 +635,7 @@ describe("proposing a campaign", () => {
     render(<CampaignExecutionPanel />);
     await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
     await userEvent.type(await screen.findByLabelText(/Campaign name/i), "Winter push");
+    await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "organic");
     await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Fill the diary");
     await userEvent.click(screen.getByRole("checkbox", { name: /Honest proof/i }));
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));

@@ -1664,6 +1664,7 @@ export type Database = {
       }
       client_campaigns: {
         Row: {
+          acquisition_mode: "legacy" | "organic" | "paid"
           ad_campaign_id: string | null
           archived_at: string | null
           audience: string | null
@@ -1672,6 +1673,7 @@ export type Database = {
           built_at: string | null
           channels: string[]
           client_id: string
+          cloned_from_campaign_id: string | null
           content_count: number
           content_ideas_generated_at: string | null
           conversion_event: string | null
@@ -1700,6 +1702,7 @@ export type Database = {
           objective: string | null
           offer_summary: string | null
           optimisation_event: string | null
+          paid_platform: "meta" | "google" | null
           starts_on: string | null
           status: string
           target_countries: string[]
@@ -1707,6 +1710,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          acquisition_mode?: "legacy" | "organic" | "paid"
           ad_campaign_id?: string | null
           archived_at?: string | null
           audience?: string | null
@@ -1715,6 +1719,7 @@ export type Database = {
           built_at?: string | null
           channels?: string[]
           client_id: string
+          cloned_from_campaign_id?: string | null
           content_count?: number
           content_ideas_generated_at?: string | null
           conversion_event?: string | null
@@ -1743,6 +1748,7 @@ export type Database = {
           objective?: string | null
           offer_summary?: string | null
           optimisation_event?: string | null
+          paid_platform?: "meta" | "google" | null
           starts_on?: string | null
           status?: string
           target_countries?: string[]
@@ -1750,6 +1756,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          acquisition_mode?: "legacy" | "organic" | "paid"
           ad_campaign_id?: string | null
           archived_at?: string | null
           audience?: string | null
@@ -1758,6 +1765,7 @@ export type Database = {
           built_at?: string | null
           channels?: string[]
           client_id?: string
+          cloned_from_campaign_id?: string | null
           content_count?: number
           content_ideas_generated_at?: string | null
           conversion_event?: string | null
@@ -1786,6 +1794,7 @@ export type Database = {
           objective?: string | null
           offer_summary?: string | null
           optimisation_event?: string | null
+          paid_platform?: "meta" | "google" | null
           starts_on?: string | null
           status?: string
           target_countries?: string[]
@@ -1793,6 +1802,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_campaigns_clone_same_client_fkey"
+            columns: ["cloned_from_campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
           {
             foreignKeyName: "client_campaigns_ad_campaign_id_fkey"
             columns: ["ad_campaign_id"]
@@ -8543,6 +8559,15 @@ export type Database = {
           required: number
           requirement: string
         }[]
+      }
+      clone_campaign_for_route: {
+        Args: {
+          p_source_campaign_id: string
+          p_target_mode: string
+          p_paid_platform?: string | null
+          p_name?: string | null
+        }
+        Returns: string
       }
       can_access_client: { Args: { target: string }; Returns: boolean }
       can_run_agent: {
