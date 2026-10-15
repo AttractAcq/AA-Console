@@ -47,6 +47,9 @@ const higgsfieldRecoveryMigration = () => readFile(new URL(
 const blockedSiblingQaMigration = () => readFile(new URL(
   "../../supabase/migrations/20261015090000_209_v5_blocked_daily_sibling_qa.sql", import.meta.url,
 ), "utf8");
+const motionLineageMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261015100000_210_v5_motion_followup_lineage.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -139,7 +142,9 @@ beforeAll(async () => {
       created_by uuid, run_id uuid, status text not null default 'queued',
       terminal boolean not null default false, attempts integer not null default 0,
       cost_usd numeric not null default 0,
-      max_attempts integer not null default 3, error text, created_at timestamptz default now());
+      max_attempts integer not null default 3, error text, created_at timestamptz default now(),
+      run_after timestamptz);
+    create table agent_job_events (job_id uuid not null, description text, payload jsonb);
     create table creative_generations (id uuid primary key default gen_random_uuid(),
       client_id uuid not null, brief_id uuid not null, media_type media_type not null,
       quality text not null, size text not null, job_id uuid, created_by uuid,
@@ -190,6 +195,7 @@ beforeAll(async () => {
   await db.exec(await reelSourceRebuildMigration());
   await db.exec(await higgsfieldRecoveryMigration());
   await db.exec(await blockedSiblingQaMigration());
+  await db.exec(await motionLineageMigration());
 });
 
 beforeEach(async () => {
@@ -298,6 +304,45 @@ describe("v5 workflow spine", () => {
       "select * from accept_ready_daily_workflow_steps()")).steps_accepted).toBe(1);
     await expect(service(`select id from resume_completed_daily_motion_qa('${run.id}')`))
       .rejects.toThrow(/No premature motion QA block/);
+  });
+
+  it("atomically hands a paid motion step to each scheduled clip collector", async () => {
+    const briefId = "33333333-3333-4333-8333-333333333335";
+    await db.exec(`insert into client_briefs (id,client_id,body,content_format,media_type,format_code)
+      values ('${briefId}','${CLIENT}','Six complete opening shots for a reel.','reel','video','F7')`);
+    const run = await makeRun("motion-collector-lineage");
+    const step = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_motion','{}','video_build','client_briefs','${briefId}')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    const first = await one<{ job_id: string }>(`select job_id from workflow_steps where id='${step.id}'`);
+    const params = `'{"v5_workflow_run_id":"${run.id}","v5_step_key":"reel_motion"}'::jsonb`;
+    await expect(service(`select schedule_agent_follow_up('video_build','${CLIENT}',
+      'client_briefs','${briefId}',120,'Collect clips',${params},'${first.job_id}')`))
+      .resolves.toHaveProperty("schedule_agent_follow_up");
+    const second = await one<{ job_id: string; status: string }>(
+      `select job_id,status from workflow_steps where id='${step.id}'`);
+    expect(second.job_id).not.toBe(first.job_id);
+    expect(second.status).toBe("queued");
+    expect((await one<{ run_id: string }>(`select run_id from agent_jobs where id='${second.job_id}'`)).run_id)
+      .toBe(run.id);
+    await db.exec(`update agent_jobs set status='completed' where id='${first.job_id}'`);
+    await service("select * from reconcile_workflow_runs()");
+    expect((await one<{ status: string }>(`select status from workflow_steps where id='${step.id}'`)).status)
+      .toBe("queued");
+    await expect(service(`select schedule_agent_follow_up('video_build','${CLIENT}',
+      'client_briefs','${briefId}',120,'Collect clips',${params},'${first.job_id}')`))
+      .rejects.toThrow(/does not match current job/);
+    const third = await service<{ schedule_agent_follow_up: string }>(
+      `select schedule_agent_follow_up('video_build','${CLIENT}',
+        'client_briefs','${briefId}',120,'Collect clips',${params},'${second.job_id}')`);
+    expect(third.schedule_agent_follow_up).not.toBe(second.job_id);
+    expect((await one<{ job_id: string }>(`select job_id from workflow_steps where id='${step.id}'`)).job_id)
+      .toBe(third.schedule_agent_follow_up);
+    await db.exec("select set_config('request.jwt.claim.role', 'authenticated', false)");
+    await expect(one(`select schedule_agent_follow_up('video_build','${CLIENT}',
+      'client_briefs','${briefId}',120,'Collect clips',${params},'${third.schedule_agent_follow_up}')`))
+      .rejects.toThrow(/service role required/);
   });
 
   it("carries a rejected cut's exact feedback into the workflow edit job", async () => {
