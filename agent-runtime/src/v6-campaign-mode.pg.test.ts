@@ -25,6 +25,12 @@ beforeAll(async () => {
       name text not null, brief text not null, status text not null default 'planning',
       ideate_on_plan boolean not null default true,
       meta_campaign_id text, approved_at timestamptz,
+      objective text, audience text, offer_summary text, core_message text,
+      channels text[], budget numeric, starts_on date, ends_on date,
+      kpi_metric text, kpi_target numeric, content_count integer,
+      needs_landing_page boolean, needs_sales_agent boolean,
+      ad_campaign_id text, built_at timestamptz, launched_at timestamptz,
+      created_at timestamptz default now(), updated_at timestamptz default now(),
       unique (id, client_id)
     );
     create table agent_jobs (
@@ -35,6 +41,55 @@ beforeAll(async () => {
   `);
   const migration = await readFile(new URL("../../supabase/migrations/20261015190000_203_v6_campaign_mode.sql", import.meta.url), "utf8");
   await db.exec(migration);
+  await db.exec(`
+    create schema mcp_internal;
+    create table mcp_internal.mcp_campaign_requests (
+      bot_id text not null, execution_id text not null, request_id text not null,
+      tool text not null, client_id uuid not null, campaign_id uuid,
+      payload jsonb not null, result jsonb not null,
+      primary key (bot_id, execution_id)
+    );
+    create function mcp_internal.require_service_role() returns void language plpgsql as $$
+    begin
+      if auth.role() <> 'service_role' then raise exception 'service_role_required'; end if;
+    end $$;
+    create function mcp_internal.require_campaign_execution_permission(text, uuid, text)
+      returns void language plpgsql as $$
+    begin
+      perform mcp_internal.require_service_role();
+    end $$;
+    create function mcp_internal.require_mcp_ids(p_request_id text, p_execution_id text)
+      returns void language plpgsql as $$
+    begin
+      if nullif(p_request_id, '') is null or nullif(p_execution_id, '') is null then
+        raise exception 'invalid_request';
+      end if;
+    end $$;
+    create function mcp_internal.take_campaign_request(
+      p_bot_id text, p_execution_id text, p_tool text, p_client_id uuid, p_payload jsonb
+    ) returns jsonb language plpgsql as $$
+    declare v_row mcp_internal.mcp_campaign_requests;
+    begin
+      select * into v_row from mcp_internal.mcp_campaign_requests
+        where bot_id = p_bot_id and execution_id = p_execution_id;
+      if found then
+        if v_row.tool is distinct from p_tool or v_row.client_id is distinct from p_client_id
+           or v_row.payload is distinct from p_payload then
+          raise exception 'idempotency_conflict';
+        end if;
+        return v_row.result || jsonb_build_object('replayed', true);
+      end if;
+      return null;
+    end $$;
+    create function mcp_internal.enqueue_mcp_job(text, uuid, text, uuid, text, text, text, text)
+      returns uuid language sql as $$ select gen_random_uuid() $$;
+    create function mcp_internal.clip_text(p_value text, p_limit integer)
+      returns text language sql as $$ select left(p_value, p_limit) $$;
+    create function mcp_internal.campaign_json(c client_campaigns)
+      returns jsonb language sql as $$ select jsonb_build_object('id', c.id, 'name', c.name) $$;
+  `);
+  const mcpMigration = await readFile(new URL("../../supabase/migrations/20261015210000_204_v6_mcp_campaign_create.sql", import.meta.url), "utf8");
+  await db.exec(mcpMigration);
   await db.exec(`
     insert into clients(id) values ('${clientA}'), ('${clientB}');
     insert into client_campaigns(id,client_id,name,brief,meta_campaign_id,approved_at)
@@ -78,4 +133,39 @@ it("rejects an incomplete paid route and cross-client lineage", async () => {
     "insert into client_campaigns(client_id,name,brief,acquisition_mode,cloned_from_campaign_id) values ($1,$2,$3,$4,$5)",
     [clientB, "Cross-client", "Invalid", "organic", source],
   )).rejects.toThrow(/foreign key/);
+});
+
+it("creates a route-aware MCP campaign once and replays the same execution", async () => {
+  const args = ["chief", clientA, "Search demand", "A specific service acquisition brief", "paid", "google", "request-1", "execution-1"];
+  const first = await db.query<{ mcp_campaign_create_v6: { campaign: { id: string; acquisition_mode: string; paid_platform: string }; replayed: boolean } }>(
+    "select mcp_campaign_create_v6($1,$2,$3,$4,$5,$6,$7,$8)", args);
+  expect(first.rows[0]!.mcp_campaign_create_v6).toMatchObject({
+    campaign: { acquisition_mode: "paid", paid_platform: "google" }, replayed: false,
+  });
+  const again = await db.query<{ mcp_campaign_create_v6: { campaign: { id: string }; replayed: boolean } }>(
+    "select mcp_campaign_create_v6($1,$2,$3,$4,$5,$6,$7,$8)", args);
+  expect(again.rows[0]!.mcp_campaign_create_v6).toMatchObject({
+    campaign: { id: first.rows[0]!.mcp_campaign_create_v6.campaign.id }, replayed: true,
+  });
+  const count = await db.query<{ count: number }>("select count(*) from client_campaigns where name='Search demand'");
+  expect(count.rows[0]!.count).toBe(1);
+  await expect(db.query("select mcp_campaign_create_v6($1,$2,$3,$4,$5,$6,$7,$8)",
+    ["chief", clientA, "Search demand", "A specific service acquisition brief", "organic", null, "request-1", "execution-1"]))
+    .rejects.toThrow(/idempotency_conflict/);
+});
+
+it("requires a valid route and rejects every v6 launch path before approval execution", async () => {
+  await expect(db.query("select mcp_campaign_create_v6($1,$2,$3,$4,$5,$6,$7,$8)",
+    ["chief", clientA, "Invalid", "Brief", "paid", null, "request-2", "execution-2"]))
+    .rejects.toThrow(/invalid_request/);
+  await expect(db.query(
+    "insert into client_campaigns(client_id,name,brief,acquisition_mode,status) values ($1,'Direct','Brief','organic','live')",
+    [clientA],
+  )).rejects.toThrow(/human approval/);
+  const v6 = await db.query<{ id: string }>(
+    "insert into client_campaigns(client_id,name,brief,acquisition_mode) values ($1,'Organic','Brief','organic') returning id",
+    [clientA]);
+  await expect(db.query("update client_campaigns set status='live' where id=$1", [v6.rows[0]!.id]))
+    .rejects.toThrow(/human approval/);
+  await db.query("update client_campaigns set status='live' where id=$1", [source]);
 });

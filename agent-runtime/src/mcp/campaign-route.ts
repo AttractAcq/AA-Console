@@ -110,6 +110,33 @@ routes["/internal/mcp/campaign/create"] = {
   },
 };
 
+routes["/internal/mcp/campaign/create-v6"] = {
+  rpc: "mcp_campaign_create_v6",
+  kind: "queue",
+  parse(body) {
+    const client_id = uuidOf(body, "client_id");
+    const name = textOf(body, "name", 1, 200);
+    const brief = textOf(body, "brief", 1, 4000);
+    const acquisition_mode = body.acquisition_mode;
+    const paid_platform = body.paid_platform;
+    if (client_id === undefined || client_id === false
+      || name === undefined || name === false
+      || brief === undefined || brief === false
+      || (acquisition_mode !== "organic" && acquisition_mode !== "paid")
+      || (acquisition_mode === "paid" && paid_platform !== "meta" && paid_platform !== "google")
+      || (acquisition_mode === "organic" && paid_platform !== undefined)
+      || !subset(body, ["client_id", "name", "brief", "acquisition_mode", "paid_platform"])) return;
+    return {
+      p_bot_id: null,
+      p_client_id: client_id,
+      p_name: name,
+      p_brief: brief,
+      p_acquisition_mode: acquisition_mode,
+      p_paid_platform: acquisition_mode === "paid" ? paid_platform : null,
+    };
+  },
+};
+
 routes["/internal/mcp/campaign/update"] = {
   rpc: "mcp_campaign_execution",
   kind: "write",

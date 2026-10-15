@@ -644,6 +644,8 @@ export const registry: Tool[] = Object.entries(domains).flatMap(
         delete fields.title;
         fields.name = z.string().trim().min(1).max(200);
         fields.brief = text;
+        fields.acquisition_mode = z.enum(["organic", "paid"]);
+        fields.paid_platform = z.enum(["meta", "google"]).optional();
       }
       if (name === "campaign.update") {
         fields.campaign_id = id;
