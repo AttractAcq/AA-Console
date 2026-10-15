@@ -128,3 +128,60 @@ revoke all on function public.mcp_campaign_create_v6(text, uuid, text, text, tex
   from public, anon, authenticated;
 grant execute on function public.mcp_campaign_create_v6(text, uuid, text, text, text, text, text, text)
   to service_role;
+
+create function public.mcp_campaign_list_v6(
+  p_bot_id text, p_client_id uuid, p_limit integer default 50, p_after uuid default null
+) returns jsonb
+language plpgsql volatile security definer
+set search_path = pg_catalog, mcp_internal, public
+set timezone = 'UTC'
+as $$
+declare
+  v_items jsonb;
+  v_next uuid;
+begin
+  perform mcp_internal.require_service_role();
+  perform mcp_internal.require_campaign_execution_permission(
+    p_bot_id, p_client_id, 'campaign.list');
+  if p_limit is null or p_limit not between 1 and 100 then
+    raise exception using message = 'invalid_request', errcode = 'P0001';
+  end if;
+  select coalesce(jsonb_agg(to_jsonb(x) order by x.id), '[]'::jsonb)
+    into v_items
+    from (
+      select c.id, c.client_id, c.name,
+        mcp_internal.clip_text(c.brief, 4000) as brief,
+        c.status, c.acquisition_mode, c.paid_platform,
+        c.cloned_from_campaign_id,
+        mcp_internal.clip_text(c.objective, 2000) as objective,
+        mcp_internal.clip_text(c.audience, 2000) as audience,
+        mcp_internal.clip_text(c.offer_summary, 2000) as offer_summary,
+        mcp_internal.clip_text(c.core_message, 2000) as core_message,
+        to_jsonb(c.channels) as channels,
+        c.budget, c.starts_on, c.ends_on, c.kpi_metric, c.kpi_target,
+        c.content_count, c.needs_landing_page, c.needs_sales_agent,
+        c.ad_campaign_id, c.built_at, c.launched_at,
+        c.created_at, c.updated_at
+      from public.client_campaigns c
+      where c.client_id = p_client_id
+        and (p_after is null or c.id > p_after)
+      order by c.id
+      limit p_limit + 1
+    ) x;
+  if jsonb_array_length(v_items) > p_limit then
+    v_items := v_items - p_limit;
+    v_next := (v_items -> (p_limit - 1) ->> 'id')::uuid;
+  end if;
+  return jsonb_build_object(
+    'client_id', p_client_id,
+    'projection', 'client_campaigns_execution_v6',
+    'campaigns', v_items,
+    'next_cursor', v_next
+  );
+end;
+$$;
+
+revoke all on function public.mcp_campaign_list_v6(text, uuid, integer, uuid)
+  from public, anon, authenticated;
+grant execute on function public.mcp_campaign_list_v6(text, uuid, integer, uuid)
+  to service_role;

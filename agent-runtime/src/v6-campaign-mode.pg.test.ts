@@ -154,6 +154,24 @@ it("creates a route-aware MCP campaign once and replays the same execution", asy
     .rejects.toThrow(/idempotency_conflict/);
 });
 
+it("exposes mode and lineage in scoped MCP campaign reads", async () => {
+  const created = await db.query<{ mcp_campaign_create_v6: { campaign: { id: string } } }>(
+    "select mcp_campaign_create_v6($1,$2,$3,$4,$5,$6,$7,$8)",
+    ["chief", clientA, "Listing probe", "Scoped route read", "paid", "google", "request-list", "execution-list"]);
+  const list = await db.query<{ mcp_campaign_list_v6: {
+    projection: string; campaigns: Array<{ id: string; acquisition_mode: string; paid_platform: string | null }>;
+  } }>("select mcp_campaign_list_v6($1,$2)", ["chief", clientA]);
+  expect(list.rows[0]!.mcp_campaign_list_v6.projection).toBe("client_campaigns_execution_v6");
+  expect(list.rows[0]!.mcp_campaign_list_v6.campaigns).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: source, acquisition_mode: "legacy", paid_platform: null }),
+    expect.objectContaining({ id: created.rows[0]!.mcp_campaign_create_v6.campaign.id,
+      acquisition_mode: "paid", paid_platform: "google" }),
+  ]));
+  const other = await db.query<{ mcp_campaign_list_v6: { campaigns: unknown[] } }>(
+    "select mcp_campaign_list_v6($1,$2)", ["chief", clientB]);
+  expect(other.rows[0]!.mcp_campaign_list_v6.campaigns).toEqual([]);
+});
+
 it("requires a valid route and rejects every v6 launch path before approval execution", async () => {
   await expect(db.query("select mcp_campaign_create_v6($1,$2,$3,$4,$5,$6,$7,$8)",
     ["chief", clientA, "Invalid", "Brief", "paid", null, "request-2", "execution-2"]))

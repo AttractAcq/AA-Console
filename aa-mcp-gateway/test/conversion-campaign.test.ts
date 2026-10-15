@@ -176,6 +176,10 @@ test("campaign adapter routes Execution OS writes and readiness", async (t) => {
   }));
   const e = engine(t, adapter);
   assert.equal(
+    (await e.call(cos, "campaign.list", { client_id: client })).status,
+    "completed",
+  );
+  assert.equal(
     (await e.call(cos, "campaign.create", {
       client_id: client,
       name: "Spring",
@@ -202,6 +206,7 @@ test("campaign adapter routes Execution OS writes and readiness", async (t) => {
     "completed",
   );
   assert.ok(seen.some((x) => x.path === "/internal/mcp/campaign/create-v6"));
+  assert.ok(seen.some((x) => x.path === "/internal/mcp/campaign/list-v6"));
   assert.ok(seen.some((x) => x.path === "/internal/mcp/campaign/get-readiness"));
   assert.ok(seen.some((x) => x.path === "/internal/mcp/campaign/launch"));
 });

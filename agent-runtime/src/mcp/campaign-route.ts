@@ -137,6 +137,24 @@ routes["/internal/mcp/campaign/create-v6"] = {
   },
 };
 
+routes["/internal/mcp/campaign/list-v6"] = {
+  rpc: "mcp_campaign_list_v6",
+  kind: "read",
+  parse(body) {
+    const client_id = uuidOf(body, "client_id");
+    const after = uuidOf(body, "after");
+    const limit = limitOf(body);
+    if (client_id === undefined || client_id === false || after === false || limit === false
+      || !subset(body, ["client_id", "limit", "after"])) return;
+    return {
+      p_bot_id: null,
+      p_client_id: client_id,
+      ...(limit === undefined ? {} : { p_limit: limit }),
+      ...(after ? { p_after: after } : {}),
+    };
+  },
+};
+
 routes["/internal/mcp/campaign/update"] = {
   rpc: "mcp_campaign_execution",
   kind: "write",
