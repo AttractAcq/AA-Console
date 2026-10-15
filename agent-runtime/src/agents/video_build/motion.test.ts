@@ -204,13 +204,28 @@ describe("prepareMotionCalls", () => {
     expect(plan.calls[0]).toMatchObject({
       kind: "submit",
       position: 1,
-      prompt: expect.stringContaining("Narrative purpose: Name it"),
+      prompt: expect.stringContaining("Visible action to perform: Name it"),
       imageUrl: "https://cdn.example.test/1.png",
       motionId: MOTION,
       strength: 1,
       modelId: "higgsfield-ai/dop/lite",
       durationSec: 3,
     });
+  });
+
+  it("carries the exact pre-action state to image-to-video rather than relying on the still alone", () => {
+    const opening = "The blank sheet is mostly in shadow, with only its leading edge entering the light.";
+    const plan = prepareMotionCalls({
+      shots: [{ ...shot("The sheet slides fully into the light", MOTION), opening_state: opening }],
+      frames: [frames[0]!],
+      stillUrlByPosition: new Map([[1, "https://cdn.example.test/1.png"]]),
+      modelId: "kling-video/v2.5-turbo/pro/image-to-video",
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok || plan.calls[0]?.kind !== "submit") return;
+    expect(plan.calls[0].prompt).toContain(`Frame-zero physical state: ${opening}`);
+    expect(plan.calls[0].prompt).toContain("action must be visible on screen");
+    expect(plan.calls[0].prompt).toContain("not implied by a camera move");
   });
 
   it("polls a shot that already has a request id instead of submitting it again", () => {

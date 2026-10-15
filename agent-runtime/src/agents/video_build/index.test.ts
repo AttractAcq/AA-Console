@@ -399,7 +399,7 @@ describe("video_build", () => {
     const post = fetchSpy.mock.calls.find((call) => call[1]?.method === "POST");
     expect(String(post?.[0])).toContain("/higgsfield-ai/dop/standard");
     const body = JSON.parse(String(post?.[1]?.body));
-    expect(body.prompt).toContain("Narrative purpose: Name the mechanism");
+    expect(body.prompt).toContain("Visible action to perform: Name the mechanism");
     expect(body.prompt).toContain("One workshop and one founder in every shot.");
     expect(body.image_url).toBe("https://cdn.example.test/still.png");
     expect(body.motions).toEqual([{ id: motion, strength: 1 }]);
