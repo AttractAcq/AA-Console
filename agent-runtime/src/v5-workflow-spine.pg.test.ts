@@ -50,6 +50,12 @@ const blockedSiblingQaMigration = () => readFile(new URL(
 const motionLineageMigration = () => readFile(new URL(
   "../../supabase/migrations/20261015100000_210_v5_motion_followup_lineage.sql", import.meta.url,
 ), "utf8");
+const recentIdeaMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261015110000_211_v5_recent_idea_diversity.sql", import.meta.url,
+), "utf8");
+const failedHiggsfieldRecoveryMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261015120000_212_v5_failed_higgsfield_prompt_recovery.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -107,7 +113,7 @@ beforeAll(async () => {
     create table content_slots (id uuid primary key, client_id uuid);
     create table client_agent_records (id uuid primary key, client_id uuid not null, job_id uuid, body text);
     create table client_ideas (id uuid primary key, client_id uuid not null, job_id uuid, title text,
-      body text, created_at timestamptz default now(),
+      body text, status text not null default 'draft', created_at timestamptz default now(),
       campaign_id uuid, pillar_id uuid, target_platform post_platform,
       content_format content_format, media_type media_type,
       source_question text, strategic_reason text);
@@ -120,7 +126,8 @@ beforeAll(async () => {
       storage_path text, render_path text, content_format content_format,
       media_type media_type, review_status text default 'pending', human_approved_at timestamptz,
       title text);
-    create table client_media_frames (asset_id uuid, provider_job_id text, clip_path text);
+    create table client_media_frames (id uuid primary key default gen_random_uuid(),
+      asset_id uuid, provider_job_id text, clip_path text);
     create table video_render_candidates (id uuid primary key, client_id uuid, asset_id uuid, job_id uuid,
       attempt integer, verdict text, render_path text, media_probe jsonb, creative_review jsonb,
       rejection_reason text, edit_plan jsonb, created_at timestamptz default now());
@@ -196,6 +203,8 @@ beforeAll(async () => {
   await db.exec(await higgsfieldRecoveryMigration());
   await db.exec(await blockedSiblingQaMigration());
   await db.exec(await motionLineageMigration());
+  await db.exec(await recentIdeaMigration());
+  await db.exec(await failedHiggsfieldRecoveryMigration());
 });
 
 beforeEach(async () => {
@@ -430,6 +439,49 @@ describe("v5 workflow spine", () => {
     expect((await one<{ status: string }>(`select status from agent_jobs where id='${old.job_id}'`)).status)
       .toBe("failed");
     await expect(service(`select id from retry_partial_higgsfield_motion_step('${motion.id}')`))
+      .rejects.toThrow(/not eligible/);
+  });
+  it("replaces one fully failed Higgsfield batch and preserves prior request IDs", async () => {
+    const briefId = "33333333-3333-4333-8333-333333333388";
+    const assetId = "44444444-4444-4444-8444-444444444488";
+    await db.exec(`insert into client_briefs (id,client_id,body,content_format,media_type)
+      values ('${briefId}','${CLIENT}','Failed batch','reel','video');
+      insert into client_media_assets (id,client_id,brief_id,storage_path,content_format,media_type)
+      values ('${assetId}','${CLIENT}','${briefId}','opening.jpg','reel','video');
+      insert into client_media_frames (asset_id,provider_job_id)
+      values ('${assetId}','failed-request-1'),('${assetId}','failed-request-2')`);
+    const run = await makeRun("higgsfield-failed-batch-recovery");
+    const source = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_create','{}','creative_build','client_briefs','${briefId}')`);
+    const motion = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_motion',array['reel_create'],'video_build','client_briefs','${briefId}')`);
+    await db.exec(`update workflow_steps set status='completed' where id='${source.id}';
+      insert into workflow_artifacts (run_id,step_id,artifact_kind,record_id,version_key,qa_evidence)
+      values ('${run.id}','${source.id}','asset','${assetId}','source-v1','{"result":"pass"}')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    const old = await one<{ job_id: string }>(`select job_id from workflow_steps where id='${motion.id}'`);
+    const blocker = "Higgsfield reported a shot as failed. The request id is stored. It was not submitted again.";
+    await db.exec(`update agent_jobs set status='failed',terminal=true,attempts=1,
+      error='${blocker}' where id='${old.job_id}'`);
+    await service("select * from reconcile_workflow_runs()");
+    const rows = (await db.query<{ id: string; provider_job_id: string }>(`
+      select id,provider_job_id from client_media_frames where asset_id='${assetId}' order by provider_job_id`)).rows;
+    const payload = JSON.stringify(rows.map((row) => ({ frame_id: row.id, request_id: row.provider_job_id })));
+    await expect(service(`select id from retry_failed_higgsfield_motion_step('${motion.id}',
+      '[{"frame_id":"${rows[0]!.id}","request_id":"wrong"}]'::jsonb)`))
+      .rejects.toThrow(/not eligible/);
+    await service(`select id from retry_failed_higgsfield_motion_step('${motion.id}','${payload}'::jsonb)`);
+    const recovered = (await db.query<{ provider_job_id: string | null; provider_retry_count: number;
+      provider_prior_job_ids: string[] }>(`select provider_job_id,provider_retry_count,
+      provider_prior_job_ids from client_media_frames where asset_id='${assetId}'
+      order by provider_prior_job_ids[1]`)).rows;
+    expect(recovered.map((row) => row.provider_job_id)).toEqual([null, null]);
+    expect(recovered.map((row) => row.provider_retry_count)).toEqual([1, 1]);
+    expect(recovered.map((row) => row.provider_prior_job_ids[0])).toEqual([
+      "failed-request-1", "failed-request-2",
+    ]);
+    await expect(service(`select id from retry_failed_higgsfield_motion_step('${motion.id}','${payload}'::jsonb)`))
       .rejects.toThrow(/not eligible/);
   });
   it("accepts finished static siblings while the reel remains blocked", async () => {
@@ -1099,5 +1151,30 @@ describe("v5 workflow spine", () => {
     await db.exec("select set_config('request.jwt.claim.role', 'authenticated', false)");
     await expect(one(`select capture_ideation_learning_context('${job.id}')`))
       .rejects.toThrow(/service role/);
+  });
+
+  it("freezes recent accepted angles across days before generating a new idea", async () => {
+    const prior = "00000000-0000-4000-8000-000000000031";
+    const rejected = "00000000-0000-4000-8000-000000000032";
+    await db.exec(`insert into client_ideas
+      (id, client_id, title, body, status, source_question, created_at) values
+      ('${prior}', '${CLIENT}', 'See the invoice before the campaign',
+       'Show the buyer a transparent invoice before any spend.', 'briefed',
+       'What am I paying for?', now() - interval '1 day'),
+      ('${rejected}', '${CLIENT}', 'Discarded guess', 'Do not include me', 'rejected',
+       null, now() - interval '1 day');`);
+    const job = await one<{ id: string }>(`insert into agent_jobs (agent_key, client_id)
+      values ('ideation', '${CLIENT}') returning id`);
+    const first = await service<{ capture_ideation_learning_context: {
+      recent_ideas: Array<{ id: string; title: string; core_idea: string }>;
+    } }>(`select capture_ideation_learning_context('${job.id}')`);
+    expect(first.capture_ideation_learning_context.recent_ideas).toEqual([
+      expect.objectContaining({ id: prior, title: 'See the invoice before the campaign' }),
+    ]);
+    await db.exec(`insert into client_ideas
+      (id, client_id, title, status, created_at) values
+      ('00000000-0000-4000-8000-000000000033', '${CLIENT}', 'Later accepted idea',
+       'approved', now() + interval '1 second');`);
+    expect(await service(`select capture_ideation_learning_context('${job.id}')`)).toEqual(first);
   });
 });

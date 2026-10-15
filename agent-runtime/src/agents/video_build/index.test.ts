@@ -59,6 +59,7 @@ function harness(
       position: number;
       storage_path: string | null;
       provider_job_id: string | null;
+      provider_retry_count?: number;
       clip_path?: string | null;
     }>;
     signedUrl?: string | null;
@@ -379,7 +380,8 @@ describe("video_build", () => {
     const { sb, frameUpdates, uploads, rpcCalls } = harness(ready, {
       assets: [{ id: "asset-1" }],
       frames: [
-        { id: "frame-1", position: 1, storage_path: "client-1/generated/r/01.png", provider_job_id: null },
+        { id: "frame-1", position: 1, storage_path: "client-1/generated/r/01.png", provider_job_id: null,
+          provider_retry_count: 1 },
         { id: "frame-2", position: 2, storage_path: "client-1/generated/r/02.png", provider_job_id: null },
       ],
       signedUrl: "https://cdn.example.test/still.png",
@@ -397,6 +399,9 @@ describe("video_build", () => {
     }
     expect(fetchSpy.mock.calls.filter((call) => String(call[0]) === clipUrl)).toHaveLength(2);
     const post = fetchSpy.mock.calls.find((call) => call[1]?.method === "POST");
+    const posts = fetchSpy.mock.calls.filter((call) => call[1]?.method === "POST");
+    expect(posts.map((call) => (call[1]?.headers as Record<string, string>)["Idempotency-Key"]))
+      .toEqual(["aa-video-frame-frame-1-r1", "aa-video-frame-frame-2"]);
     expect(String(post?.[0])).toContain("/higgsfield-ai/dop/standard");
     const body = JSON.parse(String(post?.[1]?.body));
     expect(body.prompt).toContain("Visible action to perform: Name the mechanism");

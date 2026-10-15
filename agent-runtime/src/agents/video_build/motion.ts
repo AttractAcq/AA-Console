@@ -145,18 +145,24 @@ export function directedShotPrompt(
   visualDirection?: string | null,
   openingState?: string | null,
 ): string {
-  const sharedDirection = visualDirection?.trim().slice(0, 1800);
-  return [
-    `Shot ${position} of ${total}. Visible action to perform: ${beat.trim()}`,
-    openingState?.trim() ? `Frame-zero physical state: ${openingState.trim().slice(0, 900)}. Begin from this state, then perform the visible action during the shot.` : "",
-    sharedDirection ? `Shared visual continuity for every shot: ${sharedDirection}` : "",
-    "Animate the supplied opening frame as a continuous, realistic vertical film shot.",
-    "Treat the opening frame as the factual source for the subject, objects, materials and their current physical state. Execute the beat's visible action during this shot; do not hold the opening pose when an action is specified. If that action cannot be completed from the frame, keep the scene physically plausible rather than changing an object's material, shape or position abruptly.",
-    "The action must be visible on screen, not implied by a camera move, changing light, a dissolve, or a caption. Keep one coherent set of objects; never introduce ghosted duplicates or invented equipment.",
-    "Make the scene visibly develop through subject action and natural environmental movement; maintain identity, geometry, lighting and visual continuity with the opening frame.",
-    "Use a motivated camera move only if it helps reveal the action. Avoid a generic digital zoom, static hold, warping, morphing and sudden scene changes.",
-    "Do not add text, logos, subtitles, graphics or invented products. The editor will add copy later.",
+  // Kling 2.5 rejects prompts over 2,500 characters after accepting the paid
+  // request. Reserve space for the action and start state instead of sending
+  // the entire editorial visual direction on every shot.
+  const bounded = (value: string | null | undefined, limit: number) => {
+    const clean = value?.trim() ?? "";
+    if (clean.length <= limit) return clean;
+    return clean.slice(0, limit).replace(/\s+\S*$/, "").trimEnd();
+  };
+  const sharedDirection = bounded(visualDirection, 450);
+  const prompt = [
+    `Shot ${position} of ${total}. Visible action to perform: ${bounded(beat, 380)}`,
+    openingState?.trim() ? `Frame-zero physical state: ${bounded(openingState, 400)}. Begin here, then perform the action visibly.` : "",
+    sharedDirection ? `Shared continuity: ${sharedDirection}` : "",
+    "Animate the supplied first frame as one continuous, realistic vertical shot. Execute the beat's visible action; do not hold the opening pose or replace the action with a camera move, changing light, dissolve or caption.",
+    "Preserve object count, shape, materials, geometry and lighting. No extra people or props, ghosted duplicates, text, logos, warping or digital zoom. The editor adds captions later.",
   ].filter(Boolean).join(" ");
+  if (prompt.length > 2_000) throw new Error("The directed shot prompt exceeded the safe Kling budget.");
+  return prompt;
 }
 
 function httpsUrl(value: string | undefined): string | null {
