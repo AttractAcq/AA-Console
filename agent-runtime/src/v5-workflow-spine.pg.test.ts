@@ -50,6 +50,9 @@ const blockedSiblingQaMigration = () => readFile(new URL(
 const motionLineageMigration = () => readFile(new URL(
   "../../supabase/migrations/20261015100000_210_v5_motion_followup_lineage.sql", import.meta.url,
 ), "utf8");
+const recentIdeaMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261015110000_211_v5_recent_idea_diversity.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -107,7 +110,7 @@ beforeAll(async () => {
     create table content_slots (id uuid primary key, client_id uuid);
     create table client_agent_records (id uuid primary key, client_id uuid not null, job_id uuid, body text);
     create table client_ideas (id uuid primary key, client_id uuid not null, job_id uuid, title text,
-      body text, created_at timestamptz default now(),
+      body text, status text not null default 'draft', created_at timestamptz default now(),
       campaign_id uuid, pillar_id uuid, target_platform post_platform,
       content_format content_format, media_type media_type,
       source_question text, strategic_reason text);
@@ -196,6 +199,7 @@ beforeAll(async () => {
   await db.exec(await higgsfieldRecoveryMigration());
   await db.exec(await blockedSiblingQaMigration());
   await db.exec(await motionLineageMigration());
+  await db.exec(await recentIdeaMigration());
 });
 
 beforeEach(async () => {
@@ -1099,5 +1103,30 @@ describe("v5 workflow spine", () => {
     await db.exec("select set_config('request.jwt.claim.role', 'authenticated', false)");
     await expect(one(`select capture_ideation_learning_context('${job.id}')`))
       .rejects.toThrow(/service role/);
+  });
+
+  it("freezes recent accepted angles across days before generating a new idea", async () => {
+    const prior = "00000000-0000-4000-8000-000000000031";
+    const rejected = "00000000-0000-4000-8000-000000000032";
+    await db.exec(`insert into client_ideas
+      (id, client_id, title, body, status, source_question, created_at) values
+      ('${prior}', '${CLIENT}', 'See the invoice before the campaign',
+       'Show the buyer a transparent invoice before any spend.', 'briefed',
+       'What am I paying for?', now() - interval '1 day'),
+      ('${rejected}', '${CLIENT}', 'Discarded guess', 'Do not include me', 'rejected',
+       null, now() - interval '1 day');`);
+    const job = await one<{ id: string }>(`insert into agent_jobs (agent_key, client_id)
+      values ('ideation', '${CLIENT}') returning id`);
+    const first = await service<{ capture_ideation_learning_context: {
+      recent_ideas: Array<{ id: string; title: string; core_idea: string }>;
+    } }>(`select capture_ideation_learning_context('${job.id}')`);
+    expect(first.capture_ideation_learning_context.recent_ideas).toEqual([
+      expect.objectContaining({ id: prior, title: 'See the invoice before the campaign' }),
+    ]);
+    await db.exec(`insert into client_ideas
+      (id, client_id, title, status, created_at) values
+      ('00000000-0000-4000-8000-000000000033', '${CLIENT}', 'Later accepted idea',
+       'approved', now() + interval '1 second');`);
+    expect(await service(`select capture_ideation_learning_context('${job.id}')`)).toEqual(first);
   });
 });

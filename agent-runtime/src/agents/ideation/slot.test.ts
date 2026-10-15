@@ -278,6 +278,29 @@ describe("ideation when a person asked for it", () => {
     expect(prompt).toContain("different buyer question, mechanism and conclusion");
   });
 
+  it("shows frozen cross-day angles without treating them as performance evidence", async () => {
+    modelReturns(1, "reel", "video");
+    const directed = { ...handJob, params: {
+      target_platform: "instagram", media_type: "video", content_format: "reel",
+      idea_count: 1, campaign_id: "campaign-1", pillar_id: "pillar-1",
+      v5_workflow_run_id: "run-2",
+    } } as AgentJobRow;
+    const { sb } = database();
+    (sb as unknown as { rpc: unknown }).rpc = vi.fn(async () => ({
+      data: { creative: [], runs: [], recent_ideas: [{
+        id: "prior-1", title: "See the report before paying",
+        core_idea: "Put the report on the desk before the campaign begins.",
+        source_question: "What will I receive?",
+      }] }, error: null,
+    }));
+    const result = await runIdeationJob(sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(true);
+    const prompt = (model.mock.calls[0]![0] as { prompt: string }).prompt;
+    expect(prompt).toContain("RECENT ACCEPTED CLIENT IDEAS");
+    expect(prompt).toContain("See the report before paying");
+    expect(prompt).toContain("materially different angle");
+  });
+
   it("keeps a requested video reel and destination on every idea", async () => {
     modelReturns(25, "reel", "video");
     const directed = { ...handJob, params: {
