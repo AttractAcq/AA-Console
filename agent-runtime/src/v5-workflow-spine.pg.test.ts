@@ -44,6 +44,9 @@ const reelSourceRebuildMigration = () => readFile(new URL(
 const higgsfieldRecoveryMigration = () => readFile(new URL(
   "../../supabase/migrations/20261014190000_208_v5_higgsfield_submit_recovery.sql", import.meta.url,
 ), "utf8");
+const blockedSiblingQaMigration = () => readFile(new URL(
+  "../../supabase/migrations/20261015090000_209_v5_blocked_daily_sibling_qa.sql", import.meta.url,
+), "utf8");
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -186,6 +189,7 @@ beforeAll(async () => {
   await db.exec(await videoCreativeRecoveryMigration());
   await db.exec(await reelSourceRebuildMigration());
   await db.exec(await higgsfieldRecoveryMigration());
+  await db.exec(await blockedSiblingQaMigration());
 });
 
 beforeEach(async () => {
@@ -382,6 +386,54 @@ describe("v5 workflow spine", () => {
       .toBe("failed");
     await expect(service(`select id from retry_partial_higgsfield_motion_step('${motion.id}')`))
       .rejects.toThrow(/not eligible/);
+  });
+  it("accepts finished static siblings while the reel remains blocked", async () => {
+    const briefA = "33333333-3333-4333-8333-333333333339";
+    const briefB = "33333333-3333-4333-8333-333333333340";
+    const assetA = "44444444-4444-4444-8444-444444444459";
+    const assetB = "44444444-4444-4444-8444-444444444460";
+    await db.exec(`insert into client_briefs (id,client_id,body,content_format,media_type)
+      values ('${briefA}','${CLIENT}','Static A brief','single','image'),
+        ('${briefB}','${CLIENT}','Static B brief','single','image')`);
+    const run = await makeRun("blocked-sibling-qa");
+    const reel = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','reel_motion','{}','video_build','client_briefs','${OUTPUT}')`);
+    const staticA = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','static_a_create','{}','creative_build','client_briefs','${briefA}')`);
+    const staticB = await service<{ id: string }>(`select id from add_workflow_agent_step(
+      '${run.id}','static_b_create','{}','creative_build','client_briefs','${briefB}')`);
+    await seal(run.id);
+    await service("select * from reconcile_workflow_runs()");
+    await db.exec(`insert into client_media_assets
+      (id,client_id,brief_id,storage_path,content_format,media_type)
+      values ('${assetA}','${CLIENT}','${briefA}','static-a.png','single','image'),
+        ('${assetB}','${CLIENT}','${briefB}','static-b.png','single','image');
+      update agent_jobs set status='completed' where id in (
+        select job_id from workflow_steps where id in ('${staticA.id}','${staticB.id}'));
+      update agent_jobs set status='failed',terminal=true,error='Higgsfield returned 403.'
+        where id=(select job_id from workflow_steps where id='${reel.id}')`);
+    await service("select * from reconcile_workflow_runs()");
+    expect((await one<{ status: string }>(`select status from workflow_runs where id='${run.id}'`)).status)
+      .toBe("blocked");
+    await db.exec("select set_config('request.jwt.claim.role', 'authenticated', false)");
+    await expect(db.query("select settle_completed_blocked_daily_siblings()"))
+      .rejects.toThrow(/service role required/);
+    expect((await service<{ settled: number }>(
+      "select settle_completed_blocked_daily_siblings() as settled")).settled).toBe(2);
+    const rows = await db.query<{ step_key: string; status: string }>(`
+      select step_key,status from workflow_steps where run_id='${run.id}' order by step_key`);
+    expect(rows.rows).toEqual([
+      { step_key: "reel_motion", status: "blocked" },
+      { step_key: "static_a_create", status: "completed" },
+      { step_key: "static_b_create", status: "completed" },
+    ]);
+    const state = await one<{ status: string; blocker: string }>(`
+      select status,blocker from workflow_runs where id='${run.id}'`);
+    expect(state).toEqual({ status: "blocked", blocker: "Higgsfield returned 403." });
+    expect((await one<{ count: number }>(`select count(*) from workflow_artifacts
+      where run_id='${run.id}'`)).count).toBe(2);
+    expect((await service<{ settled: number }>(
+      "select settle_completed_blocked_daily_siblings() as settled")).settled).toBe(0);
   });
   it("re-edits one rejected reel from the existing asset and keeps candidate history", async () => {
     const assetId = "44444444-4444-4444-8444-444444444448";

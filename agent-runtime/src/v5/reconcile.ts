@@ -39,6 +39,13 @@ export function startWorkflowReconciler(sb: SupabaseClient, config: RuntimeConfi
         if (qa && (qa.steps_accepted || qa.steps_blocked)) {
           logger.info("v5_daily_internal_qa", qa);
         }
+        const { data: siblings, error: siblingError } = await sb.rpc(
+          "settle_completed_blocked_daily_siblings", { p_limit: 5 },
+        );
+        if (siblingError) throw new Error(siblingError.message);
+        if (typeof siblings === "number" && siblings > 0) {
+          logger.info("v5_blocked_daily_siblings_accepted", { count: siblings });
+        }
         const { data: rebuilt, error: rebuildError } = await sb.rpc("auto_rebuild_rejected_reel_sources", { p_limit: 3 });
         if (rebuildError) throw new Error(rebuildError.message);
         if (typeof rebuilt === "number" && rebuilt > 0) {
