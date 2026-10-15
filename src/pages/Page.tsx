@@ -17,6 +17,7 @@ import { ProofIntelligencePanel } from "./intelligence/ProofIntelligencePanel";
 import { CompetitorsPanel } from "./intelligence/CompetitorsPanel";
 import { BrandingAssociationsPanel } from "./intelligence/BrandingAssociationsPanel";
 import { CampaignIntelligencePanel } from "./intelligence/CampaignIntelligencePanel";
+import { CampaignInputsPanel } from "./intelligence/CampaignInputsPanel";
 import { BrandingStrategyPanel } from "./strategy/BrandingStrategyPanel";
 import { ContentPillarsPanel } from "./strategy/ContentPillarsPanel";
 import { OfferStrategyPanel } from "./strategy/OfferStrategyPanel";
@@ -83,6 +84,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     competitors: () => <CompetitorsPanel />,
     "branding-associations": () => <BrandingAssociationsPanel />,
     "campaign-intelligence": () => <CampaignIntelligencePanel />,
+    "campaign-inputs": () => <CampaignInputsPanel />,
     "proof-intelligence": () => <ProofIntelligencePanel />,
     "branding-strategy": () => <BrandingStrategyPanel />,
     "content-pillars": () => <ContentPillarsPanel />,

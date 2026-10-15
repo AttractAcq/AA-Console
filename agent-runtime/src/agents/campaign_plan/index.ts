@@ -18,7 +18,7 @@ import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js";
-import type { BusinessContext } from "../shared.js";
+import type { BusinessContext, UpstreamRecord } from "../shared.js";
 import {
   campaignIdeas,
   asAmount,
@@ -178,16 +178,45 @@ export async function runCampaignPlanJob(
     .maybeSingle();
   const clientName = (clientRow?.name as string | undefined) ?? "this business";
 
-  const [{ data: context }, records] = await Promise.all([
-    sb
-      .from("client_business_context")
-      .select(
-        "business_overview, ideal_customer, main_offer, competitors, brand_voice, proof_testimonials, current_marketing, sales_process, current_revenue, target_revenue",
-      )
-      .eq("client_id", job.client_id)
-      .maybeSingle(),
-    loadUpstreamRecords(sb, job.client_id, ["offer_strategy", "icp", "brand_strategy", "money_model"]),
-  ]);
+  const isV6 = campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "paid";
+  let context: BusinessContext | null;
+  let records: UpstreamRecord[];
+  let pillars: Array<{ id: string; name: string; premise: string; belongs: string; does_not_belong: string }>;
+  let planningBrief = campaign.brief;
+  let intelligenceSnapshotId: string | null = null;
+  if (isV6) {
+    const { data, error } = await sb.rpc("capture_campaign_intelligence_snapshot_v6", {
+      p_campaign_id: campaign.id,
+      p_job_id: job.id,
+    });
+    if (error) throw new Error(`Failed to capture campaign intelligence: ${error.message}`);
+    const snapshot = data as {
+      id: string; brief: string; business_context: BusinessContext;
+      source_records: UpstreamRecord[];
+      content_pillars: Array<{ id: string; name: string; premise: string; belongs: string; does_not_belong: string }>;
+    };
+    intelligenceSnapshotId = snapshot.id;
+    planningBrief = snapshot.brief;
+    context = snapshot.business_context;
+    records = snapshot.source_records;
+    pillars = snapshot.content_pillars;
+  } else {
+    const [{ data }, upstream] = await Promise.all([
+      sb.from("client_business_context")
+        .select("business_overview, ideal_customer, main_offer, competitors, brand_voice, proof_testimonials, current_marketing, sales_process, current_revenue, target_revenue")
+        .eq("client_id", job.client_id).maybeSingle(),
+      loadUpstreamRecords(sb, job.client_id, ["offer_strategy", "icp", "brand_strategy", "money_model"]),
+    ]);
+    context = data as BusinessContext | null;
+    records = upstream;
+    const { data: pillarRows } = await sb.from("campaign_content_pillars")
+      .select("pillar_id, client_content_pillars(id, name, premise, belongs, does_not_belong)")
+      .eq("campaign_id", campaign.id);
+    pillars = (pillarRows ?? [])
+      .map((r) => (r as { client_content_pillars?: unknown }).client_content_pillars)
+      .filter((p): p is { id: string; name: string; premise: string; belongs: string; does_not_belong: string } =>
+        Boolean(p) && typeof p === "object");
+  }
 
   const offer = records.filter((r) => r.domain === "offer_strategy");
   if (offer.length === 0) {
@@ -209,16 +238,6 @@ export async function runCampaignPlanJob(
   // The pillars this campaign runs within, if any. They become an enum on
   // the submit tool, so a piece cannot be filed under a pillar the campaign
   // is not running.
-  const { data: pillarRows } = await sb
-    .from("campaign_content_pillars")
-    .select("pillar_id, client_content_pillars(id, name, premise, belongs, does_not_belong)")
-    .eq("campaign_id", campaign.id);
-  const pillars = (pillarRows ?? [])
-    .map((r) => (r as { client_content_pillars?: unknown }).client_content_pillars)
-    .filter((p): p is { id: string; name: string; premise: string; belongs: string; does_not_belong: string } =>
-      Boolean(p) && typeof p === "object",
-    );
-
   const includeIdeas = campaign.built_at != null || campaign.ideate_on_plan !== false;
   const submitTool = submitToolFor(pillars, includeIdeas);
   const routeInstruction = campaign.acquisition_mode === "organic"
@@ -252,7 +271,7 @@ ABSOLUTE RULES
   const prompt = `Plan a campaign for ${clientName}.
 
 WHAT THIS CAMPAIGN IS FOR — the operator's brief
-${campaign.brief}
+${planningBrief}
 
 CAMPAIGN ROUTE — fixed by the operator; do not change it
 ${routeInstruction}
@@ -279,6 +298,9 @@ ${renderUpstream(icp)}
 
 BRAND STRATEGY AND MONEY MODEL
 ${renderUpstream(records.filter((r) => r.domain === "brand_strategy" || r.domain === "money_model"))}
+
+${isV6 ? `MARKET, COMPETITORS, ASSOCIATIONS AND CAMPAIGN INTELLIGENCE
+${renderUpstream(records.filter((r) => ["market", "competitor", "association", "campaign_intel"].includes(r.domain)))}` : ""}
 
 Call ${submitTool.name} once when you are done.`;
 
@@ -388,13 +410,21 @@ Call ${submitTool.name} once when you are done.`;
     if (error) throw new Error(`Failed to write campaign plan: ${error.message}`);
   }
 
-  if (campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "paid") {
-    const { error } = await sb.rpc("create_campaign_manifest_v6", {
+  if (isV6) {
+    const { data: manifest, error } = await sb.rpc("create_campaign_manifest_v6", {
       p_campaign_id: campaign.id,
       p_idempotency_key: `campaign-plan:${job.id}`,
       p_needs_lead_magnet: false,
     });
     if (error) throw new Error(`Failed to version v6 campaign package: ${error.message}`);
+    if (!intelligenceSnapshotId || !manifest?.id) {
+      throw new Error("The v6 campaign package has no intelligence snapshot link.");
+    }
+    const { error: linkError } = await sb.rpc("attach_campaign_manifest_intelligence_v6", {
+      p_manifest_id: manifest.id,
+      p_snapshot_id: intelligenceSnapshotId,
+    });
+    if (linkError) throw new Error(`Failed to link v6 campaign intelligence: ${linkError.message}`);
   }
 
   await appendEvent(sb, job.id, `Planned "${campaign.name}".\n\n${planSummary(plan)}`, "info", {

@@ -594,6 +594,54 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_intelligence_snapshots: {
+        Row: {
+          id: string
+          client_id: string
+          campaign_id: string
+          planner_job_id: string
+          brief: string
+          acquisition_mode: string
+          paid_platform: string | null
+          business_context: Json
+          source_records: Json
+          content_pillars: Json
+          missing_domains: string[]
+          snapshot_hash: string
+          captured_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          campaign_id: string
+          planner_job_id: string
+          brief: string
+          acquisition_mode: string
+          paid_platform?: string | null
+          business_context: Json
+          source_records: Json
+          content_pillars: Json
+          missing_domains?: string[]
+          snapshot_hash: string
+          captured_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          campaign_id?: string
+          planner_job_id?: string
+          brief?: string
+          acquisition_mode?: string
+          paid_platform?: string | null
+          business_context?: Json
+          source_records?: Json
+          content_pillars?: Json
+          missing_domains?: string[]
+          snapshot_hash?: string
+          captured_at?: string
+        }
+        Relationships: []
+      }
       campaign_artifacts: {
         Row: {
           asset_id: string | null

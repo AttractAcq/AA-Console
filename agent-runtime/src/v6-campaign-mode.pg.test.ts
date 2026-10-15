@@ -38,6 +38,21 @@ beforeAll(async () => {
     create table agent_jobs (
       id uuid primary key, agent_key text, input_table text, input_id uuid, status text
     );
+    create table client_business_context (
+      client_id uuid primary key, business_overview text, ideal_customer text,
+      main_offer text, competitors text, brand_voice text, proof_testimonials text,
+      current_marketing text, sales_process text, current_revenue text,
+      target_revenue text, updated_at timestamptz default now()
+    );
+    create table client_agent_records (
+      id uuid primary key default gen_random_uuid(), client_id uuid not null,
+      domain text not null, item_key text not null, title text not null,
+      body text, updated_at timestamptz default now(), display_order integer default 0
+    );
+    create table client_content_pillars (
+      id uuid primary key, name text, premise text, belongs text, does_not_belong text
+    );
+    create table campaign_content_pillars (campaign_id uuid, pillar_id uuid);
     create function enqueue_agent_job_internal(text, uuid, text, uuid, uuid, jsonb, text)
     returns uuid language sql as $$ select gen_random_uuid() $$;
   `);
@@ -103,6 +118,8 @@ beforeAll(async () => {
   `);
   const approvalsMigration = await readFile(new URL("../../supabase/migrations/20261015230000_206_v6_action_approvals.sql", import.meta.url), "utf8");
   await db.exec(approvalsMigration);
+  const intelligenceMigration = await readFile(new URL("../../supabase/migrations/20261016000000_207_v6_intelligence_snapshot.sql", import.meta.url), "utf8");
+  await db.exec(intelligenceMigration);
   await db.exec(`
     insert into clients(id) values ('${clientA}'), ('${clientB}');
     insert into client_campaigns(id,client_id,name,brief,meta_campaign_id,approved_at)
@@ -313,4 +330,54 @@ it("binds a human decision to an exact v6 action and rejects stale or mismatched
     await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
   }
   expect(plan_hash).toMatch(/^[0-9a-f]{32}$/);
+});
+
+it("reuses the exact intelligence input on a planner retry and links it to the package", async () => {
+  const campaign = await db.query<{ id: string }>(`
+    insert into client_campaigns (
+      client_id,name,brief,acquisition_mode,built_at,objective,audience,needs_landing_page
+    ) values ($1,'Research campaign','Initial brief','organic',now(),
+      'More bookings','Local buyers',false) returning id`, [clientA]);
+  const campaignId = campaign.rows[0]!.id;
+  const jobId = "66666666-6666-4666-8666-666666666666";
+  const nextJobId = "77777777-7777-4777-8777-777777777777";
+  await db.query("insert into agent_jobs(id,agent_key,input_table,input_id,status) values ($1,'campaign_plan','client_campaigns',$2,'running'),($3,'campaign_plan','client_campaigns',$2,'running')",
+    [jobId, campaignId, nextJobId]);
+  await db.query("insert into client_business_context(client_id,business_overview) values ($1,'Service business') on conflict(client_id) do update set business_overview=excluded.business_overview",
+    [clientA]);
+  const record = await db.query<{ id: string }>(`
+    insert into client_agent_records(client_id,domain,item_key,title,body)
+    values ($1,'offer_strategy','offer','Offer','An evidence-backed service') returning id`, [clientA]);
+  const first = await db.query<{ snapshot: { id: string; snapshot_hash: string;
+    source_records: Array<{ id: string; body: string; updated_at: string }>;
+    missing_domains: string[] } }>(
+    "select to_jsonb(capture_campaign_intelligence_snapshot_v6($1,$2)) as snapshot",
+    [campaignId, jobId]);
+  const original = first.rows[0]!.snapshot;
+  expect(original.source_records).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: record.rows[0]!.id, body: "An evidence-backed service" }),
+  ]));
+  expect(original.missing_domains).toContain("icp");
+  await db.query("update client_agent_records set body='Changed offer',updated_at=now() where id=$1",
+    [record.rows[0]!.id]);
+  const replay = await db.query<{ snapshot: { id: string; snapshot_hash: string; source_records: Array<{ body: string }> } }>(
+    "select to_jsonb(capture_campaign_intelligence_snapshot_v6($1,$2)) as snapshot",
+    [campaignId, jobId]);
+  expect(replay.rows[0]!.snapshot.id).toBe(original.id);
+  expect(replay.rows[0]!.snapshot.snapshot_hash).toBe(original.snapshot_hash);
+  expect(replay.rows[0]!.snapshot.source_records[0]!.body).toBe("An evidence-backed service");
+  const fresh = await db.query<{ snapshot: { id: string; snapshot_hash: string } }>(
+    "select to_jsonb(capture_campaign_intelligence_snapshot_v6($1,$2)) as snapshot",
+    [campaignId, nextJobId]);
+  expect(fresh.rows[0]!.snapshot.snapshot_hash).not.toBe(original.snapshot_hash);
+  const manifest = await db.query<{ manifest: { id: string } }>(
+    "select to_jsonb(create_campaign_manifest_v6($1,$2,$3)) as manifest",
+    [campaignId, "research-package", false]);
+  await db.query("select attach_campaign_manifest_intelligence_v6($1,$2)",
+    [manifest.rows[0]!.manifest.id, original.id]);
+  await db.query("select attach_campaign_manifest_intelligence_v6($1,$2)",
+    [manifest.rows[0]!.manifest.id, original.id]);
+  await expect(db.query("select attach_campaign_manifest_intelligence_v6($1,$2)",
+    [manifest.rows[0]!.manifest.id, fresh.rows[0]!.snapshot.id]))
+    .rejects.toThrow(/already uses another/);
 });

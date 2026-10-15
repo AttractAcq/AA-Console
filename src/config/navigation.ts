@@ -364,6 +364,7 @@ export const v6ModuleNodes: NavNode[] = [
       { id: "icp", label: "ICP" }, { id: "competitors", label: "Competitors" },
       { id: "branding-associations", label: "Branding & Associations" },
       { id: "campaign-intelligence", label: "Campaign Intelligence" },
+      { id: "campaign-inputs", label: "Campaign Inputs" },
       { id: "proof-intelligence", label: "Proof Intelligence" },
       { id: "branding-strategy", label: "Branding Strategy" },
       { id: "content-pillars", label: "Content Pillars" },
