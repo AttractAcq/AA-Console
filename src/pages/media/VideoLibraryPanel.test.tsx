@@ -41,7 +41,7 @@ describe("reels in the video library", () => {
     expect(await screen.findByText(/1 source video is in Edit \/ Repurpose/)).toBeInTheDocument();
     expect(screen.queryByText(/in Create \/ Edit/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Open editing work" }));
-    expect(navigate).toHaveBeenCalledWith("/clients/client-1/delivery/edit-repurpose?tab=overview");
+    expect(navigate).toHaveBeenCalledWith("/clients/client-1/delivery/content-production-factory?tab=edit");
   });
   it("links an unfinished reel to its production view", async () => {
     show([{ id: "r1", title: "Idea", render_path: null, review_status: "pending", brief_id: "b1" }]);

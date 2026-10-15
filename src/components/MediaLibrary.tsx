@@ -148,10 +148,10 @@ export function MediaLibrary({
                 asset.edit_stage === "edited" ? (
                   <span className="text-xs text-muted-foreground">Source footage preserved</span>
                 ) : asset.edit_stage && asset.edit_stage !== "review_ready" ? (
-                  <Link to={`/clients/${clientId}/delivery/edit-repurpose?tab=overview${asset.brief_id ? `&brief=${encodeURIComponent(asset.brief_id)}` : ""}`}
+                  <Link to={`/clients/${clientId}/delivery/content-production-factory?tab=edit${asset.brief_id ? `&brief=${encodeURIComponent(asset.brief_id)}` : ""}`}
                     className="text-xs font-medium text-brand-strong hover:underline">Edit before approval</Link>
                 ) : asset.media_type === "video" && !asset.human_approved_at && asset.review_status !== "rejected" ? (
-                  <Link to={`/clients/${clientId}/delivery/approvals?tab=assets`}
+                  <Link to={`/clients/${clientId}/delivery/approval-inbox?tab=assets`}
                     className="text-xs font-medium text-brand-strong hover:underline">
                     Review sign-offs in Approvals
                   </Link>

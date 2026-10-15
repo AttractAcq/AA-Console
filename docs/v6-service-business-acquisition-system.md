@@ -1,0 +1,82 @@
+# AA Console v6 — Service Business Acquisition System
+
+Status: approved product direction; implementation ledger starts below. Updated 15 October 2026.
+
+## Goal and immutable decisions
+
+AA Console is the per-client operating system for acquisition by **any service business**. A campaign coordinates intelligence, an offer, genuine proof, creative, conversion assets, channel activation, sales and attributable outcomes. Existing v5 content production remains usable in full; it becomes one factory in the larger system.
+
+1. Every operational campaign has exactly one mode: **organic** or **paid**. To reuse a successful idea in the other mode, clone it as a separately identified campaign with lineage, independent assets, approvals, activation and results. A paid campaign then selects its paid platform; asset format never silently selects the route.
+2. Internal research, production, revision, testing and QA may run automatically. **Every external action requires human approval of the exact version, destination and scope.** Internal QA is necessary but is not human approval. Publishing, deploying a page or sales agent, sending lead communication, creating external ad objects, activating spend and changing budgets are external actions.
+3. Every one of the fifteen named modules is its own first-class client Delivery page, in the order in the next section. Dashboard, cross-module Approval Inbox, Motion Design and Archive are additional visible utility pages. Media libraries are prominent in Content Production Factory. Account and agency/employee/client consoles remain accessible.
+4. Proof source, evidence, permission and expiry follow every derivative. A proof artifact distributes through Proof Distribution. A reel, image or ad derived from proof also appears in Content Distribution or the relevant Ads Studio, carrying lineage to the original proof.
+5. All pages are visible early, but an unimplemented capability must say **Planned** and name its dependency. A rendered placeholder or a filled checklist is never evidence that an API action, conversion or attribution actually works.
+
+## Delivery information architecture and source audit
+
+The canonical Delivery sidebar has Dashboard and Approval Inbox utilities, the following **fifteen module pages in this exact order**, then Motion Design and Archive utilities. Each module may have tabs and detail views. Existing deep links remain routable during migration and should point to or render the same functional component while new links move to its v6 home.
+
+| # | New Delivery page | Reused v5 surfaces and capabilities | Verified gap / first v6 outcome |
+|---|---|---|---|
+| 1 | Intelligence OS | Intelligence tabs; Business Context, Market, ICP, Competitors, Brand Associations, Campaign Intelligence, Proof Intelligence; Branding Strategy, Content Pillars and Money Model Strategy. | One versioned intelligence snapshot for the campaign, with opportunity and outcome feedback. Preserve PDF/ZIP export. |
+| 2 | Campaign Factory | Campaign Execution, campaign content links, templates, planner, provision, readiness, v5 launch package and workflow spine. | Exclusive mode, clone lineage, full acquisition manifest and honest readiness. Operational `client_campaigns` is canonical; legacy `campaigns` is a spend tracker. |
+| 3 | Proof Production Factory | Proof Bank, structured evidence, discovery, rights, expiry and proof idea links. | Direct capture/import of genuine reviews and other proof, source-linked GEO/SEO derivatives and channel-specific clearance. |
+| 4 | Content Production Factory | Ideation and Briefs; Create; Edit/Repurpose; asset and engine review context; image, video, reel-shot, copy, story and carousel libraries. | Campaign-led production, preserved v5 stage flow, premium video QA and complete asset-version lineage. The standalone Motion Design utility remains visible. |
+| 5 | Proof Distribution | No dedicated page or workflow. Reuse publisher primitives only where a destination is actually supported. | Destination-specific proof packages, approval, publication record and external ID. Do not claim Google Profile publication from the current Instagram/Facebook adapter. |
+| 6 | Content Distribution | Distribution Assets, Organic, Engine and scheduling; Instagram/Facebook publisher. | Organic-mode routing from campaign, exact approved asset/version and delivery evidence. Existing Paid board remains visible in Meta Ads Studio until paid routing is migrated. |
+| 7 | Google Ads Studio | No production Google Ads builder found. Google is only a selectable integration provider today. | Search campaign planning, account connection, reviewable build, approved deployment, measurement and bounded optimization. |
+| 8 | Meta Ads Studio | Meta Build, paused campaign/ad objects, ad copy, Paid distribution board, paid reporting and Meta integration. | Full paid-campaign studio and optimization loop. A paused external object is still an external write and must meet v6 approval policy. |
+| 9 | Google Profile | No Google Business Profile management adapter found. | Profile details, reviews, approved updates, proof posts and observed performance. |
+| 10 | Meta Profile | Instagram/Facebook publishing, Instagram organic metrics and existing Meta account context. | Profile management and channel state; distinguish profile presence from campaign distribution. |
+| 11 | Offer Studio | Offer Strategy and campaign `offer_summary`; offer-page context. | Versioned, service-specific offer record with claims, economics, approval and campaign association. |
+| 12 | Website Studio | Page Builder for landing and offer pages; account-level Sites overview/settings; page audit, revision and publish capabilities; page reporting. | Campaign page versions, conversion-path probe, approval-before-publication and source propagation to Sales OS. Account-level hosting configuration stays in Account. |
+| 13 | Lead Magnet Studio | No dedicated entity/page/workflow found. | Versioned magnet, delivery/fulfilment, consent, campaign and page links, capture measurement. |
+| 14 | Sales OS | Prospects & Leads pipeline, lead events, appointments, sale/cash fields, Sales Agents and their existing role definitions. | Observable capture → qualify → nurture → book → sell journey, governed outbound actions and campaign source continuity. |
+| 15 | Attribution OS | Reporting (organic, paid, pages, attribution, commentary), Economics, metrics ingestion and v5 observed/estimated/unknown links. | Join operational campaign to legacy spend identity, channel IDs, lead and cash; surface coverage and uncertainty; feed evidence to Intelligence OS. |
+
+**Visible utilities and retained non-Delivery surfaces:** Dashboard remains the client overview. Approval Inbox includes existing Engine and Assets queues and grows to all external-action requests. Motion Design remains its own page and creation mode. Archive retains content, pages, campaigns and sales agents. Account retains Onboarding, Sites configuration, Contact/Identity, Brand/Design, Integrations/Credentials, Contracts, Billing and Audit Log. Agency Operations, Team, Admin, the client-facing dashboard and employee views are not removed by the Delivery restructure.
+
+**Legacy route preservation map:** `/delivery/intelligence` and `/delivery/strategy` → Intelligence OS except Offer Strategy → Offer Studio; `/delivery/campaign-execution` → Campaign Factory; `/delivery/proof-bank` → Proof Production Factory; `/delivery/ideation`, `/delivery/create`, `/delivery/edit-repurpose`, `/delivery/media` → Content Production Factory; `/delivery/approvals` → Approval Inbox; `/delivery/distribution` Organic/Assets/Engine → Content Distribution, Paid → Meta Ads Studio; `/delivery/reporting` and `/delivery/economics` → Attribution OS with relevant paid/organic and page views also accessible from their operating modules; `/delivery/conversion` → Website Studio; `/delivery/sales` and `/delivery/prospects-leads` → Sales OS; `/delivery/motion-design`, `/delivery/archive`, `/delivery/dashboard` remain visible utilities. Retain old paths until every internal link, bookmark and test has a working v6 destination. The campaign detail route retains its campaign ID.
+
+## Shared contracts before individual studios
+
+**Campaign:** extend `client_campaigns`, without replacing historical rows, with explicit mode and `cloned_from_campaign_id`; maintain platform choice separately for paid campaigns. A clone copies editable strategic inputs, never performance, external IDs or approvals. Pre-v6 mixed campaigns require an explicit legacy state and a human choice on edit/clone; do not guess a mode from `channels`, `template` or assets. Existing `campaign_artifacts` has typed links only for content, page, agent and post; add typed relationships for offer, proof, magnet and activation as their modules arrive. Do not use unchecked prose or unverified polymorphic IDs as readiness evidence.
+
+**Campaign package:** reuse `workflow_runs`, `workflow_steps`, `workflow_artifacts` and `client_launch_packages` as durable orchestration foundations. One campaign manifest names required deliverables, dependency order, exact versions, internal QA, approval and external outcome. A module can advance only its own validated step. Separate `draft`, `internally_ready`, `awaiting_human_approval`, `approved`, `activating`, `live`, `blocked` and `failed` semantics; current campaign `live` is not proof of live Meta/Google spend or a tested conversion path.
+
+**Approval and activation:** one version-bound, scoped request identifies actor, client, campaign, destination, action, artifact hash/version and any spending limit. Approval cannot be reused for changed copy, creative, page, audience or budget. An idempotent executor records the external ID and outcome. Existing content/video approval rules and platform kill switches stay in force during migration. Every external adapter must fail closed when approval or credentials are missing.
+
+**Proof and conversion:** retain `client_proof_assets` rights default `not_cleared`, source URL/evidence, and expiry. Derivatives store a link to source proof plus what claim was made. Page and magnet capture must persist consent and campaign/source identifiers on the lead. `client_leads` remains the Sales OS primary record; existing lead events, appointments and cash are preserved.
+
+**Attribution:** preserve the older `campaigns` table and its financial/reporting dependencies. It represents ad spend, while `client_campaigns` represents the operational plan. Add an explicit bridge to Meta/Google external campaign IDs and lead sources; migrate reports only with reconciliation tests. Report observed, estimated and unknown separately, and never infer a commercial win from a publication or model narrative.
+
+## Structured build process
+
+Each slice follows: inventory existing behavior → define data/API contract and approval boundary → implement one module and its visible page → migrate links without removing old route → test permissions, idempotency and realistic failure → review live evidence → record outcome here. Use one module per focused PR where possible. All fifteen pages appear in the first UI slice with honest capability states; a page can reuse real v5 functionality before its new backend is complete.
+
+| Slice | Build | Acceptance gate |
+|---|---|---|
+| 0. Preservation and UI spine | This inventory; fifteen module pages and four utilities; existing panels placed in their new homes; old routes and content-stage links preserved. | Navigation and deep-link tests prove every v5 Delivery feature is reachable and the planned modules do not pretend to work. |
+| 1. Campaign Factory | Exclusive mode, clone lineage, campaign manifest and dependency graph. | A paid and an organic campaign each plan the correct channel route; cloning retains lineage but cannot copy approvals or results. Existing campaigns remain readable. |
+| 2. Intelligence OS | Versioned campaign-context snapshot and opportunity inputs. | Every campaign plan can show the exact client research it used, missing facts and source dates. |
+| 3. Offer Studio | Versioned offer and campaign association. | Offer claims and economics are reviewable; campaign/page/agent use the same approved version. |
+| 4. Proof Production Factory | Capture, rights, derivative generation and GEO/SEO artifact review. | Each output traces to genuine evidence and is withheld from external use unless rights and claim QA pass. |
+| 5. Content Production Factory | Campaign-led v5 creative flow and video quality repair. | All existing formats and motion design links remain usable; generated reel passes full-cut creative QA before approval. |
+| 6. Website Studio | Campaign destination, site/page version and trusted form/routing/consent/event probe. | A real test submission becomes a correctly sourced lead; approval binds the exact page before publication. |
+| 7. Lead Magnet Studio | Magnet creation, fulfilment and capture. | Delivery and consent are verified and linked to the campaign and lead. |
+| 8. Sales OS | Lead journey, sales agent configuration, human handoff and outcome record. | A test lead can be qualified, nurtured, booked and marked sold with source and event history; external messages are gated. |
+| 9. Content Distribution | Organic scheduling/publishing under campaign mode. | Exact approved content reaches an actual supported account with recorded result; failures are visible. |
+| 10. Meta Profile | Account/profile operations beyond post publication. | Profile state and approved changes are observed, not asserted from setup fields. |
+| 11. Proof Distribution | Proof-first channel packages; route to Meta/Google profile where implemented. | External proof record links back to cleared source, exact artifact and approval. |
+| 12. Google Profile | Business Profile connection, reviews, updates and proof presence. | Real account test proves read and approved write paths with external IDs. |
+| 13. Meta Ads Studio | Bring existing paused Meta build under v6 approval, then add optimization. | Paid-mode campaign can be built, approved, activated and measured without conflating internal readiness and spend. |
+| 14. Google Ads Studio | Search campaign builder, deployment and optimization. | Real account test proves approved activation, spend control and outcome ingestion. |
+| 15. Attribution OS | Final cross-channel reporting and evidence-fed learning. | Campaign → proof/creative → destination → lead → booked call → sale/cash is traceable where evidence exists; missing links remain unknown. |
+
+Attribution identifiers and approval enforcement begin in slice 1 and are added to every later slice; slice 15 completes the reporting and learning experience. External account availability may reorder individual integration slices, but must not weaken the gates. No module is declared complete solely because its page, database table, prompt or mocked test exists.
+
+## Implementation ledger
+
+- 15 October 2026: source audit and v6 product decisions captured. The v5 goal remains paused, not completed. V5 video generation/editing is technically connected but the latest live cuts failed creative QA. No v6 code or production migration has shipped at this checkpoint.
+- 15 October 2026: slice 0 implemented on `codex/v6-service-business-os`. The Delivery sidebar now exposes the fifteen module pages plus Dashboard, Approval Inbox, Motion Design and Archive. Existing v5 panels are routed into their v6 homes; old Delivery URLs and campaign detail URLs remain routable. Internal stage, campaign and approval links point to v6 homes. Four modules with no working adapter show a clear Planned state and dependency. Focused navigation, deep-link, export and planned-state tests pass. This is a source-branch implementation, not a deployed v6 capability.
+- Slice 1 audit: the current Campaign Factory form and campaign planner still permit organic and paid activity in one `client_campaigns` row, and the current `launch_campaign` status is not proof of external activation. The next PR must introduce an explicit mode and legacy migration behavior, enforce route compatibility in the planner and Meta build path, provide clone lineage without copying approvals/results, and test those contracts before any claim of completion.

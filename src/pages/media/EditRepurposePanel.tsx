@@ -342,7 +342,7 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false }: {
               {(ai.status === "completed" || restored?.output_asset_id) && <p className="text-xs text-brand-strong">
                 {ai.status === "completed" ? "Edited version" : "Previous cut"} is ready for owner and SMM approval.{" "}
                 <Link className="font-medium underline" to={employeeMode ? "/employee/video-approvals"
-                  : `/clients/${clientId}/delivery/approvals?tab=assets`}>
+                  : `/clients/${clientId}/delivery/approval-inbox?tab=assets`}>
                   Open approvals
                 </Link>
               </p>}

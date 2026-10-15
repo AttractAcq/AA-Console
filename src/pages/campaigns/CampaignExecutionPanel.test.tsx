@@ -155,8 +155,8 @@ describe("campaign pages", () => {
     useParams.mockReturnValue({ clientId: "client-1" });
     show([planned(), planned({ id: "camp-2", name: "Spring whitening" })]);
     expect(await screen.findAllByRole("heading", { level: 3 })).toHaveLength(2);
-    expect(screen.getByRole("link", { name: /Winter full-arch push/i })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-execution/camp-1");
-    expect(screen.getByRole("link", { name: /Spring whitening/i })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-execution/camp-2");
+    expect(screen.getByRole("link", { name: /Winter full-arch push/i })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-factory/camp-1");
+    expect(screen.getByRole("link", { name: /Spring whitening/i })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-factory/camp-2");
     expect(screen.queryByRole("button", { name: "Launch" })).not.toBeInTheDocument();
   });
 

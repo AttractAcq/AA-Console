@@ -352,7 +352,7 @@ export function CampaignExecutionPanel() {
         ? `Deleted "${campaign.name}", along with ${parts.join(", ")}.`
         : `Deleted "${campaign.name}".`,
     );
-    if (campaignId) navigate(`/clients/${clientId}/delivery/campaign-execution`);
+    if (campaignId) navigate(`/clients/${clientId}/delivery/campaign-factory`);
     else void refresh();
   };
 
@@ -362,7 +362,7 @@ export function CampaignExecutionPanel() {
     <div>
       <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
 
-      {campaignId && clientId && <Link to={`/clients/${clientId}/delivery/campaign-execution`} className="mb-4 inline-block text-sm text-brand-strong hover:underline">← All campaigns</Link>}
+      {campaignId && clientId && <Link to={`/clients/${clientId}/delivery/campaign-factory`} className="mb-4 inline-block text-sm text-brand-strong hover:underline">← All campaigns</Link>}
       {!campaignId && <div className="mb-4 flex justify-end">
         <Button icon={Plus} onClick={() => setNewOpen(true)}>
           New Campaign
@@ -398,7 +398,7 @@ export function CampaignExecutionPanel() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <h3 className="min-w-0 flex-1">
                   {campaignId ? <span className="flex w-full items-start gap-2 text-lg font-semibold text-card-foreground">{c.name}</span> : <Link
-                    to={`/clients/${clientId}/delivery/campaign-execution/${c.id}`}
+                    to={`/clients/${clientId}/delivery/campaign-factory/${c.id}`}
                     className="flex w-full items-start gap-2 rounded text-left text-sm font-semibold text-card-foreground hover:text-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <span className="min-w-0">
@@ -575,7 +575,7 @@ export function CampaignExecutionPanel() {
                     id={c.id}
                     archived={false}
                     noun="campaign"
-                    onDone={() => navigate(`/clients/${clientId}/delivery/campaign-execution`)}
+                    onDone={() => navigate(`/clients/${clientId}/delivery/campaign-factory`)}
                     onError={setProblem}
                   />
                   <button

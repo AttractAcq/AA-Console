@@ -62,7 +62,7 @@ describe("ReelShotGrid", () => {
       </MemoryRouter>
     );
     expect(screen.getByRole("link", { name: "Review sign-offs in Approvals" })).toHaveAttribute(
-      "href", "/clients/client-1/delivery/approvals?tab=assets",
+      "href", "/clients/client-1/delivery/approval-inbox?tab=assets",
     );
     expect(screen.getByText("MD-1 · Cut")).toBeInTheDocument();
     expect(screen.getByLabelText("Finished cut of How it works")).toHaveAttribute("src", "https://example.com/cut.mp4");

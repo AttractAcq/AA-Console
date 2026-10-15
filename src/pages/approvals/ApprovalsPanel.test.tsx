@@ -140,7 +140,7 @@ describe("ApprovalsPanel — review controls stay intact", () => {
     render(<MemoryRouter><ApprovalsPanel /></MemoryRouter>);
     await userEvent.setup().click(screen.getByRole("button", { name: "Video" }));
     expect(await screen.findByRole("link", { name: "Production history" })).toHaveAttribute(
-      "href", "/clients/client-1/delivery/media?tab=reel-shots&brief=brief-1",
+      "href", "/clients/client-1/delivery/content-production-factory?tab=reel-shots&brief=brief-1",
     );
   });
 });

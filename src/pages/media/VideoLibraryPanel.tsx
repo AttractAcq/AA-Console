@@ -58,7 +58,7 @@ export function VideoLibraryPanel() {
       {rawFootage.length > 0 && <p className="mb-4 text-sm text-muted-foreground">
         {rawFootage.length} source video{rawFootage.length === 1 ? " is" : "s are"} in Edit / Repurpose.{" "}
         <button type="button" className="font-medium text-brand-strong hover:underline"
-          onClick={() => navigate(`/clients/${clientId}/delivery/edit-repurpose?tab=overview`)}>
+          onClick={() => navigate(`/clients/${clientId}/delivery/content-production-factory?tab=edit`)}>
           Open editing work
         </button>
       </p>}

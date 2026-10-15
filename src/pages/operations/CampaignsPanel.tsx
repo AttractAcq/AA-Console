@@ -50,7 +50,7 @@ export function CampaignsPanel() {
       emptyLabel={rows.length ? "No campaigns match these filters" : "No campaigns yet"}
       rows={visible.map(r => [
         clients.find(c => c.id === r.client_id)?.name ?? r.client_id,
-        <Link to={`/clients/${r.client_id}/delivery/campaign-execution/${r.id}`} key={r.id} className="text-brand-strong underline">{r.name}</Link>,
+        <Link to={`/clients/${r.client_id}/delivery/campaign-factory/${r.id}`} key={r.id} className="text-brand-strong underline">{r.name}</Link>,
         r.status === "planning" && ready(r.id) ? "Ready to Launch" : r.status,
         r.objective ?? "—", (r.channels ?? []).join(", ") || "—", r.starts_on ?? "—", r.ends_on ?? "—",
         readiness[r.id]?.find(check => check.requirement === "Content")?.detail ?? (readiness[r.id]?.length ? "No content required" : "Readiness unavailable"),

@@ -70,8 +70,76 @@ import { AgentsPanel } from "./team/AgentsPanel";
 import { FinancialsPanel } from "./admin/FinancialsPanel";
 import { SopsPanel } from "./admin/SopsPanel";
 import { ContentJourney } from "../components/ContentJourney";
+import { PlannedModulePanel } from "./v6/PlannedModulePanel";
+
+const strategyTabIds = new Set(["branding-strategy", "content-pillars", "money-model-strategy"]);
 
 const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
+  "intelligence-os": {
+    "business-context": () => <BusinessContextPanel />,
+    market: () => <MarketPanel />,
+    icp: () => <IcpPanel />,
+    competitors: () => <CompetitorsPanel />,
+    "branding-associations": () => <BrandingAssociationsPanel />,
+    "campaign-intelligence": () => <CampaignIntelligencePanel />,
+    "proof-intelligence": () => <ProofIntelligencePanel />,
+    "branding-strategy": () => <BrandingStrategyPanel />,
+    "content-pillars": () => <ContentPillarsPanel />,
+    "money-model-strategy": () => <MoneyModelStrategyPanel />,
+  },
+  "campaign-factory": { overview: () => <CampaignExecutionPanel /> },
+  "proof-production-factory": { "proof-bank": () => <ProofBankPanel /> },
+  "content-production-factory": {
+    generation: () => <GenerationPanel />,
+    briefs: () => <BriefsPanel />,
+    create: () => <BriefsPanel stage="create" />,
+    edit: () => <EditRepurposePanel />,
+    "image-library": () => <ImageLibraryPanel />,
+    "video-library": () => <VideoLibraryPanel />,
+    "reel-shots": () => <ReelShotsPanel />,
+    "copy-library": () => <CopyLibraryPanel />,
+    "story-library": () => <StoryLibraryPanel />,
+    "carousel-library": () => <CarouselLibraryPanel />,
+  },
+  "content-distribution": {
+    "distribution-assets": () => <AssetsPanel />,
+    organic: () => <OrganicPanel />,
+    engine: () => <EnginePanel />,
+  },
+  "meta-ads-studio": {
+    campaigns: () => <CampaignExecutionPanel />,
+    paid: () => <PaidPanel />,
+    reporting: () => <PaidReportingPanel />,
+  },
+  "meta-profile": {
+    organic: () => <OrganicPanel />,
+    reporting: () => <OrganicReportingPanel />,
+  },
+  "offer-studio": { "offer-strategy": () => <OfferStrategyPanel /> },
+  "website-studio": {
+    "landing-pages": () => <PageBuilderPanel pageType="landing" />,
+    "offer-pages": () => <PageBuilderPanel pageType="offer" />,
+    sites: () => <SitesPanel />,
+    "landing-reporting": () => <PagesReportingPanel pageType="landing" />,
+    "offer-reporting": () => <PagesReportingPanel pageType="offer" />,
+  },
+  "sales-os": {
+    leads: () => <ProspectsLeadsPanel />,
+    agents: () => <SalesOverviewPanel />,
+  },
+  "attribution-os": {
+    overview: () => <AttributionPanel />,
+    organic: () => <OrganicReportingPanel />,
+    paid: () => <PaidReportingPanel />,
+    "landing-pages": () => <PagesReportingPanel pageType="landing" />,
+    "offer-pages": () => <PagesReportingPanel pageType="offer" />,
+    commentary: () => <CommentaryPanel />,
+    economics: () => <ClientEconomicsPanel />,
+  },
+  "approval-inbox": {
+    "engine-inbox": () => <EngineInboxPanel />,
+    assets: () => <ApprovalsPanel />,
+  },
   admin: {
     financials: () => <FinancialsPanel />,
     sops: () => <SopsPanel />,
@@ -166,6 +234,10 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
 };
 
 const nodePanels: Record<string, () => ReactNode> = {
+  "proof-distribution": () => <PlannedModulePanel module="proof-distribution" />,
+  "google-ads-studio": () => <PlannedModulePanel module="google-ads-studio" />,
+  "google-profile": () => <PlannedModulePanel module="google-profile" />,
+  "lead-magnet-studio": () => <PlannedModulePanel module="lead-magnet-studio" />,
   dashboard: () => <DashboardPanel />,
   // distinct id from the agency dashboard; both live at a path segment
   // called "dashboard" but they are different pages
@@ -201,13 +273,16 @@ export function Page({ node }: { node: NavNode }) {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const tabs = node.tabs;
-  const exportModule: ExportModule | null =
-    node.id === "intelligence" || node.id === "strategy" ? node.id : null;
-
   const requestedTab = searchParams.get("tab");
   const activeTab =
     tabs && (tabs.find((t) => t.id === requestedTab) ?? tabs[0]);
-
+  const v6Intelligence = node.id === "intelligence-os";
+  const exportModule: ExportModule | null = v6Intelligence
+    ? strategyTabIds.has(activeTab?.id ?? "") ? "strategy" : "intelligence"
+    : node.id === "intelligence" || node.id === "strategy" ? node.id : null;
+  const exportTabs = v6Intelligence && tabs
+    ? tabs.filter((tab) => strategyTabIds.has(tab.id) === (exportModule === "strategy"))
+    : tabs;
   const sectionLabel = activeTab ? activeTab.label : node.label;
 
   function handleTabChange(id: string) {
@@ -224,8 +299,23 @@ export function Page({ node }: { node: NavNode }) {
     setExporting(true);
     setExportError(null);
     try {
-      if (all) await downloadModuleZip(clientId, exportModule, tabs);
+      if (all) await downloadModuleZip(clientId, exportModule, exportTabs ?? []);
       else await downloadTabPdf(clientId, exportModule, activeTab);
+    } catch (error) {
+      setExportError(`Download failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleV6Zip(module: ExportModule) {
+    if (!clientId || !tabs) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      await downloadModuleZip(clientId, module, tabs.filter(
+        (tab) => strategyTabIds.has(tab.id) === (module === "strategy"),
+      ));
     } catch (error) {
       setExportError(`Download failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
@@ -240,11 +330,20 @@ export function Page({ node }: { node: NavNode }) {
           <div>
             <h1 className="text-[22px] font-semibold tracking-[-0.012em] text-foreground">{node.label}</h1>
           </div>
-          <Button icon={Download} disabled={exporting} onClick={() => void handleExport(true)}>
+          {v6Intelligence ? <div className="flex flex-wrap gap-2">
+            <Button icon={Download} disabled={exporting} onClick={() => void handleV6Zip("intelligence")}>Download intelligence</Button>
+            <Button icon={Download} disabled={exporting} onClick={() => void handleV6Zip("strategy")}>Download strategy</Button>
+          </div> : <Button icon={Download} disabled={exporting} onClick={() => void handleExport(true)}>
             {exporting ? "Preparing download…" : "Download all"}
-          </Button>
+          </Button>}
         </div>
       ) : <PageHeader title={node.label} />}
+      {node.capability === "planned" && <p className="mb-4 text-sm text-muted-foreground">
+        This module is visible in v6 and is not connected to an external service yet.
+      </p>}
+      {node.capability === "expanding" && <p className="mb-4 text-sm text-muted-foreground">
+        Existing tools are available here. Additional v6 capabilities are being built module by module.
+      </p>}
       {node.id === "distribution" && <ContentJourney clientId={clientId} current="distribution" />}
       {tabs && activeTab && (
         <div className="mb-6">
