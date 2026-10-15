@@ -359,13 +359,21 @@ export function reelKeyframePrompt(
   brand: BrandProfile | null,
   castAnchor = "",
   hasVisualReference = false,
+  shot?: { beat: string; opening_state?: string },
 ): string {
   const value = (key: string) => String(frame[key] ?? "").trim();
   return [
     `Create the opening keyframe for shot ${value("position")} of ${total} in a vertical cinematic reel for ${clientName}.`,
+    ...(shot ? [
+      `Action that will happen AFTER this still: ${shot.beat}`,
+      shot.opening_state
+        ? `Exact frame-zero state to draw: ${shot.opening_state}`
+        : "Draw the physical state before that action begins; do not show its completed result.",
+      "This is the FIRST frame, not a summary of the whole shot. Preserve the stated object count and position. If something enters, show it at the frame edge with the destination clear. If something exits, show it present and ready to leave. Do not add a hand, rig, lamp or other mechanism to explain motion. The video model will animate the action later.",
+    ] : []),
     ...(castAnchor.trim() ? [`Continuity anchor for every shot: ${castAnchor.trim()}`] : []),
     ...(hasVisualReference ? [
-      "The attached first-shot image is the visual identity reference. Keep the same person's face, age, hair, build and clothing, and the same room layout, furniture and lighting. Change the pose and action to serve this shot; do not copy the first shot's framing or action.",
+      "The attached first-shot image is the visual identity reference. Preserve the same subjects, object shapes, materials, colours, room layout and lighting. If a person is already present, keep their face, age, hair, build and clothing consistent; do not add a person to an object-only sequence. Change the composition to serve this shot without copying the first shot's completed action.",
     ] : []),
     `Narrative job: ${value("purpose")}`,
     `Visible subject: ${value("subject")}`,
@@ -1013,7 +1021,8 @@ Call ${submitTool.name} once when you are done.`;
           }
           const prompt = openingShots
             ? reelKeyframePrompt(frame as unknown as Record<string, unknown>, total, clientName, brand,
-              String(concept.cast_anchor ?? ""), Boolean(visualReference))
+              String(concept.cast_anchor ?? ""), Boolean(visualReference),
+              openingShots[frame.position - 1])
             : framePrompt(frame, total, composed);
           const out = await renderImage(config, prompt, {
             size: renderSize,

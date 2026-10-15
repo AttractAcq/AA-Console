@@ -66,7 +66,9 @@ export function openingStillsRoute(
     shots: plan.shots,
     frameAsk: {
       count: plan.shots.length,
-      plan: plan.shots.map((shot) => shot.beat),
+      plan: plan.shots.map((shot) => shot.opening_state
+        ? `Opening frame: ${shot.opening_state} Later motion: ${shot.beat}`
+        : `Opening frame before this action: ${shot.beat}`),
     },
   };
 }
