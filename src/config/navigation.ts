@@ -432,6 +432,7 @@ export const clientNavGroups: NavNode[] = [
     { id: "approval-inbox", label: "Approval Inbox", path: "approval-inbox", icon: CheckSquare,
       capability: "expanding", tabs: [
         { id: "engine-inbox", label: "Engine" }, { id: "assets", label: "Assets" },
+        { id: "campaign-actions", label: "Campaign actions" },
       ] },
     ...v6ModuleNodes,
     legacyUtility("motion-design"),

@@ -540,6 +540,60 @@ export type Database = {
           },
         ]
       }
+      campaign_action_approvals: {
+        Row: {
+          id: string
+          client_id: string
+          campaign_id: string
+          manifest_id: string
+          idempotency_key: string
+          action_key: string
+          destination: string
+          artifact_version_hash: string
+          scope: Json
+          request_hash: string
+          status: string
+          requested_at: string
+          decided_at: string | null
+          decided_by: string | null
+          rejection_reason: string | null
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          campaign_id: string
+          manifest_id: string
+          idempotency_key: string
+          action_key: string
+          destination: string
+          artifact_version_hash: string
+          scope: Json
+          request_hash: string
+          status?: string
+          requested_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          rejection_reason?: string | null
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          campaign_id?: string
+          manifest_id?: string
+          idempotency_key?: string
+          action_key?: string
+          destination?: string
+          artifact_version_hash?: string
+          scope?: Json
+          request_hash?: string
+          status?: string
+          requested_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          rejection_reason?: string | null
+        }
+        Relationships: []
+      }
       campaign_artifacts: {
         Row: {
           asset_id: string | null
@@ -8252,6 +8306,10 @@ export type Database = {
       }
     }
     Functions: {
+      decide_campaign_action_approval_v6: {
+        Args: { p_request_id: string; p_decision: string; p_reason?: string | null }
+        Returns: Database["public"]["Tables"]["campaign_action_approvals"]["Row"]
+      }
       request_repurpose_clip: {
         Args: { p_derivative_id: string; p_brief_id: string }
         Returns: string

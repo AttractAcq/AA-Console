@@ -5,6 +5,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 const clientA = "11111111-1111-4111-8111-111111111111";
 const clientB = "22222222-2222-4222-8222-222222222222";
 const source = "33333333-3333-4333-8333-333333333333";
+const manager = "44444444-4444-4444-8444-444444444444";
 let db: PGlite;
 
 beforeAll(async () => {
@@ -20,6 +21,7 @@ beforeAll(async () => {
     create function can_access_client(uuid) returns boolean language sql stable as
       $$ select current_setting('test.is_admin', true) = 'true' $$;
     create table clients (id uuid primary key);
+    create table profiles (id uuid primary key);
     create table client_campaigns (
       id uuid primary key default gen_random_uuid(), client_id uuid not null references clients(id),
       name text not null, brief text not null, status text not null default 'planning',
@@ -92,6 +94,15 @@ beforeAll(async () => {
   await db.exec(mcpMigration);
   const manifestMigration = await readFile(new URL("../../supabase/migrations/20261015220000_205_v6_campaign_manifest.sql", import.meta.url), "utf8");
   await db.exec(manifestMigration);
+  await db.exec(`
+    create or replace function auth.uid() returns uuid language sql stable as $$
+      select nullif(current_setting('test.user_id', true), '')::uuid $$;
+    create function active_video_approval_manager(uuid) returns uuid language sql stable as $$
+      select '${manager}'::uuid $$;
+    insert into profiles(id) values ('${manager}');
+  `);
+  const approvalsMigration = await readFile(new URL("../../supabase/migrations/20261015230000_206_v6_action_approvals.sql", import.meta.url), "utf8");
+  await db.exec(approvalsMigration);
   await db.exec(`
     insert into clients(id) values ('${clientA}'), ('${clientB}');
     insert into client_campaigns(id,client_id,name,brief,meta_campaign_id,approved_at)
@@ -233,4 +244,73 @@ it("versions a route-bound campaign package with honest module dependencies", as
   } finally {
     await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
   }
+});
+
+it("binds a human decision to an exact v6 action and rejects stale or mismatched scope", async () => {
+  const campaign = await db.query<{ id: string }>(`
+    insert into client_campaigns (
+      client_id,name,brief,acquisition_mode,paid_platform,built_at,objective,audience
+    ) values ($1,'Approval test','Brief','paid','meta',now(),
+      'Qualified leads','Service buyers') returning id`, [clientA]);
+  const campaignId = campaign.rows[0]!.id;
+  const manifest = await db.query<{ manifest: { id: string; plan_hash: string } }>(
+    "select to_jsonb(create_campaign_manifest_v6($1,$2,$3)) as manifest",
+    [campaignId, "approval-package-1", false]);
+  const { id, plan_hash } = manifest.rows[0]!.manifest;
+  const scope = JSON.stringify({ account_id: "act_123", daily_spend_limit: 50 });
+  await expect(db.query(
+    "select request_campaign_action_approval_v6($1,$2,$3,$4,$5,$6::jsonb)",
+    [id, "wrong-route", "google_ad_build", "google:123", "a".repeat(32), scope],
+  )).rejects.toThrow(/does not match/);
+  await expect(db.query(
+    "select request_campaign_action_approval_v6($1,$2,$3,$4,$5,$6::jsonb)",
+    [id, "wrong-version", "campaign_launch", "campaign", "a".repeat(32), scope],
+  )).rejects.toThrow(/exact package hash/);
+  const args = [id, "meta-build-1", "meta_ad_build", "meta:act_123", "a".repeat(32), scope];
+  const first = await db.query<{ approval: { id: string; status: string; request_hash: string } }>(
+    "select to_jsonb(request_campaign_action_approval_v6($1,$2,$3,$4,$5,$6::jsonb)) as approval", args);
+  expect(first.rows[0]!.approval.status).toBe("pending");
+  const approvalId = first.rows[0]!.approval.id;
+  const replay = await db.query<{ approval: { id: string } }>(
+    "select to_jsonb(request_campaign_action_approval_v6($1,$2,$3,$4,$5,$6::jsonb)) as approval", args);
+  expect(replay.rows[0]!.approval.id).toBe(approvalId);
+  await expect(db.query(
+    "select request_campaign_action_approval_v6($1,$2,$3,$4,$5,$6::jsonb)",
+    [id, "meta-build-1", "meta_ad_build", "meta:other", "a".repeat(32), scope],
+  )).rejects.toThrow(/Idempotency key/);
+  await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
+    select set_config('test.user_id','55555555-5555-4555-8555-555555555555',false);`);
+  try {
+    await expect(db.query("select decide_campaign_action_approval_v6($1,$2)",
+      [approvalId, "approved"])).rejects.toThrow(/admin or the active client manager/);
+    await db.exec(`select set_config('test.user_id','${manager}',false)`);
+    const decided = await db.query<{ approval: { status: string; decided_by: string } }>(
+      "select to_jsonb(decide_campaign_action_approval_v6($1,$2)) as approval",
+      [approvalId, "approved"]);
+    expect(decided.rows[0]!.approval).toMatchObject({ status: "approved", decided_by: manager });
+    await expect(db.query("select decide_campaign_action_approval_v6($1,$2)",
+      [approvalId, "approved"])).rejects.toThrow(/already been decided/);
+    await expect(db.query("update campaign_action_approvals set destination='meta:other' where id=$1",
+      [approvalId])).rejects.toThrow(/immutable/);
+  } finally {
+    await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+  }
+  const pending = await db.query<{ approval: { id: string } }>(
+    "select to_jsonb(request_campaign_action_approval_v6($1,$2,$3,$4,$5,$6::jsonb)) as approval",
+    [id, "meta-build-2", "meta_ad_build", "meta:act_123", "b".repeat(32), scope]);
+  await db.query("select create_campaign_manifest_v6($1,$2,$3)",
+    [campaignId, "approval-package-2", false]);
+  await expect(db.query(
+    "select request_campaign_action_approval_v6($1,$2,$3,$4,$5,$6::jsonb)",
+    [id, "stale", "meta_ad_build", "meta:act_123", "a".repeat(32), scope],
+  )).rejects.toThrow(/superseded/);
+  await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
+    select set_config('test.user_id','${manager}',false);`);
+  try {
+    await expect(db.query("select decide_campaign_action_approval_v6($1,$2)",
+      [pending.rows[0]!.approval.id, "approved"])).rejects.toThrow(/package changed/);
+  } finally {
+    await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+  }
+  expect(plan_hash).toMatch(/^[0-9a-f]{32}$/);
 });

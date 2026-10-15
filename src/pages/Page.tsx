@@ -35,6 +35,7 @@ import { EditRepurposePanel } from "./media/EditRepurposePanel";
 import { MotionDesignPanel } from "./motion/MotionDesignPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { EngineInboxPanel } from "./approvals/EngineInboxPanel";
+import { CampaignActionApprovalsPanel } from "./approvals/CampaignActionApprovalsPanel";
 import { OrganicPanel } from "./distribution/OrganicPanel";
 import { AssetsPanel } from "./distribution/AssetsPanel";
 import { EnginePanel } from "./distribution/EnginePanel";
@@ -139,6 +140,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   "approval-inbox": {
     "engine-inbox": () => <EngineInboxPanel />,
     assets: () => <ApprovalsPanel />,
+    "campaign-actions": () => <CampaignActionApprovalsPanel />,
   },
   admin: {
     financials: () => <FinancialsPanel />,
@@ -230,6 +232,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     // person's backlog.
     "engine-inbox": () => <EngineInboxPanel />,
     assets: () => <ApprovalsPanel />,
+    "campaign-actions": () => <CampaignActionApprovalsPanel />,
   },
 };
 
