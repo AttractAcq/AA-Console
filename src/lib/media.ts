@@ -130,6 +130,7 @@ export type ProofAsset = {
   services: string | null;
   strength: string;
   usage_rights: string;
+  permission_basis: string | null;
   captured_on: string | null;
   expires_on: string | null;
 };
@@ -141,7 +142,7 @@ export async function fetchProofAssets(
   let query = supabase
     .from("client_proof_assets")
     .select(
-      "id, client_id, media_type, title, body, storage_path, source, created_at, ref_number, proof_type, claim, evidence, avatar_relevance, services, strength, usage_rights, captured_on, expires_on",
+      "id, client_id, media_type, title, body, storage_path, source, created_at, ref_number, proof_type, claim, evidence, avatar_relevance, services, strength, usage_rights, permission_basis, captured_on, expires_on",
     )
     .eq("client_id", clientId);
   if (mediaType) query = query.eq("media_type", mediaType);

@@ -98,12 +98,15 @@ export function MetaBuildSection({
   campaign,
   building,
   onChanged,
+  externalActionsAvailable = true,
 }: {
   clientId: string;
   campaign: MetaCampaign;
   /** A meta_build job for this campaign is queued or running. */
   building: boolean;
   onChanged: () => void;
+  /** v6 external writes wait for the shared version-bound approval executor. */
+  externalActionsAvailable?: boolean;
 }) {
   const [integration, setIntegration] = useState<Integration | null>(null);
   const [lastBuild, setLastBuild] = useState<LastBuild | null>(null);
@@ -296,18 +299,21 @@ export function MetaBuildSection({
         >
           Write build sheet
         </button>
-        <button type="button" className={buttonClass} onClick={() => setRecording(true)}>
+        <button type="button" className={buttonClass} disabled={!externalActionsAvailable} onClick={() => setRecording(true)}>
           Record a hand build
         </button>
         <button
           type="button"
           className={buttonClass}
-          disabled={busy || building}
+          disabled={busy || building || !externalActionsAvailable}
           onClick={() => void request()}
         >
           {building ? "Building in Meta…" : campaign.meta_campaign_id ? "Build again (paused)" : "Build in Meta (paused)"}
         </button>
       </div>
+      {!externalActionsAvailable && <p className="mt-2 text-xs text-muted-foreground">
+        Build sheet and settings are available. Creating objects in Meta waits for exact-version human approval.
+      </p>}
 
       <FormModal
         open={editing}

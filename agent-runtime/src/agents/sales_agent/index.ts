@@ -20,6 +20,7 @@ import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js";
 import type { BusinessContext } from "../shared.js";
 import { loadPagePackage, renderPackage } from "../landing_page/aggregate.js";
+import { loadArtifactCampaignOffer } from "../campaign-offer.js";
 import {
   definitionProblem,
   definitionSummary,
@@ -63,6 +64,7 @@ export async function runSalesAgentJob(
       failureMessage: "The sales agent has no purpose. Say what it is for and try again.",
     };
   }
+  const campaignOffer = await loadArtifactCampaignOffer(sb, job.id, "sales_agent");
 
   const { data: clientRow } = await sb
     .from("clients")
@@ -83,7 +85,7 @@ export async function runSalesAgentJob(
   ]);
 
   const offer = records.filter((r) => r.domain === "offer_strategy");
-  if (offer.length === 0) {
+  if (offer.length === 0 && !campaignOffer) {
     return {
       ok: false,
       retryable: false,
@@ -210,7 +212,7 @@ WHAT MAKES A SALES AGENT WORK
 ABSOLUTE RULES
 - Never invent a claim, a statistic, a price, a guarantee, a timeline, a credential or a customer. If it is not in what you were given, the agent does not say it. This is the difference between a marketing mistake and a regulatory one, and it is the client who carries it.
 - Only reference proof you were actually given as cleared. Uncleared proof does not exist as far as this agent is concerned.
-- Respect everything the offer strategy lists as a limit or a thing that cannot be promised. Those become guardrails, stated explicitly, in your own guardrails field.
+- ${campaignOffer ? "The approved campaign offer version below is authoritative. Use its exact promise, price, claims and exclusions; put every exclusion into the guardrails. The broader offer strategy cannot override it." : "Respect everything the offer strategy lists as a limit or a thing that cannot be promised. Those become guardrails, stated explicitly, in your own guardrails field."}
 - Never claim to be a human being. If asked, the agent says plainly what it is.
 - Never leave a bracket, a placeholder or a template variable in anything a visitor will read.
 - Match the brand voice you are given. If it says never to say something, never say it.`;
@@ -225,6 +227,10 @@ ${renderContext(context as BusinessContext | null)}
 
 OFFER STRATEGY — what is being sold, and what may not be promised
 ${renderUpstream(offer)}
+
+${campaignOffer ? `APPROVED CAMPAIGN OFFER VERSION — authoritative for this sales agent
+${JSON.stringify(campaignOffer)}
+Do not sell another service, invent claims, change the price, or promise anything excluded here.` : ""}
 
 ICP — who this agent is talking to, in their language
 ${renderUpstream(icp)}

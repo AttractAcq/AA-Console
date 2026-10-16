@@ -4,12 +4,12 @@ import { cn } from "../lib/cn";
 export type ContentStage = "ideation" | "brief" | "create" | "edit" | "approval" | "distribution";
 
 const STAGES: { id: ContentStage; label: string; path: string }[] = [
-  { id: "ideation", label: "Ideation", path: "ideation?tab=generation" },
-  { id: "brief", label: "Brief", path: "ideation?tab=briefs" },
-  { id: "create", label: "Create", path: "create" },
-  { id: "edit", label: "Edit / Repurpose", path: "edit-repurpose?tab=overview" },
-  { id: "approval", label: "Approval", path: "approvals?tab=assets" },
-  { id: "distribution", label: "Distribution", path: "distribution?tab=distribution-assets" },
+  { id: "ideation", label: "Ideation", path: "content-production-factory?tab=generation" },
+  { id: "brief", label: "Brief", path: "content-production-factory?tab=briefs" },
+  { id: "create", label: "Create", path: "content-production-factory?tab=create" },
+  { id: "edit", label: "Edit / Repurpose", path: "content-production-factory?tab=edit" },
+  { id: "approval", label: "Approval", path: "approval-inbox?tab=assets" },
+  { id: "distribution", label: "Distribution", path: "content-distribution?tab=distribution-assets" },
 ];
 
 /** One route through the same work item, with the active stage marked explicitly. */
@@ -25,7 +25,7 @@ export function ContentJourney({ clientId, current, briefId, engineApproval = fa
       <ol className="flex flex-wrap items-center gap-1.5 text-xs">
         {STAGES.map((stage, index) => {
           const suffix = stage.id === "approval" && engineApproval
-            ? "approvals?tab=engine-inbox" : stage.path;
+            ? "approval-inbox?tab=engine-inbox" : stage.path;
           const focused = briefId && (stage.id === "brief" || stage.id === "create" || stage.id === "edit")
             ? `${suffix}${suffix.includes("?") ? "&" : "?"}brief=${encodeURIComponent(briefId)}` : suffix;
           const className = cn(

@@ -123,6 +123,7 @@ export async function runMarketingGate(invoke: Invoke, f: MarketingFixtures) {
   const campaign = await write("campaign.create", {
     name: `Gate 16 campaign ${randomUUID().slice(0, 8)}`,
     brief: "Gate 16 disposable campaign brief",
+    acquisition_mode: "organic",
   }, "accepted");
   assert.ok(campaign.data.job_id, "Missing durable campaign_plan job");
   const campaign_id = campaign.data.campaign?.id ?? f.campaign_id;

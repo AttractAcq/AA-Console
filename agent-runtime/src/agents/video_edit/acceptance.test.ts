@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
-import { missingReviewAreas, probeRenderedVideo } from "./acceptance.js";
+import { finalReviewSampleFps, freezeIntervalsFromLog, missingReviewAreas, probeRenderedVideo } from "./acceptance.js";
 
 describe("creative review contract", () => {
   const areas = ["continuity", "visual_defects", "caption_readability", "crop", "narrative", "brand_fit", "brief_execution"];
@@ -18,6 +18,16 @@ describe("creative review contract", () => {
     expect(missingReviewAreas({ checks: areas.map((area) => area === "brand_fit"
       ? { ...check(area), reason: "" } : check(area)) })).toEqual(["brand_fit"]);
   });
+});
+
+it("samples short reels densely while keeping long reels below the API image limit", () => {
+  expect(finalReviewSampleFps(30)).toBe(2);
+  expect(finalReviewSampleFps(45)).toBe(2);
+  expect(finalReviewSampleFps(90)).toBe(1);
+  expect(freezeIntervalsFromLog("freeze_start: 1.2 freeze_end: 4.5", 10))
+    .toEqual([{ start_sec: 1.2, end_sec: 4.5 }]);
+  expect(freezeIntervalsFromLog("freeze_start: 8", 10))
+    .toEqual([{ start_sec: 8, end_sec: 10 }]);
 });
 import { hasAudioStream } from "./media.js";
 
@@ -37,6 +47,7 @@ it("rejects an actual exported file with black frames", async () => {
     expect(probe.width).toBe(1080);
     expect(probe.height).toBe(1920);
     expect(probe.black_intervals.length).toBeGreaterThan(0);
+    expect(probe.freeze_intervals.length).toBeGreaterThan(0);
   } finally {
     await rm(work, { recursive: true, force: true });
   }
@@ -61,6 +72,7 @@ it("checks that a requested soundtrack is actually audible in the exported file"
     expect(audible.has_audio).toBe(true);
     expect(audible.audio_mean_db).not.toBeNull();
     expect(audible.checks).not.toContain("The requested soundtrack is silent or too quiet to verify.");
+    expect(audible.freeze_intervals.length).toBeGreaterThan(0);
     expect((await probeRenderedVideo(withTone)).checks)
       .toContain("Captions-only export unexpectedly contains audio.");
   } finally {

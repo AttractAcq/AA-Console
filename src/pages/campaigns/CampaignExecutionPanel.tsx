@@ -24,6 +24,9 @@ import { cn } from "../../lib/cn";
 
 type Campaign = {
   id: string;
+  acquisition_mode: "legacy" | "organic" | "paid";
+  paid_platform: "meta" | "google" | null;
+  cloned_from_campaign_id: string | null;
   name: string;
   brief: string;
   status: string;
@@ -65,10 +68,17 @@ export type Requirement = {
 
 const FIELDS: FieldDef[] = [
   { name: "name", label: "Campaign name", kind: "text", required: true },
+  { name: "acquisition_mode", label: "Campaign route", kind: "select", required: true,
+    options: [{ value: "organic", label: "Organic" }, { value: "paid", label: "Paid" }],
+    hint: "One route per campaign. Clone it to run the same idea through the other route." },
+  { name: "paid_platform", label: "Paid platform", kind: "select", required: true,
+    showIf: { field: "acquisition_mode", equals: ["paid"] },
+    options: [{ value: "meta", label: "Meta Ads" }, { value: "google", label: "Google Ads (planned)" }] },
   {
     name: "template",
     label: "Campaign template (optional)",
     kind: "select",
+    showIf: { field: "paid_platform", equals: ["meta"] },
     options: templateOptions(),
     hint: "Fixes the objective, the audience state it aims at and what has to be built, so the planner decides none of those. Leave it blank and the campaign is planned from the brief exactly as before.",
   },
@@ -101,23 +111,29 @@ export function CampaignExecutionPanel() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [readiness, setReadiness] = useState<Record<string, Requirement[]>>({});
   const [newOpen, setNewOpen] = useState(false);
+  const [cloneSource, setCloneSource] = useState<Campaign | null>(null);
   const [planIdeaChoices, setPlanIdeaChoices] = useState<Record<string, boolean>>({});
   const [proposing, setProposing] = useState(false);
   // The dialog's own pick, kept here so the generated draft can carry it into
   // the form. The endpoint steers by it but does not echo it back.
   const [proposeTemplate, setProposeTemplate] = useState("");
-  // Organic scoping. Separate from the paid template on purpose: a campaign
-  // can have both, because the same asset runs as an ad and sits on the feed.
+  // Content pillars are useful in either route; route choice is immutable.
   const [pillars, setPillars] = useState<{ id: string; name: string; target_share: number }[]>([]);
   const [pillarsFailed, setPillarsFailed] = useState(false);
   const [chosenPillars, setChosenPillars] = useState<string[]>([]);
+  const [approvedOfferChoices, setApprovedOfferChoices] = useState<{ id: string; label: string }[]>([]);
+  const [offersFailed, setOffersFailed] = useState(false);
   const chosenTemplate = templateFor(proposeTemplate);
   // template is not part of what the endpoint returns — it is the operator's
   // own pick, carried through so the form opens on it.
   const [aiDraft, setAiDraft] = useState<
     { name: string; brief: string; template?: string } | null
   >(null);
-  const newCampaignValues = useMemo(() => ({ ...aiDraft, ideate_on_plan: true }), [aiDraft]);
+  const newCampaignValues = useMemo(() => ({
+    ...aiDraft,
+    ...(aiDraft?.template ? { acquisition_mode: "paid", paid_platform: "meta" } : {}),
+    ideate_on_plan: true,
+  }), [aiDraft]);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -140,7 +156,7 @@ export function CampaignExecutionPanel() {
       const query = supabase
         .from("client_campaigns")
         .select(
-          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at",
+          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at, acquisition_mode, paid_platform, cloned_from_campaign_id",
         )
         .eq("client_id", clientId)
         // A campaign somebody archived is over. It reads from the archive.
@@ -215,6 +231,32 @@ export function CampaignExecutionPanel() {
     return () => {
       cancelled = true;
     };
+  }, [newOpen, clientId]);
+
+  useEffect(() => {
+    if (!newOpen || !clientId) return;
+    let cancelled = false;
+    setOffersFailed(false);
+    void (async () => {
+      const [offers, versions, signoffs] = await Promise.all([
+        supabase.from("service_offers").select("id, service_name").eq("client_id", clientId),
+        supabase.from("service_offer_versions").select("id, offer_id, version, promise").eq("client_id", clientId),
+        supabase.from("service_offer_signoffs").select("offer_version_id").eq("client_id", clientId),
+      ]);
+      if (cancelled) return;
+      if (offers.error || versions.error || signoffs.error) {
+        setOffersFailed(true);
+        setApprovedOfferChoices([]);
+        return;
+      }
+      const signed = new Set((signoffs.data ?? []).map((row) => row.offer_version_id));
+      const names = new Map((offers.data ?? []).map((row) => [row.id, row.service_name]));
+      setApprovedOfferChoices((versions.data ?? [])
+        .filter((row) => signed.has(row.id))
+        .map((row) => ({ id: row.id,
+          label: `${names.get(row.offer_id) ?? "Service"} v${row.version} · ${row.promise.slice(0, 90)}` })));
+    })().catch(() => { if (!cancelled) setOffersFailed(true); });
+    return () => { cancelled = true; };
   }, [newOpen, clientId]);
 
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
@@ -352,7 +394,7 @@ export function CampaignExecutionPanel() {
         ? `Deleted "${campaign.name}", along with ${parts.join(", ")}.`
         : `Deleted "${campaign.name}".`,
     );
-    if (campaignId) navigate(`/clients/${clientId}/delivery/campaign-execution`);
+    if (campaignId) navigate(`/clients/${clientId}/delivery/campaign-factory`);
     else void refresh();
   };
 
@@ -362,7 +404,7 @@ export function CampaignExecutionPanel() {
     <div>
       <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
 
-      {campaignId && clientId && <Link to={`/clients/${clientId}/delivery/campaign-execution`} className="mb-4 inline-block text-sm text-brand-strong hover:underline">← All campaigns</Link>}
+      {campaignId && clientId && <Link to={`/clients/${clientId}/delivery/campaign-factory`} className="mb-4 inline-block text-sm text-brand-strong hover:underline">← All campaigns</Link>}
       {!campaignId && <div className="mb-4 flex justify-end">
         <Button icon={Plus} onClick={() => setNewOpen(true)}>
           New Campaign
@@ -398,7 +440,7 @@ export function CampaignExecutionPanel() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <h3 className="min-w-0 flex-1">
                   {campaignId ? <span className="flex w-full items-start gap-2 text-lg font-semibold text-card-foreground">{c.name}</span> : <Link
-                    to={`/clients/${clientId}/delivery/campaign-execution/${c.id}`}
+                    to={`/clients/${clientId}/delivery/campaign-factory/${c.id}`}
                     className="flex w-full items-start gap-2 rounded text-left text-sm font-semibold text-card-foreground hover:text-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <span className="min-w-0">
@@ -417,6 +459,18 @@ export function CampaignExecutionPanel() {
                   >
                     {c.status}
                   </span>
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="rounded border border-border px-2 py-0.5 font-medium capitalize text-foreground">
+                    {c.acquisition_mode === "paid"
+                      ? `Paid · ${c.paid_platform === "google" ? "Google Ads" : "Meta Ads"}`
+                      : c.acquisition_mode === "organic" ? "Organic" : "Legacy route · clone for v6"}
+                  </span>
+                  {c.cloned_from_campaign_id && <Link className="text-brand-strong underline"
+                    to={`/clients/${clientId}/delivery/campaign-factory/${c.cloned_from_campaign_id}`}>
+                    Source campaign
+                  </Link>}
                 </div>
 
                 {campaignId && <dl className="mt-4 grid gap-3 border-t border-border pt-3 text-xs sm:grid-cols-2">
@@ -502,17 +556,23 @@ export function CampaignExecutionPanel() {
                 </div>
                 )}
 
-                {campaignId && clientId && (
+                {campaignId && clientId && (c.acquisition_mode === "legacy"
+                  || (c.acquisition_mode === "paid" && c.paid_platform === "meta")) && (
                   <MetaBuildSection
                     clientId={clientId}
                     campaign={c}
                     building={inFlight.some((j) => j.agent_key === "meta_build" && j.input_id === c.id)}
                     onChanged={() => void refresh()}
+                    externalActionsAvailable={c.acquisition_mode === "legacy"}
                   />
                 )}
 
                 {campaignId && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                  <button type="button" disabled={busy} onClick={() => setCloneSource(c)}
+                    className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-card-foreground hover:bg-accent disabled:opacity-50">
+                    Clone to another route
+                  </button>
                   {!c.built_at && (
                     <label className="flex items-center gap-2 text-xs text-foreground">
                       <input type="checkbox" checked={planIdeaChoices[c.id] ?? c.ideate_on_plan ?? true}
@@ -552,7 +612,7 @@ export function CampaignExecutionPanel() {
                       Build sales agent
                     </button>
                   )}
-                  {c.status !== "live" && (
+                  {c.status !== "live" && c.acquisition_mode === "legacy" && (
                     <button
                       type="button"
                       disabled={busy || !ready}
@@ -561,6 +621,11 @@ export function CampaignExecutionPanel() {
                     >
                       Launch
                     </button>
+                  )}
+                  {c.status !== "live" && c.acquisition_mode !== "legacy" && (
+                    <span className="text-xs text-muted-foreground">
+                      External activation waits for version-bound human approval.
+                    </span>
                   )}
                   {!ready && c.status !== "live" && unmet.length > 0 && (
                     <span className="text-xs text-muted-foreground">
@@ -575,7 +640,7 @@ export function CampaignExecutionPanel() {
                     id={c.id}
                     archived={false}
                     noun="campaign"
-                    onDone={() => navigate(`/clients/${clientId}/delivery/campaign-execution`)}
+                    onDone={() => navigate(`/clients/${clientId}/delivery/campaign-factory`)}
                     onError={setProblem}
                   />
                   <button
@@ -605,10 +670,14 @@ export function CampaignExecutionPanel() {
         }}
         title="New Campaign"
         draftKey={`campaign:${clientId}`}
-        intro="Queues the Campaign Planner. It needs your offer strategy and ICP, and writes the plan — including what has to be built before this can run."
-        fields={FIELDS}
+        intro="Queues the Campaign Planner. Select an approved service offer to bind its exact version to the plan and package. The planner needs the ICP and uses the client-wide offer strategy when no offer is selected."
+        fields={[...FIELDS, { name: "offer_version_id", label: "Approved service offer (optional)",
+          kind: "select", options: approvedOfferChoices.map((offer) => ({ value: offer.id, label: offer.label })),
+          hint: "The selected version is fixed for this campaign. Leave empty to use the client-wide offer strategy." } as FieldDef]}
         extra={
-          pillarsFailed ? (
+          offersFailed ? <p role="alert" className="text-sm text-destructive">
+            Approved offers could not be loaded. Try again before planning this campaign.
+          </p> : pillarsFailed ? (
             <p role="alert" className="rounded-md border border-border p-3 text-sm text-destructive">
               Could not load this client&apos;s content pillars, so none can be picked. The campaign can
               still be planned without them.
@@ -659,17 +728,30 @@ export function CampaignExecutionPanel() {
         }
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
+          if (offersFailed) throw new Error("Approved offers could not be loaded.");
+          if (v.offer_version_id && !approvedOfferChoices.some((offer) => offer.id === v.offer_version_id))
+            throw new Error("Choose an approved offer belonging to this client.");
+          const acquisitionMode = v.acquisition_mode;
+          const paidPlatform = acquisitionMode === "paid" ? v.paid_platform : null;
+          if (acquisitionMode !== "organic" && acquisitionMode !== "paid")
+            throw new Error("Choose an organic or paid route.");
+          if (acquisitionMode === "paid" && paidPlatform !== "meta" && paidPlatform !== "google")
+            throw new Error("Choose Meta Ads or Google Ads for this paid campaign.");
           const { data, error } = await supabase
             .from("client_campaigns")
             .insert({
               client_id: clientId,
               name: (v.name as string).trim(),
               brief: (v.brief as string).trim(),
+              acquisition_mode: acquisitionMode,
+              paid_platform: paidPlatform as "meta" | "google" | null,
+              offer_version_id: (v.offer_version_id as string) || null,
               ideate_on_plan: v.ideate_on_plan !== false,
               // Spread only when a template was picked. The columns arrive in
               // migration 96, and a campaign planned without a template must
               // keep working on a database that does not have them yet.
-              ...(templateColumns(v.template as string) ?? {}),
+              ...(acquisitionMode === "paid" && paidPlatform === "meta"
+                ? templateColumns(v.template as string) ?? {} : {}),
             })
             .select("id")
             .single();
@@ -698,6 +780,45 @@ export function CampaignExecutionPanel() {
           setChosenPillars([]);
           void refresh();
         }}
+      />
+
+      <FormModal
+        open={cloneSource !== null}
+        onClose={() => setCloneSource(null)}
+        title="Clone campaign into a new route"
+        intro="Copies the source brief and starts a separate plan. Creative, approvals, platform IDs and results stay with the original campaign."
+        fields={[
+          { name: "name", label: "New campaign name", kind: "text", required: true },
+          { name: "acquisition_mode", label: "New route", kind: "select", required: true,
+            options: [{ value: "organic", label: "Organic" }, { value: "paid", label: "Paid" }] },
+          { name: "paid_platform", label: "Paid platform", kind: "select", required: true,
+            showIf: { field: "acquisition_mode", equals: ["paid"] },
+            options: [{ value: "meta", label: "Meta Ads" }, { value: "google", label: "Google Ads (planned)" }] },
+        ]}
+        initialValues={cloneSource ? {
+          name: `${cloneSource.name} · New route`,
+          acquisition_mode: cloneSource.acquisition_mode === "organic" ? "paid" : "organic",
+          paid_platform: cloneSource.acquisition_mode === "organic" ? "meta" : "",
+        } : undefined}
+        submitLabel="Create separate campaign"
+        onSubmit={async (v) => {
+          if (!cloneSource || !clientId) throw new Error("No source campaign selected.");
+          const mode = v.acquisition_mode as string;
+          const platform = mode === "paid" ? v.paid_platform as string : null;
+          if (mode === cloneSource.acquisition_mode)
+            throw new Error("Choose the other route. This clone must be independent.");
+          const { data, error } = await supabase.rpc("clone_campaign_for_route", {
+            p_source_campaign_id: cloneSource.id,
+            p_target_mode: mode,
+            p_paid_platform: platform,
+            p_name: (v.name as string).trim(),
+          });
+          if (error) throw error;
+          if (typeof data !== "string") throw new Error("The new campaign ID was not returned.");
+          setNotice("New campaign created. Run its planner to build the new route.");
+          navigate(`/clients/${clientId}/delivery/campaign-factory/${data}`);
+        }}
+        onSaved={() => { setCloneSource(null); void refresh(); }}
       />
 
       {clientId && (

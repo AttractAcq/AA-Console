@@ -540,6 +540,258 @@ export type Database = {
           },
         ]
       }
+      campaign_action_approvals: {
+        Row: {
+          id: string
+          client_id: string
+          campaign_id: string
+          manifest_id: string
+          idempotency_key: string
+          action_key: string
+          destination: string
+          artifact_version_hash: string
+          scope: Json
+          request_hash: string
+          status: string
+          requested_at: string
+          decided_at: string | null
+          decided_by: string | null
+          rejection_reason: string | null
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          campaign_id: string
+          manifest_id: string
+          idempotency_key: string
+          action_key: string
+          destination: string
+          artifact_version_hash: string
+          scope: Json
+          request_hash: string
+          status?: string
+          requested_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          rejection_reason?: string | null
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          campaign_id?: string
+          manifest_id?: string
+          idempotency_key?: string
+          action_key?: string
+          destination?: string
+          artifact_version_hash?: string
+          scope?: Json
+          request_hash?: string
+          status?: string
+          requested_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          rejection_reason?: string | null
+        }
+        Relationships: []
+      }
+      campaign_page_approval_snapshots: {
+        Row: {
+          approval_id: string
+          client_id: string
+          page_id: string
+          revision_id: string
+          site_repository_id: string
+          site_path: string
+          rendered_html: string
+          rendered_sha256: string
+          created_at: string
+        }
+        Insert: {
+          approval_id: string
+          client_id: string
+          page_id: string
+          revision_id: string
+          site_repository_id: string
+          site_path: string
+          rendered_html: string
+          rendered_sha256: string
+          created_at?: string
+        }
+        Update: {
+          approval_id?: string
+          client_id?: string
+          page_id?: string
+          revision_id?: string
+          site_repository_id?: string
+          site_path?: string
+          rendered_html?: string
+          rendered_sha256?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      campaign_intelligence_snapshots: {
+        Row: {
+          id: string
+          client_id: string
+          campaign_id: string
+          planner_job_id: string
+          brief: string
+          acquisition_mode: string
+          paid_platform: string | null
+          business_context: Json
+          source_records: Json
+          content_pillars: Json
+          missing_domains: string[]
+          snapshot_hash: string
+          captured_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          campaign_id: string
+          planner_job_id: string
+          brief: string
+          acquisition_mode: string
+          paid_platform?: string | null
+          business_context: Json
+          source_records: Json
+          content_pillars: Json
+          missing_domains?: string[]
+          snapshot_hash: string
+          captured_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          campaign_id?: string
+          planner_job_id?: string
+          brief?: string
+          acquisition_mode?: string
+          paid_platform?: string | null
+          business_context?: Json
+          source_records?: Json
+          content_pillars?: Json
+          missing_domains?: string[]
+          snapshot_hash?: string
+          captured_at?: string
+        }
+        Relationships: []
+      }
+      service_offers: {
+        Row: { id: string; client_id: string; service_name: string; created_at: string }
+        Insert: { id?: string; client_id: string; service_name: string; created_at?: string }
+        Update: { id?: string; client_id?: string; service_name?: string; created_at?: string }
+        Relationships: []
+      }
+      service_offer_versions: {
+        Row: {
+          id: string; offer_id: string; client_id: string; version: number
+          idempotency_key: string; audience: string; promise: string
+          inclusions: string[]; exclusions: string[]; price_amount: number | null
+          currency: string | null; delivery_cost_estimate: number | null
+          claims: Json; content_hash: string; created_at: string
+        }
+        Insert: {
+          id?: string; offer_id: string; client_id: string; version: number
+          idempotency_key: string; audience: string; promise: string
+          inclusions?: string[]; exclusions?: string[]; price_amount?: number | null
+          currency?: string | null; delivery_cost_estimate?: number | null
+          claims?: Json; content_hash: string; created_at?: string
+        }
+        Update: {
+          id?: string; offer_id?: string; client_id?: string; version?: number
+          idempotency_key?: string; audience?: string; promise?: string
+          inclusions?: string[]; exclusions?: string[]; price_amount?: number | null
+          currency?: string | null; delivery_cost_estimate?: number | null
+          claims?: Json; content_hash?: string; created_at?: string
+        }
+        Relationships: []
+      }
+      service_offer_signoffs: {
+        Row: { offer_version_id: string; client_id: string; approved_by: string; approved_at: string }
+        Insert: { offer_version_id: string; client_id: string; approved_by: string; approved_at?: string }
+        Update: { offer_version_id?: string; client_id?: string; approved_by?: string; approved_at?: string }
+        Relationships: []
+      }
+      campaign_manifest_offers: {
+        Row: { manifest_id: string; campaign_id: string; client_id: string; offer_version_id: string; linked_at: string }
+        Insert: { manifest_id: string; campaign_id: string; client_id: string; offer_version_id: string; linked_at?: string }
+        Update: { manifest_id?: string; campaign_id?: string; client_id?: string; offer_version_id?: string; linked_at?: string }
+        Relationships: []
+      }
+      campaign_manifest_versions: {
+        Row: {
+          id: string; campaign_id: string; client_id: string; version: number
+          idempotency_key: string; acquisition_mode: string; paid_platform: string | null
+          plan_snapshot: Json; plan_hash: string; created_at: string
+        }
+        Insert: {
+          id?: string; campaign_id: string; client_id: string; version: number
+          idempotency_key: string; acquisition_mode: string; paid_platform?: string | null
+          plan_snapshot: Json; plan_hash: string; created_at?: string
+        }
+        Update: {
+          id?: string; campaign_id?: string; client_id?: string; version?: number
+          idempotency_key?: string; acquisition_mode?: string; paid_platform?: string | null
+          plan_snapshot?: Json; plan_hash?: string; created_at?: string
+        }
+        Relationships: []
+      }
+      proof_artifact_versions: {
+        Row: {
+          id: string; client_id: string; source_proof_id: string
+          artifact_kind: string; version: number; idempotency_key: string
+          source_snapshot: Json; source_hash: string; supported_claim: string
+          evidence_excerpt: string; content: string; content_hash: string
+          created_by_job_id: string | null; created_at: string
+        }
+        Insert: {
+          id?: string; client_id: string; source_proof_id: string
+          artifact_kind: string; version: number; idempotency_key: string
+          source_snapshot: Json; source_hash: string; supported_claim: string
+          evidence_excerpt: string; content: string; content_hash: string
+          created_by_job_id?: string | null; created_at?: string
+        }
+        Update: {
+          id?: string; client_id?: string; source_proof_id?: string
+          artifact_kind?: string; version?: number; idempotency_key?: string
+          source_snapshot?: Json; source_hash?: string; supported_claim?: string
+          evidence_excerpt?: string; content?: string; content_hash?: string
+          created_by_job_id?: string | null; created_at?: string
+        }
+        Relationships: []
+      }
+      proof_artifact_signoffs: {
+        Row: { artifact_version_id: string; client_id: string; approved_by: string; approved_at: string }
+        Insert: { artifact_version_id: string; client_id: string; approved_by: string; approved_at?: string }
+        Update: { artifact_version_id?: string; client_id?: string; approved_by?: string; approved_at?: string }
+        Relationships: []
+      }
+      video_render_candidates: {
+        Row: {
+          id: string; client_id: string; asset_id: string; job_id: string
+          attempt: number; render_path: string; media_probe: Json
+          creative_review: Json | null; edit_plan: Json | null
+          verdict: string; rejection_reason: string | null
+          created_at: string; reviewed_at: string | null
+        }
+        Insert: {
+          id?: string; client_id: string; asset_id: string; job_id: string
+          attempt: number; render_path: string; media_probe: Json
+          creative_review?: Json | null; edit_plan?: Json | null
+          verdict?: string; rejection_reason?: string | null
+          created_at?: string; reviewed_at?: string | null
+        }
+        Update: {
+          id?: string; client_id?: string; asset_id?: string; job_id?: string
+          attempt?: number; render_path?: string; media_probe?: Json
+          creative_review?: Json | null; edit_plan?: Json | null
+          verdict?: string; rejection_reason?: string | null
+          created_at?: string; reviewed_at?: string | null
+        }
+        Relationships: []
+      }
       campaign_artifacts: {
         Row: {
           asset_id: string | null
@@ -1664,6 +1916,7 @@ export type Database = {
       }
       client_campaigns: {
         Row: {
+          acquisition_mode: "legacy" | "organic" | "paid"
           ad_campaign_id: string | null
           archived_at: string | null
           audience: string | null
@@ -1672,6 +1925,7 @@ export type Database = {
           built_at: string | null
           channels: string[]
           client_id: string
+          cloned_from_campaign_id: string | null
           content_count: number
           content_ideas_generated_at: string | null
           conversion_event: string | null
@@ -1699,7 +1953,9 @@ export type Database = {
           needs_sales_agent: boolean
           objective: string | null
           offer_summary: string | null
+          offer_version_id: string | null
           optimisation_event: string | null
+          paid_platform: "meta" | "google" | null
           starts_on: string | null
           status: string
           target_countries: string[]
@@ -1707,6 +1963,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          acquisition_mode?: "legacy" | "organic" | "paid"
           ad_campaign_id?: string | null
           archived_at?: string | null
           audience?: string | null
@@ -1715,6 +1972,7 @@ export type Database = {
           built_at?: string | null
           channels?: string[]
           client_id: string
+          cloned_from_campaign_id?: string | null
           content_count?: number
           content_ideas_generated_at?: string | null
           conversion_event?: string | null
@@ -1742,7 +2000,9 @@ export type Database = {
           needs_sales_agent?: boolean
           objective?: string | null
           offer_summary?: string | null
+          offer_version_id?: string | null
           optimisation_event?: string | null
+          paid_platform?: "meta" | "google" | null
           starts_on?: string | null
           status?: string
           target_countries?: string[]
@@ -1750,6 +2010,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          acquisition_mode?: "legacy" | "organic" | "paid"
           ad_campaign_id?: string | null
           archived_at?: string | null
           audience?: string | null
@@ -1758,6 +2019,7 @@ export type Database = {
           built_at?: string | null
           channels?: string[]
           client_id?: string
+          cloned_from_campaign_id?: string | null
           content_count?: number
           content_ideas_generated_at?: string | null
           conversion_event?: string | null
@@ -1785,7 +2047,9 @@ export type Database = {
           needs_sales_agent?: boolean
           objective?: string | null
           offer_summary?: string | null
+          offer_version_id?: string | null
           optimisation_event?: string | null
+          paid_platform?: "meta" | "google" | null
           starts_on?: string | null
           status?: string
           target_countries?: string[]
@@ -1793,6 +2057,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_campaigns_clone_same_client_fkey"
+            columns: ["cloned_from_campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
           {
             foreignKeyName: "client_campaigns_ad_campaign_id_fkey"
             columns: ["ad_campaign_id"]
@@ -3529,6 +3800,7 @@ export type Database = {
           expires_on: string | null
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
+          permission_basis: string | null
           proof_type: string | null
           ref_number: string | null
           services: string | null
@@ -3551,6 +3823,7 @@ export type Database = {
           expires_on?: string | null
           id?: string
           media_type: Database["public"]["Enums"]["media_type"]
+          permission_basis?: string | null
           proof_type?: string | null
           ref_number?: string | null
           services?: string | null
@@ -3573,6 +3846,7 @@ export type Database = {
           expires_on?: string | null
           id?: string
           media_type?: Database["public"]["Enums"]["media_type"]
+          permission_basis?: string | null
           proof_type?: string | null
           ref_number?: string | null
           services?: string | null
@@ -8236,6 +8510,44 @@ export type Database = {
       }
     }
     Functions: {
+      create_service_offer_version_v6: {
+        Args: {
+          p_client_id: string; p_service_name: string; p_audience: string;
+          p_promise: string; p_inclusions: string[]; p_exclusions: string[];
+          p_price_amount: number | null; p_currency: string | null;
+          p_delivery_cost_estimate: number | null; p_claims: Json;
+          p_idempotency_key: string; p_offer_id?: string | null
+        }
+        Returns: Database["public"]["Tables"]["service_offer_versions"]["Row"]
+      }
+      approve_service_offer_version_v6: {
+        Args: { p_version_id: string }
+        Returns: Database["public"]["Tables"]["service_offer_signoffs"]["Row"]
+      }
+      attach_campaign_offer_v6: {
+        Args: { p_manifest_id: string; p_offer_version_id: string }
+        Returns: undefined
+      }
+      create_proof_artifact_v6: {
+        Args: {
+          p_client_id: string; p_source_proof_id: string; p_artifact_kind: string
+          p_supported_claim: string; p_evidence_excerpt: string; p_content: string
+          p_idempotency_key: string; p_job_id?: string | null
+        }
+        Returns: Database["public"]["Tables"]["proof_artifact_versions"]["Row"]
+      }
+      approve_proof_artifact_v6: {
+        Args: { p_artifact_version_id: string }
+        Returns: Database["public"]["Tables"]["proof_artifact_signoffs"]["Row"]
+      }
+      request_proof_artifact_v6: {
+        Args: { p_client_id: string; p_source_proof_id: string; p_artifact_kind: string }
+        Returns: string
+      }
+      decide_campaign_action_approval_v6: {
+        Args: { p_request_id: string; p_decision: string; p_reason?: string | null }
+        Returns: Database["public"]["Tables"]["campaign_action_approvals"]["Row"]
+      }
       request_repurpose_clip: {
         Args: { p_derivative_id: string; p_brief_id: string }
         Returns: string
@@ -8543,6 +8855,15 @@ export type Database = {
           required: number
           requirement: string
         }[]
+      }
+      clone_campaign_for_route: {
+        Args: {
+          p_source_campaign_id: string
+          p_target_mode: string
+          p_paid_platform?: string | null
+          p_name?: string | null
+        }
+        Returns: string
       }
       can_access_client: { Args: { target: string }; Returns: boolean }
       can_run_agent: {

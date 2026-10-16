@@ -62,7 +62,7 @@ describe("approving from the library", () => {
     fetchClientAssets.mockResolvedValue([asset({ media_type: "video", storage_path: "p/1.mp4" })]);
     render(<MemoryRouter><MediaLibrary mediaType="video" /></MemoryRouter>);
     expect(await screen.findByRole("link", { name: "Review sign-offs in Approvals" })).toHaveAttribute(
-      "href", "/clients/client-1/delivery/approvals?tab=assets",
+      "href", "/clients/client-1/delivery/approval-inbox?tab=assets",
     );
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });

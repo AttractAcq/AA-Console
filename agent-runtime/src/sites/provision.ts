@@ -80,6 +80,7 @@ export interface SiteStore {
     lastError: string | null;
   }): Promise<SiteRepoRecord>;
   loadPage(pageId: string): Promise<PageRecord | null>;
+  assertPagePublishAllowed(pageId: string): Promise<void>;
   /** Deployments for this page, as stored. Newest-first is typical; the caller decides. */
   deploymentsForPage(pageId: string): Promise<PageDeploymentRecord[]>;
   markPublishing(pageId: string, repoId: string, path: string): Promise<void>;
@@ -228,6 +229,7 @@ export async function publishPage(
   if (!page.html || page.html.trim().length === 0) {
     throw new Error("That page has no built HTML yet. Run the Page Builder first.");
   }
+  await store.assertPagePublishAllowed(pageId);
 
   const { record } = await syncInstallation(store, app, deps);
 

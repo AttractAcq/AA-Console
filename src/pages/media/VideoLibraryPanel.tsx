@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { MediaLibrary } from "../../components/MediaLibrary";
 import { supabase } from "../../lib/supabase";
 import { signPaths } from "../../lib/media";
+import { VideoCandidateReviewsPanel } from "./VideoCandidateReviewsPanel";
 
 type Reel = {
   id: string;
@@ -58,7 +59,7 @@ export function VideoLibraryPanel() {
       {rawFootage.length > 0 && <p className="mb-4 text-sm text-muted-foreground">
         {rawFootage.length} source video{rawFootage.length === 1 ? " is" : "s are"} in Edit / Repurpose.{" "}
         <button type="button" className="font-medium text-brand-strong hover:underline"
-          onClick={() => navigate(`/clients/${clientId}/delivery/edit-repurpose?tab=overview`)}>
+          onClick={() => navigate(`/clients/${clientId}/delivery/content-production-factory?tab=edit`)}>
           Open editing work
         </button>
       </p>}
@@ -93,6 +94,8 @@ export function VideoLibraryPanel() {
           </div>
         </section>
       )}
+      <VideoCandidateReviewsPanel clientId={clientId}
+        titles={new Map(reels.map((reel) => [reel.id, reel.title || reel.ref_number || "Reel"]))} />
       <MediaLibrary mediaType="video" />
     </div>
   );

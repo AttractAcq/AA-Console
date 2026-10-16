@@ -30,7 +30,7 @@ beforeEach(() => {
 describe("operations campaign deletion", () => {
   it("opens the specific campaign page", () => {
     show();
-    expect(screen.getByRole("link", { name: "Winter push" })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-execution/camp-1");
+    expect(screen.getByRole("link", { name: "Winter push" })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-factory/camp-1");
   });
 
   it("requires a warning and exact name, then deletes and refreshes", async () => {

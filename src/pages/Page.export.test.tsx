@@ -11,10 +11,11 @@ vi.mock("../lib/moduleExport", () => ({ downloadTabPdf, downloadModuleZip }));
 vi.mock("./intelligence/BusinessContextPanel", () => ({ BusinessContextPanel: () => <p>Business context panel</p> }));
 vi.mock("./intelligence/MarketPanel", () => ({ MarketPanel: () => <p>Market panel</p> }));
 
-import { clientNavGroups } from "../config/navigation";
+import { legacyDeliveryNodes, v6ModuleNodes } from "../config/navigation";
 import { Page } from "./Page";
 
-const intelligence = clientNavGroups[0].children!.find((node) => node.id === "intelligence")!;
+const intelligence = legacyDeliveryNodes.find((node) => node.id === "intelligence")!;
+const intelligenceOs = v6ModuleNodes.find((node) => node.id === "intelligence-os")!;
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -54,4 +55,21 @@ it("shows an export failure and allows retry", async () => {
   await user.click(screen.getByRole("button", { name: "Download PDF" }));
   expect(downloadTabPdf).toHaveBeenCalledTimes(2);
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it("exports both retained intelligence and strategy groups from Intelligence OS", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={["/clients/client-1/delivery/intelligence-os"]}>
+      <Routes>
+        <Route path="/clients/:clientId/delivery/intelligence-os" element={<Page node={intelligenceOs} />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  const strategyStart = intelligenceOs.tabs!.findIndex((tab) => tab.id === "branding-strategy");
+  await user.click(screen.getByRole("button", { name: "Download intelligence" }));
+  expect(downloadModuleZip).toHaveBeenCalledWith("client-1", "intelligence", intelligenceOs.tabs!.slice(0, strategyStart));
+  await user.click(screen.getByRole("button", { name: "Download strategy" }));
+  expect(downloadModuleZip).toHaveBeenLastCalledWith("client-1", "strategy", intelligenceOs.tabs!.slice(strategyStart));
 });

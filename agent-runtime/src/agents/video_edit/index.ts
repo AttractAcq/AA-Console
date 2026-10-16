@@ -394,6 +394,7 @@ async function cut(
       path: outputPath, workDir: work, brief: briefTextForEdit(brief),
       visualBrief: visualBriefForReview(brief),
       brandNeverDo: brand?.never_do ?? "",
+      durationSec: probe.duration_sec,
       soundTreatment: probe.has_audio ? "audio_present" : "captions_only",
     }, { model: config.model, timeoutMs: deadlineMs ? Math.max(30_000, deadlineMs - Date.now()) : undefined });
   } catch (error) {

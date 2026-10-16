@@ -175,11 +175,11 @@ export function ReelShotGrid({
                     <span className="text-xs text-muted-foreground">Waiting for human sign-off</span>}
                   {asset.reviewStatus !== "rejected" && !asset.humanApproved && asset.cut.status === "cut" && engineHeldIds.has(asset.id) && clientId && (
                     <Link className="text-xs font-medium text-brand-strong hover:underline"
-                      to={`/clients/${clientId}/delivery/approvals?tab=engine-inbox`}>Approve in Engine</Link>
+                      to={`/clients/${clientId}/delivery/approval-inbox?tab=engine-inbox`}>Approve in Engine</Link>
                   )}
                   {asset.reviewStatus !== "rejected" && !asset.humanApproved && asset.cut.status === "cut" && asset.cut.url && !engineHeldIds.has(asset.id) && clientId && (
                     <Link className="text-xs font-medium text-brand-strong hover:underline"
-                      to={`/clients/${clientId}/delivery/approvals?tab=assets`}>
+                      to={`/clients/${clientId}/delivery/approval-inbox?tab=assets`}>
                       Review sign-offs in Approvals
                     </Link>
                   )}

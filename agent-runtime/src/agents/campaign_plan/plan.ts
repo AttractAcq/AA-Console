@@ -65,6 +65,36 @@ export function normaliseChannels(raw: unknown): string[] {
   return [...seen];
 }
 
+/** Route is a stored campaign decision; the model cannot turn organic into paid. */
+export function planRouteProblem(
+  mode: unknown,
+  paidPlatform: unknown,
+  channels: string[],
+): string | null {
+  if (mode === "legacy" || mode == null) return null;
+  if (mode === "organic") {
+    if (channels.some((channel) => /(^|[_ -])(ads?|paid|ppc)([_ -]|$)/i.test(channel)))
+      return "An organic campaign cannot include a paid advertising channel.";
+    return null;
+  }
+  if (mode !== "paid") return "The campaign has an unknown acquisition route.";
+  if (paidPlatform === "meta") {
+    if (!channels.some((channel) => ["meta", "facebook", "instagram"].includes(channel)))
+      return "A paid Meta campaign needs a Meta, Facebook or Instagram destination.";
+    if (channels.some((channel) => ["google", "google_ads", "search", "youtube"].includes(channel)))
+      return "A paid Meta campaign cannot include a Google destination.";
+    return null;
+  }
+  if (paidPlatform === "google") {
+    if (!channels.some((channel) => ["google", "google_ads", "search"].includes(channel)))
+      return "A paid Google campaign needs a Google or search destination.";
+    if (channels.some((channel) => ["meta", "facebook", "instagram"].includes(channel)))
+      return "A paid Google campaign cannot include a Meta destination.";
+    return null;
+  }
+  return "A paid campaign needs a supported platform.";
+}
+
 /**
  * Why this plan cannot be accepted, or null if it can.
  *

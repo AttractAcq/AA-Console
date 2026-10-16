@@ -134,6 +134,13 @@ export function supabaseSiteStore(sb: SupabaseClient): SiteStore {
       };
     },
 
+    async assertPagePublishAllowed(pageId) {
+      const { error } = await sb.rpc("assert_page_publish_allowed_v6", {
+        p_page_id: pageId,
+      });
+      if (error) throw new Error(error.message);
+    },
+
     async deploymentsForPage(pageId): Promise<PageDeploymentRecord[]> {
       const { data, error } = await sb
         .from("client_sales_agent_deployments")

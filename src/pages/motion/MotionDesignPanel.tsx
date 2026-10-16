@@ -192,7 +192,7 @@ export function MotionDesignPanel() {
               </select>
               {attachments.some((item) => item.project_id === project.id
                 && item.brief_id === (attachSelections[project.id] || null))
-                ? <Link to={`/clients/${clientId}/delivery/approvals?tab=assets`}
+                ? <Link to={`/clients/${clientId}/delivery/approval-inbox?tab=assets`}
                   className="text-xs font-medium text-brand-strong hover:underline">Open approval asset</Link>
                 : <button type="button" disabled={busy} onClick={() => void attach(project)}
                   className="rounded-md border border-border px-3 py-2 text-xs font-medium disabled:opacity-50">

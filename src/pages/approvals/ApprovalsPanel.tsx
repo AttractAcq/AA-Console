@@ -185,7 +185,7 @@ export function ApprovalsPanel() {
               actions={
                 <>
                   {asset.content_format === "reel" && asset.brief_id && (
-                    <Link to={`/clients/${clientId}/delivery/media?tab=reel-shots&brief=${encodeURIComponent(asset.brief_id)}`}
+                    <Link to={`/clients/${clientId}/delivery/content-production-factory?tab=reel-shots&brief=${encodeURIComponent(asset.brief_id)}`}
                       className="rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-brand-strong hover:bg-accent">
                       Production history
                     </Link>

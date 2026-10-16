@@ -170,7 +170,7 @@ export function VideoRepurposePanel({ clientId, employeeMode = false }: {
                     {PLATFORMS.filter((item) => candidate.kind !== "short_clip" || item !== "linkedin")
                       .map((item) => <option key={item} value={item} className="capitalize">{item}</option>)}
                   </select>
-                  {linked && <Link to={`/clients/${clientId}/delivery/ideation?tab=${linked.reentry_stage === "brief" ? "briefs" : "generation"}`}
+                  {linked && <Link to={`/clients/${clientId}/delivery/content-production-factory?tab=${linked.reentry_stage === "brief" ? "briefs" : "generation"}`}
                     className="text-xs font-medium text-brand-strong hover:underline">
                     Open {linked.reentry_stage === "brief" ? "brief" : "draft idea"}</Link>}
                   {!linked && <button type="button" disabled={busy} onClick={() => void branch(request, index + 1, platform, "ideation")}
@@ -190,7 +190,7 @@ export function VideoRepurposePanel({ clientId, employeeMode = false }: {
                   return <div className="text-xs">
                     {clip?.status === "completed" ? <Link className="font-medium text-brand-strong hover:underline"
                       to={employeeMode ? "/employee/video-editing"
-                        : `/clients/${clientId}/delivery/edit-repurpose?tab=overview&brief=${encodeURIComponent(brief.id)}`}>
+                        : `/clients/${clientId}/delivery/content-production-factory?tab=edit&brief=${encodeURIComponent(brief.id)}`}>
                       Open extracted clip in Edit / Repurpose</Link>
                       : <button type="button" disabled={busy || (clip && clip.status !== "failed")}
                         onClick={() => void createClip(linked, brief)}

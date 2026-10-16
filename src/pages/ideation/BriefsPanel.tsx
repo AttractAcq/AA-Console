@@ -204,10 +204,10 @@ export function BriefsPanel({ stage = "brief" }: { stage?: "brief" | "create" } 
           b.status === "in_production" || b.status === "complete" ? (
             b.media_type === "video" && b.content_format === "reel" ?
               <button key="a" type="button" className="text-xs font-medium text-brand-strong hover:underline"
-                onClick={() => navigate(`/clients/${clientId}/delivery/media?tab=reel-shots&brief=${b.id}`)}>Track reel</button>
+                onClick={() => navigate(`/clients/${clientId}/delivery/content-production-factory?tab=reel-shots&brief=${b.id}`)}>Track reel</button>
               : (assignments.get(b.id) ?? []).some((assignment) => assignment.asset_id) ?
                 <button key="a" type="button" className="text-xs font-medium text-brand-strong hover:underline"
-                  onClick={() => navigate(`/clients/${clientId}/delivery/media?tab=${b.media_type === "video" ? "video-library" : b.media_type === "image" ? "image-library" : "copy-library"}`)}>
+                  onClick={() => navigate(`/clients/${clientId}/delivery/content-production-factory?tab=${b.media_type === "video" ? "video-library" : b.media_type === "image" ? "image-library" : "copy-library"}`)}>
                   View delivery
                 </button>
               : <span key="a" className="text-xs text-muted-foreground">Actioned</span>
