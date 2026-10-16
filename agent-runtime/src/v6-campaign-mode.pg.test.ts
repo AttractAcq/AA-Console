@@ -64,6 +64,13 @@ beforeAll(async () => {
       title text, body text, source text, proof_type text, claim text,
       evidence text, captured_on date, storage_path text
     );
+    create table client_pages (id uuid primary key, client_id uuid not null);
+    create table client_sales_agents (id uuid primary key, client_id uuid not null);
+    create table campaign_artifacts (
+      id uuid primary key default gen_random_uuid(), campaign_id uuid not null,
+      client_id uuid not null, kind text not null, page_id uuid,
+      sales_agent_id uuid
+    );
     create function enqueue_agent_job_internal(text, uuid, text, uuid, uuid, jsonb, text)
     returns uuid language sql as $$ select gen_random_uuid() $$;
   `);
@@ -137,6 +144,8 @@ beforeAll(async () => {
   await db.exec(proofArtifactMigration);
   const offerBindingMigration = await readFile(new URL("../../supabase/migrations/20261016030000_210_v6_campaign_offer_binding.sql", import.meta.url), "utf8");
   await db.exec(offerBindingMigration);
+  const artifactOfferMigration = await readFile(new URL("../../supabase/migrations/20261016040000_211_v6_artifact_offer_inputs.sql", import.meta.url), "utf8");
+  await db.exec(artifactOfferMigration);
   await db.exec(`
     insert into clients(id) values ('${clientA}'), ('${clientB}');
     insert into client_campaigns(id,client_id,name,brief,meta_campaign_id,approved_at)
@@ -575,4 +584,77 @@ it("binds one approved offer before planning and captures its exact version", as
   expect(replay.rows[0]!.mcp_campaign_create_v6.replayed).toBe(true);
   await expect(db.query("select mcp_campaign_create_v6($1,$2,$3,$4,$5,$6,$7,$8,$9)",
     [...mcpArgs.slice(0, 8), null])).rejects.toThrow(/idempotency_conflict/);
+});
+
+it("freezes the same approved campaign offer for page and sales-agent build jobs", async () => {
+  const created = await db.query<{ offer: { id: string } }>(
+    "select to_jsonb(create_service_offer_version_v6($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12)) as offer",
+    [clientA, "Garden design", "Homeowners", "A tailored garden plan",
+      ["Site visit"], ["Construction excluded"], null, null, null, "[]",
+      "artifact-offer", null]);
+  const offerId = created.rows[0]!.offer.id;
+  await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
+    select set_config('test.user_id','${manager}',false);`);
+  await db.query("select approve_service_offer_version_v6($1)", [offerId]);
+  await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+  const campaign = await db.query<{ id: string }>(`insert into client_campaigns
+    (client_id,name,brief,acquisition_mode,offer_version_id,built_at,objective,audience,
+     needs_landing_page,needs_sales_agent)
+    values ($1,'Garden enquiries','Brief','organic',$2,now(),'Booked visits',
+      'Homeowners',true,true) returning id`, [clientA, offerId]);
+  const campaignId = campaign.rows[0]!.id;
+  const manifest = await db.query<{ manifest: { id: string } }>(
+    "select to_jsonb(create_campaign_manifest_v6($1,$2,$3)) as manifest",
+    [campaignId, "artifact-offer-package", false]);
+  await db.query("select attach_campaign_offer_v6($1,$2)", [manifest.rows[0]!.manifest.id, offerId]);
+  const pageId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaabbbb";
+  const agentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaacccc";
+  const pageJob = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaadddd";
+  const agentJob = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaeeee";
+  await db.query("insert into client_pages(id,client_id) values ($1,$2)", [pageId, clientA]);
+  await db.query("insert into client_sales_agents(id,client_id) values ($1,$2)", [agentId, clientA]);
+  await db.query(`insert into campaign_artifacts(campaign_id,client_id,kind,page_id)
+    values ($1,$2,'landing_page',$3)`, [campaignId, clientA, pageId]);
+  await db.query(`insert into campaign_artifacts(campaign_id,client_id,kind,sales_agent_id)
+    values ($1,$2,'sales_agent',$3)`, [campaignId, clientA, agentId]);
+  await db.query(`insert into agent_jobs(id,agent_key,client_id,input_table,input_id)
+    values ($1,'landing_page',$2,'client_pages',$3)`, [pageJob, clientA, pageId]);
+  await db.query(`insert into agent_jobs(id,agent_key,client_id,input_table,input_id)
+    values ($1,'sales_agent',$2,'client_sales_agents',$3)`, [agentJob, clientA, agentId]);
+  const page = await db.query<{ offer: { id: string; promise: string } }>(
+    "select capture_campaign_artifact_offer_v6($1,$2) as offer", [pageJob, "page"]);
+  const agent = await db.query<{ offer: { id: string; promise: string } }>(
+    "select capture_campaign_artifact_offer_v6($1,$2) as offer", [agentJob, "sales_agent"]);
+  expect(page.rows[0]!.offer).toMatchObject({ id: offerId, promise: "A tailored garden plan" });
+  expect(agent.rows[0]!.offer).toEqual(page.rows[0]!.offer);
+  const replay = await db.query<{ offer: { id: string } }>(
+    "select capture_campaign_artifact_offer_v6($1,$2) as offer", [pageJob, "page"]);
+  expect(replay.rows[0]!.offer.id).toBe(offerId);
+  await expect(db.query("select capture_campaign_artifact_offer_v6($1,$2)",
+    [pageJob, "sales_agent"])).rejects.toThrow(/matching artifact build job/);
+  const manualCampaign = await db.query<{ id: string }>(`insert into client_campaigns
+    (client_id,name,brief,acquisition_mode,built_at,objective,audience,
+     needs_landing_page,needs_sales_agent)
+    values ($1,'Manual package offer','Brief','organic',now(),'Booked visits',
+      'Homeowners',true,false) returning id`, [clientA]);
+  const manualManifest = await db.query<{ manifest: { id: string } }>(
+    "select to_jsonb(create_campaign_manifest_v6($1,$2,$3)) as manifest",
+    [manualCampaign.rows[0]!.id, "manual-offer-package", false]);
+  await db.query("select attach_campaign_offer_v6($1,$2)", [manualManifest.rows[0]!.manifest.id, offerId]);
+  const manualPage = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaffff";
+  const manualJob = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaababa";
+  await db.query("insert into client_pages(id,client_id) values ($1,$2)", [manualPage, clientA]);
+  await db.query(`insert into campaign_artifacts(campaign_id,client_id,kind,page_id)
+    values ($1,$2,'landing_page',$3)`, [manualCampaign.rows[0]!.id, clientA, manualPage]);
+  await db.query(`insert into agent_jobs(id,agent_key,client_id,input_table,input_id)
+    values ($1,'landing_page',$2,'client_pages',$3)`, [manualJob, clientA, manualPage]);
+  const manual = await db.query<{ offer: { id: string } }>(
+    "select capture_campaign_artifact_offer_v6($1,$2) as offer", [manualJob, "page"]);
+  expect(manual.rows[0]!.offer.id).toBe(offerId);
+  const another = await db.query<{ id: string }>(`insert into client_campaigns
+    (client_id,name,brief,acquisition_mode) values ($1,'Another','Brief','organic') returning id`, [clientA]);
+  await db.query(`insert into campaign_artifacts(campaign_id,client_id,kind,page_id)
+    values ($1,$2,'landing_page',$3)`, [another.rows[0]!.id, clientA, pageId]);
+  await expect(db.query("select capture_campaign_artifact_offer_v6($1,$2)",
+    [pageJob, "page"])).rejects.toThrow(/ambiguous offer scope/);
 });
