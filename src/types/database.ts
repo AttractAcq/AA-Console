@@ -738,6 +738,21 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_manifest_items: {
+        Row: {
+          manifest_id: string; item_key: string; module_key: string
+          required: boolean; depends_on: string[]; external_activation: boolean
+        }
+        Insert: {
+          manifest_id: string; item_key: string; module_key: string
+          required: boolean; depends_on?: string[]; external_activation?: boolean
+        }
+        Update: {
+          manifest_id?: string; item_key?: string; module_key?: string
+          required?: boolean; depends_on?: string[]; external_activation?: boolean
+        }
+        Relationships: []
+      }
       proof_artifact_versions: {
         Row: {
           id: string; client_id: string; source_proof_id: string
