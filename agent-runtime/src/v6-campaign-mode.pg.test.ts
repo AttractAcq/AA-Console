@@ -36,7 +36,12 @@ beforeAll(async () => {
       unique (id, client_id)
     );
     create table agent_jobs (
-      id uuid primary key, agent_key text, input_table text, input_id uuid, status text
+      id uuid primary key, agent_key text, client_id uuid,
+      input_table text, input_id uuid, status text
+    );
+    create table agents (
+      agent_key text primary key, name text, initials text, domain text,
+      description text, requires_upstream text[], requires_input boolean
     );
     create table client_business_context (
       client_id uuid primary key, business_overview text, ideal_customer text,
@@ -55,7 +60,9 @@ beforeAll(async () => {
     create table campaign_content_pillars (campaign_id uuid, pillar_id uuid);
     create table client_proof_assets (
       id uuid primary key, client_id uuid not null,
-      usage_rights text not null, expires_on date
+      usage_rights text not null, expires_on date,
+      title text, body text, source text, proof_type text, claim text,
+      evidence text, captured_on date, storage_path text
     );
     create function enqueue_agent_job_internal(text, uuid, text, uuid, uuid, jsonb, text)
     returns uuid language sql as $$ select gen_random_uuid() $$;
@@ -126,6 +133,8 @@ beforeAll(async () => {
   await db.exec(intelligenceMigration);
   const offerMigration = await readFile(new URL("../../supabase/migrations/20261016010000_208_v6_offer_studio.sql", import.meta.url), "utf8");
   await db.exec(offerMigration);
+  const proofArtifactMigration = await readFile(new URL("../../supabase/migrations/20261016020000_209_v6_proof_artifacts.sql", import.meta.url), "utf8");
+  await db.exec(proofArtifactMigration);
   await db.exec(`
     insert into clients(id) values ('${clientA}'), ('${clientB}');
     insert into client_campaigns(id,client_id,name,brief,meta_campaign_id,approved_at)
@@ -412,7 +421,7 @@ it("versions service offers and requires cleared proof before a human signs quan
   try {
     await expect(db.query("select approve_service_offer_version_v6($1)", [offer.id]))
       .rejects.toThrow(/current, cleared proof/);
-    await db.query("update client_proof_assets set usage_rights='approved' where id=$1", [proofId]);
+    await db.query("update client_proof_assets set usage_rights='approved',permission_basis='Customer signed testimonial release' where id=$1", [proofId]);
     const signed = await db.query<{ signoff: { approved_by: string } }>(
       "select to_jsonb(approve_service_offer_version_v6($1)) as signoff", [offer.id]);
     expect(signed.rows[0]!.signoff.approved_by).toBe(manager);
@@ -445,4 +454,69 @@ it("versions service offers and requires cleared proof before a human signs quan
   await db.query("update client_proof_assets set expires_on=current_date-1 where id=$1", [proofId]);
   await expect(db.query("select attach_campaign_offer_v6($1,$2)",
     [nextManifest.rows[0]!.manifest.id, offer.id])).rejects.toThrow(/current, cleared proof/);
+});
+
+it("holds proof derivatives until source rights and text pass human review", async () => {
+  const proofId = "99999999-9999-4999-8999-999999999999";
+  await db.query(`insert into client_proof_assets
+    (id,client_id,usage_rights,title,body,source,claim,evidence)
+    values ($1,$2,'not_cleared','Customer review','The team arrived on time.',
+      'https://example.test/review','On-time arrival','The team arrived on time.')`,
+  [proofId, clientA]);
+  const args = [clientA, proofId, "geo_answer", "The team arrived on time",
+    "The team arrived on time.", "How quickly do you arrive? A customer reported that the team arrived on time.",
+    "proof-artifact-1", null];
+  const first = await db.query<{ artifact: {
+    id: string; version: number; source_hash: string; content_hash: string;
+  } }>("select to_jsonb(create_proof_artifact_v6($1,$2,$3,$4,$5,$6,$7,$8)) as artifact", args);
+  const artifact = first.rows[0]!.artifact;
+  expect(artifact.version).toBe(1);
+  expect(artifact.source_hash).toMatch(/^[0-9a-f]{64}$/);
+  const replay = await db.query<{ artifact: { id: string } }>(
+    "select to_jsonb(create_proof_artifact_v6($1,$2,$3,$4,$5,$6,$7,$8)) as artifact", args);
+  expect(replay.rows[0]!.artifact.id).toBe(artifact.id);
+  await expect(db.query("select create_proof_artifact_v6($1,$2,$3,$4,$5,$6,$7,$8)",
+    [clientA, proofId, "geo_answer", "Claim", "Invented excerpt", "Draft", "bad-excerpt", null]))
+    .rejects.toThrow(/appear verbatim/);
+  await expect(db.query("select create_proof_artifact_v6($1,$2,$3,$4,$5,$6,$7,$8)",
+    [clientB, proofId, "geo_answer", "Claim", "The team arrived on time.", "Draft", "wrong-client", null]))
+    .rejects.toThrow(/does not belong/);
+  await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
+    select set_config('test.user_id','${manager}',false);`);
+  try {
+    const requested = await db.query<{ request_proof_artifact_v6: string }>(
+      "select request_proof_artifact_v6($1,$2,$3)", [clientA, proofId, "seo_case_study"]);
+    expect(requested.rows[0]!.request_proof_artifact_v6).toMatch(/^[0-9a-f-]{36}$/);
+    await expect(db.query("select request_proof_artifact_v6($1,$2,$3)",
+      [clientB, proofId, "geo_answer"])).rejects.toThrow(/same-client proof/);
+    await expect(db.query("select approve_proof_artifact_v6($1)", [artifact.id]))
+      .rejects.toThrow(/uncleared, expired or changed/);
+    await expect(db.query("update client_proof_assets set usage_rights='approved' where id=$1", [proofId]))
+      .rejects.toThrow(/permission basis/);
+    await db.query("update client_proof_assets set usage_rights='approved',permission_basis='Customer authorized quote use' where id=$1", [proofId]);
+    const rights = await db.query<{ actor_id: string; actor_role: string; permission_basis: string }>(
+      "select actor_id,actor_role,permission_basis from proof_rights_events where proof_id=$1", [proofId]);
+    expect(rights.rows).toEqual([{
+      actor_id: manager, actor_role: "authenticated", permission_basis: "Customer authorized quote use",
+    }]);
+    await db.query("update client_proof_assets set evidence='A revised account.' where id=$1", [proofId]);
+    await expect(db.query("select approve_proof_artifact_v6($1)", [artifact.id]))
+      .rejects.toThrow(/uncleared, expired or changed/);
+    await db.query("update client_proof_assets set evidence='The team arrived on time.' where id=$1", [proofId]);
+    const signoff = await db.query<{ signoff: { approved_by: string } }>(
+      "select to_jsonb(approve_proof_artifact_v6($1)) as signoff", [artifact.id]);
+    expect(signoff.rows[0]!.signoff.approved_by).toBe(manager);
+  } finally {
+    await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+  }
+  const jobId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  await db.query("insert into agent_jobs(id,agent_key,client_id) values ($1,'proof_artifact',$2)",
+    [jobId, clientA]);
+  const generated = await db.query<{ artifact: { created_by_job_id: string; version: number } }>(
+    "select to_jsonb(create_proof_artifact_v6($1,$2,$3,$4,$5,$6,$7,$8)) as artifact",
+    [clientA, proofId, "geo_answer", "On-time arrival", "The team arrived on time.",
+      "A customer said the team arrived on time.", "agent-proof-1", jobId]);
+  expect(generated.rows[0]!.artifact).toMatchObject({ created_by_job_id: jobId, version: 2 });
+  await expect(db.query("update proof_artifact_versions set content='changed' where id=$1", [artifact.id]))
+    .rejects.toThrow(/immutable/);
 });

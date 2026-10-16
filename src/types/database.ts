@@ -702,6 +702,36 @@ export type Database = {
         }
         Relationships: []
       }
+      proof_artifact_versions: {
+        Row: {
+          id: string; client_id: string; source_proof_id: string
+          artifact_kind: string; version: number; idempotency_key: string
+          source_snapshot: Json; source_hash: string; supported_claim: string
+          evidence_excerpt: string; content: string; content_hash: string
+          created_by_job_id: string | null; created_at: string
+        }
+        Insert: {
+          id?: string; client_id: string; source_proof_id: string
+          artifact_kind: string; version: number; idempotency_key: string
+          source_snapshot: Json; source_hash: string; supported_claim: string
+          evidence_excerpt: string; content: string; content_hash: string
+          created_by_job_id?: string | null; created_at?: string
+        }
+        Update: {
+          id?: string; client_id?: string; source_proof_id?: string
+          artifact_kind?: string; version?: number; idempotency_key?: string
+          source_snapshot?: Json; source_hash?: string; supported_claim?: string
+          evidence_excerpt?: string; content?: string; content_hash?: string
+          created_by_job_id?: string | null; created_at?: string
+        }
+        Relationships: []
+      }
+      proof_artifact_signoffs: {
+        Row: { artifact_version_id: string; client_id: string; approved_by: string; approved_at: string }
+        Insert: { artifact_version_id: string; client_id: string; approved_by: string; approved_at?: string }
+        Update: { artifact_version_id?: string; client_id?: string; approved_by?: string; approved_at?: string }
+        Relationships: []
+      }
       campaign_artifacts: {
         Row: {
           asset_id: string | null
@@ -3707,6 +3737,7 @@ export type Database = {
           expires_on: string | null
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
+          permission_basis: string | null
           proof_type: string | null
           ref_number: string | null
           services: string | null
@@ -3729,6 +3760,7 @@ export type Database = {
           expires_on?: string | null
           id?: string
           media_type: Database["public"]["Enums"]["media_type"]
+          permission_basis?: string | null
           proof_type?: string | null
           ref_number?: string | null
           services?: string | null
@@ -3751,6 +3783,7 @@ export type Database = {
           expires_on?: string | null
           id?: string
           media_type?: Database["public"]["Enums"]["media_type"]
+          permission_basis?: string | null
           proof_type?: string | null
           ref_number?: string | null
           services?: string | null
@@ -8431,6 +8464,22 @@ export type Database = {
       attach_campaign_offer_v6: {
         Args: { p_manifest_id: string; p_offer_version_id: string }
         Returns: undefined
+      }
+      create_proof_artifact_v6: {
+        Args: {
+          p_client_id: string; p_source_proof_id: string; p_artifact_kind: string
+          p_supported_claim: string; p_evidence_excerpt: string; p_content: string
+          p_idempotency_key: string; p_job_id?: string | null
+        }
+        Returns: Database["public"]["Tables"]["proof_artifact_versions"]["Row"]
+      }
+      approve_proof_artifact_v6: {
+        Args: { p_artifact_version_id: string }
+        Returns: Database["public"]["Tables"]["proof_artifact_signoffs"]["Row"]
+      }
+      request_proof_artifact_v6: {
+        Args: { p_client_id: string; p_source_proof_id: string; p_artifact_kind: string }
+        Returns: string
       }
       decide_campaign_action_approval_v6: {
         Args: { p_request_id: string; p_decision: string; p_reason?: string | null }

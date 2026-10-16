@@ -373,7 +373,10 @@ export const v6ModuleNodes: NavNode[] = [
   { id: "campaign-factory", label: "Campaign Factory", path: "campaign-factory", icon: Megaphone,
     capability: "expanding", tabs: [{ id: "overview", label: "Campaigns" }] },
   { id: "proof-production-factory", label: "Proof Production Factory", path: "proof-production-factory",
-    icon: FolderCheck, capability: "expanding", tabs: [{ id: "proof-bank", label: "Proof Bank" }] },
+    icon: FolderCheck, capability: "expanding", tabs: [
+      { id: "proof-bank", label: "Proof Bank" },
+      { id: "artifacts", label: "Proof Artifacts" },
+    ] },
   { id: "content-production-factory", label: "Content Production Factory", path: "content-production-factory",
     icon: Clapperboard, capability: "expanding", tabs: [
       { id: "generation", label: "Ideation" }, { id: "briefs", label: "Briefs" },

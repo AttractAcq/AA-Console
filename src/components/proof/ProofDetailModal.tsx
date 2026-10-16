@@ -56,6 +56,7 @@ export function ProofDetailModal({
       services: proof.services ?? "",
       strength: proof.strength ?? "medium",
       usage_rights: proof.usage_rights ?? "not_cleared",
+      permission_basis: proof.permission_basis ?? "",
       captured_on: proof.captured_on ?? "",
       expires_on: proof.expires_on ?? "",
     });
@@ -77,6 +78,7 @@ export function ProofDetailModal({
         services: form.services?.trim() || null,
         strength: form.strength || "medium",
         usage_rights: form.usage_rights || "not_cleared",
+        permission_basis: form.permission_basis?.trim() || null,
         captured_on: form.captured_on || null,
         expires_on: form.expires_on || null,
       })
@@ -165,6 +167,8 @@ export function ProofDetailModal({
               })}
             </div>
           </div>
+
+          {field("permission_basis", "Permission basis", "Record who authorized use and where that authorization is documented. Required when clearing proof.", 2)}
 
           {field("claim", "Claim", "The one specific thing this proves. Not \"we do good work\".", 2)}
           {field("evidence", "Evidence", "What backs it, so a sceptic can judge it.", 2)}

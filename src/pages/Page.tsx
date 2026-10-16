@@ -24,6 +24,7 @@ import { OfferStrategyPanel } from "./strategy/OfferStrategyPanel";
 import { ServiceOffersPanel } from "./offer/ServiceOffersPanel";
 import { MoneyModelStrategyPanel } from "./strategy/MoneyModelStrategyPanel";
 import { ProofBankPanel } from "./proof-bank/ProofBankPanel";
+import { ProofArtifactsPanel } from "./proof-bank/ProofArtifactsPanel";
 import { GenerationPanel } from "./ideation/GenerationPanel";
 import { ContentArchivePanel } from "./archive/ContentArchivePanel";
 import { ARCHIVE_DOMAINS, SimpleArchivePanel } from "./archive/SimpleArchivePanel";
@@ -92,7 +93,10 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "money-model-strategy": () => <MoneyModelStrategyPanel />,
   },
   "campaign-factory": { overview: () => <CampaignExecutionPanel /> },
-  "proof-production-factory": { "proof-bank": () => <ProofBankPanel /> },
+  "proof-production-factory": {
+    "proof-bank": () => <ProofBankPanel />,
+    artifacts: () => <ProofArtifactsPanel />,
+  },
   "content-production-factory": {
     generation: () => <GenerationPanel />,
     briefs: () => <BriefsPanel />,
