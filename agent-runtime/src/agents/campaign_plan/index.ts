@@ -139,6 +139,39 @@ type ApprovedCampaignOffer = {
   claims: unknown[]; content_hash: string;
 };
 
+export function savedPlanNeedsFinalization(campaign: {
+  built_at: string | null; job_id: string | null;
+  content_ideas_generated_at: string | null; ideate_on_plan: boolean | null;
+}, jobId: string): boolean {
+  return Boolean(campaign.built_at && campaign.job_id === jobId &&
+    (campaign.content_ideas_generated_at || campaign.ideate_on_plan === false));
+}
+
+async function finalizeV6CampaignPackage(
+  sb: SupabaseClient, campaignId: string, jobId: string,
+  intelligenceSnapshotId: string, offerVersionId: string | null,
+): Promise<void> {
+  const { data: manifest, error } = await sb.rpc("create_campaign_manifest_v6", {
+    p_campaign_id: campaignId,
+    p_idempotency_key: `campaign-plan:${jobId}`,
+    p_needs_lead_magnet: false,
+  });
+  if (error) throw new Error(`Failed to version v6 campaign package: ${error.message}`);
+  if (!manifest?.id) throw new Error("The v6 campaign package has no manifest ID.");
+  const { error: linkError } = await sb.rpc("attach_campaign_manifest_intelligence_v6", {
+    p_manifest_id: manifest.id,
+    p_snapshot_id: intelligenceSnapshotId,
+  });
+  if (linkError) throw new Error(`Failed to link v6 campaign intelligence: ${linkError.message}`);
+  if (offerVersionId) {
+    const { error: offerError } = await sb.rpc("attach_campaign_offer_v6", {
+      p_manifest_id: manifest.id,
+      p_offer_version_id: offerVersionId,
+    });
+    if (offerError) throw new Error(`Failed to link approved campaign offer: ${offerError.message}`);
+  }
+}
+
 export async function runCampaignPlanJob(
   sb: SupabaseClient,
   runtime: RuntimeConfig,
@@ -167,7 +200,28 @@ export async function runCampaignPlanJob(
   if (!campaign) {
     return { ok: false, retryable: false, failureMessage: "That campaign no longer exists." };
   }
-  // A committed batch survives worker crashes and repeated generation requests.
+  const isV6 = campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "paid";
+  // A committed batch survives worker crashes. The same job must still finish
+  // package creation and links after a crash between the SQL save and return.
+  if (savedPlanNeedsFinalization(campaign, job.id)) {
+    if (isV6) {
+      const { data: snapshot, error } = await sb.rpc("capture_campaign_intelligence_snapshot_v6", {
+        p_campaign_id: campaign.id, p_job_id: job.id,
+      });
+      if (error || !snapshot?.id) throw new Error(`Failed to recover campaign intelligence: ${error?.message ?? "missing snapshot"}`);
+      if (campaign.offer_version_id) {
+        const { data: offer, error: offerError } = await sb.rpc("capture_campaign_offer_v6", {
+          p_campaign_id: campaign.id,
+        });
+        if (offerError || offer?.id !== campaign.offer_version_id) {
+          throw new Error(`Failed to recover approved campaign offer: ${offerError?.message ?? "version mismatch"}`);
+        }
+      }
+      await finalizeV6CampaignPackage(
+        sb, campaign.id, job.id, snapshot.id, campaign.offer_version_id ?? null);
+    }
+    return { ok: true, retryable: false };
+  }
   if (campaign.content_ideas_generated_at) return { ok: true, retryable: false };
 
   if (!campaign.brief || campaign.brief.trim().length === 0) {
@@ -185,7 +239,6 @@ export async function runCampaignPlanJob(
     .maybeSingle();
   const clientName = (clientRow?.name as string | undefined) ?? "this business";
 
-  const isV6 = campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "paid";
   let approvedOffer: ApprovedCampaignOffer | null = null;
   if (isV6 && campaign.offer_version_id) {
     const { data, error } = await sb.rpc("capture_campaign_offer_v6", {
@@ -437,27 +490,11 @@ Call ${submitTool.name} once when you are done.`;
   }
 
   if (isV6) {
-    const { data: manifest, error } = await sb.rpc("create_campaign_manifest_v6", {
-      p_campaign_id: campaign.id,
-      p_idempotency_key: `campaign-plan:${job.id}`,
-      p_needs_lead_magnet: false,
-    });
-    if (error) throw new Error(`Failed to version v6 campaign package: ${error.message}`);
-    if (!intelligenceSnapshotId || !manifest?.id) {
+    if (!intelligenceSnapshotId) {
       throw new Error("The v6 campaign package has no intelligence snapshot link.");
     }
-    const { error: linkError } = await sb.rpc("attach_campaign_manifest_intelligence_v6", {
-      p_manifest_id: manifest.id,
-      p_snapshot_id: intelligenceSnapshotId,
-    });
-    if (linkError) throw new Error(`Failed to link v6 campaign intelligence: ${linkError.message}`);
-    if (approvedOffer) {
-      const { error: offerError } = await sb.rpc("attach_campaign_offer_v6", {
-        p_manifest_id: manifest.id,
-        p_offer_version_id: approvedOffer.id,
-      });
-      if (offerError) throw new Error(`Failed to link approved campaign offer: ${offerError.message}`);
-    }
+    await finalizeV6CampaignPackage(
+      sb, campaign.id, job.id, intelligenceSnapshotId, approvedOffer?.id ?? null);
   }
 
   await appendEvent(sb, job.id, `Planned "${campaign.name}".\n\n${planSummary(plan)}`, "info", {
