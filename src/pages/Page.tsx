@@ -21,6 +21,7 @@ import { CampaignInputsPanel } from "./intelligence/CampaignInputsPanel";
 import { BrandingStrategyPanel } from "./strategy/BrandingStrategyPanel";
 import { ContentPillarsPanel } from "./strategy/ContentPillarsPanel";
 import { OfferStrategyPanel } from "./strategy/OfferStrategyPanel";
+import { ServiceOffersPanel } from "./offer/ServiceOffersPanel";
 import { MoneyModelStrategyPanel } from "./strategy/MoneyModelStrategyPanel";
 import { ProofBankPanel } from "./proof-bank/ProofBankPanel";
 import { GenerationPanel } from "./ideation/GenerationPanel";
@@ -118,7 +119,10 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     organic: () => <OrganicPanel />,
     reporting: () => <OrganicReportingPanel />,
   },
-  "offer-studio": { "offer-strategy": () => <OfferStrategyPanel /> },
+  "offer-studio": {
+    offers: () => <ServiceOffersPanel />,
+    "offer-strategy": () => <OfferStrategyPanel />,
+  },
   "website-studio": {
     "landing-pages": () => <PageBuilderPanel pageType="landing" />,
     "offer-pages": () => <PageBuilderPanel pageType="offer" />,

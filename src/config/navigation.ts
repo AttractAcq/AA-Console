@@ -403,7 +403,10 @@ export const v6ModuleNodes: NavNode[] = [
       { id: "organic", label: "Posts" }, { id: "reporting", label: "Profile Metrics" },
     ] },
   { id: "offer-studio", label: "Offer Studio", path: "offer-studio", icon: Target,
-    capability: "expanding", tabs: [{ id: "offer-strategy", label: "Offer Strategy" }] },
+    capability: "expanding", tabs: [
+      { id: "offers", label: "Service Offers" },
+      { id: "offer-strategy", label: "Offer Strategy" },
+    ] },
   { id: "website-studio", label: "Website Studio", path: "website-studio", icon: Globe,
     capability: "expanding", tabs: [
       { id: "landing-pages", label: "Landing Pages" }, { id: "offer-pages", label: "Offer Pages" },

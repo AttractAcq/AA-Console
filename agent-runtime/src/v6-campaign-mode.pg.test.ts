@@ -53,6 +53,10 @@ beforeAll(async () => {
       id uuid primary key, name text, premise text, belongs text, does_not_belong text
     );
     create table campaign_content_pillars (campaign_id uuid, pillar_id uuid);
+    create table client_proof_assets (
+      id uuid primary key, client_id uuid not null,
+      usage_rights text not null, expires_on date
+    );
     create function enqueue_agent_job_internal(text, uuid, text, uuid, uuid, jsonb, text)
     returns uuid language sql as $$ select gen_random_uuid() $$;
   `);
@@ -120,6 +124,8 @@ beforeAll(async () => {
   await db.exec(approvalsMigration);
   const intelligenceMigration = await readFile(new URL("../../supabase/migrations/20261016000000_207_v6_intelligence_snapshot.sql", import.meta.url), "utf8");
   await db.exec(intelligenceMigration);
+  const offerMigration = await readFile(new URL("../../supabase/migrations/20261016010000_208_v6_offer_studio.sql", import.meta.url), "utf8");
+  await db.exec(offerMigration);
   await db.exec(`
     insert into clients(id) values ('${clientA}'), ('${clientB}');
     insert into client_campaigns(id,client_id,name,brief,meta_campaign_id,approved_at)
@@ -380,4 +386,63 @@ it("reuses the exact intelligence input on a planner retry and links it to the p
   await expect(db.query("select attach_campaign_manifest_intelligence_v6($1,$2)",
     [manifest.rows[0]!.manifest.id, fresh.rows[0]!.snapshot.id]))
     .rejects.toThrow(/already uses another/);
+});
+
+it("versions service offers and requires cleared proof before a human signs quantified claims", async () => {
+  const proofId = "88888888-8888-4888-8888-888888888888";
+  await db.query("insert into client_proof_assets(id,client_id,usage_rights) values ($1,$2,'not_cleared')",
+    [proofId, clientA]);
+  const claims = JSON.stringify([
+    { kind: "quantified", text: "95% of callers book a visit", proof_asset_id: proofId },
+  ]);
+  const args = [clientA, "Roof repair", "Homeowners", "A fast inspection",
+    ["On-site survey"], ["Structural replacement"], 150, "EUR", 40, claims, "offer-draft-1", null];
+  const first = await db.query<{ offer: { id: string; offer_id: string; version: number; content_hash: string } }>(
+    "select to_jsonb(create_service_offer_version_v6($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12)) as offer", args);
+  const offer = first.rows[0]!.offer;
+  expect(offer.version).toBe(1);
+  expect(offer.content_hash).toMatch(/^[0-9a-f]{64}$/);
+  const replay = await db.query<{ offer: { id: string } }>(
+    "select to_jsonb(create_service_offer_version_v6($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12)) as offer", args);
+  expect(replay.rows[0]!.offer.id).toBe(offer.id);
+  await expect(db.query("update service_offer_versions set promise='Changed' where id=$1", [offer.id]))
+    .rejects.toThrow(/immutable/);
+  await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
+    select set_config('test.user_id','${manager}',false);`);
+  try {
+    await expect(db.query("select approve_service_offer_version_v6($1)", [offer.id]))
+      .rejects.toThrow(/current, cleared proof/);
+    await db.query("update client_proof_assets set usage_rights='approved' where id=$1", [proofId]);
+    const signed = await db.query<{ signoff: { approved_by: string } }>(
+      "select to_jsonb(approve_service_offer_version_v6($1)) as signoff", [offer.id]);
+    expect(signed.rows[0]!.signoff.approved_by).toBe(manager);
+    await expect(db.query("select approve_service_offer_version_v6($1)", [offer.id]))
+      .rejects.toThrow(/already approved/);
+  } finally {
+    await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+  }
+  const campaign = await db.query<{ id: string }>(`
+    insert into client_campaigns (
+      client_id,name,brief,acquisition_mode,built_at,objective,audience,needs_landing_page
+    ) values ($1,'Offer campaign','Brief','organic',now(),'Booked visits',
+      'Homeowners',false) returning id`, [clientA]);
+  const manifest = await db.query<{ manifest: { id: string } }>(
+    "select to_jsonb(create_campaign_manifest_v6($1,$2,$3)) as manifest",
+    [campaign.rows[0]!.id, "offer-package", false]);
+  await db.query("select attach_campaign_offer_v6($1,$2)", [manifest.rows[0]!.manifest.id, offer.id]);
+  await db.query("select attach_campaign_offer_v6($1,$2)", [manifest.rows[0]!.manifest.id, offer.id]);
+  const attached = await db.query<{ offer_version_id: string }>(
+    "select offer_version_id from campaign_manifest_offers where manifest_id=$1",
+    [manifest.rows[0]!.manifest.id]);
+  expect(attached.rows[0]!.offer_version_id).toBe(offer.id);
+  await expect(db.query("update campaign_manifest_offers set offer_version_id=$1 where manifest_id=$2",
+    [offer.id, manifest.rows[0]!.manifest.id])).rejects.toThrow(/immutable/);
+  const nextManifest = await db.query<{ manifest: { id: string } }>(
+    "select to_jsonb(create_campaign_manifest_v6($1,$2,$3)) as manifest",
+    [campaign.rows[0]!.id, "offer-package-next", false]);
+  await expect(db.query("select attach_campaign_offer_v6($1,$2)",
+    [manifest.rows[0]!.manifest.id, offer.id])).rejects.toThrow(/superseded/);
+  await db.query("update client_proof_assets set expires_on=current_date-1 where id=$1", [proofId]);
+  await expect(db.query("select attach_campaign_offer_v6($1,$2)",
+    [nextManifest.rows[0]!.manifest.id, offer.id])).rejects.toThrow(/current, cleared proof/);
 });

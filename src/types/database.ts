@@ -642,6 +642,66 @@ export type Database = {
         }
         Relationships: []
       }
+      service_offers: {
+        Row: { id: string; client_id: string; service_name: string; created_at: string }
+        Insert: { id?: string; client_id: string; service_name: string; created_at?: string }
+        Update: { id?: string; client_id?: string; service_name?: string; created_at?: string }
+        Relationships: []
+      }
+      service_offer_versions: {
+        Row: {
+          id: string; offer_id: string; client_id: string; version: number
+          idempotency_key: string; audience: string; promise: string
+          inclusions: string[]; exclusions: string[]; price_amount: number | null
+          currency: string | null; delivery_cost_estimate: number | null
+          claims: Json; content_hash: string; created_at: string
+        }
+        Insert: {
+          id?: string; offer_id: string; client_id: string; version: number
+          idempotency_key: string; audience: string; promise: string
+          inclusions?: string[]; exclusions?: string[]; price_amount?: number | null
+          currency?: string | null; delivery_cost_estimate?: number | null
+          claims?: Json; content_hash: string; created_at?: string
+        }
+        Update: {
+          id?: string; offer_id?: string; client_id?: string; version?: number
+          idempotency_key?: string; audience?: string; promise?: string
+          inclusions?: string[]; exclusions?: string[]; price_amount?: number | null
+          currency?: string | null; delivery_cost_estimate?: number | null
+          claims?: Json; content_hash?: string; created_at?: string
+        }
+        Relationships: []
+      }
+      service_offer_signoffs: {
+        Row: { offer_version_id: string; client_id: string; approved_by: string; approved_at: string }
+        Insert: { offer_version_id: string; client_id: string; approved_by: string; approved_at?: string }
+        Update: { offer_version_id?: string; client_id?: string; approved_by?: string; approved_at?: string }
+        Relationships: []
+      }
+      campaign_manifest_offers: {
+        Row: { manifest_id: string; campaign_id: string; client_id: string; offer_version_id: string; linked_at: string }
+        Insert: { manifest_id: string; campaign_id: string; client_id: string; offer_version_id: string; linked_at?: string }
+        Update: { manifest_id?: string; campaign_id?: string; client_id?: string; offer_version_id?: string; linked_at?: string }
+        Relationships: []
+      }
+      campaign_manifest_versions: {
+        Row: {
+          id: string; campaign_id: string; client_id: string; version: number
+          idempotency_key: string; acquisition_mode: string; paid_platform: string | null
+          plan_snapshot: Json; plan_hash: string; created_at: string
+        }
+        Insert: {
+          id?: string; campaign_id: string; client_id: string; version: number
+          idempotency_key: string; acquisition_mode: string; paid_platform?: string | null
+          plan_snapshot: Json; plan_hash: string; created_at?: string
+        }
+        Update: {
+          id?: string; campaign_id?: string; client_id?: string; version?: number
+          idempotency_key?: string; acquisition_mode?: string; paid_platform?: string | null
+          plan_snapshot?: Json; plan_hash?: string; created_at?: string
+        }
+        Relationships: []
+      }
       campaign_artifacts: {
         Row: {
           asset_id: string | null
@@ -8354,6 +8414,24 @@ export type Database = {
       }
     }
     Functions: {
+      create_service_offer_version_v6: {
+        Args: {
+          p_client_id: string; p_service_name: string; p_audience: string;
+          p_promise: string; p_inclusions: string[]; p_exclusions: string[];
+          p_price_amount: number | null; p_currency: string | null;
+          p_delivery_cost_estimate: number | null; p_claims: Json;
+          p_idempotency_key: string; p_offer_id?: string | null
+        }
+        Returns: Database["public"]["Tables"]["service_offer_versions"]["Row"]
+      }
+      approve_service_offer_version_v6: {
+        Args: { p_version_id: string }
+        Returns: Database["public"]["Tables"]["service_offer_signoffs"]["Row"]
+      }
+      attach_campaign_offer_v6: {
+        Args: { p_manifest_id: string; p_offer_version_id: string }
+        Returns: undefined
+      }
       decide_campaign_action_approval_v6: {
         Args: { p_request_id: string; p_decision: string; p_reason?: string | null }
         Returns: Database["public"]["Tables"]["campaign_action_approvals"]["Row"]
