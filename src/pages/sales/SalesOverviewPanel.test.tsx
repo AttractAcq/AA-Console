@@ -86,7 +86,7 @@ const conv = (over: Conv = {}): Conv => ({
 const update = vi.fn();
 const eq = vi.fn();
 
-function show(agents: unknown[] = [built()], convs: Conv[] = [], jobs: Job[] = []) {
+function show(agents: unknown[] = [built()], convs: Conv[] = [], jobs: Job[] = [], campaignId?: string) {
   const chain = {
     eq,
     then: (r: (v: { error: null }) => unknown) => Promise.resolve({ error: null }).then(r),
@@ -119,13 +119,32 @@ function show(agents: unknown[] = [built()], convs: Conv[] = [], jobs: Job[] = [
     };
     return chain;
   });
-  return render(<SalesOverviewPanel />);
+  return render(<SalesOverviewPanel campaignId={campaignId} campaignName={campaignId ? "Winter push" : undefined} />);
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   useParams.mockReturnValue({ clientId: "client-1" });
   getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+});
+
+it("links a sales agent built from Campaign Factory to that campaign", async () => {
+  show([], [], [], "campaign-1");
+  const originalFrom = from.getMockImplementation()!;
+  const link = vi.fn(() => Promise.resolve({ error: null }));
+  from.mockImplementation((table: string) => table === "client_sales_agents"
+    ? { ...originalFrom(table), insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "new-agent" }, error: null }) }) }) }
+    : table === "campaign_artifacts" ? { insert: link } : originalFrom(table));
+  rpc.mockResolvedValue({ error: null });
+  await userEvent.click(screen.getByRole("button", { name: "Build Sales Agent" }));
+  expect(screen.getByLabelText("Campaign")).toHaveValue("campaign-1");
+  await userEvent.type(screen.getByRole("textbox", { name: "Agent name" }), "Winter setter");
+  await userEvent.selectOptions(screen.getByRole("combobox", { name: "What surface is this agent for" }), "appointment_setter");
+  await userEvent.type(screen.getByRole("textbox", { name: "What this agent is for" }), "Book consultations");
+  await userEvent.click(screen.getByRole("button", { name: "Build" }));
+  await waitFor(() => expect(link).toHaveBeenCalledWith({
+    campaign_id: "campaign-1", client_id: "client-1", kind: "sales_agent", sales_agent_id: "new-agent",
+  }));
 });
 
 describe("liveStateOf", () => {

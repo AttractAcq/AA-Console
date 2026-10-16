@@ -275,6 +275,7 @@ function getPanelBody(
   sectionLabel: string,
   view: string,
 ): ReactNode {
+  if (node.id === "campaign-factory" && view === "v2") return <CampaignExecutionPanel />;
   if (node.id === "content-production-factory" && view === "v2") {
     switch (activeTab?.id) {
       case "generation": return <GenerationPanel showJourney={false} />;
@@ -299,9 +300,10 @@ export function Page({ node }: { node: NavNode }) {
   const requestedView = searchParams.get("view");
   const view = node.id === "intelligence-os" ? requestedView === "strategy" ? "strategy" : "intelligence"
     : requestedView === "v2" && node.sidebarViews?.some((item) => item.id === "v2") ? "v2" : "v1";
-  const v2Blank = view === "v2" && node.id !== "content-production-factory";
+  const v2Blank = view === "v2" && node.id !== "content-production-factory" && node.id !== "campaign-factory";
   const tabs = node.id === "intelligence-os"
     ? node.tabs?.filter((tab) => strategyTabIds.has(tab.id) === (view === "strategy"))
+    : node.id === "campaign-factory" && view === "v2" ? undefined
     : node.id === "content-production-factory" && view === "v2"
       ? [
         { id: "generation", label: "Ideation" }, { id: "briefs", label: "Briefs" },

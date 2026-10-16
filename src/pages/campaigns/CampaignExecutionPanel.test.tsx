@@ -3,12 +3,13 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, useParams, useNavigate, useAgentJobs, callRuntime } = vi.hoisted(() => ({
+const { from, rpc, useParams, useNavigate, useAgentJobs, callRuntime, useSearchParams } = vi.hoisted(() => ({
   callRuntime: vi.fn(),
   from: vi.fn(),
   rpc: vi.fn(),
   useParams: vi.fn(),
   useNavigate: vi.fn(() => vi.fn()),
+  useSearchParams: vi.fn(() => [new URLSearchParams()]),
   useAgentJobs: vi.fn(),
 }));
 vi.mock("../../lib/supabase", () => ({
@@ -22,6 +23,7 @@ vi.mock("../../lib/supabase", () => ({
 vi.mock("react-router-dom", () => ({
   useParams,
   useNavigate,
+  useSearchParams,
   // Link renders as an anchor so tests can still find navigation by role.
   Link: ({ to, children, ...rest }: { to: string; children?: unknown }) =>
     createElement("a", { href: to, ...rest }, children as never),
@@ -40,6 +42,7 @@ const planned = (over: Record<string, unknown> = {}) => ({
   id: "camp-1",
   acquisition_mode: "legacy",
   paid_platform: null,
+  offer_version_id: null,
   cloned_from_campaign_id: null,
   name: "Winter full-arch push",
   brief: "Fill the January consult diary",
@@ -135,6 +138,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   useParams.mockReturnValue({ clientId: "client-1", campaignId: "camp-1" });
   useAgentJobs.mockReturnValue({ inFlight: [], recentFailures: [] });
+  useSearchParams.mockReturnValue([new URLSearchParams()]);
 });
 
 describe("the plan", () => {
@@ -154,6 +158,83 @@ describe("the plan", () => {
 });
 
 describe("campaign pages", () => {
+  it("shows the v2 campaign table and opens a campaign through its name", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    useParams.mockReturnValue({ clientId: "client-1" });
+    show([planned(), planned({ id: "camp-2", name: "Spring whitening" })]);
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Winter full-arch push" })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-factory/camp-1?view=v2");
+    expect(screen.getByRole("columnheader", { name: "Date" })).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Archive" }));
+    expect(screen.getByRole("dialog", { name: "Confirm campaign action" })).toHaveTextContent("Archive");
+    expect(from).not.toHaveBeenCalledWith("client_campaigns", expect.objectContaining({ archived_at: expect.anything() }));
+  });
+
+  it("keeps campaign actions behind a second confirmation in v2", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    show([planned()], READY);
+    expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Plan", "Content"]);
+    await userEvent.click(screen.getByRole("button", { name: "Action buttons" }));
+    await userEvent.click(screen.getByRole("button", { name: "Launch" }));
+    expect(screen.getByRole("dialog", { name: "Confirm campaign action" })).toHaveTextContent("Launch");
+    expect(rpc).not.toHaveBeenCalledWith("launch_campaign", expect.anything());
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(rpc).not.toHaveBeenCalledWith("launch_campaign", expect.anything());
+  });
+
+  it("shows all v2 build tabs only for paid campaigns", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
+    expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Plan", "Content", "Landing Page", "Sales Agent", "Meta Ads"]);
+    expect(screen.getAllByText("Book 40 consultations in January")).toHaveLength(2);
+    expect(screen.getByText("Chewing is not a cosmetic problem")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Meta Ads" }));
+    await userEvent.click(screen.getByRole("button", { name: "Build functionality" }));
+    expect(screen.getByRole("button", { name: "Budget and countries" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Write build sheet" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Record a hand build" })).toBeEnabled();
+  });
+
+  it("regenerates a built plan as a linked revision instead of replacing its assets", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    const navigate = vi.fn();
+    useNavigate.mockReturnValue(navigate);
+    show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
+    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "revision-1" }, error: null }) }) }));
+    const originalFrom = from.getMockImplementation()!;
+    from.mockImplementation((table: string) => table === "client_campaigns" ? { ...originalFrom(table), insert } : originalFrom(table));
+    await screen.findByRole("heading", { name: "Winter full-arch push" });
+    await userEvent.click(screen.getByRole("button", { name: "Regenerate plan" }));
+    expect(insert).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      acquisition_mode: "paid", paid_platform: "meta", cloned_from_campaign_id: "camp-1",
+      brief: "Fill the January consult diary",
+    })));
+    expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", expect.objectContaining({ p_input_id: "revision-1" }));
+    expect(navigate).toHaveBeenCalledWith("/clients/client-1/delivery/campaign-factory/revision-1?view=v2");
+  });
+
+  it("passes edited plan details to the planner of a new revision", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
+    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "revision-2" }, error: null }) }) }));
+    const originalFrom = from.getMockImplementation()!;
+    from.mockImplementation((table: string) => table === "client_campaigns" ? { ...originalFrom(table), insert } : originalFrom(table));
+    await screen.findByRole("heading", { name: "Winter full-arch push" });
+    await userEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit and regenerate plan" }));
+    await userEvent.clear(dialog.getByRole("textbox", { name: "Objective" }));
+    await userEvent.type(dialog.getByRole("textbox", { name: "Objective" }), "Book 60 consultations");
+    await userEvent.click(dialog.getByRole("button", { name: "Save and regenerate" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      brief: expect.stringContaining("Objective: Book 60 consultations"),
+    })));
+  });
+
   it("clones a legacy campaign into an explicit route without reusing its activation", async () => {
     show();
     rpc.mockImplementation((name: string) => name === "clone_campaign_for_route"

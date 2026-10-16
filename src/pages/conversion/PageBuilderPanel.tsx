@@ -57,9 +57,14 @@ export type PageBuilderType = "landing" | "offer" | "recruitment";
 export function PageBuilderPanel({
   pageType = "landing",
   clientId: clientIdProp,
+  campaignId: selectedCampaignId,
+  campaignName,
 }: {
   pageType?: PageBuilderType;
   clientId?: string;
+  /** Campaign Factory v2 embeds the existing build form with a fixed campaign. */
+  campaignId?: string;
+  campaignName?: string;
 }) {
   const [buildOpen, setBuildOpen] = useState(false);
   const [briefing, setBriefing] = useState(false);
@@ -310,7 +315,7 @@ export function PageBuilderPanel({
 
   return (
     <div>
-      <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
+      {!selectedCampaignId && <AgentActivityBar inFlight={inFlight} failures={recentFailures} />}
 
       <div className="mb-4 flex justify-end">
         <Button icon={Plus} onClick={() => setBuildOpen(true)}>
@@ -325,7 +330,7 @@ export function PageBuilderPanel({
       )}
       {actionError && <p role="alert" className="mb-4 text-sm text-destructive">{actionError}</p>}
 
-      {pages.length === 0 ? (
+      {selectedCampaignId ? null : pages.length === 0 ? (
         <EmptyState label="No pages built yet" />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -470,11 +475,13 @@ export function PageBuilderPanel({
           setAiBrief(null);
         }}
         title="Build Page"
-        draftKey={`page:${pageType}:${clientId}`}
+        draftKey={selectedCampaignId ? undefined : `page:${pageType}:${clientId}`}
         intro="Upload finished HTML when the page already exists, or leave the file empty to queue the page agent."
-        fields={fields}
+        fields={selectedCampaignId ? fields.map((field) => field.name === "campaign_id"
+          ? { ...field, options: [{ value: selectedCampaignId, label: campaignName ?? "Current campaign" }] }
+          : field) : fields}
         submitLabel="Save page"
-        initialValues={aiBrief ? { brief: aiBrief } : undefined}
+        initialValues={selectedCampaignId ? { campaign_id: selectedCampaignId, ...(aiBrief ? { brief: aiBrief } : {}) } : aiBrief ? { brief: aiBrief } : undefined}
         actions={
           <button
             type="button"
@@ -488,7 +495,7 @@ export function PageBuilderPanel({
           if (!clientId) throw new Error("No client selected.");
           const title = (v.title as string).trim();
           const brief = typeof v.brief === "string" ? v.brief.trim() : "";
-          const campaignId = typeof v.campaign_id === "string" ? v.campaign_id : "";
+          const campaignId = selectedCampaignId ?? (typeof v.campaign_id === "string" ? v.campaign_id : "");
           const referenceAssetId =
             typeof v.reference_asset_id === "string" && v.reference_asset_id
               ? v.reference_asset_id

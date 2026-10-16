@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
@@ -21,6 +21,10 @@ import { CampaignContentPanel } from "./CampaignContentPanel";
 import { MetaBuildSection } from "./MetaBuildSection";
 import { ArchiveAction } from "../../components/ArchiveAction";
 import { cn } from "../../lib/cn";
+import { Modal } from "../../components/Modal";
+import type { Database } from "../../types/database";
+import { PageBuilderPanel } from "../conversion/PageBuilderPanel";
+import { SalesOverviewPanel } from "../sales/SalesOverviewPanel";
 
 type Campaign = {
   id: string;
@@ -56,6 +60,7 @@ type Campaign = {
   meta_campaign_id: string | null;
   meta_ad_set_id: string | null;
   meta_built_at: string | null;
+  offer_version_id: string | null;
 };
 
 export type Requirement = {
@@ -104,9 +109,12 @@ const STATUS_TONE: Record<string, string> = {
   complete: "bg-muted text-muted-foreground",
   cancelled: "bg-muted text-muted-foreground",
 };
+const buttonClass = "rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50";
 
 export function CampaignExecutionPanel() {
   const { clientId, campaignId } = useParams<{ clientId: string; campaignId?: string }>();
+  const [searchParams] = useSearchParams();
+  const v2 = searchParams.get("view") === "v2";
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [readiness, setReadiness] = useState<Record<string, Requirement[]>>({});
@@ -134,6 +142,13 @@ export function CampaignExecutionPanel() {
     ...(aiDraft?.template ? { acquisition_mode: "paid", paid_platform: "meta" } : {}),
     ideate_on_plan: true,
   }), [aiDraft]);
+  const [editing, setEditing] = useState<Campaign | null>(null);
+  const [editingPlan, setEditingPlan] = useState<Campaign | null>(null);
+  const [metaToolsOpen, setMetaToolsOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [rowActions, setRowActions] = useState<string | null>(null);
+  const [v2Tab, setV2Tab] = useState("plan");
+  const [confirmAction, setConfirmAction] = useState<{ campaign: Campaign; kind: "archive" | "delete" | "plan" | "launch" | "clone" } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -156,7 +171,7 @@ export function CampaignExecutionPanel() {
       const query = supabase
         .from("client_campaigns")
         .select(
-          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at, acquisition_mode, paid_platform, cloned_from_campaign_id",
+          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at, acquisition_mode, paid_platform, cloned_from_campaign_id, offer_version_id",
         )
         .eq("client_id", clientId)
         // A campaign somebody archived is over. It reads from the archive.
@@ -363,12 +378,12 @@ export function CampaignExecutionPanel() {
    * Confirm copy must name that scope — a silent cascade is how somebody
    * deletes twelve ideas by accident.
    */
-  const deleteCampaign = async (campaign: Campaign) => {
+  const deleteCampaign = async (campaign: Campaign, confirmed = false) => {
     const warning =
       `Delete "${campaign.name}"? This also deletes its campaign ideas, ` +
       `content briefs and generated assets. Landing pages and sales agents ` +
       `stay, but their link to this campaign is removed. It cannot be undone.`;
-    if (!window.confirm(warning)) return;
+    if (!confirmed && !window.confirm(warning)) return;
     setBusy(true);
     setProblem(null);
     setNotice(null);
@@ -394,8 +409,57 @@ export function CampaignExecutionPanel() {
         ? `Deleted "${campaign.name}", along with ${parts.join(", ")}.`
         : `Deleted "${campaign.name}".`,
     );
-    if (campaignId) navigate(`/clients/${clientId}/delivery/campaign-factory`);
+    if (campaignId) navigate(`/clients/${clientId}/delivery/campaign-factory${v2 ? "?view=v2" : ""}`);
     else void refresh();
+  };
+
+  /** A planned campaign can have approved creative and an immutable v6 package.
+   * Regeneration therefore makes a linked revision and preserves the source. */
+  const createPlanRevision = async (campaign: Campaign, brief: string) => {
+    if (!clientId) throw new Error("No client selected.");
+    const { data, error } = await supabase.from("client_campaigns").insert({
+      client_id: clientId,
+      name: `${campaign.name.slice(0, 180)} · Revised plan`,
+      brief,
+      acquisition_mode: campaign.acquisition_mode,
+      paid_platform: campaign.paid_platform,
+      cloned_from_campaign_id: campaign.id,
+      offer_version_id: campaign.offer_version_id,
+      ideate_on_plan: campaign.ideate_on_plan,
+      ...(campaign.template ? templateColumns(campaign.template) ?? {} : {}),
+    }).select("id").single();
+    if (error) throw error;
+    const queued = await supabase.rpc("enqueue_agent_job", {
+      p_agent_key: "campaign_plan", p_client_id: clientId,
+      p_input_table: "client_campaigns", p_input_id: data.id,
+    });
+    if (queued.error) throw queued.error;
+    navigate(`/clients/${clientId}/delivery/campaign-factory/${data.id}?view=v2`);
+  };
+
+  const runConfirmedAction = async () => {
+    if (!confirmAction || !clientId) return;
+    const { campaign, kind } = confirmAction;
+    setConfirmAction(null);
+    setActionsOpen(false);
+    setRowActions(null);
+    if (kind === "clone") { setCloneSource(campaign); return; }
+    if (kind === "delete") { await deleteCampaign(campaign, true); return; }
+    if (kind === "plan") {
+      if (campaign.built_at) {
+        try { await createPlanRevision(campaign, campaign.brief); }
+        catch (error) { setProblem((error as Error).message); }
+      } else await plan(campaign);
+      return;
+    }
+    if (kind === "launch") { await act("launch_campaign", campaign, () => `"${campaign.name}" is live.`); return; }
+    setBusy(true);
+    const { error } = await supabase.from("client_campaigns")
+      .update({ archived_at: new Date().toISOString() }).eq("id", campaign.id).eq("client_id", clientId);
+    setBusy(false);
+    if (error) setProblem(error.message);
+    else if (campaignId) navigate(`/clients/${clientId}/delivery/campaign-factory?view=v2`);
+    else { setNotice(`Archived "${campaign.name}".`); void refresh(); }
   };
 
   const visibleCampaigns = campaignId ? campaigns.filter((campaign) => campaign.id === campaignId) : campaigns;
@@ -404,7 +468,7 @@ export function CampaignExecutionPanel() {
     <div>
       <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
 
-      {campaignId && clientId && <Link to={`/clients/${clientId}/delivery/campaign-factory`} className="mb-4 inline-block text-sm text-brand-strong hover:underline">← All campaigns</Link>}
+      {campaignId && clientId && <Link to={`/clients/${clientId}/delivery/campaign-factory${v2 ? "?view=v2" : ""}`} className="mb-4 inline-block text-sm text-brand-strong hover:underline">← All campaigns</Link>}
       {!campaignId && <div className="mb-4 flex justify-end">
         <Button icon={Plus} onClick={() => setNewOpen(true)}>
           New Campaign
@@ -427,6 +491,48 @@ export function CampaignExecutionPanel() {
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : visibleCampaigns.length === 0 ? (
         <EmptyState label={campaignId ? "Campaign not found" : "No campaigns yet"} />
+      ) : v2 ? (
+        campaignId ? visibleCampaigns.map((c) => {
+          const reqs = readiness[c.id] ?? [];
+          const ready = reqs.length > 0 && reqs.every((requirement) => requirement.met);
+          const launchAvailable = c.status !== "live" && c.acquisition_mode === "legacy" && ready;
+          const paid = c.acquisition_mode === "paid";
+          const tabs = paid ? [ ["plan", "Plan"], ["content", "Content"], ["landing-page", "Landing Page"], ["sales-agent", "Sales Agent"], ...(c.paid_platform === "meta" ? [["meta-ads", "Meta Ads"]] as const : []) ] as const : [ ["plan", "Plan"], ["content", "Content"] ] as const;
+          return <div key={c.id}>
+            <section className="rounded-lg border border-border bg-card p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-center gap-3"><h2 className="text-lg font-semibold">{c.name}</h2><span className={cn("rounded-full px-2 py-0.5 text-xs font-medium capitalize", STATUS_TONE[c.status] ?? "bg-muted text-muted-foreground")}>{c.status}</span></div>
+                <button type="button" className={buttonClass} onClick={() => setEditing(c)}>Edit campaign</button>
+              </div>
+              <dl className="mt-4 grid gap-4 border-t border-border pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                <div><dt className="text-muted-foreground">Brief</dt><dd className="whitespace-pre-wrap">{c.brief}</dd></div>
+                <div><dt className="text-muted-foreground">Objective</dt><dd>{c.objective ?? "Awaiting plan"}</dd></div>
+                <div><dt className="text-muted-foreground">Offer</dt><dd>{c.offer_summary ?? "—"}</dd></div>
+                <div><dt className="text-muted-foreground">Budget</dt><dd>{c.budget == null ? "—" : c.budget.toLocaleString()}</dd></div>
+                <div><dt className="text-muted-foreground">Template</dt><dd>{c.template ?? "—"}</dd></div>
+                <div><dt className="text-muted-foreground">Dates</dt><dd>{c.starts_on ?? "—"} to {c.ends_on ?? "—"}</dd></div>
+              </dl>
+            </section>
+            <div className="relative mt-4">
+              <Button onClick={() => setActionsOpen((open) => !open)}>Action buttons</Button>
+              {actionsOpen && <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-border bg-card p-3" aria-label="Campaign actions">
+                {(["archive", "delete", "plan", "launch", "clone"] as const).map((kind) => <button key={kind} type="button" className={buttonClass} disabled={busy || (kind === "launch" && !launchAvailable) || (kind === "plan" && planning.has(c.id))} onClick={() => setConfirmAction({ campaign: c, kind })}>{kind === "plan" ? "Run planner" : kind === "clone" ? "Clone to another route" : kind[0].toUpperCase() + kind.slice(1)}</button>)}
+                {!launchAvailable && c.status !== "live" && <p className="w-full text-xs text-muted-foreground">Launch requires a ready legacy campaign. New routes require version-bound human approval.</p>}
+              </div>}
+            </div>
+            <div className="mt-6 flex flex-wrap gap-1 border-b border-border" role="tablist" aria-label="Campaign sections">
+              {tabs.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={v2Tab === id} onClick={() => setV2Tab(id)} className={cn("border-b-2 px-4 py-2 text-sm", v2Tab === id ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>{label}</button>)}
+            </div>
+            {v2Tab === "plan" && <section className="space-y-4 py-4" aria-label="Campaign plan">
+              <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">Campaign plan</h3><p className="text-xs text-muted-foreground">{c.built_at ? `Generated ${new Date(c.built_at).toLocaleString()}` : "Awaiting planner"}</p></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => setEditingPlan(c)}>Edit plan</button><button type="button" className={buttonClass} disabled={busy || planning.has(c.id)} onClick={() => setConfirmAction({ campaign: c, kind: "plan" })}>{c.built_at ? "Regenerate plan" : "Run planner"}</button></div></div>
+              <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Objective</dt><dd>{c.objective ?? "—"}</dd></div><div><dt className="text-muted-foreground">Audience</dt><dd>{c.audience ?? "—"}</dd></div><div><dt className="text-muted-foreground">Offer</dt><dd>{c.offer_summary ?? "—"}</dd></div><div><dt className="text-muted-foreground">Core message</dt><dd>{c.core_message ?? "—"}</dd></div><div><dt className="text-muted-foreground">Channels</dt><dd>{c.channels?.join(", ") || "—"}</dd></div><div><dt className="text-muted-foreground">Budget</dt><dd>{c.budget == null ? "—" : c.budget.toLocaleString()}</dd></div><div><dt className="text-muted-foreground">Dates</dt><dd>{c.starts_on ?? "—"} to {c.ends_on ?? "—"}</dd></div><div><dt className="text-muted-foreground">KPI</dt><dd>{c.kpi_metric ?? "—"}{c.kpi_target != null ? ` · target ${c.kpi_target}` : ""}</dd></div><div><dt className="text-muted-foreground">Content pieces</dt><dd>{c.content_count}</dd></div><div><dt className="text-muted-foreground">Required builds</dt><dd>{[c.needs_landing_page && "Landing page", c.needs_sales_agent && "Sales agent"].filter(Boolean).join(", ") || "None"}</dd></div></dl>
+            </section>}
+            {v2Tab === "content" && clientId && <CampaignContentPanel key={`${clientId}:${c.id}:v2`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} template={c.template} mirrorsTemplate={c.mirrors_template} onChanged={refresh} refreshToken={campaigns} layout="v2" />}
+            {paid && v2Tab === "landing-page" && clientId && <PageBuilderPanel clientId={clientId} campaignId={c.id} campaignName={c.name} />}
+            {paid && v2Tab === "sales-agent" && <SalesOverviewPanel campaignId={c.id} campaignName={c.name} />}
+            {paid && c.paid_platform === "meta" && v2Tab === "meta-ads" && clientId && <section className="py-4"><div className="flex justify-end"><Button onClick={() => setMetaToolsOpen((open) => !open)}>Build functionality</Button></div>{metaToolsOpen && <MetaBuildSection clientId={clientId} campaign={c} building={inFlight.some((job) => job.agent_key === "meta_build" && job.input_id === c.id)} onChanged={() => void refresh()} externalActionsAvailable={false} handBuildAvailable />}</section>}
+          </div>;
+        }) : <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-muted/40"><tr><th className="p-3">Campaign</th><th className="p-3">Date</th><th className="p-3">Stage</th><th className="p-3">Edit</th></tr></thead><tbody>{visibleCampaigns.map((c) => <tr key={c.id} className="border-b border-border last:border-0"><td className="p-3"><Link className="font-medium text-brand-strong hover:underline" to={`/clients/${clientId}/delivery/campaign-factory/${c.id}?view=v2`}>{c.name}</Link></td><td className="p-3">{new Date(c.created_at).toLocaleDateString()}</td><td className="p-3 capitalize">{c.status}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={rowActions === c.id} onClick={() => setRowActions(rowActions === c.id ? null : c.id)}>Edit</button>{rowActions === c.id && <div className="mt-2 flex gap-2"><button type="button" className={buttonClass} onClick={() => setConfirmAction({ campaign: c, kind: "archive" })}>Archive</button><button type="button" className={buttonClass} onClick={() => setConfirmAction({ campaign: c, kind: "delete" })}>Delete</button></div>}</td></tr>)}</tbody></table></div>
       ) : (
         <div className="space-y-4">
           {visibleCampaigns.map((c) => {
@@ -783,6 +889,110 @@ export function CampaignExecutionPanel() {
       />
 
       <FormModal
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        title="Edit campaign"
+        fields={[
+          { name: "name", label: "Campaign name", kind: "text", required: true },
+          { name: "brief", label: "Brief", kind: "textarea", rows: 4, required: true },
+          { name: "objective", label: "Objective", kind: "textarea", rows: 2 },
+          { name: "offer_summary", label: "Offer", kind: "textarea", rows: 2 },
+          { name: "budget", label: "Budget", kind: "number" },
+          { name: "template", label: "Template", kind: "select", options: templateOptions() },
+          { name: "starts_on", label: "Start date", kind: "date" },
+          { name: "ends_on", label: "End date", kind: "date" },
+        ]}
+        initialValues={editing ? {
+          name: editing.name, brief: editing.brief, objective: editing.objective,
+          offer_summary: editing.offer_summary, budget: editing.budget?.toString() ?? "",
+          template: editing.template, starts_on: editing.starts_on, ends_on: editing.ends_on,
+        } : undefined}
+        onSubmit={async (values) => {
+          if (!editing || !clientId) throw new Error("No campaign selected.");
+          const name = String(values.name ?? "").trim();
+          const brief = String(values.brief ?? "").trim();
+          if (!name || !brief) throw new Error("Name and brief are required.");
+          const budget = values.budget === "" || values.budget == null ? null : Number(values.budget);
+          if (budget !== null && (!Number.isFinite(budget) || budget < 0)) throw new Error("Enter a valid budget.");
+          const starts = String(values.starts_on ?? "") || null;
+          const ends = String(values.ends_on ?? "") || null;
+          if (starts && ends && ends < starts) throw new Error("End date must be after the start date.");
+          const templateValue = String(values.template ?? "");
+          if (templateValue && !templateFor(templateValue)) throw new Error("Choose a valid campaign template.");
+          const { error } = await supabase.from("client_campaigns").update({
+            name, brief, objective: String(values.objective ?? "").trim() || null,
+            offer_summary: String(values.offer_summary ?? "").trim() || null,
+            budget, template: (templateValue || null) as Database["public"]["Tables"]["client_campaigns"]["Row"]["template"],
+            starts_on: starts, ends_on: ends,
+          }).eq("id", editing.id).eq("client_id", clientId);
+          if (error) throw error;
+        }}
+        onSaved={() => { setEditing(null); setNotice("Campaign updated."); void refresh(); }}
+      />
+
+      <FormModal
+        open={editingPlan !== null}
+        onClose={() => setEditingPlan(null)}
+        title="Edit and regenerate plan"
+        intro="A generated plan may already have content and approvals. Saving creates a new campaign revision with your changes and runs the planner; the current campaign remains available."
+        fields={[
+          { name: "brief", label: "Campaign brief", kind: "textarea", rows: 4, required: true },
+          { name: "objective", label: "Objective", kind: "textarea", rows: 2 },
+          { name: "audience", label: "Audience", kind: "textarea", rows: 2 },
+          { name: "offer_summary", label: "Offer", kind: "textarea", rows: 2 },
+          { name: "core_message", label: "Core message", kind: "textarea", rows: 2 },
+          { name: "channels", label: "Channels (comma separated)", kind: "text" },
+          { name: "budget", label: "Budget", kind: "number" },
+          { name: "starts_on", label: "Start date", kind: "date" },
+          { name: "ends_on", label: "End date", kind: "date" },
+          { name: "kpi_metric", label: "KPI", kind: "text" },
+          { name: "kpi_target", label: "KPI target", kind: "number" },
+          { name: "content_count", label: "Content pieces", kind: "number" },
+        ]}
+        initialValues={editingPlan ? {
+          brief: editingPlan.brief, objective: editingPlan.objective, audience: editingPlan.audience,
+          offer_summary: editingPlan.offer_summary, core_message: editingPlan.core_message,
+          channels: editingPlan.channels?.join(", ") ?? "", budget: editingPlan.budget?.toString() ?? "",
+          starts_on: editingPlan.starts_on, ends_on: editingPlan.ends_on,
+          kpi_metric: editingPlan.kpi_metric, kpi_target: editingPlan.kpi_target?.toString() ?? "",
+          content_count: editingPlan.content_count.toString(),
+        } : undefined}
+        submitLabel="Save and regenerate"
+        onSubmit={async (values) => {
+          if (!editingPlan) throw new Error("No campaign selected.");
+          const brief = String(values.brief ?? "").trim();
+          if (!brief) throw new Error("Campaign brief is required.");
+          const planInstructions = [
+            ["Objective", values.objective], ["Audience", values.audience],
+            ["Offer", values.offer_summary], ["Core message", values.core_message],
+            ["Channels", values.channels], ["Budget", values.budget],
+            ["Start date", values.starts_on], ["End date", values.ends_on],
+            ["KPI", values.kpi_metric], ["KPI target", values.kpi_target],
+            ["Content pieces", values.content_count],
+          ].filter(([, value]) => String(value ?? "").trim()).map(([label, value]) => `${label}: ${String(value).trim()}`);
+          await createPlanRevision(editingPlan, `${brief}\n\nRequested plan direction:\n${planInstructions.join("\n")}`);
+        }}
+        onSaved={() => setEditingPlan(null)}
+      />
+
+      <Modal open={confirmAction !== null} onClose={() => setConfirmAction(null)} title="Confirm campaign action">
+        {confirmAction && <div className="space-y-4 text-sm">
+          <p>{confirmAction.kind === "delete"
+            ? `Delete “${confirmAction.campaign.name}” and its campaign ideas, briefs, and generated assets? Linked landing pages and sales agents remain. This cannot be undone.`
+            : confirmAction.kind === "archive"
+              ? `Archive “${confirmAction.campaign.name}”? You can restore it from Archive.`
+              : confirmAction.kind === "plan"
+                ? confirmAction.campaign.built_at
+                  ? `Regenerate the plan for “${confirmAction.campaign.name}”? This creates a linked revision and preserves the original campaign and its assets.`
+                  : `Run the planner for “${confirmAction.campaign.name}”?`
+                : confirmAction.kind === "launch"
+                  ? `Launch “${confirmAction.campaign.name}”? This changes its status to live.`
+                  : `Clone “${confirmAction.campaign.name}” into another route?`}</p>
+          <div className="flex justify-end gap-2"><button type="button" className={buttonClass} onClick={() => setConfirmAction(null)}>Cancel</button><Button onClick={() => void runConfirmedAction()}>Continue</Button></div>
+        </div>}
+      </Modal>
+
+      <FormModal
         open={cloneSource !== null}
         onClose={() => setCloneSource(null)}
         title="Clone campaign into a new route"
@@ -816,7 +1026,7 @@ export function CampaignExecutionPanel() {
           if (error) throw error;
           if (typeof data !== "string") throw new Error("The new campaign ID was not returned.");
           setNotice("New campaign created. Run its planner to build the new route.");
-          navigate(`/clients/${clientId}/delivery/campaign-factory/${data}`);
+          navigate(`/clients/${clientId}/delivery/campaign-factory/${data}${v2 ? "?view=v2" : ""}`);
         }}
         onSaved={() => { setCloneSource(null); void refresh(); }}
       />
