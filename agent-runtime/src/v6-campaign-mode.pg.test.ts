@@ -64,7 +64,10 @@ beforeAll(async () => {
       title text, body text, source text, proof_type text, claim text,
       evidence text, captured_on date, storage_path text
     );
-    create table client_pages (id uuid primary key, client_id uuid not null);
+    create table client_pages (
+      id uuid primary key, client_id uuid not null, published_url text,
+      publish_status text not null default 'unpublished'
+    );
     create table client_sales_agents (id uuid primary key, client_id uuid not null);
     create table campaign_artifacts (
       id uuid primary key default gen_random_uuid(), campaign_id uuid not null,
@@ -146,6 +149,8 @@ beforeAll(async () => {
   await db.exec(offerBindingMigration);
   const artifactOfferMigration = await readFile(new URL("../../supabase/migrations/20261016040000_211_v6_artifact_offer_inputs.sql", import.meta.url), "utf8");
   await db.exec(artifactOfferMigration);
+  const pagePublishBoundaryMigration = await readFile(new URL("../../supabase/migrations/20261016050000_212_v6_page_publish_boundary.sql", import.meta.url), "utf8");
+  await db.exec(pagePublishBoundaryMigration);
   await db.exec(`
     insert into clients(id) values ('${clientA}'), ('${clientB}');
     insert into client_campaigns(id,client_id,name,brief,meta_campaign_id,approved_at)
@@ -657,4 +662,28 @@ it("freezes the same approved campaign offer for page and sales-agent build jobs
     values ($1,$2,'landing_page',$3)`, [another.rows[0]!.id, clientA, pageId]);
   await expect(db.query("select capture_campaign_artifact_offer_v6($1,$2)",
     [pageJob, "page"])).rejects.toThrow(/ambiguous offer scope/);
+});
+
+it("blocks both page-publish entry and late attachment for v6 campaigns", async () => {
+  const pageId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const livePageId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  await db.query("insert into client_pages(id,client_id) values ($1,$2)", [pageId, clientA]);
+  await db.query(`insert into client_pages(id,client_id,published_url,publish_status)
+    values ($1,$2,'https://example.test/live','published')`, [livePageId, clientA]);
+  await db.query("select assert_page_publish_allowed_v6($1)", [pageId]);
+  const campaign = await db.query<{ id: string }>(`insert into client_campaigns
+    (client_id,name,brief,acquisition_mode) values ($1,'Page gate','Brief','organic') returning id`, [clientA]);
+  await db.query(`insert into campaign_artifacts(campaign_id,client_id,kind,page_id)
+    values ($1,$2,'landing_page',$3)`, [campaign.rows[0]!.id, clientA, pageId]);
+  await expect(db.query("select assert_page_publish_allowed_v6($1)", [pageId]))
+    .rejects.toThrow(/exact-version human approval/);
+  await expect(db.query("update client_pages set publish_status='publishing' where id=$1", [pageId]))
+    .rejects.toThrow(/exact-version human approval/);
+  await expect(db.query(`insert into campaign_artifacts(campaign_id,client_id,kind,page_id)
+    values ($1,$2,'landing_page',$3)`, [campaign.rows[0]!.id, clientA, livePageId]))
+    .rejects.toThrow(/live page cannot be attached/);
+  await db.exec("select set_config('request.jwt.claim.role','authenticated',false)");
+  await expect(db.query("select assert_page_publish_allowed_v6($1)", [pageId]))
+    .rejects.toThrow(/Service role required/);
+  await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
 });
