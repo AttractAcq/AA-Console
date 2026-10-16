@@ -12,6 +12,7 @@ vi.mock("./intelligence/BusinessContextPanel", () => ({ BusinessContextPanel: ()
 vi.mock("./intelligence/MarketPanel", () => ({ MarketPanel: () => <p>Market panel</p> }));
 vi.mock("./ideation/GenerationPanel", () => ({ GenerationPanel: ({ showJourney = true }: { showJourney?: boolean }) => <p>Ideation panel · journey {String(showJourney)}</p> }));
 vi.mock("./media/ContentAssetsPanel", () => ({ ContentAssetsPanel: () => <p>Grouped asset libraries</p> }));
+vi.mock("./campaigns/CampaignExecutionPanel", () => ({ CampaignExecutionPanel: () => <p>Campaign table</p> }));
 
 import { legacyDeliveryNodes, v6ModuleNodes } from "../config/navigation";
 import { Page } from "./Page";
@@ -107,12 +108,12 @@ it("keeps Content Production v1 tabs and gives v2 grouped assets without its sta
   expect(screen.getByText("Ideation panel · journey false")).toBeInTheDocument();
 });
 
-it("renders a heading only for an unbuilt v2 module", () => {
+it("renders the campaign factory v2 panel", () => {
   const campaign = v6ModuleNodes.find((node) => node.id === "campaign-factory")!;
   render(<MemoryRouter initialEntries={["/clients/client-1/delivery/campaign-factory?view=v2"]}>
     <Routes><Route path="/clients/:clientId/delivery/campaign-factory" element={<Page node={campaign} />} /></Routes>
   </MemoryRouter>);
   expect(screen.getByRole("heading", { name: "Campaign Factory v2" })).toBeInTheDocument();
-  expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+  expect(screen.getByText("Campaign table")).toBeInTheDocument();
   expect(screen.queryByText(/Existing tools are available here/)).not.toBeInTheDocument();
 });

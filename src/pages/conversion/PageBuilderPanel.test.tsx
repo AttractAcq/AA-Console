@@ -141,6 +141,18 @@ it("uploads a built HTML page and links it to the selected campaign without queu
   expect(rpc).not.toHaveBeenCalledWith("enqueue_agent_job", expect.anything());
 });
 
+it("locks the build page form to its Campaign Factory campaign", async () => {
+  render(<PageBuilderPanel campaignId="campaign-1" />);
+  fireEvent.click(screen.getByRole("button", { name: "Build Page" }));
+  fireEvent.change(await screen.findByLabelText(/Page title/), { target: { value: "Campaign landing" } });
+  expect(screen.getByLabelText("Campaign")).toHaveValue("campaign-1");
+  fireEvent.change(screen.getByLabelText(/What this page is for/), { target: { value: "Book consults" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save page" }));
+  await waitFor(() => expect(inserts).toEqual(expect.arrayContaining([
+    expect.objectContaining({ table: "campaign_artifacts", value: expect.objectContaining({ campaign_id: "campaign-1", kind: "landing_page" }) }),
+  ])));
+});
+
 it("queues the page agent when no HTML file is uploaded and still links the campaign", async () => {
   render(<PageBuilderPanel />);
   fireEvent.click(screen.getByRole("button", { name: "Build Page" }));

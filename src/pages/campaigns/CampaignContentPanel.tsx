@@ -10,6 +10,7 @@ import { allowedCtas } from "../../lib/campaignTemplates";
 import { signPaths, type MediaAsset } from "../../lib/media";
 import { formatLabel } from "../../lib/contentFormat";
 import { cn } from "../../lib/cn";
+import { RegenerateAction } from "../../components/RegenerateAction";
 
 type Idea = Database["public"]["Tables"]["client_ideas"]["Row"];
 type Brief = Database["public"]["Tables"]["client_briefs"]["Row"];
@@ -25,7 +26,7 @@ function hasAdCopy(asset: CampaignAsset): boolean {
   return [asset.ad_primary_text, asset.ad_headline, asset.ad_link_url, asset.ad_cta].some((v) => (v ?? "").trim() !== "");
 }
 
-export function CampaignContentPanel({ clientId, campaignId, contentCount, builtAt, contentIdeasGeneratedAt, template = null, mirrorsTemplate = null, onChanged, refreshToken }: {
+export function CampaignContentPanel({ clientId, campaignId, contentCount, builtAt, contentIdeasGeneratedAt, template = null, mirrorsTemplate = null, onChanged, refreshToken, layout = "v1" }: {
   clientId: string;
   campaignId: string;
   /** The campaign template, which decides which Meta buttons an ad may carry. */
@@ -36,6 +37,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
   contentIdeasGeneratedAt: string | null;
   onChanged: () => void;
   refreshToken?: unknown;
+  layout?: "v1" | "v2";
 }) {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [briefs, setBriefs] = useState<Brief[]>([]);
@@ -57,6 +59,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
   // of twelve full bodies; nobody scrolls that to find one. Match the empty-Set
   // pattern CampaignExecutionPanel uses for campaign cards.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [openAssetActions, setOpenAssetActions] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -137,6 +140,18 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
     );
   }
 
+  async function deleteAsset(asset: CampaignAsset) {
+    if (!window.confirm(`Delete “${asset.title ?? "asset"}”? This removes this asset from the campaign and cannot be undone. An asset already used by another workflow may need to be removed there first.`)) return;
+    await act(
+      async () => {
+        const { data, error } = await supabase.from("client_media_assets")
+          .delete().eq("id", asset.id).eq("client_id", clientId).select("id");
+        return { error: error ?? (data?.length ? null : { message: "This asset could not be deleted." }) };
+      },
+      "Asset deleted.", { id: asset.id, action: "delete" },
+    );
+  }
+
   const briefById = new Map(briefs.map((brief) => [brief.id, brief]));
   const ideaById = new Map(ideas.map((idea) => [idea.id, idea]));
 
@@ -206,6 +221,29 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
       </>}
     </div>
   );
+
+  const modals = <>
+    <BriefDetailModal brief={viewing} open={viewing !== null} onClose={() => setViewing(null)} />
+    <ApproveAndBuildModal brief={building} open={building !== null} onClose={() => setBuilding(null)} onDone={() => { void refresh(); onChanged(); setNotice("Production queued. Assets will appear here for approval."); }} />
+    <AdCopyModal asset={copying} brief={copying?.brief_id ? briefById.get(copying.brief_id) ?? null : null} landingUrl={landingUrl} allowedCtas={allowedCtas(template, mirrorsTemplate)} open={copying !== null} onClose={() => setCopying(null)} onSaved={() => { setNotice("Ad copy saved. This asset is in the next Meta build."); void refresh(); }} />
+    <MediaDetailModal asset={preview} url={preview ? urls.get(preview.storage_path) : undefined} open={preview !== null} onClose={() => setPreview(null)} />
+  </>;
+
+  if (layout === "v2") return <section className="mt-4 space-y-3" aria-label="Campaign content production">
+    <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold">Content production</h3><p className="text-xs text-muted-foreground">{ready} ready to distribute · {contentCount} planned · {ideas.length} ideas</p></div><button type="button" className={buttonClass} onClick={() => void refresh()}>Refresh content</button></div>
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
+    {contentCount > 0 && builtAt && !contentIdeasGeneratedAt && <button type="button" className={buttonClass} disabled={busy !== null || loading} onClick={() => void act(() => supabase.rpc("enqueue_agent_job", { p_agent_key: "campaign_plan", p_client_id: clientId, p_input_table: "client_campaigns", p_input_id: campaignId }), "Queued campaign ideas.", { id: campaignId, action: "plan" })}>Generate campaign ideas</button>}
+    {contentCount > 0 && !builtAt && <p className="text-xs text-muted-foreground">Run the planner to generate campaign content.</p>}
+    {loading ? <p className="text-sm text-muted-foreground">Loading content…</p> : <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-muted/40"><tr><th className="p-3">Name</th><th className="p-3">Preview</th><th className="p-3">Stage</th><th className="p-3">Brief</th><th className="p-3">Actions</th></tr></thead><tbody>
+      {assets.map((asset) => { const brief = asset.brief_id ? briefById.get(asset.brief_id) : null; const url = urls.get(asset.storage_path); return <tr key={`asset:${asset.id}`} className="border-b border-border align-top last:border-0"><td className="p-3 font-medium">{asset.title ?? "Untitled asset"}</td><td className="p-3"><button type="button" onClick={() => setPreview(asset)} aria-label={`Preview ${asset.title ?? "asset"}`}>{asset.media_type === "image" && url ? <img src={url} alt={asset.title ?? "Campaign asset"} className="h-16 w-24 rounded object-cover" /> : asset.media_type === "video" && url ? <video src={url} className="h-16 w-24 rounded object-cover" muted preload="metadata" /> : <span className="text-brand-strong">Preview {asset.media_type}</span>}</button></td><td className="p-3 capitalize">{asset.review_status}</td><td className="p-3">{brief ? <button type="button" className={buttonClass} onClick={() => setViewing(brief)}>Brief</button> : "—"}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={openAssetActions === asset.id} onClick={() => setOpenAssetActions(openAssetActions === asset.id ? null : asset.id)}>Actions</button>{openAssetActions === asset.id && <div className="mt-2 flex min-w-32 flex-col items-start gap-2"><button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void deleteAsset(asset)}>Delete</button>{asset.review_status === "pending" && <><button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("review_media_asset", { p_asset_id: asset.id, p_decision: "approved" }), "Asset approved. Ready to distribute.", { id: asset.id, action: "approve" })}>Approve</button><button type="button" className={buttonClass} disabled={busy !== null} onClick={() => { setRejecting(asset); setReason(""); }}>Reject</button></>}{asset.review_status === "approved" && asset.media_type === "image" && asset.content_format !== "carousel" && <button type="button" className={buttonClass} onClick={() => setCopying(asset)}>{hasAdCopy(asset) ? "Edit ad copy" : "Write ad copy"}</button>}<RegenerateAction assetId={asset.id} hasBrief={Boolean(brief)} isRejected={asset.review_status === "rejected"} onDone={() => { void refresh(); onChanged(); }} onError={setError} onNotice={setNotice} /></div>}</td></tr>; })}
+      {briefs.map((brief) => <tr key={`brief:${brief.id}`} className="border-b border-border"><td className="p-3 font-medium">{brief.title}</td><td className="p-3 text-muted-foreground">{(assetsByBrief.get(brief.id)?.length ?? 0) > 0 ? "Asset produced" : "Awaiting asset"}</td><td className="p-3 capitalize">Brief · {brief.status.replace(/_/g, " ")}</td><td className="p-3"><button type="button" className={buttonClass} onClick={() => setViewing(brief)}>Brief</button></td><td className="p-3">{(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}</td></tr>)}
+      {ideas.map((idea) => <tr key={`idea:${idea.id}`} className="border-b border-border"><td className="p-3 font-medium">{idea.title}</td><td className="max-w-xs p-3 text-xs text-muted-foreground">{idea.body ?? idea.source_question ?? "Awaiting brief"}{idea.strategic_reason && <span className="block">{idea.strategic_reason}</span>}</td><td className="p-3 capitalize">Idea · {idea.status.replace(/_/g, " ")}</td><td className="p-3">—</td><td className="p-3"><div className="flex flex-wrap gap-2">{idea.status === "draft" && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.from("client_ideas").update({ status: "approved" }).eq("id", idea.id).eq("client_id", clientId).eq("campaign_id", campaignId).eq("status", "draft"), "Idea approved.", { id: idea.id, action: "approve" })}>Approve idea</button>}{(idea.status === "draft" || idea.status === "approved") && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: idea.id }), "Brief queued.", { id: idea.id, action: "brief" })}>Approve &amp; brief</button>}<button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void deleteIdea(idea)}>Delete idea</button></div></td></tr>)}
+      {assets.length === 0 && briefs.length === 0 && ideas.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No campaign content yet.</td></tr>}
+    </tbody></table></div>}
+    {rejecting && <div className="rounded-md border border-border p-3"><label className="text-sm">Reason for rejecting {rejecting.title ?? "asset"}<textarea className="mt-2 block w-full rounded-md border border-input bg-background p-2" value={reason} onChange={(event) => setReason(event.target.value)} /></label><div className="mt-2 flex gap-2"><button type="button" className={buttonClass} disabled={busy !== null || !reason.trim()} onClick={() => { const asset = rejecting; void act(() => supabase.rpc("review_media_asset", { p_asset_id: asset.id, p_decision: "rejected", p_reason: reason.trim() }), "Asset rejected with feedback.", { id: asset.id, action: "approve" }); setRejecting(null); }}>Confirm rejection</button><button type="button" className={buttonClass} onClick={() => setRejecting(null)}>Cancel</button></div></div>}
+    {modals}
+  </section>;
 
   return <section className="mt-4 space-y-3 border-t border-border pt-4" aria-label="Campaign content production">
     <h4 className="text-sm font-semibold">Content production</h4>
@@ -341,17 +379,6 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
       }}>Confirm rejection</button>
       <button type="button" className={buttonClass} onClick={() => setRejecting(null)}>Cancel</button>
     </div>}
-    <BriefDetailModal brief={viewing} open={viewing !== null} onClose={() => setViewing(null)} />
-    <ApproveAndBuildModal brief={building} open={building !== null} onClose={() => setBuilding(null)} onDone={() => { void refresh(); onChanged(); setNotice("Production queued. Assets will appear here for approval."); }} />
-    <AdCopyModal
-      asset={copying}
-      brief={copying?.brief_id ? briefById.get(copying.brief_id) ?? null : null}
-      landingUrl={landingUrl}
-      allowedCtas={allowedCtas(template, mirrorsTemplate)}
-      open={copying !== null}
-      onClose={() => setCopying(null)}
-      onSaved={() => { setNotice("Ad copy saved. This asset is in the next Meta build."); void refresh(); }}
-    />
-    <MediaDetailModal asset={preview} url={preview ? urls.get(preview.storage_path) : undefined} open={preview !== null} onClose={() => setPreview(null)} />
+    {modals}
   </section>;
 }

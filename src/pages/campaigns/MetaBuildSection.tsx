@@ -99,6 +99,7 @@ export function MetaBuildSection({
   building,
   onChanged,
   externalActionsAvailable = true,
+  handBuildAvailable = externalActionsAvailable,
 }: {
   clientId: string;
   campaign: MetaCampaign;
@@ -107,6 +108,8 @@ export function MetaBuildSection({
   onChanged: () => void;
   /** v6 external writes wait for the shared version-bound approval executor. */
   externalActionsAvailable?: boolean;
+  /** Recording an operator's completed hand build is an internal write. */
+  handBuildAvailable?: boolean;
 }) {
   const [integration, setIntegration] = useState<Integration | null>(null);
   const [lastBuild, setLastBuild] = useState<LastBuild | null>(null);
@@ -299,7 +302,7 @@ export function MetaBuildSection({
         >
           Write build sheet
         </button>
-        <button type="button" className={buttonClass} disabled={!externalActionsAvailable} onClick={() => setRecording(true)}>
+        <button type="button" className={buttonClass} disabled={!handBuildAvailable} onClick={() => setRecording(true)}>
           Record a hand build
         </button>
         <button
