@@ -511,6 +511,31 @@ describe("proposing a campaign", () => {
     expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", expect.objectContaining({ p_input_id: "new-1" }));
   });
 
+  it("passes the selected approved offer version to the planner campaign", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "bound-1" }, error: null }) }) }));
+    from.mockImplementation((table: string) => {
+      if (table === "client_campaigns") return { ...rows([]), insert };
+      if (table === "service_offers") return rows([{ id: "service-1", service_name: "Boiler service" }]);
+      if (table === "service_offer_versions") return rows([{
+        id: "version-1", offer_id: "service-1", version: 2, promise: "An inspected boiler",
+      }]);
+      if (table === "service_offer_signoffs") return rows([{ offer_version_id: "version-1" }]);
+      return rows([]);
+    });
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.type(screen.getByLabelText(/Campaign name/i), "Boiler acquisition");
+    await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "organic");
+    await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Book inspections");
+    await userEvent.selectOptions(await screen.findByLabelText(/Approved service offer/i), "version-1");
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      offer_version_id: "version-1", acquisition_mode: "organic",
+    })));
+  });
+
   it("stores a paid Google route without applying Meta's campaign template", async () => {
     useParams.mockReturnValue({ clientId: "client-1" });
     const insert = vi.fn((_values: Record<string, unknown>) => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "new-google" }, error: null }) }) }));

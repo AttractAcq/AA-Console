@@ -119,13 +119,15 @@ routes["/internal/mcp/campaign/create-v6"] = {
     const brief = textOf(body, "brief", 1, 4000);
     const acquisition_mode = body.acquisition_mode;
     const paid_platform = body.paid_platform;
+    const offer_version_id = uuidOf(body, "offer_version_id");
     if (client_id === undefined || client_id === false
       || name === undefined || name === false
       || brief === undefined || brief === false
       || (acquisition_mode !== "organic" && acquisition_mode !== "paid")
       || (acquisition_mode === "paid" && paid_platform !== "meta" && paid_platform !== "google")
       || (acquisition_mode === "organic" && paid_platform !== undefined)
-      || !subset(body, ["client_id", "name", "brief", "acquisition_mode", "paid_platform"])) return;
+      || offer_version_id === false
+      || !subset(body, ["client_id", "name", "brief", "acquisition_mode", "paid_platform", "offer_version_id"])) return;
     return {
       p_bot_id: null,
       p_client_id: client_id,
@@ -133,6 +135,7 @@ routes["/internal/mcp/campaign/create-v6"] = {
       p_brief: brief,
       p_acquisition_mode: acquisition_mode,
       p_paid_platform: acquisition_mode === "paid" ? paid_platform : null,
+      p_offer_version_id: offer_version_id ?? null,
     };
   },
 };

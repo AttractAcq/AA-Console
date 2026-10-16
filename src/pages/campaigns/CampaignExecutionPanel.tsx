@@ -121,6 +121,8 @@ export function CampaignExecutionPanel() {
   const [pillars, setPillars] = useState<{ id: string; name: string; target_share: number }[]>([]);
   const [pillarsFailed, setPillarsFailed] = useState(false);
   const [chosenPillars, setChosenPillars] = useState<string[]>([]);
+  const [approvedOfferChoices, setApprovedOfferChoices] = useState<{ id: string; label: string }[]>([]);
+  const [offersFailed, setOffersFailed] = useState(false);
   const chosenTemplate = templateFor(proposeTemplate);
   // template is not part of what the endpoint returns — it is the operator's
   // own pick, carried through so the form opens on it.
@@ -229,6 +231,32 @@ export function CampaignExecutionPanel() {
     return () => {
       cancelled = true;
     };
+  }, [newOpen, clientId]);
+
+  useEffect(() => {
+    if (!newOpen || !clientId) return;
+    let cancelled = false;
+    setOffersFailed(false);
+    void (async () => {
+      const [offers, versions, signoffs] = await Promise.all([
+        supabase.from("service_offers").select("id, service_name").eq("client_id", clientId),
+        supabase.from("service_offer_versions").select("id, offer_id, version, promise").eq("client_id", clientId),
+        supabase.from("service_offer_signoffs").select("offer_version_id").eq("client_id", clientId),
+      ]);
+      if (cancelled) return;
+      if (offers.error || versions.error || signoffs.error) {
+        setOffersFailed(true);
+        setApprovedOfferChoices([]);
+        return;
+      }
+      const signed = new Set((signoffs.data ?? []).map((row) => row.offer_version_id));
+      const names = new Map((offers.data ?? []).map((row) => [row.id, row.service_name]));
+      setApprovedOfferChoices((versions.data ?? [])
+        .filter((row) => signed.has(row.id))
+        .map((row) => ({ id: row.id,
+          label: `${names.get(row.offer_id) ?? "Service"} v${row.version} · ${row.promise.slice(0, 90)}` })));
+    })().catch(() => { if (!cancelled) setOffersFailed(true); });
+    return () => { cancelled = true; };
   }, [newOpen, clientId]);
 
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
@@ -642,10 +670,14 @@ export function CampaignExecutionPanel() {
         }}
         title="New Campaign"
         draftKey={`campaign:${clientId}`}
-        intro="Queues the Campaign Planner. It needs your offer strategy and ICP, and writes the plan — including what has to be built before this can run."
-        fields={FIELDS}
+        intro="Queues the Campaign Planner. Select an approved service offer to bind its exact version to the plan and package. The planner needs the ICP and uses the client-wide offer strategy when no offer is selected."
+        fields={[...FIELDS, { name: "offer_version_id", label: "Approved service offer (optional)",
+          kind: "select", options: approvedOfferChoices.map((offer) => ({ value: offer.id, label: offer.label })),
+          hint: "The selected version is fixed for this campaign. Leave empty to use the client-wide offer strategy." } as FieldDef]}
         extra={
-          pillarsFailed ? (
+          offersFailed ? <p role="alert" className="text-sm text-destructive">
+            Approved offers could not be loaded. Try again before planning this campaign.
+          </p> : pillarsFailed ? (
             <p role="alert" className="rounded-md border border-border p-3 text-sm text-destructive">
               Could not load this client&apos;s content pillars, so none can be picked. The campaign can
               still be planned without them.
@@ -696,6 +728,9 @@ export function CampaignExecutionPanel() {
         }
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
+          if (offersFailed) throw new Error("Approved offers could not be loaded.");
+          if (v.offer_version_id && !approvedOfferChoices.some((offer) => offer.id === v.offer_version_id))
+            throw new Error("Choose an approved offer belonging to this client.");
           const acquisitionMode = v.acquisition_mode;
           const paidPlatform = acquisitionMode === "paid" ? v.paid_platform : null;
           if (acquisitionMode !== "organic" && acquisitionMode !== "paid")
@@ -710,6 +745,7 @@ export function CampaignExecutionPanel() {
               brief: (v.brief as string).trim(),
               acquisition_mode: acquisitionMode,
               paid_platform: paidPlatform as "meta" | "google" | null,
+              offer_version_id: (v.offer_version_id as string) || null,
               ideate_on_plan: v.ideate_on_plan !== false,
               // Spread only when a template was picked. The columns arrive in
               // migration 96, and a campaign planned without a template must

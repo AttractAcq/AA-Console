@@ -135,6 +135,8 @@ beforeAll(async () => {
   await db.exec(offerMigration);
   const proofArtifactMigration = await readFile(new URL("../../supabase/migrations/20261016020000_209_v6_proof_artifacts.sql", import.meta.url), "utf8");
   await db.exec(proofArtifactMigration);
+  const offerBindingMigration = await readFile(new URL("../../supabase/migrations/20261016030000_210_v6_campaign_offer_binding.sql", import.meta.url), "utf8");
+  await db.exec(offerBindingMigration);
   await db.exec(`
     insert into clients(id) values ('${clientA}'), ('${clientB}');
     insert into client_campaigns(id,client_id,name,brief,meta_campaign_id,approved_at)
@@ -519,4 +521,58 @@ it("holds proof derivatives until source rights and text pass human review", asy
   expect(generated.rows[0]!.artifact).toMatchObject({ created_by_job_id: jobId, version: 2 });
   await expect(db.query("update proof_artifact_versions set content='changed' where id=$1", [artifact.id]))
     .rejects.toThrow(/immutable/);
+});
+
+it("binds one approved offer before planning and captures its exact version", async () => {
+  const args = [clientA, "Boiler service", "Homeowners", "An inspected boiler",
+    ["Safety inspection"], ["Parts not included"], 120, "EUR", 30,
+    JSON.stringify([{ kind: "general", text: "Includes a safety inspection" }]),
+    "campaign-binding-offer", null];
+  const created = await db.query<{ offer: { id: string; content_hash: string } }>(
+    "select to_jsonb(create_service_offer_version_v6($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12)) as offer", args);
+  const offerId = created.rows[0]!.offer.id;
+  await expect(db.query(`insert into client_campaigns
+    (client_id,name,brief,acquisition_mode,offer_version_id)
+    values ($1,'Unapproved','Brief','organic',$2)`, [clientA, offerId]))
+    .rejects.toThrow(/approved offer/);
+  await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
+    select set_config('test.user_id','${manager}',false);`);
+  await db.query("select approve_service_offer_version_v6($1)", [offerId]);
+  await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+  await expect(db.query(`insert into client_campaigns
+    (client_id,name,brief,acquisition_mode,offer_version_id)
+    values ($1,'Other client','Brief','organic',$2)`, [clientB, offerId]))
+    .rejects.toThrow();
+  const campaign = await db.query<{ id: string }>(`insert into client_campaigns
+    (client_id,name,brief,acquisition_mode,offer_version_id)
+    values ($1,'Bound','Brief','organic',$2) returning id`, [clientA, offerId]);
+  const campaignId = campaign.rows[0]!.id;
+  const captured = await db.query<{ offer: { id: string; content_hash: string; promise: string } }>(
+    "select capture_campaign_offer_v6($1) as offer", [campaignId]);
+  expect(captured.rows[0]!.offer).toMatchObject({
+    id: offerId, content_hash: created.rows[0]!.offer.content_hash,
+    promise: "An inspected boiler",
+  });
+  await expect(db.query("update client_campaigns set offer_version_id=null where id=$1", [campaignId]))
+    .rejects.toThrow(/fixed|before planning/);
+  await db.query("update client_campaigns set built_at=now(),objective='Booked inspections',audience='Homeowners',needs_landing_page=false,needs_sales_agent=false where id=$1", [campaignId]);
+  const manifest = await db.query<{ manifest: { id: string } }>(
+    "select to_jsonb(create_campaign_manifest_v6($1,$2,$3)) as manifest",
+    [campaignId, "bound-package", false]);
+  await db.query("select attach_campaign_offer_v6($1,$2)", [manifest.rows[0]!.manifest.id, offerId]);
+  const linked = await db.query<{ offer_version_id: string }>(
+    "select offer_version_id from campaign_manifest_offers where manifest_id=$1",
+    [manifest.rows[0]!.manifest.id]);
+  expect(linked.rows[0]!.offer_version_id).toBe(offerId);
+  const mcpArgs = ["chief", clientA, "Boiler acquisition", "Book boiler inspections",
+    "paid", "meta", "offer-bind-request", "offer-bind-execution", offerId];
+  const mcp = await db.query<{ mcp_campaign_create_v6: {
+    campaign: { id: string; offer_version_id: string }; replayed: boolean;
+  } }>("select mcp_campaign_create_v6($1,$2,$3,$4,$5,$6,$7,$8,$9)", mcpArgs);
+  expect(mcp.rows[0]!.mcp_campaign_create_v6.campaign.offer_version_id).toBe(offerId);
+  const replay = await db.query<{ mcp_campaign_create_v6: { replayed: boolean } }>(
+    "select mcp_campaign_create_v6($1,$2,$3,$4,$5,$6,$7,$8,$9)", mcpArgs);
+  expect(replay.rows[0]!.mcp_campaign_create_v6.replayed).toBe(true);
+  await expect(db.query("select mcp_campaign_create_v6($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+    [...mcpArgs.slice(0, 8), null])).rejects.toThrow(/idempotency_conflict/);
 });

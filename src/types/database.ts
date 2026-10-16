@@ -1917,6 +1917,7 @@ export type Database = {
           needs_sales_agent: boolean
           objective: string | null
           offer_summary: string | null
+          offer_version_id: string | null
           optimisation_event: string | null
           paid_platform: "meta" | "google" | null
           starts_on: string | null
@@ -1963,6 +1964,7 @@ export type Database = {
           needs_sales_agent?: boolean
           objective?: string | null
           offer_summary?: string | null
+          offer_version_id?: string | null
           optimisation_event?: string | null
           paid_platform?: "meta" | "google" | null
           starts_on?: string | null
@@ -2009,6 +2011,7 @@ export type Database = {
           needs_sales_agent?: boolean
           objective?: string | null
           offer_summary?: string | null
+          offer_version_id?: string | null
           optimisation_event?: string | null
           paid_platform?: "meta" | "google" | null
           starts_on?: string | null

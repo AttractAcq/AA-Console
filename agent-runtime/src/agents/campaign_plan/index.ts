@@ -132,6 +132,13 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
 /** The shape with no pillars, which is every campaign planned before them. */
 export const SUBMIT_TOOL = submitToolFor();
 
+type ApprovedCampaignOffer = {
+  id: string; service_name: string; version: number; audience: string;
+  promise: string; inclusions: string[]; exclusions: string[];
+  price_amount: number | null; currency: string | null;
+  claims: unknown[]; content_hash: string;
+};
+
 export async function runCampaignPlanJob(
   sb: SupabaseClient,
   runtime: RuntimeConfig,
@@ -179,6 +186,17 @@ export async function runCampaignPlanJob(
   const clientName = (clientRow?.name as string | undefined) ?? "this business";
 
   const isV6 = campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "paid";
+  let approvedOffer: ApprovedCampaignOffer | null = null;
+  if (isV6 && campaign.offer_version_id) {
+    const { data, error } = await sb.rpc("capture_campaign_offer_v6", {
+      p_campaign_id: campaign.id,
+    });
+    if (error) throw new Error(`Failed to capture approved campaign offer: ${error.message}`);
+    if (!data || data.id !== campaign.offer_version_id) {
+      throw new Error("Campaign offer version could not be verified.");
+    }
+    approvedOffer = data as ApprovedCampaignOffer;
+  }
   let context: BusinessContext | null;
   let records: UpstreamRecord[];
   let pillars: Array<{ id: string; name: string; premise: string; belongs: string; does_not_belong: string }>;
@@ -219,7 +237,7 @@ export async function runCampaignPlanJob(
   }
 
   const offer = records.filter((r) => r.domain === "offer_strategy");
-  if (offer.length === 0) {
+  if (offer.length === 0 && !approvedOffer) {
     return {
       ok: false,
       retryable: false,
@@ -261,7 +279,7 @@ WHAT MAKES A PLAN GOOD
 ABSOLUTE RULES
 - ${routeInstruction}
 - Never invent a budget, a price, a date or a target you have no basis for. Omitting a number is honest; inventing one becomes a commitment somebody else has to meet.
-- Take the audience from the ICP and the offer from the offer strategy. Do not invent either.
+- Take the audience from the ICP. ${approvedOffer ? "Use only the exact approved campaign offer version below. The broader offer strategy is context and cannot override its promise, price, claims or exclusions." : "Take the offer from the offer strategy. Do not invent it."}
 - ${includeIdeas
     ? "Supply exactly content_count distinct ideas tailored to this campaign, its audience, offer, dates, channels and constraints. An idea is an angle and purpose, not a finished production brief."
     : "Plan the campaign and decide how many content pieces it needs, but do not ideate any content. Do not write titles, angles or concepts. The operator can generate campaign ideas later."}
@@ -292,6 +310,10 @@ ${renderContext(context as BusinessContext | null)}
 
 OFFER STRATEGY — what is being sold and what may not be promised
 ${renderUpstream(offer)}
+
+${approvedOffer ? `APPROVED CAMPAIGN OFFER VERSION — authoritative for this campaign
+${JSON.stringify(approvedOffer)}
+Do not use a different service, promise, price or claim. A quantified claim may be used only as written and with its cited proof. Respect every exclusion.` : ""}
 
 ICP — who this is aimed at
 ${renderUpstream(icp)}
@@ -367,6 +389,10 @@ Call ${submitTool.name} once when you are done.`;
       needs_sales_agent: result.submitted.needs_sales_agent,
     }),
   };
+  if (approvedOffer && !campaign.built_at) {
+    // The model may paraphrase its summary; persist the exact signed promise.
+    submittedPlan.offer_summary = approvedOffer.promise;
+  }
 
   const plan: CampaignPlan = campaign.built_at ? {
     objective: campaign.objective, audience: campaign.audience, offer_summary: campaign.offer_summary,
@@ -425,6 +451,13 @@ Call ${submitTool.name} once when you are done.`;
       p_snapshot_id: intelligenceSnapshotId,
     });
     if (linkError) throw new Error(`Failed to link v6 campaign intelligence: ${linkError.message}`);
+    if (approvedOffer) {
+      const { error: offerError } = await sb.rpc("attach_campaign_offer_v6", {
+        p_manifest_id: manifest.id,
+        p_offer_version_id: approvedOffer.id,
+      });
+      if (offerError) throw new Error(`Failed to link approved campaign offer: ${offerError.message}`);
+    }
   }
 
   await appendEvent(sb, job.id, `Planned "${campaign.name}".\n\n${planSummary(plan)}`, "info", {
