@@ -67,8 +67,9 @@ it("exports both retained intelligence and strategy groups from Intelligence OS"
     </MemoryRouter>,
   );
 
+  const strategyStart = intelligenceOs.tabs!.findIndex((tab) => tab.id === "branding-strategy");
   await user.click(screen.getByRole("button", { name: "Download intelligence" }));
-  expect(downloadModuleZip).toHaveBeenCalledWith("client-1", "intelligence", intelligenceOs.tabs!.slice(0, 7));
+  expect(downloadModuleZip).toHaveBeenCalledWith("client-1", "intelligence", intelligenceOs.tabs!.slice(0, strategyStart));
   await user.click(screen.getByRole("button", { name: "Download strategy" }));
-  expect(downloadModuleZip).toHaveBeenLastCalledWith("client-1", "strategy", intelligenceOs.tabs!.slice(7));
+  expect(downloadModuleZip).toHaveBeenLastCalledWith("client-1", "strategy", intelligenceOs.tabs!.slice(strategyStart));
 });
