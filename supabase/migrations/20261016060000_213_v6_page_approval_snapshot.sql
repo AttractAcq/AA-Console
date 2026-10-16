@@ -153,8 +153,8 @@ begin
   select * into v_manifest from public.campaign_manifest_versions
     where campaign_id = v_campaign_id order by version desc limit 1;
   if not found then raise exception 'Campaign package is required.'; end if;
-  if nullif(btrim(coalesce(p_idempotency_key, '')), '') is null then
-    raise exception 'An idempotency key is required.';
+  if length(btrim(coalesce(p_idempotency_key, ''))) not between 1 and 120 then
+    raise exception 'A short idempotency key is required.';
   end if;
 
   update public.client_pages set site_repository_id = v_repo_id,
@@ -163,7 +163,7 @@ begin
     replace(v_path, 'index.html', '');
   v_hash := encode(sha256(convert_to(v_page.html, 'UTF8')), 'hex');
   v_approval := public.request_campaign_action_approval_v6(
-    v_manifest.id, left(btrim(p_idempotency_key), 120) || ':' || v_manifest.id,
+    v_manifest.id, btrim(p_idempotency_key) || ':' || v_manifest.id,
     'page_deploy', v_url, v_hash,
     jsonb_build_object(
       'page_id', p_page_id, 'revision_id', v_revision.id,

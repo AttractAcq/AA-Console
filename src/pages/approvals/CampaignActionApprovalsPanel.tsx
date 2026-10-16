@@ -120,6 +120,7 @@ export function CampaignActionApprovalsPanel() {
                   <iframe
                     title={`Page revision for ${request.destination}`}
                     sandbox=""
+                    referrerPolicy="no-referrer"
                     srcDoc={pageSnapshots[request.id].rendered_html}
                     className="h-80 w-full rounded-lg border border-border bg-white"
                   />
