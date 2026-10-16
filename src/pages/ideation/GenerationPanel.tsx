@@ -67,7 +67,7 @@ const AUTO_FIELDS: FieldDef[] = [
 ];
 const AUTO_INITIAL = { idea_count: "5" };
 
-export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?: boolean; refreshToken?: unknown } = {}) {
+export function GenerationPanel({ watchJobs = true, refreshToken, showJourney = true }: { watchJobs?: boolean; refreshToken?: unknown; showJourney?: boolean } = {}) {
   const { clientId } = useParams<{ clientId: string }>();
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
@@ -301,7 +301,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken }: { watchJobs?
 
   return (
     <div>
-      <ContentJourney clientId={clientId} current="ideation" />
+      {showJourney && <ContentJourney clientId={clientId} current="ideation" />}
       <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
 
       {notice && (

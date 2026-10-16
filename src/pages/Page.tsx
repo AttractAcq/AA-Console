@@ -34,6 +34,7 @@ import { StoryLibraryPanel } from "./media/StoryLibraryPanel";
 import { CarouselLibraryPanel } from "./media/CarouselLibraryPanel";
 import { VideoLibraryPanel } from "./media/VideoLibraryPanel";
 import { ReelShotsPanel } from "./media/ReelShotsPanel";
+import { ContentAssetsPanel } from "./media/ContentAssetsPanel";
 import { EditRepurposePanel } from "./media/EditRepurposePanel";
 import { MotionDesignPanel } from "./motion/MotionDesignPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
@@ -272,7 +273,17 @@ function getPanelBody(
   node: NavNode,
   activeTab: NavTab | undefined,
   sectionLabel: string,
+  view: string,
 ): ReactNode {
+  if (node.id === "content-production-factory" && view === "v2") {
+    switch (activeTab?.id) {
+      case "generation": return <GenerationPanel showJourney={false} />;
+      case "briefs": return <BriefsPanel showJourney={false} />;
+      case "create": return <BriefsPanel stage="create" showJourney={false} />;
+      case "edit": return <EditRepurposePanel showJourney={false} />;
+      case "assets": return <ContentAssetsPanel />;
+    }
+  }
   const renderPanel = activeTab
     ? nodeTabPanels[node.id]?.[activeTab.id]
     : nodePanels[node.id];
@@ -285,26 +296,39 @@ export function Page({ node }: { node: NavNode }) {
   const { clientId } = useParams<{ clientId: string }>();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  const tabs = node.tabs;
+  const requestedView = searchParams.get("view");
+  const view = node.id === "intelligence-os" ? requestedView === "strategy" ? "strategy" : "intelligence"
+    : requestedView === "v2" && node.sidebarViews?.some((item) => item.id === "v2") ? "v2" : "v1";
+  const v2Blank = view === "v2" && node.id !== "content-production-factory";
+  const tabs = node.id === "intelligence-os"
+    ? node.tabs?.filter((tab) => strategyTabIds.has(tab.id) === (view === "strategy"))
+    : node.id === "content-production-factory" && view === "v2"
+      ? [
+        { id: "generation", label: "Ideation" }, { id: "briefs", label: "Briefs" },
+        { id: "create", label: "Create" }, { id: "edit", label: "Edit / Repurpose" },
+        { id: "assets", label: "Assets" },
+      ]
+      : node.tabs;
   const requestedTab = searchParams.get("tab");
   const activeTab =
     tabs && (tabs.find((t) => t.id === requestedTab) ?? tabs[0]);
   const v6Intelligence = node.id === "intelligence-os";
   const exportModule: ExportModule | null = v6Intelligence
-    ? strategyTabIds.has(activeTab?.id ?? "") ? "strategy" : "intelligence"
+    ? view === "strategy" ? "strategy" : "intelligence"
     : node.id === "intelligence" || node.id === "strategy" ? node.id : null;
-  const exportTabs = v6Intelligence && tabs
-    ? tabs.filter((tab) => strategyTabIds.has(tab.id) === (exportModule === "strategy"))
-    : tabs;
   const sectionLabel = activeTab ? activeTab.label : node.label;
+  const pageTitle = node.id === "intelligence-os" && view === "strategy" ? "Strategy"
+    : view === "v2" ? `${node.label} v2` : node.label;
 
   function handleTabChange(id: string) {
     if (!tabs) return;
-    if (id === tabs[0].id) {
-      setSearchParams({});
-    } else {
-      setSearchParams({ tab: id });
-    }
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (id === tabs[0].id) next.delete("tab");
+      else next.set("tab", id);
+      if (id !== "assets") next.delete("asset");
+      return next;
+    });
   }
 
   async function handleExport(all: boolean) {
@@ -312,23 +336,8 @@ export function Page({ node }: { node: NavNode }) {
     setExporting(true);
     setExportError(null);
     try {
-      if (all) await downloadModuleZip(clientId, exportModule, exportTabs ?? []);
+      if (all) await downloadModuleZip(clientId, exportModule, tabs);
       else await downloadTabPdf(clientId, exportModule, activeTab);
-    } catch (error) {
-      setExportError(`Download failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-    } finally {
-      setExporting(false);
-    }
-  }
-
-  async function handleV6Zip(module: ExportModule) {
-    if (!clientId || !tabs) return;
-    setExporting(true);
-    setExportError(null);
-    try {
-      await downloadModuleZip(clientId, module, tabs.filter(
-        (tab) => strategyTabIds.has(tab.id) === (module === "strategy"),
-      ));
     } catch (error) {
       setExportError(`Download failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
@@ -341,22 +350,17 @@ export function Page({ node }: { node: NavNode }) {
       {exportModule && clientId ? (
         <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-[22px] font-semibold tracking-[-0.012em] text-foreground">{node.label}</h1>
+            <h1 className="text-[22px] font-semibold tracking-[-0.012em] text-foreground">{pageTitle}</h1>
           </div>
-          {v6Intelligence ? <div className="flex flex-wrap gap-2">
-            <Button icon={Download} disabled={exporting} onClick={() => void handleV6Zip("intelligence")}>Download intelligence</Button>
-            <Button icon={Download} disabled={exporting} onClick={() => void handleV6Zip("strategy")}>Download strategy</Button>
-          </div> : <Button icon={Download} disabled={exporting} onClick={() => void handleExport(true)}>
-            {exporting ? "Preparing download…" : "Download all"}
-          </Button>}
+          <Button icon={Download} disabled={exporting} onClick={() => void handleExport(true)}>
+            {exporting ? "Preparing download…" : v6Intelligence ? `Download ${view}` : "Download all"}
+          </Button>
         </div>
-      ) : <PageHeader title={node.label} />}
+      ) : <PageHeader title={pageTitle} />}
       {node.capability === "planned" && <p className="mb-4 text-sm text-muted-foreground">
         This module is visible in v6 and is not connected to an external service yet.
       </p>}
-      {node.capability === "expanding" && <p className="mb-4 text-sm text-muted-foreground">
-        Existing tools are available here. Additional v6 capabilities are being built module by module.
-      </p>}
+      {v2Blank ? null : <>
       {node.id === "distribution" && <ContentJourney clientId={clientId} current="distribution" />}
       {tabs && activeTab && (
         <div className="mb-6">
@@ -376,8 +380,9 @@ export function Page({ node }: { node: NavNode }) {
         role={activeTab ? "tabpanel" : undefined}
         aria-labelledby={activeTab ? `tab-${activeTab.id}` : undefined}
       >
-        {getPanelBody(node, activeTab, sectionLabel)}
+        {getPanelBody(node, activeTab, sectionLabel, view)}
       </div>
+      </>}
     </div>
   );
 }
