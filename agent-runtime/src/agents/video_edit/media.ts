@@ -78,13 +78,14 @@ export async function renderCapability(): Promise<{ ok: true } | { ok: false; me
       message: `ffmpeg is not usable on this runtime: ${formatFfmpegStderr(error)}`,
     };
   }
-  const missing = ["drawtext", "xfade", "scale"].filter((filter) => !new RegExp(`\\b${filter}\\b`).test(filters));
+  const missing = ["drawtext", "xfade", "scale", "blackdetect", "freezedetect"]
+    .filter((filter) => !new RegExp(`\\b${filter}\\b`).test(filters));
   if (missing.length > 0) {
     return {
       ok: false,
       message:
         `This ffmpeg has no ${missing.join(", ")} filter, so a cut cannot be rendered. ` +
-        `drawtext needs a build with libfreetype. Nothing was planned, so nothing was spent.`,
+        `A missing drawtext filter needs a build with libfreetype. Nothing was planned, so nothing was spent.`,
     };
   }
   return { ok: true };

@@ -732,6 +732,30 @@ export type Database = {
         Update: { artifact_version_id?: string; client_id?: string; approved_by?: string; approved_at?: string }
         Relationships: []
       }
+      video_render_candidates: {
+        Row: {
+          id: string; client_id: string; asset_id: string; job_id: string
+          attempt: number; render_path: string; media_probe: Json
+          creative_review: Json | null; edit_plan: Json | null
+          verdict: string; rejection_reason: string | null
+          created_at: string; reviewed_at: string | null
+        }
+        Insert: {
+          id?: string; client_id: string; asset_id: string; job_id: string
+          attempt: number; render_path: string; media_probe: Json
+          creative_review?: Json | null; edit_plan?: Json | null
+          verdict?: string; rejection_reason?: string | null
+          created_at?: string; reviewed_at?: string | null
+        }
+        Update: {
+          id?: string; client_id?: string; asset_id?: string; job_id?: string
+          attempt?: number; render_path?: string; media_probe?: Json
+          creative_review?: Json | null; edit_plan?: Json | null
+          verdict?: string; rejection_reason?: string | null
+          created_at?: string; reviewed_at?: string | null
+        }
+        Relationships: []
+      }
       campaign_artifacts: {
         Row: {
           asset_id: string | null

@@ -15,6 +15,9 @@ vi.mock("react-router-dom", () => ({
 vi.mock("../../components/MediaLibrary", () => ({
   MediaLibrary: ({ mediaType }: { mediaType: string }) => <div>library:{mediaType}</div>,
 }));
+vi.mock("./VideoCandidateReviewsPanel", () => ({
+  VideoCandidateReviewsPanel: () => <div>candidate reviews</div>,
+}));
 
 import { VideoLibraryPanel } from "./VideoLibraryPanel";
 

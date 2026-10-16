@@ -90,7 +90,7 @@ describe("the render capability is checked before anything is paid for", () => {
     // Locally this depends on the installed build; either answer is valid,
     // but a refusal has to say which filter is missing rather than just no.
     if (!result.ok) {
-      expect(result.message).toMatch(/drawtext|xfade|scale|not usable/);
+      expect(result.message).toMatch(/drawtext|xfade|scale|blackdetect|freezedetect|not usable/);
       expect(result.message).toMatch(/nothing was spent|not usable/i);
     } else {
       expect(result.ok).toBe(true);
