@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Users, Settings2, UsersRound, ShieldCheck, ChevronRight } from "lucide-react";
 import { Panel } from "../components/Panel";
 import { ClientCard } from "../components/ClientCard";
-import { MasterAIChat } from "../components/masterai/MasterAIChat";
+import { MasterAIChatDialog } from "../components/masterai/MasterAIChatDialog";
 import { EmptyState } from "../components/EmptyState";
 import { getRecentClientIds } from "../lib/routeEntities";
 import { supabase } from "../lib/supabase";
@@ -104,6 +104,7 @@ export function DashboardPanel() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end"><MasterAIChatDialog scope={{ kind: "company" }} /></div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => (
           <Panel key={c.id} title={c.label}>
@@ -111,8 +112,6 @@ export function DashboardPanel() {
           </Panel>
         ))}
       </div>
-
-      <MasterAIChat scope={{ kind: "company" }} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">

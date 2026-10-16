@@ -42,7 +42,10 @@ export type NavNode = {
   capability?: "available" | "expanding" | "planned";
   tabs?: NavTab[];
   children?: NavNode[];
+  sidebarViews?: { id: string; label: string }[];
 };
+
+const versionViews = [{ id: "v1", label: "v1" }, { id: "v2", label: "v2" }];
 
 /** Flat, top-level agency sidebar items. Each may carry its own in-page tabs. */
 export const agencyNav: NavNode[] = [
@@ -359,6 +362,7 @@ export const legacyDeliveryNodes = (legacyClientNavGroups[0]?.children ?? []).fi
 /** Every acquisition component is a distinct Delivery page, in product order. */
 export const v6ModuleNodes: NavNode[] = [
   { id: "intelligence-os", label: "Intelligence OS", path: "intelligence-os", icon: Brain, capability: "expanding",
+    sidebarViews: [{ id: "intelligence", label: "Intelligence" }, { id: "strategy", label: "Strategy" }],
     tabs: [
       { id: "business-context", label: "Business Context" }, { id: "market", label: "Market" },
       { id: "icp", label: "ICP" }, { id: "competitors", label: "Competitors" },
@@ -370,15 +374,15 @@ export const v6ModuleNodes: NavNode[] = [
       { id: "content-pillars", label: "Content Pillars" },
       { id: "money-model-strategy", label: "Money Model Strategy" },
     ] },
-  { id: "campaign-factory", label: "Campaign Factory", path: "campaign-factory", icon: Megaphone,
+  { id: "campaign-factory", label: "Campaign Factory", path: "campaign-factory", icon: Megaphone, sidebarViews: versionViews,
     capability: "expanding", tabs: [{ id: "overview", label: "Campaigns" }] },
   { id: "proof-production-factory", label: "Proof Production Factory", path: "proof-production-factory",
-    icon: FolderCheck, capability: "expanding", tabs: [
+    icon: FolderCheck, capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "proof-bank", label: "Proof Bank" },
       { id: "artifacts", label: "Proof Artifacts" },
     ] },
   { id: "content-production-factory", label: "Content Production Factory", path: "content-production-factory",
-    icon: Clapperboard, capability: "expanding", tabs: [
+    icon: Clapperboard, capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "generation", label: "Ideation" }, { id: "briefs", label: "Briefs" },
       { id: "create", label: "Create" }, { id: "edit", label: "Edit / Repurpose" },
       { id: "image-library", label: "Images" }, { id: "video-library", label: "Videos" },
@@ -387,31 +391,31 @@ export const v6ModuleNodes: NavNode[] = [
     ] },
   { id: "proof-distribution", label: "Proof Distribution", path: "proof-distribution", icon: Share2,
     capability: "planned" },
-  { id: "content-distribution", label: "Content Distribution", path: "content-distribution", icon: Share2,
-    capability: "expanding", tabs: [
+  { id: "content-distribution", label: "Organic Content Distribution", path: "content-distribution", icon: Share2,
+    capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "distribution-assets", label: "Assets" }, { id: "organic", label: "Organic" },
       { id: "engine", label: "Engine" },
     ] },
   { id: "google-ads-studio", label: "Google Ads Studio", path: "google-ads-studio", icon: Megaphone,
     capability: "planned" },
   { id: "meta-ads-studio", label: "Meta Ads Studio", path: "meta-ads-studio", icon: Megaphone,
-    capability: "expanding", tabs: [
+    capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "campaigns", label: "Campaign Builds" }, { id: "paid", label: "Paid Distribution" },
       { id: "reporting", label: "Paid Reporting" },
     ] },
   { id: "google-profile", label: "Google Profile", path: "google-profile", icon: Globe,
     capability: "planned" },
   { id: "meta-profile", label: "Meta Profile", path: "meta-profile", icon: Users,
-    capability: "expanding", tabs: [
+    capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "organic", label: "Posts" }, { id: "reporting", label: "Profile Metrics" },
     ] },
   { id: "offer-studio", label: "Offer Studio", path: "offer-studio", icon: Target,
-    capability: "expanding", tabs: [
+    capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "offers", label: "Service Offers" },
       { id: "offer-strategy", label: "Offer Strategy" },
     ] },
   { id: "website-studio", label: "Website Studio", path: "website-studio", icon: Globe,
-    capability: "expanding", tabs: [
+    capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "landing-pages", label: "Landing Pages" }, { id: "offer-pages", label: "Offer Pages" },
       { id: "sites", label: "Sites" }, { id: "landing-reporting", label: "Landing Results" },
       { id: "offer-reporting", label: "Offer Results" },
@@ -419,7 +423,7 @@ export const v6ModuleNodes: NavNode[] = [
   { id: "lead-magnet-studio", label: "Lead Magnet Studio", path: "lead-magnet-studio", icon: UserPlus,
     capability: "planned" },
   { id: "sales-os", label: "Sales OS", path: "sales-os", icon: MessagesSquare,
-    capability: "expanding", tabs: [
+    capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "leads", label: "Prospects & Leads" }, { id: "agents", label: "Sales Agents" },
     ] },
   { id: "attribution-os", label: "Attribution OS", path: "attribution-os", icon: BarChart3,
@@ -442,7 +446,7 @@ export const clientNavGroups: NavNode[] = [
         { id: "campaign-actions", label: "Campaign actions" },
       ] },
     ...v6ModuleNodes,
-    legacyUtility("motion-design"),
+    { ...legacyUtility("motion-design"), sidebarViews: versionViews },
     legacyUtility("archive"),
   ] },
   ...legacyClientNavGroups.slice(1),

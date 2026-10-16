@@ -6,12 +6,19 @@ describe("client delivery navigation", () => {
     expect(clientNavGroups[0]?.children?.map((node) => node.label)).toEqual([
       "Dashboard", "Approval Inbox", "Intelligence OS", "Campaign Factory",
       "Proof Production Factory", "Content Production Factory", "Proof Distribution",
-      "Content Distribution", "Google Ads Studio", "Meta Ads Studio", "Google Profile",
+      "Organic Content Distribution", "Google Ads Studio", "Meta Ads Studio", "Google Profile",
       "Meta Profile", "Offer Studio", "Website Studio", "Lead Magnet Studio",
       "Sales OS", "Attribution OS", "Motion Design", "Archive",
     ]);
     expect(v6ModuleNodes).toHaveLength(15);
     expect(new Set(clientNavGroups[0]?.children?.map((node) => node.path)).size).toBe(19);
+    for (const id of ["campaign-factory", "proof-production-factory", "content-production-factory",
+      "content-distribution", "meta-ads-studio", "meta-profile", "offer-studio", "website-studio", "sales-os"]) {
+      expect(v6ModuleNodes.find((node) => node.id === id)?.sidebarViews?.map((view) => view.id))
+        .toEqual(["v1", "v2"]);
+    }
+    expect(v6ModuleNodes.find((node) => node.id === "intelligence-os")?.sidebarViews?.map((view) => view.id))
+      .toEqual(["intelligence", "strategy"]);
   });
 
   it("keeps every replaced v5 Delivery route available during migration", () => {

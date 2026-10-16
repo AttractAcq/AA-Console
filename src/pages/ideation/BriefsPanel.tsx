@@ -47,7 +47,7 @@ const STATUS_TONE: Record<string, string> = {
   rejected: "bg-destructive/10 text-destructive",
 };
 
-export function BriefsPanel({ stage = "brief" }: { stage?: "brief" | "create" } = {}) {
+export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "brief" | "create"; showJourney?: boolean } = {}) {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -135,7 +135,7 @@ export function BriefsPanel({ stage = "brief" }: { stage?: "brief" | "create" } 
 
   return (
     <div>
-      <ContentJourney clientId={clientId} current={stage} briefId={focusedBrief} />
+      {showJourney && <ContentJourney clientId={clientId} current={stage} briefId={focusedBrief} />}
       {stage === "create" && <p className="mb-4 text-sm text-muted-foreground">
         Choose a brief to create with AI or assign to a person. Track generated reels in Media → Reel shots and returned footage in Edit / Repurpose.
       </p>}
@@ -145,7 +145,12 @@ export function BriefsPanel({ stage = "brief" }: { stage?: "brief" | "create" } 
         <p className="mb-4 text-xs text-muted-foreground">
           Following one brief from its production view.{" "}
           <button type="button" className="font-medium text-brand-strong hover:underline"
-            onClick={() => setSearchParams(stage === "create" ? {} : { tab: "briefs" })}>Show all briefs</button>
+            onClick={() => setSearchParams((current) => {
+              const next = new URLSearchParams(current);
+              next.delete("brief");
+              if (stage === "brief") next.set("tab", "briefs");
+              return next;
+            })}>Show all briefs</button>
         </p>
       ) : (
         <div className="mb-4 flex flex-col gap-2">
@@ -204,10 +209,12 @@ export function BriefsPanel({ stage = "brief" }: { stage?: "brief" | "create" } 
           b.status === "in_production" || b.status === "complete" ? (
             b.media_type === "video" && b.content_format === "reel" ?
               <button key="a" type="button" className="text-xs font-medium text-brand-strong hover:underline"
-                onClick={() => navigate(`/clients/${clientId}/delivery/content-production-factory?tab=reel-shots&brief=${b.id}`)}>Track reel</button>
+                onClick={() => navigate(`/clients/${clientId}/delivery/content-production-factory?${searchParams.get("view") === "v2" ? "view=v2&tab=assets&asset=reel-shots" : "tab=reel-shots"}&brief=${b.id}`)}>Track reel</button>
               : (assignments.get(b.id) ?? []).some((assignment) => assignment.asset_id) ?
                 <button key="a" type="button" className="text-xs font-medium text-brand-strong hover:underline"
-                  onClick={() => navigate(`/clients/${clientId}/delivery/content-production-factory?tab=${b.media_type === "video" ? "video-library" : b.media_type === "image" ? "image-library" : "copy-library"}`)}>
+                  onClick={() => navigate(`/clients/${clientId}/delivery/content-production-factory?${searchParams.get("view") === "v2"
+                    ? `view=v2&tab=assets&asset=${b.media_type === "video" ? "videos" : b.media_type === "image" ? "images" : "copy"}`
+                    : `tab=${b.media_type === "video" ? "video-library" : b.media_type === "image" ? "image-library" : "copy-library"}`}`)}>
                   View delivery
                 </button>
               : <span key="a" className="text-xs text-muted-foreground">Actioned</span>
