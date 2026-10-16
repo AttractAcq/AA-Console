@@ -594,6 +594,42 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_page_approval_snapshots: {
+        Row: {
+          approval_id: string
+          client_id: string
+          page_id: string
+          revision_id: string
+          site_repository_id: string
+          site_path: string
+          rendered_html: string
+          rendered_sha256: string
+          created_at: string
+        }
+        Insert: {
+          approval_id: string
+          client_id: string
+          page_id: string
+          revision_id: string
+          site_repository_id: string
+          site_path: string
+          rendered_html: string
+          rendered_sha256: string
+          created_at?: string
+        }
+        Update: {
+          approval_id?: string
+          client_id?: string
+          page_id?: string
+          revision_id?: string
+          site_repository_id?: string
+          site_path?: string
+          rendered_html?: string
+          rendered_sha256?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       campaign_intelligence_snapshots: {
         Row: {
           id: string

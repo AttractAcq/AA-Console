@@ -224,12 +224,14 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.url === "/admin/sites/provision" || req.url === "/admin/sites/publish") {
+  if (req.url === "/admin/sites/provision" || req.url === "/admin/sites/publish"
+      || req.url === "/admin/sites/request-page-approval") {
     if (req.method !== "POST") {
       json(405, { ok: false, error: "POST only" });
       return;
     }
-    const action = req.url.endsWith("provision") ? "provision" : "publish";
+    const action = req.url.endsWith("provision") ? "provision"
+      : req.url.endsWith("request-page-approval") ? "request-page-approval" : "publish";
     void handleSitesRoute(req, res, sb, config, action);
     return;
   }

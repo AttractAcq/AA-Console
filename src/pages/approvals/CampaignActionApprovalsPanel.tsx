@@ -4,10 +4,12 @@ import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 
 type Approval = Database["public"]["Tables"]["campaign_action_approvals"]["Row"];
+type PageSnapshot = Database["public"]["Tables"]["campaign_page_approval_snapshots"]["Row"];
 
 export function CampaignActionApprovalsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [requests, setRequests] = useState<Approval[]>([]);
+  const [pageSnapshots, setPageSnapshots] = useState<Record<string, PageSnapshot>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reasonById, setReasonById] = useState<Record<string, string>>({});
@@ -16,6 +18,7 @@ export function CampaignActionApprovalsPanel() {
   const refresh = useCallback(async () => {
     if (!clientId) {
       setRequests([]);
+      setPageSnapshots({});
       setLoading(false);
       return;
     }
@@ -31,6 +34,23 @@ export function CampaignActionApprovalsPanel() {
       setError(queryError.message);
       return;
     }
+    const pageIds = (data ?? []).filter((request) => request.action_key === "page_deploy")
+      .map((request) => request.id);
+    if (pageIds.length > 0) {
+      const { data: snapshots, error: snapshotError } = await supabase
+        .from("campaign_page_approval_snapshots")
+        .select("*")
+        .in("approval_id", pageIds);
+      if (snapshotError) {
+        setError(snapshotError.message);
+        setPageSnapshots({});
+        setRequests(data ?? []);
+        return;
+      }
+      setPageSnapshots(Object.fromEntries((snapshots ?? []).map((row) => [row.approval_id, row])));
+    } else {
+      setPageSnapshots({});
+    }
     setError(null);
     setRequests(data ?? []);
   }, [clientId]);
@@ -38,6 +58,10 @@ export function CampaignActionApprovalsPanel() {
   useEffect(() => { void refresh(); }, [refresh]);
 
   async function decide(request: Approval, decision: "approved" | "rejected") {
+    if (decision === "approved" && request.action_key === "page_deploy" && !pageSnapshots[request.id]) {
+      setError("This page request has no reviewable version snapshot. Ask for a new request.");
+      return;
+    }
     const reason = reasonById[request.id]?.trim();
     if (decision === "rejected" && !reason) {
       setError("Enter a reason before rejecting this request.");
@@ -87,8 +111,27 @@ export function CampaignActionApprovalsPanel() {
               </dl>
               <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">Approved scope</p>
               <pre className="mt-1 max-h-56 overflow-auto rounded-lg bg-muted p-3 text-xs">{JSON.stringify(request.scope, null, 2)}</pre>
+              {request.action_key === "page_deploy" && (pageSnapshots[request.id] ? (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm font-medium">Page revision preview</p>
+                  <p className="text-xs text-muted-foreground">
+                    Review the page destined for {request.destination}. Scripts and forms are disabled in this preview.
+                  </p>
+                  <iframe
+                    title={`Page revision for ${request.destination}`}
+                    sandbox=""
+                    srcDoc={pageSnapshots[request.id].rendered_html}
+                    className="h-80 w-full rounded-lg border border-border bg-white"
+                  />
+                  <details className="text-xs"><summary className="cursor-pointer">View exact HTML source</summary>
+                    <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-muted p-3">{pageSnapshots[request.id].rendered_html}</pre>
+                  </details>
+                </div>
+              ) : <p role="alert" className="mt-4 text-sm text-destructive">
+                No reviewable page snapshot is attached. Request a new approval.
+              </p>)}
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                <button type="button" disabled={busyId === request.id}
+                <button type="button" disabled={busyId === request.id || (request.action_key === "page_deploy" && !pageSnapshots[request.id])}
                   onClick={() => void decide(request, "approved")}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
                   Approve this scope

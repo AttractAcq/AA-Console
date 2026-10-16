@@ -66,8 +66,19 @@ beforeAll(async () => {
     );
     create table client_pages (
       id uuid primary key, client_id uuid not null, published_url text,
-      publish_status text not null default 'unpublished'
+      publish_status text not null default 'unpublished', html text,
+      current_revision integer, site_repository_id uuid, site_path text
     );
+    create table client_page_revisions (
+      id uuid primary key default gen_random_uuid(), client_id uuid not null,
+      page_id uuid not null, revision_number integer not null, html text not null
+    );
+    create table client_site_repositories (
+      id uuid primary key default gen_random_uuid(), client_id uuid not null,
+      status text not null, pages_url text, owner text, repo text,
+      default_branch text not null default 'main'
+    );
+    create table client_sales_agent_deployments (page_id uuid not null);
     create table client_sales_agents (id uuid primary key, client_id uuid not null);
     create table campaign_artifacts (
       id uuid primary key default gen_random_uuid(), campaign_id uuid not null,
@@ -151,6 +162,8 @@ beforeAll(async () => {
   await db.exec(artifactOfferMigration);
   const pagePublishBoundaryMigration = await readFile(new URL("../../supabase/migrations/20261016050000_212_v6_page_publish_boundary.sql", import.meta.url), "utf8");
   await db.exec(pagePublishBoundaryMigration);
+  const pageApprovalMigration = await readFile(new URL("../../supabase/migrations/20261016060000_213_v6_page_approval_snapshot.sql", import.meta.url), "utf8");
+  await db.exec(pageApprovalMigration);
   await db.exec(`
     insert into clients(id) values ('${clientA}'), ('${clientB}');
     insert into client_campaigns(id,client_id,name,brief,meta_campaign_id,approved_at)
@@ -686,4 +699,79 @@ it("blocks both page-publish entry and late attachment for v6 campaigns", async 
   await expect(db.query("select assert_page_publish_allowed_v6($1)", [pageId]))
     .rejects.toThrow(/Service role required/);
   await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+});
+
+it("freezes the exact revision and destination for a v6 page approval request", async () => {
+  const pageId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const repoId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const html = "<html><body>Approved service offer</body></html>";
+  const campaign = await db.query<{ id: string }>(`insert into client_campaigns
+    (client_id,name,brief,acquisition_mode) values ($1,'Page approval','Brief','organic') returning id`, [clientA]);
+  const campaignId = campaign.rows[0]!.id;
+  await db.query(`update client_campaigns set objective='Leads', audience='Local buyers',
+    built_at=now(), needs_landing_page=true where id=$1`, [campaignId]);
+  await db.query("select create_campaign_manifest_v6($1,'page-approval-package',false)", [campaignId]);
+  await db.query(`insert into client_site_repositories
+    (id,client_id,status,pages_url,owner,repo) values
+    ($1,$2,'ready','https://sites.example/client','aa-sites','client')`, [repoId, clientA]);
+  await db.query(`insert into client_pages
+    (id,client_id,html,current_revision)
+    values ($1,$2,$3,1)`, [pageId, clientA, html]);
+  await db.query(`insert into client_page_revisions
+    (client_id,page_id,revision_number,html) values ($1,$2,1,$3)`, [clientA, pageId, html]);
+  await db.query(`insert into campaign_artifacts
+    (campaign_id,client_id,kind,page_id) values ($1,$2,'landing_page',$3)`, [campaignId, clientA, pageId]);
+
+  const requested = await db.query<{ approval: { id: string; destination: string; status: string } }>(
+    "select to_jsonb(request_campaign_page_deploy_approval_v6($1,$2,$3,$4)) as approval",
+    [pageId, "deploy-v1", repoId, "service-offer/index.html"]);
+  expect(requested.rows[0]!.approval).toMatchObject({
+    destination: "https://sites.example/client/service-offer/", status: "pending",
+  });
+  const approvalId = requested.rows[0]!.approval.id;
+  const snapshot = await db.query<{ rendered_html: string; site_path: string }>(
+    "select rendered_html,site_path from campaign_page_approval_snapshots where approval_id=$1",
+    [approvalId]);
+  expect(snapshot.rows[0]).toEqual({ rendered_html: html, site_path: "service-offer/index.html" });
+  const placement = await db.query<{ site_repository_id: string; site_path: string }>(
+    "select site_repository_id,site_path from client_pages where id=$1", [pageId]);
+  expect(placement.rows[0]).toEqual({ site_repository_id: repoId,
+    site_path: "service-offer/index.html" });
+  const replay = await db.query<{ approval: { id: string } }>(
+    "select to_jsonb(request_campaign_page_deploy_approval_v6($1,$2)) as approval",
+    [pageId, "deploy-v1"]);
+  expect(replay.rows[0]!.approval.id).toBe(approvalId);
+  const generic = await db.query<{ approval: { id: string } }>(
+    `select to_jsonb(request_campaign_action_approval_v6(
+      (select id from campaign_manifest_versions where campaign_id=$1),
+      'generic-page', 'page_deploy', 'https://sites.example/client/other/',
+      repeat('a',64), '{}'::jsonb)) as approval`, [campaignId]);
+  await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
+    select set_config('test.user_id','${manager}',false)`);
+  await expect(db.query("select decide_campaign_action_approval_v6($1,'approved',null)",
+    [generic.rows[0]!.approval.id])).rejects.toThrow(/exact rendered snapshot/);
+  await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+  await db.query("update client_pages set html='<html>Changed</html>' where id=$1", [pageId]);
+  await expect(db.query("select request_campaign_page_deploy_approval_v6($1,$2)",
+    [pageId, "deploy-v1"])).rejects.toThrow(/does not match its recorded revision/);
+  await db.exec("select set_config('request.jwt.claim.role','authenticated',false)");
+  await expect(db.query("select decide_campaign_action_approval_v6($1,'approved',null)",
+    [approvalId])).rejects.toThrow(/Page or destination changed/);
+  await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+  await db.query("update client_pages set html=$2 where id=$1", [pageId, html]);
+  await db.exec("select set_config('request.jwt.claim.role','authenticated',false)");
+  const decided = await db.query<{ approval: { status: string } }>(
+    "select to_jsonb(decide_campaign_action_approval_v6($1,'approved',null)) as approval",
+    [approvalId]);
+  expect(decided.rows[0]!.approval.status).toBe("approved");
+  await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+  await db.query("select create_campaign_manifest_v6($1,'page-approval-package-v2',false)",
+    [campaignId]);
+  const nextPackageRequest = await db.query<{ approval: { id: string } }>(
+    "select to_jsonb(request_campaign_page_deploy_approval_v6($1,$2)) as approval",
+    [pageId, "deploy-v1"]);
+  expect(nextPackageRequest.rows[0]!.approval.id).not.toBe(approvalId);
+  await db.query("insert into client_sales_agent_deployments(page_id) values ($1)", [pageId]);
+  await expect(db.query("select request_campaign_page_deploy_approval_v6($1,$2)",
+    [pageId, "deploy-v2"])).rejects.toThrow(/Sales-agent widgets/);
 });

@@ -49,3 +49,38 @@ it("shows the exact destination and scope before a human approves", async () => 
   }));
   expect(await screen.findByText("No campaign action requests are waiting.")).toBeInTheDocument();
 });
+
+it("requires the frozen page HTML before allowing page deployment approval", async () => {
+  const pageRequest = { ...pending, action_key: "page_deploy",
+    destination: "https://sites.example/offer/" };
+  from.mockImplementation((table: string) => {
+    if (table === "campaign_page_approval_snapshots") {
+      return { select: () => ({ in: async () => ({ data: [{
+        approval_id: "approval-1", rendered_html: "<html><body>Exact offer</body></html>",
+      }], error: null }) }) };
+    }
+    const query = { select: () => query, eq: () => query,
+      order: async () => ({ data: [pageRequest], error: null }) };
+    return query;
+  });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByTitle("Page revision for https://sites.example/offer/"))
+    .toHaveAttribute("sandbox", "");
+  expect(screen.getByText(/Exact offer/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Approve this scope" })).toBeEnabled();
+});
+
+it("refuses a page approval with no reviewable snapshot", async () => {
+  const pageRequest = { ...pending, action_key: "page_deploy" };
+  from.mockImplementation((table: string) => {
+    if (table === "campaign_page_approval_snapshots") {
+      return { select: () => ({ in: async () => ({ data: [], error: null }) }) };
+    }
+    const query = { select: () => query, eq: () => query,
+      order: async () => ({ data: [pageRequest], error: null }) };
+    return query;
+  });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByText(/No reviewable page snapshot is attached/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Approve this scope" })).toBeDisabled();
+});

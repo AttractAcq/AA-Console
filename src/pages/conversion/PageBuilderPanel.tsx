@@ -12,6 +12,7 @@ import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
 import { ArchiveAction } from "../../components/ArchiveAction";
 import { PublishButton } from "../../components/sites/PublishButton";
+import { PageApprovalButton } from "../../components/sites/PageApprovalButton";
 import type { SiteRepo } from "../sites/readiness";
 import { PagePreview } from "../../components/pages/PagePreview";
 import { PagePolish } from "./PagePolish";
@@ -37,6 +38,7 @@ type CampaignOption = {
   id: string;
   name: string;
   status: string;
+  acquisition_mode: string;
 };
 
 type PageCampaignLink = {
@@ -100,7 +102,7 @@ export function PageBuilderPanel({
           ? Promise.resolve({ data: [], error: null })
           : supabase
           .from("client_campaigns")
-          .select("id, name, status")
+          .select("id, name, status, acquisition_mode")
           .eq("client_id", clientId)
           .order("created_at", { ascending: false }),
         isRecruitment
@@ -357,7 +359,13 @@ export function PageBuilderPanel({
                 <p className="mt-1 truncate text-xs text-muted-foreground">{p.published_url}</p>
               )}
               <div className="mt-4 border-t border-border pt-3">
-                <PublishButton
+                {pageLinks.some((link) => link.page_id === p.id &&
+                  campaigns.some((campaign) => campaign.id === link.campaign_id &&
+                    (campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "paid"))) ? (
+                  <PageApprovalButton pageId={p.id}
+                    ready={Boolean(p.html && p.current_revision) &&
+                      repos.some((repo) => repo.status === "ready" && Boolean(repo.pages_url))} />
+                ) : <PublishButton
                   page={{
                     id: p.id,
                     title: p.title,
@@ -368,7 +376,7 @@ export function PageBuilderPanel({
                   }}
                   repos={repos}
                   onPublished={() => void refresh()}
-                />
+                />}
               </div>
 
               {isRecruitment && (
