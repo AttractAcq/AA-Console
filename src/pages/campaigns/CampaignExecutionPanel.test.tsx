@@ -121,7 +121,7 @@ function show(campaigns: unknown[] = [planned()], reqs: Requirement[] = NOT_READ
   // populated with campaign rows, which is mock pollution that would hide a
   // real bug rather than catch one.
   from.mockImplementation((table: string) =>
-    table === "client_content_pillars" ? rows([]) : rows(campaigns),
+    table === "client_content_pillars" || table === "campaign_content_pillars" ? rows([]) : rows(campaigns),
   );
   rpc.mockImplementation((name: string) => {
     if (name === "campaign_readiness") return Promise.resolve({ data: reqs, error: null });
@@ -196,6 +196,36 @@ describe("campaign pages", () => {
     expect(screen.getByRole("button", { name: "Budget and countries" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Write build sheet" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Record a hand build" })).toBeEnabled();
+  });
+
+  it("shows route and artifact blockers while keeping a planned campaign's edit form to its name", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], NOT_READY);
+    expect(await screen.findByRole("region", { name: "Readiness and blockers" })).toHaveTextContent("0 of 2 pieces ready");
+    expect(screen.getByText("Paid · Meta Ads")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Edit campaign" }));
+    expect(screen.getByRole("textbox", { name: "Campaign name" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Objective" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Brief" })).not.toBeInTheDocument();
+  });
+
+  it("shows the current immutable package and only its own approval state", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    const manifest = { id: "manifest-3", version: 3, plan_hash: "abc123def456", created_at: "2026-10-16T10:00:00Z" };
+    const manifestQuery = rows([]);
+    manifestQuery.limit = () => ({ maybeSingle: () => Promise.resolve({ data: manifest, error: null }) });
+    from.mockImplementation((table: string) => {
+      if (table === "campaign_manifest_versions") return manifestQuery;
+      if (table === "campaign_manifest_items") return rows([{ item_key: "creative", module_key: "content_production_factory", required: true, external_activation: false }]);
+      if (table === "campaign_action_approvals") return rows([{ id: "approval-1", action_key: "meta_ad_build", status: "pending", destination: "Meta", requested_at: "2026-10-16T11:00:00Z" }]);
+      return rows([planned({ acquisition_mode: "paid", paid_platform: "meta" })]);
+    });
+    rpc.mockResolvedValue({ data: NOT_READY, error: null });
+    render(<CampaignExecutionPanel />);
+    const readiness = await screen.findByRole("region", { name: "Readiness and blockers" });
+    expect(readiness).toHaveTextContent("Package v3");
+    expect(readiness).toHaveTextContent("creative");
+    expect(readiness).toHaveTextContent("meta ad build · pending");
   });
 
   it("regenerates a built plan as a linked revision instead of replacing its assets", async () => {

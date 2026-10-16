@@ -100,6 +100,7 @@ export function MetaBuildSection({
   onChanged,
   externalActionsAvailable = true,
   handBuildAvailable = externalActionsAvailable,
+  showSheetInline = false,
 }: {
   clientId: string;
   campaign: MetaCampaign;
@@ -110,6 +111,8 @@ export function MetaBuildSection({
   externalActionsAvailable?: boolean;
   /** Recording an operator's completed hand build is an internal write. */
   handBuildAvailable?: boolean;
+  /** Campaign Factory v2 keeps the generated manual sheet in its Meta tab. */
+  showSheetInline?: boolean;
 }) {
   const [integration, setIntegration] = useState<Integration | null>(null);
   const [lastBuild, setLastBuild] = useState<LastBuild | null>(null);
@@ -118,9 +121,10 @@ export function MetaBuildSection({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<{ status: string; text: string | null; error: string | null } | null>(null);
 
   const load = useCallback(async () => {
-    const [meta, job] = await Promise.all([
+    const [meta, job, sheetJob] = await Promise.all([
       supabase
         .from("client_integrations")
         .select("status, ad_account_id, meta_page_id, meta_pixel_id")
@@ -136,10 +140,28 @@ export function MetaBuildSection({
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      showSheetInline ? supabase.from("agent_jobs")
+        .select("id, status, error").eq("client_id", clientId)
+        .eq("agent_key", "meta_build_sheet")
+        .eq("input_table", "client_campaigns").eq("input_id", campaign.id)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
     ]);
     setIntegration((meta.data as Integration | null) ?? null);
     setLastBuild((job.data as LastBuild | null) ?? null);
-  }, [clientId, campaign.id]);
+    if (showSheetInline) {
+      if (sheetJob.error) {
+        setSheet({ status: "unavailable", error: sheetJob.error.message, text: null });
+      } else if (sheetJob.data) {
+        const event = await supabase.from("agent_job_events")
+          .select("payload").eq("job_id", sheetJob.data.id)
+          .order("created_at", { ascending: false }).limit(100);
+        const payload = event.data?.find((row) => row.payload && typeof row.payload === "object" && "sheet" in row.payload)?.payload;
+        setSheet({ status: sheetJob.data.status, error: event.error?.message ?? sheetJob.data.error,
+          text: payload && typeof payload === "object" && "sheet" in payload && typeof payload.sheet === "string" ? payload.sheet : null });
+      } else setSheet(null);
+    }
+  }, [clientId, campaign.id, showSheetInline]);
 
   // Reloads when a build starts or settles, which is when the answer changes.
   useEffect(() => {
@@ -215,8 +237,9 @@ export function MetaBuildSection({
       return;
     }
     setNotice(
-      "Queued. The sheet appears in the Meta Build Sheet agent's log; it sends nothing to Meta and changes nothing here.",
+      showSheetInline ? "Queued. The manual sheet will appear below when ready; nothing is sent to Meta." : "Queued. The sheet appears in the Meta Build Sheet agent's log; it sends nothing to Meta and changes nothing here.",
     );
+    if (showSheetInline) void load();
     onChanged();
   };
 
@@ -317,6 +340,7 @@ export function MetaBuildSection({
       {!externalActionsAvailable && <p className="mt-2 text-xs text-muted-foreground">
         Build sheet and settings are available. Creating objects in Meta waits for exact-version human approval.
       </p>}
+      {showSheetInline && <section className="mt-4 rounded-lg border border-border bg-card p-3" aria-label="Manual Meta build sheet"><div className="flex items-center justify-between gap-2"><h5 className="text-sm font-semibold">Manual build sheet</h5><button type="button" className={buttonClass} onClick={() => void load()}>Refresh sheet</button></div>{sheet ? <><p className="mt-2 text-xs text-muted-foreground">Latest sheet job: {sheet.status}</p>{sheet.error && <p role="alert" className="mt-2 text-xs text-destructive">{sheet.error}</p>}{sheet.text ? <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded bg-muted p-3 text-xs">{sheet.text}</pre> : <p className="mt-2 text-xs text-muted-foreground">{sheet.status === "completed" ? "The sheet was not available in the job record. Check its agent log." : "The sheet is being prepared."}</p>}</> : <p className="mt-2 text-xs text-muted-foreground">No sheet requested yet.</p>}</section>}
 
       <FormModal
         open={editing}

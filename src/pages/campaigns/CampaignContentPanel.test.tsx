@@ -154,11 +154,12 @@ it("only marks approved assets ready and reuses the normal review RPC", async ()
 it("shows v2 assets in a table with brief, preview and review actions", async () => {
   show({ layout: "v2" });
   expect(await screen.findByRole("table")).toBeInTheDocument();
-  expect(screen.getByText("Finished piece")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Preview Finished piece" })).toBeInTheDocument();
-  expect(screen.getAllByRole("button", { name: "Brief" })).toHaveLength(2);
-  fireEvent.click(screen.getByRole("button", { name: "Actions" }));
-  expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /WhatsApp photo triage/ }));
+  expect(screen.getByText(/Asset version · Finished piece/)).toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: "Preview Finished piece" })).toHaveLength(2);
+  expect(screen.getAllByRole("button", { name: "Brief" })).toHaveLength(1);
+  fireEvent.click(screen.getAllByRole("button", { name: "Actions" })[1]);
+  expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Approve" }));
   await waitFor(() => expect(rpc).toHaveBeenCalledWith("review_media_asset", { p_asset_id: "asset-1", p_decision: "approved" }));
 });

@@ -49,6 +49,7 @@ beforeEach(() => {
       in: (field: string, value: unknown) => { filters.push([field, value]); return chain; },
       is: (field: string, value: unknown) => { filters.push([field, value]); return chain; },
       order: () => chain,
+      limit: () => chain,
       single: () => Promise.resolve({ data: { id: "page-1" }, error: null }),
       delete: () => { deleting = true; deletes.push({ table, filters }); return chain; },
       insert: (value: unknown) => {
@@ -68,6 +69,7 @@ beforeEach(() => {
           data: deleting
             ? table === "client_pages" ? [{ id: "page-1" }] : deletedLinks.map((link) => ({ id: link.id }))
             : table === "client_campaigns" ? [campaign]
+              : table === "campaign_action_approvals" || table === "campaign_manifest_versions" ? []
               : table === "client_pages" ? rows.pages : rows.links,
         }).then(resolve);
       },
@@ -151,6 +153,22 @@ it("locks the build page form to its Campaign Factory campaign", async () => {
   await waitFor(() => expect(inserts).toEqual(expect.arrayContaining([
     expect.objectContaining({ table: "campaign_artifacts", value: expect.objectContaining({ campaign_id: "campaign-1", kind: "landing_page" }) }),
   ])));
+});
+
+it("shows only pages linked to the selected campaign after creation", async () => {
+  rows.pages = [
+    { id: "page-1", title: "Campaign landing", status: "approved", html: "<h1>Ready</h1>", published_url: null },
+    { id: "page-2", title: "Other landing", status: "approved", html: "<h1>Other</h1>", published_url: null },
+  ];
+  rows.links = [
+    { id: "link-1", page_id: "page-1", campaign_id: "campaign-1" },
+    { id: "link-2", page_id: "page-2", campaign_id: "campaign-2" },
+  ];
+  render(<PageBuilderPanel campaignId="campaign-1" />);
+  expect(await screen.findByText("Campaign landing")).toBeInTheDocument();
+  expect(screen.queryByText("Other landing")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Open the page" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Build Page" })).toBeInTheDocument();
 });
 
 it("queues the page agent when no HTML file is uploaded and still links the campaign", async () => {

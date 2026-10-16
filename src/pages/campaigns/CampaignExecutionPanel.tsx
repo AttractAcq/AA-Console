@@ -22,9 +22,9 @@ import { MetaBuildSection } from "./MetaBuildSection";
 import { ArchiveAction } from "../../components/ArchiveAction";
 import { cn } from "../../lib/cn";
 import { Modal } from "../../components/Modal";
-import type { Database } from "../../types/database";
 import { PageBuilderPanel } from "../conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "../sales/SalesOverviewPanel";
+import { useCampaignV2Package } from "./useCampaignV2Package";
 
 type Campaign = {
   id: string;
@@ -111,6 +111,18 @@ const STATUS_TONE: Record<string, string> = {
 };
 const buttonClass = "rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50";
 
+function productionStage(campaign: Campaign, checks: Requirement[], isPlanning: boolean): string {
+  if (campaign.status === "live") return "Live";
+  if (campaign.status === "complete" || campaign.status === "cancelled") return campaign.status;
+  if (!campaign.built_at) return isPlanning ? "Planning" : "Awaiting plan";
+  if (campaign.content_count === 0) return "Plan ready";
+  if (campaign.content_count > 0 && !campaign.content_ideas_generated_at) return "Awaiting ideas";
+  const content = checks.find((check) => check.requirement.toLowerCase() === "content");
+  if (content?.met) return "Content ready";
+  if (content && content.have > 0) return "Content in review";
+  return "Content production";
+}
+
 export function CampaignExecutionPanel() {
   const { clientId, campaignId } = useParams<{ clientId: string; campaignId?: string }>();
   const [searchParams] = useSearchParams();
@@ -144,10 +156,12 @@ export function CampaignExecutionPanel() {
   }), [aiDraft]);
   const [editing, setEditing] = useState<Campaign | null>(null);
   const [editingPlan, setEditingPlan] = useState<Campaign | null>(null);
-  const [metaToolsOpen, setMetaToolsOpen] = useState(false);
+  const [metaToolsOpenFor, setMetaToolsOpenFor] = useState<string | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [rowActions, setRowActions] = useState<string | null>(null);
-  const [v2Tab, setV2Tab] = useState("plan");
+  const [v2TabSelection, setV2TabSelection] = useState({ campaignId, tab: "plan" });
+  const v2Tab = v2TabSelection.campaignId === campaignId ? v2TabSelection.tab : "plan";
+  const metaToolsOpen = metaToolsOpenFor === campaignId;
   const [confirmAction, setConfirmAction] = useState<{ campaign: Campaign; kind: "archive" | "delete" | "plan" | "launch" | "clone" } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -157,6 +171,7 @@ export function CampaignExecutionPanel() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [readinessError, setReadinessError] = useState<string | null>(null);
   const request = useRef(0);
+  const packageState = useCampaignV2Package(clientId, campaignId, v2 && Boolean(campaignId));
 
   const refresh = useCallback(async () => {
     const version = ++request.current;
@@ -249,7 +264,7 @@ export function CampaignExecutionPanel() {
   }, [newOpen, clientId]);
 
   useEffect(() => {
-    if (!newOpen || !clientId) return;
+    if ((!newOpen && !editingPlan) || !clientId) return;
     let cancelled = false;
     setOffersFailed(false);
     void (async () => {
@@ -272,9 +287,12 @@ export function CampaignExecutionPanel() {
           label: `${names.get(row.offer_id) ?? "Service"} v${row.version} · ${row.promise.slice(0, 90)}` })));
     })().catch(() => { if (!cancelled) setOffersFailed(true); });
     return () => { cancelled = true; };
-  }, [newOpen, clientId]);
+  }, [newOpen, editingPlan, clientId]);
 
-  const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
+  const { inFlight, recentFailures } = useAgentJobs(clientId, () => {
+    void refresh();
+    void packageState.refresh();
+  });
 
   // Which campaigns have a planner running right now. Taken from the job queue
   // rather than local state so it survives a reload and is still right when the
@@ -415,20 +433,36 @@ export function CampaignExecutionPanel() {
 
   /** A planned campaign can have approved creative and an immutable v6 package.
    * Regeneration therefore makes a linked revision and preserves the source. */
-  const createPlanRevision = async (campaign: Campaign, brief: string) => {
+  const createPlanRevision = async (campaign: Campaign, brief: string, changes?: { template: string; offerVersionId: string | null }) => {
     if (!clientId) throw new Error("No client selected.");
+    if (changes && offersFailed) throw new Error("Approved offers could not be loaded.");
+    if (changes?.offerVersionId && !approvedOfferChoices.some((offer) => offer.id === changes.offerVersionId))
+      throw new Error("Choose an approved offer belonging to this client.");
+    const nextTemplate = changes?.template ?? campaign.template;
+    if (nextTemplate && !templateFor(nextTemplate)) throw new Error("Choose a valid campaign template.");
     const { data, error } = await supabase.from("client_campaigns").insert({
       client_id: clientId,
-      name: `${campaign.name.slice(0, 180)} · Revised plan`,
+      name: `${campaign.name.slice(0, 165)} · Plan revision ${new Date().toISOString().slice(0, 10)}`,
       brief,
       acquisition_mode: campaign.acquisition_mode,
       paid_platform: campaign.paid_platform,
       cloned_from_campaign_id: campaign.id,
-      offer_version_id: campaign.offer_version_id,
+      offer_version_id: changes ? changes.offerVersionId : campaign.offer_version_id,
       ideate_on_plan: campaign.ideate_on_plan,
-      ...(campaign.template ? templateColumns(campaign.template) ?? {} : {}),
+      ...(nextTemplate ? templateColumns(nextTemplate) ?? {} : {}),
     }).select("id").single();
     if (error) throw error;
+    // A revision must carry the same selected pillars into its new plan.
+    // Otherwise the planner silently changes the creative scope.
+    const selected = await supabase.from("campaign_content_pillars")
+      .select("pillar_id").eq("campaign_id", campaign.id);
+    if (selected.error) throw selected.error;
+    if (selected.data?.length) {
+      const copied = await supabase.from("campaign_content_pillars").insert(
+        selected.data.map(({ pillar_id }) => ({ campaign_id: data.id, pillar_id })),
+      );
+      if (copied.error) throw copied.error;
+    }
     const queued = await supabase.rpc("enqueue_agent_job", {
       p_agent_key: "campaign_plan", p_client_id: clientId,
       p_input_table: "client_campaigns", p_input_id: data.id,
@@ -501,7 +535,10 @@ export function CampaignExecutionPanel() {
           return <div key={c.id}>
             <section className="rounded-lg border border-border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex items-center gap-3"><h2 className="text-lg font-semibold">{c.name}</h2><span className={cn("rounded-full px-2 py-0.5 text-xs font-medium capitalize", STATUS_TONE[c.status] ?? "bg-muted text-muted-foreground")}>{c.status}</span></div>
+                <div><div className="flex items-center gap-3"><h2 className="text-lg font-semibold">{c.name}</h2><span className={cn("rounded-full px-2 py-0.5 text-xs font-medium capitalize", STATUS_TONE[c.status] ?? "bg-muted text-muted-foreground")}>{c.status}</span></div>
+                  <p className="mt-1 text-xs text-muted-foreground">{c.acquisition_mode === "paid" ? `Paid · ${c.paid_platform === "meta" ? "Meta Ads" : "Google Ads"}` : c.acquisition_mode === "organic" ? "Organic" : "Legacy campaign"}
+                    {c.cloned_from_campaign_id && <>{" · "}<Link className="text-brand-strong underline" to={`/clients/${clientId}/delivery/campaign-factory/${c.cloned_from_campaign_id}?view=v2`}>Source campaign</Link></>}
+                  </p></div>
                 <button type="button" className={buttonClass} onClick={() => setEditing(c)}>Edit campaign</button>
               </div>
               <dl className="mt-4 grid gap-4 border-t border-border pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
@@ -513,6 +550,18 @@ export function CampaignExecutionPanel() {
                 <div><dt className="text-muted-foreground">Dates</dt><dd>{c.starts_on ?? "—"} to {c.ends_on ?? "—"}</dd></div>
               </dl>
             </section>
+            <section className="mt-4 rounded-lg border border-border bg-card p-4" aria-label="Readiness and blockers">
+              <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">Readiness and blockers</h3><button type="button" className={buttonClass} onClick={() => { void refresh(); void packageState.refresh(); }}>Refresh status</button></div>
+              {packageState.error && <p role="alert" className="mt-2 text-xs text-destructive">Package status unavailable: {packageState.error}</p>}
+              {packageState.loading && <p className="mt-2 text-xs text-muted-foreground">Loading package…</p>}
+              {packageState.manifest ? <p className="mt-2 text-xs text-muted-foreground">Package v{packageState.manifest.version} · created {new Date(packageState.manifest.created_at).toLocaleString()} · plan hash {packageState.manifest.plan_hash.slice(0, 12)}… Content and approvals must be checked against this version.</p>
+                : c.acquisition_mode !== "legacy" && !packageState.loading && <p className="mt-2 text-xs text-muted-foreground">No versioned package yet. Run the planner to create one.</p>}
+              {packageState.items.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Package scope: {packageState.items.filter((item) => item.required).map((item) => item.item_key.replaceAll("_", " ")).join(", ")}. These are planned dependencies, not completed work.</p>}
+              {reqs.length ? <><p className="mt-3 text-xs font-medium">Artifact checks</p><ul className="mt-1 space-y-1">{reqs.map((r) => <li key={r.requirement} className="flex gap-2 text-xs"><span className={r.met ? "text-brand-strong" : "text-destructive"}>{r.met ? "●" : "○"}</span><span className="font-medium">{r.requirement}</span><span className="text-muted-foreground">{r.detail}</span></li>)}</ul></>
+                : <p className="mt-2 text-xs text-muted-foreground">Artifact readiness is unavailable; launch cannot be assessed.</p>}
+              {packageState.manifest && <p className="mt-3 text-xs text-muted-foreground">Content here belongs to this campaign revision. Existing content links identify the campaign, but do not store a separate package version; review the exact asset before requesting external approval.</p>}
+              {packageState.approvals.length > 0 && <p className="mt-3 text-xs text-muted-foreground">Current-package approvals: {packageState.approvals.map((approval) => `${approval.action_key.replaceAll("_", " ")} · ${approval.status}`).join("; ")}</p>}
+            </section>
             <div className="relative mt-4">
               <Button onClick={() => setActionsOpen((open) => !open)}>Action buttons</Button>
               {actionsOpen && <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-border bg-card p-3" aria-label="Campaign actions">
@@ -521,18 +570,18 @@ export function CampaignExecutionPanel() {
               </div>}
             </div>
             <div className="mt-6 flex flex-wrap gap-1 border-b border-border" role="tablist" aria-label="Campaign sections">
-              {tabs.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={v2Tab === id} onClick={() => setV2Tab(id)} className={cn("border-b-2 px-4 py-2 text-sm", v2Tab === id ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>{label}</button>)}
+              {tabs.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={v2Tab === id} onClick={() => setV2TabSelection({ campaignId, tab: id })} className={cn("border-b-2 px-4 py-2 text-sm", v2Tab === id ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>{label}</button>)}
             </div>
             {v2Tab === "plan" && <section className="space-y-4 py-4" aria-label="Campaign plan">
               <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">Campaign plan</h3><p className="text-xs text-muted-foreground">{c.built_at ? `Generated ${new Date(c.built_at).toLocaleString()}` : "Awaiting planner"}</p></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => setEditingPlan(c)}>Edit plan</button><button type="button" className={buttonClass} disabled={busy || planning.has(c.id)} onClick={() => setConfirmAction({ campaign: c, kind: "plan" })}>{c.built_at ? "Regenerate plan" : "Run planner"}</button></div></div>
               <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Objective</dt><dd>{c.objective ?? "—"}</dd></div><div><dt className="text-muted-foreground">Audience</dt><dd>{c.audience ?? "—"}</dd></div><div><dt className="text-muted-foreground">Offer</dt><dd>{c.offer_summary ?? "—"}</dd></div><div><dt className="text-muted-foreground">Core message</dt><dd>{c.core_message ?? "—"}</dd></div><div><dt className="text-muted-foreground">Channels</dt><dd>{c.channels?.join(", ") || "—"}</dd></div><div><dt className="text-muted-foreground">Budget</dt><dd>{c.budget == null ? "—" : c.budget.toLocaleString()}</dd></div><div><dt className="text-muted-foreground">Dates</dt><dd>{c.starts_on ?? "—"} to {c.ends_on ?? "—"}</dd></div><div><dt className="text-muted-foreground">KPI</dt><dd>{c.kpi_metric ?? "—"}{c.kpi_target != null ? ` · target ${c.kpi_target}` : ""}</dd></div><div><dt className="text-muted-foreground">Content pieces</dt><dd>{c.content_count}</dd></div><div><dt className="text-muted-foreground">Required builds</dt><dd>{[c.needs_landing_page && "Landing page", c.needs_sales_agent && "Sales agent"].filter(Boolean).join(", ") || "None"}</dd></div></dl>
             </section>}
             {v2Tab === "content" && clientId && <CampaignContentPanel key={`${clientId}:${c.id}:v2`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} template={c.template} mirrorsTemplate={c.mirrors_template} onChanged={refresh} refreshToken={campaigns} layout="v2" />}
-            {paid && v2Tab === "landing-page" && clientId && <PageBuilderPanel clientId={clientId} campaignId={c.id} campaignName={c.name} />}
-            {paid && v2Tab === "sales-agent" && <SalesOverviewPanel campaignId={c.id} campaignName={c.name} />}
-            {paid && c.paid_platform === "meta" && v2Tab === "meta-ads" && clientId && <section className="py-4"><div className="flex justify-end"><Button onClick={() => setMetaToolsOpen((open) => !open)}>Build functionality</Button></div>{metaToolsOpen && <MetaBuildSection clientId={clientId} campaign={c} building={inFlight.some((job) => job.agent_key === "meta_build" && job.input_id === c.id)} onChanged={() => void refresh()} externalActionsAvailable={false} handBuildAvailable />}</section>}
+            {paid && v2Tab === "landing-page" && clientId && <PageBuilderPanel key={c.id} clientId={clientId} campaignId={c.id} campaignName={c.name} />}
+            {paid && v2Tab === "sales-agent" && <SalesOverviewPanel key={c.id} campaignId={c.id} campaignName={c.name} />}
+            {paid && c.paid_platform === "meta" && v2Tab === "meta-ads" && clientId && <section className="py-4"><div className="rounded-lg border border-border bg-card p-4 text-sm"><h3 className="font-semibold">Meta activation</h3><p className="mt-2 text-xs text-muted-foreground">{packageState.manifest ? `Current package v${packageState.manifest.version}. ` : "A planned package is required. "}{packageState.approvals.filter((approval) => approval.action_key === "meta_ad_build").map((approval) => `Meta ad build approval: ${approval.status}. `).join("") || "No Meta build approval is recorded for this package. "}Prepare the build sheet and approved creative here. Creating Meta objects still awaits the exact-version approval executor.</p><Link className="mt-2 inline-block text-xs text-brand-strong underline" to={`/clients/${clientId}/delivery/approval-inbox?tab=campaign-actions`}>Open Approval Inbox</Link>{c.meta_campaign_id && <p className="mt-2 text-xs">Meta campaign {c.meta_campaign_id}{c.meta_ad_set_id ? ` · ad set ${c.meta_ad_set_id}` : " · ad set pending"}{c.meta_built_at ? ` · recorded ${new Date(c.meta_built_at).toLocaleString()}` : ""}</p>}</div><div className="mt-3 flex justify-end"><Button onClick={() => setMetaToolsOpenFor((open) => open === c.id ? null : c.id)}>Build functionality</Button></div>{metaToolsOpen && <MetaBuildSection clientId={clientId} campaign={c} building={inFlight.some((job) => job.agent_key === "meta_build" && job.input_id === c.id)} onChanged={() => { void refresh(); void packageState.refresh(); }} externalActionsAvailable={false} handBuildAvailable showSheetInline />}</section>}
           </div>;
-        }) : <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-muted/40"><tr><th className="p-3">Campaign</th><th className="p-3">Date</th><th className="p-3">Stage</th><th className="p-3">Edit</th></tr></thead><tbody>{visibleCampaigns.map((c) => <tr key={c.id} className="border-b border-border last:border-0"><td className="p-3"><Link className="font-medium text-brand-strong hover:underline" to={`/clients/${clientId}/delivery/campaign-factory/${c.id}?view=v2`}>{c.name}</Link></td><td className="p-3">{new Date(c.created_at).toLocaleDateString()}</td><td className="p-3 capitalize">{c.status}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={rowActions === c.id} onClick={() => setRowActions(rowActions === c.id ? null : c.id)}>Edit</button>{rowActions === c.id && <div className="mt-2 flex gap-2"><button type="button" className={buttonClass} onClick={() => setConfirmAction({ campaign: c, kind: "archive" })}>Archive</button><button type="button" className={buttonClass} onClick={() => setConfirmAction({ campaign: c, kind: "delete" })}>Delete</button></div>}</td></tr>)}</tbody></table></div>
+        }) : <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full text-left text-sm"><thead className="border-b border-border bg-muted/40"><tr><th className="p-3">Campaign</th><th className="p-3">Route</th><th className="p-3">Date</th><th className="p-3">Status</th><th className="p-3">Production stage</th><th className="p-3">Edit</th></tr></thead><tbody>{visibleCampaigns.map((c) => <tr key={c.id} className="border-b border-border last:border-0"><td className="p-3"><Link className="font-medium text-brand-strong hover:underline" to={`/clients/${clientId}/delivery/campaign-factory/${c.id}?view=v2`}>{c.name}</Link>{c.cloned_from_campaign_id && <span className="block text-xs text-muted-foreground">Revised or cloned from another campaign</span>}</td><td className="p-3">{c.acquisition_mode === "paid" ? `Paid · ${c.paid_platform === "meta" ? "Meta" : "Google"}` : c.acquisition_mode === "organic" ? "Organic" : "Legacy"}</td><td className="p-3">{new Date(c.created_at).toLocaleDateString()}</td><td className="p-3 capitalize">{c.status}</td><td className="p-3">{productionStage(c, readiness[c.id] ?? [], planning.has(c.id))}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={rowActions === c.id} onClick={() => setRowActions(rowActions === c.id ? null : c.id)}>Edit</button>{rowActions === c.id && <div className="mt-2 flex gap-2"><button type="button" className={buttonClass} onClick={() => setConfirmAction({ campaign: c, kind: "archive" })}>Archive</button><button type="button" className={buttonClass} onClick={() => setConfirmAction({ campaign: c, kind: "delete" })}>Delete</button></div>}</td></tr>)}</tbody></table></div>
       ) : (
         <div className="space-y-4">
           {visibleCampaigns.map((c) => {
@@ -892,15 +941,10 @@ export function CampaignExecutionPanel() {
         open={editing !== null}
         onClose={() => setEditing(null)}
         title="Edit campaign"
+        intro={editing?.built_at ? "This plan is versioned. Rename the campaign here; use Edit plan to change its brief, offer, budget, template or dates and generate a new revision." : "Rename or change the brief before the planner runs."}
         fields={[
           { name: "name", label: "Campaign name", kind: "text", required: true },
-          { name: "brief", label: "Brief", kind: "textarea", rows: 4, required: true },
-          { name: "objective", label: "Objective", kind: "textarea", rows: 2 },
-          { name: "offer_summary", label: "Offer", kind: "textarea", rows: 2 },
-          { name: "budget", label: "Budget", kind: "number" },
-          { name: "template", label: "Template", kind: "select", options: templateOptions() },
-          { name: "starts_on", label: "Start date", kind: "date" },
-          { name: "ends_on", label: "End date", kind: "date" },
+          ...(!editing?.built_at ? [{ name: "brief", label: "Brief", kind: "textarea", rows: 4, required: true } as FieldDef] : []),
         ]}
         initialValues={editing ? {
           name: editing.name, brief: editing.brief, objective: editing.objective,
@@ -910,20 +954,10 @@ export function CampaignExecutionPanel() {
         onSubmit={async (values) => {
           if (!editing || !clientId) throw new Error("No campaign selected.");
           const name = String(values.name ?? "").trim();
-          const brief = String(values.brief ?? "").trim();
+          const brief = editing.built_at ? editing.brief : String(values.brief ?? "").trim();
           if (!name || !brief) throw new Error("Name and brief are required.");
-          const budget = values.budget === "" || values.budget == null ? null : Number(values.budget);
-          if (budget !== null && (!Number.isFinite(budget) || budget < 0)) throw new Error("Enter a valid budget.");
-          const starts = String(values.starts_on ?? "") || null;
-          const ends = String(values.ends_on ?? "") || null;
-          if (starts && ends && ends < starts) throw new Error("End date must be after the start date.");
-          const templateValue = String(values.template ?? "");
-          if (templateValue && !templateFor(templateValue)) throw new Error("Choose a valid campaign template.");
           const { error } = await supabase.from("client_campaigns").update({
-            name, brief, objective: String(values.objective ?? "").trim() || null,
-            offer_summary: String(values.offer_summary ?? "").trim() || null,
-            budget, template: (templateValue || null) as Database["public"]["Tables"]["client_campaigns"]["Row"]["template"],
-            starts_on: starts, ends_on: ends,
+            name, ...(!editing.built_at ? { brief } : {}),
           }).eq("id", editing.id).eq("client_id", clientId);
           if (error) throw error;
         }}
@@ -934,9 +968,11 @@ export function CampaignExecutionPanel() {
         open={editingPlan !== null}
         onClose={() => setEditingPlan(null)}
         title="Edit and regenerate plan"
-        intro="A generated plan may already have content and approvals. Saving creates a new campaign revision with your changes and runs the planner; the current campaign remains available."
+        intro="Saving creates a new campaign revision and asks the planner to apply these directions. Review the generated plan before building; existing assets and approvals stay with the original campaign. Select a different approved offer or Meta template here when that binding must change."
         fields={[
           { name: "brief", label: "Campaign brief", kind: "textarea", rows: 4, required: true },
+          ...(editingPlan?.acquisition_mode === "paid" && editingPlan.paid_platform === "meta" ? [{ name: "template", label: "Meta template", kind: "select", options: templateOptions() } as FieldDef] : []),
+          { name: "offer_version_id", label: "Approved service offer", kind: "select", options: approvedOfferChoices.map((offer) => ({ value: offer.id, label: offer.label })) },
           { name: "objective", label: "Objective", kind: "textarea", rows: 2 },
           { name: "audience", label: "Audience", kind: "textarea", rows: 2 },
           { name: "offer_summary", label: "Offer", kind: "textarea", rows: 2 },
@@ -950,7 +986,7 @@ export function CampaignExecutionPanel() {
           { name: "content_count", label: "Content pieces", kind: "number" },
         ]}
         initialValues={editingPlan ? {
-          brief: editingPlan.brief, objective: editingPlan.objective, audience: editingPlan.audience,
+          brief: editingPlan.brief, template: editingPlan.template ?? "", offer_version_id: editingPlan.offer_version_id ?? "", objective: editingPlan.objective, audience: editingPlan.audience,
           offer_summary: editingPlan.offer_summary, core_message: editingPlan.core_message,
           channels: editingPlan.channels?.join(", ") ?? "", budget: editingPlan.budget?.toString() ?? "",
           starts_on: editingPlan.starts_on, ends_on: editingPlan.ends_on,
@@ -970,7 +1006,10 @@ export function CampaignExecutionPanel() {
             ["KPI", values.kpi_metric], ["KPI target", values.kpi_target],
             ["Content pieces", values.content_count],
           ].filter(([, value]) => String(value ?? "").trim()).map(([label, value]) => `${label}: ${String(value).trim()}`);
-          await createPlanRevision(editingPlan, `${brief}\n\nRequested plan direction:\n${planInstructions.join("\n")}`);
+          await createPlanRevision(editingPlan, `${brief}\n\nRequested plan direction:\n${planInstructions.join("\n")}`, {
+            template: String(values.template ?? editingPlan.template ?? ""),
+            offerVersionId: String(values.offer_version_id ?? "") || null,
+          });
         }}
         onSaved={() => setEditingPlan(null)}
       />

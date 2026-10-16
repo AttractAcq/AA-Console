@@ -78,6 +78,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
   const [pages, setPages] = useState<PageOption[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [builds, setBuilds] = useState<Record<string, { status: string }>>({});
+  const [linkedAgentIds, setLinkedAgentIds] = useState<string[]>([]);
   const [buildOpen, setBuildOpen] = useState(false);
   const [briefing, setBriefing] = useState(false);
   const [aiPurpose, setAiPurpose] = useState<string | null>(null);
@@ -97,7 +98,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
       setLoading(false);
       return;
     }
-    const [agentRes, pageRes, convRes, jobRes] = await Promise.all([
+    const [agentRes, pageRes, convRes, jobRes, linkRes] = await Promise.all([
       supabase
         .from("client_sales_agents")
         .select(
@@ -128,11 +129,16 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
         .eq("client_id", clientId)
         .eq("agent_key", "sales_agent")
         .order("created_at", { ascending: false }),
+      campaignId ? supabase.from("campaign_artifacts")
+        .select("sales_agent_id").eq("client_id", clientId)
+        .eq("campaign_id", campaignId).eq("kind", "sales_agent")
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
     setAgents((agentRes.data ?? []) as SalesAgent[]);
     setPages((pageRes.data ?? []) as PageOption[]);
     setConversations((convRes.data ?? []) as Conversation[]);
+    setLinkedAgentIds((linkRes.data ?? []).flatMap((link) => link.sales_agent_id ? [link.sales_agent_id] : []));
 
     // Newest first, so the first sighting of an agent id is its latest job.
     const latest: Record<string, { status: string }> = {};
@@ -141,7 +147,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
     }
     setBuilds(latest);
     setLoading(false);
-  }, [clientId]);
+  }, [clientId, campaignId]);
 
   useEffect(() => {
     void refresh();
@@ -150,6 +156,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
   const open = agents.find((a) => a.id === openId);
+  const visibleAgents = campaignId ? agents.filter((agent) => linkedAgentIds.includes(agent.id)) : agents;
   const openConversations = conversations.filter((c) => c.sales_agent_id === openId);
 
   const setStatus = async (agent: SalesAgent, status: string) => {
@@ -244,13 +251,13 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
         </p>
       )}
 
-      {campaignId ? null : loading ? (
+      {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : agents.length === 0 ? (
-        <EmptyState label="No sales agents built yet" />
+      ) : visibleAgents.length === 0 ? (
+        <EmptyState label={campaignId ? "No sales agent linked to this campaign yet" : "No sales agents built yet"} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {agents.map((a) => {
+          {visibleAgents.map((a) => {
             const mine = conversations.filter((c) => c.sales_agent_id === a.id);
             const captured = mine.filter((c) => c.lead_id).length;
             const qualified = mine.filter((c) => c.qualified).length;
@@ -280,6 +287,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                   </p>
                 )}
                 <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{a.purpose}</p>
+                {campaignId && <p className="mt-1 text-xs text-muted-foreground">Build: {a.built_at ? new Date(a.built_at).toLocaleString() : "pending"} · Public approval: {a.approved_at ? "approved" : "not approved"} · Exact-version deploy approval: not available yet</p>}
 
                 {a.built_at ? (
                   <>
