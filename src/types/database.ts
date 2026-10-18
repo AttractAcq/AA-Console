@@ -39,6 +39,82 @@ export type Database = {
   }
   public: {
     Tables: {
+      proof_capture_configs: {
+        Row: {
+          id: string
+          client_id: string
+          method: string
+          name: string
+          instructions: string
+          trigger_event: string | null
+          message_template: string | null
+          page_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          method: string
+          name: string
+          instructions?: string
+          trigger_event?: string | null
+          message_template?: string | null
+          page_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          method?: string
+          name?: string
+          instructions?: string
+          trigger_event?: string | null
+          message_template?: string | null
+          page_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      proof_production_requests: {
+        Row: {
+          id: string
+          client_id: string
+          source_proof_id: string
+          source_asset_id: string | null
+          idea_id: string
+          job_id: string | null
+          direction: string
+          destination: string
+          created_at: string
+        }
+        Insert: {
+          id: string
+          client_id: string
+          source_proof_id: string
+          source_asset_id: string | null
+          idea_id: string
+          job_id: string | null
+          direction: string
+          destination: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          source_proof_id?: string
+          source_asset_id?: string | null
+          idea_id?: string
+          job_id?: string | null
+          direction?: string
+          destination?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+
       agent_job_events: {
         Row: {
           created_at: string
@@ -3808,6 +3884,10 @@ export type Database = {
       }
       client_proof_assets: {
         Row: {
+          capture_method: string | null
+          source_category: string | null
+          source_kind: string | null
+          source_format: "single" | "carousel" | "story" | "reel"
           avatar_relevance: string | null
           body: string | null
           captured_on: string | null
@@ -3831,6 +3911,10 @@ export type Database = {
           usage_rights: string
         }
         Insert: {
+          capture_method?: string | null
+          source_category?: string | null
+          source_kind?: string | null
+          source_format?: "single" | "carousel" | "story" | "reel"
           avatar_relevance?: string | null
           body?: string | null
           captured_on?: string | null
@@ -3854,6 +3938,10 @@ export type Database = {
           usage_rights?: string
         }
         Update: {
+          capture_method?: string | null
+          source_category?: string | null
+          source_kind?: string | null
+          source_format?: "single" | "carousel" | "story" | "reel"
           avatar_relevance?: string | null
           body?: string | null
           captured_on?: string | null
@@ -8528,6 +8616,11 @@ export type Database = {
       }
     }
     Functions: {
+      request_proof_production_v2: {
+        Args: { p_request_id: string; p_client_id: string; p_source_proof_id: string; p_source_asset_id: string | null; p_media_type: "image" | "video" | "text"; p_format: "single" | "carousel" | "story" | "reel"; p_direction: string; p_destination: string }
+        Returns: string
+      }
+
       create_service_offer_version_v6: {
         Args: {
           p_client_id: string; p_service_name: string; p_audience: string;

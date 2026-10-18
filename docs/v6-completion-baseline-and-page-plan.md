@@ -222,3 +222,48 @@ Alex requested the following UI-only restructuring as the first granular v6 chan
 | Other versioned v2 pages | Heading only, ready for Alex's later specifications. | V1 retains the full current page. Proof Distribution, Google Ads, Google Profile, Lead Magnet, Attribution OS, Archive and other unchanged pages retain their present state. |
 
 The generic sentence about tools being available and capabilities being built was removed from the shared page shell. Planned-module dependency notices remain because they describe actual unsupported operations. Before closing this change, check all version links, tab/export scoping, production build, and the v1 preservation tests. Future instructions should be entered into the comparison table in section 6 and applied to v2 without silently deleting v1 workflows.
+
+## Proof Production Factory v2 — approved specification and first build (18 October 2026)
+
+### Product contract
+
+V2 is a proof production workspace with **Capture → Produce → Repurpose → Assets**. V1 Proof Bank and Proof Artifacts remain available with their existing routes and controls. Capture method, source category/type, media/format and intended destination are separate concepts. Raw evidence is preserved; finished derivatives retain a source reference and repurposed assets retain their parent.
+
+**Capture methods:** Automated Requests; Field Capture Portal; Guided Interview Capture; Integration Capture; Manual Upload & Import; Outcome Follow-up Engine. Each has its own navigable capture view. Integration and Outcome Follow-up are heading-only placeholders by explicit request.
+
+**Source categories and types:**
+
+- Customers: Video Testimonials; Online Reviews; Customer Feedback Forms; Customer-Submitted Photos & Videos; Referral & Recommendation Capture; Customer Interviews.
+- Business Operations: Before-and-after Documentation; Proof of Work Capture; Employee Voice Notes / Field Reports; Job Completion Forms; Measured Result Capture; Historical Project Import.
+- Independent Sources: Certification & Accreditations; Independent Inspection & Verification; Media Mentions & External Recognition; Organic Mentions and Social Listening; Partners and Supplier Endorsements; Customer Outcome Follow-ups.
+
+These are classifications, not a requirement for eighteen sidebar pages. Existing v1 `proof_type` remains intact. New `source_category`, `source_kind`, `capture_method` and `source_format` store the v2 classification; historical sources remain unclassified rather than guessed.
+
+**Destinations:** Main Website; SEO / GEO Content; Google Business Profile; Organic Social Media; Paid Advertising; Campaign Landing Pages; Sales Conversations; Email / SMS Nurturing; Third Party Directories; Proposals & Quotations. Selecting a destination records production intent and does not publish or send anything.
+
+### Implemented in this first build (requires migration 215 and coordinated release)
+
+- Four v2 tabs; six capture entry points. Configurations are stored per client, editable, and isolated with database policies. Configurations cannot link another client's page.
+- Automated Requests saves trigger descriptions, message templates and instructions **as drafts**. Guided Interview saves editable questions/process scripts. Field Capture and Manual Import save capture setup instructions and link existing client pages; Website Studio remains available for page building and publishing.
+- Internal manual proof upload retains the existing private proof bucket and adds category/type/method/format inputs. Existing raw sources can still be previewed, structured and cleared through Proof Detail.
+- Produce selects a cleared raw source, media, format, destination and direction, with additional video/frame instructions. A transaction creates an idea, a queued brief job and an immutable source-linked request record. Retries of the same request do not duplicate work; changed payloads require a new request ID.
+- The brief worker uses the exact selected source rather than choosing a different proof record from the library. It rechecks clearance and rejects model output that fails to cite the selected source. A database trigger enforces source binding on the resulting brief.
+- A request row shows brief-job status/failure, Brief preview and the existing Create modal. This reuses AI/human production rather than creating a second rendering pipeline.
+- Repurpose selects an approved produced asset linked to proof. The parent brief supplies creative context; the original proof remains the source of truth. Resulting briefs retain `derived_from_asset_id`.
+- Produced/repurposed asset tables show name, date, format, review state and preview; Assets separates Raw and Produced with media/format filters and raw source-category filters. Existing proof-linked media is included. SEO/GEO artifacts remain accessible through the existing artifact workspace.
+- Video outputs link into the existing edit workflow. Existing voiceover, captions and motion controls remain in that workflow; entering an editing instruction here is not a claim that every provider capability is supported.
+
+### Remaining implementation sequence — not claimed complete
+
+1. **Public capture intake:** purpose-built submission endpoints, scoped expiring portal tokens, upload validation and private client paths, submission records and permission capture. Link generated/published pages to these endpoints. A generated page or saved page link alone does not constitute a functioning capture portal. Employee/contractor access must not require sharing an administrator account.
+2. **Automated Requests delivery:** map configured rules to actual delivery events; verified recipient selection; message previews/approval; Resend/SMS provider routing; idempotency, delivery status, retry/cancellation, and response links. Draft capture settings cannot activate sending.
+3. **Production orchestration:** collapse the current explicit Brief → Create steps into the requested single adaptive production form, forwarding validated options through existing generation agents. Include usable job recovery and completion notifications. Add transcript/extraction intake for raw media that lacks readable evidence.
+4. **Unified finished library:** integrate versioned GEO/SEO artifacts into the same produced table and repurpose selector; add bundle/multi-file raw imports and classification editing for historical sources. Expand channel-specific output requirements without confusing evidence types with asset formats.
+5. **Editing and distribution:** direct proof-scoped video editing controls and tested render quality; approved outputs handed to destination modules with exact-version/source permissions. Produced does not mean approved for publication. Preserve genuine evidence; never generate a fabricated customer testimonial or alter the underlying result.
+6. **Deferred by instruction:** Integration Capture and Outcome Follow-up Engine stay empty until their separate specifications are approved.
+
+### Release and verification
+
+Migration 215 is additive but must precede the v2 frontend. The updated brief worker must be deployed before enabling new proof production requests; otherwise pinned-source jobs could run through an older worker that does not enforce the selection. No external capture automation is activated by this migration. Keep this work separate from PR #215 (collapsible Intelligence/Strategy), which remains an independent change.
+
+Local checks cover migration authorization, cross-client/permission rejection, idempotency, classification validity, same-source approved-parent repurposing, enforced brief lineage, worker source pinning/revocation, v1/v2 route separation and raw/produced workspace behavior. Live portal collection, external messaging and premium output quality remain acceptance gates for the later slices above.

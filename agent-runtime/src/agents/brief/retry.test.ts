@@ -9,14 +9,14 @@ vi.mock('../../tools/anthropic.js', async () => ({
 }));
 vi.mock('../shared.js', () => ({ loadUpstreamRecords: async () => [] }));
 vi.mock('../identity.js', () => ({ loadIdentity: async () => ({}), identityWriterBlock: () => 'Identity' }));
-vi.mock('../proof.js', () => ({ loadUsableProof: async () => [], renderProof: () => 'No proof', proofIdForRef: () => null }));
+vi.mock('../proof.js', () => ({ loadUsableProof: async () => [], renderProof: () => 'No proof', proofIdForRef: (rows: {id:string;ref_number:string}[], ref: string) => rows.find((r) => r.ref_number === ref)?.id ?? null }));
 import { runBriefJob } from './index.js';
 
 const job = { id: 'job', client_id: 'client', input_table: 'client_ideas', input_id: 'idea' } as AgentJobRow;
 const config = { anthropicApiKeyByAgent: {}, anthropicApiKey: 'test' } as RuntimeConfig;
 const agent = { agent_key: 'brief' } as AgentRow;
 const existing = { id: 'brief', client_id: 'client', source_idea_id: 'idea', title: 'Human edited' };
-function database(options: { existing?: typeof existing; conflict?: boolean; error?: string; wrongOwner?: boolean } = {}) {
+function database(options: { existing?: typeof existing; conflict?: boolean; error?: string; wrongOwner?: boolean; proof?: Record<string, unknown> } = {}) {
   let saved: Record<string, unknown> | undefined = options.existing;
   const insert = vi.fn(async (row: Record<string, unknown>) => {
     if (options.error) return { error: { code: options.error, message: 'write failed' } };
@@ -33,6 +33,7 @@ function database(options: { existing?: typeof existing; conflict?: boolean; err
       select: () => query, eq: () => query, is: () => query,
       neq: async () => ({ count: 0 }),
       maybeSingle: async () => ({ error: null, data: table === 'client_briefs' ? saved ?? null
+        : table === 'client_proof_assets' ? options.proof ?? null
         : table === 'client_ideas' ? { id: 'idea', title: 'Idea', media_type: 'image' } : { name: 'Client' } }),
       insert,
     };
@@ -80,5 +81,28 @@ describe('brief worker retry persistence', () => {
   });
   it('does not mask unrelated database failures', async () => {
     await expect(run(database({ error: '23503' }).sb)).rejects.toThrow('Failed to write brief');
+  });
+});
+
+describe('proof factory selected source', () => {
+  const pinnedJob = {...job, params: {proof_factory_source_id: 'proof-1'}};
+  const proof = {id:'proof-1',ref_number:'PRF-1',usage_rights:'approved',permission_basis:'Customer consent',expires_on:null};
+  it('rejects revoked sources before calling a model', async () => {
+    const db=database({proof:{...proof,usage_rights:'restricted'}});
+    expect((await runBriefJob(db.sb,config,agent,pinnedJob,Date.now()+60_000)).ok).toBe(false);
+    expect(model).not.toHaveBeenCalled();
+  });
+  it('rejects a model response that does not cite the selected source', async () => {
+    const db=database({proof});
+    expect((await runBriefJob(db.sb,config,agent,pinnedJob,Date.now()+60_000)).ok).toBe(false);
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+  it('persists the selected source when the model cites it', async () => {
+    const result=await model();
+    model.mockClear();
+    model.mockResolvedValue({...result,submitted:{...result.submitted,proof_ref:'PRF-1'}});
+    const db=database({proof});
+    expect((await runBriefJob(db.sb,config,agent,pinnedJob,Date.now()+60_000)).ok).toBe(true);
+    expect(db.saved()?.proof_asset_id).toBe('proof-1');
   });
 });
