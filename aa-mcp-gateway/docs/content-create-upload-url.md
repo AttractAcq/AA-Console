@@ -21,7 +21,7 @@ The RPC requires the brief to exist, `client_briefs.client_id` to match the gran
 
 Status must be `draft`, `approved`, or `in_production`, and `archived_at` must be null.
 
-1. Apply migration `20260924110000_126_content_create_upload_url.sql` (Alex via Chief of Staff; do not apply it from this PR alone).
+1. Apply migration `20261019190000_228_content_create_upload_url.sql` (Alex via Chief of Staff; do not apply it from this PR alone).
 2. Deploy the gateway and the agent-runtime together. The runtime already has the service role; do not add it to the Production bot env.
 3. As `bot_production`, `content.get_brief` or list the campaign's ideas/briefs and pick one draft `brief_id`.
 4. `content.create_upload_url` with that `brief_id` and `content_type: "image/png"`.
