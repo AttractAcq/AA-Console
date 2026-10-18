@@ -6581,6 +6581,118 @@ export type Database = {
           },
         ]
       }
+      market_opportunities: {
+        Row: {
+          buying_situation: string
+          client_id: string
+          confidence: Database["public"]["Enums"]["opportunity_confidence"]
+          conversion_action: string | null
+          core_problem: string | null
+          created_at: string
+          created_by: string | null
+          desired_outcome: string | null
+          entry_awareness: string | null
+          id: string
+          idempotency_key: string
+          micro_market: string
+          name: string
+          positioning: string | null
+          proposed_by: string
+          proposed_by_job_id: string | null
+          purchase_trigger: string | null
+          status: Database["public"]["Enums"]["opportunity_status"]
+          status_note: string | null
+          updated_at: string
+        }
+        Insert: {
+          buying_situation: string
+          client_id: string
+          confidence?: Database["public"]["Enums"]["opportunity_confidence"]
+          conversion_action?: string | null
+          core_problem?: string | null
+          created_at?: string
+          created_by?: string | null
+          desired_outcome?: string | null
+          entry_awareness?: string | null
+          id?: string
+          idempotency_key: string
+          micro_market: string
+          name: string
+          positioning?: string | null
+          proposed_by?: string
+          proposed_by_job_id?: string | null
+          purchase_trigger?: string | null
+          status?: Database["public"]["Enums"]["opportunity_status"]
+          status_note?: string | null
+          updated_at?: string
+        }
+        Update: {
+          buying_situation?: string
+          client_id?: string
+          confidence?: Database["public"]["Enums"]["opportunity_confidence"]
+          conversion_action?: string | null
+          core_problem?: string | null
+          created_at?: string
+          created_by?: string | null
+          desired_outcome?: string | null
+          entry_awareness?: string | null
+          id?: string
+          idempotency_key?: string
+          micro_market?: string
+          name?: string
+          positioning?: string | null
+          proposed_by?: string
+          proposed_by_job_id?: string | null
+          purchase_trigger?: string | null
+          status?: Database["public"]["Enums"]["opportunity_status"]
+          status_note?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_proposed_by_job_id_fkey"
+            columns: ["proposed_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_proposed_by_job_id_fkey"
+            columns: ["proposed_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_proposed_by_job_id_fkey"
+            columns: ["proposed_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+        ]
+      }
       master_ai_conversations: {
         Row: {
           client_id: string | null
@@ -7109,6 +7221,456 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      opportunity_attributes: {
+        Row: {
+          body: string
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          opportunity_id: string
+          position: number
+        }
+        Insert: {
+          body: string
+          client_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          opportunity_id: string
+          position: number
+        }
+        Update: {
+          body?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          opportunity_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_attributes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_attributes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+        ]
+      }
+      opportunity_awareness_stages: {
+        Row: {
+          asset_direction: string | null
+          client_id: string
+          created_at: string
+          distribution_note: string | null
+          id: string
+          message: string
+          mindset: string
+          opportunity_id: string
+          stage: string
+        }
+        Insert: {
+          asset_direction?: string | null
+          client_id: string
+          created_at?: string
+          distribution_note?: string | null
+          id?: string
+          message: string
+          mindset: string
+          opportunity_id: string
+          stage: string
+        }
+        Update: {
+          asset_direction?: string | null
+          client_id?: string
+          created_at?: string
+          distribution_note?: string | null
+          id?: string
+          message?: string
+          mindset?: string
+          opportunity_id?: string
+          stage?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+        ]
+      }
+      opportunity_events: {
+        Row: {
+          actor: string
+          client_id: string
+          detail: string | null
+          event: string
+          id: string
+          occurred_at: string
+          opportunity_id: string
+        }
+        Insert: {
+          actor: string
+          client_id: string
+          detail?: string | null
+          event: string
+          id?: string
+          occurred_at?: string
+          opportunity_id: string
+        }
+        Update: {
+          actor?: string
+          client_id?: string
+          detail?: string | null
+          event?: string
+          id?: string
+          occurred_at?: string
+          opportunity_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+        ]
+      }
+      opportunity_links: {
+        Row: {
+          campaign_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          offer_id: string | null
+          opportunity_id: string
+          record_id: string | null
+          role: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          offer_id?: string | null
+          opportunity_id: string
+          record_id?: string | null
+          role: string
+        }
+        Update: {
+          campaign_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          offer_id?: string | null
+          opportunity_id?: string
+          record_id?: string | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "service_offers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "client_agent_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_proof_requirements: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          opportunity_id: string
+          proof_id: string | null
+          requirement: string
+          satisfied_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          opportunity_id: string
+          proof_id?: string | null
+          requirement: string
+          satisfied_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          opportunity_id?: string
+          proof_id?: string | null
+          requirement?: string
+          satisfied_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_proof_requirements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_score_factors: {
+        Row: {
+          factor: string
+          label: string
+          note: string
+          weight: number
+        }
+        Insert: {
+          factor: string
+          label: string
+          note: string
+          weight: number
+        }
+        Update: {
+          factor?: string
+          label?: string
+          note?: string
+          weight?: number
+        }
+        Relationships: []
+      }
+      opportunity_scores: {
+        Row: {
+          classification: string
+          client_id: string
+          factors: Json
+          id: string
+          note: string | null
+          opportunity_id: string
+          scored_at: string
+          scored_by: string | null
+          total: number
+        }
+        Insert: {
+          classification: string
+          client_id: string
+          factors: Json
+          id?: string
+          note?: string | null
+          opportunity_id: string
+          scored_at?: string
+          scored_by?: string | null
+          total: number
+        }
+        Update: {
+          classification?: string
+          client_id?: string
+          factors?: Json
+          id?: string
+          note?: string | null
+          opportunity_id?: string
+          scored_at?: string
+          scored_by?: string | null
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_scores_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_scored_by_fkey"
+            columns: ["scored_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_transitions: {
+        Row: {
+          from_status: Database["public"]["Enums"]["opportunity_status"]
+          note: string | null
+          to_status: Database["public"]["Enums"]["opportunity_status"]
+        }
+        Insert: {
+          from_status: Database["public"]["Enums"]["opportunity_status"]
+          note?: string | null
+          to_status: Database["public"]["Enums"]["opportunity_status"]
+        }
+        Update: {
+          from_status?: Database["public"]["Enums"]["opportunity_status"]
+          note?: string | null
+          to_status?: Database["public"]["Enums"]["opportunity_status"]
+        }
+        Relationships: []
       }
       platform_format_publishing: {
         Row: {
@@ -12040,6 +12602,38 @@ export type Database = {
         }
         Relationships: []
       }
+      opportunity_readiness: {
+        Row: {
+          awareness_stages: number | null
+          blocker: string | null
+          classification: string | null
+          client_id: string | null
+          confidence:
+            | Database["public"]["Enums"]["opportunity_confidence"]
+            | null
+          name: string | null
+          open_proof_gaps: number | null
+          opportunity_id: string | null
+          score: number | null
+          status: Database["public"]["Enums"]["opportunity_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       pages_archive: {
         Row: {
           archived_at: string | null
@@ -12992,6 +13586,7 @@ export type Database = {
         Args: { p_agent_key: string; p_client_id: string }
         Returns: boolean
       }
+      can_shape_opportunity: { Args: { p_client_id: string }; Returns: boolean }
       cancel_assignment: {
         Args: { p_assignment_id: string; p_reason?: string }
         Returns: {
@@ -13398,6 +13993,24 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      create_market_opportunity_v6: {
+        Args: {
+          p_buying_situation: string
+          p_client_id: string
+          p_conversion_action?: string
+          p_core_problem?: string
+          p_desired_outcome?: string
+          p_entry_awareness?: string
+          p_idempotency_key: string
+          p_job_id?: string
+          p_micro_market: string
+          p_name: string
+          p_positioning?: string
+          p_proposed_by?: string
+          p_purchase_trigger?: string
+        }
+        Returns: string
       }
       create_proof_artifact_v6: {
         Args: {
@@ -13921,6 +14534,10 @@ export type Database = {
       lead_stage_rank: {
         Args: { s: Database["public"]["Enums"]["lead_stage"] }
         Returns: number
+      }
+      link_opportunity_v6: {
+        Args: { p_opportunity_id: string; p_role: string; p_target_id: string }
+        Returns: string
       }
       lock_down_definer_functions: { Args: never; Returns: number }
       mark_proof_placement_placed_v6: {
@@ -15323,6 +15940,10 @@ export type Database = {
         Args: { p_asset_id: string; p_direction?: string }
         Returns: string
       }
+      require_opportunity_proof_v6: {
+        Args: { p_opportunity_id: string; p_requirement: string }
+        Returns: string
+      }
       rerender_generation: {
         Args: { p_generation_id: string; p_quality?: string; p_size?: string }
         Returns: string
@@ -15552,6 +16173,10 @@ export type Database = {
           reason: string
         }[]
       }
+      satisfy_opportunity_proof_v6: {
+        Args: { p_proof_id: string; p_requirement_id: string }
+        Returns: undefined
+      }
       save_campaign_plan_only: {
         Args: {
           p_campaign_id: string
@@ -15604,6 +16229,26 @@ export type Database = {
           p_time?: string
         }
         Returns: string
+      }
+      score_market_opportunity_v6: {
+        Args: { p_factors: Json; p_note?: string; p_opportunity_id: string }
+        Returns: {
+          classification: string
+          client_id: string
+          factors: Json
+          id: string
+          note: string | null
+          opportunity_id: string
+          scored_at: string
+          scored_by: string | null
+          total: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "opportunity_scores"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       score_slot_ideas: {
         Args: { p_slot_id: string }
@@ -15822,6 +16467,76 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "client_engine_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_opportunity_attributes_v6: {
+        Args: { p_kind: string; p_opportunity_id: string; p_values: string[] }
+        Returns: number
+      }
+      set_opportunity_awareness_v6: {
+        Args: {
+          p_asset_direction?: string
+          p_distribution_note?: string
+          p_message: string
+          p_mindset: string
+          p_opportunity_id: string
+          p_stage: string
+        }
+        Returns: undefined
+      }
+      set_opportunity_confidence_v6: {
+        Args: {
+          p_confidence: Database["public"]["Enums"]["opportunity_confidence"]
+          p_note: string
+          p_opportunity_id: string
+        }
+        Returns: undefined
+      }
+      set_opportunity_fields_v6: {
+        Args: {
+          p_conversion_action?: string
+          p_core_problem?: string
+          p_desired_outcome?: string
+          p_entry_awareness?: string
+          p_opportunity_id: string
+          p_positioning?: string
+          p_purchase_trigger?: string
+        }
+        Returns: undefined
+      }
+      set_opportunity_status_v6: {
+        Args: {
+          p_note?: string
+          p_opportunity_id: string
+          p_status: Database["public"]["Enums"]["opportunity_status"]
+        }
+        Returns: {
+          buying_situation: string
+          client_id: string
+          confidence: Database["public"]["Enums"]["opportunity_confidence"]
+          conversion_action: string | null
+          core_problem: string | null
+          created_at: string
+          created_by: string | null
+          desired_outcome: string | null
+          entry_awareness: string | null
+          id: string
+          idempotency_key: string
+          micro_market: string
+          name: string
+          positioning: string | null
+          proposed_by: string
+          proposed_by_job_id: string | null
+          purchase_trigger: string | null
+          status: Database["public"]["Enums"]["opportunity_status"]
+          status_note: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "market_opportunities"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -16075,6 +16790,21 @@ export type Database = {
       metric_basis: "daily" | "cumulative"
       metric_entity: "account" | "campaign" | "post" | "page"
       metric_surface: "paid" | "organic" | "landing" | "offer"
+      opportunity_confidence:
+        | "hypothesis"
+        | "desk_research"
+        | "conversation"
+        | "first_party"
+        | "proven"
+      opportunity_status:
+        | "discovered"
+        | "validated"
+        | "approved"
+        | "active"
+        | "learning"
+        | "scaling"
+        | "paused"
+        | "rejected"
       page_type: "landing" | "offer" | "recruitment"
       pipeline_stage: "first_touch" | "second_touch" | "call_booked"
       post_channel: "organic" | "paid"
@@ -16317,6 +17047,23 @@ export const Constants = {
       metric_basis: ["daily", "cumulative"],
       metric_entity: ["account", "campaign", "post", "page"],
       metric_surface: ["paid", "organic", "landing", "offer"],
+      opportunity_confidence: [
+        "hypothesis",
+        "desk_research",
+        "conversation",
+        "first_party",
+        "proven",
+      ],
+      opportunity_status: [
+        "discovered",
+        "validated",
+        "approved",
+        "active",
+        "learning",
+        "scaling",
+        "paused",
+        "rejected",
+      ],
       page_type: ["landing", "offer", "recruitment"],
       pipeline_stage: ["first_touch", "second_touch", "call_booked"],
       post_channel: ["organic", "paid"],

@@ -14,7 +14,7 @@ import {
   ATTRIBUTE_KINDS, AWARENESS_STAGES, CLASSIFICATION_HINT, CONFIDENCE_LEVELS,
   fetchOpportunities, fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
   setAttributes, setAwarenessStage, setConfidence, setFields, setStatus,
-  type Opportunity, type Readiness, type ScoreFactor,
+  type Opportunity, type OpportunityConfidence, type Readiness, type ScoreFactor,
 } from "../../lib/opportunities";
 
 /**
@@ -312,7 +312,9 @@ function EvaluateView({
   const [marks, setMarks] = useState<Record<string, number>>({});
   const [note, setNote] = useState("");
   const [why, setWhy] = useState("");
-  const [level, setLevel] = useState(opportunity.confidence);
+  const [level, setLevel] = useState<OpportunityConfidence>(
+    opportunity.confidence as OpportunityConfidence,
+  );
 
   // Shown live, because the interesting moment is watching a weak factor pull
   // an attractive-looking opportunity down a band before you commit to it.
@@ -409,7 +411,7 @@ function EvaluateView({
           <select
             aria-label="Confidence"
             value={level}
-            onChange={(e) => setLevel(e.target.value)}
+            onChange={(e) => setLevel(e.target.value as OpportunityConfidence)}
             className="w-full rounded-lg border border-border bg-background p-2 text-sm"
           >
             {CONFIDENCE_LEVELS.map((l) => (
