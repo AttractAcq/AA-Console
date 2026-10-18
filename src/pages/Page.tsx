@@ -77,6 +77,7 @@ import { SopsPanel } from "./admin/SopsPanel";
 import { ContentJourney } from "../components/ContentJourney";
 import { PlannedModulePanel } from "./v6/PlannedModulePanel";
 import { ContentAssetTable } from "../components/content/ContentAssetTable";
+import { MarketOpportunitiesPanel } from "./opportunities/MarketOpportunitiesPanel";
 
 const strategyTabIds = new Set(["branding-strategy", "content-pillars", "money-model-strategy"]);
 
@@ -93,6 +94,12 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "branding-strategy": () => <BrandingStrategyPanel />,
     "content-pillars": () => <ContentPillarsPanel />,
     "money-model-strategy": () => <MoneyModelStrategyPanel />,
+  },
+  "market-opportunities": {
+    discover: () => <MarketOpportunitiesPanel view="discover" />,
+    evaluate: () => <MarketOpportunitiesPanel view="evaluate" />,
+    strategize: () => <MarketOpportunitiesPanel view="strategize" />,
+    activate: () => <MarketOpportunitiesPanel view="activate" />,
   },
   "campaign-factory": { overview: () => <CampaignExecutionPanel /> },
   "proof-production-factory": {

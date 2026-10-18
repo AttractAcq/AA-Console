@@ -23,6 +23,7 @@ import {
   Scissors,
   Share2,
   ShieldCheck,
+  Compass,
   Target,
   TrendingUp,
   UserPlus,
@@ -373,6 +374,15 @@ export const v6ModuleNodes: NavNode[] = [
       { id: "branding-strategy", label: "Branding Strategy" },
       { id: "content-pillars", label: "Content Pillars" },
       { id: "money-model-strategy", label: "Money Model Strategy" },
+    ] },
+  // Between intelligence and campaigns on purpose: an opportunity is the
+  // commercial reason a campaign should exist, and reading those two in the
+  // other order is how a business ends up with attractive campaigns that are
+  // not rooted in anything somebody would actually buy.
+  { id: "market-opportunities", label: "Market Opportunities", path: "market-opportunities",
+    icon: Compass, capability: "expanding", tabs: [
+      { id: "discover", label: "Discover" }, { id: "evaluate", label: "Evaluate" },
+      { id: "strategize", label: "Strategize" }, { id: "activate", label: "Activate" },
     ] },
   { id: "campaign-factory", label: "Campaign Factory", path: "campaign-factory", icon: Megaphone, sidebarViews: versionViews,
     capability: "expanding", tabs: [{ id: "overview", label: "Campaigns" }] },
