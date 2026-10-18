@@ -7,11 +7,13 @@ const { downloadTabPdf, downloadModuleZip } = vi.hoisted(() => ({
   downloadTabPdf: vi.fn(),
   downloadModuleZip: vi.fn(),
 }));
+vi.mock("../components/content/ContentAssetTable", () => ({
+  ContentAssetTable: ({ approved }: { approved: boolean }) => <p>{approved ? "Approved assets" : "Assets awaiting approval"}</p>,
+}));
 vi.mock("../lib/moduleExport", () => ({ downloadTabPdf, downloadModuleZip }));
 vi.mock("./intelligence/BusinessContextPanel", () => ({ BusinessContextPanel: () => <p>Business context panel</p> }));
 vi.mock("./intelligence/MarketPanel", () => ({ MarketPanel: () => <p>Market panel</p> }));
 vi.mock("./ideation/GenerationPanel", () => ({ GenerationPanel: ({ showJourney = true }: { showJourney?: boolean }) => <p>Ideation panel · journey {String(showJourney)}</p> }));
-vi.mock("./media/ContentAssetsPanel", () => ({ ContentAssetsPanel: () => <p>Grouped asset libraries</p> }));
 vi.mock("./campaigns/CampaignExecutionPanel", () => ({ CampaignExecutionPanel: () => <p>Campaign table</p> }));
 
 vi.mock("./proof-bank/ProofFactoryV2Panel", () => ({ ProofFactoryV2Panel: ({tab}: {tab: string}) => <p>Proof v2 {tab}</p> }));
@@ -105,8 +107,10 @@ it("keeps Content Production v1 tabs and gives v2 grouped assets without its sta
   expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
     "Ideation", "Briefs", "Create", "Edit / Repurpose", "Assets",
   ]);
+  // v2 Assets is the approved assets themselves now, not a group of
+  // libraries: the table renders, and says so when nothing is approved yet.
   await user.click(screen.getByRole("tab", { name: "Assets" }));
-  expect(screen.getByText("Grouped asset libraries")).toBeInTheDocument();
+  expect(screen.getByText("Approved assets")).toBeInTheDocument();
   await user.click(screen.getByRole("tab", { name: "Ideation" }));
   expect(screen.getByText("Ideation panel · journey false")).toBeInTheDocument();
 });

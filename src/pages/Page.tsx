@@ -35,7 +35,6 @@ import { StoryLibraryPanel } from "./media/StoryLibraryPanel";
 import { CarouselLibraryPanel } from "./media/CarouselLibraryPanel";
 import { VideoLibraryPanel } from "./media/VideoLibraryPanel";
 import { ReelShotsPanel } from "./media/ReelShotsPanel";
-import { ContentAssetsPanel } from "./media/ContentAssetsPanel";
 import { EditRepurposePanel } from "./media/EditRepurposePanel";
 import { MotionDesignPanel } from "./motion/MotionDesignPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
@@ -77,6 +76,7 @@ import { FinancialsPanel } from "./admin/FinancialsPanel";
 import { SopsPanel } from "./admin/SopsPanel";
 import { ContentJourney } from "../components/ContentJourney";
 import { PlannedModulePanel } from "./v6/PlannedModulePanel";
+import { ContentAssetTable } from "../components/content/ContentAssetTable";
 
 const strategyTabIds = new Set(["branding-strategy", "content-pillars", "money-model-strategy"]);
 
@@ -282,9 +282,12 @@ function getPanelBody(
     switch (activeTab?.id) {
       case "generation": return <GenerationPanel showJourney={false} />;
       case "briefs": return <BriefsPanel showJourney={false} />;
-      case "create": return <BriefsPanel stage="create" showJourney={false} />;
+      // v2 only. Create is the assets a person has yet to sign off, not the
+      // briefs waiting for one — a brief with nothing made from it stays in
+      // Briefs, where Approve & build starts the work.
+      case "create": return <ContentAssetTable approved={false} />;
       case "edit": return <EditRepurposePanel showJourney={false} />;
-      case "assets": return <ContentAssetsPanel />;
+      case "assets": return <ContentAssetTable approved />;
     }
   }
   const renderPanel = activeTab

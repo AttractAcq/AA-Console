@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { FilterPills } from "../../components/FilterPills";
 import { DataTable } from "../../components/DataTable";
+import { ActionMenu } from "../../components/ActionMenu";
+import { dayOrDash, deleteContentBrief, deletionSummary, setContentArchived, DELETE_BRIEF_WARNING } from "../../lib/contentRecords";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { mediaFilters } from "../../data/mediaFilters";
 import type { MediaFilterId } from "../../data/mediaFilters";
@@ -9,7 +11,6 @@ import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
 import { ApproveAndBuildModal } from "../../components/briefs/ApproveAndBuildModal";
 import { BriefDetailModal } from "../../components/briefs/BriefDetailModal";
-import { cn } from "../../lib/cn";
 import { formatFilters, formatLabel } from "../../lib/contentFormat";
 import { platformLabel } from "../../lib/postPlatform";
 import type { FormatFilterId } from "../../lib/contentFormat";
@@ -39,14 +40,6 @@ type Assignment = {
   team_members: { name: string } | null;
 };
 
-const STATUS_TONE: Record<string, string> = {
-  draft: "bg-secondary text-secondary-foreground",
-  approved: "bg-secondary text-secondary-foreground",
-  in_production: "bg-primary/10 text-brand-strong",
-  complete: "bg-primary/10 text-brand-strong",
-  rejected: "bg-destructive/10 text-destructive",
-};
-
 export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "brief" | "create"; showJourney?: boolean } = {}) {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
@@ -61,6 +54,8 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
   const [building, setBuilding] = useState<Brief | null>(null);
   const [viewing, setViewing] = useState<Brief | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** The brief whose delete or archive is running, so its menu disables. */
+  const [busyBrief, setBusyBrief] = useState<string | null>(null);
 
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -131,6 +126,48 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
   );
   const elsewhere = briefs.length - shown.length;
 
+  async function archiveBrief(brief: Brief) {
+    if (busyBrief) return;
+    setBusyBrief(brief.id);
+    setNotice(null);
+    try {
+      await setContentArchived("brief", brief.id);
+      setNotice("Archived. It is still in the Archive, under Briefs.");
+      await refresh();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Something went wrong.");
+    } finally {
+      setBusyBrief(null);
+    }
+  }
+
+  async function deleteBrief(brief: Brief) {
+    if (busyBrief || !window.confirm(DELETE_BRIEF_WARNING)) return;
+    setBusyBrief(brief.id);
+    setNotice(null);
+    try {
+      setNotice(deletionSummary(await deleteContentBrief(brief.id)));
+      await refresh();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Something went wrong.");
+    } finally {
+      setBusyBrief(null);
+    }
+  }
+
+  /**
+   * Where a finished brief's asset lives.
+   *
+   * In v2 that is Create until somebody signs it off, not Assets: Assets is
+   * only what has been approved for distribution. v1 still has a library per
+   * media type, so it keeps its own route.
+   */
+  function deliveryHref(b: Brief): string {
+    const v2 = searchParams.get("view") === "v2";
+    const legacy = b.media_type === "video" ? "video-library" : b.media_type === "image" ? "image-library" : "copy-library";
+    return `/clients/${clientId}/delivery/content-production-factory?${v2 ? "view=v2&tab=create" : `tab=${legacy}`}`;
+  }
+
   if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
 
   return (
@@ -165,7 +202,7 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
       )}
 
       <DataTable
-        columns={["Brief", "Destination", "Format", "Type", "Status", ""]}
+        columns={["Brief", "Destination", "Format", "Type", "Brief created at", "Actions"]}
         emptyLabel={
           loading
             ? "Loading briefs…"
@@ -195,39 +232,30 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
           <span key="p">{platformLabel(b.target_platform)}</span>,
           <span key="f">{formatLabel(b.content_format)}</span>,
           <span key="m" className="capitalize">{b.media_type}</span>,
-          <span
-            key="s"
-            className={cn(
-              "inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize",
-              STATUS_TONE[b.status] ?? "bg-muted text-muted-foreground",
-            )}
-          >
-            {b.status.replace(/_/g, " ")}
-          </span>,
-          // A brief already in production or finished has been actioned;
-          // offering Build again would quietly queue a second one.
-          b.status === "in_production" || b.status === "complete" ? (
-            b.media_type === "video" && b.content_format === "reel" ?
-              <button key="a" type="button" className="text-xs font-medium text-brand-strong hover:underline"
-                onClick={() => navigate(`/clients/${clientId}/delivery/content-production-factory?${searchParams.get("view") === "v2" ? "view=v2&tab=assets&asset=reel-shots" : "tab=reel-shots"}&brief=${b.id}`)}>Track reel</button>
-              : (assignments.get(b.id) ?? []).some((assignment) => assignment.asset_id) ?
-                <button key="a" type="button" className="text-xs font-medium text-brand-strong hover:underline"
-                  onClick={() => navigate(`/clients/${clientId}/delivery/content-production-factory?${searchParams.get("view") === "v2"
-                    ? `view=v2&tab=assets&asset=${b.media_type === "video" ? "videos" : b.media_type === "image" ? "images" : "copy"}`
-                    : `tab=${b.media_type === "video" ? "video-library" : b.media_type === "image" ? "image-library" : "copy-library"}`}`)}>
-                  View delivery
-                </button>
-              : <span key="a" className="text-xs text-muted-foreground">Actioned</span>
-          ) : (
-            <button
-              key="a"
-              type="button"
-              onClick={() => setBuilding(b)}
-              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Approve &amp; Build
-            </button>
-          ),
+          <span key="c">{dayOrDash(b.created_at)}</span>,
+          // Forward action first, then the ways of looking at it, then
+          // archive, then delete. A brief already in production has been
+          // actioned: offering Build again would quietly queue a second one.
+          <ActionMenu
+            key={`a-${b.id}`}
+            name={b.title}
+            busy={busyBrief === b.id}
+            items={[
+              ...(b.status === "in_production" || b.status === "complete"
+                ? b.media_type === "video" && b.content_format === "reel"
+                  ? [{
+                      label: "Track reel",
+                      onSelect: () => navigate(`/clients/${clientId}/delivery/content-production-factory?${searchParams.get("view") === "v2" ? "view=v2&tab=assets&asset=reel-shots" : "tab=reel-shots"}&brief=${b.id}`),
+                    }]
+                  : (assignments.get(b.id) ?? []).some((assignment) => assignment.asset_id)
+                    ? [{ label: "View delivery", onSelect: () => navigate(deliveryHref(b)) }]
+                    : []
+                : [{ label: "Approve & build", onSelect: () => setBuilding(b) }]),
+              { label: "View brief", onSelect: () => setViewing(b) },
+              { label: "Archive", busyLabel: "Archiving…", onSelect: () => void archiveBrief(b) },
+              { label: "Delete", destructive: true, busyLabel: "Deleting…", onSelect: () => void deleteBrief(b) },
+            ]}
+          />,
         ])}
       />
 
