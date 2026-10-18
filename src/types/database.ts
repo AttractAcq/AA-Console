@@ -82,6 +82,7 @@ export type Database = {
         Row: {
           auto_produce: boolean
           production_status: string
+          production_checked_at: string
           production_error: string | null
           production_job_id: string | null
           production_quality: string

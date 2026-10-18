@@ -4,7 +4,8 @@ alter table public.proof_production_requests
  add column production_size text not null default '1024x1536' check(production_size in ('1024x1536','1024x1024','1536x1024')),
  add column production_job_id uuid references public.agent_jobs(id),
  add column production_status text not null default 'briefing' check(production_status in ('briefing','building','complete','failed','needs_attention')),
- add column production_error text;
+ add column production_error text,
+ add column production_checked_at timestamptz not null default '-infinity';
 create function public.request_proof_auto_production(
  p_request_id uuid,p_client_id uuid,p_source_proof_id uuid,p_source_asset_id uuid,
  p_media_type public.media_type,p_format public.content_format,p_direction text,p_destination text,
@@ -43,8 +44,9 @@ language plpgsql security definer set search_path=pg_catalog,public as $$
 declare r public.proof_production_requests%rowtype; b public.client_briefs%rowtype; jid uuid; advanced int:=0; jobstate text; joberror text; jobterminal boolean;
 begin
  if auth.role() is distinct from 'service_role' then raise exception 'Service role required'; end if;
- for r in select * from public.proof_production_requests where auto_produce and production_status in ('briefing','building') order by created_at for update skip locked limit 10 loop
+ for r in select * from public.proof_production_requests where auto_produce and production_status in ('briefing','building') order by production_checked_at,created_at for update skip locked limit 10 loop
   begin
+   update public.proof_production_requests set production_checked_at=now() where id=r.id;
    if not exists(select 1 from public.client_proof_assets p where p.id=r.source_proof_id and p.client_id=r.client_id and p.usage_rights='approved' and (p.expires_on is null or p.expires_on>=current_date) and nullif(btrim(p.permission_basis),'') is not null) then
     update public.proof_production_requests set production_status='needs_attention',production_error='Source permission expired or was revoked.' where id=r.id; continue;
    end if;
