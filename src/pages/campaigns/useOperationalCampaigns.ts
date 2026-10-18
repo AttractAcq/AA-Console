@@ -15,6 +15,7 @@ export function useOperationalCampaigns(clientId?: string) {
     rows: [] as OperationalCampaign[], clients: [] as { id: string; name: string }[],
     readiness: {} as Record<string, Requirement[]>, loading: true, error: "", readinessError: "",
   });
+  const [revision, setRevision] = useState(0);
   useEffect(() => {
     let current = true;
     setState({ rows: [], clients: [], readiness: {}, loading: true, error: "", readinessError: "" });
@@ -43,6 +44,6 @@ export function useOperationalCampaigns(clientId?: string) {
       }
     })();
     return () => { current = false; };
-  }, [clientId]);
-  return state;
+  }, [clientId, revision]);
+  return { ...state, refresh: () => setRevision(value => value + 1) };
 }

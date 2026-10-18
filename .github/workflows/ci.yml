@@ -29,6 +29,11 @@ jobs:
         working-directory: agent-runtime
     steps:
       - uses: actions/checkout@v4
+      # video_edit's render tests shell out to ffmpeg and skip when it is
+      # absent. Skipping silently is how a render path stays untested, so it
+      # is installed here rather than tolerated.
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        working-directory: .
       - uses: actions/setup-node@v4
         with:
           node-version: 22

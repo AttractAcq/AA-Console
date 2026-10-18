@@ -6,13 +6,13 @@ import { UUID } from './http.js';
 // Gateway permission checks and client allowlist still run before this hop.
 
 const ALL_STAGES = new Set([
-  'lead', 'conversation', 'qualified_conversation', 'appointment',
-  'qualified_appointment', 'shown', 'sale', 'cash', 'lost',
+  'profile_visit', 'follower', 'qualified', 'conversation', 'qualified_conversation',
+  'appointment', 'qualified_appointment', 'shown', 'cash', 'lost',
 ]);
-// sale/cash excluded: money-adjacent, deferred to pipeline.record_sale (stub).
+// Cash is excluded: revenue recording stays a human action.
 // Matches the gateway's registry/tools.ts field shape and the RPC's own
 // hard-coded invalid_stage guard — three independent layers, not one.
-const WRITABLE_STAGES = new Set([...ALL_STAGES].filter((s) => s !== 'sale' && s !== 'cash'));
+const WRITABLE_STAGES = new Set([...ALL_STAGES].filter((s) => s !== 'cash'));
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function str(body: Record<string, unknown>, key: string): string | undefined {

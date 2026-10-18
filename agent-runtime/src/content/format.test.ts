@@ -27,8 +27,14 @@ describe("formatFitsMedia", () => {
     }
   });
 
+  it("keeps a reel to video", () => {
+    expect(formatFitsMedia("reel", "video")).toBe(true);
+    expect(formatFitsMedia("reel", "image")).toBe(false);
+    expect(formatFitsMedia("reel", "text")).toBe(false);
+  });
+
   it("refuses a format it does not know", () => {
-    expect(formatFitsMedia("reel", "video")).toBe(false);
+    expect(formatFitsMedia("short", "video")).toBe(false);
   });
 });
 
@@ -45,8 +51,13 @@ describe("coerceFormat", () => {
     expect(coerceFormat("story", "text")).toBe("single");
   });
 
-  it("falls back to single for anything it does not recognise", () => {
-    expect(coerceFormat("reel", "video")).toBe("single");
+  it("keeps a reel when the piece is video", () => {
+    expect(coerceFormat("reel", "video")).toBe("reel");
+  });
+
+  it("falls back to single for a reel that is not video, and for anything it does not recognise", () => {
+    expect(coerceFormat("reel", "image")).toBe("single");
+    expect(coerceFormat("short", "video")).toBe("single");
     expect(coerceFormat(undefined, "image")).toBe("single");
     expect(coerceFormat(7, "image")).toBe("single");
   });
@@ -71,25 +82,27 @@ describe("formatsForMedia", () => {
     expect(formatsForMedia("image")).toEqual(["single", "carousel", "story"]);
   });
 
-  it("offers video single and story", () => {
-    expect(formatsForMedia("video")).toEqual(["single", "story"]);
+  it("offers video single, story and reel", () => {
+    expect(formatsForMedia("video")).toEqual(["single", "story", "reel"]);
   });
 });
 
 describe("isMultiFrame", () => {
-  it("is the two formats made of frames", () => {
+  it("is the formats made of frames", () => {
     expect(isMultiFrame("carousel")).toBe(true);
     expect(isMultiFrame("story")).toBe(true);
+    expect(isMultiFrame("reel")).toBe(true);
     expect(isMultiFrame("single")).toBe(false);
   });
 });
 
 describe("isContentFormat", () => {
-  it("accepts the three and nothing else", () => {
+  it("accepts the stored formats and nothing else", () => {
     expect(isContentFormat("single")).toBe(true);
     expect(isContentFormat("carousel")).toBe(true);
     expect(isContentFormat("story")).toBe(true);
-    expect(isContentFormat("reel")).toBe(false);
+    expect(isContentFormat("reel")).toBe(true);
+    expect(isContentFormat("short")).toBe(false);
     expect(isContentFormat(null)).toBe(false);
   });
 });

@@ -45,6 +45,7 @@ const proof = (over: Partial<ProofAsset> = {}): ProofAsset => ({
   services: "Implants",
   strength: "high",
   usage_rights: "approved",
+  permission_basis: "Customer permission recorded",
   captured_on: "2026-03-01",
   expires_on: null,
   ...over,

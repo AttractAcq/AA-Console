@@ -87,11 +87,14 @@ describe("the board", () => {
     expect(screen.getByRole("columnheader", { name: "Platform" })).toBeInTheDocument();
   });
 
+  // The month calendar also prints the asset code when the post falls in
+  // the current month, so the ref has to be read from the schedule table.
   it("shows a dash for a post scheduled before platforms were recorded", async () => {
-    from.mockReturnValue(postsReturn([post({ platform: null })]));
+    from.mockImplementation(byTable([post({ platform: null })]));
     render(<DistributionBoard channel="organic" />);
-    const row = await screen.findByText("AA-014");
-    expect(within(row.closest("tr")!).getByText("—")).toBeInTheDocument();
+    const table = await screen.findByRole("table");
+    const cell = await within(table).findByRole("cell", { name: "AA-014" });
+    expect(within(cell.closest("tr")!).getByText("—")).toBeInTheDocument();
   });
 });
 

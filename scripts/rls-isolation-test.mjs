@@ -49,7 +49,7 @@ for (const u of [AA, HD]) {
 const TABLES = [
   "agent_jobs","agent_tool_calls","campaigns","client_agent_inputs","client_agent_records",
   "client_assignments","client_audit_notes","client_billing","client_briefs","client_business_context",
-  "client_contracts","client_ideas","client_integrations","client_leads","client_media_assets",
+  "client_contracts","client_ideas","client_integrations","client_leads","archived_leads","client_media_assets",
   "client_onboarding_steps","client_pages","client_proof_assets","client_users","finance_entries",
   "job_assignments","master_ai_conversations","metrics_daily","ref_counters","scheduled_posts","work_logs",
 ];
@@ -66,6 +66,12 @@ async function login(u) {
 
 const get = (token, path) =>
   fetch(`${URL}/rest/v1/${path}`, { headers: { apikey: KEY, Authorization: `Bearer ${token}` } });
+
+const call = (token, name, body) => fetch(`${URL}/rest/v1/rpc/${name}`, {
+  method: "POST",
+  headers: { apikey: KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
 
 let failures = [];
 const fail = (m) => { failures.push(m); console.log("  *** LEAK: " + m); };
@@ -98,6 +104,20 @@ async function run() {
       if (Array.isArray(rows) && rows.length) { fail(`${t}: targeted read for ${other.name} returned ${rows.length} row(s)`); targeted += rows.length; }
     }
     console.log(`  targeted reads for the other client's id: ${targeted} row(s) returned`);
+
+    // Use only IDs the other client's own token can read. Both calls must be
+    // refused before a write; never create or archive fixture data here.
+    for (const [table, rpc, args] of [
+      ["client_leads", "archive_lead", (id) => ({ p_lead_id: id, p_reason: "isolation probe" })],
+      ["archived_leads", "recover_lead", (id) => ({ p_lead_id: id })],
+    ]) {
+      const foreignResponse = await get(tokens[other.name], `${table}?select=id&limit=1`);
+      if (!foreignResponse.ok) continue;
+      const foreign = await foreignResponse.json();
+      if (!foreign[0]?.id) continue;
+      const attempt = await call(token, rpc, args(foreign[0].id));
+      if (attempt.ok) fail(`${rpc}: ${self.name} changed ${other.name}'s lead`);
+    }
 
     // 3. The clients table itself.
     const cr = await get(token, `clients?select=id,name`);

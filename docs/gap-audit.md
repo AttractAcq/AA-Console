@@ -1,50 +1,243 @@
-# Gap audit — 7 September 2026
+# Gap audit — 8 October 2026
 
 The current reference for what is built, what is not, and what is built but
 unproven. Every claim was checked against the running system rather than
 recalled, and the method is stated so each can be re-run rather than trusted.
 
-Supersedes the status framing in `ui-data-entry-mapping.md`.
+Supersedes the status framing in `ui-data-entry-mapping.md`, and the
+7 September revision of this file. One row of that revision was wrong rather
+than stale, and it is called out below.
 
 ---
 
 ## Where the build is
 
+**Closed on 8 October. The two databases are now structurally identical**, and
+that is a measurement rather than an impression — 81 tables, 0 without RLS,
+146 policies, 32 agents, 101 SECURITY DEFINER functions reachable by a
+signed-in user, 15 of those not checking their own caller, and 0 reachable by
+`anon`. Both, same numbers.
+
+Eighteen migrations went to production: 150–155 and 157–168. Verified beyond
+the counts — all 41 console RPCs still callable by a signed-in user, both
+publishing switches off, the engine installed and switched off behind three
+switches, and 166's backfill landing 11 assignments at `assigned` and 2 at
+`delivered` with `completed_at` correctly cleared.
+
+The drift section below stays because the habit that caused it has not
+changed — see
+[migration-history-repair-2026-10-08.md](migration-history-repair-2026-10-08.md).
+
 | Area | State | Checked by |
 |---|---|---|
-| Admin console | **Complete.** Every nav leaf resolves to a real panel. | Diffing nav ids against the two panel registries in `Page.tsx`; only `clients` is unmatched, and it has its own route |
-| Client and employee consoles | **Complete.** No page says "coming soon". | Parsing `consoleNav.ts` against the `page.id ===` branches in both console pages |
-| Agent runtime | **16 agents, 16 runners.** Nothing can be queued that cannot execute. | `agents` table vs `RUNNERS` in `dispatch.ts`, exact set match |
-| **Hosting** | **Live.** Console at `console.attractacq.com` (Pages, HTTPS enforced), runtime at `aa-console-production.up.railway.app`. Nothing runs on localhost. | `gh api .../pages`, `/health`, and `agent_runtime_status` showing one live worker |
-| Deployment | **Current**, and CI and deploy are both green on every recent push. | `agent_runtime_status.version` matches HEAD; `gh run list` |
-| RLS | **45 tables, all with RLS. 106 policies. No client can see another client's data by any path.** | `pg_class.relrowsecurity`, `pg_policy`, and `scripts/rls-isolation-test.mjs` against two live logins |
-| Exposed functions | **No `SECURITY DEFINER` function is reachable by `anon`.** | `has_function_privilege('anon', ...)` across `public` |
-| Schema in git | **54 migrations, replaying onto a fresh database.** Staging matches production: 45 tables, 0 without RLS, 106 policies, 16 agents. | `supabase db push` onto staging, then a count-for-count comparison |
-| Tests | **276** — 155 frontend, 121 runtime. | `npm test` in both packages |
-| Brand | **On file and enforced.** Palette, typography, imagery direction and per-brand bans reach both stages of a build. | `client_brand_profiles`, and the render block printed from a real row |
-| Idea → brief → asset → scheduled | **Built end to end**, AI and human routes, and the AI half has produced real assets. | 2 completed renders, 5 media assets, 7 scheduled posts |
-| Reporting ingest | **Built end to end**, scheduled daily. | See gap 1: no live pull has ever succeeded |
+| Admin console | **Complete.** Every nav leaf resolves to a real panel. | Diffing nav ids against the two panel registries in `Page.tsx` |
+| Client and employee consoles | **Complete.** No page says "coming soon". | Parsing `consoleNav.ts` against the `page.id ===` branches |
+| Agent runtime | **32 agents, 32 runners.** Nothing can be queued that cannot execute. | `agents` table vs `RUNNERS` in `dispatch.ts`, exact set match |
+| Hosting | **Live.** Console at `console.attractacq.com`, runtime on Railway. | `/health` and `agent_runtime_status` |
+| RLS | **81 tables, all with RLS. 146 policies.** | `pg_class.relrowsecurity`, `pg_policies` |
+| Exposed functions | **No `SECURITY DEFINER` function is reachable by `anon`, on either.** Was 21 on production until 8 Oct. | `select * from security_definer_exposure where anon_can_execute` — empty on both |
+| Schema in git | **175 migrations, and both databases have every one.** Production's history was repaired on 8 Oct, having ended at 149 plus 156 out of order. `db push` now works there with no flags. | `supabase migration list --linked`: nothing pending, nothing remote-only |
+| Tests | **3,034** — 950 console, 2,084 runtime. | `npm test` in both packages |
+| Idea → brief → asset → scheduled → published | **Built end to end on both, and inert at the last step by design.** Both publishing switches off, no client enabled. | Migrations 144–168; `publish_due` returns 6 outstanding, 0 that would go out |
+| The one human gate | **Reachable.** Approvals → Engine calls `approve_slot`. | `src/pages/approvals/EngineInboxPanel.tsx`; `approval_inbox` readable on production |
+| The engine | **Installed on both, and switched off on both.** Three independent switches, none flipped by the push. | `engine_controls.enabled` false; 0 clients with `enabled`; no client has a month cap |
+| Assignments | **Seven states, and the first overdue count this system has produced.** 4 of 13 are late. | `assignment_board` on production |
+| Reporting ingest | **Paid works. Organic's fix is deployed and unproven.** Three paid pulls completed 6–7 Oct; `metrics_daily` is still empty because the account had no delivery in the window. 167 stopped the organic call asking for a metric that endpoint rejects, and has not run against the live API yet. | `agent_jobs` for `metrics_ingest`; `client_integrations`: meta=active, instagram=error, facebook=connected |
 
-Agent spend to date: **$5.26**.
+Agent spend to date, production: **$83.50**.
+
+---
+
+## Drift: closed 8 October, and worth reading anyway
+
+Production is now level. This section stays because the drift took three
+wrong answers to measure and the habit that caused it has not changed.
+
+The first draft of this revision said eleven migrations, on the assumption
+that production "stops at 156" because 156 is there. 156 is a one-function fix
+to `integration_secret` and applied cleanly out of order, which is exactly why
+it is misleading evidence.
+
+Asked properly — `list_migrations` against production — the recorded history
+ends at **149_plan_slots**, with 156 as the only later entry. Confirmed
+object by object: `engine_controls`, `slot_pipeline`, `engine_tick`,
+`engine_decisions`, `select_idea_for_slot`, `client_ideas.slot_id` and
+`slot_pipeline.input_table` are all absent.
+
+**So the engine did not exist on production.** Not "was switched off", not
+"had no work" — there was no tick, no pipeline table, no idea selection and no
+decision log. Everything from M3.3 onward lived only on staging, while the
+console's Engine panel rendered against it quite happily, because
+`engine_readiness` came with 146 and 146 was applied. A screen describing a
+database that cannot run what it shows is the most expensive kind of drift:
+nothing looks wrong.
+
+All of it is on production as of 8 October, and still switched off.
+
+### `supabase db push` cannot be used against production, and would abort
+
+The obvious way to close seventeen migrations is one `db push`. It does not
+work here, and finding out by running it is the expensive way.
+
+`supabase migration list --linked` against production shows the two histories
+have diverged at scale, not just over the recent gap:
+
+- **65 recorded remote versions correspond to no local file.** The earliest is
+  `20260916203244`. They are the local migrations applied through the MCP or
+  the dashboard, each stamped with the time it was applied rather than the
+  version in its filename.
+- **Local files from mid-September onward therefore show as unapplied**, even
+  though their objects plainly exist — `scheduled_posts.platform`,
+  `distribution_due`, `client_media_frames` and the rest are all there.
+
+`db push` applies every local file the remote history does not list. Against
+production that is roughly eighty files, most of them already applied in
+substance, and it aborts at the first statement that is not idempotent —
+`147_content_slots` opens with `create type slot_stage as enum (...)`, which
+fails with "type already exists" and takes the transaction with it. A partial
+push that stops in the middle of a renumbered sequence is a worse state than
+the one it started from.
+
+**What closing this properly looks like**, in order, and none of it is
+guesswork once the first step is done:
+
+1. `supabase migration list --linked`, and for each local version that shows
+   as pending but whose objects exist, `supabase migration repair --status
+   applied <version>`. This writes only the history table, never the schema.
+   The remote-only rows can be left: they are harmless records of the same
+   work under a different version string.
+2. Confirm the list then shows exactly the seventeen genuine gaps as pending.
+3. `supabase db push --linked`, which applies them in order, each file its own
+   transaction — which also resolves the one ordering constraint, that 163
+   adds an enum value and 164 is the first to use it.
+4. Re-run the two post-checks: `select * from security_definer_exposure where
+   anon_can_execute` should be empty, and the 36-RPC authenticated-callable
+   query should match the baseline taken before 161.
+
+The repair step is the whole job, and it is the step nobody should do from a
+guess. Until it is done, every production migration has to go one at a time
+through the MCP, which is how the drift got here.
+
+| # | What it is | Why it matters that production lacks it |
+|---|---|---|
+| 150 | The engine tick | Nothing moves a slot. The engine cannot run. |
+| 151 | Ideas know their slot | Ideation output has nowhere to attach |
+| 152 | Idea selection and policy | No candidate can be chosen or auto-approved |
+| 153 | Copywriter | The engine cannot write per-platform copy |
+| 154 | Follow-up keeps its params | A rescheduled job loses its input |
+| 155 | Tick queues the right input | The tick would hand agents the wrong row |
+| 157 | Token health | An errored integration cannot clear itself |
+| 158 | QA | The engine has no gate before a person |
+| 159 | The approval inbox | An approved asset never reaches a calendar |
+| 160 | The publisher | Nothing can go out at all |
+| **161** | **anon cannot drive the engine** | **See below. A live authorisation hole.** |
+| 162 | Three the sweep could not fix | Cross-client write via `create_content_slot` |
+| 163–164 | Held jobs | A monthly cap discards the rest of the month |
+| 165 | Backfill | No history can be asked for |
+| 166 | Assignment states | A rejection reaches nobody |
+| 167 | A missing figure is not a zero | Organic ingest fails; a panel reports a 0 nobody measured |
+
+### The 7 September row that was wrong
+
+That revision claimed "**No `SECURITY DEFINER` function is reachable by
+`anon`**", checked by `has_function_privilege('anon', ...)` across `public`.
+The check was the right one; the answer has not been that since long before
+the claim was written.
+
+Supabase grants EXECUTE on every new function in `public` to `anon`,
+`authenticated` and `service_role` by name, and PostgreSQL grants it to
+PUBLIC, which `anon` belongs to. `revoke all on function x from public` —
+which migrations 158, 159 and 160 all do while describing the function as
+service_role only — removes the second and leaves the first.
+
+Production today: **21 SECURITY DEFINER functions are callable with the anon
+key that ships in the browser bundle.** Three of them have no check of any
+kind in their own body and are in `public`:
+
+- `advance_slot` — the engine's entire state machine, and the only thing
+  permitted to write `content_slots.stage`. A slot id was the whole
+  credential, and slot ids appear in job events and engine views. The move
+  it would not refuse is `awaiting_approval → scheduled`, which is the one
+  human gate the engine exists to stop at.
+- `create_content_slot` — creates slots against any `client_id`, which the
+  tick then picks up and spends that client's budget on.
+- `plan_slots` — plans a whole horizon for any client, which is the same bill
+  at a larger size.
+
+The `mcp_internal` lead-reading functions are also in the 21 and are **not**
+exposed: each calls `require_active_bot` and `require_bot_client_grant`, so a
+caller needs a bot id and a grant. They are in the list because the heuristic
+that found them looks for `can_access_client` and `auth.role()`, not for the
+MCP's own equivalents.
+
+Migrations 161 and 162 close all of this on staging. `ALTER DEFAULT
+PRIVILEGES` cannot prevent a recurrence and fails silently — verified against
+this project on 7 October: after revoking EXECUTE on functions from both
+PUBLIC and `anon`, a freshly created function was still executable by both
+and `pg_default_acl` had no row for the schema. Revoking the implicit
+EXECUTE-to-PUBLIC default is a revoke of nothing. An event trigger on CREATE
+FUNCTION would work and needs superuser, which Supabase does not grant. So
+the mechanism is `lock_down_definer_functions()`, which every migration that
+adds such a function calls, and `security_definer_exposure`, which is how
+anybody notices one did not.
+
+**To close:** apply 161 and 162 to production. Needs Alex via Chief of Staff
+under the Phase 6 release boundary.
 
 ---
 
 ## The open gaps, in the order they block things
 
-### 1. Meta is not connected — the largest remaining blocker
+### 1. Meta is connected. Paid pulls; organic does not — and the reason is known
 
-`client_integrations` holds **0 rows** and `metrics_daily` **0 rows**. Everything
-downstream is therefore inert: the Reporting panels, the daily ingest cron, and
-the commentary agent.
+The September revision said `client_integrations` held 0 rows and no live pull
+had ever succeeded. Both have changed, and not in the same direction.
 
-The code either side of the boundary is verified. Meta's failure path was tested
-against the real API — an invalid token came back correctly classified as
-non-retryable and flipped the integration to `error`. What has never happened is
-a successful pull.
+Production, checked today:
 
-**To close:** Account → Integrations → Add, one row per surface (`meta` with
-`act_<ad account id>`, `instagram` with the IG user id), then turn Daily sync on.
-It defaults to off so a credential does not silently start billing API calls.
+| Provider | Status | Last checked | What it means |
+|---|---|---|---|
+| `meta` | **active** | 7 Oct | Only a successful ingest writes `active`. Paid works. |
+| `instagram` | **error** | 6 Oct | Fails on the account call. See below. |
+| `facebook` | connected | never | Stored, not synced; no connector reads it. |
+
+Three paid pulls completed on 6 and 7 October. What unblocked them was
+migration 156: `integration_secret` required `status = 'active'`, nothing but
+a successful ingest writes `active`, and an ingest cannot succeed without the
+token — so a freshly connected integration could never be used. The same
+fault had been fixed in the TypeScript on 24 September and the comment left
+on that fix describes this bug exactly, two weeks before it was found again
+in the SQL.
+
+`metrics_daily` is still **0 rows**, and that is now a different statement
+from "not connected": the pulls succeeded and the ad account had no delivery
+in the trailing week they asked for. Migration 165 is what lets somebody go
+and ask for a window that does.
+
+**Organic fails for a reason the API states outright.** The 6 October jobs
+carry:
+
+```
+(#100) metric[0] must be one of the following values: reach, follower_count,
+website_clicks, profile_views, online_followers, accounts_engaged,
+total_interactions, ...
+```
+
+`metric[0]` was `views`. The media endpoint accepts `views` — that is the
+2024 replacement for per-post `impressions`, and reading it is a fix that
+already landed — and the **account** endpoint does not. Asking for it failed
+the whole call, so reach and interactions were lost along with it. Migration
+167 and the change beside it ask the account endpoint only for what it
+accepts, which leaves account impressions unobtainable per day: the
+replacement needs `metric_type=total_value` and returns a period total, and
+this table holds daily rows. `organic_account.impressions` is therefore null
+rather than 0, and both readers say "not available" rather than reporting a
+number nobody measured.
+
+**To close:** apply 157 and 167 to production, then let the 03:15 cron run —
+or press Pull history on Account → Integrations for a window with delivery in
+it. The Instagram row will clear itself once a call succeeds; until 157 is
+applied, an errored integration cannot clear itself at all.
 
 ### 2. No email has ever been sent
 
@@ -105,17 +298,34 @@ empty state that reads as a bug.
 
 **To close:** a second connector — GA4 or Plausible — behind the same
 `MetricsSource` interface the Meta one implements. Schema, scheduler, queue and
-panels need no change.
+panels need no change, and `request_metrics_backfill` already takes a window,
+so a new connector arrives with history rather than only a future.
 
-### 6. The commentary agent cannot describe a trend
+### 6. ~~The commentary agent cannot describe a trend~~ — CLOSED
 
-Asked to report, it correctly says *"there is no prior-period data in this
-summary, so nothing here can be called up or down"*. Right behaviour, permanent
-ceiling: `metrics_daily` holds the history, `metrics_period_summary()` does not
-compute a comparison.
+The prescription here was "a prior-window block in that function. Panels and
+agent both pick it up, because they read the same one." Done slightly
+differently and for a reason: putting the comparison inside
+`metrics_period_summary` changes the shape both readers parse, so instead both
+read that function twice — once per window — and share the delta arithmetic
+through a mirrored module, the same mechanism the platform limits use.
 
-**To close:** a prior-window block in that function. Panels and agent both pick
-it up, because they read the same one. Blocked behind gap 1.
+What it refuses is the part worth keeping:
+
+- **Individual posts are never compared.** Those figures are
+  lifetime-to-date snapshots, so the earlier snapshot of a post that existed
+  in both windows is contained in the later one. Subtracting them gives a
+  confident, wrong growth figure, and always a positive one.
+- **Uneven coverage is refused.** Thirty days of data against three is not a
+  trend however the arithmetic comes out, and because the ingest backfills a
+  trailing window this is the normal case rather than the edge one.
+- **A base under 20 gets no percentage.** One click becoming three is +200%.
+
+The panels show the same numbers, from the same code, with the same
+refusals — `npm run sync:metrics-compare` and a mirror test keep the two
+copies byte-identical. Not because the agent needed company, but because a
+chart saying "+25%" beside a write-up saying "+30%" gives a reader no way to
+know which to believe and both look authoritative.
 
 ### 7. Smaller things
 
@@ -138,10 +348,24 @@ it up, because they read the same one. Blocked behind gap 1.
   `client_pages.body` is markdown shown as plain text in both the admin panel
   and the client view. The palette and treatment tokens *are* used; the CSS is
   waiting on a page renderer that does not exist yet.
-- **No backfill UI.** `enqueue_metrics_ingest_jobs(p_days)` accepts a window;
-  nothing calls it with anything but the default.
-- **A finished render has no route to distribution beyond scheduling.** It can
-  be approved and booked in from the brief, but nothing links it onward.
+- ~~**No backfill UI.**~~ **Closed, and the comment next to the switch had
+  been wrong for weeks.** The Integrations panel said the daily-sync toggle
+  "gates the schedule only — the ingest can still be run by hand, which is
+  what you want for a one-off backfill without arming a recurring job."
+  `enqueue_metrics_ingest_jobs` requires `ingest_enabled`, so the one case
+  that sentence described was the one case it refused.
+  `request_metrics_backfill` ignores that switch on purpose, caps the window
+  at 400 days and says so rather than clamping, and refuses a window already
+  being pulled. `metrics_coverage` sits above the date picker, because
+  without it the picker is a guess and these are real requests against the
+  client's own quota.
+- ~~**A finished render has no route to distribution beyond scheduling.**~~
+  **Closed.** Approving a slot creates the scheduled post, copies its copy
+  onto it, and the publisher claims it when its time comes. Inert until both
+  switches are on — `PUBLISH_ENABLED` in the runtime and
+  `publishing_enabled` for that client — and that is two switches on purpose:
+  one env var would mean the day somebody turns publishing on for one
+  account it is on for every account the engine has ever planned a slot for.
 - **`react-router-dom` 6.30.6 carries two moderate advisories**, and the fix is
   a semver-major move to 7.x. Checked rather than assumed: neither is reachable.
   The SSR hydration one needs SSR and this is a Vite SPA with no server entry.
@@ -149,12 +373,52 @@ it up, because they read the same one. Blocked behind gap 1.
   `navigate()` and `to={}` in `src/` is a literal, a constant role-map lookup or
   a database UUID. Worth doing as its own migration, not urgent.
 - **`SectionCard` is dead code.** Nothing imports it but a comment in `Panel.tsx`.
-- **26 advisor warnings for `SECURITY DEFINER` functions callable by
-  `authenticated`.** Reviewed as a set today: every one is an intended RPC that
-  carries its own guard (`is_admin()`, `can_access_client()`, an actor check).
-  None is a finding on its own, but the safety of all 26 rests on those internal
-  guards rather than on the grant, so a new one added without a guard would not
-  be caught by the linter — it would look exactly like these.
+- ~~**A monthly cap discards the rest of the month.**~~ **Closed, and it was
+  never written down as a gap.** A client reaching its cap had its job failed
+  non-retryably and its slot failed with it, and nothing resumed when the cap
+  was raised or when the month rolled over — the cap row is per month, so the
+  refusal stopped being true on the 1st and the work was already gone. `failed`
+  now means something broke; a cap is a hold, and `resume_paused_jobs` runs
+  hourly and re-checks the reason rather than trusting the recorded one.
+- **Node 25's `localStorage` shadows jsdom's and has no methods on it.** Fixed
+  in the test setup, and worth recording because the visible half was cheap
+  (five failing AdCopyModal tests) and the expensive half was silent: FormModal
+  restores a cancelled edit from `localStorage` and AgentActivityBar keeps
+  dismissals in `sessionStorage`, and under test both were reading and writing
+  a store that quietly did nothing. The setup file's own `clear()` was wrapped
+  in a try/catch, which swallowed the first sign of it.
+- **101 advisor warnings for `SECURITY DEFINER` functions callable by
+  `authenticated`** (26 at the last revision). The September note ended with
+  the right worry: "the safety of all 26 rests on those internal guards
+  rather than on the grant, so a new one added without a guard would not be
+  caught by the linter — it would look exactly like these." Three had been
+  added without one by the time anybody looked, and
+  `security_definer_exposure.body_checks_the_caller` now answers the question
+  the linter cannot:
+
+  ```sql
+  select * from security_definer_exposure where not body_checks_the_caller;
+  ```
+
+  **Fifteen rows, on both databases**, and all fifteen are fine — the reason
+  is written into migration 162 so it is not re-litigated on every review:
+  `is_admin`,
+  `is_member`, `current_role_of` and the rest are the permission primitives
+  themselves, so "check the caller" is what they are; `lead_stage_rank` is
+  arithmetic on an enum; the trigger functions are run by Postgres without
+  consulting EXECUTE at all; the MCP entry points check a bot's own grant.
+  The last two are `enqueue_publish_sweep` and `enqueue_token_health_job`,
+  deliberately reachable so an admin can prod them, each queueing one
+  idempotent job. The engine's own drivers are absent from this view
+  entirely — they are service_role only, which is the point of 161.
+
+  Any row that is none of those is a finding. That contract is only worth
+  something if the view counts correctly, and on 8 October it did not:
+  migration 168 found six gated functions being reported as ungated,
+  because 161 taught the heuristic `may_advance_slot` and 166 introduced
+  `may_touch_assignment` without going back. The pattern now lives in
+  `caller_gate_markers()` and a source test asserts every `may_*` predicate
+  in the migrations appears in it.
 
 ---
 
@@ -370,7 +634,19 @@ credential does not silently start billing API calls.
     output is expected to be consistent about needs the two-state treatment:
     the real value quoted verbatim, or its absence stated explicitly. There is
     no third state, and a blank is not the absence — it is an invitation.
-13. **A suite that passes on first run has not been shown to work.** Every one
+13. **A typecheck can check nothing and exit 0.** The root `tsconfig.json`
+    is a solution file — `"files": []` plus two project references — so
+    `npx tsc --noEmit -p tsconfig.json` type-checks zero files and passes.
+    Confirmed with `--listFiles`. CI runs `npx tsc -b`, which follows the
+    references; an entire session of "typecheck clean" for the console was a
+    no-op, and it hid five real errors including a `Record<JobStatus,
+    string>` with no entry for the `paused` status added in 163 — a held job
+    would have rendered with no label. `agent-runtime`'s own config is real,
+    so `npm run typecheck` there does check. The full console set is
+    `npm run lint` (oxlint, not eslint), `npx tsc -b`, `npm test`,
+    `npm run build`.
+
+14. **A suite that passes on first run has not been shown to work.** Every one
     of these did. The check is to break the source deliberately and confirm the
     right tests fail: `isVideo = false` must fail the video tests, and removing
     the orphaned-selection cleanup must fail that one. Both did, and both were
@@ -387,9 +663,12 @@ credential does not silently start billing API calls.
   any id it does not know, so an unimplemented page looks like an empty one.
   Today only `clients` was unmatched, and it has its own route.
 - **Supabase advisors:** run the security advisor. It is how the
-  leaked-password gap stays visible, and it re-lists the 26 `SECURITY DEFINER`
-  functions callable by `authenticated` — all intended, all relying on their own
-  internal guard rather than on the grant.
+  leaked-password gap stays visible. It also re-lists every `SECURITY DEFINER`
+  function callable by `authenticated` — 101 now — and the useful question is
+  not that count but which of them check their own caller. Ask the database
+  rather than the advisor: `select * from security_definer_exposure where not
+  body_checks_the_caller`, and compare the rows against the fifteen migration
+  162 explains. Anything else is a finding.
 - **Agents without runners:** `agents` table vs `RUNNERS` in
   `agent-runtime/src/orchestration/dispatch.ts`.
 - **Deployed version:** `select version from agent_runtime_status where is_live`.
@@ -397,8 +676,13 @@ credential does not silently start billing API calls.
 - **Cross-client isolation:** `node scripts/rls-isolation-test.mjs`, with
   `.env.local` sourced and `RLS_TEST_CLIENT_A_PASSWORD` /
   `RLS_TEST_CLIENT_B_PASSWORD` set (the script holds no credentials).
-- **Exposed functions:** `has_function_privilege('anon', p.oid, 'execute')`
-  over `pg_proc` where `prosecdef`.
+- **Exposed functions:** `select * from security_definer_exposure where
+  anon_can_execute`, which is the same `has_function_privilege` check the
+  September revision used and reports it as rows rather than as a claim. Any
+  row is a finding. If the count is non-zero after a migration that added a
+  function, that migration forgot `select
+  public.lock_down_definer_functions();` — `ALTER DEFAULT PRIVILEGES` cannot
+  do this and fails silently, so the call is the mechanism.
 - **Orphaned schema:** grep each table name across `src/`, excluding
   `types/database.ts`. Tables read through an RPC or a view look like false
   positives — `metrics_daily` and `agent_runtime_heartbeats` are.
@@ -410,3 +694,24 @@ credential does not silently start billing API calls.
 - **Whether the frontend suites still bite:** break one invariant in the source
   on purpose, run `npm test`, confirm the expected tests fail, and revert. A
   passing suite is evidence only if it can fail.
+- **The console typecheck:** `npx tsc -b`, never
+  `npx tsc --noEmit -p tsconfig.json`. The second checks zero files and exits
+  0 — see trap 13. `npm run lint` is oxlint.
+- **Whether the two databases agree:** run the same block against both and
+  compare, rather than reasoning from which migrations went where.
+
+  ```sql
+  select
+    (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r') as tables,
+    (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity) as no_rls,
+    (select count(*) from pg_policies where schemaname = 'public') as policies,
+    (select count(*) from agents where archived_at is null) as agents,
+    (select count(*) from security_definer_exposure where anon_can_execute) as anon,
+    (select count(*) from security_definer_exposure) as definer_signed_in,
+    (select count(*) from security_definer_exposure
+      where not body_checks_the_caller) as ungated;
+  ```
+
+  On 8 October both answered: 81, 0, 146, 32, 0, 101, 15.

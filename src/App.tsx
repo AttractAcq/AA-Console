@@ -10,9 +10,10 @@ import { EmployeeLoginPage } from "./pages/employee/EmployeeLoginPage";
 import { EmployeeConsolePage } from "./pages/employee/EmployeeConsolePage";
 import { MemberDetailPage } from "./pages/operations/MemberDetailPage";
 import { AgentDetailPage } from "./pages/team/AgentDetailPage";
+import { CampaignExecutionPanel } from "./pages/campaigns/CampaignExecutionPanel";
 import { ThemeProvider } from "./context/theme";
 import { AuthProvider } from "./context/auth";
-import { agencyNav, clientNavGroups } from "./config/navigation";
+import { agencyNav, clientNavGroups, legacyDeliveryNodes } from "./config/navigation";
 import { memberSections } from "./data/team";
 import { agentSections } from "./data/agents";
 
@@ -100,6 +101,11 @@ export default function App() {
                   index
                   element={<Navigate to="delivery/dashboard" replace />}
                 />
+                <Route path="delivery/campaign-execution/:campaignId" element={<CampaignExecutionPanel />} />
+                <Route path="delivery/campaign-factory/:campaignId" element={<CampaignExecutionPanel />} />
+                {legacyDeliveryNodes.map((node) => (
+                  <Route key={`legacy-delivery-${node.id}`} path={`delivery/${node.path}`} element={<Page node={node} />} />
+                ))}
                 {clientNavGroups.flatMap((group) =>
                   (group.children ?? []).map((child) => (
                     <Route

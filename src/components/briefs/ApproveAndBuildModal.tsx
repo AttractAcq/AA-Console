@@ -3,8 +3,9 @@ import { useParams } from "react-router-dom";
 import { Bot, ImagePlus, Users, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
-import { MAX_FRAMES, MIN_FRAMES, STORY_SIZE, formatLabel, isMultiFrame, sizeFitsFormat } from "../../lib/contentFormat";
+import { MAX_FRAMES, MIN_FRAMES, STORY_SIZE, formatLabel, sizeFitsFormat } from "../../lib/contentFormat";
 import { framePlanLines } from "../../lib/framePlan";
+import { isPhase1MotionBrief } from "../../lib/reelShots";
 
 type Brief = {
   id: string;
@@ -14,6 +15,9 @@ type Brief = {
   editor_brief?: string | null;
   media_type: "image" | "text" | "video";
   content_format?: string | null;
+  format_code?: string | null;
+  frame_plan?: string[] | null;
+  production_method?: string | null;
   brief_ref: string | null;
   status: string;
 };
@@ -35,10 +39,9 @@ const SIZE = [
 /**
  * The step between an approved brief and a finished asset.
  *
- * Two routes. The AI route builds the asset in two stages — the concept is
- * written first, then rendered from it — and is not offered for video,
- * which people make. The human route hands the brief to an editor or an
- * avatar; the assignment is what matters and the email is the heads-up.
+ * Two routes. The AI route builds a still in two stages, or queues
+ * video_build for a Phase 1 reel. Other video is made by people. The
+ * human route hands the brief to an editor or an avatar.
  */
 export function ApproveAndBuildModal({
   brief,
@@ -68,10 +71,14 @@ export function ApproveAndBuildModal({
   const [frameCount, setFrameCount] = useState("");
   const [framePlan, setFramePlan] = useState("");
 
-  const isVideo = brief?.media_type === "video";
-  // Only a carousel or a story has frames to ask about. A single brief never
-  // sees these fields, and the RPC refuses them if it somehow does.
-  const isFramed = isMultiFrame(brief?.content_format);
+  const phase1Motion = isPhase1MotionBrief(brief);
+  // A video that is not an F6/F7 reel is still made by a person. A Phase 1
+  // reel may take the AI route through still generation and Higgsfield.
+  const peopleOnlyVideo = brief?.media_type === "video" && !phase1Motion;
+  const isVideoBrief = brief?.media_type === "video";
+  // Only a carousel or a story has frames to ask about. A reel's shot plan
+  // is already on the brief; typing over it would replace the JSON shots.
+  const isFramed = brief?.content_format === "carousel" || brief?.content_format === "story";
   // A story is full-screen vertical. Offering Landscape beside Portrait and
   // letting the trigger added in 116 refuse it afterwards is a worse way to
   // say so than not offering it.
@@ -81,19 +88,19 @@ export function ApproveAndBuildModal({
   // choices is how the wrong person gets sent the wrong work.
   useEffect(() => {
     if (!open) return;
-    setRoute(isVideo ? "human" : null);
+    setRoute(peopleOnlyVideo ? "human" : null);
     setQuality("medium");
     setSize(STORY_SIZE);
     setPicked(new Set());
-    setKinds(isVideo ? new Set(["avatars"]) : new Set());
-    setBriefRole(isVideo ? "avatar" : "full");
+    setKinds(peopleOnlyVideo ? new Set(["avatars"]) : new Set());
+    setBriefRole(isVideoBrief ? "avatar" : "full");
     setDueDate("");
     setCompensation("");
     setReference(null);
     setFrameCount("");
     setFramePlan("");
     setError(null);
-  }, [open, brief?.id, isVideo]);
+  }, [open, brief?.id, peopleOnlyVideo, isVideoBrief]);
 
   const loadMembers = useCallback(async () => {
     const { data } = await supabase
@@ -172,8 +179,8 @@ export function ApproveAndBuildModal({
           p_reference_path: reference?.path ?? undefined,
           // Omitted rather than sent as null: the generated Args type has
           // these as optional, and null is not the same as absent to it.
-          ...(isFramed && lines.length > 0 ? { p_frame_plan: lines } : {}),
-          ...(isFramed && lines.length === 0 && Number.isFinite(typedCount) && typedCount > 0
+          ...(isFramed && !phase1Motion && lines.length > 0 ? { p_frame_plan: lines } : {}),
+          ...(isFramed && !phase1Motion && lines.length === 0 && Number.isFinite(typedCount) && typedCount > 0
             ? { p_frame_count: typedCount }
             : {}),
         });
@@ -186,7 +193,7 @@ export function ApproveAndBuildModal({
           // rather than null for the generated types to accept it.
           p_due_date: dueDate || undefined,
           p_compensation: compensation ? Number(compensation) : undefined,
-          p_brief_role: isVideo ? briefRole : "full",
+          p_brief_role: isVideoBrief ? briefRole : "full",
         });
         if (rpcError) throw new Error(rpcError.message);
       }
@@ -237,6 +244,10 @@ export function ApproveAndBuildModal({
           {/* the brief itself, so nobody builds from a title alone */}
           <section>
             <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">The brief</h3>
+            <p className="mb-2 text-xs text-muted-foreground">
+              {brief.format_code ?? formatLabel(brief.content_format)} · {brief.production_method ?? "Production route not specified"}
+              {phase1Motion ? ` · ${brief.frame_plan?.length ?? 0} planned shots` : ""}
+            </p>
             <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-muted/40 p-3">
               <p className="whitespace-pre-wrap text-sm text-foreground">{brief.body ?? "(no detail on this brief)"}</p>
             </div>
@@ -247,21 +258,23 @@ export function ApproveAndBuildModal({
             <div className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
-                disabled={isVideo}
+                disabled={peopleOnlyVideo}
                 onClick={() => setRoute("ai")}
                 className={cn(
                   "rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   route === "ai" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
-                  isVideo && "cursor-not-allowed opacity-50 hover:border-border",
+                  peopleOnlyVideo && "cursor-not-allowed opacity-50 hover:border-border",
                 )}
               >
                 <span className="flex items-center gap-2 text-sm font-medium text-card-foreground">
                   <Bot className="h-4 w-4" aria-hidden="true" /> AI
                 </span>
                 <span className="mt-1 block text-xs text-muted-foreground">
-                  {isVideo
-                    ? "Not available for video — video is made by people."
-                    : "Writes the creative concept, then renders it. Text and image only."}
+                  {peopleOnlyVideo
+                    ? "AI creation currently supports F6/F7 reels with a shot plan. Assign this video to a person."
+                    : phase1Motion
+                      ? "Builds shot stills, animates them with Higgsfield, then queues an AI cut for review."
+                      : "Writes the creative concept, then renders it. Text and image only."}
                 </span>
               </button>
 
@@ -277,13 +290,23 @@ export function ApproveAndBuildModal({
                   <Users className="h-4 w-4" aria-hidden="true" /> Human
                 </span>
                 <span className="mt-1 block text-xs text-muted-foreground">
-                  Send it to an editor or an avatar. Lands on their dashboard and emails them.
+                  Assign it to an editor or avatar dashboard. Email is sent when Resend is configured.
                 </span>
               </button>
             </div>
           </section>
 
-          {route === "ai" && (
+          {route === "ai" && phase1Motion && (
+            <section>
+              <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                This queues an opening still for each planned shot, then Higgsfield clips and an edited cut.
+                Higgsfield must be configured for the video build to run. Follow progress under Media → Reel shots;
+                approve the finished cut there.
+              </p>
+            </section>
+          )}
+
+          {route === "ai" && !phase1Motion && (
             <section className="space-y-4">
               <div>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quality</h3>
@@ -436,7 +459,7 @@ export function ApproveAndBuildModal({
           {route === "human" && (
             <section className="space-y-4">
 
-              {isVideo && (
+              {isVideoBrief && (
                 <div>
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Which brief

@@ -149,10 +149,10 @@ test("pipeline reads complete through the AA adapter", async (t) => {
   );
 });
 
-test("pipeline.update_stage and pipeline.create_followup are completed writes; sale/cash target stages are rejected before AA", async (t) => {
+test("pipeline.update_stage accepts the new stages and rejects legacy and cash stages before AA", async (t) => {
   const { adapter, received } = await mockAa(t, ({ url, body }) => {
     if (url === "/internal/mcp/pipeline/update-stage")
-      return { status: 200, body: { client_id: client, lead_id: lead, from_stage: "lead", stage: body.stage, replayed: false } };
+      return { status: 200, body: { client_id: client, lead_id: lead, from_stage: "qualified", stage: body.stage, replayed: false } };
     if (url === "/internal/mcp/pipeline/create-followup")
       return { status: 200, body: { client_id: client, lead_id: lead, next_action: body.next_action, replayed: false } };
     throw new Error(url);
@@ -165,20 +165,26 @@ test("pipeline.update_stage and pipeline.create_followup are completed writes; s
   });
   assert.equal(staged.status, "completed");
   assert.deepEqual(received[0]?.body, { client_id: client, lead_id: lead, stage: "conversation" });
+  for (const stage of ["profile_visit", "follower", "qualified"]) {
+    const allowed = await engine.call(identity, "pipeline.update_stage", {
+      client_id: client, lead_id: lead, stage, idempotency_key: `new-stage-${stage}`,
+    });
+    assert.equal(allowed.status, "completed", stage);
+  }
   const followup = await engine.call(identity, "pipeline.create_followup", {
     client_id: client, lead_id: lead, next_action: "Call back Thursday", idempotency_key: "followup-0001",
   });
   assert.equal(followup.status, "completed");
-  assert.equal(received[1]?.url, "/internal/mcp/pipeline/create-followup");
+  assert.equal(received[4]?.url, "/internal/mcp/pipeline/create-followup");
 
-  for (const stage of ["sale", "cash"]) {
+  for (const stage of ["lead", "sale", "cash"]) {
     const denied = await engine.call(identity, "pipeline.update_stage", {
       client_id: client, lead_id: lead, stage, idempotency_key: `no-stage-${stage}`,
     });
     assert.equal(denied.status, "rejected", stage);
     assert.equal(denied.message, "Invalid tool input.", stage);
   }
-  assert.equal(received.length, 2);
+  assert.equal(received.length, 5);
 });
 
 test("sales_agents reads complete through the AA adapter", async (t) => {

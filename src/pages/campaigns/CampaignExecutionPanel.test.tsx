@@ -3,11 +3,13 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, useParams, useAgentJobs, callRuntime } = vi.hoisted(() => ({
+const { from, rpc, useParams, useNavigate, useAgentJobs, callRuntime, useSearchParams } = vi.hoisted(() => ({
   callRuntime: vi.fn(),
   from: vi.fn(),
   rpc: vi.fn(),
   useParams: vi.fn(),
+  useNavigate: vi.fn(() => vi.fn()),
+  useSearchParams: vi.fn(() => [new URLSearchParams()]),
   useAgentJobs: vi.fn(),
 }));
 vi.mock("../../lib/supabase", () => ({
@@ -20,6 +22,8 @@ vi.mock("../../lib/supabase", () => ({
 }));
 vi.mock("react-router-dom", () => ({
   useParams,
+  useNavigate,
+  useSearchParams,
   // Link renders as an anchor so tests can still find navigation by role.
   Link: ({ to, children, ...rest }: { to: string; children?: unknown }) =>
     createElement("a", { href: to, ...rest }, children as never),
@@ -36,6 +40,10 @@ import { CampaignExecutionPanel, type Requirement } from "./CampaignExecutionPan
 
 const planned = (over: Record<string, unknown> = {}) => ({
   id: "camp-1",
+  acquisition_mode: "legacy",
+  paid_platform: null,
+  offer_version_id: null,
+  cloned_from_campaign_id: null,
   name: "Winter full-arch push",
   brief: "Fill the January consult diary",
   status: "planning",
@@ -113,7 +121,7 @@ function show(campaigns: unknown[] = [planned()], reqs: Requirement[] = NOT_READ
   // populated with campaign rows, which is mock pollution that would hide a
   // real bug rather than catch one.
   from.mockImplementation((table: string) =>
-    table === "client_content_pillars" ? rows([]) : rows(campaigns),
+    table === "client_content_pillars" || table === "campaign_content_pillars" ? rows([]) : rows(campaigns),
   );
   rpc.mockImplementation((name: string) => {
     if (name === "campaign_readiness") return Promise.resolve({ data: reqs, error: null });
@@ -122,15 +130,15 @@ function show(campaigns: unknown[] = [planned()], reqs: Requirement[] = NOT_READ
   return render(<CampaignExecutionPanel />);
 }
 
-/** Cards arrive collapsed, so anything inside one has to be opened first. */
 async function open(name = "Winter full-arch push") {
-  await userEvent.click(await screen.findByRole("button", { name: new RegExp(name, "i") }));
+  await screen.findByRole("heading", { name: new RegExp(name, "i") });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useParams.mockReturnValue({ clientId: "client-1" });
+  useParams.mockReturnValue({ clientId: "client-1", campaignId: "camp-1" });
   useAgentJobs.mockReturnValue({ inFlight: [], recentFailures: [] });
+  useSearchParams.mockReturnValue([new URLSearchParams()]);
 });
 
 describe("the plan", () => {
@@ -145,54 +153,163 @@ describe("the plan", () => {
 
   it("says a campaign is still being planned rather than showing empty fields", async () => {
     show([planned({ built_at: null, objective: null })]);
-    // Visible collapsed, because triaging a list must not need fifteen clicks.
-    expect(await screen.findByText(/waiting for the planner/i)).toBeInTheDocument();
+    expect(await screen.findByText("Waiting for the planner to write this.")).toBeInTheDocument();
   });
 });
 
-describe("collapsing", () => {
-  it("opens collapsed, so fifteen campaigns are a list and not a wall", async () => {
-    show();
-    await screen.findByText("Winter full-arch push");
-    // The objective stays visible — it is the card's one-line summary. What
-    // goes away is the detail: channels, requirements, and every action.
-    expect(screen.queryByText("instagram, facebook")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Launch" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Before this can launch")).not.toBeInTheDocument();
-  });
-
-  it("still says where a campaign stands while collapsed", async () => {
-    // Otherwise triaging a list means opening every card in it.
-    show();
-    expect(await screen.findByText(/Planned\. · 2 things still missing/)).toBeInTheDocument();
-  });
-
-  it("opens and closes on the heading", async () => {
-    show();
-    const toggle = await screen.findByRole("button", { name: /Winter full-arch push/i });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("instagram, facebook")).toBeInTheDocument();
-
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("instagram, facebook")).not.toBeInTheDocument();
-  });
-
-  it("opens one card without opening the rest", async () => {
+describe("campaign pages", () => {
+  it("shows the v2 campaign table and opens a campaign through its name", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    useParams.mockReturnValue({ clientId: "client-1" });
     show([planned(), planned({ id: "camp-2", name: "Spring whitening" })]);
-    await userEvent.click(await screen.findByRole("button", { name: /Winter full-arch push/i }));
-    expect(screen.getByRole("button", { name: /Spring whitening/i })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Winter full-arch push" })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-factory/camp-1?view=v2");
+    expect(screen.getByRole("columnheader", { name: "Date" })).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Archive" }));
+    expect(screen.getByRole("dialog", { name: "Confirm campaign action" })).toHaveTextContent("Archive");
+    expect(from).not.toHaveBeenCalledWith("client_campaigns", expect.objectContaining({ archived_at: expect.anything() }));
   });
 
-  it("keeps the campaign name a heading, so the list is still navigable", async () => {
+  it("keeps campaign actions behind a second confirmation in v2", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    show([planned()], READY);
+    expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Plan", "Content"]);
+    await userEvent.click(screen.getByRole("button", { name: "Action buttons" }));
+    await userEvent.click(screen.getByRole("button", { name: "Launch" }));
+    expect(screen.getByRole("dialog", { name: "Confirm campaign action" })).toHaveTextContent("Launch");
+    expect(rpc).not.toHaveBeenCalledWith("launch_campaign", expect.anything());
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(rpc).not.toHaveBeenCalledWith("launch_campaign", expect.anything());
+  });
+
+  it("shows all v2 build tabs only for paid campaigns", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
+    expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Plan", "Content", "Landing Page", "Sales Agent", "Meta Ads"]);
+    expect(screen.getAllByText("Book 40 consultations in January")).toHaveLength(2);
+    expect(screen.getByText("Chewing is not a cosmetic problem")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Meta Ads" }));
+    await userEvent.click(screen.getByRole("button", { name: "Build functionality" }));
+    expect(screen.getByRole("button", { name: "Budget and countries" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Write build sheet" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Record a hand build" })).toBeEnabled();
+  });
+
+  it("shows route and artifact blockers while keeping a planned campaign's edit form to its name", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], NOT_READY);
+    expect(await screen.findByRole("region", { name: "Readiness and blockers" })).toHaveTextContent("0 of 2 pieces ready");
+    expect(screen.getByText("Paid · Meta Ads")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Edit campaign" }));
+    expect(screen.getByRole("textbox", { name: "Campaign name" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Objective" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Brief" })).not.toBeInTheDocument();
+  });
+
+  it("shows the current immutable package and only its own approval state", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    const manifest = { id: "manifest-3", version: 3, plan_hash: "abc123def456", created_at: "2026-10-16T10:00:00Z" };
+    const manifestQuery = rows([]);
+    manifestQuery.limit = () => ({ maybeSingle: () => Promise.resolve({ data: manifest, error: null }) });
+    from.mockImplementation((table: string) => {
+      if (table === "campaign_manifest_versions") return manifestQuery;
+      if (table === "campaign_manifest_items") return rows([{ item_key: "creative", module_key: "content_production_factory", required: true, external_activation: false }]);
+      if (table === "campaign_action_approvals") return rows([{ id: "approval-1", action_key: "meta_ad_build", status: "pending", destination: "Meta", requested_at: "2026-10-16T11:00:00Z" }]);
+      return rows([planned({ acquisition_mode: "paid", paid_platform: "meta" })]);
+    });
+    rpc.mockResolvedValue({ data: NOT_READY, error: null });
+    render(<CampaignExecutionPanel />);
+    const readiness = await screen.findByRole("region", { name: "Readiness and blockers" });
+    expect(readiness).toHaveTextContent("Package v3");
+    expect(readiness).toHaveTextContent("creative");
+    expect(readiness).toHaveTextContent("meta ad build · pending");
+  });
+
+  it("regenerates a built plan as a linked revision instead of replacing its assets", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    const navigate = vi.fn();
+    useNavigate.mockReturnValue(navigate);
+    show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
+    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "revision-1" }, error: null }) }) }));
+    const originalFrom = from.getMockImplementation()!;
+    from.mockImplementation((table: string) => table === "client_campaigns" ? { ...originalFrom(table), insert } : originalFrom(table));
+    await screen.findByRole("heading", { name: "Winter full-arch push" });
+    await userEvent.click(screen.getByRole("button", { name: "Regenerate plan" }));
+    expect(insert).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      acquisition_mode: "paid", paid_platform: "meta", cloned_from_campaign_id: "camp-1",
+      brief: "Fill the January consult diary",
+    })));
+    expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", expect.objectContaining({ p_input_id: "revision-1" }));
+    expect(navigate).toHaveBeenCalledWith("/clients/client-1/delivery/campaign-factory/revision-1?view=v2");
+  });
+
+  it("passes edited plan details to the planner of a new revision", async () => {
+    useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
+    show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
+    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "revision-2" }, error: null }) }) }));
+    const originalFrom = from.getMockImplementation()!;
+    from.mockImplementation((table: string) => table === "client_campaigns" ? { ...originalFrom(table), insert } : originalFrom(table));
+    await screen.findByRole("heading", { name: "Winter full-arch push" });
+    await userEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Edit and regenerate plan" }));
+    await userEvent.clear(dialog.getByRole("textbox", { name: "Objective" }));
+    await userEvent.type(dialog.getByRole("textbox", { name: "Objective" }), "Book 60 consultations");
+    await userEvent.click(dialog.getByRole("button", { name: "Save and regenerate" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      brief: expect.stringContaining("Objective: Book 60 consultations"),
+    })));
+  });
+
+  it("clones a legacy campaign into an explicit route without reusing its activation", async () => {
     show();
-    expect(await screen.findAllByRole("heading", { level: 3 })).toHaveLength(1);
+    rpc.mockImplementation((name: string) => name === "clone_campaign_for_route"
+      ? Promise.resolve({ data: "new-paid", error: null })
+      : Promise.resolve({ data: READY, error: null }));
+    await open();
+    await userEvent.click(screen.getByRole("button", { name: "Clone to another route" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "New route" }), "paid");
+    await userEvent.selectOptions(screen.getByLabelText(/Paid platform/i), "meta");
+    await userEvent.click(screen.getByRole("button", { name: "Create separate campaign" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("clone_campaign_for_route", {
+      p_source_campaign_id: "camp-1",
+      p_target_mode: "paid",
+      p_paid_platform: "meta",
+      p_name: "Winter full-arch push · New route",
+    }));
+  });
+
+  it("shows a paid route, its source, and blocks unapproved external activation", async () => {
+    show([planned({ acquisition_mode: "paid", paid_platform: "google", cloned_from_campaign_id: "source-1" })], READY);
+    await open();
+    expect(screen.getByText("Paid · Google Ads")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Source campaign" })).toHaveAttribute(
+      "href", "/clients/client-1/delivery/campaign-factory/source-1",
+    );
+    expect(screen.queryByRole("button", { name: "Launch" })).not.toBeInTheDocument();
+    expect(screen.getByText(/External activation waits for version-bound human approval/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Meta build")).not.toBeInTheDocument();
+  });
+
+  it("links each list name to its own page without expanding a card", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    show([planned(), planned({ id: "camp-2", name: "Spring whitening" })]);
+    expect(await screen.findAllByRole("heading", { level: 3 })).toHaveLength(2);
+    expect(screen.getByRole("link", { name: /Winter full-arch push/i })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-factory/camp-1");
+    expect(screen.getByRole("link", { name: /Spring whitening/i })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-factory/camp-2");
+    expect(screen.queryByRole("button", { name: "Launch" })).not.toBeInTheDocument();
+  });
+
+  it("shows only the selected campaign and its actions", async () => {
+    show([planned(), planned({ id: "camp-2", name: "Spring whitening" })]);
+    await open();
+    expect(screen.queryByText("Spring whitening")).not.toBeInTheDocument();
+    expect(screen.getByText("instagram, facebook")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Launch" })).toBeInTheDocument();
   });
 });
 
@@ -276,7 +393,7 @@ describe("building what the campaign needs", () => {
 
   it("offers neither until the planner has written the campaign", async () => {
     show([planned({ built_at: null, objective: null })]);
-    await screen.findByText(/waiting for the planner/i);
+    await screen.findByText("Waiting for the planner to write this.");
     await open("Winter full-arch push");
     expect(screen.queryByRole("button", { name: "Build landing page" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Build sales agent" })).not.toBeInTheDocument();
@@ -332,6 +449,7 @@ describe("campaign visibility", () => {
     expect(from).toHaveBeenCalledWith("client_campaigns");
   });
   it("distinguishes a successful empty query", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
     show([]);
     expect(await screen.findByText("No campaigns yet")).toBeInTheDocument();
   });
@@ -484,7 +602,73 @@ describe("proposing a campaign", () => {
       "Fill the January consultation diary with full-arch patients, using the written plan assessment the offer strategy says nobody is using.",
   };
 
+  it("can plan a new campaign without generating content ideas", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "new-1" }, error: null }) }) }));
+    from.mockImplementation((table: string) => table === "client_content_pillars"
+      ? rows([])
+      : table === "client_campaigns" ? { ...rows([]), insert } : rows([]));
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.type(screen.getByLabelText(/Campaign name/i), "Editor hiring");
+    await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "organic");
+    await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Plan the campaign first");
+    const toggle = screen.getByRole("checkbox", { name: /Generate content ideas with this plan/i });
+    expect(toggle).toBeChecked();
+    await userEvent.click(toggle);
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({ ideate_on_plan: false, acquisition_mode: "organic", paid_platform: null })));
+    expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", expect.objectContaining({ p_input_id: "new-1" }));
+  });
+
+  it("passes the selected approved offer version to the planner campaign", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    const insert = vi.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "bound-1" }, error: null }) }) }));
+    from.mockImplementation((table: string) => {
+      if (table === "client_campaigns") return { ...rows([]), insert };
+      if (table === "service_offers") return rows([{ id: "service-1", service_name: "Boiler service" }]);
+      if (table === "service_offer_versions") return rows([{
+        id: "version-1", offer_id: "service-1", version: 2, promise: "An inspected boiler",
+      }]);
+      if (table === "service_offer_signoffs") return rows([{ offer_version_id: "version-1" }]);
+      return rows([]);
+    });
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.type(screen.getByLabelText(/Campaign name/i), "Boiler acquisition");
+    await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "organic");
+    await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Book inspections");
+    await userEvent.selectOptions(await screen.findByLabelText(/Approved service offer/i), "version-1");
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      offer_version_id: "version-1", acquisition_mode: "organic",
+    })));
+  });
+
+  it("stores a paid Google route without applying Meta's campaign template", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
+    const insert = vi.fn((_values: Record<string, unknown>) => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "new-google" }, error: null }) }) }));
+    from.mockImplementation((table: string) => table === "client_content_pillars"
+      ? rows([]) : table === "client_campaigns" ? { ...rows([]), insert } : rows([]));
+    rpc.mockResolvedValue({ data: [], error: null });
+    render(<CampaignExecutionPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
+    await userEvent.type(screen.getByLabelText(/Campaign name/i), "Search consults");
+    await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "paid");
+    await userEvent.selectOptions(screen.getByLabelText(/Paid platform/i), "google");
+    expect(screen.queryByLabelText(/Campaign template/i)).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Book consultations from search");
+    await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      acquisition_mode: "paid", paid_platform: "google",
+    })));
+    expect(insert.mock.calls[0]?.[0]).not.toHaveProperty("template");
+  });
+
   async function openProposer() {
+    useParams.mockReturnValue({ clientId: "client-1" });
     show();
     await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
     await userEvent.click(screen.getByRole("button", { name: "Generate with AI" }));
@@ -553,6 +737,7 @@ describe("proposing a campaign", () => {
   });
 
   it("does not offer pillars to a client that has none", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
     from.mockImplementation((table: string) =>
       table === "client_content_pillars"
         ? { select: () => ({ eq: () => ({ eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }) }) }) }
@@ -567,6 +752,7 @@ describe("proposing a campaign", () => {
   // Without this the campaign is created, the pillars silently are not, and
   // the planner runs without them while the operator believes they were set.
   it("refuses to queue the planner when the pillars cannot be attached", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
     const pillarInsert = vi.fn().mockResolvedValue({ error: { message: "pillar write failed" } });
     from.mockImplementation((table: string) => {
       if (table === "client_content_pillars") {
@@ -585,6 +771,7 @@ describe("proposing a campaign", () => {
     render(<CampaignExecutionPanel />);
     await userEvent.click(await screen.findByRole("button", { name: /New Campaign/i }));
     await userEvent.type(await screen.findByLabelText(/Campaign name/i), "Winter push");
+    await userEvent.selectOptions(screen.getByLabelText(/Campaign route/i), "organic");
     await userEvent.type(screen.getByLabelText(/What this campaign is for/i), "Fill the diary");
     await userEvent.click(screen.getByRole("checkbox", { name: /Honest proof/i }));
     await userEvent.click(screen.getByRole("button", { name: "Plan it" }));
@@ -597,6 +784,7 @@ describe("proposing a campaign", () => {
   // A failed load must not look like "this client has no pillars": somebody
   // would plan without them believing there were none to pick.
   it("says so when the pillars could not be loaded", async () => {
+    useParams.mockReturnValue({ clientId: "client-1" });
     from.mockImplementation((table: string) =>
       table === "client_content_pillars"
         ? {

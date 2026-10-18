@@ -7,6 +7,8 @@ const row = (over: Partial<DueRow> = {}): DueRow => ({
   asset_id: "a1",
   ref_number: "AA-0067",
   scheduled_for: "2026-09-09",
+  scheduled_at: "2026-09-09T08:00:00Z",
+  due_now: true,
   channel: "organic",
   platform: "instagram",
   media_type: "image",

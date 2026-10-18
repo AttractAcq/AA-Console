@@ -42,6 +42,7 @@ async function loadProfile(userId: string): Promise<Profile | null> {
     supabase.from("client_users").select("client_id").eq("user_id", userId).maybeSingle(),
     supabase.from("team_members").select("id").eq("user_id", userId).maybeSingle(),
   ]);
+  if (data.role === "employee" && !member) return null;
 
   return {
     id: data.id,
@@ -96,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const loaded = await loadProfile(data.user.id);
     if (!loaded) {
       await supabase.auth.signOut();
-      throw new Error("This account has no profile. Ask an admin to set it up.");
+      throw new Error("This account is unavailable. Ask an admin to check your team profile.");
     }
     setProfile(loaded);
     return loaded;

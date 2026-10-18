@@ -1,8 +1,13 @@
-import { useSearchParams } from "react-router-dom";
+import { ProofFactoryV2Panel } from "./proof-bank/ProofFactoryV2Panel";
+import { useParams, useSearchParams } from "react-router-dom";
+import { useState } from "react";
+import { Download } from "lucide-react";
 import { ClientDashboardPanel } from "./dashboard/ClientDashboardPanel";
 import type { ReactNode } from "react";
 import type { NavNode, NavTab } from "../config/navigation";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
+import { downloadModuleZip, downloadTabPdf, type ExportModule } from "../lib/moduleExport";
 import { Tabs } from "../components/Tabs";
 import { EmptyState } from "../components/EmptyState";
 import { DashboardPanel } from "./DashboardPanel";
@@ -13,11 +18,14 @@ import { ProofIntelligencePanel } from "./intelligence/ProofIntelligencePanel";
 import { CompetitorsPanel } from "./intelligence/CompetitorsPanel";
 import { BrandingAssociationsPanel } from "./intelligence/BrandingAssociationsPanel";
 import { CampaignIntelligencePanel } from "./intelligence/CampaignIntelligencePanel";
+import { CampaignInputsPanel } from "./intelligence/CampaignInputsPanel";
 import { BrandingStrategyPanel } from "./strategy/BrandingStrategyPanel";
 import { ContentPillarsPanel } from "./strategy/ContentPillarsPanel";
 import { OfferStrategyPanel } from "./strategy/OfferStrategyPanel";
+import { ServiceOffersPanel } from "./offer/ServiceOffersPanel";
 import { MoneyModelStrategyPanel } from "./strategy/MoneyModelStrategyPanel";
 import { ProofBankPanel } from "./proof-bank/ProofBankPanel";
+import { ProofArtifactsPanel } from "./proof-bank/ProofArtifactsPanel";
 import { GenerationPanel } from "./ideation/GenerationPanel";
 import { ContentArchivePanel } from "./archive/ContentArchivePanel";
 import { ARCHIVE_DOMAINS, SimpleArchivePanel } from "./archive/SimpleArchivePanel";
@@ -26,9 +34,15 @@ import { ImageLibraryPanel } from "./media/ImageLibraryPanel";
 import { StoryLibraryPanel } from "./media/StoryLibraryPanel";
 import { CarouselLibraryPanel } from "./media/CarouselLibraryPanel";
 import { VideoLibraryPanel } from "./media/VideoLibraryPanel";
+import { ReelShotsPanel } from "./media/ReelShotsPanel";
+import { EditRepurposePanel } from "./media/EditRepurposePanel";
+import { MotionDesignPanel } from "./motion/MotionDesignPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
+import { EngineInboxPanel } from "./approvals/EngineInboxPanel";
+import { CampaignActionApprovalsPanel } from "./approvals/CampaignActionApprovalsPanel";
 import { OrganicPanel } from "./distribution/OrganicPanel";
 import { AssetsPanel } from "./distribution/AssetsPanel";
+import { EnginePanel } from "./distribution/EnginePanel";
 import { PaidPanel } from "./distribution/PaidPanel";
 import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "./sales/SalesOverviewPanel";
@@ -53,14 +67,100 @@ import { AuditLogPanel } from "./account/AuditLogPanel";
 import { TeamCategoryPanel } from "./operations/TeamCategoryPanel";
 import { RecruitmentPanel } from "./operations/RecruitmentPanel";
 import { RecruitmentPagesPanel } from "./team/RecruitmentPagesPanel";
+import { RecruitmentDistributionPanel } from "./team/RecruitmentDistributionPanel";
 import { CampaignsPanel } from "./operations/CampaignsPanel";
 import { CalendarPanel } from "./operations/CalendarPanel";
 import { ChatPanel } from "./team/ChatPanel";
 import { AgentsPanel } from "./team/AgentsPanel";
 import { FinancialsPanel } from "./admin/FinancialsPanel";
 import { SopsPanel } from "./admin/SopsPanel";
+import { ContentJourney } from "../components/ContentJourney";
+import { PlannedModulePanel } from "./v6/PlannedModulePanel";
+import { ContentAssetTable } from "../components/content/ContentAssetTable";
+import { MarketOpportunitiesPanel } from "./opportunities/MarketOpportunitiesPanel";
+
+const strategyTabIds = new Set(["branding-strategy", "content-pillars", "money-model-strategy"]);
 
 const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
+  "intelligence-os": {
+    "business-context": () => <BusinessContextPanel />,
+    market: () => <MarketPanel />,
+    icp: () => <IcpPanel />,
+    competitors: () => <CompetitorsPanel />,
+    "branding-associations": () => <BrandingAssociationsPanel />,
+    "campaign-intelligence": () => <CampaignIntelligencePanel />,
+    "campaign-inputs": () => <CampaignInputsPanel />,
+    "proof-intelligence": () => <ProofIntelligencePanel />,
+    "branding-strategy": () => <BrandingStrategyPanel />,
+    "content-pillars": () => <ContentPillarsPanel />,
+    "money-model-strategy": () => <MoneyModelStrategyPanel />,
+  },
+  "market-opportunities": {
+    discover: () => <MarketOpportunitiesPanel view="discover" />,
+    evaluate: () => <MarketOpportunitiesPanel view="evaluate" />,
+    strategize: () => <MarketOpportunitiesPanel view="strategize" />,
+    activate: () => <MarketOpportunitiesPanel view="activate" />,
+  },
+  "campaign-factory": { overview: () => <CampaignExecutionPanel /> },
+  "proof-production-factory": {
+    "proof-bank": () => <ProofBankPanel />,
+    artifacts: () => <ProofArtifactsPanel />,
+  },
+  "content-production-factory": {
+    generation: () => <GenerationPanel />,
+    briefs: () => <BriefsPanel />,
+    create: () => <BriefsPanel stage="create" />,
+    edit: () => <EditRepurposePanel />,
+    "image-library": () => <ImageLibraryPanel />,
+    "video-library": () => <VideoLibraryPanel />,
+    "reel-shots": () => <ReelShotsPanel />,
+    "copy-library": () => <CopyLibraryPanel />,
+    "story-library": () => <StoryLibraryPanel />,
+    "carousel-library": () => <CarouselLibraryPanel />,
+  },
+  "content-distribution": {
+    "distribution-assets": () => <AssetsPanel />,
+    organic: () => <OrganicPanel />,
+    engine: () => <EnginePanel />,
+  },
+  "meta-ads-studio": {
+    campaigns: () => <CampaignExecutionPanel />,
+    paid: () => <PaidPanel />,
+    reporting: () => <PaidReportingPanel />,
+  },
+  "meta-profile": {
+    organic: () => <OrganicPanel />,
+    reporting: () => <OrganicReportingPanel />,
+  },
+  "offer-studio": {
+    offers: () => <ServiceOffersPanel />,
+    "offer-strategy": () => <OfferStrategyPanel />,
+  },
+  "website-studio": {
+    "landing-pages": () => <PageBuilderPanel pageType="landing" />,
+    "offer-pages": () => <PageBuilderPanel pageType="offer" />,
+    sites: () => <SitesPanel />,
+    "landing-reporting": () => <PagesReportingPanel pageType="landing" />,
+    "offer-reporting": () => <PagesReportingPanel pageType="offer" />,
+  },
+  "sales-os": {
+    leads: () => <ProspectsLeadsPanel />,
+    agents: () => <SalesOverviewPanel />,
+  },
+  "attribution-os": {
+    overview: () => <AttributionPanel />,
+    organic: () => <OrganicReportingPanel />,
+    paid: () => <PaidReportingPanel />,
+    "landing-pages": () => <PagesReportingPanel pageType="landing" />,
+    "offer-pages": () => <PagesReportingPanel pageType="offer" />,
+    commentary: () => <CommentaryPanel />,
+    economics: () => <ClientEconomicsPanel />,
+  },
+  "approval-inbox": {
+    "engine-inbox": () => <EngineInboxPanel />,
+    assets: () => <ApprovalsPanel />,
+    "campaign-actions": () => <CampaignActionApprovalsPanel />,
+  },
   admin: {
     financials: () => <FinancialsPanel />,
     sops: () => <SopsPanel />,
@@ -77,6 +177,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     smm: () => <TeamCategoryPanel category="smm" />,
     recruitment: () => <RecruitmentPanel />,
     "recruitment-pages": () => <RecruitmentPagesPanel />,
+    "recruitment-distribution": () => <RecruitmentDistributionPanel />,
   },
   intelligence: {
     "business-context": () => <BusinessContextPanel />,
@@ -102,10 +203,15 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "story-library": () => <StoryLibraryPanel />,
     "carousel-library": () => <CarouselLibraryPanel />,
     "video-library": () => <VideoLibraryPanel />,
+    "reel-shots": () => <ReelShotsPanel />,
     "copy-library": () => <CopyLibraryPanel />,
+  },
+  "edit-repurpose": {
+    overview: () => <EditRepurposePanel />,
   },
   distribution: {
     "distribution-assets": () => <AssetsPanel />,
+    engine: () => <EnginePanel />,
     organic: () => <OrganicPanel />,
     paid: () => <PaidPanel />,
   },
@@ -140,15 +246,27 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     attribution: () => <AttributionPanel />,
     commentary: () => <CommentaryPanel />,
   },
+  approvals: {
+    // First, because it is the queue that stops a machine rather than a
+    // person's backlog.
+    "engine-inbox": () => <EngineInboxPanel />,
+    assets: () => <ApprovalsPanel />,
+    "campaign-actions": () => <CampaignActionApprovalsPanel />,
+  },
 };
 
 const nodePanels: Record<string, () => ReactNode> = {
+  "proof-distribution": () => <PlannedModulePanel module="proof-distribution" />,
+  "google-ads-studio": () => <PlannedModulePanel module="google-ads-studio" />,
+  "google-profile": () => <PlannedModulePanel module="google-profile" />,
+  "lead-magnet-studio": () => <PlannedModulePanel module="lead-magnet-studio" />,
   dashboard: () => <DashboardPanel />,
   // distinct id from the agency dashboard; both live at a path segment
   // called "dashboard" but they are different pages
   "delivery-dashboard": () => <ClientDashboardPanel />,
+  create: () => <BriefsPanel stage="create" />,
+  "motion-design": () => <MotionDesignPanel />,
   "proof-bank": () => <ProofBankPanel />,
-  approvals: () => <ApprovalsPanel />,
   "prospects-leads": () => <ProspectsLeadsPanel />,
   onboarding: () => <OnboardingPanel />,
   contact: () => <ContactPanel />,
@@ -163,7 +281,22 @@ function getPanelBody(
   node: NavNode,
   activeTab: NavTab | undefined,
   sectionLabel: string,
+  view: string,
 ): ReactNode {
+  if (node.id === "proof-production-factory" && view === "v2") return <ProofFactoryV2Panel tab={activeTab?.id ?? "capture"} />;
+  if (node.id === "campaign-factory" && view === "v2") return <CampaignExecutionPanel />;
+  if (node.id === "content-production-factory" && view === "v2") {
+    switch (activeTab?.id) {
+      case "generation": return <GenerationPanel showJourney={false} />;
+      case "briefs": return <BriefsPanel showJourney={false} />;
+      // v2 only. Create is the assets a person has yet to sign off, not the
+      // briefs waiting for one — a brief with nothing made from it stays in
+      // Briefs, where Approve & build starts the work.
+      case "create": return <ContentAssetTable approved={false} />;
+      case "edit": return <EditRepurposePanel showJourney={false} />;
+      case "assets": return <ContentAssetTable approved />;
+    }
+  }
   const renderPanel = activeTab
     ? nodeTabPanels[node.id]?.[activeTab.id]
     : nodePanels[node.id];
@@ -173,38 +306,98 @@ function getPanelBody(
 
 export function Page({ node }: { node: NavNode }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabs = node.tabs;
-
+  const { clientId } = useParams<{ clientId: string }>();
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const requestedView = searchParams.get("view");
+  const view = node.id === "intelligence-os" ? requestedView === "strategy" ? "strategy" : "intelligence"
+    : requestedView === "v2" && node.sidebarViews?.some((item) => item.id === "v2") ? "v2" : "v1";
+  const v2Blank = view === "v2" && node.id !== "content-production-factory" && node.id !== "campaign-factory" && node.id !== "proof-production-factory";
+  const tabs = node.id === "intelligence-os"
+    ? node.tabs?.filter((tab) => strategyTabIds.has(tab.id) === (view === "strategy"))
+    : node.id === "proof-production-factory" && view === "v2" ? [{id:"capture",label:"Capture"},{id:"produce",label:"Produce"},{id:"repurpose",label:"Repurpose"},{id:"assets",label:"Assets"}]
+    : node.id === "campaign-factory" && view === "v2" ? undefined
+    : node.id === "content-production-factory" && view === "v2"
+      ? [
+        { id: "generation", label: "Ideation" }, { id: "briefs", label: "Briefs" },
+        { id: "create", label: "Create" }, { id: "edit", label: "Edit / Repurpose" },
+        { id: "assets", label: "Assets" },
+      ]
+      : node.tabs;
   const requestedTab = searchParams.get("tab");
   const activeTab =
     tabs && (tabs.find((t) => t.id === requestedTab) ?? tabs[0]);
-
+  const v6Intelligence = node.id === "intelligence-os";
+  const exportModule: ExportModule | null = v6Intelligence
+    ? view === "strategy" ? "strategy" : "intelligence"
+    : node.id === "intelligence" || node.id === "strategy" ? node.id : null;
   const sectionLabel = activeTab ? activeTab.label : node.label;
+  const pageTitle = node.id === "intelligence-os" && view === "strategy" ? "Strategy"
+    : view === "v2" ? `${node.label} v2` : node.label;
 
   function handleTabChange(id: string) {
     if (!tabs) return;
-    if (id === tabs[0].id) {
-      setSearchParams({});
-    } else {
-      setSearchParams({ tab: id });
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (id === tabs[0].id) next.delete("tab");
+      else next.set("tab", id);
+      if (id !== "assets") next.delete("asset");
+      return next;
+    });
+  }
+
+  async function handleExport(all: boolean) {
+    if (!clientId || !exportModule || !tabs || !activeTab) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      if (all) await downloadModuleZip(clientId, exportModule, tabs);
+      else await downloadTabPdf(clientId, exportModule, activeTab);
+    } catch (error) {
+      setExportError(`Download failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setExporting(false);
     }
   }
 
   return (
     <div>
-      <PageHeader title={node.label} />
+      {exportModule && clientId ? (
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[22px] font-semibold tracking-[-0.012em] text-foreground">{pageTitle}</h1>
+          </div>
+          <Button icon={Download} disabled={exporting} onClick={() => void handleExport(true)}>
+            {exporting ? "Preparing download…" : v6Intelligence ? `Download ${view}` : "Download all"}
+          </Button>
+        </div>
+      ) : <PageHeader title={pageTitle} />}
+      {node.capability === "planned" && <p className="mb-4 text-sm text-muted-foreground">
+        This module is visible in v6 and is not connected to an external service yet.
+      </p>}
+      {v2Blank ? null : <>
+      {node.id === "distribution" && <ContentJourney clientId={clientId} current="distribution" />}
       {tabs && activeTab && (
         <div className="mb-6">
           <Tabs tabs={tabs} activeId={activeTab.id} onChange={handleTabChange} />
         </div>
       )}
+      {exportModule && clientId && activeTab && (
+        <div className="mb-4 flex justify-end">
+          <Button icon={Download} disabled={exporting} onClick={() => void handleExport(false)}>
+            {exporting ? "Preparing download…" : "Download PDF"}
+          </Button>
+        </div>
+      )}
+      {exportError && <p role="alert" className="mb-4 text-sm text-destructive">{exportError}</p>}
       <div
         id={activeTab ? `tabpanel-${activeTab.id}` : undefined}
         role={activeTab ? "tabpanel" : undefined}
         aria-labelledby={activeTab ? `tab-${activeTab.id}` : undefined}
       >
-        {getPanelBody(node, activeTab, sectionLabel)}
+        {getPanelBody(node, activeTab, sectionLabel, view)}
       </div>
+      </>}
     </div>
   );
 }

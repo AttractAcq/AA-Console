@@ -26,6 +26,17 @@ describe("mediaAndFormat", () => {
     });
   });
 
+  it("keeps a reel on video and refuses one on an image", () => {
+    expect(mediaAndFormat({ media_type: "video", content_format: "reel" })).toEqual({
+      media_type: "video",
+      content_format: "reel",
+    });
+    expect(mediaAndFormat({ media_type: "image", content_format: "reel" })).toEqual({
+      media_type: "image",
+      content_format: "single",
+    });
+  });
+
   it("defaults a missing format to single", () => {
     expect(mediaAndFormat({ media_type: "image" }).content_format).toBe("single");
   });

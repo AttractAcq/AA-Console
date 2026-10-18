@@ -3,7 +3,9 @@ import { Clapperboard, Scissors, Upload } from "lucide-react";
 import { Panel } from "../../../components/Panel";
 import { DataTable } from "../../../components/DataTable";
 import { EmptyState } from "../../../components/EmptyState";
+import { Modal } from "../../../components/Modal";
 import { supabase } from "../../../lib/supabase";
+import { signPaths } from "../../../lib/media";
 
 type Job = {
   id: string;
@@ -11,14 +13,22 @@ type Job = {
   due_date: string | null;
   compensation: number | null;
   completed_at: string | null;
+  /**
+   * Where this piece of work has got to. Seven states, not two: delivered
+   * and approved are deliberately different, so a file uploaded and waiting
+   * on a reviewer is not shown as finished.
+   */
+  stage: string;
+  stage_reason: string | null;
   client_id: string | null;
   // The brief this job exists to satisfy. Carried onto the delivered asset —
   // without it a human-made asset has no route back to its brief or its idea,
   // and falls out of attribution entirely. That was the case for every asset
   // an editor or avatar had ever delivered.
   brief_id: string | null;
+  source_asset_id: string | null;
   clients: { name: string } | null;
-  client_briefs: { title: string; brief_ref: string | null; body: string | null; avatar_brief?: string | null; editor_brief?: string | null } | null;
+  client_briefs: { title: string; brief_ref: string | null; body: string | null; content_format?: string | null; avatar_brief?: string | null; editor_brief?: string | null } | null;
   brief_role?: string | null;
 };
 
@@ -32,6 +42,31 @@ type Submission = {
 };
 
 type Variant = "editors" | "avatars";
+
+/** Stages where the maker still owes something. */
+const OWED = new Set(["assigned", "accepted", "rework"]);
+
+/**
+ * What each stage says to the person it belongs to. Said in their terms:
+ * "delivered" is the agency's word for it, and what the maker needs to know
+ * is that it is no longer theirs to do.
+ */
+const STAGE_LABEL: Record<string, string> = {
+  assigned: "New",
+  accepted: "Accepted",
+  declined: "Declined",
+  delivered: "With the reviewer",
+  rework: "Needs another version",
+  approved: "Done",
+  cancelled: "Withdrawn",
+};
+
+const STAGE_TONE: Record<string, string> = {
+  rework: "bg-destructive/10 text-destructive",
+  declined: "bg-muted text-muted-foreground",
+  cancelled: "bg-muted text-muted-foreground",
+  approved: "bg-primary/10 text-brand-strong",
+};
 
 const COPY: Record<
   Variant,
@@ -72,12 +107,19 @@ export function ProductionWorkspace({
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [sourceUrls, setSourceUrls] = useState<ReadonlyMap<string, string>>(new Map());
+  const [sourceNotes, setSourceNotes] = useState<ReadonlyMap<string, string>>(new Map());
   const [rejectionReasons, setRejectionReasons] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [jobId, setJobId] = useState("");
+  const [acting, setActing] = useState<string | null>(null);
+  // Declining asks why, because decline_assignment refuses an empty reason
+  // and the reason is the only thing the agency can act on.
+  const [declining, setDeclining] = useState<string | null>(null);
+  const [declineReason, setDeclineReason] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
@@ -85,7 +127,7 @@ export function ProductionWorkspace({
       supabase
         .from("job_assignments")
         .select(
-          "id, title, due_date, compensation, completed_at, client_id, brief_id, clients(name), client_briefs(title, brief_ref, body, avatar_brief, editor_brief)",
+          "id, title, due_date, compensation, completed_at, stage, stage_reason, client_id, brief_id, source_asset_id, clients(name), client_briefs(title, brief_ref, body, content_format, avatar_brief, editor_brief)",
         )
         .eq("member_id", memberId)
         .order("due_date", { nullsFirst: false }),
@@ -96,7 +138,20 @@ export function ProductionWorkspace({
         .order("created_at", { ascending: false })
         .limit(20),
     ]);
-    setJobs((assigned.data ?? []) as unknown as Job[]);
+    const jobs = (assigned.data ?? []) as unknown as Job[];
+    setJobs(jobs);
+    const sourceIds = jobs.map((job) => job.source_asset_id).filter((id): id is string => Boolean(id));
+    if (sourceIds.length) {
+      const { data: sources } = await supabase.from("client_media_assets")
+        .select("id, storage_path, intake_notes").in("id", sourceIds);
+      const signed = await signPaths("client-media", (sources ?? []).map((source) => source.storage_path));
+      setSourceUrls(new Map((sources ?? []).flatMap((source) => {
+        const url = signed.get(source.storage_path);
+        return url ? [[source.id, url] as const] : [];
+      })));
+      setSourceNotes(new Map((sources ?? []).flatMap((source) =>
+        source.intake_notes ? [[source.id, source.intake_notes] as const] : [])));
+    } else { setSourceUrls(new Map()); setSourceNotes(new Map()); }
     const rows = (delivered.data ?? []) as Submission[];
     setSubmissions(rows);
 
@@ -138,6 +193,10 @@ export function ProductionWorkspace({
       setError("Pick a job that is attached to a client.");
       return;
     }
+    if (job.source_asset_id && !file.type.startsWith("video/")) {
+      setError("Deliver a video file for this edit assignment.");
+      return;
+    }
 
     setError(null);
     setNotice(null);
@@ -159,6 +218,11 @@ export function ProductionWorkspace({
     }
 
     const { error: rowError } = await supabase.from("client_media_assets").insert({
+      // The same id as the storage path, set explicitly rather than left to
+      // the default: deliver_assignment is handed this id so the assignment
+      // and the asset point at each other, and a generated default would
+      // leave the path naming one row and the link naming another.
+      id: assetId,
       client_id: clientId,
       member_id: memberId,
       media_type: mediaTypeOf(file),
@@ -166,6 +230,8 @@ export function ProductionWorkspace({
       // The brief, not just the client. This is the link the whole chain hangs
       // on: asset -> brief -> idea, and later performance -> idea.
       brief_id: job.brief_id,
+      source_asset_id: job.source_asset_id,
+      content_format: job.client_briefs?.content_format === "reel" ? "reel" : "single",
       // Named after the work, not after whatever the camera called the file.
       // "IMG_4032.mov" tells a reviewer nothing about what they are approving.
       title: job.client_briefs?.title ?? job.title ?? file.name,
@@ -176,30 +242,62 @@ export function ProductionWorkspace({
       return;
     }
 
-    // Close the assignment. Without this a delivered job stays in the open
-    // queue forever, so neither the maker nor the agency can tell what is
-    // still outstanding.
-    const { error: closeError } = await supabase
-      .from("job_assignments")
-      .update({ completed_at: new Date().toISOString() })
-      .eq("id", job.id);
+    // Mark it delivered — not done. This used to write completed_at
+    // directly, which closed the job the instant a file arrived while the
+    // asset was still unreviewed, and left a later rejection with nowhere
+    // to go. deliver_assignment moves it to 'delivered'; approving the
+    // asset is what finishes it, and rejecting it sends this back as
+    // rework with the reviewer's own words.
+    const { error: closeError } = await supabase.rpc("deliver_assignment", {
+      p_assignment_id: job.id,
+      p_asset_id: assetId,
+    });
 
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
     setJobId("");
-    // The file is delivered either way; a failure to close the job is worth
+    // The file is delivered either way; a failure to record it is worth
     // saying rather than swallowing, but it is not a failed delivery.
     setNotice(
       closeError
-        ? "Delivered and waiting for approval — but the job could not be marked done. Tell the agency."
-        : "Delivered. It is now waiting for approval.",
+        ? "Delivered and waiting for approval — but the job could not be marked delivered. Tell the agency."
+        : job.source_asset_id
+          ? "Edited version delivered. It is now waiting for approval; the original footage remains on file."
+          : variant === "avatars" && file.type.startsWith("video/")
+            ? "Footage delivered to Edit / Repurpose. Approval follows the finished edit."
+          : "Delivered. It is now waiting for approval.",
     );
+    void refresh();
+  }
+
+  /**
+   * Accept or decline. Through the named functions rather than an update:
+   * job_assignments.stage is written only by advance_assignment, and a
+   * direct write is refused by trigger.
+   */
+  async function act(id: string, what: "accept" | "decline", reason?: string) {
+    setActing(id);
+    setError(null);
+    setNotice(null);
+    const { error: failure } = await supabase.rpc(
+      what === "accept" ? "accept_assignment" : "decline_assignment",
+      what === "accept" ? { p_assignment_id: id } : { p_assignment_id: id, p_reason: reason },
+    );
+    setActing(null);
+    if (failure) {
+      setError(failure.message);
+      return;
+    }
+    setNotice(what === "accept" ? "Accepted." : "Declined. The agency will reassign it.");
     void refresh();
   }
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading your work…</p>;
 
-  const openJobs = jobs.filter((j) => !j.completed_at);
+  // Outstanding means the maker still owes something. Delivered work is
+  // waiting on a reviewer rather than on them, and rework is owed again —
+  // which is the state that did not exist before and so could not be shown.
+  const openJobs = jobs.filter((j) => OWED.has(j.stage));
   const selected = jobs.find((j) => j.id === jobId);
 
   return (
@@ -241,10 +339,38 @@ export function ProductionWorkspace({
                     {job.clients?.name ?? "Unassigned client"}
                     {job.due_date ? ` · due ${job.due_date}` : ""}
                   </p>
+                  {/* What the reviewer actually said. Before this there was
+                      nowhere for it to go: the assignment was already
+                      closed when the rejection arrived. */}
+                  {job.stage === "rework" && job.stage_reason && (
+                    <p className="mt-1 text-xs text-destructive">{job.stage_reason}</p>
+                  )}
                 </div>
-                {job.completed_at && (
-                  <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
-                    Done
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
+                    STAGE_TONE[job.stage] ?? "bg-secondary text-secondary-foreground"
+                  }`}
+                >
+                  {STAGE_LABEL[job.stage] ?? job.stage}
+                </span>
+                {job.stage === "assigned" && (
+                  <span className="flex shrink-0 gap-1.5">
+                    <button
+                      type="button"
+                      disabled={acting === job.id}
+                      onClick={() => void act(job.id, "accept")}
+                      className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      type="button"
+                      disabled={acting === job.id}
+                      onClick={() => setDeclining(job.id)}
+                      className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-destructive disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      Decline
+                    </button>
                   </span>
                 )}
               </div>
@@ -252,6 +378,51 @@ export function ProductionWorkspace({
           </div>
         )}
       </Panel>
+
+      <Modal
+        open={declining !== null}
+        onClose={() => setDeclining(null)}
+        title="Decline this job"
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Say why. The agency reassigns it from this, so a decline with no reason leaves them
+            guessing — and it is refused without one.
+          </p>
+          <label htmlFor="decline-reason" className="sr-only">
+            Why you are declining
+          </label>
+          <textarea
+            id="decline-reason"
+            value={declineReason}
+            onChange={(e) => setDeclineReason(e.target.value)}
+            rows={3}
+            className="w-full rounded-md border border-input bg-background p-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setDeclining(null)}
+              className="rounded-md px-3.5 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!declineReason.trim()}
+              onClick={() => {
+                const id = declining;
+                setDeclining(null);
+                if (id) void act(id, "decline", declineReason.trim());
+                setDeclineReason("");
+              }}
+              className="rounded-md bg-destructive px-3.5 py-2 text-sm font-medium text-destructive-foreground hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Decline
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Panel title={copy.deliver}>
         <div className="space-y-3">
@@ -301,12 +472,22 @@ export function ProductionWorkspace({
                   // Fall back to master body for legacy / full dispatches.
                   const role = (selected as { brief_role?: string }).brief_role;
                   if (role === "avatar" && cb.avatar_brief) return cb.avatar_brief;
-                  if (role === "editor" && cb.editor_brief) return cb.editor_brief;
+                  if ((role === "editor" || selected.source_asset_id) && cb.editor_brief) return cb.editor_brief;
                   return cb.body ?? "This brief has no detail beyond its title.";
                 })()}
               </p>
             </details>
           )}
+          {selected?.source_asset_id && (sourceUrls.get(selected.source_asset_id)
+            ? <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Source footage to edit</p>
+                {sourceNotes.get(selected.source_asset_id) && <p className="whitespace-pre-wrap text-xs text-muted-foreground">
+                  Source-specific instructions: {sourceNotes.get(selected.source_asset_id)}
+                </p>}
+                <video controls preload="metadata" className="w-full max-w-xl rounded-md"
+                  src={sourceUrls.get(selected.source_asset_id)} />
+              </div>
+            : <p role="alert" className="text-xs text-destructive">Source footage preview unavailable. Ask the agency before delivering an edit.</p>)}
           {selected && !selected.brief_id && (
             <p className="text-xs text-muted-foreground">
               This job has no brief attached — deliver against its title.
@@ -323,7 +504,7 @@ export function ProductionWorkspace({
           <button
             type="button"
             onClick={handleUpload}
-            disabled={uploading}
+            disabled={uploading || Boolean(selected?.source_asset_id && !sourceUrls.get(selected.source_asset_id))}
             className="flex items-center gap-2 rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Upload className="h-4 w-4" aria-hidden="true" />

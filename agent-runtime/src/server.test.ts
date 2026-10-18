@@ -22,6 +22,8 @@ it("binds the configured port on all IPv4 interfaces and serves public liveness"
     const res = { writeHead: vi.fn(), end: vi.fn() };
     mocks.handler({ url: "/health", method: "GET", headers: {} }, res);
     expect(res.writeHead).toHaveBeenCalledWith(200, { "Content-Type": "application/json" });
-    expect(JSON.parse(res.end.mock.calls[0]![0])).toEqual({ ok: true, enabled: false, workers: 0, pid: process.pid });
+    expect(JSON.parse(res.end.mock.calls[0]![0])).toEqual({
+      ok: true, enabled: false, workflowEnabled: false, workers: 0, pid: process.pid,
+    });
   } finally { signals.mockRestore(); }
 });

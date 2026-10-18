@@ -335,6 +335,11 @@ for (const tool of registry.filter(
   };
 }
 
+// New campaign creation has a route-bound SQL contract. Historical direct
+// callers keep the old endpoint, while the gateway always uses v6.
+ROUTES["campaign.create"]!.path = "/internal/mcp/campaign/create-v6";
+ROUTES["campaign.list"]!.path = "/internal/mcp/campaign/list-v6";
+
 const codes = new Set([
   "event_not_found",
   "event_conflict",
