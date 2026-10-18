@@ -93,8 +93,18 @@ export function TeamCategoryPanel({ category }: { category: TeamCategory }) {
     ...profileToFormValues(resolveTeamMemberProfile(editing)),
   } : undefined, [editing]);
 
+  // This used to promise "lose team access", and production does not keep that
+  // promise. Migration 127 adds `tm.active` to accessible_client_ids,
+  // can_access_client, is_member and current_member_id; until it is applied
+  // every one of them ignores `active`, so a retired member keeps every client
+  // they were assigned to. Retiring still does real work — they leave the
+  // roster and dispatch_brief_to_members filters on `active = true`, so they
+  // stop being sent briefs — which is why this warns rather than refusing.
+  //
+  // When 127 lands, the second sentence here and the note under the retired
+  // list can both go, and the original wording is correct again.
   async function setRetired(member: MemberRow, retired: boolean) {
-    if (retired && !window.confirm(`Retire ${member.name}? They will leave the active roster and lose team access. Past work and payments will remain.`)) return;
+    if (retired && !window.confirm(`Retire ${member.name}? They leave the active roster and stop being sent briefs. Their sign-in and access to clients they are assigned to are not revoked yet, so clear their client assignments too if that matters. Past work and payments will remain.`)) return;
     setActionError(null);
     setNotice(null);
     const { error } = await supabase.from("team_members")
@@ -157,7 +167,16 @@ export function TeamCategoryPanel({ category }: { category: TeamCategory }) {
           <button type="button" onClick={() => setShowRetired((value) => !value)} className="text-sm font-medium text-brand-strong hover:underline">
             {showRetired ? "Hide" : "Show"} retired ({retiredMembers.length})
           </button>
-          {showRetired && <div className="mt-3 grid gap-4 md:grid-cols-3">{retiredMembers.map((member) => card(member, true))}</div>}
+          {showRetired && (
+            <>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Retiring takes someone off the roster and stops new briefs reaching them. It does not
+                yet revoke their sign-in or their access to clients they were assigned to — clear
+                their client assignments as well if that matters.
+              </p>
+              <div className="mt-3 grid gap-4 md:grid-cols-3">{retiredMembers.map((member) => card(member, true))}</div>
+            </>
+          )}
         </div>
       )}
 

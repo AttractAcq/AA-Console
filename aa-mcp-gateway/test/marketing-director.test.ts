@@ -56,7 +56,7 @@ test("all Marketing tools deny other-client before adapter or approval creation"
     const raw = { client_id: f.denied_client_id, campaign_id: f.campaign_id,
       idea_id: f.generation_idea_id, asset_id: f.pending_asset_id, brief_id: f.revision_brief_id,
       page_id: f.page_id, finding_ids: f.finding_ids, revision_number: f.revision_number,
-      name: "fixture", brief: "fixture",
+      name: "fixture", brief: "fixture", acquisition_mode: "paid", paid_platform: "meta",
       task_id: id(11), title: "fixture", summary: "fixture", assignee: f.assignee,
       formats: ["text_post"], repo: "harbour-site", idempotency_key: "isolation-fixture" };
     const shape = (registry.find(t => t.name === name)!.input as any).shape;

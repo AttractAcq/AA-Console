@@ -62,7 +62,11 @@ export function ProofBankPanel() {
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
   const activeLabel = mediaFilters.find((f) => f.id === activeFilter)?.label ?? "";
-  const cleared = proof.filter((p) => p.usage_rights === "approved").length;
+  const today = new Date().toISOString().slice(0, 10);
+  const cleared = proof.filter((p) => p.usage_rights === "approved"
+    && (!p.expires_on || p.expires_on >= today)).length;
+  const missingPermissionBasis = proof.filter((p) => p.usage_rights === "approved"
+    && !p.permission_basis?.trim()).length;
   const unstructured = proof.filter((p) => !p.claim).length;
 
   if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
@@ -107,6 +111,10 @@ export function ProofBankPanel() {
               {unstructured === 1 ? "it cannot" : "they cannot"} be matched to a buyer.
             </>
           )}
+          {missingPermissionBasis > 0 && <>
+            {" "}{missingPermissionBasis} cleared record{missingPermissionBasis === 1 ? " has" : "s have"} no recorded permission basis;
+            add it before approving a new v6 proof artifact.
+          </>}
         </div>
       )}
 

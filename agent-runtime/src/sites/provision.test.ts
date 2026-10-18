@@ -26,6 +26,7 @@ function store() {
     } as PageRecord,
     pageStatus: "unpublished",
     pageError: null as string | null,
+    publishBlocked: false,
     published: null as { commit: string; url: string } | null,
     deployments: [] as PageDeploymentRecord[],
   };
@@ -64,6 +65,9 @@ function store() {
     },
     async loadPage() {
       return state.page;
+    },
+    async assertPagePublishAllowed() {
+      if (state.publishBlocked) throw new Error("V6 campaign page publishing requires exact-version human approval and its executor.");
     },
     async deploymentsForPage() {
       return state.deployments;
@@ -237,6 +241,16 @@ describe("provisioning a site", () => {
 });
 
 describe("publishing a page", () => {
+  it("stops a v6 campaign page before GitHub or publication state changes", async () => {
+    const s = store();
+    provisioned(s);
+    s.state.publishBlocked = true;
+    const { fetchImpl, calls } = github(baseRoutes());
+    await expect(publishPage(s.impl, APP, SITE, "page-1", { fetchImpl, sleep: noSleep }))
+      .rejects.toThrow(/exact-version human approval/);
+    expect(calls).toEqual([]);
+    expect(s.state.pageStatus).toBe("unpublished");
+  });
   function provisioned(s: ReturnType<typeof store>) {
     s.state.repos = [{
       id: "repo-1", clientId: "client-1", owner: "AttractAcq-Sites",

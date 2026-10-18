@@ -106,8 +106,18 @@ export function FrameStrip({
             {frame.caption && (
               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{frame.caption}</p>
             )}
-            {/* Ungated here, like Regenerate beside it: regenerate_frame is
-                admin-only and refuses anyone else by name. */}
+            {frame.beat && (
+              <p className="mt-1 line-clamp-2 text-xs text-foreground">{frame.beat}</p>
+            )}
+            {(frame.shot_source_kind || frame.clip_path || frame.motion_preset) && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {frame.clip_path ? "Clip on file" : frame.provider_job_id ? "Submitted" : "No clip"}
+                {frame.motion_preset ? ` · ${frame.motion_preset}` : ""}
+              </p>
+            )}
+            {/* A reel shot is not an image frame. regenerate_frame refuses
+                video, so the rebuild control stays on carousels and stories. */}
+            {frame.shot_source_kind || frame.beat || frame.clip_path || frame.motion_preset ? null : (
             <button
               type="button"
               onClick={() => {
@@ -122,6 +132,7 @@ export function FrameStrip({
               <RotateCcw className="h-3 w-3" aria-hidden="true" />
               Rebuild
             </button>
+            )}
           </li>
         ))}
       </ul>

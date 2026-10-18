@@ -18,7 +18,7 @@ import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js";
-import type { BusinessContext } from "../shared.js";
+import type { BusinessContext, UpstreamRecord } from "../shared.js";
 import {
   campaignIdeas,
   asAmount,
@@ -26,6 +26,7 @@ import {
   asDate,
   normaliseChannels,
   planProblem,
+  planRouteProblem,
   planSummary,
   resolveNeeds,
   MAX_CONTENT,
@@ -88,13 +89,13 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
             title: { type: "string", description: "At most 300 characters." },
             body: { type: "string", description: "The concrete angle, buyer question, intended response and call to action for this piece. Respect campaign constraints." },
             media_type: { type: "string", enum: ["image", "text", "video"] },
-            channel: { type: "string", description: "Which of the campaign's channels this piece is for." },
+            channel: { type: "string", description: "Which of the campaign's channels this piece is for. For a social destination, use the exact platform name: instagram, facebook, tiktok, linkedin or youtube. This determines the saved destination." },
             strategic_reason: { type: "string", description: "Why this distinct piece helps achieve the campaign objective." },
             content_format: {
               type: "string",
-              enum: ["single", "carousel", "story"],
+              enum: ["single", "carousel", "story", "reel"],
               description:
-                "The shape this piece runs in. single is one image, one video or one piece of copy. carousel is images only, a swipeable set where frame one earns the swipe. story is a still or a clip, tapped through. Choose single unless the argument genuinely needs more than one frame — a carousel that restates one point five times is worse than the single image it should have been.",
+                "The shape this piece runs in. single is one image, one video or one piece of copy. carousel is images only; story is a still or clip; reel is a short video made of shots. Choose a multi-frame shape only when the argument genuinely needs it.",
             },
             ...(ids.length
               ? {
@@ -131,6 +132,46 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
 /** The shape with no pillars, which is every campaign planned before them. */
 export const SUBMIT_TOOL = submitToolFor();
 
+type ApprovedCampaignOffer = {
+  id: string; service_name: string; version: number; audience: string;
+  promise: string; inclusions: string[]; exclusions: string[];
+  price_amount: number | null; currency: string | null;
+  claims: unknown[]; content_hash: string;
+};
+
+export function savedPlanNeedsFinalization(campaign: {
+  built_at: string | null; job_id: string | null;
+  content_ideas_generated_at: string | null; ideate_on_plan: boolean | null;
+}, jobId: string): boolean {
+  return Boolean(campaign.built_at && campaign.job_id === jobId &&
+    (campaign.content_ideas_generated_at || campaign.ideate_on_plan === false));
+}
+
+async function finalizeV6CampaignPackage(
+  sb: SupabaseClient, campaignId: string, jobId: string,
+  intelligenceSnapshotId: string, offerVersionId: string | null,
+): Promise<void> {
+  const { data: manifest, error } = await sb.rpc("create_campaign_manifest_v6", {
+    p_campaign_id: campaignId,
+    p_idempotency_key: `campaign-plan:${jobId}`,
+    p_needs_lead_magnet: false,
+  });
+  if (error) throw new Error(`Failed to version v6 campaign package: ${error.message}`);
+  if (!manifest?.id) throw new Error("The v6 campaign package has no manifest ID.");
+  const { error: linkError } = await sb.rpc("attach_campaign_manifest_intelligence_v6", {
+    p_manifest_id: manifest.id,
+    p_snapshot_id: intelligenceSnapshotId,
+  });
+  if (linkError) throw new Error(`Failed to link v6 campaign intelligence: ${linkError.message}`);
+  if (offerVersionId) {
+    const { error: offerError } = await sb.rpc("attach_campaign_offer_v6", {
+      p_manifest_id: manifest.id,
+      p_offer_version_id: offerVersionId,
+    });
+    if (offerError) throw new Error(`Failed to link approved campaign offer: ${offerError.message}`);
+  }
+}
+
 export async function runCampaignPlanJob(
   sb: SupabaseClient,
   runtime: RuntimeConfig,
@@ -159,7 +200,28 @@ export async function runCampaignPlanJob(
   if (!campaign) {
     return { ok: false, retryable: false, failureMessage: "That campaign no longer exists." };
   }
-  // A committed batch survives worker crashes and repeated generation requests.
+  const isV6 = campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "paid";
+  // A committed batch survives worker crashes. The same job must still finish
+  // package creation and links after a crash between the SQL save and return.
+  if (savedPlanNeedsFinalization(campaign, job.id)) {
+    if (isV6) {
+      const { data: snapshot, error } = await sb.rpc("capture_campaign_intelligence_snapshot_v6", {
+        p_campaign_id: campaign.id, p_job_id: job.id,
+      });
+      if (error || !snapshot?.id) throw new Error(`Failed to recover campaign intelligence: ${error?.message ?? "missing snapshot"}`);
+      if (campaign.offer_version_id) {
+        const { data: offer, error: offerError } = await sb.rpc("capture_campaign_offer_v6", {
+          p_campaign_id: campaign.id,
+        });
+        if (offerError || offer?.id !== campaign.offer_version_id) {
+          throw new Error(`Failed to recover approved campaign offer: ${offerError?.message ?? "version mismatch"}`);
+        }
+      }
+      await finalizeV6CampaignPackage(
+        sb, campaign.id, job.id, snapshot.id, campaign.offer_version_id ?? null);
+    }
+    return { ok: true, retryable: false };
+  }
   if (campaign.content_ideas_generated_at) return { ok: true, retryable: false };
 
   if (!campaign.brief || campaign.brief.trim().length === 0) {
@@ -177,19 +239,58 @@ export async function runCampaignPlanJob(
     .maybeSingle();
   const clientName = (clientRow?.name as string | undefined) ?? "this business";
 
-  const [{ data: context }, records] = await Promise.all([
-    sb
-      .from("client_business_context")
-      .select(
-        "business_overview, ideal_customer, main_offer, competitors, brand_voice, proof_testimonials, current_marketing, sales_process, current_revenue, target_revenue",
-      )
-      .eq("client_id", job.client_id)
-      .maybeSingle(),
-    loadUpstreamRecords(sb, job.client_id, ["offer_strategy", "icp", "brand_strategy", "money_model"]),
-  ]);
+  let approvedOffer: ApprovedCampaignOffer | null = null;
+  if (isV6 && campaign.offer_version_id) {
+    const { data, error } = await sb.rpc("capture_campaign_offer_v6", {
+      p_campaign_id: campaign.id,
+    });
+    if (error) throw new Error(`Failed to capture approved campaign offer: ${error.message}`);
+    if (!data || data.id !== campaign.offer_version_id) {
+      throw new Error("Campaign offer version could not be verified.");
+    }
+    approvedOffer = data as ApprovedCampaignOffer;
+  }
+  let context: BusinessContext | null;
+  let records: UpstreamRecord[];
+  let pillars: Array<{ id: string; name: string; premise: string; belongs: string; does_not_belong: string }>;
+  let planningBrief = campaign.brief;
+  let intelligenceSnapshotId: string | null = null;
+  if (isV6) {
+    const { data, error } = await sb.rpc("capture_campaign_intelligence_snapshot_v6", {
+      p_campaign_id: campaign.id,
+      p_job_id: job.id,
+    });
+    if (error) throw new Error(`Failed to capture campaign intelligence: ${error.message}`);
+    const snapshot = data as {
+      id: string; brief: string; business_context: BusinessContext;
+      source_records: UpstreamRecord[];
+      content_pillars: Array<{ id: string; name: string; premise: string; belongs: string; does_not_belong: string }>;
+    };
+    intelligenceSnapshotId = snapshot.id;
+    planningBrief = snapshot.brief;
+    context = snapshot.business_context;
+    records = snapshot.source_records;
+    pillars = snapshot.content_pillars;
+  } else {
+    const [{ data }, upstream] = await Promise.all([
+      sb.from("client_business_context")
+        .select("business_overview, ideal_customer, main_offer, competitors, brand_voice, proof_testimonials, current_marketing, sales_process, current_revenue, target_revenue")
+        .eq("client_id", job.client_id).maybeSingle(),
+      loadUpstreamRecords(sb, job.client_id, ["offer_strategy", "icp", "brand_strategy", "money_model"]),
+    ]);
+    context = data as BusinessContext | null;
+    records = upstream;
+    const { data: pillarRows } = await sb.from("campaign_content_pillars")
+      .select("pillar_id, client_content_pillars(id, name, premise, belongs, does_not_belong)")
+      .eq("campaign_id", campaign.id);
+    pillars = (pillarRows ?? [])
+      .map((r) => (r as { client_content_pillars?: unknown }).client_content_pillars)
+      .filter((p): p is { id: string; name: string; premise: string; belongs: string; does_not_belong: string } =>
+        Boolean(p) && typeof p === "object");
+  }
 
   const offer = records.filter((r) => r.domain === "offer_strategy");
-  if (offer.length === 0) {
+  if (offer.length === 0 && !approvedOffer) {
     return {
       ok: false,
       retryable: false,
@@ -208,18 +309,15 @@ export async function runCampaignPlanJob(
   // The pillars this campaign runs within, if any. They become an enum on
   // the submit tool, so a piece cannot be filed under a pillar the campaign
   // is not running.
-  const { data: pillarRows } = await sb
-    .from("campaign_content_pillars")
-    .select("pillar_id, client_content_pillars(id, name, premise, belongs, does_not_belong)")
-    .eq("campaign_id", campaign.id);
-  const pillars = (pillarRows ?? [])
-    .map((r) => (r as { client_content_pillars?: unknown }).client_content_pillars)
-    .filter((p): p is { id: string; name: string; premise: string; belongs: string; does_not_belong: string } =>
-      Boolean(p) && typeof p === "object",
-    );
-
   const includeIdeas = campaign.built_at != null || campaign.ideate_on_plan !== false;
   const submitTool = submitToolFor(pillars, includeIdeas);
+  const routeInstruction = campaign.acquisition_mode === "organic"
+    ? "This is an ORGANIC campaign. Plan organic distribution only. No advertising, paid search, boosts or ad spend."
+    : campaign.acquisition_mode === "paid" && campaign.paid_platform === "meta"
+      ? "This is a PAID META campaign. Route creative to Meta/Facebook/Instagram ads only. Do not add Google or organic publication as campaign distribution."
+      : campaign.acquisition_mode === "paid" && campaign.paid_platform === "google"
+        ? "This is a PAID GOOGLE campaign. Route creative to Google search ads only. Do not add Meta or organic publication as campaign distribution."
+        : "This is a legacy campaign. Preserve its historical routing without inferring a v6 mode.";
 
   const system = `You plan marketing campaigns for Attract Acquisition, a marketing agency.
 
@@ -232,8 +330,9 @@ WHAT MAKES A PLAN GOOD
 - A single KPI. A campaign scored on five numbers cannot be stopped, because there is always one going up.
 
 ABSOLUTE RULES
+- ${routeInstruction}
 - Never invent a budget, a price, a date or a target you have no basis for. Omitting a number is honest; inventing one becomes a commitment somebody else has to meet.
-- Take the audience from the ICP and the offer from the offer strategy. Do not invent either.
+- Take the audience from the ICP. ${approvedOffer ? "Use only the exact approved campaign offer version below. The broader offer strategy is context and cannot override its promise, price, claims or exclusions." : "Take the offer from the offer strategy. Do not invent it."}
 - ${includeIdeas
     ? "Supply exactly content_count distinct ideas tailored to this campaign, its audience, offer, dates, channels and constraints. An idea is an angle and purpose, not a finished production brief."
     : "Plan the campaign and decide how many content pieces it needs, but do not ideate any content. Do not write titles, angles or concepts. The operator can generate campaign ideas later."}
@@ -243,7 +342,10 @@ ABSOLUTE RULES
   const prompt = `Plan a campaign for ${clientName}.
 
 WHAT THIS CAMPAIGN IS FOR — the operator's brief
-${campaign.brief}
+${planningBrief}
+
+CAMPAIGN ROUTE — fixed by the operator; do not change it
+${routeInstruction}
 
 ${pillars.length ? `THE CONTENT PILLARS THIS CAMPAIGN RUNS WITHIN — every idea sits in one of these
 ${pillars.map((p) => `**${p.name}** (${p.id})
@@ -262,11 +364,18 @@ ${renderContext(context as BusinessContext | null)}
 OFFER STRATEGY — what is being sold and what may not be promised
 ${renderUpstream(offer)}
 
+${approvedOffer ? `APPROVED CAMPAIGN OFFER VERSION — authoritative for this campaign
+${JSON.stringify(approvedOffer)}
+Do not use a different service, promise, price or claim. A quantified claim may be used only as written and with its cited proof. Respect every exclusion.` : ""}
+
 ICP — who this is aimed at
 ${renderUpstream(icp)}
 
 BRAND STRATEGY AND MONEY MODEL
 ${renderUpstream(records.filter((r) => r.domain === "brand_strategy" || r.domain === "money_model"))}
+
+${isV6 ? `MARKET, COMPETITORS, ASSOCIATIONS AND CAMPAIGN INTELLIGENCE
+${renderUpstream(records.filter((r) => ["market", "competitor", "association", "campaign_intel"].includes(r.domain)))}` : ""}
 
 Call ${submitTool.name} once when you are done.`;
 
@@ -333,6 +442,10 @@ Call ${submitTool.name} once when you are done.`;
       needs_sales_agent: result.submitted.needs_sales_agent,
     }),
   };
+  if (approvedOffer && !campaign.built_at) {
+    // The model may paraphrase its summary; persist the exact signed promise.
+    submittedPlan.offer_summary = approvedOffer.promise;
+  }
 
   const plan: CampaignPlan = campaign.built_at ? {
     objective: campaign.objective, audience: campaign.audience, offer_summary: campaign.offer_summary,
@@ -344,6 +457,10 @@ Call ${submitTool.name} once when you are done.`;
   const problem = planProblem(plan);
   if (problem) {
     return { ok: false, retryable: true, failureMessage: problem, usage };
+  }
+  const routeProblem = planRouteProblem(campaign.acquisition_mode, campaign.paid_platform, plan.channels);
+  if (routeProblem) {
+    return { ok: false, retryable: true, failureMessage: routeProblem, usage };
   }
 
   if (includeIdeas) {
@@ -370,6 +487,14 @@ Call ${submitTool.name} once when you are done.`;
       p_plan: plan,
     });
     if (error) throw new Error(`Failed to write campaign plan: ${error.message}`);
+  }
+
+  if (isV6) {
+    if (!intelligenceSnapshotId) {
+      throw new Error("The v6 campaign package has no intelligence snapshot link.");
+    }
+    await finalizeV6CampaignPackage(
+      sb, campaign.id, job.id, intelligenceSnapshotId, approvedOffer?.id ?? null);
   }
 
   await appendEvent(sb, job.id, `Planned "${campaign.name}".\n\n${planSummary(plan)}`, "info", {

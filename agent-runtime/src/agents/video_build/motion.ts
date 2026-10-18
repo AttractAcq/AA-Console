@@ -1,29 +1,49 @@
 /**
- * Whether motion may run.
+ * Whether motion may run, and which shots are ready to submit.
  *
- * Higgsfield is submit-then-poll: POST a still and a motion id, then poll
- * the request. That client is not in this scaffold. This function decides
- * the pause and does not open a connection. Callers must not fetch
- * platform.higgsfield.ai from here — a missing key and a present key both
- * stop before any request, so a deploy cannot spend by accident.
+ * Missing Higgsfield env pauses before any request. When the key, the
+ * secret, and both model ids are set, the adapter may submit. Pending and
+ * Zoom In are the Cockpit Zoom In catalog id. Any other name that is not
+ * already a catalog UUID is not submitted — inventing an id would point
+ * DoP at nothing. A shot whose opening still has no https URL is not sent.
  */
+
+import type { ShotPlanEntry } from "../brief/shots.js";
+import { resolveMotionPreset } from "./motions.js";
 
 export const HIGGSFIELD_KEY_ENV = "HIGGSFIELD_API_KEY";
 export const HIGGSFIELD_SECRET_ENV = "HIGGSFIELD_API_SECRET";
+export const HIGGSFIELD_MODEL_DRAFT_ENV = "HIGGSFIELD_MODEL_DRAFT";
+export const HIGGSFIELD_MODEL_FINAL_ENV = "HIGGSFIELD_MODEL_FINAL";
+
+const MOTION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface MotionEnv {
   apiKey?: string | null;
   apiSecret?: string | null;
+  modelDraft?: string | null;
+  modelFinal?: string | null;
 }
 
-export interface MotionDecision {
-  /** Always false in Phase 1. The adapter does not exist yet. */
-  proceed: false;
-  stage: "paused";
-  retryable: false;
-  reason: "missing_higgsfield_credentials" | "adapter_not_enabled";
-  message: string;
-}
+export type MotionDecision =
+  | {
+      proceed: false;
+      stage: "paused";
+      retryable: false;
+      reason: "missing_higgsfield_credentials";
+      message: string;
+      modelDraft: null;
+      modelFinal: null;
+    }
+  | {
+      proceed: true;
+      stage: "ready";
+      retryable: false;
+      reason: "ready";
+      message: string;
+      modelDraft: string;
+      modelFinal: string;
+    };
 
 function present(value: string | null | undefined): string {
   return value?.trim() ?? "";
@@ -33,6 +53,8 @@ export function readHiggsfieldEnv(env: NodeJS.ProcessEnv = process.env): MotionE
   return {
     apiKey: env[HIGGSFIELD_KEY_ENV],
     apiSecret: env[HIGGSFIELD_SECRET_ENV],
+    modelDraft: env[HIGGSFIELD_MODEL_DRAFT_ENV],
+    modelFinal: env[HIGGSFIELD_MODEL_FINAL_ENV],
   };
 }
 
@@ -40,10 +62,15 @@ export function decideMotion(env: MotionEnv): MotionDecision {
   const missing = [
     present(env.apiKey) ? null : HIGGSFIELD_KEY_ENV,
     present(env.apiSecret) ? null : HIGGSFIELD_SECRET_ENV,
+    present(env.modelDraft) ? null : HIGGSFIELD_MODEL_DRAFT_ENV,
+    present(env.modelFinal) ? null : HIGGSFIELD_MODEL_FINAL_ENV,
   ].filter((name): name is string => name !== null);
 
   if (missing.length > 0) {
-    const listed = missing.join(" and ");
+    const listed =
+      missing.length === 1
+        ? missing[0]
+        : `${missing.slice(0, -1).join(", ")} and ${missing[missing.length - 1]}`;
     const verb = missing.length === 1 ? "is" : "are";
     return {
       proceed: false,
@@ -51,15 +78,236 @@ export function decideMotion(env: MotionEnv): MotionDecision {
       retryable: false,
       reason: "missing_higgsfield_credentials",
       message: `Motion paused: ${listed} ${verb} not set. No Higgsfield request was sent.`,
+      modelDraft: null,
+      modelFinal: null,
     };
   }
 
   return {
-    proceed: false,
-    stage: "paused",
+    proceed: true,
+    stage: "ready",
     retryable: false,
-    reason: "adapter_not_enabled",
-    message:
-      "Motion paused: Higgsfield credentials are present, but this scaffold does not submit image-to-video. No Higgsfield request was sent.",
+    reason: "ready",
+    message: "Higgsfield credentials are set. Image-to-video can be submitted.",
+    modelDraft: present(env.modelDraft),
+    modelFinal: present(env.modelFinal),
+  };
+}
+
+export function isMotionCatalogId(value: string | null | undefined): boolean {
+  return MOTION_UUID.test(value?.trim() ?? "");
+}
+
+export interface MotionFrameRef {
+  id: string;
+  position: number;
+  providerJobId: string | null;
+}
+
+export interface MotionSubmitCall {
+  kind: "submit";
+  position: number;
+  frameId: string;
+  prompt: string;
+  imageUrl: string;
+  motionId: string | null;
+  strength: number;
+  modelId: string;
+  durationSec: number;
+}
+
+export interface MotionPollCall {
+  kind: "poll";
+  position: number;
+  frameId: string;
+  requestId: string;
+}
+
+export type MotionCall = MotionSubmitCall | MotionPollCall;
+
+export type MotionPlan =
+  | { ok: true; calls: MotionCall[] }
+  | {
+      ok: false;
+      reason: "stills_not_ready" | "motion_preset_pending";
+      message: string;
+    };
+
+/** Kling image-to-video has no DoP motions parameter in its model contract. */
+export function usesDopMotion(modelId: string): boolean {
+  return !modelId.trim().startsWith("kling-video/");
+}
+
+export function directedShotPrompt(
+  beat: string,
+  position: number,
+  total: number,
+  visualDirection?: string | null,
+  openingState?: string | null,
+): string {
+  // Kling 2.5 rejects prompts over 2,500 characters after accepting the paid
+  // request. Reserve space for the action and start state instead of sending
+  // the entire editorial visual direction on every shot.
+  const bounded = (value: string | null | undefined, limit: number) => {
+    const clean = value?.trim() ?? "";
+    if (clean.length <= limit) return clean;
+    return clean.slice(0, limit).replace(/\s+\S*$/, "").trimEnd();
+  };
+  const sharedDirection = bounded(visualDirection, 450);
+  const prompt = [
+    `Shot ${position} of ${total}. Visible action to perform: ${bounded(beat, 380)}`,
+    openingState?.trim() ? `Frame-zero physical state: ${bounded(openingState, 400)}. Begin here, then perform the action visibly.` : "",
+    sharedDirection ? `Shared continuity: ${sharedDirection}` : "",
+    "Animate the supplied first frame as one continuous, realistic vertical shot. Execute the beat's visible action; do not hold the opening pose or replace the action with a camera move, changing light, dissolve or caption.",
+    "Preserve object count, shape, materials, geometry and lighting. No extra people or props, ghosted duplicates, text, logos, warping or digital zoom. The editor adds captions later.",
+  ].filter(Boolean).join(" ");
+  if (prompt.length > 2_000) throw new Error("The directed shot prompt exceeded the safe Kling budget.");
+  return prompt;
+}
+
+function httpsUrl(value: string | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed.startsWith("https://")) return null;
+  return trimmed;
+}
+
+/**
+ * Submit every shot, or none.
+ *
+ * A shot that already has a provider request id is polled and not submitted
+ * again. If any shot is not ready and nothing has been submitted yet, the
+ * whole reel waits — a partial submit would spend on an unfinished plan.
+ * Polls already on file still run, so a retry does not submit twice.
+ */
+export function prepareMotionCalls(input: {
+  shots: readonly ShotPlanEntry[];
+  frames: readonly MotionFrameRef[];
+  stillUrlByPosition: ReadonlyMap<number, string>;
+  modelId: string;
+  strength?: number;
+  visualDirection?: string | null;
+}): MotionPlan {
+  const strength = input.strength ?? 1;
+  const calls: MotionCall[] = [];
+  const stillProblems: number[] = [];
+  const motionProblems: Array<{ position: number; preset: string }> = [];
+
+  input.shots.forEach((shot, index) => {
+    const position = index + 1;
+    const frame = input.frames.find((row) => row.position === position);
+    const existing = frame?.providerJobId?.trim() ?? "";
+    if (existing) {
+      calls.push({ kind: "poll", position, frameId: frame!.id, requestId: existing });
+      return;
+    }
+    const imageUrl = httpsUrl(input.stillUrlByPosition.get(position));
+    const resolved = resolveMotionPreset(shot.motion_preset);
+    // A UUID already stored on the shot is a catalog id the plan carried.
+    // It is not replaced. Only pending and Zoom In are filled in from the
+    // Cockpit mapping. Any other name stays unresolved.
+    const motionId = resolved.ok
+      ? resolved.id
+      : isMotionCatalogId(shot.motion_preset)
+        ? shot.motion_preset.trim()
+        : "";
+    if (!frame || !imageUrl) {
+      stillProblems.push(position);
+      return;
+    }
+    if (!motionId && usesDopMotion(input.modelId)) {
+      motionProblems.push({ position, preset: shot.motion_preset.trim() || "(blank)" });
+      return;
+    }
+    calls.push({
+      kind: "submit",
+      position,
+      frameId: frame.id,
+      prompt: directedShotPrompt(shot.beat, position, input.shots.length, input.visualDirection, shot.opening_state),
+      imageUrl,
+      motionId: usesDopMotion(input.modelId) ? motionId : null,
+      strength,
+      modelId: input.modelId,
+      durationSec: Math.max(3, Math.min(15, Math.ceil(shot.duration_sec))),
+    });
+  });
+
+  const polls = calls.filter((call): call is MotionPollCall => call.kind === "poll");
+  if (stillProblems.length > 0 || motionProblems.length > 0) {
+    // A request id already stored is polled. New submits wait until every
+    // remaining shot is ready, so a blocked still does not spend on its neighbours.
+    if (polls.length > 0) {
+      return { ok: true, calls: polls };
+    }
+    const reason = stillProblems.length > 0 ? "stills_not_ready" : "motion_preset_pending";
+    const parts: string[] = [];
+    if (stillProblems.length > 0) {
+      parts.push(`opening stills are not ready for shot ${stillProblems.join(", ")}`);
+    }
+    if (motionProblems.length > 0) {
+      const listed = motionProblems.map((item) => `"${item.preset}" (shot ${item.position})`).join(", ");
+      parts.push(`motion preset ${listed} is not a known catalog id`);
+    }
+    return {
+      ok: false,
+      reason,
+      message: `Motion paused: ${parts.join("; ")}. No Higgsfield request was sent.`,
+    };
+  }
+
+  if (calls.length === 0) {
+    return {
+      ok: false,
+      reason: "stills_not_ready",
+      message: "Motion paused: this reel has no shots to submit. No Higgsfield request was sent.",
+    };
+  }
+  return { ok: true, calls };
+}
+
+/** What the job should do after submit/poll statuses come back. */
+/**
+ * How long to wait before looking at Higgsfield again.
+ *
+ * DoP took a little over a minute for six shots on the first real run. Two
+ * minutes is long enough that a poll usually finds work finished, and short
+ * enough that a finished clip is not left sitting.
+ */
+export const MOTION_POLL_AFTER_SECONDS = 120;
+
+export type MotionFollowUp =
+  | { outcome: "completed"; message: string }
+  /** Waiting on the provider. Not a failure, and not a retry. */
+  | { outcome: "pending"; message: string; pollAfterSeconds: number }
+  | { outcome: "failed"; retryable: boolean; message: string };
+
+export function motionFollowUp(statuses: readonly string[]): MotionFollowUp {
+  const normalized = statuses.map((status) => status.trim().toLowerCase());
+  if (normalized.length === 0) {
+    return {
+      outcome: "failed",
+      retryable: false,
+      message: "Motion paused: nothing was submitted. No Higgsfield request was sent.",
+    };
+  }
+  if (normalized.some((status) => status === "failed" || status === "nsfw" || status === "canceled")) {
+    return {
+      outcome: "failed",
+      retryable: false,
+      message: "Higgsfield reported a shot as failed. The request id is stored. It was not submitted again.",
+    };
+  }
+  if (normalized.every((status) => status === "completed")) {
+    return {
+      outcome: "completed",
+      message: "Higgsfield completed the submitted shots.",
+    };
+  }
+  // Waiting, not failing. The caller schedules the next look rather than
+  // spending a retry on it: retries run out at whatever speed the queue
+  // loops at, which has nothing to do with how long a render takes.
+  return {
+    outcome: "pending",
+    pollAfterSeconds: MOTION_POLL_AFTER_SECONDS,
+    message: "Higgsfield is still rendering. The request ids are stored, and a follow-up is scheduled to collect them.",
   };
 }

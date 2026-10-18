@@ -82,17 +82,48 @@ describe("ApproveAndBuildModal — routing", () => {
     expect(screen.getByRole("button", { name: /^Generate$/ })).toBeDisabled();
   });
 
-  // The rule the whole modal exists to enforce: AI makes text and images.
-  // Video is made by people.
-  it("never offers the AI route for video", () => {
+  it("keeps unsupported video on the human route", () => {
     show({ media_type: "video" });
     expect(screen.getByRole("button", { name: /AI/ })).toBeDisabled();
-    expect(screen.getByText(/video is made by people/i)).toBeInTheDocument();
+    expect(screen.getByText(/AI creation currently supports F6\/F7 reels/i)).toBeInTheDocument();
   });
 
   it("preselects the human route for video rather than leaving it unset", () => {
     show({ media_type: "video" });
     expect(screen.getByRole("heading", { name: /Send to/i })).toBeInTheDocument();
+  });
+
+  it("offers AI for an F6 reel and queues the same build call without a frame plan", async () => {
+    const user = userEvent.setup();
+    show({ media_type: "video", content_format: "reel", format_code: "F6" });
+    expect(screen.getByRole("button", { name: /AI/ })).toBeEnabled();
+    expect(screen.getByText(/animates them with Higgsfield/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Send to/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /AI/ }));
+    expect(screen.getByText(/opening still for each planned shot/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^Quality$/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/The set/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Generate$/ }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledOnce());
+    expect(rpc).toHaveBeenCalledWith("build_brief_with_ai", {
+      p_brief_id: "brief-1",
+      p_quality: "medium",
+      p_size: "1024x1536",
+      p_reference_path: undefined,
+    });
+  });
+
+  it("offers AI for a reel whose format code is not set yet", () => {
+    show({ media_type: "video", content_format: "reel", format_code: null });
+    expect(screen.getByRole("button", { name: /AI/ })).toBeEnabled();
+  });
+
+  it("keeps a later-phase reel on the human route", () => {
+    show({ media_type: "video", content_format: "reel", format_code: "F5" });
+    expect(screen.getByRole("button", { name: /AI/ })).toBeDisabled();
+    expect(screen.getByText(/AI creation currently supports F6\/F7 reels/i)).toBeInTheDocument();
   });
 
   it("cannot be talked into an AI build for video by clicking the disabled card", async () => {

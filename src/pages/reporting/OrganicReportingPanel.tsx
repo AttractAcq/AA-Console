@@ -5,12 +5,13 @@ import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
 import { RangePicker } from "./RangePicker";
 import { RANGES, count, useMetrics } from "./useMetrics";
+import { TrendLine } from "./TrendLine";
 
 export function OrganicReportingPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [range, setRange] = useState("30");
   const days = RANGES.find((r) => r.id === range)?.days ?? 30;
-  const { summary, loading, error } = useMetrics(clientId, days);
+  const { summary, trend, loading, error } = useMetrics(clientId, days);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading metrics…</p>;
   if (error) {
@@ -39,9 +40,28 @@ export function OrganicReportingPanel() {
 
       {account && account.days_covered > 0 && (
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
+          {/* Null, not zero. The Instagram account endpoint has no daily
+              impressions series, so "0 — summed across the period" beside a
+              real reach figure would say the account was seen by people and
+              shown to nobody. */}
           <Panel title="Impressions">
-            <p className="text-2xl font-semibold text-card-foreground">{count(account.impressions)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Summed across the period</p>
+            {account.impressions === null || account.impression_days === 0 ? (
+              <>
+                <p className="text-2xl font-semibold text-muted-foreground">—</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Not available per day from the Instagram account endpoint. Per-post views are in
+                  the table below.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-2xl font-semibold text-card-foreground">
+                  {count(account.impressions)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Summed across the period</p>
+                {trend && <TrendLine comparison={trend.organic} label="Impressions" />}
+              </>
+            )}
           </Panel>
           <Panel title="Best day for reach">
             <p className="text-2xl font-semibold text-card-foreground">
@@ -52,9 +72,13 @@ export function OrganicReportingPanel() {
             <p className="mt-1 text-xs text-muted-foreground">
               Reach counts people, so it is never summed across days
             </p>
+            {/* Best day against best day. Both sides are the same kind of
+                figure, which is the only way reach compares at all. */}
+            {trend && <TrendLine comparison={trend.organic} label="Best day for reach" />}
           </Panel>
           <Panel title="Interactions">
             <p className="text-2xl font-semibold text-card-foreground">{count(account.engagements)}</p>
+            {trend && <TrendLine comparison={trend.organic} label="Interactions" />}
           </Panel>
         </div>
       )}

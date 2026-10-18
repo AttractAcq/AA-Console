@@ -16,6 +16,8 @@ const STATUSES = new Set(['draft', 'approved', 'rejected', 'briefed']);
 const CHANNELS = new Set(['organic', 'paid']);
 const PUBLICATION_STATUSES = new Set(['published', 'failed']);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** Local time of day, 24 hour, seconds optional. Never a zone: the client's zone is on the client. */
+const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 
 type Kind = 'read' | 'write' | 'queue';
 export type Route = {
@@ -190,15 +192,20 @@ const ROUTES: Record<string, Route> = {
       const asset_id = uuid(body, 'asset_id');
       const scheduled_for = str(body, 'scheduled_for');
       const channel = body.channel === undefined ? undefined : str(body, 'channel');
+      // Optional local time of day. Omitted, the row takes the default hour,
+      // which is what every call did before migration 144.
+      const scheduled_time = body.scheduled_time === undefined ? undefined : str(body, 'scheduled_time');
       if (!client_id || !asset_id || !scheduled_for || !DATE.test(scheduled_for)
           || (channel !== undefined && !CHANNELS.has(channel))
-          || !subset(body, ['client_id', 'asset_id', 'scheduled_for', 'channel'])) {
+          || (scheduled_time !== undefined && (!scheduled_time || !TIME_OF_DAY.test(scheduled_time)))
+          || !subset(body, ['client_id', 'asset_id', 'scheduled_for', 'channel', 'scheduled_time'])) {
         return undefined;
       }
       return {
         p_bot_id: null, p_client_id: client_id, p_asset_id: asset_id,
         p_scheduled_for: scheduled_for,
         ...(channel === undefined ? {} : { p_channel: channel }),
+        ...(scheduled_time === undefined ? {} : { p_scheduled_time: scheduled_time }),
       };
     },
   },

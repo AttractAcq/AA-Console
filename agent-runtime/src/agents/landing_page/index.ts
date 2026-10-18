@@ -20,6 +20,7 @@ import { loadUpstreamRecords, renderContext, renderUpstream } from "../shared.js
 import type { BusinessContext } from "../shared.js";
 import { loadPagePackage, renderPackage } from "./aggregate.js";
 import { pageProblem, recruitmentPageProblem } from "./safety.js";
+import { loadArtifactCampaignOffer } from "../campaign-offer.js";
 
 const PAGE_KIND: Record<string, string> = {
   landing: "a primary landing page — the main page traffic is sent to, carrying the core offer",
@@ -87,6 +88,7 @@ export async function runLandingPageJob(
       failureMessage: "The page has no brief. Say what the page is for and try again.",
     };
   }
+  const campaignOffer = await loadArtifactCampaignOffer(sb, job.id, "page");
 
   const { data: clientRow } = await sb
     .from("clients")
@@ -107,7 +109,7 @@ export async function runLandingPageJob(
   ]);
 
   const offer = records.filter((r) => r.domain === "offer_strategy");
-  if (offer.length === 0) {
+  if (offer.length === 0 && !campaignOffer) {
     return {
       ok: false,
       retryable: false,
@@ -201,7 +203,7 @@ WHAT MAKES THIS PAGE WORK
 
 ABSOLUTE RULES
 - Only reference proof you were actually given. If there is none, write a page that works without a proof claim and say so at the end of your body under a "Gaps" heading — do not invent a statistic, a testimonial, a customer, a guarantee or a credential. This is the page a regulator or a disappointed customer reads back to you.
-- Respect anything the offer strategy lists as a limit or a thing that cannot be promised. Those are hard constraints, not preferences.
+- ${campaignOffer ? "Use the exact approved campaign offer version in the prompt as the authority. Never change its promise, price, claims or exclusions; the broader offer strategy is context." : "Respect anything the offer strategy lists as a limit or a thing that cannot be promised. Those are hard constraints, not preferences."}
 - Match the brand voice you are given. If it says never to say something, never say it.
 - Write in the buyer's language, taken from the ICP, not in marketing register.
 
@@ -223,6 +225,10 @@ ${renderContext(context as BusinessContext | null)}
 
 OFFER STRATEGY — what is being sold and what may not be promised
 ${renderUpstream(offer)}
+
+${campaignOffer ? `APPROVED CAMPAIGN OFFER VERSION — authoritative for this page
+${JSON.stringify(campaignOffer)}
+Use its exact service, promise, price and limits. Never add a quantified claim beyond its approved text and cited proof.` : ""}
 
 ICP AND BRAND STRATEGY — who is reading, and the voice to hold
 ${renderUpstream(records.filter((r) => r.domain !== "offer_strategy"))}

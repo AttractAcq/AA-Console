@@ -67,6 +67,9 @@ function input(name: string, client_id = client): Record<string, unknown> {
   if (name === "workflow.get_task") return { client_id, task_id: job };
   if (name === "campaign.list" || name === "workflow.list_tasks")
     return { client_id, limit: 1 };
+  if (name === "campaign.create")
+    return { client_id, name: "Campaign", brief: "Service acquisition",
+      acquisition_mode: "paid", paid_platform: "meta", idempotency_key: "campaign-create-key" };
   return { client_id, campaign_id: idea };
 }
 test("contract 4/8: CoS reference matches existing grants and discovers only allowed real tools", async (t) => {
@@ -149,10 +152,10 @@ test("contract 5/6: all real adapters reach scoped HTTP; durable keys replay and
       "completed",
       tool.name,
     );
-    assert.equal(
-      received.at(-1)?.url,
-      `/internal/mcp/${tool.name.replace(".", "/").replaceAll("_", "-")}`,
-    );
+    const route = tool.name === "campaign.list" ? "/internal/mcp/campaign/list-v6"
+      : tool.name === "campaign.create" ? "/internal/mcp/campaign/create-v6"
+        : `/internal/mcp/${tool.name.replace(".", "/").replaceAll("_", "-")}`;
+    assert.equal(received.at(-1)?.url, route);
     assert.ok(!Object.hasOwn(received.at(-1)!.body, "idempotency_key"));
     if (tool.action === "write")
       assert.equal(

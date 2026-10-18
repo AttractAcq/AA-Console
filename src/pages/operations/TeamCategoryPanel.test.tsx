@@ -68,3 +68,36 @@ describe("team profile management", () => {
     expect(update).not.toHaveBeenCalled();
   });
 });
+
+// The dialog used to say "they will leave the active roster and lose team
+// access". Production does not revoke access: migration 127 adds `tm.active` to
+// the four client-access functions and is not applied, so a retired member
+// keeps every client they were assigned to. Retiring still does real work, so
+// the control stays and the wording tells the truth instead.
+describe("what retiring actually promises", () => {
+  it("does not claim access is lost", async () => {
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Retire" }));
+
+    const asked = vi.mocked(window.confirm).mock.calls[0]![0] as string;
+    expect(asked).not.toMatch(/lose team access/i);
+    expect(asked).toMatch(/not revoked yet/i);
+    expect(asked).toMatch(/clear their client assignments/i);
+    // The part that is true stays: they do come off the roster and briefs stop.
+    expect(asked).toMatch(/stop being sent briefs/i);
+  });
+
+  it("repeats it on the retired list, for anyone who clicked through", async () => {
+    from.mockReturnValue({
+      ...query([{ ...member, id: "member-2", name: "Editor 2", active: false }]),
+      update: () => {
+        const chain = { eq: () => chain, then: (done: (result: { error: null }) => void) => Promise.resolve({ error: null }).then(done) };
+        return chain;
+      },
+    });
+    show();
+
+    await userEvent.click(await screen.findByRole("button", { name: /Show retired \(1\)/ }));
+    expect(screen.getByText(/does not\s+yet revoke their sign-in/i)).toBeInTheDocument();
+  });
+});

@@ -10,6 +10,8 @@ export interface RuntimeConfig {
   anthropicApiKeyByAgent: Record<string, string>;
   model: string;
   enabled: boolean;
+  /** Starts the v5 outcome reconciler after its schema is installed. */
+  workflowEnabled: boolean;
   concurrency: number;
   leaseSeconds: number;
   emptyQueueBackoffMs: number;
@@ -45,8 +47,16 @@ export interface RuntimeConfig {
   allowedOrigins: string[];
 
   /** Image rendering. Absent means the AI build route reports itself unavailable. */
+  /**
+   * Whether this runtime may post to clients' own accounts. Off unless set,
+   * and the second of two switches: client_engine_settings.publishing_enabled
+   * is the first. Both, or nothing goes out.
+   */
+  publishEnabled: boolean;
   openaiApiKey: string | null;
   imageModel: string;
+  /** Reel keyframes can use a precision-first model without changing static creative. */
+  reelImageModel: string;
   /** Which provider writes the creative concept. */
   conceptProvider: "openai" | "anthropic";
   conceptModel: string;
@@ -147,6 +157,7 @@ export function loadConfig(): RuntimeConfig {
     anthropicApiKeyByAgent,
     model: optionalEnv("AGENT_RUNTIME_MODEL") ?? "claude-opus-5",
     enabled: (optionalEnv("AGENT_RUNTIME_ENABLED") ?? "true").toLowerCase() === "true",
+    workflowEnabled: (optionalEnv("V5_WORKFLOW_ENABLED") ?? "false").toLowerCase() === "true",
     concurrency: intEnv("AGENT_RUNTIME_CONCURRENCY", 2),
     leaseSeconds,
     emptyQueueBackoffMs: intEnv("AGENT_RUNTIME_EMPTY_QUEUE_BACKOFF_MS", 5000),
@@ -191,10 +202,16 @@ export function loadConfig(): RuntimeConfig {
     // that reports itself unavailable, not a process that refuses to boot —
     // the rest of the runtime has no business failing because nobody has
     // connected an image renderer yet.
+    // Deliberately off by default, and deliberately not `?? "true"` like
+    // AGENT_RUNTIME_ENABLED. A runtime that is up is meant to run agents; a
+    // runtime that is up is not meant to post on a client's behalf until
+    // somebody has said it should.
+    publishEnabled: (optionalEnv("PUBLISH_ENABLED") ?? "false").toLowerCase() === "true",
     openaiApiKey: optionalEnv("OPENAI_API_KEY") ?? null,
     // Not pinned in code: the correct id is a provider fact that changes
     // faster than this repo does, so a wrong one is a config edit.
     imageModel: optionalEnv("OPENAI_IMAGE_MODEL") ?? "gpt-image-2",
+    reelImageModel: optionalEnv("OPENAI_REEL_IMAGE_MODEL") ?? "gpt-image-2.5-sunburst",
     // Explicit rather than inferred from the model name: reading the
     // provider out of a string is the kind of cleverness that breaks
     // silently the first time a model is named differently.

@@ -1,0 +1,337 @@
+/**
+ * EDL to ffmpeg arguments.
+ *
+ * Pure: this builds an argv and the caption files it reads, and runs nothing.
+ * media.ts runs it with execFile, so no shell ever parses a value.
+ *
+ * Caption text never enters the filtergraph. Each caption goes to its own
+ * file and drawtext reads it with textfile= and expansion=none. Inline text
+ * would need three layers of escaping (drawtext, filtergraph, option), and a
+ * model-written apostrophe or colon would break the render or the filter.
+ *
+ * Output is 1080x1920, 30 fps, H.264, faststart: what Reels and TikTok take.
+ * Clips are scaled to fill and centre-cropped, not letterboxed. Generated
+ * shots are already 9:16, so the crop is a no-op for them.
+ *
+ * Every link that feeds a join carries OUTPUT_TB. xfade refuses two inputs
+ * whose timebases differ, and concat rewrites its output to AV_TIME_BASE_Q
+ * (1/1000000) whatever it was given. So a cut followed by a crossfade handed
+ * xfade one link at 1/1000000 and one at 1/30, and the render died with
+ * "Failed to configure output pad" and "-22 (Invalid argument)". A settb
+ * after every concat, and on every segment, makes the timebases agree by
+ * construction instead of by the order the model happened to choose.
+ */
+
+import {
+  CROSSFADE_SEC,
+  segmentsDuration,
+  segmentWindows,
+  totalDuration,
+  type CaptionPosition,
+  type Edl,
+} from "./edl.js";
+
+export const OUTPUT_WIDTH = 1080;
+export const OUTPUT_HEIGHT = 1920;
+export const OUTPUT_FPS = 30;
+/** The one timebase every join input carries. See the note above. */
+export const OUTPUT_TB = `1/${OUTPUT_FPS}`;
+
+/** Paths go into the filtergraph unquoted, so they are held to plain characters. */
+const SAFE_PATH = /^[A-Za-z0-9_./-]+$/;
+const HEX = /^#?([0-9a-f]{6})$/i;
+
+export class RenderPlanError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RenderPlanError";
+  }
+}
+
+export interface RenderOptions {
+  /** Shot position to a local clip file. */
+  clipPaths: ReadonlyMap<number, string>;
+  outputPath: string;
+  /** A TTF on disk. Alpine has no fontconfig default, so it is always explicit. */
+  fontFile: string;
+  /** Directory media.ts writes caption files to. */
+  workDir: string;
+  musicPath?: string | null;
+  /** Brand colours. Anything that is not a six-digit hex falls back. */
+  backgroundColour?: string | null;
+  textColour?: string | null;
+}
+
+export interface RenderPlan {
+  args: string[];
+  /** Write these before running ffmpeg. */
+  textFiles: Array<{ path: string; content: string }>;
+  durationSec: number;
+}
+
+function safePath(value: string, label: string): string {
+  if (!SAFE_PATH.test(value) || value.includes("..")) {
+    throw new RenderPlanError(`The ${label} path has characters ffmpeg filters cannot take.`);
+  }
+  return value;
+}
+
+function colour(value: string | null | undefined, fallback: string): string {
+  const match = value?.trim().match(HEX);
+  return `0x${(match?.[1] ?? fallback).toLowerCase()}`;
+}
+
+function luminance(hex: string): number {
+  const channels = [2, 4, 6].map((offset) => {
+    const value = Number.parseInt(hex.slice(offset, offset + 2), 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722;
+}
+
+function contrast(a: string, b: string): number {
+  const first = luminance(a);
+  const second = luminance(b);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+/** Preserve a brand end-card colour when it is legible; otherwise use the clearest neutral. */
+export function readableEndCardColour(background: string, requested: string): string {
+  if (contrast(background, requested) >= 4.5) return requested;
+  const white = "0xffffff";
+  const black = "0x000000";
+  return contrast(background, white) >= contrast(background, black) ? white : black;
+}
+
+/** Seconds as ffmpeg reads them. Fixed precision so the argv is stable in tests. */
+function sec(value: number): string {
+  return (Math.round(value * 1000) / 1000).toString();
+}
+
+/**
+ * drawtext does not wrap. A bold face runs about 0.6 em per character, so at
+ * 64px a 1080 frame with margins holds about 24; 22 leaves room for wide
+ * glyphs. A word longer than the line is left whole rather than split.
+ */
+export const CAPTION_LINE_CHARS = 22;
+export const END_CARD_LINE_CHARS = 16;
+
+/** Keep exact short-form copy together while scaling longer lines within safe margins. */
+export function captionLayout(text: string): { lines: string[]; size: number } {
+  for (const [lineChars, size] of [[22, 64], [28, 54], [32, 48]] as const) {
+    const lines = wrapLines(text, lineChars);
+    if (lines.length <= 2) return { lines, size };
+  }
+  return { lines: wrapLines(text, 32), size: 48 };
+}
+
+export function endCardLayout(text: string): { lines: string[]; size: number } {
+  for (const [lineChars, size] of [[END_CARD_LINE_CHARS, 80], [22, 64], [28, 54], [32, 48]] as const) {
+    const lines = wrapLines(text, lineChars);
+    if (lines.length <= 2) return { lines, size };
+  }
+  return { lines: wrapLines(text, 32), size: 48 };
+}
+
+export function wrapLines(text: string, lineChars: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.trim().split(/\s+/)) {
+    if (line && line.length + 1 + word.length > lineChars) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line ? `${line} ${word}` : word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+export function wrapText(text: string, lineChars: number): string {
+  return wrapLines(text, lineChars).join("\n");
+}
+
+/** Pixels between baselines, on top of the font size. */
+export const LINE_SPACING = 12;
+
+/** How tall a block of n lines is at this size, in pixels. */
+export function blockHeight(lineCount: number, size: number): number {
+  if (lineCount <= 0) return 0;
+  return lineCount * (size + LINE_SPACING) - LINE_SPACING;
+}
+
+/**
+ * Where the first line of a block starts.
+ *
+ * `text_h` is deliberately not used. Each line is drawn by its own drawtext
+ * so that each centres on its own width, which means text_h is one line's
+ * height rather than the block's — so the block is measured here instead.
+ */
+function captionY(position: CaptionPosition, lineCount: number, size: number): string {
+  // Bottom sits above the Reels caption and button area, not at the edge.
+  if (position === "top") return "h*0.12";
+  if (position === "middle") return `(h-${blockHeight(lineCount, size)})/2`;
+  return "h*0.70";
+}
+
+export function buildRenderPlan(edl: Edl, options: RenderOptions): RenderPlan {
+  const fontFile = safePath(options.fontFile, "font");
+  const workDir = safePath(options.workDir.replace(/\/+$/, ""), "work directory");
+  const background = colour(options.backgroundColour, "000000");
+  const endCardColour = readableEndCardColour(background, colour(options.textColour, "ffffff"));
+  const brandCaptionPlate = Boolean(options.backgroundColour && options.textColour);
+  const captionInk = brandCaptionPlate ? endCardColour : "0xffffff";
+  const captionPlate = brandCaptionPlate ? `${background}@0.90` : "black@0.58";
+
+  const args: string[] = ["-hide_banner", "-loglevel", "error", "-y"];
+  const filters: string[] = [];
+
+  // One input per segment, trimmed at the input. Re-encoding makes the
+  // input seek frame-accurate, and it keeps each stream starting at zero.
+  edl.segments.forEach((segment, i) => {
+    const path = options.clipPaths.get(segment.shot);
+    if (!path) throw new RenderPlanError(`Shot ${segment.shot} has no clip file.`);
+    args.push("-ss", sec(segment.in_sec), "-t", sec(segment.out_sec - segment.in_sec), "-i", path);
+    filters.push(
+      `[${i}:v]scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,` +
+        `crop=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT},setsar=1,fps=${OUTPUT_FPS},format=yuv420p,` +
+        `setpts=PTS-STARTPTS,settb=${OUTPUT_TB}[s${i}]`,
+    );
+  });
+
+  // An xfade starts where its own segment starts on the timeline, which is
+  // what segmentWindows works out. validateEdl reads the same windows.
+  const windows = segmentWindows(edl.segments);
+  let current = "s0";
+  for (let i = 1; i < edl.segments.length; i += 1) {
+    const next = `j${i}`;
+    if (edl.segments[i]!.transition === "crossfade") {
+      filters.push(
+        `[${current}][s${i}]xfade=transition=fade:duration=${sec(CROSSFADE_SEC)}:offset=${sec(windows[i]!.start)}[${next}]`,
+      );
+    } else {
+      filters.push(`[${current}][s${i}]concat=n=2:v=1:a=0,settb=${OUTPUT_TB}[${next}]`);
+    }
+    current = next;
+  }
+
+  let inputCount = edl.segments.length;
+  const cutSec = segmentsDuration(edl.segments);
+  if (edl.end_card_text) {
+    args.push(
+      "-f",
+      "lavfi",
+      "-t",
+      sec(edl.end_card_sec),
+      "-i",
+      `color=c=${background}:s=${OUTPUT_WIDTH}x${OUTPUT_HEIGHT}:r=${OUTPUT_FPS}`,
+    );
+    filters.push(`[${inputCount}:v]format=yuv420p,setsar=1[card]`);
+    filters.push(`[${current}][card]concat=n=2:v=1:a=0,settb=${OUTPUT_TB}[withcard]`);
+    current = "withcard";
+    inputCount += 1;
+  }
+
+  const textFiles: RenderPlan["textFiles"] = [];
+
+  /**
+   * One drawtext per line, not one per block.
+   *
+   * `x=(w-text_w)/2` centres what the filter is drawing, and text_w is the
+   * width of the widest line in it. Given a whole block that leaves every
+   * line left-aligned inside a centred box, so a two-line caption with a
+   * short second line sits visibly off. Drawing each line separately makes
+   * text_w that line's own width, and each one centres.
+   *
+   * The cost is one text file per line rather than per caption. Still
+   * textfile= rather than text=, because inline text would need three
+   * layers of escaping and the caption comes from a model.
+   */
+  const drawBlock = (
+    name: string,
+    lines: readonly string[],
+    firstY: string,
+    size: number,
+    start: number,
+    end: number,
+    fontColour: string,
+    captionBox: boolean,
+  ): string[] =>
+    lines.map((line, index) => {
+      const file = `${workDir}/${name}-${index + 1}.txt`;
+      textFiles.push({ path: file, content: line });
+      const y = index === 0 ? firstY : `${firstY}+${index * (size + LINE_SPACING)}`;
+      return (
+        `drawtext=fontfile=${fontFile}:textfile=${file}:expansion=none:fontsize=${size}:` +
+        `fontcolor=${fontColour}:borderw=${!captionBox || brandCaptionPlate ? 0 : 5}:bordercolor=black@0.85:` +
+        (captionBox ? `box=1:boxcolor=${captionPlate}:boxborderw=16:` : "") +
+        `x=(w-text_w)/2:y=${y}:` +
+        `enable='between(t,${sec(start)},${sec(end)})'`
+      );
+    });
+
+  const overlays: string[] = [];
+  edl.captions.forEach((caption, i) => {
+    const { lines, size } = captionLayout(caption.text);
+    overlays.push(
+      ...drawBlock(
+        `caption-${i + 1}`,
+        lines,
+        captionY(caption.position, lines.length, size),
+        size,
+        caption.start_sec,
+        caption.end_sec,
+        captionInk,
+        true,
+      ),
+    );
+  });
+  if (edl.end_card_text) {
+    const { lines, size } = endCardLayout(edl.end_card_text);
+    overlays.push(
+      ...drawBlock(
+        "end-card",
+        lines,
+        `(h-${blockHeight(lines.length, size)})/2`,
+        size,
+        cutSec,
+        cutSec + edl.end_card_sec,
+        endCardColour,
+        false,
+      ),
+    );
+  }
+  filters.push(`[${current}]${overlays.length ? overlays.join(",") : "null"}[vout]`);
+
+  const durationSec = totalDuration(edl);
+  const audioMaps: string[] = ["-an"];
+  if (options.musicPath) {
+    args.push("-i", options.musicPath);
+    const fadeStart = Math.max(0, durationSec - 1);
+    filters.push(
+      `[${inputCount}:a]atrim=0:${sec(durationSec)},asetpts=PTS-STARTPTS,afade=t=out:st=${sec(fadeStart)}:d=1[aout]`,
+    );
+    audioMaps.splice(0, 1, "-map", "[aout]", "-c:a", "aac", "-b:a", "128k");
+  }
+
+  args.push("-filter_complex", filters.join(";"), "-map", "[vout]", ...audioMaps);
+  args.push(
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-crf",
+    "20",
+    "-pix_fmt",
+    "yuv420p",
+    "-r",
+    String(OUTPUT_FPS),
+    "-movflags",
+    "+faststart",
+    "-t",
+    sec(durationSec),
+    options.outputPath,
+  );
+  return { args, textFiles, durationSec };
+}

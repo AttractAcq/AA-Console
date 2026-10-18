@@ -88,6 +88,7 @@ describe("scheduling from the asset", () => {
         p_asset_id: "a1",
         p_date: "2026-10-09",
         p_channel: "paid",
+        p_time: "09:00",
         p_platform: "tiktok",
       }),
     );
@@ -106,6 +107,28 @@ describe("scheduling from the asset", () => {
         p_asset_id: "a1",
         p_date: "2026-10-09",
         p_channel: "organic",
+        // The form prefills the hour the database would apply anyway, so the
+        // default is visible rather than silent, and the call carries it.
+        p_time: "09:00",
+      }),
+    );
+  });
+
+  it("sends the time a person picked, in the client's own clock", async () => {
+    render(<AssetsPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: /Schedule/i }));
+    const dialog = within(screen.getByRole("dialog"));
+    await userEvent.type(dialog.getByLabelText("Date"), "2026-10-09");
+    await userEvent.clear(dialog.getByLabelText("Time"));
+    await userEvent.type(dialog.getByLabelText("Time"), "18:45");
+    await userEvent.click(dialog.getByRole("button", { name: "Schedule" }));
+
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("schedule_asset", {
+        p_asset_id: "a1",
+        p_date: "2026-10-09",
+        p_channel: "organic",
+        p_time: "18:45",
       }),
     );
   });

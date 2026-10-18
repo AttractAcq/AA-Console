@@ -5,7 +5,18 @@ export type Option = { value: string; label: string };
 export type FieldDef = {
   name: string;
   label: string;
-  kind: "text" | "textarea" | "number" | "date" | "datetime-local" | "select" | "toggle" | "file" | "password" | "heading";
+  kind:
+    | "text"
+    | "textarea"
+    | "number"
+    | "date"
+    | "time"
+    | "datetime-local"
+    | "select"
+    | "toggle"
+    | "file"
+    | "password"
+    | "heading";
   required?: boolean;
   placeholder?: string;
   hint?: string;
@@ -113,6 +124,8 @@ export function FieldControl({
               ? "number"
               : field.kind === "date"
                 ? "date"
+                : field.kind === "time"
+                  ? "time"
                 : field.kind === "datetime-local"
                   ? "datetime-local"
                 : field.kind === "password"

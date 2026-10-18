@@ -32,3 +32,9 @@ aa-mcp-gateway/*.sqlite*
 
 # tsc -b incremental build state, not source
 *.tsbuildinfo
+
+# Rendered output. The reel cuts and generated PDFs are what the agents
+# produce, not source: a 6MB mp4 in history is 6MB in every clone forever,
+# and the asset of record lives in Supabase storage.
+output/
+*.mp4

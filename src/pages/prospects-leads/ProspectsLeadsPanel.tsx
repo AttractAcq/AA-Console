@@ -8,6 +8,7 @@ import type { FieldDef } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
 import { LeadEditModal } from "../../components/leads/LeadEditModal";
 import { ArchivedLeadsModal, type ArchivedLead } from "../../components/leads/ArchivedLeadsModal";
+import { isMissingTable, MIGRATION_PENDING_NOTE } from "../../lib/schemaGaps";
 import { detailFields, leadFieldsPayload, type OwnerOption } from "../../components/leads/leadDetails";
 import { PIPELINE_STAGES, STAGE_OPTIONS, stageLabel, type LeadStage } from "../../components/leads/stages";
 import type { Lead } from "../../components/leads/types";
@@ -46,6 +47,7 @@ export function ProspectsLeadsPanel() {
   const moving = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [archiveUnavailable, setArchiveUnavailable] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -65,7 +67,13 @@ export function ProspectsLeadsPanel() {
         .eq("client_id", clientId).order("archived_at", { ascending: false }),
       supabase.from("team_members").select("id, name").eq("active", true).order("name"),
     ]);
-    const failed = rows.error ?? stalledRows.error ?? archivedRows.error ?? ownerRows.error;
+    // archived_leads arrives with migration 129, and the pipeline works
+    // without it. Folding its error into the panel-wide one meant an
+    // unapplied migration hid every lead that had already loaded.
+    const archiveMissing = isMissingTable(archivedRows.error);
+    setArchiveUnavailable(archiveMissing);
+    const failed = rows.error ?? stalledRows.error
+      ?? (archiveMissing ? null : archivedRows.error) ?? ownerRows.error;
     if (failed) setError(failed.message);
     setLeads((rows.data ?? []) as Lead[]);
     setStalled((stalledRows.data ?? []) as Stalled[]);
@@ -137,6 +145,11 @@ export function ProspectsLeadsPanel() {
     <div className="space-y-4">
       {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {archiveUnavailable && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Archiving is unavailable. {MIGRATION_PENDING_NOTE} The pipeline below is live and unaffected.
+        </p>
+      )}
       <p className="text-xs text-muted-foreground">Drag a card to a stage, or open Edit to move it.</p>
       {/* What is sitting still, before what exists. A pipeline board shows
           you the shape; this shows you the work. */}
@@ -184,7 +197,12 @@ export function ProspectsLeadsPanel() {
       </div>
 
       <div className="mb-2 flex justify-end gap-2">
-        <Button icon={Archive} className="bg-secondary text-secondary-foreground" onClick={() => setArchiveOpen(true)}>Archive ({archived.length})</Button>
+        <Button
+          icon={Archive}
+          className="bg-secondary text-secondary-foreground"
+          disabled={archiveUnavailable}
+          onClick={() => setArchiveOpen(true)}
+        >{archiveUnavailable ? "Archive unavailable" : `Archive (${archived.length})`}</Button>
         <Button icon={Plus} onClick={() => setAddOpen(true)}>
           Add Lead
         </Button>

@@ -12,14 +12,18 @@
 // Stage two renders it. For text briefs there is nothing to render — the
 // concept IS the deliverable — so stage one writes the copy and stops.
 //
-// Video never reaches here. It is human work, and the database rejects an
-// AI video generation outright rather than relying on the UI to hide it.
+// A video story, and any reel that is not Phase 1, never reaches a render.
+// Those are human work, and creative_generations rejects media_type video.
+// A Phase 1 reel (F6/F7) is the exception: its opening stills are queued as
+// an image generation, one still per shot, and rendered here. The reel
+// itself stays a video. Motion is video_build's job and is not called here.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { anthropicKeyForAgent, type RuntimeConfig } from "../../config.js";
 import type { AgentRow } from "../../orchestration/registry.js";
 import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
+import { handOffToSlot } from "../../engine/slot.js";
 import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { OpenAiError, runStructuredCompletion } from "../../tools/openai.js";
@@ -55,6 +59,8 @@ import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
 import { placeLogo } from "./logo.js";
 import { brandConceptBlock, brandRenderBlock, loadBrandProfile, type BrandProfile } from "./brand.js";
+import { openingStillsRoute, withOpeningShotFields } from "./openingStills.js";
+import { REEL_SAFE_AREA_NOTE, toReelFrame } from "./vertical.js";
 
 const BUCKET = "client-media";
 
@@ -68,8 +74,10 @@ interface BriefRow {
   /** 'client' or 'recruitment'. A hiring ad is a different deliverable. */
   purpose: string | null;
   recruitment_role: string | null;
-  /** 'single', 'carousel' or 'story'. The last two are made of frames. */
-  content_format: "single" | "carousel" | "story";
+  /** 'single', 'carousel', 'story' or 'reel'. Carousel, story and reel are frames. */
+  content_format: "single" | "carousel" | "story" | "reel";
+  /** F6/F7 on a Phase 1 reel. Null on a still. */
+  format_code: string | null;
   /** How many frames the brief asks for, or null to leave it to the agent. */
   frame_count: number | null;
   /** An ordered line per frame saying what it is for, or null. */
@@ -140,6 +148,7 @@ export const IMAGE_CONCEPT_TOOL = {
  * checked in framePlanProblem instead, the same way campaignIdeas does.
  */
 export function framesConceptTool(format: string, ask: FrameAsk = NO_FRAME_ASK) {
+  const isReel = format === "reel";
   const required = requiredFrameCount(ask);
   const howMany =
     required === null
@@ -174,8 +183,14 @@ export function framesConceptTool(format: string, ask: FrameAsk = NO_FRAME_ASK) 
           },
         },
         rationale: { type: "string", description: "Why this set and this order. For the operator, not the renderer." },
+        ...(isReel ? {
+          cast_anchor: {
+            type: "string",
+            description: "One precise, fictional lead-person appearance reused verbatim in every shot: complexion, age, hair, facial features, build and wardrobe. Name stable props and location cues too. Do not write only 'same person'.",
+          },
+        } : {}),
       },
-      required: ["frames", "rationale"],
+      required: isReel ? ["frames", "rationale", "cast_anchor"] : ["frames", "rationale"],
       additionalProperties: false,
     },
   };
@@ -336,6 +351,45 @@ function composePrompt(
   ].join("\n");
 }
 
+/** Film input gets visual direction, never the static ad's type layout. */
+export function reelKeyframePrompt(
+  frame: Record<string, unknown>,
+  total: number,
+  clientName: string,
+  brand: BrandProfile | null,
+  castAnchor = "",
+  hasVisualReference = false,
+  shot?: { beat: string; opening_state?: string },
+): string {
+  const value = (key: string) => String(frame[key] ?? "").trim();
+  return [
+    `Create the opening keyframe for shot ${value("position")} of ${total} in a vertical cinematic reel for ${clientName}.`,
+    ...(shot ? [
+      `Action that will happen AFTER this still: ${shot.beat}`,
+      shot.opening_state
+        ? `Exact frame-zero state to draw: ${shot.opening_state}`
+        : "Draw the physical state before that action begins; do not show its completed result.",
+      "This is the FIRST frame, not a summary of the whole shot. Preserve the stated object count and position. If something enters, show it at the frame edge with the destination clear. If something exits, show it present and ready to leave. Do not add a hand, rig, lamp or other mechanism to explain motion. The video model will animate the action later.",
+    ] : []),
+    ...(castAnchor.trim() ? [`Continuity anchor for every shot: ${castAnchor.trim()}`] : []),
+    ...(hasVisualReference ? [
+      "The attached first-shot image is the visual identity reference. Preserve the same subjects, object shapes, materials, colours, room layout and lighting. If a person is already present, keep their face, age, hair, build and clothing consistent; do not add a person to an object-only sequence. Change the composition to serve this shot without copying the first shot's completed action.",
+    ] : []),
+    `Narrative job: ${value("purpose")}`,
+    `Visible subject: ${value("subject")}`,
+    `Real environment: ${value("background")}`,
+    `Treatment: ${value("visual_treatment").replace(/_/g, " ")}`,
+    `Composition: ${value("composition")}`,
+    `Art direction: ${value("art_direction")}`,
+    brandRenderBlock(brand),
+    "This is footage input, not a finished static advertisement. Show a tangible scene with depth and plausible physical motion. Keep room for captions to be added in the edit.",
+    "No text, typography, graphic layout, diagrams, cards, badges, interface elements, logos or wordmarks anywhere in the image.",
+    `Avoid: ${value("avoid") || "stock-photo cliches, distorted people, warped geometry and watermarks"}.`,
+    "Do not invent any business identity, product detail, price, result or claim.",
+    REEL_SAFE_AREA_NOTE,
+  ].join("\n\n");
+}
+
 const RECRUITMENT_ROLE_LABEL: Record<string, string> = {
   editor: "Editor",
   smm: "Social Media Manager",
@@ -419,29 +473,41 @@ export async function runCreativeBuildJob(
 
   const { data: brief, error: briefError } = await sb
     .from("client_briefs")
-    .select("id, client_id, title, body, media_type, brief_ref, purpose, recruitment_role, content_format, frame_count, frame_plan")
+    .select("id, client_id, title, body, media_type, brief_ref, purpose, recruitment_role, content_format, format_code, frame_count, frame_plan")
     .eq("id", generation.brief_id)
     .maybeSingle();
   if (briefError) throw new Error(`Could not load the brief: ${briefError.message}`);
   if (!brief) return { ok: false, retryable: false, failureMessage: "That brief no longer exists." };
 
   const typed = brief as BriefRow;
-  if (typed.media_type === "video") {
+  // A Phase 1 reel's opening stills are an image generation on a video brief.
+  // Every other video still stops here. Carousel, story and single never
+  // match, because their briefs are not video.
+  const route = openingStillsRoute(typed, String(generation.media_type));
+  if (route.kind === "refuse") {
+    return { ok: false, retryable: false, failureMessage: route.message };
+  }
+  if (route.kind === "stills" && remake) {
     return {
       ok: false,
       retryable: false,
-      failureMessage: "Video is produced by people. Send this brief to an editor or avatar instead.",
+      failureMessage: "Replacing one opening still of a reel is not available yet. Rebuild the set.",
     };
   }
+  const openingShots = route.kind === "stills" ? route.shots : null;
 
-  const isImage = typed.media_type === "image";
-  // A carousel or story is rendered as an ordered set. Only the image route
-  // builds them; a video story is a person's job, same as any other video.
-  const isFramed = buildRoute(typed.media_type, typed.content_format) === "frames";
+  const isImage = openingShots !== null || typed.media_type === "image";
+  // A carousel or story is rendered as an ordered set. Reel opening stills
+  // join that path as images. buildRoute("video", "reel") stays "text" on
+  // purpose: a video brief must not become frames unless the generation is
+  // an image and the route above said so.
+  const isFramed = openingShots !== null || buildRoute(typed.media_type, typed.content_format) === "frames";
   // What the operator asked of the set. Null in both halves is the state
   // every brief written before 113 is in, and it means what it always meant:
-  // the agent decides.
-  const frameAsk: FrameAsk = { count: typed.frame_count, plan: typed.frame_plan };
+  // the agent decides. A reel stills job uses the shot beats, not the raw
+  // JSON plan, so the model is asked for one picture per shot.
+  const frameAsk: FrameAsk =
+    route.kind === "stills" ? route.frameAsk : { count: typed.frame_count, plan: typed.frame_plan };
 
   // The set being rebuilt part of. Loaded before the concept, because the
   // replacement frame has to be written against the frames it will sit
@@ -575,7 +641,9 @@ export async function runCreativeBuildJob(
     remake
       ? ""
       : isFramed
-      ? `an ordered set of frames for a ${typed.content_format}`
+      ? openingShots
+        ? "opening stills for a reel, one image per shot"
+        : `an ordered set of frames for a ${typed.content_format}`
       : isImage
         ? "a creative concept for a single image"
         : "finished copy"
@@ -595,7 +663,11 @@ ${
         remakeFeedback,
       )}\n`
     : ""
-}${remake ? "" : remakeBlock(remakeFeedback)}${isRecruitment ? recruitmentBlock(roleLabel) : ""}${isFramed && !remake ? `\nTHE SET\n${frameAskInstruction(frameAsk)}\n` : ""}
+}${remake ? "" : remakeBlock(remakeFeedback)}${isRecruitment ? recruitmentBlock(roleLabel) : ""}${
+  openingShots
+    ? "\nVIDEO KEYFRAMES\nEach frame is the opening image of one filmed shot, not a finished ad or title card. Show a concrete person, object, action or environment that can visibly change during the shot. Define one specific fictional lead-person appearance in cast_anchor, including complexion, hair, age, face, build and wardrobe; repeat those traits in every frame's subject. 'The same owner' without those traits is insufficient: separate image calls will cast different people. Keep the same props and visual world across the sequence. Set headline, subhead and call_to_action to empty strings for every frame: the video editor will add readable copy after animation. No typography, diagrams, UI mockups, labels, logo or wordmark in the source image. Describe the opening composition, not a camera move; motion is directed later.\n"
+    : ""
+}${isFramed && !remake ? `\nTHE SET\n${frameAskInstruction(frameAsk)}\n` : ""}
 THE BRIEF
 ${typed.title}
 
@@ -896,7 +968,7 @@ Call ${submitTool.name} once when you are done.`;
         stage: "render",
         concept,
         concept_model: conceptModel,
-        image_model: config.imageModel,
+        image_model: openingShots ? config.reelImageModel : config.imageModel,
         cost_usd: usage.costUsd,
         updated_at: new Date().toISOString(),
       })
@@ -913,6 +985,19 @@ Call ${submitTool.name} once when you are done.`;
       if (position !== null) done.add(position);
     }
 
+    // A reel's first stored opening still anchors the cast and room for the
+    // remaining shots. If a retry resumes after frame one, restore the same
+    // reference before making another paid image call.
+    let reelReference: ReferenceImage | null = null;
+    if (openingShots && done.has(1)) {
+      const path = framePath(String(job.client_id), renderId, 1, "png");
+      const { data, error } = await sb.storage.from(BUCKET).download(path);
+      if (error || !data) throw new Error(`Could not restore reel continuity frame: ${error?.message ?? "missing image"}`);
+      reelReference = {
+        bytes: Buffer.from(await data.arrayBuffer()), contentType: "image/png", filename: "reel-shot-1.png",
+      };
+    }
+
     let frames;
     try {
       frames = await renderFrames({
@@ -921,18 +1006,39 @@ Call ${submitTool.name} once when you are done.`;
         pathFor: (frame) => framePath(String(job.client_id), renderId, frame.position, "png"),
         onProgress: (note) => void appendEvent(sb, job.id, note),
         renderOne: async (frame, total) => {
-          const composed = composePrompt(
+          const composed = openingShots ? "" : composePrompt(
             frame as unknown as Record<string, unknown>,
             typed,
             clientName,
             identity,
             brand,
           );
-          const out = await renderImage(config, framePrompt(frame, total, composed), {
+          // The image API cannot render 9:16 directly. Keep the action inside
+          // the safe area for the centred crop that makes a true reel frame.
+          const visualReference = openingShots && frame.position > 1 ? reelReference : null;
+          if (openingShots && frame.position > 1 && !visualReference) {
+            throw new Error("The first reel frame is required before later shots can be rendered.");
+          }
+          const prompt = openingShots
+            ? reelKeyframePrompt(frame as unknown as Record<string, unknown>, total, clientName, brand,
+              String(concept.cast_anchor ?? ""), Boolean(visualReference),
+              openingShots[frame.position - 1])
+            : framePrompt(frame, total, composed);
+          const out = await renderImage(config, prompt, {
             size: renderSize,
             quality: renderQuality,
-            reference: null,
+            reference: visualReference,
+            model: openingShots ? config.reelImageModel : undefined,
           });
+          if (openingShots) {
+            const vertical = await toReelFrame(out.bytes);
+            if (frame.position === 1) {
+              reelReference = {
+                bytes: vertical.bytes, contentType: vertical.contentType, filename: "reel-shot-1.png",
+              };
+            }
+            return vertical;
+          }
           return { bytes: out.bytes, contentType: out.contentType, extension: out.extension };
         },
         store: async (frame, out) => {
@@ -952,22 +1058,28 @@ Call ${submitTool.name} once when you are done.`;
       return { ok: false, retryable: true, failureMessage: message, usage };
     }
 
+    const filedFormat = openingShots ? "reel" : typed.content_format;
+    // Reel keyframes contain no lettering. Do not tell the cut planner that
+    // a headline was burned into them just because the concept named one.
+    const filedFrames = openingShots
+      ? withOpeningShotFields(frames.map((frame) => ({ ...frame, caption: null })), openingShots)
+      : frames;
     const { data: framedId, error: saveError } = await sb.rpc("save_framed_asset", {
       p_client_id: job.client_id,
       p_brief_id: typed.id,
-      p_format: typed.content_format,
-      p_media_type: "image",
+      p_format: filedFormat,
+      p_media_type: openingShots ? "video" : "image",
       p_title: typed.title,
-      p_frames: frames,
+      p_frames: filedFrames,
     });
-    if (saveError) throw new Error(`Could not file the ${typed.content_format}: ${saveError.message}`);
+    if (saveError) throw new Error(`Could not file the ${filedFormat}: ${saveError.message}`);
 
     await sb
       .from("creative_renders")
       .update({
         status: "done",
         asset_id: framedId as string,
-        model: config.imageModel,
+        model: openingShots ? config.reelImageModel : config.imageModel,
         cost_usd: usage.costUsd + estimateImageCostUsd(renderQuality) * frames.length,
         error: null,
         updated_at: new Date().toISOString(),
@@ -982,8 +1094,13 @@ Call ${submitTool.name} once when you are done.`;
     await appendEvent(
       sb,
       job.id,
-      `Filed a ${typed.content_format} of ${frames.length} frames, awaiting approval.`,
+      openingShots
+        ? `Filed ${frames.length} opening stills for the reel. Motion was not called.`
+        : `Filed a ${typed.content_format} of ${frames.length} frames, awaiting approval.`,
     );
+    // A reel's opening stills are not the finished asset: video_build still
+    // has to animate them, so the slot stays at building for it.
+    if (!openingShots) await handOffToSlot(sb, job, "creative_build");
     return { ok: true, retryable: false, usage };
   }
 
@@ -1102,6 +1219,7 @@ Call ${submitTool.name} once when you are done.`;
       ? "Image rendered and filed under the client's assets, awaiting review."
       : "Re-render complete, filed alongside the earlier ones.",
   );
+  await handOffToSlot(sb, job, "creative_build");
   return { ok: true, retryable: false, usage };
 }
 

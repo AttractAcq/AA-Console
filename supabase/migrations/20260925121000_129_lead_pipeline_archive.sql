@@ -45,11 +45,6 @@ alter table mcp_internal.mcp_pipeline_requests drop constraint mcp_pipeline_requ
 alter table mcp_internal.mcp_pipeline_requests add constraint mcp_pipeline_requests_lead_id_fkey
   foreign key (lead_id) references lead_identities(id);
 
--- Alex confirmed on 25 Sept 2026 that the existing prospects are disposable.
--- Clear only the rows present when this migration runs. Lead events cascade;
--- durable identities keep historical conversation and MCP request references valid.
-delete from client_leads;
-
 create table archived_leads (
   id uuid primary key references lead_identities(id),
   client_id uuid not null references clients(id) on delete cascade,
@@ -68,6 +63,32 @@ create policy archived_leads_admin_all on archived_leads
 create policy archived_leads_client_read on archived_leads
   for select to authenticated using (is_client_user(client_id));
 grant select on archived_leads to authenticated;
+
+-- The rows present when this migration runs are archived, not dropped.
+--
+-- This block used to be a bare `delete from client_leads`, on the strength of
+-- a 25 September note that the existing prospects were disposable. Two rows
+-- were still there eight days later, and lead_events.lead_id is ON DELETE
+-- CASCADE, so the delete would have taken their history with them.
+--
+-- archived_leads is created immediately above for exactly this purpose, so
+-- the rows go there instead. Nothing is lost and the Prospects & Leads
+-- archive has real content to be verified against.
+--
+-- archived_by is null: a migration has no auth.uid(). A lead still sitting at
+-- a legacy stage ('lead' or 'sale') archives fine but cannot be brought back
+-- through recover_lead, which refuses those stages by design.
+insert into archived_leads (id, client_id, name, stage_at_archive, lead, events, reason, archived_by)
+select l.id, l.client_id, l.name, l.stage, to_jsonb(l),
+       coalesce((select jsonb_agg(to_jsonb(e) order by e.occurred_at, e.id)
+                   from lead_events e where e.lead_id = l.id), '[]'::jsonb),
+       'Archived by migration 129 when the lead pipeline was rebuilt.',
+       null
+  from client_leads l;
+
+-- Now safe: the history is captured above, and the durable identities keep
+-- historical conversation and MCP request references valid.
+delete from client_leads;
 
 create or replace function lead_stage_rank(s lead_stage)
 returns integer language sql immutable security definer set search_path = public as $$

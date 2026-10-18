@@ -52,10 +52,10 @@ const FRAMED_DESCRIPTIONS: Partial<Record<BriefField, string>> = {
 /** A reel is shots, not a swipe. Carousel and story keep the descriptions above. */
 const REEL_DESCRIPTIONS: Partial<Record<BriefField, string>> = {
   hook: "The first thing in shot 1. It has one job: stop the scroll. If shot 1 does not stop them, no later shot is seen.",
-  script: "The words across the reel, in order, marked by shot. Each shot carries its own line.",
+  script: "Editor-added captions only. Write exactly one SHOT n: caption line for each planned shot, in order. Each viewer-facing line is at most 60 characters; keep the argument concise enough to read on mute. The CTA is the final shot's line or a separately labelled end card.",
   visual_direction: "How the generated stills should look. One treatment across the reel: these shots are one piece.",
   shot_requirements: "What each generated shot must show. Phase 1 does not capture client footage.",
-  call_to_action: "The action asked for, which lands on the last shot.",
+  call_to_action: "One exact viewer-facing line of at most 60 characters, which lands on the last shot or end card. No edit instructions or voiceover notes.",
 };
 
 export function fieldsFor(

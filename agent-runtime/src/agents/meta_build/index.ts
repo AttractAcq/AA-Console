@@ -38,8 +38,8 @@ import { UnrecordedError, executeBuild, progressFrom, type BuildStore, type Meta
 
 const BUCKET = "client-media";
 
-const CAMPAIGN_COLUMNS =
-  "id, client_id, name, template, mirrors_template, optimisation_event, conversion_event, daily_budget, target_countries, starts_on, ends_on, meta_campaign_id, meta_ad_set_id";
+export const CAMPAIGN_COLUMNS =
+  "id, client_id, name, template, mirrors_template, optimisation_event, conversion_event, daily_budget, target_countries, starts_on, ends_on, meta_campaign_id, meta_ad_set_id, acquisition_mode, paid_platform";
 
 const ASSET_COLUMNS =
   "id, title, media_type, content_format, storage_path, review_status, purpose, ad_primary_text, ad_headline, ad_description, ad_link_url, ad_cta, meta_image_hash, meta_creative_id, meta_ad_id";
@@ -52,7 +52,7 @@ function fail(message: string, retryable = false): JobResult {
 }
 
 /** The campaign's content assets, by the same links campaign_readiness counts. */
-async function loadAssets(sb: SupabaseClient, clientId: string, campaignId: string): Promise<AssetRow[]> {
+export async function loadAssets(sb: SupabaseClient, clientId: string, campaignId: string): Promise<AssetRow[]> {
   const { data: links, error } = await sb
     .from("campaign_artifacts")
     .select("brief_id, asset_id")
@@ -215,6 +215,9 @@ export async function runMetaBuildJob(
   if (error) throw new Error(`Could not read the campaign: ${error.message}`);
   if (!campaign) return fail("That campaign no longer exists.");
   if (campaign.client_id !== job.client_id) return fail("That campaign belongs to a different client.");
+  if (campaign.acquisition_mode !== "legacy") {
+    return fail("V6 Meta objects require a version-bound human approval before an external build. The activation executor is not connected yet.");
+  }
   const row = campaign as unknown as CampaignRow;
 
   if (await concurrentBuild(sb, job)) {

@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { briefSubmitTool, composeBody, framePlanColumns } from "./fields.js";
+import { ZOOM_IN_MOTION_ID } from "../video_build/motions.js";
 import {
   MOTION_PRESET_PLACEHOLDER,
+  completeMissingFinalReelCaption,
+  exactFirstCaption,
   parseStoredShotPlan,
   reelBriefProblem,
+  reelCopyProblem,
   reelPlannerNote,
   serializeShot,
 } from "./shots.js";
@@ -13,6 +17,7 @@ const shot = (
   extra: Record<string, unknown> = {},
 ) => ({
   beat,
+  opening_state: "The physical scene is ready before the action begins.",
   duration_sec: 3,
   shot_source_kind: "ai_generated",
   motion_preset: MOTION_PRESET_PLACEHOLDER,
@@ -26,6 +31,27 @@ const reelSubmission = (extra: Record<string, unknown> = {}) => ({
 });
 
 describe("a reel brief", () => {
+  it("repairs only a missing last caption using the exact call to action", () => {
+    const base = {
+      frames: [shot("Opening object moves"), shot("Second object appears"), shot("Closing invitation")],
+      script: "SHOT 1: First claim.\nSHOT 2: Second claim.",
+      call_to_action: "Read the method — attractacq.com",
+    };
+    const repaired = completeMissingFinalReelCaption(base);
+    expect(repaired.script).toBe(`${base.script}\nSHOT 3: ${base.call_to_action}`);
+    expect(reelCopyProblem(repaired)).toBeNull();
+    expect(completeMissingFinalReelCaption({ ...base, script: `${base.script}\nSHOT 3: Done.` }))
+      .toEqual({ ...base, script: `${base.script}\nSHOT 3: Done.` });
+    expect(completeMissingFinalReelCaption({ ...base, script: "SHOT 1: First.\nSHOT 3: Third." }))
+      .toEqual({ ...base, script: "SHOT 1: First.\nSHOT 3: Third." });
+  });
+  it("refuses a generated reel whose visual proof depends on fake lettering", () => {
+    expect(reelCopyProblem({ frames: [shot("A pen writes the rule on a report")],
+      hook: "Read the rule", call_to_action: "Read more" }))
+      .toMatch(/generated writing or printed words/);
+    expect(reelCopyProblem({ frames: [shot("An unmarked card slides onto a blank desk")],
+      hook: "Read the rule", call_to_action: "Read more" })).toBeNull();
+  });
   it("is only briefed when the idea is video", () => {
     expect(reelBriefProblem("reel", "video")).toBeNull();
     expect(reelBriefProblem("carousel", "image")).toBeNull();
@@ -38,22 +64,105 @@ describe("a reel brief", () => {
     expect(note).toContain("F7");
     expect(note).toContain("ai_generated");
     expect(note).toContain(MOTION_PRESET_PLACEHOLDER);
+    expect(note).toContain(ZOOM_IN_MOTION_ID);
     expect(note).toMatch(/do not invent a motion uuid/i);
+    expect(note).toMatch(/silent with editor-added captions/i);
+    expect(note).toContain("opening_state");
+  });
+
+  it("refuses an exact hook or CTA that cannot fit the reel caption contract", () => {
+    expect(reelCopyProblem({ hook: `First caption: "${"A".repeat(61)}"`, call_to_action: "Read the plan." }))
+      .toMatch(/first caption/);
+    expect(reelCopyProblem({ hook: "Open on the owner", call_to_action: "A".repeat(61) }))
+      .toMatch(/call to action/);
+    expect(reelCopyProblem({ hook: "Open on the owner", call_to_action: "Voiceover: read the plan." }))
+      .toMatch(/no voiceover source/);
+    expect(reelCopyProblem({ hook: 'First caption: "Show the rule."', call_to_action: "Read it at attractacq.com." }))
+      .toBeNull();
+  });
+
+  it("recognises both live ways a brief names its exact opening caption", () => {
+    expect(exactFirstCaption('The first caption reads: "Read the report before you spend a rand."'))
+      .toBe("Read the report before you spend a rand.");
+    expect(exactFirstCaption('Exact first caption, burned in: "Three weeks. Fee spent."'))
+      .toBe("Three weeks. Fee spent.");
+    expect(reelCopyProblem({ hook: `The first caption reads: "${"A".repeat(61)}"`,
+      call_to_action: "Read the plan." })).toMatch(/exact first caption/);
+  });
+
+  it("rejects a handshake beat when the client's visual brand forbids it", () => {
+    const submission = reelSubmission({
+      hook: "The workshop is quiet.", call_to_action: "Read the rule.",
+      frames: [shot("Show the empty bay"),
+        shot("The owner shakes hands with a customer arriving at the door")],
+    });
+    expect(reelCopyProblem(submission, "No generic handshake/startup stock."))
+      .toMatch(/Shot 2 depicts a handshake/);
+    expect(reelCopyProblem(submission, "No neon greens.")).toBeNull();
+  });
+
+  it("rejects a second performer when the reel's shared visual direction specifies one", () => {
+    const submission = reelSubmission({
+      visual_direction: "One desk and the same pair of weathered hands across all shots.",
+      frames: [shot("The first hands slide a report away"),
+        shot("A second pair of hands enters and takes the folder")],
+    });
+    expect(reelCopyProblem(submission)).toMatch(/Shot 2 introduces another person or pair of hands/);
+    expect(reelCopyProblem({ ...submission, frames: [shot("The same hands slide a report away"),
+      shot("The hands open the blank specimen")]})).toBeNull();
+  });
+
+  it("refuses an invented reel palette outside the recorded visual brand", () => {
+    const submission = reelSubmission({ script: "SHOT 1: Read the report.\nSHOT 2: Check the source.",
+      visual_direction: "End card navy #07192f on paper #fbfaf7.",
+      call_to_action: "Read the report." });
+    expect(reelCopyProblem(submission, "", ["#142B23", "#F5F7F3"]))
+      .toMatch(/#07192f.*not in/);
+    expect(reelCopyProblem({ ...submission, visual_direction: "Use #142B23 on #F5F7F3." },
+      "", ["#142B23", "#F5F7F3"])).toBeNull();
+  });
+
+  it("keeps silent shot captions within one readable line each", () => {
+    const base = reelSubmission({ call_to_action: "Read the report.", script:
+      `SHOT 1: Read the report.\nSHOT 2: ${"A".repeat(61)}` });
+    expect(reelCopyProblem(base)).toMatch(/SHOT 2 has 61 caption characters/);
+    expect(reelCopyProblem({ ...base, script: "SHOT 1: Read the report." }))
+      .toMatch(/exactly one SHOT n/);
+    expect(reelCopyProblem({ ...base, script:
+      "SHOT 1: Read the report.\nSHOT 2: Check the source." })).toBeNull();
   });
 
   it("asks for a shot plan and a format code, and leaves a carousel on string frames", () => {
     const reel = briefSubmitTool("video", [], "reel");
     expect(reel.inputSchema.required).toEqual(expect.arrayContaining(["frames", "format_code"]));
     const frames = reel.inputSchema.properties.frames as unknown as {
-      items: { properties: { shot_source_kind: { enum: string[] } } };
+      items: { properties: { shot_source_kind: { enum: string[] } }; required: string[] };
     };
     expect(frames.items.properties.shot_source_kind.enum).toEqual(["ai_generated"]);
+    expect(frames.items.required).toContain("opening_state");
 
     const carousel = briefSubmitTool("image", [], "carousel");
     const carouselFrames = carousel.inputSchema.properties.frames as { items: { type: string } };
     expect(carouselFrames.items.type).toBe("string");
     expect(carousel.inputSchema.properties).not.toHaveProperty("format_code");
     expect(carousel.inputSchema.required).not.toContain("format_code");
+  });
+
+  it("stores a frame-zero state for new reels while reading older shot plans", () => {
+    const opening = "A blank sheet is half in shadow; the lit area is empty.";
+    const submitted = framePlanColumns(reelSubmission({ frames: [
+      shot("The sheet slides into light", { opening_state: opening }),
+      shot("The sheet leaves the light", { opening_state: "The sheet rests in the lit area." }),
+    ] }), "reel");
+    expect(submitted.problem).toBeNull();
+    const lines = submitted.columns.frame_plan as string[];
+    expect(parseStoredShotPlan(lines).shots[0]?.opening_state).toBe(opening);
+    expect(framePlanColumns(reelSubmission({ frames: [
+      shot("The sheet slides into light", { opening_state: " " }), shot("Payoff"),
+    ] }), "reel").problem).toMatch(/opening state/);
+    expect(parseStoredShotPlan([serializeShot({ beat: "Legacy shot", duration_sec: 3,
+      motion_preset: MOTION_PRESET_PLACEHOLDER, shot_source_kind: "ai_generated" }), lines[1]!]).problem)
+      .toBeNull();
   });
 
   it("stores a shot-shaped frame plan for F6 and F7", () => {
@@ -65,8 +174,9 @@ describe("a reel brief", () => {
       const lines = out.columns.frame_plan as string[];
       expect(JSON.parse(lines[0] ?? "")).toEqual({
         beat: "Name the mechanism",
+        opening_state: "The physical scene is ready before the action begins.",
         duration_sec: 3,
-        motion_preset: MOTION_PRESET_PLACEHOLDER,
+        motion_preset: ZOOM_IN_MOTION_ID,
         shot_source_kind: "ai_generated",
       });
       expect(parseStoredShotPlan(lines).shots).toHaveLength(2);
@@ -115,7 +225,8 @@ describe("a reel brief", () => {
       ...reelSubmission(),
     }, "reel");
     expect(body).toContain("## Shots");
-    expect(body).toContain("1. Name the mechanism (3s, generated, motion pending)");
+    expect(body).toContain(`1. Name the mechanism Start: The physical scene is ready before the action begins. (3s, generated, motion Zoom In ${ZOOM_IN_MOTION_ID})`);
+    expect(body).not.toContain("motion pending");
     expect(body).not.toContain("shot_source_kind");
   });
 
@@ -131,6 +242,35 @@ describe("a reel brief", () => {
       duration_sec: 4,
       shot_source_kind: "ai_generated",
       motion_preset: "pending",
-    })]).shots[0]).toMatchObject({ beat: "Cold open", duration_sec: 2.5 });
+    })]).shots[0]).toMatchObject({
+      beat: "Cold open",
+      duration_sec: 2.5,
+      motion_preset: ZOOM_IN_MOTION_ID,
+    });
+  });
+
+  it("stores Zoom In as the catalog id and leaves any other preset unresolved", () => {
+    const named = framePlanColumns(
+      reelSubmission({
+        frames: [shot("Open", { motion_preset: "Zoom In" }), shot("Hold", { motion_preset: "zoom_in" })],
+      }),
+      "reel",
+    );
+    const lines = named.columns.frame_plan as string[];
+    expect(JSON.parse(lines[0] ?? "").motion_preset).toBe(ZOOM_IN_MOTION_ID);
+    expect(JSON.parse(lines[1] ?? "").motion_preset).toBe(ZOOM_IN_MOTION_ID);
+
+    const other = framePlanColumns(
+      reelSubmission({
+        frames: [
+          shot("Pan", { motion_preset: "Pan Left" }),
+          shot("Other", { motion_preset: "11111111-1111-4111-8111-111111111111" }),
+        ],
+      }),
+      "reel",
+    );
+    const kept = other.columns.frame_plan as string[];
+    expect(JSON.parse(kept[0] ?? "").motion_preset).toBe("Pan Left");
+    expect(JSON.parse(kept[1] ?? "").motion_preset).toBe("11111111-1111-4111-8111-111111111111");
   });
 });

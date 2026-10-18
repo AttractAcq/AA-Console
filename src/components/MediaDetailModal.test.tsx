@@ -105,6 +105,13 @@ describe("MediaDetailModal — the preview", () => {
     expect(video).toHaveAttribute("controls");
   });
 
+  it("shows the original footage alongside an edited version", () => {
+    show({ asset: asset({ media_type: "video", source_asset_id: "raw-1" }),
+      url: "https://signed/edited.mp4", sourceUrl: "https://signed/raw.mp4" });
+    expect(screen.getByLabelText("Original footage before editing")).toHaveAttribute("src", "https://signed/raw.mp4");
+    expect(screen.getByText("Original footage")).toBeInTheDocument();
+  });
+
   it("shows the copy for a text asset", () => {
     show({ asset: asset({ media_type: "text" }), url: undefined, body: "Book before April." });
     expect(screen.getByText("Book before April.")).toBeInTheDocument();

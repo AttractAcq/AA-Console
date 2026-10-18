@@ -3,13 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "postinstall": "node scripts/exclude-node-modules-from-icloud.mjs"
+    "postinstall": "node scripts/exclude-node-modules-from-icloud.mjs",
+    "sync:platform-limits": "node scripts/sync-platform-limits.mjs",
+    "sync:metrics-compare": "node scripts/sync-metrics-compare.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.114.0",

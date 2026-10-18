@@ -1,4 +1,11 @@
 import { MAX_FRAMES, MIN_FRAMES } from "../../content/format.js";
+import { MAX_CAPTION_CHARS } from "../video_edit/edl.js";
+import {
+  MOTION_PRESET_PENDING,
+  resolveMotionPreset,
+  ZOOM_IN_MOTION_ID,
+  ZOOM_IN_MOTION_NAME,
+} from "../video_build/motions.js";
 
 /**
  * Shot source on a frame.
@@ -19,13 +26,17 @@ export const PHASE1_FORMAT_CODES = ["F6", "F7"] as const;
 export type Phase1FormatCode = (typeof PHASE1_FORMAT_CODES)[number];
 
 /**
- * Stored until a Higgsfield motions-catalog id is chosen.
- * Not a UUID. Inventing one would point a later submit at nothing.
+ * Token a planner may still emit. Phase 1 stores the Zoom In catalog UUID
+ * instead. The token is accepted and replaced; it is not what gets written.
  */
-export const MOTION_PRESET_PLACEHOLDER = "pending";
+export const MOTION_PRESET_PLACEHOLDER = MOTION_PRESET_PENDING;
+
+export { ZOOM_IN_MOTION_ID, ZOOM_IN_MOTION_NAME };
 
 export interface ShotPlanEntry {
   beat: string;
+  /** Frame zero, before the beat's action. Absent on briefs saved before this contract. */
+  opening_state?: string;
   duration_sec: number;
   shot_source_kind: typeof SHOT_SOURCE_GENERATED;
   motion_preset: string;
@@ -51,12 +62,109 @@ export function reelPlannerNote(): string {
   return [
     "Format: video — produced as a reel.",
     "Phase 1 formats are F6 (mechanism explainer) and F7 (problem cold-open).",
-    "Both are generated stills with motion applied. They need no client assets and no proof footage.",
-    "Submit a shot plan. Each shot has a beat, a duration in seconds, shot_source_kind ai_generated,",
-    `and motion_preset "${MOTION_PRESET_PLACEHOLDER}" unless you were given a real catalog id.`,
-    "Do not invent a motion UUID. Do not mark any shot as a client asset or as proof.",
+    "Both are generated visual keyframes animated into video shots. They need no client assets and no proof footage.",
+    "Each beat must specify what the viewer sees and what visibly changes: a subject action, an environmental change, or a reveal. Do not write a headline, graphic card, diagram or abstract lesson as a shot. Carry the argument in the brief so the editor can caption it after animation.",
+    "For every beat, also write opening_state: the exact visible composition at frame zero BEFORE that beat's movement. An entering object starts at the frame edge with its destination empty; an exiting object starts fully visible; a counted group starts with the exact count visible. Never describe the completed action as the opening state. Do not invent a device, hand or third prop to cause the movement.",
+    "For this generated-video route, prefer an object-led visual treatment with two or three repeatable, unlabelled physical elements. Avoid visible hands, fingers and other anatomy as the continuing subject; current motion generation struggles to preserve them across shots. Avoid writing actions and close views of printed documents: the model can invent fake handwriting, pseudo-text, figures and logos. Keep any paper completely blank or show only its shape and movement. Never make a viewer's understanding depend on AI-rendered letters, numbers, page counts or a readable object label. Put all exact wording, evidence and numbers in the script for real editor captions instead.",
+    "Keep the cast, location and physical props consistent across the visual direction and every shot. If the visual direction specifies one person or one pair of hands, no later shot may introduce another person or pair.",
+    `The Phase 1 export is silent with editor-added captions. Do not write voiceover or narration instructions. The script has exactly one SHOT n: caption for each planned shot, each at most ${MAX_CAPTION_CHARS} characters; do not pack several sentences into a shot. If the hook names an exact first caption, keep that line within ${MAX_CAPTION_CHARS} characters. The call_to_action field must be one exact viewer-facing line within ${MAX_CAPTION_CHARS} characters, not a paragraph of edit directions; it must fit on the last shot or end card.`,
+    "Submit a shot plan. Each shot has a beat, an opening_state, a duration in seconds, shot_source_kind ai_generated,",
+    `and a motion_preset. For compatibility with the original DoP route use ${ZOOM_IN_MOTION_NAME}, catalog id ${ZOOM_IN_MOTION_ID}; the selected video model will direct motion from the beat rather than force a digital zoom.`,
+    `Write that id. "${MOTION_PRESET_PLACEHOLDER}" and "${ZOOM_IN_MOTION_NAME}" are accepted and stored as that id.`,
+    "Do not invent a motion UUID. Any other name is stored as written, and motion pauses until a catalog confirms it.",
+    "Do not mark any shot as a client asset or as proof.",
     "slot_role is not yours to choose. Leave quota buckets alone.",
   ].join(" ");
+}
+
+/** The editor cannot faithfully fit an overlong exact line into one caption. */
+export function exactFirstCaption(hook: string): string | null {
+  return /\bfirst\s+(?:caption|line)\b[^\n:"“]{0,40}:\s*["“]([^"”]+)["”]/i.exec(hook)?.[1]?.trim() ?? null;
+}
+
+/** Fill only an omitted final caption from the model's separately approved CTA. */
+export function completeMissingFinalReelCaption(submitted: Record<string, unknown>): Record<string, unknown> {
+  const frames = Array.isArray(submitted.frames) ? submitted.frames : [];
+  const script = String(submitted.script ?? "").trim();
+  const cta = String(submitted.call_to_action ?? "").trim();
+  if (frames.length < MIN_FRAMES || frames.length > MAX_FRAMES || !script || !cta
+      || cta.length > MAX_CAPTION_CHARS || script.includes(cta)) return submitted;
+  const captions = [...script.matchAll(/^\s*SHOT\s+(\d+)\s*:\s*(.+)$/gim)];
+  if (captions.length !== frames.length - 1
+      || captions.some((caption, index) => Number(caption[1]) !== index + 1)) return submitted;
+  return { ...submitted, script: `${script}\nSHOT ${frames.length}: ${cta}` };
+}
+
+export function reelCopyProblem(submitted: Record<string, unknown>, brandNeverDo = "", allowedColours: string[] | null = null): string | null {
+  const hook = String(submitted.hook ?? "");
+  const cta = String(submitted.call_to_action ?? "").trim();
+  const visualDirection = String(submitted.visual_direction ?? "");
+  const frames = Array.isArray(submitted.frames) ? submitted.frames : [];
+  for (const [index, raw] of frames.entries()) {
+    if (!raw || typeof raw !== "object") continue;
+    const beat = String((raw as Record<string, unknown>).beat ?? "");
+    if (/\b(?:writ(?:e|es|ing|ten)|handwrit(?:ing|ten)|printed|paragraphs?|words?|letters?|glyphs?)\b/i.test(beat)) {
+      return `Shot ${index + 1} depends on generated writing or printed words. Keep the physical object unlettered and put exact language in the editor's captions.`;
+    }
+  }
+  if (/\b(?:same|single|one|only)\s+(?:pair\s+of\s+(?:[\w-]+\s+){0,3}hands|person|actor|subject|character)\b/i.test(visualDirection)) {
+    for (const [index, raw] of frames.entries()) {
+      if (!raw || typeof raw !== "object") continue;
+      const beat = String((raw as Record<string, unknown>).beat ?? "");
+      if (/\b(?:a|the)\s+(?:second|another|additional)\s+(?:pair\s+of\s+(?:[\w-]+\s+){0,3}hands|person|actor|subject|character)\b/i.test(beat)) {
+        return `Shot ${index + 1} introduces another person or pair of hands, contradicting the reel's single-cast visual direction.`;
+      }
+    }
+  }
+  const firstLine = exactFirstCaption(hook);
+  if (firstLine && firstLine.length > MAX_CAPTION_CHARS) {
+    return `The reel's exact first caption is ${firstLine.length} characters; keep it within ${MAX_CAPTION_CHARS}.`;
+  }
+  if (cta.length > MAX_CAPTION_CHARS) {
+    return `The reel's call to action is ${cta.length} characters; write one exact line within ${MAX_CAPTION_CHARS}.`;
+  }
+  if (/\bvoice\s*-?over\b|\bnarrat(?:ion|e|or)\b/i.test(cta)) {
+    return "A Phase 1 reel has no voiceover source. Write the call to action as on-screen text.";
+  }
+  if (allowedColours) {
+    const allowed = new Set(allowedColours.map((value) => value.toLowerCase()));
+    const creativeText = [submitted.script, submitted.visual_direction, submitted.editor_notes,
+      ...((Array.isArray(submitted.frames) ? submitted.frames : []) as Array<Record<string, unknown>>)
+        .flatMap((frame) => [frame.beat, frame.subject, frame.composition, frame.background])]
+      .map((value) => String(value ?? "")).join(" ");
+    const invented = [...creativeText.matchAll(/#[0-9a-f]{6}\b/gi)]
+      .map((match) => match[0].toLowerCase()).find((value) => !allowed.has(value));
+    if (invented) return `The reel brief specifies ${invented}, which is not in the client's recorded visual brand palette.`;
+  }
+  if (/hand\s*-?shake/i.test(brandNeverDo)) {
+    const frames = Array.isArray(submitted.frames) ? submitted.frames : [];
+    for (const [index, raw] of frames.entries()) {
+      if (!raw || typeof raw !== "object") continue;
+      const frame = raw as Record<string, unknown>;
+      const scene = [frame.beat, frame.subject, frame.composition, frame.background]
+        .map((part) => String(part ?? "")).join(" ");
+      if (/hand\s*-?shake|hands?\b.{0,60}\b(?:meet|greet|shake)|\bshak(?:e|es|ing)\s+hands?\b|\bextend(?:s|ing)?\s+(?:his|her|their|a)\s+hand\b/i.test(scene)) {
+        return `Shot ${index + 1} depicts a handshake, which this client's visual brand forbids. Choose a different visible action.`;
+      }
+    }
+  }
+  const script = String(submitted.script ?? "").trim();
+  if (script) {
+    const frames = Array.isArray(submitted.frames) ? submitted.frames : [];
+    const captions = [...script.matchAll(/^\s*SHOT\s+(\d+)\s*:\s*(.+)$/gim)];
+    if (frames.length > 0 && captions.length !== frames.length) {
+      return `The silent reel needs exactly one SHOT n: caption line per planned shot (${frames.length} shots, ${captions.length} lines).`;
+    }
+    for (const [index, caption] of captions.entries()) {
+      const number = Number(caption[1]);
+      const line = caption[2]!.trim().replace(/^["“]|["”]$/g, "");
+      if (number !== index + 1) return "Number the SHOT n: caption lines once, in shot order.";
+      if (line.length > MAX_CAPTION_CHARS) {
+        return `SHOT ${number} has ${line.length} caption characters; keep each viewer-facing line within ${MAX_CAPTION_CHARS}.`;
+      }
+    }
+  }
+  return null;
 }
 
 /** The two extra properties a reel brief submits, and nothing a carousel does. */
@@ -80,7 +188,11 @@ export function reelSubmitProperties(): {
           properties: {
             beat: {
               type: "string",
-              description: "What this shot does in the reel. One line. No invented statistics, prices, or quotes.",
+              description: "One line naming the shot's narrative purpose, visible subject and physical change over time. No title cards, abstract diagrams, invented statistics, prices, or quotes.",
+            },
+            opening_state: {
+              type: "string",
+              description: "What is visibly present at frame zero, before the beat's action. Name exact object count and position. For an entrance, leave the destination clear; for an exit, show the object fully present. No new prop or mechanism.",
             },
             duration_sec: {
               type: "number",
@@ -94,10 +206,10 @@ export function reelSubmitProperties(): {
             },
             motion_preset: {
               type: "string",
-              description: `Higgsfield motion id, or "${MOTION_PRESET_PLACEHOLDER}" until a catalog id is chosen. Do not invent a UUID.`,
+              description: `Higgsfield motions-catalog id. Phase 1 default is ${ZOOM_IN_MOTION_NAME} (${ZOOM_IN_MOTION_ID}). "${MOTION_PRESET_PLACEHOLDER}" and "${ZOOM_IN_MOTION_NAME}" are stored as that id. Do not invent a UUID.`,
             },
           },
-          required: ["beat", "duration_sec", "shot_source_kind", "motion_preset"],
+          required: ["beat", "opening_state", "duration_sec", "shot_source_kind", "motion_preset"],
           additionalProperties: false,
         },
       },
@@ -112,7 +224,7 @@ function shotCountProblem(count: number): string | null {
   return null;
 }
 
-function asShot(raw: unknown, index: number): { shot: ShotPlanEntry | null; problem: string } {
+function asShot(raw: unknown, index: number, requireOpeningState = false): { shot: ShotPlanEntry | null; problem: string } {
   const label = `Shot ${index + 1}`;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return {
@@ -123,6 +235,13 @@ function asShot(raw: unknown, index: number): { shot: ShotPlanEntry | null; prob
   const row = raw as Record<string, unknown>;
   const beat = typeof row.beat === "string" ? row.beat.trim() : "";
   if (!beat) return { shot: null, problem: `${label} has no beat.` };
+  const openingState = typeof row.opening_state === "string" ? row.opening_state.trim() : "";
+  if (requireOpeningState && !openingState) {
+    return { shot: null, problem: `${label} needs an opening state before its visible action.` };
+  }
+  if (row.opening_state !== undefined && !openingState) {
+    return { shot: null, problem: `${label} has no usable opening state.` };
+  }
 
   const duration = row.duration_sec;
   if (typeof duration !== "number" || !Number.isFinite(duration) || duration <= 0) {
@@ -143,16 +262,20 @@ function asShot(raw: unknown, index: number): { shot: ShotPlanEntry | null; prob
   if (!motion) {
     return {
       shot: null,
-      problem: `${label} needs a motion preset. Use "${MOTION_PRESET_PLACEHOLDER}" until a catalog id exists.`,
+      problem: `${label} needs a motion preset. Phase 1 uses ${ZOOM_IN_MOTION_NAME} (${ZOOM_IN_MOTION_ID}). "${MOTION_PRESET_PLACEHOLDER}" is accepted and stored as that id.`,
     };
   }
 
+  // Known SoT names become the catalog UUID. Anything else is kept verbatim
+  // so a later pause can name it. No other UUID is filled in here.
+  const resolved = resolveMotionPreset(motion);
   return {
     shot: {
       beat,
+      ...(openingState ? { opening_state: openingState } : {}),
       duration_sec: duration,
       shot_source_kind: SHOT_SOURCE_GENERATED,
-      motion_preset: motion,
+      motion_preset: resolved.ok ? resolved.id : motion,
     },
     problem: "",
   };
@@ -162,6 +285,7 @@ function asShot(raw: unknown, index: number): { shot: ShotPlanEntry | null; prob
 export function serializeShot(shot: ShotPlanEntry): string {
   return JSON.stringify({
     beat: shot.beat,
+    ...(shot.opening_state ? { opening_state: shot.opening_state } : {}),
     duration_sec: shot.duration_sec,
     motion_preset: shot.motion_preset,
     shot_source_kind: shot.shot_source_kind,
@@ -179,7 +303,7 @@ export function shotsFromSubmitted(submitted: Record<string, unknown>): {
 
   const shots: ShotPlanEntry[] = [];
   for (let i = 0; i < raw.length; i++) {
-    const parsed = asShot(raw[i], i);
+    const parsed = asShot(raw[i], i, true);
     if (!parsed.shot) return { shots: [], problem: parsed.problem };
     shots.push(parsed.shot);
   }
@@ -258,6 +382,12 @@ export function readableShotPlan(submitted: Record<string, unknown>): string | n
   const plan = shotsFromSubmitted(submitted);
   if (plan.problem || plan.shots.length === 0) return null;
   return plan.shots
-    .map((shot, i) => `${i + 1}. ${shot.beat} (${shot.duration_sec}s, generated, motion ${shot.motion_preset})`)
+    .map((shot, i) => `${i + 1}. ${shot.beat}${shot.opening_state ? ` Start: ${shot.opening_state}` : ""} (${shot.duration_sec}s, generated, motion ${motionForReader(shot.motion_preset)})`)
     .join("\n");
+}
+
+function motionForReader(preset: string): string {
+  const resolved = resolveMotionPreset(preset);
+  if (resolved.ok && resolved.id === ZOOM_IN_MOTION_ID) return `${ZOOM_IN_MOTION_NAME} ${ZOOM_IN_MOTION_ID}`;
+  return preset;
 }

@@ -12,6 +12,7 @@ import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
 import { ArchiveAction } from "../../components/ArchiveAction";
 import { PublishButton } from "../../components/sites/PublishButton";
+import { PageApprovalButton } from "../../components/sites/PageApprovalButton";
 import type { SiteRepo } from "../sites/readiness";
 import { PagePreview } from "../../components/pages/PagePreview";
 import { PagePolish } from "./PagePolish";
@@ -37,12 +38,14 @@ type CampaignOption = {
   id: string;
   name: string;
   status: string;
+  acquisition_mode: string;
 };
 
 type PageCampaignLink = {
   id: string;
   page_id: string;
   campaign_id: string;
+  manifest_id: string | null;
 };
 
 export type PageBuilderType = "landing" | "offer" | "recruitment";
@@ -55,9 +58,14 @@ export type PageBuilderType = "landing" | "offer" | "recruitment";
 export function PageBuilderPanel({
   pageType = "landing",
   clientId: clientIdProp,
+  campaignId: selectedCampaignId,
+  campaignName,
 }: {
   pageType?: PageBuilderType;
   clientId?: string;
+  /** Campaign Factory v2 embeds the existing build form with a fixed campaign. */
+  campaignId?: string;
+  campaignName?: string;
 }) {
   const [buildOpen, setBuildOpen] = useState(false);
   const [briefing, setBriefing] = useState(false);
@@ -71,6 +79,8 @@ export function PageBuilderPanel({
   const [pages, setPages] = useState<Page[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [pageLinks, setPageLinks] = useState<PageCampaignLink[]>([]);
+  const [pageApprovalState, setPageApprovalState] = useState<Record<string, string>>({});
+  const [manifestVersions, setManifestVersions] = useState<Record<string, number>>({});
   const [repos, setRepos] = useState<SiteRepo[]>([]);
   // The approved ads a recruitment page can be the destination for.
   const [ads, setAds] = useState<{ id: string; title: string | null; ref_number: string | null }[]>([]);
@@ -85,7 +95,7 @@ export function PageBuilderPanel({
     setLoadError(null);
     try {
       if (!clientId) return;
-      const [pageRows, campaignRows, linkRows, adRows, repoRows] = await Promise.all([
+      const [pageRows, campaignRows, linkRows, adRows, repoRows, approvalRows, manifestRows] = await Promise.all([
         supabase
           .from("client_pages")
           .select(
@@ -100,14 +110,14 @@ export function PageBuilderPanel({
           ? Promise.resolve({ data: [], error: null })
           : supabase
           .from("client_campaigns")
-          .select("id, name, status")
+          .select("id, name, status, acquisition_mode")
           .eq("client_id", clientId)
           .order("created_at", { ascending: false }),
         isRecruitment
           ? Promise.resolve({ data: [], error: null })
           : supabase
           .from("campaign_artifacts")
-          .select("id, page_id, campaign_id")
+          .select("id, page_id, campaign_id, manifest_id")
           .eq("client_id", clientId)
           .eq("kind", "landing_page"),
         // The site this client's pages publish onto. One site holds many
@@ -125,6 +135,15 @@ export function PageBuilderPanel({
           .from("client_site_repositories")
           .select("id, owner, repo, status, pages_url")
           .eq("client_id", clientId),
+        selectedCampaignId ? supabase.from("campaign_action_approvals")
+          .select("status, scope, manifest_id, requested_at")
+          .eq("client_id", clientId).eq("campaign_id", selectedCampaignId)
+          .eq("action_key", "page_deploy").order("requested_at", { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
+        selectedCampaignId ? supabase.from("campaign_manifest_versions")
+          .select("id, version").eq("client_id", clientId).eq("campaign_id", selectedCampaignId)
+          .order("version", { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
       ]);
       if (pageRows.error) throw pageRows.error;
       if (campaignRows.error) throw campaignRows.error;
@@ -133,6 +152,18 @@ export function PageBuilderPanel({
       setCampaigns((campaignRows.data ?? []) as CampaignOption[]);
       const links = (linkRows.data ?? []) as PageCampaignLink[];
       setPageLinks(links);
+      if (selectedCampaignId && !manifestRows.error) {
+        setManifestVersions(Object.fromEntries((manifestRows.data ?? []).map((row) => [row.id, row.version])));
+      }
+      if (selectedCampaignId && !approvalRows.error && !manifestRows.error) {
+        const latestManifest = manifestRows.data?.[0]?.id;
+        const states: Record<string, string> = {};
+        for (const approval of approvalRows.data ?? []) {
+          const pageId = (approval.scope as { page_id?: string } | null)?.page_id;
+          if (pageId && !states[pageId] && approval.manifest_id === latestManifest) states[pageId] = approval.status;
+        }
+        setPageApprovalState(states);
+      }
       setRepos((repoRows.data ?? []) as SiteRepo[]);
       setAds((adRows.data ?? []) as { id: string; title: string | null; ref_number: string | null }[]);
       setCampaignSelections((previous) => {
@@ -145,7 +176,7 @@ export function PageBuilderPanel({
     } catch (error) {
       setLoadError("Failed to load pages: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
     }
-  }, [clientId, pageType, isRecruitment]);
+  }, [clientId, pageType, isRecruitment, selectedCampaignId]);
 
   useEffect(() => {
     void refresh();
@@ -156,6 +187,9 @@ export function PageBuilderPanel({
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
   const open = pages.find((p) => p.id === openId);
+  const visiblePages = selectedCampaignId
+    ? pages.filter((page) => pageLinks.some((link) => link.page_id === page.id && link.campaign_id === selectedCampaignId))
+    : pages;
   const saveCampaign = async (page: Page) => {
     if (!clientId || busyPageId) return;
     setBusyPageId(page.id);
@@ -308,7 +342,7 @@ export function PageBuilderPanel({
 
   return (
     <div>
-      <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
+      {!selectedCampaignId && <AgentActivityBar inFlight={inFlight} failures={recentFailures} />}
 
       <div className="mb-4 flex justify-end">
         <Button icon={Plus} onClick={() => setBuildOpen(true)}>
@@ -323,16 +357,17 @@ export function PageBuilderPanel({
       )}
       {actionError && <p role="alert" className="mb-4 text-sm text-destructive">{actionError}</p>}
 
-      {pages.length === 0 ? (
-        <EmptyState label="No pages built yet" />
+      {visiblePages.length === 0 ? (
+        <EmptyState label={selectedCampaignId ? "No page linked to this campaign yet" : "No pages built yet"} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {pages.map((p) => (
+          {visiblePages.map((p) => (
             <Panel key={p.id} title={p.title}>
               <p className="text-sm capitalize text-muted-foreground">
                 {p.status}
                 {p.published_url ? " · live" : p.html ? " · built, not published" : ""}
               </p>
+              {selectedCampaignId && <p className="mt-1 text-xs text-muted-foreground">Revision: {p.current_revision ?? "not built"} · Package: {(() => { const id = pageLinks.find((link) => link.page_id === p.id && link.campaign_id === selectedCampaignId)?.manifest_id; return id ? `v${manifestVersions[id] ?? "unknown"}` : "not version-bound"; })()} · Review request: {pageApprovalState[p.id] ?? "not requested for current package"}. The exact revision is rechecked before deployment.</p>}
               {p.html ? (
                 <>
                   {p.meta_description && (
@@ -357,7 +392,13 @@ export function PageBuilderPanel({
                 <p className="mt-1 truncate text-xs text-muted-foreground">{p.published_url}</p>
               )}
               <div className="mt-4 border-t border-border pt-3">
-                <PublishButton
+                {pageLinks.some((link) => link.page_id === p.id &&
+                  campaigns.some((campaign) => campaign.id === link.campaign_id &&
+                    (campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "paid"))) ? (
+                  <PageApprovalButton pageId={p.id}
+                    ready={Boolean(p.html && p.current_revision) &&
+                      repos.some((repo) => repo.status === "ready" && Boolean(repo.pages_url))} />
+                ) : <PublishButton
                   page={{
                     id: p.id,
                     title: p.title,
@@ -368,7 +409,7 @@ export function PageBuilderPanel({
                   }}
                   repos={repos}
                   onPublished={() => void refresh()}
-                />
+                />}
               </div>
 
               {isRecruitment && (
@@ -398,12 +439,12 @@ export function PageBuilderPanel({
               )}
 
               <div className="mt-4 border-t border-border pt-3">
-                {!isRecruitment && (
+                {!isRecruitment && !selectedCampaignId && (
                 <label htmlFor={`page-campaign-${p.id}`} className="mb-1 block text-xs text-muted-foreground">
                   Campaign for {p.title}
                 </label>
                 )}
-                {!isRecruitment && (
+                {!isRecruitment && !selectedCampaignId && (
                 <select
                   id={`page-campaign-${p.id}`}
                   value={campaignSelections[p.id] ?? pageLinks.find((link) => link.page_id === p.id)?.campaign_id ?? ""}
@@ -418,7 +459,7 @@ export function PageBuilderPanel({
                 </select>
                 )}
                 <div className="mt-2 flex items-center gap-3">
-                  {!isRecruitment && (
+                  {!isRecruitment && !selectedCampaignId && (
                   <button
                     type="button"
                     onClick={() => void saveCampaign(p)}
@@ -462,11 +503,13 @@ export function PageBuilderPanel({
           setAiBrief(null);
         }}
         title="Build Page"
-        draftKey={`page:${pageType}:${clientId}`}
+        draftKey={selectedCampaignId ? undefined : `page:${pageType}:${clientId}`}
         intro="Upload finished HTML when the page already exists, or leave the file empty to queue the page agent."
-        fields={fields}
+        fields={selectedCampaignId ? fields.map((field) => field.name === "campaign_id"
+          ? { ...field, options: [{ value: selectedCampaignId, label: campaignName ?? "Current campaign" }] }
+          : field) : fields}
         submitLabel="Save page"
-        initialValues={aiBrief ? { brief: aiBrief } : undefined}
+        initialValues={selectedCampaignId ? { campaign_id: selectedCampaignId, ...(aiBrief ? { brief: aiBrief } : {}) } : aiBrief ? { brief: aiBrief } : undefined}
         actions={
           <button
             type="button"
@@ -480,7 +523,7 @@ export function PageBuilderPanel({
           if (!clientId) throw new Error("No client selected.");
           const title = (v.title as string).trim();
           const brief = typeof v.brief === "string" ? v.brief.trim() : "";
-          const campaignId = typeof v.campaign_id === "string" ? v.campaign_id : "";
+          const campaignId = selectedCampaignId ?? (typeof v.campaign_id === "string" ? v.campaign_id : "");
           const referenceAssetId =
             typeof v.reference_asset_id === "string" && v.reference_asset_id
               ? v.reference_asset_id
