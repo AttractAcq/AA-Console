@@ -14825,6 +14825,19 @@ export type Database = {
         }
         Returns: Json
       }
+      mcp_create_upload_url: {
+        Args: {
+          p_bot_id: string
+          p_brief_id: string
+          p_byte_size?: number
+          p_client_id: string
+          p_content_type: string
+          p_execution_id: string
+          p_filename?: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
       mcp_delivery_create_task: {
         Args: {
           p_bot_id: string
@@ -15203,19 +15216,6 @@ export type Database = {
           p_request_id: string
           p_storage_path: string
           p_title?: string
-        }
-        Returns: Json
-      }
-      mcp_create_upload_url: {
-        Args: {
-          p_bot_id: string
-          p_brief_id: string
-          p_byte_size?: number
-          p_client_id: string
-          p_content_type: string
-          p_execution_id: string
-          p_filename?: string
-          p_request_id: string
         }
         Returns: Json
       }
