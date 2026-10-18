@@ -25,8 +25,14 @@ export function validateProofArtifactOutput(
   // Numbers in a proof artifact are factual claims. A new figure cannot be
   // smuggled into a heading, statistic or paragraph just because the cited
   // excerpt is real. This check is intentionally conservative.
-  const sourceNumbers = new Set(sourceText.match(/\b\d+(?:[.,]\d+)?%?\b/g) ?? []);
-  const outputNumbers = [supportedClaim, content].join(" ").match(/\b\d+(?:[.,]\d+)?%?\b/g) ?? [];
+  // No trailing \b: % is a non-word character and so is whatever follows it,
+  // so a boundary after % never matches and the pattern silently falls back
+  // to the bare number. That made "99 jobs" in the source enough to license
+  // "99%" in the output -- a count and a rate are different claims, and the
+  // rate is the one a regulator reads back to you.
+  const NUMBER = /\b\d+(?:[.,]\d+)?%?/g;
+  const sourceNumbers = new Set(sourceText.match(NUMBER) ?? []);
+  const outputNumbers = [supportedClaim, content].join(" ").match(NUMBER) ?? [];
   if (outputNumbers.some((number) => !sourceNumbers.has(number))) return null;
   return { supportedClaim, evidenceExcerpt, content };
 }
