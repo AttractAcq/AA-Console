@@ -1,3 +1,4 @@
+import { CollapsiblePanel } from "../../components/CollapsiblePanel";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -41,7 +42,7 @@ export function CampaignInputsPanel() {
         : rows.map((row) => {
           const sources = Array.isArray(row.source_records)
             ? row.source_records as SourceRecord[] : [];
-          return <article key={row.id} className="rounded-xl border border-border bg-card p-5">
+          return <CollapsiblePanel key={`${clientId}:${row.id}`} title={`${row.acquisition_mode === "paid" ? `${row.paid_platform ?? "Paid"} campaign` : "Organic campaign"} · ${new Date(row.captured_at).toLocaleString()}`}>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h3 className="font-semibold">{row.acquisition_mode === "paid"
@@ -61,14 +62,13 @@ export function CampaignInputsPanel() {
               <summary className="cursor-pointer font-medium">View exact source material</summary>
               <div className="mt-3 space-y-3">
                 <pre className="overflow-auto rounded-lg bg-muted p-3 text-xs">{JSON.stringify(row.business_context, null, 2)}</pre>
-                {sources.map((source) => <section key={source.id} className="rounded-lg border border-border p-3">
-                  <h4 className="font-medium">{source.domain}: {source.title}</h4>
+                {sources.map((source) => <CollapsiblePanel key={source.id} title={`${source.domain}: ${source.title}`}>
                   <p className="text-xs text-muted-foreground">Updated {new Date(source.updated_at).toLocaleString()}</p>
                   <p className="mt-2 whitespace-pre-wrap">{source.body}</p>
-                </section>)}
+                </CollapsiblePanel>)}
               </div>
             </details>
-          </article>;
+          </CollapsiblePanel>;
         })}
   </div>;
 }

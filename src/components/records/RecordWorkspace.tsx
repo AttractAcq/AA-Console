@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Play, Pencil } from "lucide-react";
+import { CollapsiblePanel } from "../CollapsiblePanel";
 import { Button } from "../Button";
 import { EmptyState } from "../EmptyState";
 import { FormModal } from "../forms/FormModal";
@@ -255,26 +256,22 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
             const record = byKey.get(t.item_key);
             const isReference = t.item_type === "reference";
             return (
-              <div
-                key={t.item_key}
-                className="flex flex-col rounded-lg border border-border bg-card p-5"
+              <CollapsiblePanel
+                key={`${clientId}:${domain}:${t.item_key}`}
+                title={t.title}
+                badge={t.item_type !== "section" && (
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
+                      t.item_type === "question"
+                        ? "bg-primary/10 text-brand-strong"
+                        : "bg-secondary text-secondary-foreground",
+                    )}
+                  >
+                    {isReference ? "Reference" : t.item_type}
+                  </span>
+                )}
               >
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-card-foreground">{t.title}</h2>
-                  {t.item_type !== "section" && (
-                    <span
-                      className={cn(
-                        "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
-                        t.item_type === "question"
-                          ? "bg-primary/10 text-brand-strong"
-                          : "bg-secondary text-secondary-foreground",
-                      )}
-                    >
-                      {isReference ? "Reference" : t.item_type}
-                    </span>
-                  )}
-                </div>
-
                 {t.description && (
                   <p className="mb-3 text-sm text-muted-foreground">{t.description}</p>
                 )}
@@ -314,7 +311,7 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
                     Edit
                   </button>
                 </div>
-              </div>
+              </CollapsiblePanel>
             );
           })}
         </div>

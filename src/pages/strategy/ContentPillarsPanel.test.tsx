@@ -101,13 +101,18 @@ describe("a set that already exists", () => {
 
   it("retires a pillar rather than deleting it", async () => {
     render(<ContentPillarsPanel />);
-    await screen.findByDisplayValue("Honest proof");
+    const toggle = await screen.findByRole("button", { name: "Honest proof" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Retire" })).not.toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
     await userEvent.click(screen.getAllByRole("button", { name: "Retire" })[0]!);
     await waitFor(() => expect(update).toHaveBeenCalledWith({ active: false }));
   });
 
   it("saves an edited boundary on blur", async () => {
     render(<ContentPillarsPanel />);
+    await userEvent.click(await screen.findByRole("button", { name: "Honest proof" }));
     const box = await screen.findByLabelText(/What does not for Honest proof/i);
     await userEvent.clear(box);
     await userEvent.type(box, "Anything without a named source.");
