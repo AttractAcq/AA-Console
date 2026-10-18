@@ -1,3 +1,6 @@
+import { handlePublicProof } from "./proof-capture/public-route.js";
+import { handleProofCaptureAdmin } from "./proof-capture/admin-route.js";
+import { startProofCoordinator } from "./proof-capture/coordinator.js";
 // Process entry point: a small health/status HTTP surface plus
 // config.concurrency worker loops in the same process. One process, not a
 // server/worker pair — there is no cross-process coordination this runtime
@@ -25,7 +28,10 @@ import { handleMcpAttribution } from "./mcp/attribution-route.js";
 import { handleMcpBrand } from "./mcp/brand-route.js";
 import { handleMcpSites } from "./mcp/sites-mcp-route.js";
 import { handleMcpAuth } from "./mcp/auth-route.js";
-import { handlePublicSales, isPublicSalesRequest } from "./public/sales-route.js";
+import {
+  handlePublicSales,
+  isPublicSalesRequest,
+} from "./public/sales-route.js";
 import { loadConfig } from "./config.js";
 import { serviceClient } from "./db.js";
 import { startWorker, type WorkerHandle } from "./worker.js";
@@ -66,8 +72,14 @@ if (config.enabled) {
   });
 }
 
+const proofCoordinator = config.enabled
+  ? startProofCoordinator(sb, config)
+  : null;
 const heartbeat = startHeartbeat(sb, config, workers.length);
-const workflows = config.enabled && config.workflowEnabled ? startWorkflowReconciler(sb, config) : null;
+const workflows =
+  config.enabled && config.workflowEnabled
+    ? startWorkflowReconciler(sb, config)
+    : null;
 
 const server = http.createServer((req, res) => {
   const json = (status: number, body: unknown): void => {
@@ -79,13 +91,17 @@ const server = http.createServer((req, res) => {
     void handleMcpBrief(req, res, sb, config.mcpServiceSecret);
     return;
   }
-  if (req.url === "/internal/mcp/attribution/get-revenue-attribution"
-      || req.url?.startsWith("/internal/mcp/economics/")) {
+  if (
+    req.url === "/internal/mcp/attribution/get-revenue-attribution" ||
+    req.url?.startsWith("/internal/mcp/economics/")
+  ) {
     void handleMcpEconomics(req, res, sb, config.mcpServiceSecret);
     return;
   }
-  if (req.url === "/internal/mcp/attribution/get-conversion-funnel"
-      || req.url === "/internal/mcp/attribution/get-content-performance") {
+  if (
+    req.url === "/internal/mcp/attribution/get-conversion-funnel" ||
+    req.url === "/internal/mcp/attribution/get-content-performance"
+  ) {
     void handleMcpAttribution(req, res, sb, config.mcpServiceSecret);
     return;
   }
@@ -93,8 +109,10 @@ const server = http.createServer((req, res) => {
     void handleMcpBrand(req, res, sb, config.mcpServiceSecret);
     return;
   }
-  if (req.url === "/internal/mcp/sites/provision"
-      || req.url === "/internal/mcp/sites/publish-page") {
+  if (
+    req.url === "/internal/mcp/sites/provision" ||
+    req.url === "/internal/mcp/sites/publish-page"
+  ) {
     void handleMcpSites(req, res, sb, config.mcpServiceSecret, config);
     return;
   }
@@ -106,7 +124,7 @@ const server = http.createServer((req, res) => {
     void handleMcpCampaign(req, res, sb, config.mcpServiceSecret);
     return;
   }
-  if (/^\/internal\/mcp\/(workflow|attribution)\//.test(req.url ?? '')) {
+  if (/^\/internal\/mcp\/(workflow|attribution)\//.test(req.url ?? "")) {
     void handleMcpOrchestration(req, res, sb, config.mcpServiceSecret);
     return;
   }
@@ -147,6 +165,15 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.url?.startsWith("/public/proof")) {
+    void handlePublicProof(req, res, sb);
+    return;
+  }
+  if (req.url === "/internal/proof-capture/event") {
+    void handleProofCaptureAdmin(req, res, sb, config);
+    return;
+  }
+
   // The public sales widget. Handled before the console CORS block because its
   // allowed origin comes from the deployment record, not from a static env
   // allowlist — a static list cannot express one origin per client site.
@@ -162,7 +189,10 @@ const server = http.createServer((req, res) => {
   if (origin && config.allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
-    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Authorization, Content-Type",
+    );
     // GET is here for /admin/github/status. A GET carrying Authorization
     // is preflighted, and the browser refuses it unless the method is listed.
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -171,6 +201,11 @@ const server = http.createServer((req, res) => {
   if (req.method === "OPTIONS") {
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  if (req.url === "/admin/proof-capture") {
+    void handleProofCaptureAdmin(req, res, sb, config);
     return;
   }
 
@@ -224,14 +259,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.url === "/admin/sites/provision" || req.url === "/admin/sites/publish"
-      || req.url === "/admin/sites/request-page-approval") {
+  if (
+    req.url === "/admin/sites/provision" ||
+    req.url === "/admin/sites/publish" ||
+    req.url === "/admin/sites/request-page-approval"
+  ) {
     if (req.method !== "POST") {
       json(405, { ok: false, error: "POST only" });
       return;
     }
-    const action = req.url.endsWith("provision") ? "provision"
-      : req.url.endsWith("request-page-approval") ? "request-page-approval" : "publish";
+    const action = req.url.endsWith("provision")
+      ? "provision"
+      : req.url.endsWith("request-page-approval")
+        ? "request-page-approval"
+        : "publish";
     void handleSitesRoute(req, res, sb, config, action);
     return;
   }
@@ -259,7 +300,10 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url === "/status") {
-    if (config.sharedSecret && req.headers["x-runtime-secret"] !== config.sharedSecret) {
+    if (
+      config.sharedSecret &&
+      req.headers["x-runtime-secret"] !== config.sharedSecret
+    ) {
       json(401, { ok: false, error: "unauthorized" });
       return;
     }
@@ -290,6 +334,7 @@ async function shutdown(signal: string): Promise<void> {
 
   heartbeat.stop();
   await workflows?.stop();
+  await proofCoordinator?.stop();
   server.close();
   // Let in-flight jobs finish their current iteration rather than killing
   // them; anything still running will have its lease expire and be

@@ -32,7 +32,9 @@ it("queues a hero motion video from its own client page", async () => {
   expect(rpc).toHaveBeenCalledWith("request_motion_design", {
     p_client_id: "client-1", p_prompt: "A calm animated hero introducing our client growth process.",
     p_preset: "hero", p_aspect: "horizontal", p_duration_sec: 8,
-    p_brand_mode: "on_brand", p_revision_of: null,
+    // A first request revises nothing, so the key is left out rather than
+    // set to the null the function defaults to anyway.
+    p_brand_mode: "on_brand",
   });
 });
 

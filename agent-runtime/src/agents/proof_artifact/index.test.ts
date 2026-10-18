@@ -25,3 +25,20 @@ it("rejects invented evidence and figures before saving a model response", () =>
     content: "A 99% on-time rate.",
   }, source)).toBeNull();
 });
+
+it("will not let a count in the source license a rate in the output", () => {
+  // The pattern used to drop a trailing %, so "99" matched "99%" and a
+  // number of jobs was enough to justify a percentage nobody measured.
+  const counted = "The team completed 99 jobs. The team arrived on time.";
+  expect(validateProofArtifactOutput({
+    supported_claim: "The team has a 99% on-time rate",
+    evidence_excerpt: "The team arrived on time",
+    content: "A 99% on-time rate.",
+  }, counted)).toBeNull();
+  // The same figure, stated as the source states it, is still fine.
+  expect(validateProofArtifactOutput({
+    supported_claim: "The team completed 99 jobs",
+    evidence_excerpt: "The team arrived on time",
+    content: "99 jobs completed.",
+  }, counted)).not.toBeNull();
+});

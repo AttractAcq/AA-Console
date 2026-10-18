@@ -1,3 +1,4 @@
+import { ProofFactoryV2Panel } from "./proof-bank/ProofFactoryV2Panel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -34,7 +35,6 @@ import { StoryLibraryPanel } from "./media/StoryLibraryPanel";
 import { CarouselLibraryPanel } from "./media/CarouselLibraryPanel";
 import { VideoLibraryPanel } from "./media/VideoLibraryPanel";
 import { ReelShotsPanel } from "./media/ReelShotsPanel";
-import { ContentAssetsPanel } from "./media/ContentAssetsPanel";
 import { EditRepurposePanel } from "./media/EditRepurposePanel";
 import { MotionDesignPanel } from "./motion/MotionDesignPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
@@ -76,6 +76,8 @@ import { FinancialsPanel } from "./admin/FinancialsPanel";
 import { SopsPanel } from "./admin/SopsPanel";
 import { ContentJourney } from "../components/ContentJourney";
 import { PlannedModulePanel } from "./v6/PlannedModulePanel";
+import { ContentAssetTable } from "../components/content/ContentAssetTable";
+import { MarketOpportunitiesPanel } from "./opportunities/MarketOpportunitiesPanel";
 
 const strategyTabIds = new Set(["branding-strategy", "content-pillars", "money-model-strategy"]);
 
@@ -92,6 +94,12 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "branding-strategy": () => <BrandingStrategyPanel />,
     "content-pillars": () => <ContentPillarsPanel />,
     "money-model-strategy": () => <MoneyModelStrategyPanel />,
+  },
+  "market-opportunities": {
+    discover: () => <MarketOpportunitiesPanel view="discover" />,
+    evaluate: () => <MarketOpportunitiesPanel view="evaluate" />,
+    strategize: () => <MarketOpportunitiesPanel view="strategize" />,
+    activate: () => <MarketOpportunitiesPanel view="activate" />,
   },
   "campaign-factory": { overview: () => <CampaignExecutionPanel /> },
   "proof-production-factory": {
@@ -275,14 +283,18 @@ function getPanelBody(
   sectionLabel: string,
   view: string,
 ): ReactNode {
+  if (node.id === "proof-production-factory" && view === "v2") return <ProofFactoryV2Panel tab={activeTab?.id ?? "capture"} />;
   if (node.id === "campaign-factory" && view === "v2") return <CampaignExecutionPanel />;
   if (node.id === "content-production-factory" && view === "v2") {
     switch (activeTab?.id) {
       case "generation": return <GenerationPanel showJourney={false} />;
       case "briefs": return <BriefsPanel showJourney={false} />;
-      case "create": return <BriefsPanel stage="create" showJourney={false} />;
+      // v2 only. Create is the assets a person has yet to sign off, not the
+      // briefs waiting for one — a brief with nothing made from it stays in
+      // Briefs, where Approve & build starts the work.
+      case "create": return <ContentAssetTable approved={false} />;
       case "edit": return <EditRepurposePanel showJourney={false} />;
-      case "assets": return <ContentAssetsPanel />;
+      case "assets": return <ContentAssetTable approved />;
     }
   }
   const renderPanel = activeTab
@@ -300,9 +312,10 @@ export function Page({ node }: { node: NavNode }) {
   const requestedView = searchParams.get("view");
   const view = node.id === "intelligence-os" ? requestedView === "strategy" ? "strategy" : "intelligence"
     : requestedView === "v2" && node.sidebarViews?.some((item) => item.id === "v2") ? "v2" : "v1";
-  const v2Blank = view === "v2" && node.id !== "content-production-factory" && node.id !== "campaign-factory";
+  const v2Blank = view === "v2" && node.id !== "content-production-factory" && node.id !== "campaign-factory" && node.id !== "proof-production-factory";
   const tabs = node.id === "intelligence-os"
     ? node.tabs?.filter((tab) => strategyTabIds.has(tab.id) === (view === "strategy"))
+    : node.id === "proof-production-factory" && view === "v2" ? [{id:"capture",label:"Capture"},{id:"produce",label:"Produce"},{id:"repurpose",label:"Repurpose"},{id:"assets",label:"Assets"}]
     : node.id === "campaign-factory" && view === "v2" ? undefined
     : node.id === "content-production-factory" && view === "v2"
       ? [

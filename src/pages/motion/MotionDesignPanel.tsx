@@ -68,7 +68,10 @@ export function MotionDesignPanel() {
     setBusy(true); setError(null); setNotice(null);
     const result = await supabase.rpc("request_motion_design", {
       p_client_id: clientId, p_prompt: prompt.trim(), p_preset: preset, p_aspect: aspect,
-      p_duration_sec: duration, p_brand_mode: brandMode, p_revision_of: revisionOf,
+      p_duration_sec: duration, p_brand_mode: brandMode,
+      // A first request is not a revision of anything, and the function's
+      // default covers that, so the key is left out rather than set to null.
+      ...(revisionOf ? { p_revision_of: revisionOf } : {}),
     });
     setBusy(false);
     if (result.error) { setError(result.error.message); return; }
@@ -107,7 +110,9 @@ export function MotionDesignPanel() {
     const briefId = attachSelections[project.id] || null;
     setBusy(true); setError(null); setNotice(null);
     const result = await supabase.rpc("attach_motion_design", {
-      p_project_id: project.id, p_brief_id: briefId,
+      p_project_id: project.id,
+      // Detaching is attaching to nothing, which the default expresses.
+      ...(briefId ? { p_brief_id: briefId } : {}),
     });
     setBusy(false);
     if (result.error) { setError(result.error.message); return; }

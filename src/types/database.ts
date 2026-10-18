@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   graphql_public: {
     Tables: {
@@ -538,274 +538,197 @@ export type Database = {
             referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "brief_dispatches_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
         ]
       }
       campaign_action_approvals: {
         Row: {
-          id: string
-          client_id: string
-          campaign_id: string
-          manifest_id: string
-          idempotency_key: string
           action_key: string
-          destination: string
           artifact_version_hash: string
-          scope: Json
-          request_hash: string
-          status: string
-          requested_at: string
+          campaign_id: string
+          client_id: string
           decided_at: string | null
           decided_by: string | null
-          rejection_reason: string | null
-        }
-        Insert: {
-          id?: string
-          client_id: string
-          campaign_id: string
-          manifest_id: string
-          idempotency_key: string
-          action_key: string
           destination: string
-          artifact_version_hash: string
-          scope: Json
-          request_hash: string
-          status?: string
-          requested_at?: string
-          decided_at?: string | null
-          decided_by?: string | null
-          rejection_reason?: string | null
-        }
-        Update: {
-          id?: string
-          client_id?: string
-          campaign_id?: string
-          manifest_id?: string
-          idempotency_key?: string
-          action_key?: string
-          destination?: string
-          artifact_version_hash?: string
-          scope?: Json
-          request_hash?: string
-          status?: string
-          requested_at?: string
-          decided_at?: string | null
-          decided_by?: string | null
-          rejection_reason?: string | null
-        }
-        Relationships: []
-      }
-      campaign_page_approval_snapshots: {
-        Row: {
-          approval_id: string
-          client_id: string
-          page_id: string
-          revision_id: string
-          site_repository_id: string
-          site_path: string
-          rendered_html: string
-          rendered_sha256: string
-          created_at: string
-        }
-        Insert: {
-          approval_id: string
-          client_id: string
-          page_id: string
-          revision_id: string
-          site_repository_id: string
-          site_path: string
-          rendered_html: string
-          rendered_sha256: string
-          created_at?: string
-        }
-        Update: {
-          approval_id?: string
-          client_id?: string
-          page_id?: string
-          revision_id?: string
-          site_repository_id?: string
-          site_path?: string
-          rendered_html?: string
-          rendered_sha256?: string
-          created_at?: string
-        }
-        Relationships: []
-      }
-      campaign_intelligence_snapshots: {
-        Row: {
           id: string
-          client_id: string
-          campaign_id: string
-          planner_job_id: string
-          brief: string
-          acquisition_mode: string
-          paid_platform: string | null
-          business_context: Json
-          source_records: Json
-          content_pillars: Json
-          missing_domains: string[]
-          snapshot_hash: string
-          captured_at: string
+          idempotency_key: string
+          manifest_id: string
+          rejection_reason: string | null
+          request_hash: string
+          requested_at: string
+          scope: Json
+          status: string
         }
         Insert: {
-          id?: string
-          client_id: string
+          action_key: string
+          artifact_version_hash: string
           campaign_id: string
-          planner_job_id: string
-          brief: string
-          acquisition_mode: string
-          paid_platform?: string | null
-          business_context: Json
-          source_records: Json
-          content_pillars: Json
-          missing_domains?: string[]
-          snapshot_hash: string
-          captured_at?: string
+          client_id: string
+          decided_at?: string | null
+          decided_by?: string | null
+          destination: string
+          id?: string
+          idempotency_key: string
+          manifest_id: string
+          rejection_reason?: string | null
+          request_hash: string
+          requested_at?: string
+          scope: Json
+          status?: string
         }
         Update: {
-          id?: string
-          client_id?: string
+          action_key?: string
+          artifact_version_hash?: string
           campaign_id?: string
-          planner_job_id?: string
-          brief?: string
-          acquisition_mode?: string
-          paid_platform?: string | null
-          business_context?: Json
-          source_records?: Json
-          content_pillars?: Json
-          missing_domains?: string[]
-          snapshot_hash?: string
+          client_id?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          destination?: string
+          id?: string
+          idempotency_key?: string
+          manifest_id?: string
+          rejection_reason?: string | null
+          request_hash?: string
+          requested_at?: string
+          scope?: Json
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_action_approvals_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_approvals_manifest_id_campaign_id_client_i_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_manifest_versions"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+        ]
+      }
+      campaign_artifact_offer_inputs: {
+        Row: {
+          artifact_id: string
+          artifact_kind: string
+          campaign_id: string
+          captured_at: string
+          client_id: string
+          job_id: string
+          manifest_id: string
+          offer_snapshot: Json
+          offer_version_id: string
+        }
+        Insert: {
+          artifact_id: string
+          artifact_kind: string
+          campaign_id: string
           captured_at?: string
-        }
-        Relationships: []
-      }
-      service_offers: {
-        Row: { id: string; client_id: string; service_name: string; created_at: string }
-        Insert: { id?: string; client_id: string; service_name: string; created_at?: string }
-        Update: { id?: string; client_id?: string; service_name?: string; created_at?: string }
-        Relationships: []
-      }
-      service_offer_versions: {
-        Row: {
-          id: string; offer_id: string; client_id: string; version: number
-          idempotency_key: string; audience: string; promise: string
-          inclusions: string[]; exclusions: string[]; price_amount: number | null
-          currency: string | null; delivery_cost_estimate: number | null
-          claims: Json; content_hash: string; created_at: string
-        }
-        Insert: {
-          id?: string; offer_id: string; client_id: string; version: number
-          idempotency_key: string; audience: string; promise: string
-          inclusions?: string[]; exclusions?: string[]; price_amount?: number | null
-          currency?: string | null; delivery_cost_estimate?: number | null
-          claims?: Json; content_hash: string; created_at?: string
+          client_id: string
+          job_id: string
+          manifest_id: string
+          offer_snapshot: Json
+          offer_version_id: string
         }
         Update: {
-          id?: string; offer_id?: string; client_id?: string; version?: number
-          idempotency_key?: string; audience?: string; promise?: string
-          inclusions?: string[]; exclusions?: string[]; price_amount?: number | null
-          currency?: string | null; delivery_cost_estimate?: number | null
-          claims?: Json; content_hash?: string; created_at?: string
+          artifact_id?: string
+          artifact_kind?: string
+          campaign_id?: string
+          captured_at?: string
+          client_id?: string
+          job_id?: string
+          manifest_id?: string
+          offer_snapshot?: Json
+          offer_version_id?: string
         }
-        Relationships: []
-      }
-      service_offer_signoffs: {
-        Row: { offer_version_id: string; client_id: string; approved_by: string; approved_at: string }
-        Insert: { offer_version_id: string; client_id: string; approved_by: string; approved_at?: string }
-        Update: { offer_version_id?: string; client_id?: string; approved_by?: string; approved_at?: string }
-        Relationships: []
-      }
-      campaign_manifest_offers: {
-        Row: { manifest_id: string; campaign_id: string; client_id: string; offer_version_id: string; linked_at: string }
-        Insert: { manifest_id: string; campaign_id: string; client_id: string; offer_version_id: string; linked_at?: string }
-        Update: { manifest_id?: string; campaign_id?: string; client_id?: string; offer_version_id?: string; linked_at?: string }
-        Relationships: []
-      }
-      campaign_manifest_versions: {
-        Row: {
-          id: string; campaign_id: string; client_id: string; version: number
-          idempotency_key: string; acquisition_mode: string; paid_platform: string | null
-          plan_snapshot: Json; plan_hash: string; created_at: string
-        }
-        Insert: {
-          id?: string; campaign_id: string; client_id: string; version: number
-          idempotency_key: string; acquisition_mode: string; paid_platform?: string | null
-          plan_snapshot: Json; plan_hash: string; created_at?: string
-        }
-        Update: {
-          id?: string; campaign_id?: string; client_id?: string; version?: number
-          idempotency_key?: string; acquisition_mode?: string; paid_platform?: string | null
-          plan_snapshot?: Json; plan_hash?: string; created_at?: string
-        }
-        Relationships: []
-      }
-      campaign_manifest_items: {
-        Row: {
-          manifest_id: string; item_key: string; module_key: string
-          required: boolean; depends_on: string[]; external_activation: boolean
-        }
-        Insert: {
-          manifest_id: string; item_key: string; module_key: string
-          required: boolean; depends_on?: string[]; external_activation?: boolean
-        }
-        Update: {
-          manifest_id?: string; item_key?: string; module_key?: string
-          required?: boolean; depends_on?: string[]; external_activation?: boolean
-        }
-        Relationships: []
-      }
-      proof_artifact_versions: {
-        Row: {
-          id: string; client_id: string; source_proof_id: string
-          artifact_kind: string; version: number; idempotency_key: string
-          source_snapshot: Json; source_hash: string; supported_claim: string
-          evidence_excerpt: string; content: string; content_hash: string
-          created_by_job_id: string | null; created_at: string
-        }
-        Insert: {
-          id?: string; client_id: string; source_proof_id: string
-          artifact_kind: string; version: number; idempotency_key: string
-          source_snapshot: Json; source_hash: string; supported_claim: string
-          evidence_excerpt: string; content: string; content_hash: string
-          created_by_job_id?: string | null; created_at?: string
-        }
-        Update: {
-          id?: string; client_id?: string; source_proof_id?: string
-          artifact_kind?: string; version?: number; idempotency_key?: string
-          source_snapshot?: Json; source_hash?: string; supported_claim?: string
-          evidence_excerpt?: string; content?: string; content_hash?: string
-          created_by_job_id?: string | null; created_at?: string
-        }
-        Relationships: []
-      }
-      proof_artifact_signoffs: {
-        Row: { artifact_version_id: string; client_id: string; approved_by: string; approved_at: string }
-        Insert: { artifact_version_id: string; client_id: string; approved_by: string; approved_at?: string }
-        Update: { artifact_version_id?: string; client_id?: string; approved_by?: string; approved_at?: string }
-        Relationships: []
-      }
-      video_render_candidates: {
-        Row: {
-          id: string; client_id: string; asset_id: string; job_id: string
-          attempt: number; render_path: string; media_probe: Json
-          creative_review: Json | null; edit_plan: Json | null
-          verdict: string; rejection_reason: string | null
-          created_at: string; reviewed_at: string | null
-        }
-        Insert: {
-          id?: string; client_id: string; asset_id: string; job_id: string
-          attempt: number; render_path: string; media_probe: Json
-          creative_review?: Json | null; edit_plan?: Json | null
-          verdict?: string; rejection_reason?: string | null
-          created_at?: string; reviewed_at?: string | null
-        }
-        Update: {
-          id?: string; client_id?: string; asset_id?: string; job_id?: string
-          attempt?: number; render_path?: string; media_probe?: Json
-          creative_review?: Json | null; edit_plan?: Json | null
-          verdict?: string; rejection_reason?: string | null
-          created_at?: string; reviewed_at?: string | null
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "campaign_artifact_offer_input_manifest_id_campaign_id_clie_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_manifest_versions"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifact_offer_inputs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_artifact_offer_inputs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifact_offer_inputs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifact_offer_inputs_offer_version_id_client_id_fkey"
+            columns: ["offer_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "service_offer_versions"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
       }
       campaign_artifacts: {
         Row: {
@@ -947,6 +870,13 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
           {
+            foreignKeyName: "campaign_artifacts_manifest_identity_fk"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_manifest_versions"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
             foreignKeyName: "campaign_artifacts_page_id_fkey"
             columns: ["page_id"]
             isOneToOne: false
@@ -1040,6 +970,319 @@ export type Database = {
             columns: ["pillar_id"]
             isOneToOne: false
             referencedRelation: "client_content_pillars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_intelligence_snapshots: {
+        Row: {
+          acquisition_mode: string
+          brief: string
+          business_context: Json
+          campaign_id: string
+          captured_at: string
+          client_id: string
+          content_pillars: Json
+          id: string
+          missing_domains: string[]
+          paid_platform: string | null
+          planner_job_id: string
+          snapshot_hash: string
+          source_records: Json
+        }
+        Insert: {
+          acquisition_mode: string
+          brief: string
+          business_context: Json
+          campaign_id: string
+          captured_at?: string
+          client_id: string
+          content_pillars: Json
+          id?: string
+          missing_domains?: string[]
+          paid_platform?: string | null
+          planner_job_id: string
+          snapshot_hash: string
+          source_records: Json
+        }
+        Update: {
+          acquisition_mode?: string
+          brief?: string
+          business_context?: Json
+          campaign_id?: string
+          captured_at?: string
+          client_id?: string
+          content_pillars?: Json
+          id?: string
+          missing_domains?: string[]
+          paid_platform?: string | null
+          planner_job_id?: string
+          snapshot_hash?: string
+          source_records?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_intelligence_snapshots_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_intelligence_snapshots_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      campaign_manifest_intelligence: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          manifest_id: string
+          snapshot_id: string
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          manifest_id: string
+          snapshot_id: string
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          manifest_id?: string
+          snapshot_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_manifest_intelligenc_manifest_id_campaign_id_clie_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_manifest_versions"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_intelligenc_snapshot_id_campaign_id_clie_fkey"
+            columns: ["snapshot_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_intelligence_snapshots"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+        ]
+      }
+      campaign_manifest_items: {
+        Row: {
+          depends_on: string[]
+          external_activation: boolean
+          item_key: string
+          manifest_id: string
+          module_key: string
+          required: boolean
+        }
+        Insert: {
+          depends_on?: string[]
+          external_activation?: boolean
+          item_key: string
+          manifest_id: string
+          module_key: string
+          required: boolean
+        }
+        Update: {
+          depends_on?: string[]
+          external_activation?: boolean
+          item_key?: string
+          manifest_id?: string
+          module_key?: string
+          required?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_manifest_items_manifest_id_fkey"
+            columns: ["manifest_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_manifest_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_manifest_offers: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          linked_at: string
+          manifest_id: string
+          offer_version_id: string
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          linked_at?: string
+          manifest_id: string
+          offer_version_id: string
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          linked_at?: string
+          manifest_id?: string
+          offer_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_manifest_offers_manifest_id_campaign_id_client_id_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_manifest_versions"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_offers_offer_version_id_client_id_fkey"
+            columns: ["offer_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "service_offer_versions"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      campaign_manifest_versions: {
+        Row: {
+          acquisition_mode: string
+          campaign_id: string
+          client_id: string
+          created_at: string
+          id: string
+          idempotency_key: string
+          paid_platform: string | null
+          plan_hash: string
+          plan_snapshot: Json
+          version: number
+        }
+        Insert: {
+          acquisition_mode: string
+          campaign_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          paid_platform?: string | null
+          plan_hash: string
+          plan_snapshot: Json
+          version: number
+        }
+        Update: {
+          acquisition_mode?: string
+          campaign_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          paid_platform?: string | null
+          plan_hash?: string
+          plan_snapshot?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      campaign_page_approval_snapshots: {
+        Row: {
+          approval_id: string
+          client_id: string
+          created_at: string
+          page_id: string
+          rendered_html: string
+          rendered_sha256: string
+          revision_id: string
+          site_path: string
+          site_repository_id: string
+        }
+        Insert: {
+          approval_id: string
+          client_id: string
+          created_at?: string
+          page_id: string
+          rendered_html: string
+          rendered_sha256: string
+          revision_id: string
+          site_path: string
+          site_repository_id: string
+        }
+        Update: {
+          approval_id?: string
+          client_id?: string
+          created_at?: string
+          page_id?: string
+          rendered_html?: string
+          rendered_sha256?: string
+          revision_id?: string
+          site_path?: string
+          site_repository_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "client_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_revision_id_fkey"
+            columns: ["revision_id"]
+            isOneToOne: false
+            referencedRelation: "client_page_revisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_site_repository_id_fkey"
+            columns: ["site_repository_id"]
+            isOneToOne: false
+            referencedRelation: "client_site_repositories"
             referencedColumns: ["id"]
           },
         ]
@@ -1623,7 +1866,6 @@ export type Database = {
       }
       client_briefs: {
         Row: {
-          target_platform: Database["public"]["Enums"]["post_platform"] | null
           apply_url: string | null
           archived_at: string | null
           argument: string | null
@@ -1658,14 +1900,16 @@ export type Database = {
           script: string | null
           shot_requirements: string | null
           slot_role: string | null
+          sound_asset_id: string | null
+          sound_treatment: string
           source_idea_id: string | null
           status: Database["public"]["Enums"]["brief_status"]
+          target_platform: Database["public"]["Enums"]["post_platform"] | null
           title: string
           updated_at: string
           visual_direction: string | null
         }
         Insert: {
-          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           apply_url?: string | null
           archived_at?: string | null
           argument?: string | null
@@ -1700,14 +1944,16 @@ export type Database = {
           script?: string | null
           shot_requirements?: string | null
           slot_role?: string | null
+          sound_asset_id?: string | null
+          sound_treatment?: string
           source_idea_id?: string | null
           status?: Database["public"]["Enums"]["brief_status"]
+          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           title: string
           updated_at?: string
           visual_direction?: string | null
         }
         Update: {
-          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           apply_url?: string | null
           archived_at?: string | null
           argument?: string | null
@@ -1742,8 +1988,11 @@ export type Database = {
           script?: string | null
           shot_requirements?: string | null
           slot_role?: string | null
+          sound_asset_id?: string | null
+          sound_treatment?: string
           source_idea_id?: string | null
           status?: Database["public"]["Enums"]["brief_status"]
+          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           title?: string
           updated_at?: string
           visual_direction?: string | null
@@ -1841,6 +2090,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_briefs_sound_asset_id_fkey"
+            columns: ["sound_asset_id"]
+            isOneToOne: false
+            referencedRelation: "video_sound_assets"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "client_briefs_source_idea_id_fkey"
             columns: ["source_idea_id"]
             isOneToOne: false
@@ -1934,7 +2190,7 @@ export type Database = {
       }
       client_campaigns: {
         Row: {
-          acquisition_mode: "legacy" | "organic" | "paid"
+          acquisition_mode: string
           ad_campaign_id: string | null
           archived_at: string | null
           audience: string | null
@@ -1973,7 +2229,7 @@ export type Database = {
           offer_summary: string | null
           offer_version_id: string | null
           optimisation_event: string | null
-          paid_platform: "meta" | "google" | null
+          paid_platform: string | null
           starts_on: string | null
           status: string
           target_countries: string[]
@@ -1981,7 +2237,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          acquisition_mode?: "legacy" | "organic" | "paid"
+          acquisition_mode?: string
           ad_campaign_id?: string | null
           archived_at?: string | null
           audience?: string | null
@@ -2020,7 +2276,7 @@ export type Database = {
           offer_summary?: string | null
           offer_version_id?: string | null
           optimisation_event?: string | null
-          paid_platform?: "meta" | "google" | null
+          paid_platform?: string | null
           starts_on?: string | null
           status?: string
           target_countries?: string[]
@@ -2028,7 +2284,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          acquisition_mode?: "legacy" | "organic" | "paid"
+          acquisition_mode?: string
           ad_campaign_id?: string | null
           archived_at?: string | null
           audience?: string | null
@@ -2067,7 +2323,7 @@ export type Database = {
           offer_summary?: string | null
           offer_version_id?: string | null
           optimisation_event?: string | null
-          paid_platform?: "meta" | "google" | null
+          paid_platform?: string | null
           starts_on?: string | null
           status?: string
           target_countries?: string[]
@@ -2075,13 +2331,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "client_campaigns_clone_same_client_fkey"
-            columns: ["cloned_from_campaign_id", "client_id"]
-            isOneToOne: false
-            referencedRelation: "client_campaigns"
-            referencedColumns: ["id", "client_id"]
-          },
           {
             foreignKeyName: "client_campaigns_ad_campaign_id_fkey"
             columns: ["ad_campaign_id"]
@@ -2102,6 +2351,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_clone_same_client_fkey"
+            columns: ["cloned_from_campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_clone_same_client_fkey"
+            columns: ["cloned_from_campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
           },
           {
             foreignKeyName: "client_campaigns_feeds_from_campaign_id_fkey"
@@ -2137,6 +2400,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "metrics_pulls"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_offer_version_client_fk"
+            columns: ["offer_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "service_offer_versions"
+            referencedColumns: ["id", "client_id"]
           },
         ]
       }
@@ -2312,6 +2582,75 @@ export type Database = {
           },
         ]
       }
+      client_daily_package_settings: {
+        Row: {
+          approval_cutoff: string
+          campaign_id: string
+          client_id: string
+          enabled: boolean
+          pillar_id: string
+          platform: Database["public"]["Enums"]["post_platform"]
+          story_media_type: Database["public"]["Enums"]["media_type"]
+          updated_at: string
+        }
+        Insert: {
+          approval_cutoff?: string
+          campaign_id: string
+          client_id: string
+          enabled?: boolean
+          pillar_id: string
+          platform?: Database["public"]["Enums"]["post_platform"]
+          story_media_type?: Database["public"]["Enums"]["media_type"]
+          updated_at?: string
+        }
+        Update: {
+          approval_cutoff?: string
+          campaign_id?: string
+          client_id?: string
+          enabled?: boolean
+          pillar_id?: string
+          platform?: Database["public"]["Enums"]["post_platform"]
+          story_media_type?: Database["public"]["Enums"]["media_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_daily_package_settings_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_daily_package_settings_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_daily_package_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_daily_package_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_daily_package_settings_pillar_id_fkey"
+            columns: ["pillar_id"]
+            isOneToOne: false
+            referencedRelation: "client_content_pillars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_engine_budgets: {
         Row: {
           cap_usd: number
@@ -2410,6 +2749,9 @@ export type Database = {
           max_jobs_in_flight: number
           min_qa_score: number
           plan_horizon_days: number
+          proof_publishing_enabled: boolean
+          proof_publishing_enabled_at: string | null
+          proof_publishing_enabled_by: string | null
           publishing_enabled: boolean
           publishing_enabled_at: string | null
           publishing_enabled_by: string | null
@@ -2428,6 +2770,9 @@ export type Database = {
           max_jobs_in_flight?: number
           min_qa_score?: number
           plan_horizon_days?: number
+          proof_publishing_enabled?: boolean
+          proof_publishing_enabled_at?: string | null
+          proof_publishing_enabled_by?: string | null
           publishing_enabled?: boolean
           publishing_enabled_at?: string | null
           publishing_enabled_by?: string | null
@@ -2446,6 +2791,9 @@ export type Database = {
           max_jobs_in_flight?: number
           min_qa_score?: number
           plan_horizon_days?: number
+          proof_publishing_enabled?: boolean
+          proof_publishing_enabled_at?: string | null
+          proof_publishing_enabled_by?: string | null
           publishing_enabled?: boolean
           publishing_enabled_at?: string | null
           publishing_enabled_by?: string | null
@@ -2465,6 +2813,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_engine_settings_proof_publishing_enabled_by_fkey"
+            columns: ["proof_publishing_enabled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2515,7 +2870,6 @@ export type Database = {
       }
       client_ideas: {
         Row: {
-          target_platform: Database["public"]["Enums"]["post_platform"] | null
           archived_at: string | null
           body: string | null
           campaign_id: string | null
@@ -2535,11 +2889,11 @@ export type Database = {
           source_question: string | null
           status: Database["public"]["Enums"]["idea_status"]
           strategic_reason: string | null
+          target_platform: Database["public"]["Enums"]["post_platform"] | null
           title: string
           updated_at: string
         }
         Insert: {
-          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -2559,11 +2913,11 @@ export type Database = {
           source_question?: string | null
           status?: Database["public"]["Enums"]["idea_status"]
           strategic_reason?: string | null
+          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           title: string
           updated_at?: string
         }
         Update: {
-          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -2583,6 +2937,7 @@ export type Database = {
           source_question?: string | null
           status?: Database["public"]["Enums"]["idea_status"]
           strategic_reason?: string | null
+          target_platform?: Database["public"]["Enums"]["post_platform"] | null
           title?: string
           updated_at?: string
         }
@@ -2756,6 +3111,185 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      client_launch_asset_checks: {
+        Row: {
+          asset_id: string
+          checked_at: string
+          package_id: string
+          qa_evidence: Json
+        }
+        Insert: {
+          asset_id: string
+          checked_at?: string
+          package_id: string
+          qa_evidence: Json
+        }
+        Update: {
+          asset_id?: string
+          checked_at?: string
+          package_id?: string
+          qa_evidence?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_launch_asset_checks_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "client_launch_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_launch_checks: {
+        Row: {
+          blocker: string | null
+          check_key: string
+          checked_at: string | null
+          evidence: Json
+          package_id: string
+          record_id: string | null
+          status: string
+        }
+        Insert: {
+          blocker?: string | null
+          check_key: string
+          checked_at?: string | null
+          evidence?: Json
+          package_id: string
+          record_id?: string | null
+          status: string
+        }
+        Update: {
+          blocker?: string | null
+          check_key?: string
+          checked_at?: string | null
+          evidence?: Json
+          package_id?: string
+          record_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_launch_checks_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "client_launch_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_launch_packages: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          id: string
+          input_snapshot: Json
+          run_id: string
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          input_snapshot: Json
+          run_id: string
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          input_snapshot?: Json
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_launch_packages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_launch_packages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_launch_packages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_launch_packages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_launch_packages_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3097,6 +3631,7 @@ export type Database = {
           ad_headline: string | null
           ad_link_url: string | null
           ad_primary_text: string | null
+          archived_at: string | null
           brief_id: string | null
           client_id: string
           content_format: Database["public"]["Enums"]["content_format"]
@@ -3132,6 +3667,7 @@ export type Database = {
           ad_headline?: string | null
           ad_link_url?: string | null
           ad_primary_text?: string | null
+          archived_at?: string | null
           brief_id?: string | null
           client_id: string
           content_format?: Database["public"]["Enums"]["content_format"]
@@ -3167,6 +3703,7 @@ export type Database = {
           ad_headline?: string | null
           ad_link_url?: string | null
           ad_primary_text?: string | null
+          archived_at?: string | null
           brief_id?: string | null
           client_id?: string
           content_format?: Database["public"]["Enums"]["content_format"]
@@ -3240,6 +3777,55 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "client_media_assets_uploaded_by_fkey"
             columns: ["uploaded_by"]
             isOneToOne: false
@@ -3261,6 +3847,8 @@ export type Database = {
           position: number
           proof_asset_id: string | null
           provider_job_id: string | null
+          provider_prior_job_ids: string[]
+          provider_retry_count: number
           shot_source_kind: string | null
           storage_path: string
         }
@@ -3276,6 +3864,8 @@ export type Database = {
           position: number
           proof_asset_id?: string | null
           provider_job_id?: string | null
+          provider_prior_job_ids?: string[]
+          provider_retry_count?: number
           shot_source_kind?: string | null
           storage_path: string
         }
@@ -3291,6 +3881,8 @@ export type Database = {
           position?: number
           proof_asset_id?: string | null
           provider_job_id?: string | null
+          provider_prior_job_ids?: string[]
+          provider_retry_count?: number
           shot_source_kind?: string | null
           storage_path?: string
         }
@@ -3810,6 +4402,8 @@ export type Database = {
         Row: {
           avatar_relevance: string | null
           body: string | null
+          capture_file_mime: string | null
+          capture_method: string | null
           captured_on: string | null
           claim: string | null
           client_id: string
@@ -3823,6 +4417,9 @@ export type Database = {
           ref_number: string | null
           services: string | null
           source: string | null
+          source_category: string | null
+          source_format: Database["public"]["Enums"]["content_format"]
+          source_kind: string | null
           storage_path: string | null
           strength: string
           title: string | null
@@ -3833,6 +4430,8 @@ export type Database = {
         Insert: {
           avatar_relevance?: string | null
           body?: string | null
+          capture_file_mime?: string | null
+          capture_method?: string | null
           captured_on?: string | null
           claim?: string | null
           client_id: string
@@ -3846,6 +4445,9 @@ export type Database = {
           ref_number?: string | null
           services?: string | null
           source?: string | null
+          source_category?: string | null
+          source_format?: Database["public"]["Enums"]["content_format"]
+          source_kind?: string | null
           storage_path?: string | null
           strength?: string
           title?: string | null
@@ -3856,6 +4458,8 @@ export type Database = {
         Update: {
           avatar_relevance?: string | null
           body?: string | null
+          capture_file_mime?: string | null
+          capture_method?: string | null
           captured_on?: string | null
           claim?: string | null
           client_id?: string
@@ -3869,6 +4473,9 @@ export type Database = {
           ref_number?: string | null
           services?: string | null
           source?: string | null
+          source_category?: string | null
+          source_format?: Database["public"]["Enums"]["content_format"]
+          source_kind?: string | null
           storage_path?: string | null
           strength?: string
           title?: string | null
@@ -3894,6 +4501,62 @@ export type Database = {
           {
             foreignKeyName: "client_proof_assets_uploaded_by_fkey"
             columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_proof_destinations: {
+        Row: {
+          account_ref: string | null
+          client_id: string
+          destination_key: string
+          enabled: boolean
+          enabled_at: string | null
+          enabled_by: string | null
+        }
+        Insert: {
+          account_ref?: string | null
+          client_id: string
+          destination_key: string
+          enabled?: boolean
+          enabled_at?: string | null
+          enabled_by?: string | null
+        }
+        Update: {
+          account_ref?: string | null
+          client_id?: string
+          destination_key?: string
+          enabled?: boolean
+          enabled_at?: string | null
+          enabled_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_proof_destinations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_proof_destinations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_proof_destinations_destination_key_fkey"
+            columns: ["destination_key"]
+            isOneToOne: false
+            referencedRelation: "proof_destinations"
+            referencedColumns: ["destination_key"]
+          },
+          {
+            foreignKeyName: "client_proof_destinations_enabled_by_fkey"
+            columns: ["enabled_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -4287,6 +4950,42 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      content_approval_settings: {
+        Row: {
+          owner_user_id: string
+          singleton: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          owner_user_id: string
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          owner_user_id?: string
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_approval_settings_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_approval_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       content_slots: {
         Row: {
@@ -4856,6 +5555,360 @@ export type Database = {
           },
         ]
       }
+      daily_package_items: {
+        Row: {
+          asset_id: string | null
+          campaign_id: string
+          content_format: Database["public"]["Enums"]["content_format"]
+          created_at: string
+          final_step_id: string
+          id: string
+          media_type: Database["public"]["Enums"]["media_type"]
+          package_id: string
+          pillar_id: string
+          proof_id: string | null
+          role: string
+          slot_id: string | null
+        }
+        Insert: {
+          asset_id?: string | null
+          campaign_id: string
+          content_format: Database["public"]["Enums"]["content_format"]
+          created_at?: string
+          final_step_id: string
+          id?: string
+          media_type: Database["public"]["Enums"]["media_type"]
+          package_id: string
+          pillar_id: string
+          proof_id?: string | null
+          role: string
+          slot_id?: string | null
+        }
+        Update: {
+          asset_id?: string | null
+          campaign_id?: string
+          content_format?: Database["public"]["Enums"]["content_format"]
+          created_at?: string
+          final_step_id?: string
+          id?: string
+          media_type?: Database["public"]["Enums"]["media_type"]
+          package_id?: string
+          pillar_id?: string
+          proof_id?: string | null
+          role?: string
+          slot_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_package_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_final_step_id_fkey"
+            columns: ["final_step_id"]
+            isOneToOne: true
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "daily_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_pillar_id_fkey"
+            columns: ["pillar_id"]
+            isOneToOne: false
+            referencedRelation: "client_content_pillars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["slot_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: true
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["slot_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: true
+            referencedRelation: "content_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: true
+            referencedRelation: "slot_board"
+            referencedColumns: ["slot_id"]
+          },
+        ]
+      }
+      daily_package_recoveries: {
+        Row: {
+          id: string
+          item_id: string
+          reason: string
+          reserve_asset_id: string
+          selected_at: string
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          reason: string
+          reserve_asset_id: string
+          selected_at?: string
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          reason?: string
+          reserve_asset_id?: string
+          selected_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_package_recoveries_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "daily_package_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
+            columns: ["reserve_asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
+            columns: ["reserve_asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
+            columns: ["reserve_asset_id"]
+            isOneToOne: true
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
+            columns: ["reserve_asset_id"]
+            isOneToOne: true
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
+            columns: ["reserve_asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
+            columns: ["reserve_asset_id"]
+            isOneToOne: true
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
+            columns: ["reserve_asset_id"]
+            isOneToOne: true
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_package_recovery_alerts: {
+        Row: {
+          created_at: string
+          delivered_at: string | null
+          delivery_attempts: number
+          delivery_error: string | null
+          delivery_lease_until: string | null
+          delivery_status: string
+          delivery_worker: string | null
+          id: string
+          item_id: string
+          provider_message_id: string | null
+          reason: string
+          resolved_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          delivered_at?: string | null
+          delivery_attempts?: number
+          delivery_error?: string | null
+          delivery_lease_until?: string | null
+          delivery_status?: string
+          delivery_worker?: string | null
+          id?: string
+          item_id: string
+          provider_message_id?: string | null
+          reason: string
+          resolved_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          delivered_at?: string | null
+          delivery_attempts?: number
+          delivery_error?: string | null
+          delivery_lease_until?: string | null
+          delivery_status?: string
+          delivery_worker?: string | null
+          id?: string
+          item_id?: string
+          provider_message_id?: string | null
+          reason?: string
+          resolved_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_package_recovery_alerts_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "daily_package_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_packages: {
+        Row: {
+          client_id: string
+          created_at: string
+          cutoff_at: string
+          id: string
+          package_day: string
+          platform: Database["public"]["Enums"]["post_platform"]
+          run_id: string
+          story_media_type: Database["public"]["Enums"]["media_type"]
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          cutoff_at: string
+          id?: string
+          package_day: string
+          platform: Database["public"]["Enums"]["post_platform"]
+          run_id: string
+          story_media_type: Database["public"]["Enums"]["media_type"]
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          cutoff_at?: string
+          id?: string
+          package_day?: string
+          platform?: Database["public"]["Enums"]["post_platform"]
+          run_id?: string
+          story_media_type?: Database["public"]["Enums"]["media_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_packages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_packages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "daily_packages_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       engine_controls: {
         Row: {
           enabled: boolean
@@ -5165,6 +6218,63 @@ export type Database = {
           },
         ]
       }
+      ideation_learning_snapshots: {
+        Row: {
+          captured_at: string
+          client_id: string
+          evidence: Json
+          job_id: string
+        }
+        Insert: {
+          captured_at?: string
+          client_id: string
+          evidence: Json
+          job_id: string
+        }
+        Update: {
+          captured_at?: string
+          client_id?: string
+          evidence?: Json
+          job_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ideation_learning_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideation_learning_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "ideation_learning_snapshots_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideation_learning_snapshots_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "ideation_learning_snapshots_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+        ]
+      }
       job_assignments: {
         Row: {
           accepted_at: string | null
@@ -5178,9 +6288,9 @@ export type Database = {
           due_date: string | null
           id: string
           member_id: string
+          source_asset_id: string | null
           stage: Database["public"]["Enums"]["assignment_stage"]
           stage_reason: string | null
-          source_asset_id: string | null
           title: string
           updated_at: string
         }
@@ -5196,9 +6306,9 @@ export type Database = {
           due_date?: string | null
           id?: string
           member_id: string
+          source_asset_id?: string | null
           stage?: Database["public"]["Enums"]["assignment_stage"]
           stage_reason?: string | null
-          source_asset_id?: string | null
           title: string
           updated_at?: string
         }
@@ -5214,9 +6324,9 @@ export type Database = {
           due_date?: string | null
           id?: string
           member_id?: string
+          source_asset_id?: string | null
           stage?: Database["public"]["Enums"]["assignment_stage"]
           stage_reason?: string | null
-          source_asset_id?: string | null
           title?: string
           updated_at?: string
         }
@@ -5310,6 +6420,55 @@ export type Database = {
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
         ]
@@ -5419,6 +6578,118 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      market_opportunities: {
+        Row: {
+          buying_situation: string
+          client_id: string
+          confidence: Database["public"]["Enums"]["opportunity_confidence"]
+          conversion_action: string | null
+          core_problem: string | null
+          created_at: string
+          created_by: string | null
+          desired_outcome: string | null
+          entry_awareness: string | null
+          id: string
+          idempotency_key: string
+          micro_market: string
+          name: string
+          positioning: string | null
+          proposed_by: string
+          proposed_by_job_id: string | null
+          purchase_trigger: string | null
+          status: Database["public"]["Enums"]["opportunity_status"]
+          status_note: string | null
+          updated_at: string
+        }
+        Insert: {
+          buying_situation: string
+          client_id: string
+          confidence?: Database["public"]["Enums"]["opportunity_confidence"]
+          conversion_action?: string | null
+          core_problem?: string | null
+          created_at?: string
+          created_by?: string | null
+          desired_outcome?: string | null
+          entry_awareness?: string | null
+          id?: string
+          idempotency_key: string
+          micro_market: string
+          name: string
+          positioning?: string | null
+          proposed_by?: string
+          proposed_by_job_id?: string | null
+          purchase_trigger?: string | null
+          status?: Database["public"]["Enums"]["opportunity_status"]
+          status_note?: string | null
+          updated_at?: string
+        }
+        Update: {
+          buying_situation?: string
+          client_id?: string
+          confidence?: Database["public"]["Enums"]["opportunity_confidence"]
+          conversion_action?: string | null
+          core_problem?: string | null
+          created_at?: string
+          created_by?: string | null
+          desired_outcome?: string | null
+          entry_awareness?: string | null
+          id?: string
+          idempotency_key?: string
+          micro_market?: string
+          name?: string
+          positioning?: string | null
+          proposed_by?: string
+          proposed_by_job_id?: string | null
+          purchase_trigger?: string | null
+          status?: Database["public"]["Enums"]["opportunity_status"]
+          status_note?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_proposed_by_job_id_fkey"
+            columns: ["proposed_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_proposed_by_job_id_fkey"
+            columns: ["proposed_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_proposed_by_job_id_fkey"
+            columns: ["proposed_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -5740,6 +7011,691 @@ export type Database = {
           },
         ]
       }
+      motion_design_attachments: {
+        Row: {
+          asset_id: string
+          brief_id: string | null
+          created_at: string
+          created_by: string | null
+          destination: string
+          id: string
+          project_id: string
+        }
+        Insert: {
+          asset_id: string
+          brief_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          destination: string
+          id?: string
+          project_id: string
+        }
+        Update: {
+          asset_id?: string
+          brief_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          destination?: string
+          id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_design_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "motion_design_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      motion_design_projects: {
+        Row: {
+          aspect: string
+          brand_mode: string
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          duration_sec: number
+          error: string | null
+          id: string
+          job_id: string | null
+          poster_path: string | null
+          preset: string
+          prompt: string
+          render_path: string | null
+          revision_of: string | null
+          scene_plan: Json | null
+          status: string
+        }
+        Insert: {
+          aspect: string
+          brand_mode: string
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_sec: number
+          error?: string | null
+          id?: string
+          job_id?: string | null
+          poster_path?: string | null
+          preset: string
+          prompt: string
+          render_path?: string | null
+          revision_of?: string | null
+          scene_plan?: Json | null
+          status?: string
+        }
+        Update: {
+          aspect?: string
+          brand_mode?: string
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_sec?: number
+          error?: string | null
+          id?: string
+          job_id?: string | null
+          poster_path?: string | null
+          preset?: string
+          prompt?: string
+          render_path?: string | null
+          revision_of?: string | null
+          scene_plan?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_design_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_design_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "motion_design_projects_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_design_projects_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "motion_design_projects_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "motion_design_projects_revision_of_fkey"
+            columns: ["revision_of"]
+            isOneToOne: false
+            referencedRelation: "motion_design_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_attributes: {
+        Row: {
+          body: string
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          opportunity_id: string
+          position: number
+        }
+        Insert: {
+          body: string
+          client_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          opportunity_id: string
+          position: number
+        }
+        Update: {
+          body?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          opportunity_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_attributes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_attributes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+        ]
+      }
+      opportunity_awareness_stages: {
+        Row: {
+          asset_direction: string | null
+          client_id: string
+          created_at: string
+          distribution_note: string | null
+          id: string
+          message: string
+          mindset: string
+          opportunity_id: string
+          stage: string
+        }
+        Insert: {
+          asset_direction?: string | null
+          client_id: string
+          created_at?: string
+          distribution_note?: string | null
+          id?: string
+          message: string
+          mindset: string
+          opportunity_id: string
+          stage: string
+        }
+        Update: {
+          asset_direction?: string | null
+          client_id?: string
+          created_at?: string
+          distribution_note?: string | null
+          id?: string
+          message?: string
+          mindset?: string
+          opportunity_id?: string
+          stage?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+        ]
+      }
+      opportunity_events: {
+        Row: {
+          actor: string
+          client_id: string
+          detail: string | null
+          event: string
+          id: string
+          occurred_at: string
+          opportunity_id: string
+        }
+        Insert: {
+          actor: string
+          client_id: string
+          detail?: string | null
+          event: string
+          id?: string
+          occurred_at?: string
+          opportunity_id: string
+        }
+        Update: {
+          actor?: string
+          client_id?: string
+          detail?: string | null
+          event?: string
+          id?: string
+          occurred_at?: string
+          opportunity_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+        ]
+      }
+      opportunity_links: {
+        Row: {
+          campaign_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          offer_id: string | null
+          opportunity_id: string
+          record_id: string | null
+          role: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          offer_id?: string | null
+          opportunity_id: string
+          record_id?: string | null
+          role: string
+        }
+        Update: {
+          campaign_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          offer_id?: string | null
+          opportunity_id?: string
+          record_id?: string | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "service_offers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "client_agent_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_proof_requirements: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          opportunity_id: string
+          proof_id: string | null
+          requirement: string
+          satisfied_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          opportunity_id: string
+          proof_id?: string | null
+          requirement: string
+          satisfied_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          opportunity_id?: string
+          proof_id?: string | null
+          requirement?: string
+          satisfied_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_proof_requirements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_score_factors: {
+        Row: {
+          factor: string
+          label: string
+          note: string
+          weight: number
+        }
+        Insert: {
+          factor: string
+          label: string
+          note: string
+          weight: number
+        }
+        Update: {
+          factor?: string
+          label?: string
+          note?: string
+          weight?: number
+        }
+        Relationships: []
+      }
+      opportunity_scores: {
+        Row: {
+          classification: string
+          client_id: string
+          factors: Json
+          id: string
+          note: string | null
+          opportunity_id: string
+          scored_at: string
+          scored_by: string | null
+          total: number
+        }
+        Insert: {
+          classification: string
+          client_id: string
+          factors: Json
+          id?: string
+          note?: string | null
+          opportunity_id: string
+          scored_at?: string
+          scored_by?: string | null
+          total: number
+        }
+        Update: {
+          classification?: string
+          client_id?: string
+          factors?: Json
+          id?: string
+          note?: string | null
+          opportunity_id?: string
+          scored_at?: string
+          scored_by?: string | null
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_scores_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_scored_by_fkey"
+            columns: ["scored_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_transitions: {
+        Row: {
+          from_status: Database["public"]["Enums"]["opportunity_status"]
+          note: string | null
+          to_status: Database["public"]["Enums"]["opportunity_status"]
+        }
+        Insert: {
+          from_status: Database["public"]["Enums"]["opportunity_status"]
+          note?: string | null
+          to_status: Database["public"]["Enums"]["opportunity_status"]
+        }
+        Update: {
+          from_status?: Database["public"]["Enums"]["opportunity_status"]
+          note?: string | null
+          to_status?: Database["public"]["Enums"]["opportunity_status"]
+        }
+        Relationships: []
+      }
+      platform_format_publishing: {
+        Row: {
+          content_format: Database["public"]["Enums"]["content_format"]
+          media_type: Database["public"]["Enums"]["media_type"] | null
+          note: string
+          platform: Database["public"]["Enums"]["post_platform"]
+          supported: boolean
+        }
+        Insert: {
+          content_format: Database["public"]["Enums"]["content_format"]
+          media_type?: Database["public"]["Enums"]["media_type"] | null
+          note: string
+          platform: Database["public"]["Enums"]["post_platform"]
+          supported?: boolean
+        }
+        Update: {
+          content_format?: Database["public"]["Enums"]["content_format"]
+          media_type?: Database["public"]["Enums"]["media_type"] | null
+          note?: string
+          platform?: Database["public"]["Enums"]["post_platform"]
+          supported?: boolean
+        }
+        Relationships: []
+      }
       platform_publishing: {
         Row: {
           note: string | null
@@ -5913,6 +7869,76 @@ export type Database = {
           },
         ]
       }
+      post_frame_publications: {
+        Row: {
+          client_id: string
+          external_id: string
+          external_url: string | null
+          position: number
+          post_id: string
+          published_at: string
+        }
+        Insert: {
+          client_id: string
+          external_id: string
+          external_url?: string | null
+          position: number
+          post_id: string
+          published_at?: string
+        }
+        Update: {
+          client_id?: string
+          external_id?: string
+          external_url?: string | null
+          position?: number
+          post_id?: string
+          published_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_frame_publications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_frame_publications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "post_frame_publications_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "distribution_due"
+            referencedColumns: ["schedule_id"]
+          },
+          {
+            foreignKeyName: "post_frame_publications_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "post_copy_effective"
+            referencedColumns: ["scheduled_post_id"]
+          },
+          {
+            foreignKeyName: "post_frame_publications_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["post_id"]
+          },
+          {
+            foreignKeyName: "post_frame_publications_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -5946,6 +7972,1155 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      proof_artifact_signoffs: {
+        Row: {
+          approved_at: string
+          approved_by: string
+          artifact_version_id: string
+          client_id: string
+        }
+        Insert: {
+          approved_at?: string
+          approved_by: string
+          artifact_version_id: string
+          client_id: string
+        }
+        Update: {
+          approved_at?: string
+          approved_by?: string
+          artifact_version_id?: string
+          client_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_artifact_signoffs_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_signoffs_artifact_version_id_client_id_fkey"
+            columns: ["artifact_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "proof_artifact_versions"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      proof_artifact_versions: {
+        Row: {
+          artifact_kind: string
+          client_id: string
+          content: string
+          content_hash: string
+          created_at: string
+          created_by_job_id: string | null
+          evidence_excerpt: string
+          id: string
+          idempotency_key: string
+          source_hash: string
+          source_proof_id: string
+          source_snapshot: Json
+          supported_claim: string
+          version: number
+        }
+        Insert: {
+          artifact_kind: string
+          client_id: string
+          content: string
+          content_hash: string
+          created_at?: string
+          created_by_job_id?: string | null
+          evidence_excerpt: string
+          id?: string
+          idempotency_key: string
+          source_hash: string
+          source_proof_id: string
+          source_snapshot: Json
+          supported_claim: string
+          version: number
+        }
+        Update: {
+          artifact_kind?: string
+          client_id?: string
+          content?: string
+          content_hash?: string
+          created_at?: string
+          created_by_job_id?: string | null
+          evidence_excerpt?: string
+          id?: string
+          idempotency_key?: string
+          source_hash?: string
+          source_proof_id?: string
+          source_snapshot?: Json
+          supported_claim?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_artifact_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_versions_created_by_job_id_fkey"
+            columns: ["created_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_versions_created_by_job_id_fkey"
+            columns: ["created_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_versions_created_by_job_id_fkey"
+            columns: ["created_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_versions_source_proof_id_fkey"
+            columns: ["source_proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proof_capture_configs: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          instructions: string
+          message_template: string | null
+          method: string
+          name: string
+          page_id: string | null
+          trigger_event: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          instructions?: string
+          message_template?: string | null
+          method: string
+          name: string
+          page_id?: string | null
+          trigger_event?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          instructions?: string
+          message_template?: string | null
+          method?: string
+          name?: string
+          page_id?: string | null
+          trigger_event?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_capture_configs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_capture_configs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_capture_configs_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "client_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_capture_configs_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proof_capture_links: {
+        Row: {
+          client_id: string
+          config_id: string
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          max_submissions: number
+          revoked_at: string | null
+          submissions: number
+          token_hash: string
+        }
+        Insert: {
+          client_id: string
+          config_id: string
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          max_submissions?: number
+          revoked_at?: string | null
+          submissions?: number
+          token_hash: string
+        }
+        Update: {
+          client_id?: string
+          config_id?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          max_submissions?: number
+          revoked_at?: string | null
+          submissions?: number
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_capture_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_capture_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_capture_links_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "proof_capture_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_capture_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proof_capture_submissions: {
+        Row: {
+          client_id: string
+          consent_text: string
+          created_at: string
+          file_mime: string | null
+          id: string
+          job_reference: string | null
+          link_id: string
+          proof_id: string
+          submitted_name: string
+        }
+        Insert: {
+          client_id: string
+          consent_text: string
+          created_at?: string
+          file_mime?: string | null
+          id: string
+          job_reference?: string | null
+          link_id: string
+          proof_id: string
+          submitted_name: string
+        }
+        Update: {
+          client_id?: string
+          consent_text?: string
+          created_at?: string
+          file_mime?: string | null
+          id?: string
+          job_reference?: string | null
+          link_id?: string
+          proof_id?: string
+          submitted_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_capture_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_capture_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_capture_submissions_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "proof_capture_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_capture_submissions_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proof_destinations: {
+        Row: {
+          destination_key: string
+          executor_module: string
+          label: string
+          mode: string
+          note: string
+          provider: string | null
+          requires_integration: boolean
+          supported: boolean
+        }
+        Insert: {
+          destination_key: string
+          executor_module: string
+          label: string
+          mode: string
+          note: string
+          provider?: string | null
+          requires_integration?: boolean
+          supported?: boolean
+        }
+        Update: {
+          destination_key?: string
+          executor_module?: string
+          label?: string
+          mode?: string
+          note?: string
+          provider?: string | null
+          requires_integration?: boolean
+          supported?: boolean
+        }
+        Relationships: []
+      }
+      proof_placement_approvals: {
+        Row: {
+          campaign_action_approval_id: string | null
+          client_id: string
+          decided_at: string | null
+          decided_by: string | null
+          destination_key: string
+          id: string
+          payload_hash: string
+          placement_id: string
+          rejection_reason: string | null
+          requested_at: string
+          requested_by: string | null
+          scope: Json
+          status: string
+        }
+        Insert: {
+          campaign_action_approval_id?: string | null
+          client_id: string
+          decided_at?: string | null
+          decided_by?: string | null
+          destination_key: string
+          id?: string
+          payload_hash: string
+          placement_id: string
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          scope: Json
+          status?: string
+        }
+        Update: {
+          campaign_action_approval_id?: string | null
+          client_id?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          destination_key?: string
+          id?: string
+          payload_hash?: string
+          placement_id?: string
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          scope?: Json
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_placement_approvals_campaign_action_approval_id_fkey"
+            columns: ["campaign_action_approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_destination_key_fkey"
+            columns: ["destination_key"]
+            isOneToOne: false
+            referencedRelation: "proof_destinations"
+            referencedColumns: ["destination_key"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placement_due"
+            referencedColumns: ["placement_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proof_placement_events: {
+        Row: {
+          actor: string
+          client_id: string
+          detail: string | null
+          event: string
+          external_ref: string | null
+          id: string
+          occurred_at: string
+          placement_id: string
+        }
+        Insert: {
+          actor: string
+          client_id: string
+          detail?: string | null
+          event: string
+          external_ref?: string | null
+          id?: string
+          occurred_at?: string
+          placement_id: string
+        }
+        Update: {
+          actor?: string
+          client_id?: string
+          detail?: string | null
+          event?: string
+          external_ref?: string | null
+          id?: string
+          occurred_at?: string
+          placement_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_placement_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_events_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placement_due"
+            referencedColumns: ["placement_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_events_placement_id_fkey"
+            columns: ["placement_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proof_placement_transitions: {
+        Row: {
+          from_status: string
+          note: string | null
+          to_status: string
+        }
+        Insert: {
+          from_status: string
+          note?: string | null
+          to_status: string
+        }
+        Update: {
+          from_status?: string
+          note?: string | null
+          to_status?: string
+        }
+        Relationships: []
+      }
+      proof_placements: {
+        Row: {
+          approval_id: string | null
+          artifact_version_id: string | null
+          asset_id: string | null
+          attempts: number
+          bound_revision_id: string | null
+          bound_version_hash: string | null
+          campaign_id: string | null
+          claimed_at: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          destination_key: string
+          external_id: string | null
+          external_url: string | null
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lease_until: string | null
+          payload_hash: string
+          placed_at: string | null
+          placed_by: string | null
+          production_request_id: string | null
+          proof_id: string | null
+          retracted_at: string | null
+          source_proof_id: string
+          status: string
+          updated_at: string
+          verified_at: string | null
+        }
+        Insert: {
+          approval_id?: string | null
+          artifact_version_id?: string | null
+          asset_id?: string | null
+          attempts?: number
+          bound_revision_id?: string | null
+          bound_version_hash?: string | null
+          campaign_id?: string | null
+          claimed_at?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          destination_key: string
+          external_id?: string | null
+          external_url?: string | null
+          id?: string
+          idempotency_key: string
+          last_error?: string | null
+          lease_until?: string | null
+          payload_hash: string
+          placed_at?: string | null
+          placed_by?: string | null
+          production_request_id?: string | null
+          proof_id?: string | null
+          retracted_at?: string | null
+          source_proof_id: string
+          status?: string
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Update: {
+          approval_id?: string | null
+          artifact_version_id?: string | null
+          asset_id?: string | null
+          attempts?: number
+          bound_revision_id?: string | null
+          bound_version_hash?: string | null
+          campaign_id?: string | null
+          claimed_at?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          destination_key?: string
+          external_id?: string | null
+          external_url?: string | null
+          id?: string
+          idempotency_key?: string
+          last_error?: string | null
+          lease_until?: string | null
+          payload_hash?: string
+          placed_at?: string | null
+          placed_by?: string | null
+          production_request_id?: string | null
+          proof_id?: string | null
+          retracted_at?: string | null
+          source_proof_id?: string
+          status?: string
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_placement_approval_fk"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "proof_placement_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_artifact_version_id_fkey"
+            columns: ["artifact_version_id"]
+            isOneToOne: false
+            referencedRelation: "proof_artifact_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_placements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_placements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_placements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_placements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_bound_revision_id_fkey"
+            columns: ["bound_revision_id"]
+            isOneToOne: false
+            referencedRelation: "client_page_revisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_destination_key_fkey"
+            columns: ["destination_key"]
+            isOneToOne: false
+            referencedRelation: "proof_destinations"
+            referencedColumns: ["destination_key"]
+          },
+          {
+            foreignKeyName: "proof_placements_placed_by_fkey"
+            columns: ["placed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_production_request_id_fkey"
+            columns: ["production_request_id"]
+            isOneToOne: false
+            referencedRelation: "proof_production_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_source_proof_id_fkey"
+            columns: ["source_proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proof_production_requests: {
+        Row: {
+          auto_produce: boolean
+          client_id: string
+          created_at: string
+          destination: string
+          direction: string
+          id: string
+          idea_id: string
+          job_id: string | null
+          production_checked_at: string
+          production_error: string | null
+          production_job_id: string | null
+          production_quality: string
+          production_size: string
+          production_status: string
+          source_asset_id: string | null
+          source_proof_id: string
+        }
+        Insert: {
+          auto_produce?: boolean
+          client_id: string
+          created_at?: string
+          destination: string
+          direction: string
+          id: string
+          idea_id: string
+          job_id?: string | null
+          production_checked_at?: string
+          production_error?: string | null
+          production_job_id?: string | null
+          production_quality?: string
+          production_size?: string
+          production_status?: string
+          source_asset_id?: string | null
+          source_proof_id: string
+        }
+        Update: {
+          auto_produce?: boolean
+          client_id?: string
+          created_at?: string
+          destination?: string
+          direction?: string
+          id?: string
+          idea_id?: string
+          job_id?: string | null
+          production_checked_at?: string
+          production_error?: string | null
+          production_job_id?: string | null
+          production_quality?: string
+          production_size?: string
+          production_status?: string
+          source_asset_id?: string | null
+          source_proof_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_production_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: true
+            referencedRelation: "client_ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: true
+            referencedRelation: "content_attribution"
+            referencedColumns: ["idea_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_production_job_id_fkey"
+            columns: ["production_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_production_job_id_fkey"
+            columns: ["production_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_production_job_id_fkey"
+            columns: ["production_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_proof_id_fkey"
+            columns: ["source_proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proof_request_deliveries: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          attempts: number
+          capture_url: string
+          channel: string
+          client_id: string
+          config_id: string
+          created_at: string
+          error: string | null
+          event_key: string
+          id: string
+          lease_until: string | null
+          link_id: string
+          message: string
+          provider_id: string | null
+          recipient: string
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          subject: string
+          template_sid: string | null
+          template_variables: Json | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          attempts?: number
+          capture_url: string
+          channel: string
+          client_id: string
+          config_id: string
+          created_at?: string
+          error?: string | null
+          event_key: string
+          id: string
+          lease_until?: string | null
+          link_id: string
+          message: string
+          provider_id?: string | null
+          recipient: string
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          subject: string
+          template_sid?: string | null
+          template_variables?: Json | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          attempts?: number
+          capture_url?: string
+          channel?: string
+          client_id?: string
+          config_id?: string
+          created_at?: string
+          error?: string | null
+          event_key?: string
+          id?: string
+          lease_until?: string | null
+          link_id?: string
+          message?: string
+          provider_id?: string | null
+          recipient?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          template_sid?: string | null
+          template_variables?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_request_deliveries_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "proof_capture_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "proof_capture_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proof_rights_events: {
+        Row: {
+          actor_id: string | null
+          actor_role: string
+          changed_at: string
+          client_id: string
+          id: string
+          new_expiry: string | null
+          new_rights: string
+          permission_basis: string | null
+          previous_expiry: string | null
+          previous_rights: string
+          proof_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_role: string
+          changed_at?: string
+          client_id: string
+          id?: string
+          new_expiry?: string | null
+          new_rights: string
+          permission_basis?: string | null
+          previous_expiry?: string | null
+          previous_rights: string
+          proof_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_role?: string
+          changed_at?: string
+          client_id?: string
+          id?: string
+          new_expiry?: string | null
+          new_rights?: string
+          permission_basis?: string | null
+          previous_expiry?: string | null
+          previous_rights?: string
+          proof_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_rights_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_events_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       record_templates: {
         Row: {
@@ -6471,6 +9646,140 @@ export type Database = {
           },
         ]
       }
+      service_offer_signoffs: {
+        Row: {
+          approved_at: string
+          approved_by: string
+          client_id: string
+          offer_version_id: string
+        }
+        Insert: {
+          approved_at?: string
+          approved_by: string
+          client_id: string
+          offer_version_id: string
+        }
+        Update: {
+          approved_at?: string
+          approved_by?: string
+          client_id?: string
+          offer_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_offer_signoffs_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_offer_signoffs_offer_version_id_client_id_fkey"
+            columns: ["offer_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "service_offer_versions"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      service_offer_versions: {
+        Row: {
+          audience: string
+          claims: Json
+          client_id: string
+          content_hash: string
+          created_at: string
+          currency: string | null
+          delivery_cost_estimate: number | null
+          exclusions: string[]
+          id: string
+          idempotency_key: string
+          inclusions: string[]
+          offer_id: string
+          price_amount: number | null
+          promise: string
+          version: number
+        }
+        Insert: {
+          audience: string
+          claims?: Json
+          client_id: string
+          content_hash: string
+          created_at?: string
+          currency?: string | null
+          delivery_cost_estimate?: number | null
+          exclusions?: string[]
+          id?: string
+          idempotency_key: string
+          inclusions?: string[]
+          offer_id: string
+          price_amount?: number | null
+          promise: string
+          version: number
+        }
+        Update: {
+          audience?: string
+          claims?: Json
+          client_id?: string
+          content_hash?: string
+          created_at?: string
+          currency?: string | null
+          delivery_cost_estimate?: number | null
+          exclusions?: string[]
+          id?: string
+          idempotency_key?: string
+          inclusions?: string[]
+          offer_id?: string
+          price_amount?: number | null
+          promise?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_offer_versions_offer_id_client_id_fkey"
+            columns: ["offer_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "service_offers"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      service_offers: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          service_name: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          service_name: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          service_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_offers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_offers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       slot_events: {
         Row: {
           actor: string
@@ -6816,6 +10125,1070 @@ export type Database = {
           },
         ]
       }
+      v5_reel_source_rebuild_activation: {
+        Row: {
+          activated_at: string
+          singleton: boolean
+        }
+        Insert: {
+          activated_at?: string
+          singleton?: boolean
+        }
+        Update: {
+          activated_at?: string
+          singleton?: boolean
+        }
+        Relationships: []
+      }
+      video_approval_signoffs: {
+        Row: {
+          approval_role: string
+          asset_id: string
+          render_path: string
+          signed_at: string
+          user_id: string
+        }
+        Insert: {
+          approval_role: string
+          asset_id: string
+          render_path: string
+          signed_at?: string
+          user_id: string
+        }
+        Update: {
+          approval_role?: string
+          asset_id?: string
+          render_path?: string
+          signed_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_approval_signoffs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_client_approval_requests: {
+        Row: {
+          asset_id: string
+          client_user_id: string
+          email_error: string | null
+          email_status: string
+          emailed_at: string | null
+          job_id: string | null
+          rejected_at: string | null
+          rejection_reason: string | null
+          requested_at: string
+          requested_by: string
+        }
+        Insert: {
+          asset_id: string
+          client_user_id: string
+          email_error?: string | null
+          email_status?: string
+          emailed_at?: string | null
+          job_id?: string | null
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by: string
+        }
+        Update: {
+          asset_id?: string
+          client_user_id?: string
+          email_error?: string | null
+          email_status?: string
+          emailed_at?: string | null
+          job_id?: string | null
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_client_approval_requests_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_client_user_id_fkey"
+            columns: ["client_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_render_candidates: {
+        Row: {
+          asset_id: string
+          attempt: number
+          client_id: string
+          created_at: string
+          creative_review: Json | null
+          edit_plan: Json | null
+          id: string
+          job_id: string
+          media_probe: Json
+          rejection_reason: string | null
+          render_path: string
+          reviewed_at: string | null
+          verdict: string
+        }
+        Insert: {
+          asset_id: string
+          attempt: number
+          client_id: string
+          created_at?: string
+          creative_review?: Json | null
+          edit_plan?: Json | null
+          id?: string
+          job_id: string
+          media_probe: Json
+          rejection_reason?: string | null
+          render_path: string
+          reviewed_at?: string | null
+          verdict?: string
+        }
+        Update: {
+          asset_id?: string
+          attempt?: number
+          client_id?: string
+          created_at?: string
+          creative_review?: Json | null
+          edit_plan?: Json | null
+          id?: string
+          job_id?: string
+          media_probe?: Json
+          rejection_reason?: string | null
+          render_path?: string
+          reviewed_at?: string | null
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_render_candidates_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+        ]
+      }
+      video_repurpose_clip_requests: {
+        Row: {
+          brief_id: string
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          derivative_id: string
+          error: string | null
+          id: string
+          job_id: string | null
+          output_asset_id: string | null
+          source_asset_id: string
+          source_in_sec: number
+          source_out_sec: number
+          status: string
+        }
+        Insert: {
+          brief_id: string
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          derivative_id: string
+          error?: string | null
+          id?: string
+          job_id?: string | null
+          output_asset_id?: string | null
+          source_asset_id: string
+          source_in_sec: number
+          source_out_sec: number
+          status?: string
+        }
+        Update: {
+          brief_id?: string
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          derivative_id?: string
+          error?: string | null
+          id?: string
+          job_id?: string | null
+          output_asset_id?: string | null
+          source_asset_id?: string
+          source_in_sec?: number
+          source_out_sec?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_repurpose_clip_requests_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_derivative_id_fkey"
+            columns: ["derivative_id"]
+            isOneToOne: false
+            referencedRelation: "video_repurpose_derivatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_repurpose_derivatives: {
+        Row: {
+          candidate_index: number
+          created_at: string
+          exact_quote: string
+          id: string
+          idea_id: string
+          reentry_stage: string
+          request_id: string
+          source_asset_id: string
+          source_in_sec: number
+          source_out_sec: number
+          target_platform: Database["public"]["Enums"]["post_platform"]
+        }
+        Insert: {
+          candidate_index: number
+          created_at?: string
+          exact_quote: string
+          id?: string
+          idea_id: string
+          reentry_stage?: string
+          request_id: string
+          source_asset_id: string
+          source_in_sec: number
+          source_out_sec: number
+          target_platform: Database["public"]["Enums"]["post_platform"]
+        }
+        Update: {
+          candidate_index?: number
+          created_at?: string
+          exact_quote?: string
+          id?: string
+          idea_id?: string
+          reentry_stage?: string
+          request_id?: string
+          source_asset_id?: string
+          source_in_sec?: number
+          source_out_sec?: number
+          target_platform?: Database["public"]["Enums"]["post_platform"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_repurpose_derivatives_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "client_ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["idea_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "video_repurpose_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_repurpose_requests: {
+        Row: {
+          candidates: Json | null
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          direction: string
+          error: string | null
+          id: string
+          job_id: string | null
+          source_asset_id: string
+          status: string
+          transcript: Json | null
+        }
+        Insert: {
+          candidates?: Json | null
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          error?: string | null
+          id?: string
+          job_id?: string | null
+          source_asset_id: string
+          status?: string
+          transcript?: Json | null
+        }
+        Update: {
+          candidates?: Json | null
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          error?: string | null
+          id?: string
+          job_id?: string | null
+          source_asset_id?: string
+          status?: string
+          transcript?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_repurpose_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_sound_assets: {
+        Row: {
+          attested_at: string
+          attested_by: string
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          rights_reference: string
+          storage_path: string
+        }
+        Insert: {
+          attested_at?: string
+          attested_by: string
+          client_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          rights_reference: string
+          storage_path: string
+        }
+        Update: {
+          attested_at?: string
+          attested_by?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          rights_reference?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_sound_assets_attested_by_fkey"
+            columns: ["attested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_sound_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_sound_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      video_source_edit_requests: {
+        Row: {
+          animated_title: boolean
+          aspect: string
+          brand_treatment: string
+          captions: boolean
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          direction: string
+          edit_plan: Json | null
+          error: string | null
+          feel: string
+          id: string
+          job_id: string | null
+          output_asset_id: string | null
+          remove_pauses: boolean
+          source_asset_id: string
+          status: string
+          transcript: Json | null
+        }
+        Insert: {
+          animated_title?: boolean
+          aspect: string
+          brand_treatment: string
+          captions?: boolean
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          direction: string
+          edit_plan?: Json | null
+          error?: string | null
+          feel: string
+          id?: string
+          job_id?: string | null
+          output_asset_id?: string | null
+          remove_pauses?: boolean
+          source_asset_id: string
+          status?: string
+          transcript?: Json | null
+        }
+        Update: {
+          animated_title?: boolean
+          aspect?: string
+          brand_treatment?: string
+          captions?: boolean
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          edit_plan?: Json | null
+          error?: string | null
+          feel?: string
+          id?: string
+          job_id?: string | null
+          output_asset_id?: string | null
+          remove_pauses?: boolean
+          source_asset_id?: string
+          status?: string
+          transcript?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_source_edit_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       work_logs: {
         Row: {
           client_id: string | null
@@ -6864,6 +11237,390 @@ export type Database = {
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_artifacts: {
+        Row: {
+          accepted_at: string
+          artifact_kind: string
+          id: string
+          qa_evidence: Json
+          record_id: string
+          run_id: string
+          step_id: string
+          version_key: string
+        }
+        Insert: {
+          accepted_at?: string
+          artifact_kind: string
+          id?: string
+          qa_evidence: Json
+          record_id: string
+          run_id: string
+          step_id: string
+          version_key: string
+        }
+        Update: {
+          accepted_at?: string
+          artifact_kind?: string
+          id?: string
+          qa_evidence?: Json
+          record_id?: string
+          run_id?: string
+          step_id?: string
+          version_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_artifacts_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_artifacts_step_id_run_id_fkey"
+            columns: ["step_id", "run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["id", "run_id"]
+          },
+        ]
+      }
+      workflow_lead_attribution: {
+        Row: {
+          evidence: Json
+          label: string
+          lead_id: string
+          recorded_at: string
+          run_id: string
+        }
+        Insert: {
+          evidence: Json
+          label: string
+          lead_id: string
+          recorded_at?: string
+          run_id: string
+        }
+        Update: {
+          evidence?: Json
+          label?: string
+          lead_id?: string
+          recorded_at?: string
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_lead_attribution_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_lead_attribution_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+          {
+            foreignKeyName: "workflow_lead_attribution_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_reel_source_rebuilds: {
+        Row: {
+          created_at: string
+          edit_step_id: string
+          feedback: string
+          id: string
+          prior_artifacts: Json
+          run_id: string
+          source_asset_id: string
+        }
+        Insert: {
+          created_at?: string
+          edit_step_id: string
+          feedback: string
+          id?: string
+          prior_artifacts: Json
+          run_id: string
+          source_asset_id: string
+        }
+        Update: {
+          created_at?: string
+          edit_step_id?: string
+          feedback?: string
+          id?: string
+          prior_artifacts?: Json
+          run_id?: string
+          source_asset_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_edit_step_id_fkey"
+            columns: ["edit_step_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_runs: {
+        Row: {
+          blocker: string | null
+          campaign_id: string | null
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          deadline_at: string
+          id: string
+          idempotency_key: string
+          input_snapshot: Json
+          kind: string
+          review_ready_at: string | null
+          root_request_id: string | null
+          sealed_at: string | null
+          status: string
+          updated_at: string
+          workflow_version: string
+        }
+        Insert: {
+          blocker?: string | null
+          campaign_id?: string | null
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deadline_at: string
+          id?: string
+          idempotency_key: string
+          input_snapshot: Json
+          kind: string
+          review_ready_at?: string | null
+          root_request_id?: string | null
+          sealed_at?: string | null
+          status?: string
+          updated_at?: string
+          workflow_version: string
+        }
+        Update: {
+          blocker?: string | null
+          campaign_id?: string | null
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deadline_at?: string
+          id?: string
+          idempotency_key?: string
+          input_snapshot?: Json
+          kind?: string
+          review_ready_at?: string | null
+          root_request_id?: string | null
+          sealed_at?: string | null
+          status?: string
+          updated_at?: string
+          workflow_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_runs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_steps: {
+        Row: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        Insert: {
+          agent_key: string
+          blocker?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dependencies?: string[]
+          id?: string
+          input_from_step_key?: string | null
+          input_id?: string | null
+          input_params?: Json
+          input_table: string
+          job_id?: string | null
+          resolved_input_id?: string | null
+          run_id: string
+          status?: string
+          step_key: string
+          updated_at?: string
+        }
+        Update: {
+          agent_key?: string
+          blocker?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dependencies?: string[]
+          id?: string
+          input_from_step_key?: string | null
+          input_id?: string | null
+          input_params?: Json
+          input_table?: string
+          job_id?: string | null
+          resolved_input_id?: string | null
+          run_id?: string
+          status?: string
+          step_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_steps_agent_key_fkey"
+            columns: ["agent_key"]
+            isOneToOne: false
+            referencedRelation: "agent_stats"
+            referencedColumns: ["agent_key"]
+          },
+          {
+            foreignKeyName: "workflow_steps_agent_key_fkey"
+            columns: ["agent_key"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["agent_key"]
+          },
+          {
+            foreignKeyName: "workflow_steps_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_steps_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "workflow_steps_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "workflow_steps_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
             referencedColumns: ["id"]
           },
         ]
@@ -7845,6 +12602,38 @@ export type Database = {
         }
         Relationships: []
       }
+      opportunity_readiness: {
+        Row: {
+          awareness_stages: number | null
+          blocker: string | null
+          classification: string | null
+          client_id: string | null
+          confidence:
+            | Database["public"]["Enums"]["opportunity_confidence"]
+            | null
+          name: string | null
+          open_proof_gaps: number | null
+          opportunity_id: string | null
+          score: number | null
+          status: Database["public"]["Enums"]["opportunity_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       pages_archive: {
         Row: {
           archived_at: string | null
@@ -7983,6 +12772,52 @@ export type Database = {
           },
         ]
       }
+      proof_placement_due: {
+        Row: {
+          attempts: number | null
+          blocker: string | null
+          client_id: string | null
+          destination_key: string | null
+          destination_label: string | null
+          expires_on: string | null
+          mode: string | null
+          payload_hash: string | null
+          placement_id: string | null
+          source_proof_id: string | null
+          source_title: string | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_placements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placements_destination_key_fkey"
+            columns: ["destination_key"]
+            isOneToOne: false
+            referencedRelation: "proof_destinations"
+            referencedColumns: ["destination_key"]
+          },
+          {
+            foreignKeyName: "proof_placements_source_proof_id_fkey"
+            columns: ["source_proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       publish_due: {
         Row: {
           alt_text: string | null
@@ -7992,7 +12827,9 @@ export type Database = {
           caption: string | null
           client_id: string | null
           client_name: string | null
+          content_format: Database["public"]["Enums"]["content_format"] | null
           first_comment: string | null
+          format_supported: boolean | null
           hashtags: string[] | null
           human_approved_at: string | null
           link_url: string | null
@@ -8239,235 +13076,6 @@ export type Database = {
           },
         ]
       }
-      video_repurpose_clip_requests: {
-        Row: {
-          id: string; derivative_id: string; client_id: string; source_asset_id: string
-          brief_id: string; source_in_sec: number; source_out_sec: number
-          output_asset_id: string | null; status: string; job_id: string | null
-          error: string | null; created_by: string | null; created_at: string; completed_at: string | null
-        }
-        Insert: {
-          id?: string; derivative_id: string; client_id: string; source_asset_id: string
-          brief_id: string; source_in_sec: number; source_out_sec: number
-          output_asset_id?: string | null; status?: string; job_id?: string | null
-          error?: string | null; created_by?: string | null; created_at?: string; completed_at?: string | null
-        }
-        Update: {
-          id?: string; derivative_id?: string; client_id?: string; source_asset_id?: string
-          brief_id?: string; source_in_sec?: number; source_out_sec?: number
-          output_asset_id?: string | null; status?: string; job_id?: string | null
-          error?: string | null; created_by?: string | null; created_at?: string; completed_at?: string | null
-        }
-        Relationships: [
-          { foreignKeyName: "video_repurpose_clip_requests_derivative_id_fkey"; columns: ["derivative_id"]; isOneToOne: false; referencedRelation: "video_repurpose_derivatives"; referencedColumns: ["id"] },
-          { foreignKeyName: "video_repurpose_clip_requests_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
-          { foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"; columns: ["source_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
-          { foreignKeyName: "video_repurpose_clip_requests_brief_id_fkey"; columns: ["brief_id"]; isOneToOne: false; referencedRelation: "client_briefs"; referencedColumns: ["id"] },
-          { foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"; columns: ["output_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
-          { foreignKeyName: "video_repurpose_clip_requests_job_id_fkey"; columns: ["job_id"]; isOneToOne: false; referencedRelation: "agent_jobs"; referencedColumns: ["id"] },
-        ]
-      }
-      motion_design_attachments: {
-        Row: {
-          id: string; project_id: string; asset_id: string; brief_id: string | null
-          destination: string; created_by: string | null; created_at: string
-        }
-        Insert: {
-          id?: string; project_id: string; asset_id: string; brief_id?: string | null
-          destination: string; created_by?: string | null; created_at?: string
-        }
-        Update: {
-          id?: string; project_id?: string; asset_id?: string; brief_id?: string | null
-          destination?: string; created_by?: string | null; created_at?: string
-        }
-        Relationships: [
-          { foreignKeyName: "motion_design_attachments_project_id_fkey"; columns: ["project_id"]; isOneToOne: false; referencedRelation: "motion_design_projects"; referencedColumns: ["id"] },
-          { foreignKeyName: "motion_design_attachments_asset_id_fkey"; columns: ["asset_id"]; isOneToOne: true; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
-          { foreignKeyName: "motion_design_attachments_brief_id_fkey"; columns: ["brief_id"]; isOneToOne: false; referencedRelation: "client_briefs"; referencedColumns: ["id"] },
-        ]
-      }
-      video_repurpose_requests: {
-        Row: {
-          id: string; client_id: string; source_asset_id: string; direction: string
-          status: string; transcript: Json | null; candidates: Json | null; error: string | null
-          job_id: string | null; created_by: string | null; created_at: string; completed_at: string | null
-        }
-        Insert: {
-          id?: string; client_id: string; source_asset_id: string; direction?: string
-          status?: string; transcript?: Json | null; candidates?: Json | null; error?: string | null
-          job_id?: string | null; created_by?: string | null; created_at?: string; completed_at?: string | null
-        }
-        Update: {
-          id?: string; client_id?: string; source_asset_id?: string; direction?: string
-          status?: string; transcript?: Json | null; candidates?: Json | null; error?: string | null
-          job_id?: string | null; created_by?: string | null; created_at?: string; completed_at?: string | null
-        }
-        Relationships: [
-          { foreignKeyName: "video_repurpose_requests_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
-          { foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"; columns: ["source_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
-          { foreignKeyName: "video_repurpose_requests_job_id_fkey"; columns: ["job_id"]; isOneToOne: false; referencedRelation: "agent_jobs"; referencedColumns: ["id"] },
-        ]
-      }
-      video_repurpose_derivatives: {
-        Row: {
-          id: string; request_id: string; source_asset_id: string; candidate_index: number
-          target_platform: Database["public"]["Enums"]["post_platform"]
-          reentry_stage: string; idea_id: string; source_in_sec: number; source_out_sec: number
-          exact_quote: string; created_at: string
-        }
-        Insert: {
-          id?: string; request_id: string; source_asset_id: string; candidate_index: number
-          target_platform: Database["public"]["Enums"]["post_platform"]
-          reentry_stage?: string; idea_id: string; source_in_sec: number; source_out_sec: number
-          exact_quote: string; created_at?: string
-        }
-        Update: {
-          id?: string; request_id?: string; source_asset_id?: string; candidate_index?: number
-          target_platform?: Database["public"]["Enums"]["post_platform"]
-          reentry_stage?: string; idea_id?: string; source_in_sec?: number; source_out_sec?: number
-          exact_quote?: string; created_at?: string
-        }
-        Relationships: [
-          { foreignKeyName: "video_repurpose_derivatives_request_id_fkey"; columns: ["request_id"]; isOneToOne: false; referencedRelation: "video_repurpose_requests"; referencedColumns: ["id"] },
-          { foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"; columns: ["source_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
-          { foreignKeyName: "video_repurpose_derivatives_idea_id_fkey"; columns: ["idea_id"]; isOneToOne: false; referencedRelation: "client_ideas"; referencedColumns: ["id"] },
-        ]
-      }
-      motion_design_projects: {
-        Row: {
-          id: string
-          client_id: string
-          prompt: string
-          preset: string
-          aspect: string
-          duration_sec: number
-          brand_mode: string
-          revision_of: string | null
-          status: string
-          scene_plan: Json | null
-          render_path: string | null
-          poster_path: string | null
-          job_id: string | null
-          error: string | null
-          created_by: string | null
-          created_at: string
-          completed_at: string | null
-        }
-        Insert: {
-          id?: string
-          client_id: string
-          prompt: string
-          preset: string
-          aspect: string
-          duration_sec: number
-          brand_mode: string
-          revision_of?: string | null
-          status?: string
-          scene_plan?: Json | null
-          render_path?: string | null
-          poster_path?: string | null
-          job_id?: string | null
-          error?: string | null
-          created_by?: string | null
-          created_at?: string
-          completed_at?: string | null
-        }
-        Update: {
-          id?: string
-          client_id?: string
-          prompt?: string
-          preset?: string
-          aspect?: string
-          duration_sec?: number
-          brand_mode?: string
-          revision_of?: string | null
-          status?: string
-          scene_plan?: Json | null
-          render_path?: string | null
-          poster_path?: string | null
-          job_id?: string | null
-          error?: string | null
-          created_by?: string | null
-          created_at?: string
-          completed_at?: string | null
-        }
-        Relationships: [
-          { foreignKeyName: "motion_design_projects_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
-          { foreignKeyName: "motion_design_projects_revision_of_fkey"; columns: ["revision_of"]; isOneToOne: false; referencedRelation: "motion_design_projects"; referencedColumns: ["id"] },
-          { foreignKeyName: "motion_design_projects_job_id_fkey"; columns: ["job_id"]; isOneToOne: false; referencedRelation: "agent_jobs"; referencedColumns: ["id"] },
-        ]
-      }
-      video_source_edit_requests: {
-        Row: {
-          id: string
-          client_id: string
-          source_asset_id: string
-          output_asset_id: string | null
-          job_id: string | null
-          direction: string
-          aspect: string
-          remove_pauses: boolean
-          captions: boolean
-          animated_title: boolean
-          brand_treatment: string
-          feel: string
-          status: string
-          error: string | null
-          transcript: Json | null
-          edit_plan: Json | null
-          created_by: string | null
-          created_at: string
-          completed_at: string | null
-        }
-        Insert: {
-          id?: string
-          client_id: string
-          source_asset_id: string
-          output_asset_id?: string | null
-          job_id?: string | null
-          direction: string
-          aspect: string
-          remove_pauses?: boolean
-          captions?: boolean
-          animated_title?: boolean
-          brand_treatment: string
-          feel: string
-          status?: string
-          error?: string | null
-          transcript?: Json | null
-          edit_plan?: Json | null
-          created_by?: string | null
-          created_at?: string
-          completed_at?: string | null
-        }
-        Update: {
-          id?: string
-          client_id?: string
-          source_asset_id?: string
-          output_asset_id?: string | null
-          job_id?: string | null
-          direction?: string
-          aspect?: string
-          remove_pauses?: boolean
-          captions?: boolean
-          animated_title?: boolean
-          brand_treatment?: string
-          feel?: string
-          status?: string
-          error?: string | null
-          transcript?: Json | null
-          edit_plan?: Json | null
-          created_by?: string | null
-          created_at?: string
-          completed_at?: string | null
-        }
-        Relationships: [
-          { foreignKeyName: "video_source_edit_requests_client_id_fkey"; columns: ["client_id"]; isOneToOne: false; referencedRelation: "clients"; referencedColumns: ["id"] },
-          { foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"; columns: ["source_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
-          { foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"; columns: ["output_asset_id"]; isOneToOne: false; referencedRelation: "client_media_assets"; referencedColumns: ["id"] },
-          { foreignKeyName: "video_source_edit_requests_job_id_fkey"; columns: ["job_id"]; isOneToOne: false; referencedRelation: "agent_jobs"; referencedColumns: ["id"] },
-        ]
-      }
       work_submissions: {
         Row: {
           client_id: string | null
@@ -8528,91 +13136,6 @@ export type Database = {
       }
     }
     Functions: {
-      create_service_offer_version_v6: {
-        Args: {
-          p_client_id: string; p_service_name: string; p_audience: string;
-          p_promise: string; p_inclusions: string[]; p_exclusions: string[];
-          p_price_amount: number | null; p_currency: string | null;
-          p_delivery_cost_estimate: number | null; p_claims: Json;
-          p_idempotency_key: string; p_offer_id?: string | null
-        }
-        Returns: Database["public"]["Tables"]["service_offer_versions"]["Row"]
-      }
-      approve_service_offer_version_v6: {
-        Args: { p_version_id: string }
-        Returns: Database["public"]["Tables"]["service_offer_signoffs"]["Row"]
-      }
-      attach_campaign_offer_v6: {
-        Args: { p_manifest_id: string; p_offer_version_id: string }
-        Returns: undefined
-      }
-      create_proof_artifact_v6: {
-        Args: {
-          p_client_id: string; p_source_proof_id: string; p_artifact_kind: string
-          p_supported_claim: string; p_evidence_excerpt: string; p_content: string
-          p_idempotency_key: string; p_job_id?: string | null
-        }
-        Returns: Database["public"]["Tables"]["proof_artifact_versions"]["Row"]
-      }
-      approve_proof_artifact_v6: {
-        Args: { p_artifact_version_id: string }
-        Returns: Database["public"]["Tables"]["proof_artifact_signoffs"]["Row"]
-      }
-      request_proof_artifact_v6: {
-        Args: { p_client_id: string; p_source_proof_id: string; p_artifact_kind: string }
-        Returns: string
-      }
-      decide_campaign_action_approval_v6: {
-        Args: { p_request_id: string; p_decision: string; p_reason?: string | null }
-        Returns: Database["public"]["Tables"]["campaign_action_approvals"]["Row"]
-      }
-      request_repurpose_clip: {
-        Args: { p_derivative_id: string; p_brief_id: string }
-        Returns: string
-      }
-      attach_motion_design: {
-        Args: { p_project_id: string; p_brief_id?: string | null }
-        Returns: string
-      }
-      request_video_repurpose_insights: {
-        Args: { p_asset_id: string; p_direction?: string }
-        Returns: string
-      }
-      create_video_repurpose_idea: {
-        Args: { p_request_id: string; p_candidate_index: number;
-          p_target_platform: Database["public"]["Enums"]["post_platform"] }
-        Returns: string
-      }
-      brief_video_repurpose_candidate: {
-        Args: { p_request_id: string; p_candidate_index: number;
-          p_target_platform: Database["public"]["Enums"]["post_platform"] }
-        Returns: string
-      }
-      request_motion_design: {
-        Args: {
-          p_client_id: string
-          p_prompt: string
-          p_preset: string
-          p_aspect: string
-          p_duration_sec: number
-          p_brand_mode: string
-          p_revision_of?: string | null
-        }
-        Returns: string
-      }
-      request_source_video_edit: {
-        Args: {
-          p_asset_id: string
-          p_direction: string
-          p_aspect: string
-          p_remove_pauses: boolean
-          p_captions: boolean
-          p_animated_title: boolean
-          p_brand_treatment: string
-          p_feel: string
-        }
-        Returns: string
-      }
       aa_house_client_id: { Args: never; Returns: string }
       accept_assignment: {
         Args: { p_assignment_id: string }
@@ -8628,6 +13151,7 @@ export type Database = {
           due_date: string | null
           id: string
           member_id: string
+          source_asset_id: string | null
           stage: Database["public"]["Enums"]["assignment_stage"]
           stage_reason: string | null
           title: string
@@ -8636,6 +13160,65 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "job_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      accept_proof_capture_submission: {
+        Args: {
+          p_body: string
+          p_category: string
+          p_consent: string
+          p_job_reference: string
+          p_kind: string
+          p_mime: string
+          p_name: string
+          p_storage_path: string
+          p_submission_id: string
+          p_token_hash: string
+        }
+        Returns: string
+      }
+      accept_ready_daily_workflow_steps: {
+        Args: { p_limit?: number }
+        Returns: {
+          steps_accepted: number
+          steps_blocked: number
+        }[]
+      }
+      accept_video_as_finished: {
+        Args: { p_asset_id: string }
+        Returns: undefined
+      }
+      accept_workflow_step: {
+        Args: {
+          p_artifact_kind: string
+          p_qa_evidence: Json
+          p_record_id: string
+          p_step_id: string
+          p_version_key: string
+        }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -8661,6 +13244,10 @@ export type Database = {
           spend: number
         }[]
       }
+      active_video_approval_manager: {
+        Args: { p_client_id: string }
+        Returns: string
+      }
       add_engine_window: {
         Args: {
           p_client_id: string
@@ -8674,6 +13261,42 @@ export type Database = {
       add_lead_note: {
         Args: { p_lead_id: string; p_note: string }
         Returns: undefined
+      }
+      add_workflow_agent_step: {
+        Args: {
+          p_agent_key: string
+          p_dependencies: string[]
+          p_input_from_step_key?: string
+          p_input_id: string
+          p_input_params?: Json
+          p_input_table: string
+          p_run_id: string
+          p_step_key: string
+        }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       admin_create_team_member: {
         Args: {
@@ -8716,6 +13339,7 @@ export type Database = {
           due_date: string | null
           id: string
           member_id: string
+          source_asset_id: string | null
           stage: Database["public"]["Enums"]["assignment_stage"]
           stage_reason: string | null
           title: string
@@ -8736,6 +13360,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      advance_proof_production: { Args: never; Returns: number }
       advance_slot: {
         Args: {
           p_actor?: string
@@ -8814,9 +13439,39 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      approve_proof_artifact_v6: {
+        Args: { p_artifact_version_id: string }
+        Returns: {
+          approved_at: string
+          approved_by: string
+          artifact_version_id: string
+          client_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "proof_artifact_signoffs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       approve_recruitment_brief: {
         Args: { p_brief_id: string }
         Returns: undefined
+      }
+      approve_service_offer_version_v6: {
+        Args: { p_version_id: string }
+        Returns: {
+          approved_at: string
+          approved_by: string
+          client_id: string
+          offer_version_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offer_signoffs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       approve_slot: {
         Args: { p_note?: string; p_slot_id: string }
@@ -8852,6 +13507,58 @@ export type Database = {
         Args: { p_lead_id: string; p_reason?: string }
         Returns: undefined
       }
+      assert_page_publish_allowed_v6: {
+        Args: { p_page_id: string }
+        Returns: undefined
+      }
+      attach_campaign_manifest_intelligence_v6: {
+        Args: { p_manifest_id: string; p_snapshot_id: string }
+        Returns: undefined
+      }
+      attach_campaign_offer_v6: {
+        Args: { p_manifest_id: string; p_offer_version_id: string }
+        Returns: undefined
+      }
+      attach_motion_design: {
+        Args: { p_brief_id?: string; p_project_id: string }
+        Returns: string
+      }
+      attest_video_sound_asset: {
+        Args: {
+          p_client_id: string
+          p_kind: string
+          p_rights_reference: string
+          p_storage_path: string
+        }
+        Returns: {
+          attested_at: string
+          attested_by: string
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          rights_reference: string
+          storage_path: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "video_sound_assets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      auto_rebuild_rejected_reel_sources: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
+      brief_video_repurpose_candidate: {
+        Args: {
+          p_candidate_index: number
+          p_request_id: string
+          p_target_platform: Database["public"]["Enums"]["post_platform"]
+        }
+        Returns: string
+      }
       build_brief_with_ai: {
         Args: {
           p_brief_id: string
@@ -8874,20 +13581,12 @@ export type Database = {
           requirement: string
         }[]
       }
-      clone_campaign_for_route: {
-        Args: {
-          p_source_campaign_id: string
-          p_target_mode: string
-          p_paid_platform?: string | null
-          p_name?: string | null
-        }
-        Returns: string
-      }
       can_access_client: { Args: { target: string }; Returns: boolean }
       can_run_agent: {
         Args: { p_agent_key: string; p_client_id: string }
         Returns: boolean
       }
+      can_shape_opportunity: { Args: { p_client_id: string }; Returns: boolean }
       cancel_assignment: {
         Args: { p_assignment_id: string; p_reason?: string }
         Returns: {
@@ -8902,6 +13601,7 @@ export type Database = {
           due_date: string | null
           id: string
           member_id: string
+          source_asset_id: string | null
           stage: Database["public"]["Enums"]["assignment_stage"]
           stage_reason: string | null
           title: string
@@ -8913,6 +13613,46 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      capture_campaign_artifact_offer_v6: {
+        Args: { p_artifact_kind: string; p_job_id: string }
+        Returns: Json
+      }
+      capture_campaign_intelligence_snapshot_v6: {
+        Args: { p_campaign_id: string; p_job_id: string }
+        Returns: {
+          acquisition_mode: string
+          brief: string
+          business_context: Json
+          campaign_id: string
+          captured_at: string
+          client_id: string
+          content_pillars: Json
+          id: string
+          missing_domains: string[]
+          paid_platform: string | null
+          planner_job_id: string
+          snapshot_hash: string
+          source_records: Json
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_intelligence_snapshots"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      capture_campaign_offer_v6: {
+        Args: { p_campaign_id: string }
+        Returns: Json
+      }
+      capture_ideation_learning_context: {
+        Args: { p_job_id: string }
+        Returns: Json
+      }
+      capture_offer_version_for_artifact_v6: {
+        Args: { p_campaign_id: string; p_offer_version_id: string }
+        Returns: Json
       }
       capture_sales_agent_lead: {
         Args: { p_conversation_id: string; p_opportunity_value?: number }
@@ -8962,6 +13702,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      claim_daily_recovery_alert: {
+        Args: { p_lease_seconds?: number; p_worker: string }
+        Returns: {
+          alert_id: string
+          client_id: string
+          client_name: string
+          item_id: string
+          item_role: string
+          manager_email: string
+          package_day: string
+          reason: string
+        }[]
+      }
       claim_posts_for_publishing: {
         Args: { p_limit?: number }
         Returns: {
@@ -8970,7 +13723,9 @@ export type Database = {
           attempt: number
           caption: string
           client_id: string
+          content_format: Database["public"]["Enums"]["content_format"]
           first_comment: string
+          frame_paths: string[]
           hashtags: string[]
           link_url: string
           media_path: string
@@ -8979,6 +13734,54 @@ export type Database = {
           post_id: string
           provider: string
           scheduled_at: string
+        }[]
+      }
+      claim_proof_delivery: {
+        Args: never
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          attempts: number
+          capture_url: string
+          channel: string
+          client_id: string
+          config_id: string
+          created_at: string
+          error: string | null
+          event_key: string
+          id: string
+          lease_until: string | null
+          link_id: string
+          message: string
+          provider_id: string | null
+          recipient: string
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          subject: string
+          template_sid: string | null
+          template_variables: Json | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "proof_request_deliveries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      claim_proof_placements: {
+        Args: { p_limit?: number }
+        Returns: {
+          account_ref: string
+          artifact_version_id: string
+          asset_id: string
+          attempt: number
+          client_id: string
+          destination_key: string
+          payload_hash: string
+          placement_id: string
+          proof_id: string
+          provider: string
         }[]
       }
       client_budget_state: {
@@ -9051,6 +13854,63 @@ export type Database = {
         }[]
       }
       client_timezone: { Args: { p_client_id: string }; Returns: string }
+      clone_campaign_for_route: {
+        Args: {
+          p_name?: string
+          p_paid_platform?: string
+          p_source_campaign_id: string
+          p_target_mode: string
+        }
+        Returns: string
+      }
+      complete_daily_recovery_alert: {
+        Args: {
+          p_alert_id: string
+          p_error?: string
+          p_provider_message_id?: string
+          p_sent: boolean
+          p_worker: string
+        }
+        Returns: {
+          created_at: string
+          delivered_at: string | null
+          delivery_attempts: number
+          delivery_error: string | null
+          delivery_lease_until: string | null
+          delivery_status: string
+          delivery_worker: string | null
+          id: string
+          item_id: string
+          provider_message_id: string | null
+          reason: string
+          resolved_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "daily_package_recovery_alerts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      complete_repurpose_clip: {
+        Args: {
+          p_duration_sec: number
+          p_request_id: string
+          p_storage_path: string
+        }
+        Returns: string
+      }
+      complete_source_video_edit: {
+        Args: {
+          p_duration_sec: number
+          p_edit_plan: Json
+          p_height: number
+          p_request_id: string
+          p_storage_path: string
+          p_width: number
+        }
+        Returns: string
+      }
       compose_recruitment_body: {
         Args: {
           p_apply_url: string
@@ -9062,6 +13922,31 @@ export type Database = {
           p_visual_direction: string
         }
         Returns: string
+      }
+      create_campaign_manifest_v6: {
+        Args: {
+          p_campaign_id: string
+          p_idempotency_key: string
+          p_needs_lead_magnet?: boolean
+        }
+        Returns: {
+          acquisition_mode: string
+          campaign_id: string
+          client_id: string
+          created_at: string
+          id: string
+          idempotency_key: string
+          paid_platform: string | null
+          plan_hash: string
+          plan_snapshot: Json
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_manifest_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_console_user: {
         Args: {
@@ -9109,6 +13994,71 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_market_opportunity_v6: {
+        Args: {
+          p_buying_situation: string
+          p_client_id: string
+          p_conversion_action?: string
+          p_core_problem?: string
+          p_desired_outcome?: string
+          p_entry_awareness?: string
+          p_idempotency_key: string
+          p_job_id?: string
+          p_micro_market: string
+          p_name: string
+          p_positioning?: string
+          p_proposed_by?: string
+          p_purchase_trigger?: string
+        }
+        Returns: string
+      }
+      create_proof_artifact_v6: {
+        Args: {
+          p_artifact_kind: string
+          p_client_id: string
+          p_content: string
+          p_evidence_excerpt: string
+          p_idempotency_key: string
+          p_job_id?: string
+          p_source_proof_id: string
+          p_supported_claim: string
+        }
+        Returns: {
+          artifact_kind: string
+          client_id: string
+          content: string
+          content_hash: string
+          created_at: string
+          created_by_job_id: string | null
+          evidence_excerpt: string
+          id: string
+          idempotency_key: string
+          source_hash: string
+          source_proof_id: string
+          source_snapshot: Json
+          supported_claim: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "proof_artifact_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_proof_placement_v6: {
+        Args: {
+          p_artifact_version_id?: string
+          p_asset_id?: string
+          p_campaign_id?: string
+          p_client_id: string
+          p_destination_key: string
+          p_idempotency_key: string
+          p_production_request_id?: string
+          p_proof_id?: string
+        }
+        Returns: string
+      }
       create_recruitment_brief: {
         Args: {
           p_apply_url: string
@@ -9132,10 +14082,204 @@ export type Database = {
         }
         Returns: string
       }
+      create_service_offer_version_v6: {
+        Args: {
+          p_audience: string
+          p_claims: Json
+          p_client_id: string
+          p_currency: string
+          p_delivery_cost_estimate: number
+          p_exclusions: string[]
+          p_idempotency_key: string
+          p_inclusions: string[]
+          p_offer_id?: string
+          p_price_amount: number
+          p_promise: string
+          p_service_name: string
+        }
+        Returns: {
+          audience: string
+          claims: Json
+          client_id: string
+          content_hash: string
+          created_at: string
+          currency: string | null
+          delivery_cost_estimate: number | null
+          exclusions: string[]
+          id: string
+          idempotency_key: string
+          inclusions: string[]
+          offer_id: string
+          price_amount: number | null
+          promise: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offer_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_video_repurpose_idea: {
+        Args: {
+          p_candidate_index: number
+          p_request_id: string
+          p_target_platform: Database["public"]["Enums"]["post_platform"]
+        }
+        Returns: string
+      }
+      create_workflow_run: {
+        Args: {
+          p_campaign_id?: string
+          p_client_id: string
+          p_created_by?: string
+          p_deadline_at: string
+          p_idempotency_key: string
+          p_input_snapshot: Json
+          p_kind: string
+          p_root_request_id?: string
+          p_workflow_version: string
+        }
+        Returns: {
+          blocker: string | null
+          campaign_id: string | null
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          deadline_at: string
+          id: string
+          idempotency_key: string
+          input_snapshot: Json
+          kind: string
+          review_ready_at: string | null
+          root_request_id: string | null
+          sealed_at: string | null
+          status: string
+          updated_at: string
+          workflow_version: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_runs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       current_member_id: { Args: never; Returns: string }
       current_role_of: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      daily_package_readiness: { Args: { p_package_id: string }; Returns: Json }
+      daily_reserve_coverage: {
+        Args: { p_client_id: string }
+        Returns: {
+          available: number
+          role: string
+          shortfall: number
+          target: number
+        }[]
+      }
+      decide_campaign_action_approval_v6: {
+        Args: { p_decision: string; p_reason?: string; p_request_id: string }
+        Returns: {
+          action_key: string
+          artifact_version_hash: string
+          campaign_id: string
+          client_id: string
+          decided_at: string | null
+          decided_by: string | null
+          destination: string
+          id: string
+          idempotency_key: string
+          manifest_id: string
+          rejection_reason: string | null
+          request_hash: string
+          requested_at: string
+          scope: Json
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_action_approvals"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      decide_proof_delivery: {
+        Args: { p_approve: boolean; p_delivery_id: string }
+        Returns: undefined
+      }
+      decide_proof_placement_approval_v6: {
+        Args: { p_approval_id: string; p_approved: boolean; p_reason?: string }
+        Returns: {
+          approval_id: string | null
+          artifact_version_id: string | null
+          asset_id: string | null
+          attempts: number
+          bound_revision_id: string | null
+          bound_version_hash: string | null
+          campaign_id: string | null
+          claimed_at: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          destination_key: string
+          external_id: string | null
+          external_url: string | null
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lease_until: string | null
+          payload_hash: string
+          placed_at: string | null
+          placed_by: string | null
+          production_request_id: string | null
+          proof_id: string | null
+          retracted_at: string | null
+          source_proof_id: string
+          status: string
+          updated_at: string
+          verified_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "proof_placements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      decide_video_render_candidate: {
+        Args: {
+          p_candidate_id: string
+          p_creative_review: Json
+          p_edit_plan?: Json
+          p_rejection_reason?: string
+          p_verdict: string
+        }
+        Returns: {
+          asset_id: string
+          attempt: number
+          client_id: string
+          created_at: string
+          creative_review: Json | null
+          edit_plan: Json | null
+          id: string
+          job_id: string
+          media_probe: Json
+          rejection_reason: string | null
+          render_path: string
+          reviewed_at: string | null
+          verdict: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "video_render_candidates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       decline_assignment: {
         Args: { p_assignment_id: string; p_reason: string }
@@ -9151,6 +14295,7 @@ export type Database = {
           due_date: string | null
           id: string
           member_id: string
+          source_asset_id: string | null
           stage: Database["public"]["Enums"]["assignment_stage"]
           stage_reason: string | null
           title: string
@@ -9162,6 +14307,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      decline_video_client_approval: {
+        Args: { p_asset_id: string; p_reason: string }
+        Returns: undefined
       }
       default_post_time: { Args: never; Returns: string }
       delete_client_campaign: {
@@ -9177,6 +14326,24 @@ export type Database = {
         Returns: {
           deleted_assets: number
           deleted_briefs: number
+        }[]
+      }
+      delete_content_asset_v6: {
+        Args: { p_asset_id: string }
+        Returns: {
+          deleted_copy: number
+          deleted_files: number
+          deleted_frames: number
+          deleted_posts: number
+        }[]
+      }
+      delete_content_brief_v6: {
+        Args: { p_brief_id: string }
+        Returns: {
+          deleted_copy: number
+          deleted_files: number
+          deleted_frames: number
+          deleted_posts: number
         }[]
       }
       delete_recruitment_ad: {
@@ -9199,6 +14366,7 @@ export type Database = {
           due_date: string | null
           id: string
           member_id: string
+          source_asset_id: string | null
           stage: Database["public"]["Enums"]["assignment_stage"]
           stage_reason: string | null
           title: string
@@ -9251,28 +14419,6 @@ export type Database = {
         }
         Returns: string
       }
-      enqueue_format_ideation: {
-        Args: {
-          p_client_id: string
-          p_target_platform: Database["public"]["Enums"]["post_platform"]
-          p_media_type: Database["public"]["Enums"]["media_type"]
-          p_content_format: Database["public"]["Enums"]["content_format"]
-        }
-        Returns: string
-      }
-      enqueue_scoped_ideation: {
-        Args: {
-          p_client_id: string
-          p_target_platform: Database["public"]["Enums"]["post_platform"]
-          p_media_type: Database["public"]["Enums"]["media_type"]
-          p_content_format: Database["public"]["Enums"]["content_format"]
-          p_campaign_id: string | null
-          p_idea_count: number | null
-          p_input_table: string | null
-          p_input_id: string | null
-        }
-        Returns: string
-      }
       enqueue_agent_job_as: {
         Args: {
           p_actor: string
@@ -9295,6 +14441,15 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_format_ideation: {
+        Args: {
+          p_client_id: string
+          p_content_format: Database["public"]["Enums"]["content_format"]
+          p_media_type: Database["public"]["Enums"]["media_type"]
+          p_target_platform: Database["public"]["Enums"]["post_platform"]
+        }
+        Returns: string
+      }
       enqueue_mcp_brief: {
         Args: {
           p_bot_id: string
@@ -9310,7 +14465,32 @@ export type Database = {
         Returns: number
       }
       enqueue_publish_sweep: { Args: never; Returns: string }
+      enqueue_scoped_ideation: {
+        Args: {
+          p_campaign_id: string
+          p_client_id: string
+          p_content_format: Database["public"]["Enums"]["content_format"]
+          p_idea_count: number
+          p_input_id: string
+          p_input_table: string
+          p_media_type: Database["public"]["Enums"]["media_type"]
+          p_target_platform: Database["public"]["Enums"]["post_platform"]
+        }
+        Returns: string
+      }
       enqueue_token_health_job: { Args: never; Returns: string }
+      enqueue_workflow_step_job: {
+        Args: {
+          p_resolved_input: string
+          p_run: Database["public"]["Tables"]["workflow_runs"]["Row"]
+          p_step: Database["public"]["Tables"]["workflow_steps"]["Row"]
+        }
+        Returns: string
+      }
+      fail_source_video_edit: {
+        Args: { p_error: string; p_request_id: string }
+        Returns: undefined
+      }
       format_fits_media: {
         Args: {
           p_format: Database["public"]["Enums"]["content_format"]
@@ -9323,6 +14503,20 @@ export type Database = {
         Args: { p_brief_id: string; p_quality?: string; p_size?: string }
         Returns: Json
       }
+      intake_video_for_edit: {
+        Args: {
+          p_asset_id: string
+          p_brief_id?: string
+          p_client_id: string
+          p_format: Database["public"]["Enums"]["content_format"]
+          p_notes?: string
+          p_rights: string
+          p_source: string
+          p_storage_path: string
+          p_title: string
+        }
+        Returns: Json
+      }
       integration_secret: {
         Args: { p_client_id: string; p_provider: string }
         Returns: string
@@ -9331,6 +14525,7 @@ export type Database = {
         Args: { p_client_id: string; p_provider: string }
         Returns: boolean
       }
+      is_active_assigned_smm: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       is_channel_member: { Args: { target: string }; Returns: boolean }
       is_client_user: { Args: { target: string }; Returns: boolean }
@@ -9340,7 +14535,15 @@ export type Database = {
         Args: { s: Database["public"]["Enums"]["lead_stage"] }
         Returns: number
       }
+      link_opportunity_v6: {
+        Args: { p_opportunity_id: string; p_role: string; p_target_id: string }
+        Returns: string
+      }
       lock_down_definer_functions: { Args: never; Returns: number }
+      mark_proof_placement_placed_v6: {
+        Args: { p_external_url: string; p_placement_id: string }
+        Returns: undefined
+      }
       master_ai_describe_table: {
         Args: { p_table: string }
         Returns: {
@@ -9499,6 +14702,34 @@ export type Database = {
         }
         Returns: Json
       }
+      mcp_campaign_create_v6:
+        | {
+            Args: {
+              p_acquisition_mode: string
+              p_bot_id: string
+              p_brief: string
+              p_client_id: string
+              p_execution_id: string
+              p_name: string
+              p_paid_platform: string
+              p_request_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_acquisition_mode: string
+              p_bot_id: string
+              p_brief: string
+              p_client_id: string
+              p_execution_id: string
+              p_name: string
+              p_offer_version_id: string
+              p_paid_platform: string
+              p_request_id: string
+            }
+            Returns: Json
+          }
       mcp_campaign_execution: {
         Args: {
           p_action: string
@@ -9514,6 +14745,15 @@ export type Database = {
           p_request_id?: string
           p_status?: string
           p_summary?: string
+        }
+        Returns: Json
+      }
+      mcp_campaign_list_v6: {
+        Args: {
+          p_after?: string
+          p_bot_id: string
+          p_client_id: string
+          p_limit?: number
         }
         Returns: Json
       }
@@ -10078,6 +15318,25 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      plan_daily_package: {
+        Args: { p_client_id: string; p_day: string }
+        Returns: {
+          client_id: string
+          created_at: string
+          cutoff_at: string
+          id: string
+          package_day: string
+          platform: Database["public"]["Enums"]["post_platform"]
+          run_id: string
+          story_media_type: Database["public"]["Enums"]["media_type"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "daily_packages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       plan_slots: {
         Args: { p_client_id: string; p_now?: string }
         Returns: {
@@ -10094,6 +15353,20 @@ export type Database = {
           platform: Database["public"]["Enums"]["post_platform"]
           taken: boolean
         }[]
+      }
+      proof_placement_payload_hash_v6: {
+        Args: {
+          p_artifact_version_id: string
+          p_asset_id: string
+          p_destination_key: string
+          p_proof_id: string
+        }
+        Returns: string
+      }
+      proof_snapshot_hash_v6: { Args: { p: Json }; Returns: string }
+      proof_source_snapshot_v6: {
+        Args: { p: Database["public"]["Tables"]["client_proof_assets"]["Row"] }
+        Returns: Json
       }
       provision_campaign: {
         Args: { p_campaign_id: string }
@@ -10131,6 +15404,7 @@ export type Database = {
           due_date: string | null
           id: string
           member_id: string
+          source_asset_id: string | null
           stage: Database["public"]["Enums"]["assignment_stage"]
           stage_reason: string | null
           title: string
@@ -10142,6 +15416,61 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      reconcile_workflow_runs: {
+        Args: { p_limit?: number }
+        Returns: {
+          steps_blocked: number
+          steps_for_qa: number
+          steps_queued: number
+        }[]
+      }
+      record_client_launch_asset_check: {
+        Args: { p_asset_id: string; p_package_id: string; p_qa_evidence: Json }
+        Returns: {
+          asset_id: string
+          checked_at: string
+          package_id: string
+          qa_evidence: Json
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_launch_asset_checks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_client_launch_check: {
+        Args: {
+          p_check_key: string
+          p_evidence: Json
+          p_package_id: string
+          p_record_id: string
+        }
+        Returns: {
+          blocker: string | null
+          check_key: string
+          checked_at: string | null
+          evidence: Json
+          package_id: string
+          record_id: string | null
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_launch_checks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_frame_published: {
+        Args: {
+          p_external_id: string
+          p_external_url?: string
+          p_position: number
+          p_post_id: string
+        }
+        Returns: undefined
       }
       record_page_revision: {
         Args: {
@@ -10233,6 +15562,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_proof_placed: {
+        Args: {
+          p_external_id: string
+          p_external_url?: string
+          p_placement_id: string
+        }
+        Returns: undefined
+      }
+      record_proof_placement_failure: {
+        Args: {
+          p_placement_id: string
+          p_reason: string
+          p_retryable?: boolean
+        }
+        Returns: undefined
+      }
+      record_proof_retracted_v6: {
+        Args: { p_detail?: string; p_placement_id: string }
+        Returns: undefined
+      }
       record_qa_result: {
         Args: {
           p_findings: Json
@@ -10266,6 +15615,73 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "content_slots"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_video_render_candidate: {
+        Args: {
+          p_asset_id: string
+          p_attempt: number
+          p_job_id: string
+          p_media_probe: Json
+          p_render_path: string
+        }
+        Returns: {
+          asset_id: string
+          attempt: number
+          client_id: string
+          created_at: string
+          creative_review: Json | null
+          edit_plan: Json | null
+          id: string
+          job_id: string
+          media_probe: Json
+          rejection_reason: string | null
+          render_path: string
+          reviewed_at: string | null
+          verdict: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "video_render_candidates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_workflow_lead_attribution: {
+        Args: {
+          p_evidence: Json
+          p_label: string
+          p_lead_id: string
+          p_run_id: string
+        }
+        Returns: {
+          evidence: Json
+          label: string
+          lead_id: string
+          recorded_at: string
+          run_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_lead_attribution"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      recover_daily_package_item: {
+        Args: { p_item_id: string; p_reason: string }
+        Returns: {
+          id: string
+          item_id: string
+          reason: string
+          reserve_asset_id: string
+          selected_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "daily_package_recoveries"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -10360,6 +15776,74 @@ export type Database = {
         Args: { p_asset_id: string; p_formats: string[] }
         Returns: string
       }
+      request_campaign_action_approval_v6: {
+        Args: {
+          p_action_key: string
+          p_artifact_version_hash: string
+          p_destination: string
+          p_idempotency_key: string
+          p_manifest_id: string
+          p_scope: Json
+        }
+        Returns: {
+          action_key: string
+          artifact_version_hash: string
+          campaign_id: string
+          client_id: string
+          decided_at: string | null
+          decided_by: string | null
+          destination: string
+          id: string
+          idempotency_key: string
+          manifest_id: string
+          rejection_reason: string | null
+          request_hash: string
+          requested_at: string
+          scope: Json
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_action_approvals"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      request_campaign_page_deploy_approval_v6: {
+        Args: {
+          p_idempotency_key: string
+          p_page_id: string
+          p_site_path?: string
+          p_site_repository_id?: string
+        }
+        Returns: {
+          action_key: string
+          artifact_version_hash: string
+          campaign_id: string
+          client_id: string
+          decided_at: string | null
+          decided_by: string | null
+          destination: string
+          id: string
+          idempotency_key: string
+          manifest_id: string
+          rejection_reason: string | null
+          request_hash: string
+          requested_at: string
+          scope: Json
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_action_approvals"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      request_human_video_edit: {
+        Args: { p_asset_id: string; p_due_date?: string; p_member_id: string }
+        Returns: string
+      }
       request_meta_build: { Args: { p_campaign_id: string }; Returns: string }
       request_meta_build_sheet: {
         Args: { p_campaign_id: string }
@@ -10374,33 +15858,90 @@ export type Database = {
         }
         Returns: string[]
       }
+      request_motion_design: {
+        Args: {
+          p_aspect: string
+          p_brand_mode: string
+          p_client_id: string
+          p_duration_sec: number
+          p_preset: string
+          p_prompt: string
+          p_revision_of?: string
+        }
+        Returns: string
+      }
+      request_proof_artifact_v6: {
+        Args: {
+          p_artifact_kind: string
+          p_client_id: string
+          p_source_proof_id: string
+        }
+        Returns: string
+      }
+      request_proof_auto_production: {
+        Args: {
+          p_client_id: string
+          p_destination: string
+          p_direction: string
+          p_format: Database["public"]["Enums"]["content_format"]
+          p_media_type: Database["public"]["Enums"]["media_type"]
+          p_quality?: string
+          p_request_id: string
+          p_size?: string
+          p_source_asset_id: string
+          p_source_proof_id: string
+        }
+        Returns: string
+      }
+      request_proof_placement_approval_v6: {
+        Args: { p_placement_id: string; p_scope?: Json }
+        Returns: string
+      }
+      request_proof_production_v2: {
+        Args: {
+          p_client_id: string
+          p_destination: string
+          p_direction: string
+          p_format: Database["public"]["Enums"]["content_format"]
+          p_media_type: Database["public"]["Enums"]["media_type"]
+          p_request_id: string
+          p_source_asset_id: string
+          p_source_proof_id: string
+        }
+        Returns: string
+      }
       request_recruitment_meta_build: {
         Args: { p_campaign_id: string }
         Returns: string
       }
-      request_video_edit: { Args: { p_asset_id: string }; Returns: string }
-      retry_reel_video_build: { Args: { p_brief_id: string }; Returns: string }
-      intake_video_for_edit: {
-        Args: { p_asset_id: string; p_client_id: string; p_title: string; p_storage_path: string
-          p_format: Database["public"]["Enums"]["content_format"]; p_source: string; p_rights: string
-          p_brief_id?: string; p_notes?: string }
-        Returns: Json
+      request_repurpose_clip: {
+        Args: { p_brief_id: string; p_derivative_id: string }
+        Returns: string
       }
-      accept_video_as_finished: { Args: { p_asset_id: string }; Returns: undefined }
-      set_content_approval_owner: { Args: { p_user_id: string }; Returns: undefined }
-      video_approval_state: { Args: { p_asset_id: string }; Returns: Json }
-      sign_video_approval: { Args: { p_asset_id: string; p_role: string }; Returns: undefined }
+      request_source_video_edit: {
+        Args: {
+          p_animated_title: boolean
+          p_aspect: string
+          p_asset_id: string
+          p_brand_treatment: string
+          p_captions: boolean
+          p_direction: string
+          p_feel: string
+          p_remove_pauses: boolean
+        }
+        Returns: string
+      }
       request_video_client_approval: {
         Args: { p_asset_id: string; p_client_user_id: string }
         Returns: undefined
       }
-      decline_video_client_approval: {
-        Args: { p_asset_id: string; p_reason: string }
-        Returns: undefined
+      request_video_edit: { Args: { p_asset_id: string }; Returns: string }
+      request_video_repurpose_insights: {
+        Args: { p_asset_id: string; p_direction?: string }
+        Returns: string
       }
-      video_client_approval_email_state: { Args: { p_asset_id: string }; Returns: Json }
-      request_human_video_edit: {
-        Args: { p_asset_id: string; p_member_id: string; p_due_date?: string }
+      require_opportunity_proof_v6: {
+        Args: { p_opportunity_id: string; p_requirement: string }
         Returns: string
       }
       rerender_generation: {
@@ -10427,7 +15968,188 @@ export type Database = {
           widget_config: Json
         }[]
       }
+      resume_completed_daily_motion_qa: {
+        Args: { p_run_id: string }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       resume_paused_jobs: { Args: never; Returns: number }
+      retry_failed_higgsfield_motion_step: {
+        Args: { p_failed_requests: Json; p_step_id: string }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      retry_failed_video_creative_workflow_step: {
+        Args: { p_step_id: string }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      retry_failed_video_upload_workflow_step: {
+        Args: { p_step_id: string }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      retry_missing_render_workflow_step: {
+        Args: { p_step_id: string }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      retry_partial_higgsfield_motion_step: {
+        Args: { p_step_id: string }
+        Returns: {
+          agent_key: string
+          blocker: string | null
+          completed_at: string | null
+          created_at: string
+          dependencies: string[]
+          id: string
+          input_from_step_key: string | null
+          input_id: string | null
+          input_params: Json
+          input_table: string
+          job_id: string | null
+          resolved_input_id: string | null
+          run_id: string
+          status: string
+          step_key: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      retry_reel_video_build: { Args: { p_brief_id: string }; Returns: string }
+      retry_rejected_reel_source: {
+        Args: { p_edit_step_id: string; p_feedback: string }
+        Returns: {
+          created_at: string
+          edit_step_id: string
+          feedback: string
+          id: string
+          prior_artifacts: Json
+          run_id: string
+          source_asset_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_reel_source_rebuilds"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       revert_page_to_revision: {
         Args: { p_page_id: string; p_revision_number: number }
         Returns: number
@@ -10450,6 +16172,10 @@ export type Database = {
           allowed: boolean
           reason: string
         }[]
+      }
+      satisfy_opportunity_proof_v6: {
+        Args: { p_proof_id: string; p_requirement_id: string }
+        Returns: undefined
       }
       save_campaign_plan_only: {
         Args: {
@@ -10486,6 +16212,7 @@ export type Database = {
           p_after_seconds: number
           p_agent_key: string
           p_client_id: string
+          p_current_job_id?: string
           p_description?: string
           p_input_id: string
           p_input_table: string
@@ -10503,6 +16230,26 @@ export type Database = {
         }
         Returns: string
       }
+      score_market_opportunity_v6: {
+        Args: { p_factors: Json; p_note?: string; p_opportunity_id: string }
+        Returns: {
+          classification: string
+          client_id: string
+          factors: Json
+          id: string
+          note: string | null
+          opportunity_id: string
+          scored_at: string
+          scored_by: string | null
+          total: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "opportunity_scores"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       score_slot_ideas: {
         Args: { p_slot_id: string }
         Returns: {
@@ -10514,6 +16261,34 @@ export type Database = {
           score: number
           title: string
         }[]
+      }
+      seal_workflow_run: {
+        Args: { p_run_id: string }
+        Returns: {
+          blocker: string | null
+          campaign_id: string | null
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          deadline_at: string
+          id: string
+          idempotency_key: string
+          input_snapshot: Json
+          kind: string
+          review_ready_at: string | null
+          root_request_id: string | null
+          sealed_at: string | null
+          status: string
+          updated_at: string
+          workflow_version: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workflow_runs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       select_idea_for_slot: {
         Args: { p_slot_id: string }
@@ -10537,6 +16312,71 @@ export type Database = {
         }
       }
       select_render: { Args: { p_render_id: string }; Returns: undefined }
+      set_brief_sound_treatment: {
+        Args: {
+          p_brief_id: string
+          p_sound_asset_id?: string
+          p_treatment: string
+        }
+        Returns: {
+          apply_url: string | null
+          archived_at: string | null
+          argument: string | null
+          avatar_brief: string | null
+          b_roll: string | null
+          body: string | null
+          brief_ref: string | null
+          call_to_action: string | null
+          channel_intent: string | null
+          client_id: string
+          compensation_text: string | null
+          content_format: Database["public"]["Enums"]["content_format"]
+          created_at: string
+          derived_from_asset_id: string | null
+          editor_brief: string | null
+          format_code: string | null
+          frame_count: number | null
+          frame_plan: string[] | null
+          hook: string | null
+          id: string
+          job_id: string | null
+          media_type: Database["public"]["Enums"]["media_type"]
+          premise: string | null
+          production_method: string | null
+          proof: string | null
+          proof_asset_id: string | null
+          purpose: Database["public"]["Enums"]["content_purpose"]
+          recruitment_role:
+            | Database["public"]["Enums"]["recruitment_role"]
+            | null
+          repurpose_format: string | null
+          script: string | null
+          shot_requirements: string | null
+          slot_role: string | null
+          sound_asset_id: string | null
+          sound_treatment: string
+          source_idea_id: string | null
+          status: Database["public"]["Enums"]["brief_status"]
+          target_platform: Database["public"]["Enums"]["post_platform"] | null
+          title: string
+          updated_at: string
+          visual_direction: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_briefs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_content_approval_owner: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      set_content_archived_v6: {
+        Args: { p_archived?: boolean; p_id: string; p_record: string }
+        Returns: undefined
+      }
       set_engine_enabled: {
         Args: { p_client_id: string; p_enabled: boolean }
         Returns: {
@@ -10552,6 +16392,9 @@ export type Database = {
           max_jobs_in_flight: number
           min_qa_score: number
           plan_horizon_days: number
+          proof_publishing_enabled: boolean
+          proof_publishing_enabled_at: string | null
+          proof_publishing_enabled_by: string | null
           publishing_enabled: boolean
           publishing_enabled_at: string | null
           publishing_enabled_by: string | null
@@ -10613,6 +16456,9 @@ export type Database = {
           max_jobs_in_flight: number
           min_qa_score: number
           plan_horizon_days: number
+          proof_publishing_enabled: boolean
+          proof_publishing_enabled_at: string | null
+          proof_publishing_enabled_by: string | null
           publishing_enabled: boolean
           publishing_enabled_at: string | null
           publishing_enabled_by: string | null
@@ -10621,6 +16467,76 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "client_engine_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_opportunity_attributes_v6: {
+        Args: { p_kind: string; p_opportunity_id: string; p_values: string[] }
+        Returns: number
+      }
+      set_opportunity_awareness_v6: {
+        Args: {
+          p_asset_direction?: string
+          p_distribution_note?: string
+          p_message: string
+          p_mindset: string
+          p_opportunity_id: string
+          p_stage: string
+        }
+        Returns: undefined
+      }
+      set_opportunity_confidence_v6: {
+        Args: {
+          p_confidence: Database["public"]["Enums"]["opportunity_confidence"]
+          p_note: string
+          p_opportunity_id: string
+        }
+        Returns: undefined
+      }
+      set_opportunity_fields_v6: {
+        Args: {
+          p_conversion_action?: string
+          p_core_problem?: string
+          p_desired_outcome?: string
+          p_entry_awareness?: string
+          p_opportunity_id: string
+          p_positioning?: string
+          p_purchase_trigger?: string
+        }
+        Returns: undefined
+      }
+      set_opportunity_status_v6: {
+        Args: {
+          p_note?: string
+          p_opportunity_id: string
+          p_status: Database["public"]["Enums"]["opportunity_status"]
+        }
+        Returns: {
+          buying_situation: string
+          client_id: string
+          confidence: Database["public"]["Enums"]["opportunity_confidence"]
+          conversion_action: string | null
+          core_problem: string | null
+          created_at: string
+          created_by: string | null
+          desired_outcome: string | null
+          entry_awareness: string | null
+          id: string
+          idempotency_key: string
+          micro_market: string
+          name: string
+          positioning: string | null
+          proposed_by: string
+          proposed_by_job_id: string | null
+          purchase_trigger: string | null
+          status: Database["public"]["Enums"]["opportunity_status"]
+          status_note: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "market_opportunities"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -10655,6 +16571,9 @@ export type Database = {
           max_jobs_in_flight: number
           min_qa_score: number
           plan_horizon_days: number
+          proof_publishing_enabled: boolean
+          proof_publishing_enabled_at: string | null
+          proof_publishing_enabled_by: string | null
           publishing_enabled: boolean
           publishing_enabled_at: string | null
           publishing_enabled_by: string | null
@@ -10667,6 +16586,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      settle_completed_blocked_daily_siblings: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
+      sign_video_approval: {
+        Args: { p_asset_id: string; p_role: string }
+        Returns: undefined
+      }
       size_fits_format: {
         Args: {
           p_format: Database["public"]["Enums"]["content_format"]
@@ -10675,6 +16602,10 @@ export type Database = {
         Returns: boolean
       }
       slot_has_job_in_flight: { Args: { p_slot_id: string }; Returns: boolean }
+      stage_video_candidate_revision: {
+        Args: { p_candidate_id: string }
+        Returns: Json
+      }
       stalled_leads: {
         Args: { p_client_id: string; p_days?: number }
         Returns: {
@@ -10689,12 +16620,34 @@ export type Database = {
           stage: Database["public"]["Enums"]["lead_stage"]
         }[]
       }
+      start_client_launch_package: {
+        Args: {
+          p_campaign_id: string
+          p_deadline_at: string
+          p_idempotency_key: string
+        }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          id: string
+          input_snapshot: Json
+          run_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_launch_packages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       start_master_run: { Args: { p_client_id: string }; Returns: string }
       start_master_run_as: {
         Args: { p_actor: string; p_client_id: string }
         Returns: string
       }
       start_onboarding: { Args: { p_client_id: string }; Returns: undefined }
+      sweep_expired_proof_placements: { Args: never; Returns: number }
       title_overlap: {
         Args: { p_candidate: string; p_other: string }
         Returns: number
@@ -10729,6 +16682,8 @@ export type Database = {
         Returns: {
           avatar_relevance: string | null
           body: string | null
+          capture_file_mime: string | null
+          capture_method: string | null
           captured_on: string | null
           claim: string | null
           client_id: string
@@ -10737,10 +16692,14 @@ export type Database = {
           expires_on: string | null
           id: string
           media_type: Database["public"]["Enums"]["media_type"]
+          permission_basis: string | null
           proof_type: string | null
           ref_number: string | null
           services: string | null
           source: string | null
+          source_category: string | null
+          source_format: Database["public"]["Enums"]["content_format"]
+          source_kind: string | null
           storage_path: string | null
           strength: string
           title: string | null
@@ -10755,7 +16714,13 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      video_approval_state: { Args: { p_asset_id: string }; Returns: Json }
+      video_client_approval_email_state: {
+        Args: { p_asset_id: string }
+        Returns: Json
+      }
       weighted_sequence: { Args: { p_weights: Json }; Returns: string[] }
+      workflow_run_outcomes: { Args: { p_run_id: string }; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "employee" | "client"
@@ -10825,6 +16790,21 @@ export type Database = {
       metric_basis: "daily" | "cumulative"
       metric_entity: "account" | "campaign" | "post" | "page"
       metric_surface: "paid" | "organic" | "landing" | "offer"
+      opportunity_confidence:
+        | "hypothesis"
+        | "desk_research"
+        | "conversation"
+        | "first_party"
+        | "proven"
+      opportunity_status:
+        | "discovered"
+        | "validated"
+        | "approved"
+        | "active"
+        | "learning"
+        | "scaling"
+        | "paused"
+        | "rejected"
       page_type: "landing" | "offer" | "recruitment"
       pipeline_stage: "first_touch" | "second_touch" | "call_booked"
       post_channel: "organic" | "paid"
@@ -10855,6 +16835,7 @@ export type Database = {
         | "idea_selected"
         | "briefing"
         | "building"
+        | "editing"
         | "copywriting"
         | "qa"
         | "awaiting_approval"
@@ -11066,6 +17047,23 @@ export const Constants = {
       metric_basis: ["daily", "cumulative"],
       metric_entity: ["account", "campaign", "post", "page"],
       metric_surface: ["paid", "organic", "landing", "offer"],
+      opportunity_confidence: [
+        "hypothesis",
+        "desk_research",
+        "conversation",
+        "first_party",
+        "proven",
+      ],
+      opportunity_status: [
+        "discovered",
+        "validated",
+        "approved",
+        "active",
+        "learning",
+        "scaling",
+        "paused",
+        "rejected",
+      ],
       page_type: ["landing", "offer", "recruitment"],
       pipeline_stage: ["first_touch", "second_touch", "call_booked"],
       post_channel: ["organic", "paid"],
@@ -11092,6 +17090,7 @@ export const Constants = {
         "idea_selected",
         "briefing",
         "building",
+        "editing",
         "copywriting",
         "qa",
         "awaiting_approval",

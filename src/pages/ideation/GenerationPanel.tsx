@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PenLine, Sparkles, BadgeCheck, Columns3, Trash2 } from "lucide-react";
+import { PenLine, Sparkles, BadgeCheck, Columns3 } from "lucide-react";
 import { ActionCard } from "../../components/ActionCard";
+import { ActionMenu } from "../../components/ActionMenu";
+import { Modal } from "../../components/Modal";
+import { dayOrDash, setContentArchived } from "../../lib/contentRecords";
 import { FilterPills } from "../../components/FilterPills";
 import { DataTable } from "../../components/DataTable";
 import { FormModal } from "../../components/forms/FormModal";
@@ -31,6 +34,7 @@ type Idea = {
   target_platform: string | null;
   source: string;
   status: string;
+  created_at: string;
   campaign: { name: string } | null;
 };
 
@@ -76,7 +80,9 @@ export function GenerationPanel({ watchJobs = true, refreshToken, showJourney = 
   const [campaigns, setCampaigns] = useState<CampaignChoice[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [campaignsError, setCampaignsError] = useState<string | null>(null);
-  const [busyAction, setBusyAction] = useState<{ ideaId: string; action: "approve" | "brief" | "approve-and-brief" | "delete" } | null>(null);
+  const [busyAction, setBusyAction] = useState<{ ideaId: string; action: "approve" | "brief" | "approve-and-brief" | "archive" | "delete" } | null>(null);
+  /** The idea whose source and direction is open, or null. */
+  const [viewing, setViewing] = useState<Idea | null>(null);
   const actionInFlight = useRef(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const proofOptions = useOptions(
@@ -123,7 +129,7 @@ export function GenerationPanel({ watchJobs = true, refreshToken, showJourney = 
       if (!clientId) return;
       const { data, error } = await supabase
         .from("client_ideas")
-        .select("id, title, body, media_type, content_format, target_platform, source, status, campaign:client_campaigns!client_ideas_campaign_client_fkey(name)")
+        .select("id, title, body, media_type, content_format, target_platform, source, status, created_at, campaign:client_campaigns!client_ideas_campaign_client_fkey(name)")
         .eq("client_id", clientId)
         // An idea whose brief exists is record, not work. It lives in the
         // archive from that moment; leaving it here is how 300 drafts and 33
@@ -177,6 +183,24 @@ export function GenerationPanel({ watchJobs = true, refreshToken, showJourney = 
       await refresh();
     } catch (error) {
       setNotice({ kind: "error", text: error instanceof Error ? error.message : (error as { message?: string }).message ?? "Something went wrong." });
+    } finally {
+      actionInFlight.current = false;
+      setBusyAction(null);
+    }
+  }
+
+  /** Out of the working list, into the archive. Nothing is lost. */
+  async function archiveIdea(idea: Idea) {
+    if (!clientId || actionInFlight.current) return;
+    actionInFlight.current = true;
+    setBusyAction({ ideaId: idea.id, action: "archive" });
+    setNotice(null);
+    try {
+      await setContentArchived("idea", idea.id);
+      setNotice({ kind: "ok", text: "Archived. It is still in the Archive, under Ideation." });
+      await refresh();
+    } catch (error) {
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : "Something went wrong." });
     } finally {
       actionInFlight.current = false;
       setBusyAction(null);
@@ -289,10 +313,15 @@ export function GenerationPanel({ watchJobs = true, refreshToken, showJourney = 
       p_target_platform: platform,
       p_media_type: mediaType,
       p_content_format: format,
-      p_campaign_id: campaignId,
-      p_idea_count: count,
-      p_input_table: inputTable,
-      p_input_id: inputId,
+      // enqueue_scoped_ideation takes these positionally with no default, and
+      // null is a real argument to both: no campaign, and let the agent pick
+      // the count. The generated types model every argument as non-nullable,
+      // which is the one thing they cannot say, so the nulls are cast rather
+      // than the keys omitted — omitting them would not match the signature.
+      p_campaign_id: campaignId as unknown as string,
+      p_idea_count: count as unknown as number,
+      p_input_table: inputTable as unknown as string,
+      p_input_id: inputId as unknown as string,
     });
     if (error) throw new Error(error.message);
   }
@@ -328,58 +357,47 @@ export function GenerationPanel({ watchJobs = true, refreshToken, showJourney = 
         <FilterPills options={formatFilters} activeId={activeFormat} onChange={setActiveFormat} />
       </div>
       <DataTable
-        columns={["Idea", "Destination", "Format", "Type", "Campaign", "Status", ""]}
+        columns={["Idea", "Destination", "Format", "Type", "Campaign", "Created", "Actions"]}
         emptyLabel={`No ${activeLabel.toLowerCase()} ideas yet`}
         rows={shown.map((i) => [
-          <div key={i.id} className="space-y-1">
-            <span>{i.title}</span>
-            {i.body && <details className="text-xs text-muted-foreground">
-              <summary className="cursor-pointer text-brand-strong">View source and direction</summary>
-              <p className="mt-1 whitespace-pre-wrap">{i.body}</p>
-            </details>}
-          </div>,
+          <span key={i.id}>{i.title}</span>,
           platformLabel(i.target_platform),
           formatLabel(i.content_format),
           i.source,
           i.campaign?.name ?? "—",
-          i.status,
-          (
-            <span key={i.id} className="inline-flex items-center gap-3">
-              {i.status === "draft" && (
-                <button
-                  type="button"
-                  disabled={busyAction !== null}
-                  onClick={() => void actOnIdea(i.id, "approve")}
-                  className="text-sm text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {busyAction?.ideaId === i.id && busyAction.action === "approve" ? "Approving…" : "Approve"}
-                </button>
-              )}
-              {(i.status === "draft" || i.status === "approved") && (
-                <button
-                  type="button"
-                  disabled={busyAction !== null}
-                  onClick={() => void actOnIdea(i.id, i.status === "draft" ? "approve-and-brief" : "brief")}
-                  className="text-sm text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {busyAction?.ideaId === i.id && (busyAction.action === "brief" || busyAction.action === "approve-and-brief")
-                    ? "Queueing…" : i.status === "draft" ? "Approve & brief" : "Brief"}
-                </button>
-              )}
-              <button
-                type="button"
-                disabled={busyAction !== null}
-                onClick={() => void deleteIdea(i)}
-                aria-label={`Delete ${i.title}`}
-                className="inline-flex items-center gap-1 text-sm text-destructive hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                {busyAction?.ideaId === i.id && busyAction.action === "delete" ? "Deleting…" : "Delete"}
-              </button>
-            </span>
-          ),
+          dayOrDash(i.created_at),
+          // Forward action first, then the ways of looking at it, then
+          // archive, then delete. The same order on every tab.
+          <ActionMenu
+            key={`a-${i.id}`}
+            name={i.title}
+            busy={busyAction?.ideaId === i.id}
+            items={[
+              ...(i.status === "draft"
+                ? [{ label: "Approve", busyLabel: "Approving…", onSelect: () => void actOnIdea(i.id, "approve") }]
+                : []),
+              ...(i.status === "draft" || i.status === "approved"
+                ? [{
+                    label: i.status === "draft" ? "Approve & brief" : "Brief",
+                    busyLabel: "Queueing…",
+                    onSelect: () => void actOnIdea(i.id, i.status === "draft" ? "approve-and-brief" : "brief"),
+                  }]
+                : []),
+              ...(i.body ? [{ label: "View source and direction", onSelect: () => setViewing(i) }] : []),
+              { label: "Archive", onSelect: () => void archiveIdea(i) },
+              { label: "Delete", destructive: true, busyLabel: "Deleting…", onSelect: () => void deleteIdea(i) },
+            ]}
+          />,
         ])}
       />
+
+      <Modal
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        title={viewing?.title ?? "Idea"}
+      >
+        <p className="whitespace-pre-wrap text-sm text-foreground">{viewing?.body}</p>
+      </Modal>
 
       <FormModal
         open={openCardId === "manual-idea"}

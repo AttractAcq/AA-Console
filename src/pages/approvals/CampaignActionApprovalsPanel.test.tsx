@@ -45,7 +45,9 @@ it("shows the exact destination and scope before a human approves", async () => 
   expect(screen.getByText("a".repeat(32))).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Approve this scope" }));
   await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_campaign_action_approval_v6", {
-    p_request_id: "approval-1", p_decision: "approved", p_reason: null,
+    // An approval carries no reason: the key is left out so the function's
+    // own default applies, which is the same null it used to be sent.
+    p_request_id: "approval-1", p_decision: "approved",
   }));
   expect(await screen.findByText("No campaign action requests are waiting.")).toBeInTheDocument();
 });

@@ -124,7 +124,7 @@ export async function runBriefJob(
   // Cleared, unexpired, strongest first — the filtering happens in the
   // database so what arrives is already safe to cite. The held count lets the
   // agent distinguish "no proof exists" from "proof exists, nobody cleared it".
-  const [usable, { count: held }] = await Promise.all([
+  const [availableProof, { count: held }] = await Promise.all([
     loadUsableProof(sb, job.client_id),
     sb
       .from("client_proof_assets")
@@ -132,6 +132,18 @@ export async function runBriefJob(
       .eq("client_id", job.client_id)
       .neq("usage_rights", "approved"),
   ]);
+  let usable = availableProof;
+  const pinnedProofId = typeof job.params?.proof_factory_source_id === "string" ? job.params.proof_factory_source_id : null;
+  if (pinnedProofId) {
+    const { data: selected, error: selectedError } = await sb.from("client_proof_assets")
+      .select("*").eq("id", pinnedProofId).eq("client_id", job.client_id).maybeSingle();
+    if (selectedError) throw new Error(selectedError.message);
+    if (!selected || selected.usage_rights !== "approved" || !selected.permission_basis?.trim()
+      || (selected.expires_on && selected.expires_on < new Date().toISOString().slice(0, 10))) {
+      return { ok: false, retryable: false, failureMessage: "The selected proof is no longer cleared for production." };
+    }
+    usable = [selected];
+  }
   const proof = renderProof(usable, { held: held ?? 0 });
 
   // The real, checkable details. Without these the agent writes
@@ -259,6 +271,9 @@ Call ${submitTool.name} once when you are done.`;
   const submitted = contentFormat === "reel"
     ? completeMissingFinalReelCaption(result.submitted)
     : result.submitted;
+  if (pinnedProofId && proofIdForRef(usable, submitted.proof_ref) !== pinnedProofId) {
+    return { ok: false, retryable: true, failureMessage: "The brief must cite the selected proof source.", usage };
+  }
   const title = String(submitted.title ?? "").trim() || idea.title;
   // Composed from the fields rather than written separately: two outputs would
   // be free to disagree, and the one an editor reads would be the unvalidated

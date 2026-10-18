@@ -4,14 +4,16 @@ import { clientNavGroups, legacyDeliveryNodes, v6ModuleNodes } from "./navigatio
 describe("client delivery navigation", () => {
   it("shows every acquisition module as its own Delivery page with the agreed utilities", () => {
     expect(clientNavGroups[0]?.children?.map((node) => node.label)).toEqual([
-      "Dashboard", "Approval Inbox", "Intelligence OS", "Campaign Factory",
+      // Market Opportunities sits between intelligence and campaigns: it is
+      // the commercial reason a campaign should exist.
+      "Dashboard", "Approval Inbox", "Intelligence OS", "Market Opportunities", "Campaign Factory",
       "Proof Production Factory", "Content Production Factory", "Proof Distribution",
       "Organic Content Distribution", "Google Ads Studio", "Meta Ads Studio", "Google Profile",
       "Meta Profile", "Offer Studio", "Website Studio", "Lead Magnet Studio",
       "Sales OS", "Attribution OS", "Motion Design", "Archive",
     ]);
-    expect(v6ModuleNodes).toHaveLength(15);
-    expect(new Set(clientNavGroups[0]?.children?.map((node) => node.path)).size).toBe(19);
+    expect(v6ModuleNodes).toHaveLength(16);
+    expect(new Set(clientNavGroups[0]?.children?.map((node) => node.path)).size).toBe(20);
     for (const id of ["campaign-factory", "proof-production-factory", "content-production-factory",
       "content-distribution", "meta-ads-studio", "meta-profile", "offer-studio", "website-studio", "sales-os"]) {
       expect(v6ModuleNodes.find((node) => node.id === id)?.sidebarViews?.map((view) => view.id))

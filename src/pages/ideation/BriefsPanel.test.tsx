@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
@@ -36,7 +36,9 @@ describe("BriefsPanel human Create handoff", () => {
     render(<MemoryRouter initialEntries={["/?tab=briefs&brief=brief-1"]}><BriefsPanel /></MemoryRouter>);
     expect(await screen.findByText(/Taylor: delivered/)).toBeInTheDocument();
     expect(screen.getByText(/assigned, email not sent/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "View delivery" })).toBeInTheDocument();
+    // The row's actions moved behind one menu, named after the brief.
+    fireEvent.click(screen.getByRole("button", { name: /^Actions for / }));
+    expect(await screen.findByRole("menuitem", { name: "View delivery" })).toBeInTheDocument();
   });
   it("shows an archived production brief on Create", async () => {
     render(<MemoryRouter initialEntries={["/?brief=brief-1"]}><BriefsPanel stage="create" /></MemoryRouter>);

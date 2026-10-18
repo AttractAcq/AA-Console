@@ -34,9 +34,16 @@ import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { logger } from "../../logging/logger.js";
 import { isPlatform } from "../../content/platform-limits.js";
+import { MAX_FRAMES, MIN_FRAMES, isContentFormat } from "../../content/format.js";
 import { adapterFor } from "../../publishing/registry.js";
 import { compose } from "../../publishing/caption.js";
-import { PublishError, type PublishRequest } from "../../publishing/types.js";
+import {
+  PublishError,
+  type PublishAdapter,
+  type PublishFrame,
+  type PublishRequest,
+  type PublishSuccess,
+} from "../../publishing/types.js";
 
 const MEDIA_BUCKET = "client-media";
 /** Long enough for Meta to fetch a reel, short enough not to be a public link. */
@@ -50,6 +57,9 @@ export interface ClaimedPost {
   provider: string;
   media_type: string | null;
   media_path: string | null;
+  content_format: string | null;
+  /** Ordered by position. Null for anything that is not a frame set. */
+  frame_paths: string[] | null;
   asset_id: string | null;
   caption: string | null;
   hashtags: string[] | null;
@@ -111,6 +121,50 @@ export async function prepare(
     throw new PublishError(`Could not sign a URL for ${path}.`, true);
   }
 
+  // The frames, for a shape made of them. The queue has already refused a
+  // carousel with an unsendable number of them (migration 220), so reaching
+  // this with the wrong count means the frames changed between the claim and
+  // now -- worth failing on rather than publishing a shorter carousel than
+  // the one somebody approved.
+  // Deliberately not coerceFormat, which falls back to 'single' when a format
+  // and a media type disagree. That is right for ideation, where losing one
+  // idea's shape beats losing the batch, and precisely wrong here: falling
+  // back to 'single' is how a carousel goes out as one image, which is the
+  // bug this whole path exists to make impossible.
+  const format = post.content_format ?? "single";
+  if (!isContentFormat(format)) {
+    throw new PublishError(`This post is a "${format}", which has no rules on file.`, false);
+  }
+  let frames: PublishFrame[] | undefined;
+  if (format === "carousel" || format === "story") {
+    const paths = (post.frame_paths ?? []).map((value) => value.trim()).filter(Boolean);
+    // A carousel is one post that must hold together, so two is its floor. A
+    // story is a series of posts, and one of them is a story -- short, but
+    // not wrong.
+    const least = format === "carousel" ? MIN_FRAMES : 1;
+    if (paths.length < least || paths.length > MAX_FRAMES) {
+      throw new PublishError(
+        `This ${format} has ${paths.length} frame${paths.length === 1 ? "" : "s"} to send, and a ${format} takes between ${least} and ${MAX_FRAMES}.`,
+        false,
+      );
+    }
+    const { data: signedFrames, error: frameError } = await sb.storage
+      .from(MEDIA_BUCKET)
+      .createSignedUrls(paths, SIGNED_URL_SECONDS);
+    if (frameError || !signedFrames || signedFrames.length !== paths.length) {
+      throw new PublishError(`Could not sign URLs for this ${format}'s ${paths.length} frames.`, true);
+    }
+    frames = paths.map((path, index) => {
+      const url = signedFrames[index]?.signedUrl?.trim() ?? "";
+      if (!url.startsWith("https://")) {
+        // One unreachable frame is a failure before the post rather than a
+        // carousel with a hole in it.
+        throw new PublishError(`Could not sign a URL for frame ${index + 1} (${path}).`, true);
+      }
+      return { position: index + 1, mediaUrl: url };
+    });
+  }
+
   const words = compose(post.platform, {
     caption: post.caption,
     hashtags: post.hashtags,
@@ -126,10 +180,97 @@ export async function prepare(
     accountId,
     mediaUrl,
     mediaKind: post.media_type === "video" ? "video" : "image",
+    contentFormat: format,
+    ...(frames ? { frames } : {}),
     caption: words.caption,
     firstComment: words.firstComment,
     altText: post.alt_text,
     linkUrl: post.link_url,
+  };
+}
+
+/**
+ * A story, which is not one publication.
+ *
+ * Neither platform has a multi-frame story container, so this sends each
+ * frame as its own post and records it the moment it lands. That ordering is
+ * the point. A story that gets three frames out and then meets an expired
+ * token has three posts live on a client's account, and the only honest
+ * record of that is three rows written as they happened -- not one row
+ * written at the end, which would say either "published" (losing two) or
+ * "failed" (while three are live, and a retry then sends them again).
+ *
+ * Because that record exists, a retry is safe and useful: it reads what has
+ * already gone out and sends the rest.
+ */
+async function publishStory(
+  sb: SupabaseClient,
+  adapter: PublishAdapter,
+  request: PublishRequest,
+  jobId: string,
+): Promise<PublishSuccess> {
+  if (!adapter.publishFrame) {
+    throw new PublishError(`The ${adapter.provider} adapter cannot send a story.`, false);
+  }
+  const frames = request.frames ?? [];
+  if (frames.length === 0) throw new PublishError("This story has no frames to send.", false);
+
+  // Read before send, so a failure here costs nothing. Not part of the claim:
+  // this is the runner's own state rather than anything the adapter needs,
+  // and it has to be re-read on every attempt by definition.
+  const { data: done, error: doneError } = await sb
+    .from("post_frame_publications")
+    .select("position, external_id, external_url")
+    .eq("post_id", request.postId);
+  if (doneError) {
+    throw new PublishError(`Could not read what has already gone out: ${doneError.message}`, true);
+  }
+  const already = new Map(
+    (done ?? []).map((row) => [
+      (row as { position: number }).position,
+      row as { external_id: string; external_url: string | null },
+    ]),
+  );
+
+  let first = already.get(1) ?? null;
+  let sent = 0;
+  for (const frame of frames) {
+    if (already.has(frame.position)) continue;
+    const result = await adapter.publishFrame(request, frame);
+    const { error: frameError } = await sb.rpc("record_frame_published", {
+      p_post_id: request.postId,
+      p_position: frame.position,
+      p_external_id: result.externalId,
+      p_external_url: result.externalUrl ?? null,
+    } as never);
+    // The frame is out. Failing to record it is worse than it sounds -- the
+    // next attempt would send it again -- so this stops the story here rather
+    // than carrying on and widening the gap between the account and the
+    // record.
+    if (frameError) {
+      throw new Error(
+        `Story frame ${frame.position} went out, but could not be recorded: ${frameError.message}`,
+      );
+    }
+    sent += 1;
+    first ??= { external_id: result.externalId, external_url: result.externalUrl ?? null };
+    await appendEvent(
+      sb,
+      jobId,
+      `${request.platform}: story frame ${frame.position} of ${frames.length} published.`,
+      "info",
+      { post_id: request.postId, position: frame.position, external_id: result.externalId },
+    );
+  }
+
+  return {
+    ok: true,
+    externalId: first?.external_id ?? "",
+    externalUrl: first?.external_url ?? null,
+    detail:
+      sent === frames.length
+        ? `Published ${frames.length} story frames.`
+        : `Published ${sent} story frames; ${frames.length - sent} were already out.`,
   };
 }
 
@@ -165,7 +306,10 @@ export async function runPublisherJob(
     try {
       const request = await prepare(sb, post);
       const adapter = adapterFor(post.platform)!;
-      const result = await adapter.publish(request);
+      const result =
+        request.contentFormat === "story"
+          ? await publishStory(sb, adapter, request, job.id)
+          : await adapter.publish(request);
 
       const { error: recordError } = await sb.rpc("record_post_published", {
         p_post_id: post.post_id,
