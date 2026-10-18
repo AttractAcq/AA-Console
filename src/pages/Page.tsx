@@ -1,3 +1,4 @@
+import { ProofFactoryV2Panel } from "./proof-bank/ProofFactoryV2Panel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -275,6 +276,7 @@ function getPanelBody(
   sectionLabel: string,
   view: string,
 ): ReactNode {
+  if (node.id === "proof-production-factory" && view === "v2") return <ProofFactoryV2Panel tab={activeTab?.id ?? "capture"} />;
   if (node.id === "campaign-factory" && view === "v2") return <CampaignExecutionPanel />;
   if (node.id === "content-production-factory" && view === "v2") {
     switch (activeTab?.id) {
@@ -300,9 +302,10 @@ export function Page({ node }: { node: NavNode }) {
   const requestedView = searchParams.get("view");
   const view = node.id === "intelligence-os" ? requestedView === "strategy" ? "strategy" : "intelligence"
     : requestedView === "v2" && node.sidebarViews?.some((item) => item.id === "v2") ? "v2" : "v1";
-  const v2Blank = view === "v2" && node.id !== "content-production-factory" && node.id !== "campaign-factory";
+  const v2Blank = view === "v2" && node.id !== "content-production-factory" && node.id !== "campaign-factory" && node.id !== "proof-production-factory";
   const tabs = node.id === "intelligence-os"
     ? node.tabs?.filter((tab) => strategyTabIds.has(tab.id) === (view === "strategy"))
+    : node.id === "proof-production-factory" && view === "v2" ? [{id:"capture",label:"Capture"},{id:"produce",label:"Produce"},{id:"repurpose",label:"Repurpose"},{id:"assets",label:"Assets"}]
     : node.id === "campaign-factory" && view === "v2" ? undefined
     : node.id === "content-production-factory" && view === "v2"
       ? [
