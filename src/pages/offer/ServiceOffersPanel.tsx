@@ -112,12 +112,18 @@ export function ServiceOffersPanel() {
       p_promise: form.promise.trim(),
       p_inclusions: lines(form.inclusions),
       p_exclusions: lines(form.exclusions),
-      p_price_amount: price,
-      p_currency: price === null ? null : form.currency.trim().toUpperCase(),
-      p_delivery_cost_estimate: deliveryCost,
+      // An offer with no price has no currency either, and the function takes
+      // both positionally with no default. The generated types model every
+      // argument as non-nullable, which is why these are cast rather than
+      // omitted — leaving them out would not match the signature.
+      p_price_amount: price as unknown as number,
+      p_currency: (price === null ? null : form.currency.trim().toUpperCase()) as unknown as string,
+      p_delivery_cost_estimate: deliveryCost as unknown as number,
       p_claims: claims,
       p_idempotency_key: draftKey,
-      p_offer_id: form.offerId,
+      // A first version is not a revision of an existing offer, and that is
+      // what the default says.
+      ...(form.offerId ? { p_offer_id: form.offerId } : {}),
     });
     setBusy(null);
     if (rpcError) { setError(rpcError.message); return; }

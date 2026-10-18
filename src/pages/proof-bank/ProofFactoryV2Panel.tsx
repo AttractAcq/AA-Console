@@ -601,7 +601,10 @@ function ProofProductionWorkspace({
                   }),
               p_client_id: clientId,
               p_source_proof_id: proofId,
-              p_source_asset_id: source?.id ?? null,
+              // Producing from raw proof has no parent asset; the argument
+              // is positional with no default, so null is passed rather than
+              // the key omitted.
+              p_source_asset_id: (source?.id ?? null) as unknown as string,
               p_media_type: mt,
               p_format: f,
               p_destination: String(v.destination),

@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import type { Database } from "../types/database";
 
 /**
  * Archiving and deleting a piece of content production, from any stage.
@@ -23,30 +24,12 @@ import { supabase } from "./supabase";
 
 export type ContentRecord = "idea" | "brief" | "asset";
 
-/**
- * Both functions are added by migration 223 and are not in
- * `src/types/database.ts` yet, because that file is regenerated from a
- * database the migration has not been applied to. The casts are the price of
- * that ordering and come out the moment the types are regenerated -- they are
- * marked here rather than spread across the call sites so there is one place
- * to delete.
- */
-type UntypedRpc = (name: string, args: Record<string, unknown>) =>
-  Promise<{ data: unknown; error: { message: string } | null }>;
-/**
- * Resolved per call rather than once at module load. Bound at load it would
- * read `supabase.rpc` while a test's module mock is still being assembled,
- * and the whole file would fail to import over a cast.
- */
-const callRpc: UntypedRpc = (name, args) =>
-  (supabase.rpc as unknown as UntypedRpc)(name, args);
-
 export async function setContentArchived(
   record: ContentRecord,
   id: string,
   archived = true,
 ): Promise<void> {
-  const { error } = await callRpc("set_content_archived_v6", {
+  const { error } = await supabase.rpc("set_content_archived_v6", {
     p_record: record,
     p_id: id,
     p_archived: archived,
@@ -54,27 +37,30 @@ export async function setContentArchived(
   if (error) throw new Error(error.message);
 }
 
-/** What a termination actually removed, so the confirmation can say it. */
-export interface AssetDeletion {
-  deleted_frames: number;
-  deleted_copy: number;
-  deleted_posts: number;
-  deleted_files: number;
-}
+/**
+ * What a termination actually removed, so the confirmation can say it.
+ *
+ * Taken from the generated types rather than restated, so the day a column is
+ * added to the function's return the compiler says so here.
+ */
+export type AssetDeletion =
+  Database["public"]["Functions"]["delete_content_asset_v6"]["Returns"][number];
 
 export async function deleteContentAsset(id: string): Promise<AssetDeletion> {
-  const { data, error } = await callRpc("delete_content_asset_v6", { p_asset_id: id });
+  const { data, error } = await supabase.rpc("delete_content_asset_v6", { p_asset_id: id });
   if (error) throw new Error(error.message);
-  const row = (Array.isArray(data) ? data[0] : data) as AssetDeletion | null;
-  return row ?? { deleted_frames: 0, deleted_copy: 0, deleted_posts: 0, deleted_files: 0 };
+  // A set-returning function with nothing to say returns no rows rather than
+  // a row of zeroes, and "deleted nothing" is a true thing to report.
+  return data?.[0] ?? { deleted_frames: 0, deleted_copy: 0, deleted_posts: 0, deleted_files: 0 };
 }
 
 /** A brief, and everything made from it. Mirrors delete_client_idea's scope. */
 export async function deleteContentBrief(id: string): Promise<AssetDeletion> {
-  const { data, error } = await callRpc("delete_content_brief_v6", { p_brief_id: id });
+  const { data, error } = await supabase.rpc("delete_content_brief_v6", { p_brief_id: id });
   if (error) throw new Error(error.message);
-  const row = (Array.isArray(data) ? data[0] : data) as AssetDeletion | null;
-  return row ?? { deleted_frames: 0, deleted_copy: 0, deleted_posts: 0, deleted_files: 0 };
+  // A set-returning function with nothing to say returns no rows rather than
+  // a row of zeroes, and "deleted nothing" is a true thing to report.
+  return data?.[0] ?? { deleted_frames: 0, deleted_copy: 0, deleted_posts: 0, deleted_files: 0 };
 }
 
 /**

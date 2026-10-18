@@ -313,10 +313,15 @@ export function GenerationPanel({ watchJobs = true, refreshToken, showJourney = 
       p_target_platform: platform,
       p_media_type: mediaType,
       p_content_format: format,
-      p_campaign_id: campaignId,
-      p_idea_count: count,
-      p_input_table: inputTable,
-      p_input_id: inputId,
+      // enqueue_scoped_ideation takes these positionally with no default, and
+      // null is a real argument to both: no campaign, and let the agent pick
+      // the count. The generated types model every argument as non-nullable,
+      // which is the one thing they cannot say, so the nulls are cast rather
+      // than the keys omitted — omitting them would not match the signature.
+      p_campaign_id: campaignId as unknown as string,
+      p_idea_count: count as unknown as number,
+      p_input_table: inputTable as unknown as string,
+      p_input_id: inputId as unknown as string,
     });
     if (error) throw new Error(error.message);
   }

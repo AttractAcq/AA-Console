@@ -1059,7 +1059,8 @@ export function CampaignExecutionPanel() {
           const { data, error } = await supabase.rpc("clone_campaign_for_route", {
             p_source_campaign_id: cloneSource.id,
             p_target_mode: mode,
-            p_paid_platform: platform,
+            // Organic has no platform, and the function's default is null.
+            ...(platform ? { p_paid_platform: platform } : {}),
             p_name: (v.name as string).trim(),
           });
           if (error) throw error;

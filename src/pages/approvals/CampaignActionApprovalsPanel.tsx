@@ -72,7 +72,10 @@ export function CampaignActionApprovalsPanel() {
     const { error: rpcError } = await supabase.rpc("decide_campaign_action_approval_v6", {
       p_request_id: request.id,
       p_decision: decision,
-      p_reason: decision === "rejected" ? reason : null,
+      // p_reason defaults to null in SQL, so an approval leaves the key out
+      // rather than passing one. The generated type says optional, not
+      // nullable, and those are the same thing to the function.
+      ...(decision === "rejected" ? { p_reason: reason } : {}),
     });
     setBusyId(null);
     if (rpcError) {
