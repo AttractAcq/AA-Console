@@ -1,7 +1,23 @@
 # Content Engine — build plan
 
-1 October 2026. Status: **proposal, not yet cleared.** It needs Sec review for
-the publish milestone (M2) and an Alex CLEAR before work starts on it.
+> **Status, 18 October 2026: largely delivered. Kept as the record of the
+> reasoning, not as a plan of work.**
+>
+> This was written on 1 October as a proposal awaiting clearance. It was then
+> built. Post copy, engine settings, content slots, the hourly tick, QA, the
+> approval inbox and the publisher landed in migrations 145–171; the publisher
+> learned what shape it was sending in 219–222, which is the part this plan
+> did not anticipate. The "Needed" column below therefore describes things
+> that now exist, and the milestone numbering (M0–M6) survives only in commit
+> messages.
+>
+> Read it for why the engine is shaped the way it is — the one human commit,
+> policy approvals that are never sufficient on their own — and check the
+> migrations for what it actually does.
+
+1 October 2026. Status at the time of writing: **proposal, not yet cleared.**
+It needed Sec review for the publish milestone (M2) and an Alex CLEAR before
+work started on it.
 
 The goal is an engine that keeps any client's channels full of on-brand
 content, where the only thing a person does is **approve a post to be
