@@ -12,7 +12,9 @@ ENV NODE_ENV=production
 # video_edit renders the cut with ffmpeg. The font it burns captions with
 # comes from the dejavu-fonts-ttf package rather than an OS path, so it ships
 # with node_modules and cannot drift with a base-image change.
-RUN apk add --no-cache ffmpeg
+# Sharp renders Motion Design SVG frames through librsvg/Pango. It needs an
+# installed font; the TTF in node_modules is only used by FFmpeg drawtext.
+RUN apk add --no-cache ffmpeg fontconfig ttf-dejavu
 WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules

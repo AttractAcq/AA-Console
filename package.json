@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "postinstall": "node scripts/exclude-node-modules-from-icloud.mjs",
-    "sync:platform-limits": "node scripts/sync-platform-limits.mjs"
+    "sync:platform-limits": "node scripts/sync-platform-limits.mjs",
+    "sync:metrics-compare": "node scripts/sync-metrics-compare.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.114.0",

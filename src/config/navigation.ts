@@ -8,6 +8,7 @@ import {
   Contact,
   CreditCard,
   FileText,
+  Clapperboard,
   FolderCheck,
   Globe,
   History,
@@ -19,8 +20,10 @@ import {
   Palette,
   Plug,
   Settings2,
+  Scissors,
   Share2,
   ShieldCheck,
+  Compass,
   Target,
   TrendingUp,
   UserPlus,
@@ -37,9 +40,13 @@ export type NavNode = {
   path: string;
   icon?: LucideIcon;
   description?: string;
+  capability?: "available" | "expanding" | "planned";
   tabs?: NavTab[];
   children?: NavNode[];
+  sidebarViews?: { id: string; label: string }[];
 };
+
+const versionViews = [{ id: "v1", label: "v1" }, { id: "v2", label: "v2" }];
 
 /** Flat, top-level agency sidebar items. Each may carry its own in-page tabs. */
 export const agencyNav: NavNode[] = [
@@ -99,7 +106,7 @@ export const agencyNav: NavNode[] = [
  * Client-mode sidebar: two collapsible groups. Group `path` combines with each
  * child's `path` to form the route segment under `/clients/:clientId/`.
  */
-export const clientNavGroups: NavNode[] = [
+const legacyClientNavGroups: NavNode[] = [
   {
     id: "delivery",
     label: "Delivery",
@@ -155,6 +162,34 @@ export const clientNavGroups: NavNode[] = [
         ],
       },
       {
+        id: "create",
+        label: "Create",
+        path: "create",
+        icon: Clapperboard,
+      },
+      {
+        id: "edit-repurpose",
+        label: "Edit / Repurpose",
+        path: "edit-repurpose",
+        icon: Scissors,
+        tabs: [{ id: "overview", label: "Video edits" }],
+      },
+      {
+        id: "approvals",
+        label: "Approvals",
+        path: "approvals",
+        icon: CheckSquare,
+        // Two queues, because they are two different acts. Assets signs an
+        // asset off; Engine is the one human commit the engine stops at,
+        // which also puts the post on the calendar. Approving engine work
+        // on the Assets tab would approve the asset and leave the slot
+        // where it was.
+        tabs: [
+          { id: "engine-inbox", label: "Engine" },
+          { id: "assets", label: "Assets" },
+        ],
+      },
+      {
         id: "media",
         label: "Media",
         path: "media",
@@ -169,12 +204,6 @@ export const clientNavGroups: NavNode[] = [
         ],
       },
       {
-        id: "approvals",
-        label: "Approvals",
-        path: "approvals",
-        icon: CheckSquare,
-      },
-      {
         id: "distribution",
         label: "Distribution",
         path: "distribution",
@@ -185,6 +214,27 @@ export const clientNavGroups: NavNode[] = [
           { id: "paid", label: "Paid" },
           { id: "engine", label: "Engine" },
         ],
+      },
+      {
+        id: "reporting",
+        label: "Reporting",
+        path: "reporting",
+        icon: BarChart3,
+        tabs: [
+          { id: "organic", label: "Organic" },
+          { id: "paid", label: "Paid" },
+          { id: "landing-pages", label: "Landing Pages" },
+          { id: "offer-pages", label: "Offer Pages" },
+          { id: "attribution", label: "Attribution" },
+          { id: "commentary", label: "Commentary" },
+        ],
+      },
+      {
+        id: "campaign-execution",
+        label: "Campaigns",
+        path: "campaign-execution",
+        icon: Megaphone,
+        tabs: [{ id: "overview", label: "Overview" }],
       },
       {
         // The page-building half of Sites. Kept as its own route so nothing
@@ -200,17 +250,16 @@ export const clientNavGroups: NavNode[] = [
         ],
       },
       {
+        id: "motion-design",
+        label: "Motion Design",
+        path: "motion-design",
+        icon: Clapperboard,
+      },
+      {
         id: "sales",
         label: "Sales Agents",
         path: "sales",
         icon: MessagesSquare,
-        tabs: [{ id: "overview", label: "Overview" }],
-      },
-      {
-        id: "campaign-execution",
-        label: "Campaigns",
-        path: "campaign-execution",
-        icon: Megaphone,
         tabs: [{ id: "overview", label: "Overview" }],
       },
       {
@@ -239,20 +288,6 @@ export const clientNavGroups: NavNode[] = [
           { id: "pages", label: "Pages" },
           { id: "campaigns", label: "Campaigns" },
           { id: "sales-agents", label: "Sales Agents" },
-        ],
-      },
-      {
-        id: "reporting",
-        label: "Reporting",
-        path: "reporting",
-        icon: BarChart3,
-        tabs: [
-          { id: "organic", label: "Organic" },
-          { id: "paid", label: "Paid" },
-          { id: "landing-pages", label: "Landing Pages" },
-          { id: "offer-pages", label: "Offer Pages" },
-          { id: "attribution", label: "Attribution" },
-          { id: "commentary", label: "Commentary" },
         ],
       },
     ],
@@ -318,6 +353,113 @@ export const clientNavGroups: NavNode[] = [
       },
     ],
   },
+];
+
+/** Historical Delivery URLs remain routable while each v5 view gets a v6 home. */
+export const legacyDeliveryNodes = (legacyClientNavGroups[0]?.children ?? []).filter(
+  (node) => !["dashboard", "motion-design", "archive"].includes(node.path),
+);
+
+/** Every acquisition component is a distinct Delivery page, in product order. */
+export const v6ModuleNodes: NavNode[] = [
+  { id: "intelligence-os", label: "Intelligence OS", path: "intelligence-os", icon: Brain, capability: "expanding",
+    sidebarViews: [{ id: "intelligence", label: "Intelligence" }, { id: "strategy", label: "Strategy" }],
+    tabs: [
+      { id: "business-context", label: "Business Context" }, { id: "market", label: "Market" },
+      { id: "icp", label: "ICP" }, { id: "competitors", label: "Competitors" },
+      { id: "branding-associations", label: "Branding & Associations" },
+      { id: "campaign-intelligence", label: "Campaign Intelligence" },
+      { id: "campaign-inputs", label: "Campaign Inputs" },
+      { id: "proof-intelligence", label: "Proof Intelligence" },
+      { id: "branding-strategy", label: "Branding Strategy" },
+      { id: "content-pillars", label: "Content Pillars" },
+      { id: "money-model-strategy", label: "Money Model Strategy" },
+    ] },
+  // Between intelligence and campaigns on purpose: an opportunity is the
+  // commercial reason a campaign should exist, and reading those two in the
+  // other order is how a business ends up with attractive campaigns that are
+  // not rooted in anything somebody would actually buy.
+  { id: "market-opportunities", label: "Market Opportunities", path: "market-opportunities",
+    icon: Compass, capability: "expanding", tabs: [
+      { id: "discover", label: "Discover" }, { id: "evaluate", label: "Evaluate" },
+      { id: "strategize", label: "Strategize" }, { id: "activate", label: "Activate" },
+    ] },
+  { id: "campaign-factory", label: "Campaign Factory", path: "campaign-factory", icon: Megaphone, sidebarViews: versionViews,
+    capability: "expanding", tabs: [{ id: "overview", label: "Campaigns" }] },
+  { id: "proof-production-factory", label: "Proof Production Factory", path: "proof-production-factory",
+    icon: FolderCheck, capability: "expanding", sidebarViews: versionViews, tabs: [
+      { id: "proof-bank", label: "Proof Bank" },
+      { id: "artifacts", label: "Proof Artifacts" },
+    ] },
+  { id: "content-production-factory", label: "Content Production Factory", path: "content-production-factory",
+    icon: Clapperboard, capability: "expanding", sidebarViews: versionViews, tabs: [
+      { id: "generation", label: "Ideation" }, { id: "briefs", label: "Briefs" },
+      { id: "create", label: "Create" }, { id: "edit", label: "Edit / Repurpose" },
+      { id: "image-library", label: "Images" }, { id: "video-library", label: "Videos" },
+      { id: "reel-shots", label: "Reel Shots" }, { id: "copy-library", label: "Copy" },
+      { id: "story-library", label: "Stories" }, { id: "carousel-library", label: "Carousels" },
+    ] },
+  { id: "proof-distribution", label: "Proof Distribution", path: "proof-distribution", icon: Share2,
+    capability: "planned" },
+  { id: "content-distribution", label: "Organic Content Distribution", path: "content-distribution", icon: Share2,
+    capability: "expanding", sidebarViews: versionViews, tabs: [
+      { id: "distribution-assets", label: "Assets" }, { id: "organic", label: "Organic" },
+      { id: "engine", label: "Engine" },
+    ] },
+  { id: "google-ads-studio", label: "Google Ads Studio", path: "google-ads-studio", icon: Megaphone,
+    capability: "planned" },
+  { id: "meta-ads-studio", label: "Meta Ads Studio", path: "meta-ads-studio", icon: Megaphone,
+    capability: "expanding", sidebarViews: versionViews, tabs: [
+      { id: "campaigns", label: "Campaign Builds" }, { id: "paid", label: "Paid Distribution" },
+      { id: "reporting", label: "Paid Reporting" },
+    ] },
+  { id: "google-profile", label: "Google Profile", path: "google-profile", icon: Globe,
+    capability: "planned" },
+  { id: "meta-profile", label: "Meta Profile", path: "meta-profile", icon: Users,
+    capability: "expanding", sidebarViews: versionViews, tabs: [
+      { id: "organic", label: "Posts" }, { id: "reporting", label: "Profile Metrics" },
+    ] },
+  { id: "offer-studio", label: "Offer Studio", path: "offer-studio", icon: Target,
+    capability: "expanding", sidebarViews: versionViews, tabs: [
+      { id: "offers", label: "Service Offers" },
+      { id: "offer-strategy", label: "Offer Strategy" },
+    ] },
+  { id: "website-studio", label: "Website Studio", path: "website-studio", icon: Globe,
+    capability: "expanding", sidebarViews: versionViews, tabs: [
+      { id: "landing-pages", label: "Landing Pages" }, { id: "offer-pages", label: "Offer Pages" },
+      { id: "sites", label: "Sites" }, { id: "landing-reporting", label: "Landing Results" },
+      { id: "offer-reporting", label: "Offer Results" },
+    ] },
+  { id: "lead-magnet-studio", label: "Lead Magnet Studio", path: "lead-magnet-studio", icon: UserPlus,
+    capability: "planned" },
+  { id: "sales-os", label: "Sales OS", path: "sales-os", icon: MessagesSquare,
+    capability: "expanding", sidebarViews: versionViews, tabs: [
+      { id: "leads", label: "Prospects & Leads" }, { id: "agents", label: "Sales Agents" },
+    ] },
+  { id: "attribution-os", label: "Attribution OS", path: "attribution-os", icon: BarChart3,
+    capability: "expanding", tabs: [
+      { id: "overview", label: "Attribution" }, { id: "organic", label: "Organic" },
+      { id: "paid", label: "Paid" }, { id: "landing-pages", label: "Landing Pages" },
+      { id: "offer-pages", label: "Offer Pages" }, { id: "commentary", label: "Commentary" },
+      { id: "economics", label: "Economics" },
+    ] },
+];
+
+const legacyUtility = (path: string) => legacyClientNavGroups[0]!.children!.find((node) => node.path === path)!;
+
+export const clientNavGroups: NavNode[] = [
+  { id: "delivery", label: "Delivery", path: "delivery", children: [
+    legacyUtility("dashboard"),
+    { id: "approval-inbox", label: "Approval Inbox", path: "approval-inbox", icon: CheckSquare,
+      capability: "expanding", tabs: [
+        { id: "engine-inbox", label: "Engine" }, { id: "assets", label: "Assets" },
+        { id: "campaign-actions", label: "Campaign actions" },
+      ] },
+    ...v6ModuleNodes,
+    { ...legacyUtility("motion-design"), sidebarViews: versionViews },
+    legacyUtility("archive"),
+  ] },
+  ...legacyClientNavGroups.slice(1),
 ];
 
 export function findAgencyNode(pathname: string): NavNode | undefined {

@@ -13,7 +13,8 @@ type EngineRpc =
   | "set_engine_enabled"
   | "set_engine_platform"
   | "add_engine_window"
-  | "remove_engine_window";
+  | "remove_engine_window"
+  | "set_publishing_enabled";
 
 /**
  * Whether the engine runs for this client, and what it does when it does.
@@ -49,6 +50,18 @@ type Settings = {
   min_qa_score: number;
   approval_mode: string;
   max_jobs_in_flight: number;
+  publishing_enabled: boolean;
+};
+
+/** One row of publish_due. `blocker` is null for anything that would go out. */
+type DueRow = {
+  post_id: string;
+  platform: string | null;
+  scheduled_at: string;
+  asset_title: string | null;
+  publication_status: string;
+  publish_attempts: number | null;
+  blocker: string | null;
 };
 
 type PlatformRow = { platform: Platform; posts_per_week: number; active: boolean };
@@ -60,6 +73,7 @@ export function EnginePanel() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [platforms, setPlatforms] = useState<PlatformRow[]>([]);
   const [windows, setWindows] = useState<WindowRow[]>([]);
+  const [due, setDue] = useState<DueRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -67,7 +81,7 @@ export function EnginePanel() {
   const refresh = useCallback(async () => {
     if (!clientId) return;
     setError(null);
-    const [r, s, p, w] = await Promise.all([
+    const [r, s, p, w, d] = await Promise.all([
       supabase.from("engine_readiness").select("*").eq("client_id", clientId).maybeSingle(),
       supabase.from("client_engine_settings").select("*").eq("client_id", clientId).maybeSingle(),
       supabase.from("client_engine_platforms").select("platform, posts_per_week, active").eq("client_id", clientId),
@@ -76,8 +90,13 @@ export function EnginePanel() {
         .select("id, weekday, starts_at, ends_at")
         .eq("client_id", clientId)
         .order("weekday"),
+      supabase
+        .from("publish_due")
+        .select("post_id, platform, scheduled_at, asset_title, publication_status, publish_attempts, blocker")
+        .eq("client_id", clientId)
+        .order("scheduled_at"),
     ]);
-    const failed = r.error ?? s.error ?? p.error ?? w.error;
+    const failed = r.error ?? s.error ?? p.error ?? w.error ?? d.error;
     if (failed) {
       setError(failed.message);
       return;
@@ -86,6 +105,7 @@ export function EnginePanel() {
     setSettings((s.data as Settings) ?? null);
     setPlatforms((p.data ?? []) as PlatformRow[]);
     setWindows((w.data ?? []) as WindowRow[]);
+    setDue((d.data ?? []) as DueRow[]);
   }, [clientId]);
 
   useEffect(() => {
@@ -120,6 +140,7 @@ export function EnginePanel() {
 
   const running = readiness?.enabled ?? false;
   const canSwitchOn = readiness?.readiness === "Ready, switched off";
+  const publishing = settings?.publishing_enabled ?? false;
 
   return (
     <div className="space-y-6">
@@ -158,6 +179,82 @@ export function EnginePanel() {
           </p>
         ) : null}
       </section>
+
+      {/* The second switch.
+          PUBLISH_ENABLED in the runtime is the first, and both must be on.
+          Separate from the engine switch on purpose: making content and
+          posting it on a client's own accounts are different promises, and
+          one button for both means the day somebody turns the engine on for
+          a new client, that client's audience hears from it. */}
+      <section className="space-y-2 rounded-lg border border-border p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-card-foreground">
+              {publishing
+                ? "Approved posts go out on this client's accounts"
+                : "Nothing is posted to this client's accounts"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {publishing
+                ? "An approved post is sent at its planned time. The runtime must also have publishing on."
+                : "Approved posts sit on the calendar and wait. Nothing reaches a real account."}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void call(
+                "set_publishing_enabled",
+                { p_client_id: clientId, p_enabled: !publishing },
+                publishing
+                  ? "Publishing is off for this client."
+                  : "Publishing is on for this client. The runtime has to have it on too.",
+              )
+            }
+            className={`rounded-md px-3 py-2 text-sm disabled:opacity-50 ${
+              publishing
+                ? "bg-destructive text-destructive-foreground"
+                : "bg-primary text-primary-foreground"
+            }`}
+          >
+            {publishing ? "Stop publishing" : "Start publishing"}
+          </button>
+        </div>
+      </section>
+
+      {/* Why nothing went out, which is the question a board cannot answer.
+          publish_due gives one sentence per post; a null blocker means it
+          would go out on the next sweep. */}
+      {due.length > 0 && (
+        <section className="space-y-2 rounded-lg border border-border p-4">
+          <h3 className="text-sm font-medium text-card-foreground">
+            Waiting to go out ({due.filter((row) => row.blocker === null).length} of {due.length}{" "}
+            ready)
+          </h3>
+          <ul className="space-y-1">
+            {due.map((row) => (
+              <li key={row.post_id} className="flex flex-wrap items-baseline gap-2 text-xs">
+                <span className="text-muted-foreground">
+                  {new Date(row.scheduled_at).toLocaleString()}
+                </span>
+                <span className="text-foreground">{row.asset_title ?? "Untitled"}</span>
+                {row.platform && <span className="text-muted-foreground">{row.platform}</span>}
+                {row.blocker === null ? (
+                  <span className="text-brand-strong">Ready to go out.</span>
+                ) : (
+                  <span className="text-destructive">{row.blocker}</span>
+                )}
+                {row.publish_attempts
+                  ? <span className="text-muted-foreground">
+                      {row.publish_attempts} attempt{row.publish_attempts === 1 ? "" : "s"}
+                    </span>
+                  : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">

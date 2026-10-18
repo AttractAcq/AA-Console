@@ -78,13 +78,14 @@ export async function renderCapability(): Promise<{ ok: true } | { ok: false; me
       message: `ffmpeg is not usable on this runtime: ${formatFfmpegStderr(error)}`,
     };
   }
-  const missing = ["drawtext", "xfade", "scale"].filter((filter) => !new RegExp(`\\b${filter}\\b`).test(filters));
+  const missing = ["drawtext", "xfade", "scale", "blackdetect", "freezedetect"]
+    .filter((filter) => !new RegExp(`\\b${filter}\\b`).test(filters));
   if (missing.length > 0) {
     return {
       ok: false,
       message:
         `This ffmpeg has no ${missing.join(", ")} filter, so a cut cannot be rendered. ` +
-        `drawtext needs a build with libfreetype. Nothing was planned, so nothing was spent.`,
+        `A missing drawtext filter needs a build with libfreetype. Nothing was planned, so nothing was spent.`,
     };
   }
   return { ok: true };
@@ -127,6 +128,15 @@ export async function probeDurationSec(path: string): Promise<number> {
     if (error instanceof MediaError) throw error;
     throw new MediaError(`Could not probe ${path}: ${formatFfmpegStderr(error)}`);
   }
+}
+
+/** Reject a rights-attested file that contains no decodable audio stream. */
+export async function hasAudioStream(path: string): Promise<boolean> {
+  const { stdout } = await run("ffprobe", [
+    "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_type",
+    "-of", "default=noprint_wrappers=1:nokey=1", path,
+  ], { timeout: PROBE_TIMEOUT_MS });
+  return stdout.trim() === "audio";
 }
 
 /**

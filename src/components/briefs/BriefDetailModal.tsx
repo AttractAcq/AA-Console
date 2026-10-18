@@ -101,6 +101,74 @@ const EMAIL_TONE: Record<string, string> = {
  * produced, and who it was sent to — because those were previously stored
  * and never shown anywhere.
  */
+/** HTML-escape, because a brief is prose somebody typed. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * The brief, on paper.
+ *
+ * A separate window rather than a print stylesheet over the modal: the modal
+ * is a dialog inside a scrolling app shell, and making that paginate cleanly
+ * means fighting every ancestor's overflow. A document built for the purpose
+ * prints the whole brief, in order, with nothing clipped -- and it is what
+ * somebody on a shoot actually wants to carry.
+ */
+export function printBrief(brief: Brief, idea: Idea | null): void {
+  const sections: Array<[string, string | null | undefined]> = [
+    ["Reference", brief.brief_ref],
+    ["Media", brief.media_type],
+    ["Production method", brief.production_method],
+    ["Channel intent", brief.channel_intent],
+    ["Hook", brief.hook],
+    ["Premise", brief.premise],
+    ["Argument", brief.argument],
+    ["Proof", brief.proof],
+    ["Script", brief.script],
+    ["Visual direction", brief.visual_direction],
+    ["Shot requirements", brief.shot_requirements],
+    ["B-roll", brief.b_roll],
+    ["Call to action", brief.call_to_action],
+    ["Avatar brief", brief.avatar_brief],
+    ["Editor brief", brief.editor_brief],
+    // Briefs written before Brief Studio carry their prose here and nothing
+    // in the structured fields, so without this they print as a title alone.
+    ["Brief", brief.body],
+    ["From the idea", idea ? [idea.title, idea.body].filter(Boolean).join("\n\n") : null],
+  ];
+  const body = sections
+    .filter(([, value]) => typeof value === "string" && value.trim().length > 0)
+    .map(
+      ([label, value]) =>
+        `<section><h2>${escapeHtml(label)}</h2><p>${escapeHtml(String(value)).replace(/\n/g, "<br>")}</p></section>`,
+    )
+    .join("");
+
+  const sheet = window.open("", "_blank", "width=820,height=1000");
+  if (!sheet) return; // Pop-up blocked. Nothing opened, nothing to clean up.
+  sheet.document.write(
+    `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(brief.title)}</title><style>` +
+      "body{font:14px/1.5 system-ui,sans-serif;color:#17212e;margin:40px;max-width:46em}" +
+      "h1{font-size:20px;margin:0 0 4px}" +
+      ".ref{color:#586579;margin:0 0 24px;font-size:12px}" +
+      "section{break-inside:avoid;margin:0 0 18px}" +
+      "h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#586579;margin:0 0 4px}" +
+      "p{margin:0;white-space:pre-wrap}" +
+      "@page{margin:18mm}" +
+      `</style></head><body><h1>${escapeHtml(brief.title)}</h1><p class="ref">${escapeHtml(
+        [brief.brief_ref, brief.status.replace(/_/g, " ")].filter(Boolean).join(" · "),
+      )}</p>${body}</body></html>`,
+  );
+  sheet.document.close();
+  sheet.focus();
+  sheet.print();
+}
+
 export function BriefDetailModal({
   brief,
   open,
@@ -192,13 +260,22 @@ export function BriefDetailModal({
               <span className="capitalize">{brief.status.replace(/_/g, " ")}</span>
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Close
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => printBrief(brief, idea)}
+              className="rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Print brief
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Close
+            </button>
+          </div>
         </header>
 
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4">

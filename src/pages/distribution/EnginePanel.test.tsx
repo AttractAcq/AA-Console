@@ -16,8 +16,23 @@ const rpc = vi.fn();
  * CI counted it. Keying off the table name means any number of refreshes
  * behave the same, which is also what the panel actually does.
  */
-type State = { readiness: Record<string, unknown> | null; windows: unknown[]; platforms: unknown[] };
-const state: State = { readiness: null, windows: [], platforms: [] };
+type State = {
+  readiness: Record<string, unknown> | null;
+  windows: unknown[];
+  platforms: unknown[];
+  due: unknown[];
+  publishing: boolean;
+  /** A client with readiness but no settings row at all. */
+  noSettings: boolean;
+};
+const state: State = {
+  readiness: null,
+  windows: [],
+  platforms: [],
+  due: [],
+  publishing: false,
+  noSettings: false,
+};
 
 const SETTINGS = {
   plan_horizon_days: 14,
@@ -26,6 +41,7 @@ const SETTINGS = {
   auto_approve_ideas: false,
   auto_approve_briefs: false,
   max_jobs_in_flight: 3,
+  publishing_enabled: false,
 };
 
 function result(table: string) {
@@ -33,7 +49,15 @@ function result(table: string) {
     case "engine_readiness":
       return { data: state.readiness, error: null };
     case "client_engine_settings":
-      return { data: state.readiness ? SETTINGS : null, error: null };
+      return {
+        data:
+          state.readiness && !state.noSettings
+            ? { ...SETTINGS, publishing_enabled: state.publishing }
+            : null,
+        error: null,
+      };
+    case "publish_due":
+      return { data: state.due, error: null };
     case "client_engine_platforms":
       return { data: state.platforms, error: null };
     default:
@@ -61,6 +85,9 @@ function withState(readiness: Record<string, unknown>, windows: unknown[] = []) 
   state.readiness = readiness;
   state.windows = windows;
   state.platforms = [];
+  state.due = [];
+  state.publishing = false;
+  state.noSettings = false;
 }
 
 beforeEach(() => {
@@ -68,6 +95,8 @@ beforeEach(() => {
   state.readiness = null;
   state.windows = [];
   state.platforms = [];
+  state.due = [];
+  state.publishing = false;
   rpc.mockResolvedValue({ error: null });
 });
 
@@ -201,5 +230,102 @@ describe("how it decides", () => {
     expect(
       await screen.findByText(/Neither replaces the human approval a post still needs/),
     ).toBeInTheDocument();
+  });
+});
+
+describe("the second switch", () => {
+  const ready = { client_id: "c1", enabled: true, readiness: "Running", active_platforms: 1, posts_per_week: 3, posting_windows: 1, active_pillars: 1, month_cap_usd: 500, timezone: "Europe/London" };
+
+  it("is off even when the engine is on", async () => {
+    // Making content and posting it on a client's own accounts are
+    // different promises. One button for both means the day somebody
+    // switches the engine on for a new client, that client's audience
+    // hears from it.
+    withState(ready);
+    render(<EnginePanel />);
+    expect(await screen.findByText(/Nothing is posted to this client's accounts/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start publishing" })).toBeInTheDocument();
+  });
+
+  it("turns publishing on for this client and says the runtime must agree", async () => {
+    withState(ready);
+    rpc.mockResolvedValue({ error: null });
+    render(<EnginePanel />);
+    await userEvent.click(await screen.findByRole("button", { name: "Start publishing" }));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("set_publishing_enabled", { p_client_id: "c1", p_enabled: true }),
+    );
+    expect(await screen.findByText(/runtime has to have it on too/)).toBeInTheDocument();
+  });
+
+  it("offers to stop once it is on", async () => {
+    withState(ready);
+    state.publishing = true;
+    render(<EnginePanel />);
+    expect(await screen.findByText(/Approved posts go out on this client's accounts/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Stop publishing" }));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("set_publishing_enabled", { p_client_id: "c1", p_enabled: false }),
+    );
+  });
+
+  it("does not claim a client with no settings at all is publishing", async () => {
+    // The fallback is what a client who has never been configured reads,
+    // and "posts go out on this client's accounts" would be a lie about a
+    // real account.
+    withState(ready);
+    state.noSettings = true;
+    render(<EnginePanel />);
+    expect(await screen.findByText(/Nothing is posted to this client's accounts/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start publishing" })).toBeInTheDocument();
+  });
+
+  it("is a separate act from switching the engine off", async () => {
+    withState(ready);
+    state.publishing = true;
+    render(<EnginePanel />);
+    await userEvent.click(await screen.findByRole("button", { name: "Switch off" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("set_engine_enabled", { p_client_id: "c1", p_enabled: false }));
+    expect(rpc).not.toHaveBeenCalledWith("set_publishing_enabled", expect.anything());
+  });
+});
+
+describe("why nothing went out", () => {
+  const ready = { client_id: "c1", enabled: true, readiness: "Running", active_platforms: 1, posts_per_week: 3, posting_windows: 1, active_pillars: 1, month_cap_usd: 500, timezone: "Europe/London" };
+
+  it("says the blocker on each post rather than leaving a board to guess", async () => {
+    withState(ready);
+    state.due = [
+      {
+        post_id: "p1",
+        platform: "instagram",
+        scheduled_at: "2026-10-08T09:00:00Z",
+        asset_title: "The Chain",
+        publication_status: "scheduled",
+        publish_attempts: 0,
+        blocker: "Publishing is off for this client.",
+      },
+      {
+        post_id: "p2",
+        platform: "facebook",
+        scheduled_at: "2026-10-08T10:00:00Z",
+        asset_title: "The Step",
+        publication_status: "scheduled",
+        publish_attempts: 2,
+        blocker: null,
+      },
+    ];
+    render(<EnginePanel />);
+    expect(await screen.findByText("Publishing is off for this client.")).toBeInTheDocument();
+    expect(screen.getByText("Ready to go out.")).toBeInTheDocument();
+    expect(screen.getByText(/1 of 2 ready/)).toBeInTheDocument();
+    expect(screen.getByText("2 attempts")).toBeInTheDocument();
+  });
+
+  it("says nothing at all when there is nothing outstanding", async () => {
+    withState(ready);
+    render(<EnginePanel />);
+    await screen.findByText(/Nothing is posted/);
+    expect(screen.queryByText(/Waiting to go out/)).not.toBeInTheDocument();
   });
 });

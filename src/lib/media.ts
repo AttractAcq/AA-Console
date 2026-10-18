@@ -55,6 +55,9 @@ export type MediaAsset = {
   media_type: "image" | "text" | "video";
   title: string | null;
   storage_path: string;
+  render_path?: string | null;
+  edit_stage?: "needs_edit" | "editing" | "edited" | "review_ready";
+  source_asset_id?: string | null;
   review_status: "pending" | "approved" | "rejected";
   /** Null unless a person approved it. A bot approval never sets this. */
   human_approved_at?: string | null;
@@ -90,7 +93,7 @@ export async function fetchClientAssets(
 ): Promise<MediaAsset[]> {
   let query = supabase
     .from("client_media_assets")
-    .select("id, client_id, brief_id, ref_number, media_type, title, storage_path, review_status, human_approved_at, content_format, member_id, created_at")
+    .select("id, client_id, brief_id, ref_number, media_type, title, storage_path, render_path, edit_stage, source_asset_id, review_status, human_approved_at, content_format, member_id, created_at")
     .eq("client_id", clientId);
 
   if (opts.mediaType) query = query.eq("media_type", opts.mediaType);
@@ -127,6 +130,7 @@ export type ProofAsset = {
   services: string | null;
   strength: string;
   usage_rights: string;
+  permission_basis: string | null;
   captured_on: string | null;
   expires_on: string | null;
 };
@@ -138,7 +142,7 @@ export async function fetchProofAssets(
   let query = supabase
     .from("client_proof_assets")
     .select(
-      "id, client_id, media_type, title, body, storage_path, source, created_at, ref_number, proof_type, claim, evidence, avatar_relevance, services, strength, usage_rights, captured_on, expires_on",
+      "id, client_id, media_type, title, body, storage_path, source, created_at, ref_number, proof_type, claim, evidence, avatar_relevance, services, strength, usage_rights, permission_basis, captured_on, expires_on",
     )
     .eq("client_id", clientId);
   if (mediaType) query = query.eq("media_type", mediaType);

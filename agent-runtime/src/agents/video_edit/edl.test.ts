@@ -80,6 +80,12 @@ describe("validateEdl", () => {
     expect(validateEdl(plan(), context)).toEqual([]);
   });
 
+  it("refuses a caption that duplicates the CTA over a separate end card", () => {
+    const problems = validateEdl(plan({ captions: [{ text: "Book a call", start_sec: 5,
+      end_sec: 6.5, position: "top" }] }), context);
+    expect(problems).toContainEqual(expect.stringMatching(/overlaps the separate end card/));
+  });
+
   it("flags a segment past the end of its clip", () => {
     const problems = validateEdl(plan({ segments: [{ shot: 1, in_sec: 2, out_sec: 6, transition: "cut" }] }), context);
     expect(problems).toContain("Segment 1 (shot 1) runs outside the clip, which is 5.00s long.");
@@ -129,7 +135,7 @@ describe("validateEdl", () => {
     const problems = validateEdl(plan({ captions }), context);
     expect(problems).toContain("Caption 1 is on screen for under 0.8s, too short to read.");
     expect(problems).toContain("Two bottom captions overlap at 0.2s.");
-    expect(problems).toContain("Caption 3 runs outside the reel.");
+    expect(problems).toContainEqual(expect.stringMatching(/Caption 3 runs outside the reel.*export ends/));
   });
 
   it("flags captions too long to fit the frame", () => {
@@ -216,5 +222,37 @@ describe("segmentWindows", () => {
     const segments = plan().segments;
     const windows = segmentWindows(segments);
     expect(windows[windows.length - 1]!.end).toBeCloseTo(totalDuration({ ...plan(), end_card_text: "" }), 5);
+  });
+});
+
+describe("the plan schema", () => {
+  // Every `*_sec` field in this schema is a number of seconds, but they do not
+  // all mean the same thing: in_sec/out_sec/start_sec/end_sec are positions on
+  // a timeline and end_card_sec is a duration. A model reading an undescribed
+  // `_sec` field alongside four positional ones will read it as a position.
+  // That is exactly what happened: end_card_sec shipped with no description,
+  // and a planner returned the end card's start time as its length.
+  it("describes what every seconds field measures", () => {
+    const missing: string[] = [];
+    const walk = (node: unknown, path: string) => {
+      if (!node || typeof node !== "object") return;
+      const record = node as Record<string, unknown>;
+      const properties = record.properties as Record<string, unknown> | undefined;
+      for (const [name, value] of Object.entries(properties ?? {})) {
+        const field = value as Record<string, unknown>;
+        const here = path ? `${path}.${name}` : name;
+        if (name.endsWith("_sec") && !String(field.description ?? "").trim()) missing.push(here);
+        walk(field, here);
+        walk(field.items, `${here}[]`);
+      }
+      walk(record.items, `${path}[]`);
+    };
+    walk(EDL_SCHEMA, "");
+    expect(missing).toEqual([]);
+  });
+
+  it("says end_card_sec is a duration, because its name does not", () => {
+    const properties = EDL_SCHEMA.properties as Record<string, { description?: string } | undefined>;
+    expect(properties.end_card_sec?.description).toMatch(/duration, not a time/);
   });
 });

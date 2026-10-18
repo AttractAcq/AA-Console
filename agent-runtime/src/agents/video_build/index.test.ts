@@ -59,6 +59,7 @@ function harness(
       position: number;
       storage_path: string | null;
       provider_job_id: string | null;
+      provider_retry_count?: number;
       clip_path?: string | null;
     }>;
     signedUrl?: string | null;
@@ -297,6 +298,7 @@ describe("video_build", () => {
     expect(scheduled!.args).toMatchObject({
       p_agent_key: "video_build",
       p_input_table: "client_briefs",
+      p_current_job_id: job.id,
     });
     expect(Number(scheduled!.args.p_after_seconds)).toBeGreaterThan(0);
   });
@@ -353,6 +355,7 @@ describe("video_build", () => {
     const motion = "11111111-1111-4111-8111-111111111111";
     const ready = {
       ...reel,
+      visual_direction: "One workshop and one founder in every shot.",
       frame_plan: [shotLine("Name the mechanism").replace('"pending"', `"${motion}"`), shotLine("Show the step").replace('"pending"', `"${motion}"`)],
     };
     const clipUrl = "https://cdn.example.test/clip.mp4";
@@ -374,10 +377,11 @@ describe("video_build", () => {
         status: 200,
       });
     });
-    const { sb, frameUpdates, uploads } = harness(ready, {
+    const { sb, frameUpdates, uploads, rpcCalls } = harness(ready, {
       assets: [{ id: "asset-1" }],
       frames: [
-        { id: "frame-1", position: 1, storage_path: "client-1/generated/r/01.png", provider_job_id: null },
+        { id: "frame-1", position: 1, storage_path: "client-1/generated/r/01.png", provider_job_id: null,
+          provider_retry_count: 1 },
         { id: "frame-2", position: 2, storage_path: "client-1/generated/r/02.png", provider_job_id: null },
       ],
       signedUrl: "https://cdn.example.test/still.png",
@@ -386,16 +390,22 @@ describe("video_build", () => {
     const result = await runVideoBuildJob(sb, runtime, agent, job);
 
     expect(result.ok).toBe(true);
+    expect(rpcCalls).toContainEqual({ name: "request_video_edit", args: { p_asset_id: "asset-1" } });
     expect(fetchSpy).toHaveBeenCalled();
     const apiCalls = fetchSpy.mock.calls.filter((call) => String(call[0]) !== clipUrl);
     expect(apiCalls.length).toBeGreaterThan(0);
     for (const call of apiCalls) {
-      expect(String(call[0])).toMatch(/^https:\/\/platform\.higgsfield\.ai\//);
+      expect(String(call[0])).toMatch(/^https:\/\/(?:platform|api)\.higgsfield\.ai\//);
     }
     expect(fetchSpy.mock.calls.filter((call) => String(call[0]) === clipUrl)).toHaveLength(2);
     const post = fetchSpy.mock.calls.find((call) => call[1]?.method === "POST");
+    const posts = fetchSpy.mock.calls.filter((call) => call[1]?.method === "POST");
+    expect(posts.map((call) => (call[1]?.headers as Record<string, string>)["Idempotency-Key"]))
+      .toEqual(["aa-video-frame-frame-1-r1", "aa-video-frame-frame-2"]);
+    expect(String(post?.[0])).toContain("/higgsfield-ai/dop/standard");
     const body = JSON.parse(String(post?.[1]?.body));
-    expect(body.prompt).toBe("Name the mechanism");
+    expect(body.prompt).toContain("Visible action to perform: Name the mechanism");
+    expect(body.prompt).toContain("One workshop and one founder in every shot.");
     expect(body.image_url).toBe("https://cdn.example.test/still.png");
     expect(body.motions).toEqual([{ id: motion, strength: 1 }]);
     expect(frameUpdates.map((row) => row.provider_job_id).filter(Boolean)).toEqual(["req_abc12345", "req_abc12345"]);
@@ -408,6 +418,32 @@ describe("video_build", () => {
       { path: "client-1/generated/clips/frame-2.mp4", upsert: false, contentType: "video/mp4" },
     ]);
     expect(JSON.stringify(result)).not.toContain("not-a-real-secret");
+  });
+
+  it("leaves the edit handoff to the v5 workflow after clip collection", async () => {
+    setHiggsfieldEnv();
+    const motion = "11111111-1111-4111-8111-111111111111";
+    const ready = {
+      ...reel,
+      frame_plan: [shotLine("Name the mechanism").replace('"pending"', `"${motion}"`),
+        shotLine("Show the step").replace('"pending"', `"${motion}"`)],
+    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      status: "completed", video: { url: "https://cdn.example.test/clip.mp4" },
+    }), { status: 200 }));
+    const { sb, rpcCalls } = harness(ready, {
+      assets: [{ id: "asset-1" }],
+      frames: [
+        { id: "frame-1", position: 1, storage_path: "a/01.png", provider_job_id: "req_abc12345", clip_path: "a/01.mp4" },
+        { id: "frame-2", position: 2, storage_path: "a/02.png", provider_job_id: "req_abc12346", clip_path: "a/02.mp4" },
+      ],
+      signedUrl: "https://cdn.example.test/still.png",
+    });
+    const result = await runVideoBuildJob(sb, runtime, agent, {
+      ...job, params: { v5_workflow_run_id: "run-1", v5_step_key: "reel_motion" },
+    });
+    expect(result.ok).toBe(true);
+    expect(rpcCalls).not.toContainEqual({ name: "request_video_edit", args: { p_asset_id: "asset-1" } });
   });
 
   it("pauses an unknown motion name and does not invent a catalog id", async () => {

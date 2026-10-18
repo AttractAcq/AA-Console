@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
-import { ArrowLeft, ChevronDown, Moon, Sun } from "lucide-react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { ArrowLeft, ChevronDown, Moon, PanelLeftClose, PanelLeftOpen, Sun } from "lucide-react";
 import { agencyNav, clientNavGroups } from "../config/navigation";
 import { getMemberSections, teamCategoryLabels } from "../data/team";
 import type { TeamCategory } from "../data/team";
@@ -15,12 +15,21 @@ const navItemBase =
 const navItemInactive = "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground";
 const navItemActive = "bg-accent font-medium text-brand-strong";
 
-export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function Sidebar({ onNavigate, minimized = false, onToggleMinimized }: {
+  onNavigate?: () => void; minimized?: boolean; onToggleMinimized?: () => void;
+}) {
   const { scope, client, member, agent } = useRouteEntities();
   const { category } = scope;
 
   return (
-    <aside className="flex h-full w-[240px] flex-col border-r border-sidebar-border bg-sidebar">
+    <aside className={cn("flex h-full flex-col border-r border-sidebar-border bg-sidebar", minimized ? "w-14" : "w-[240px]")}>
+      {onToggleMinimized && <button type="button" onClick={onToggleMinimized}
+        aria-label={minimized ? "Expand sidebar" : "Minimize sidebar"}
+        title={minimized ? "Expand sidebar" : "Minimize sidebar"}
+        className={cn(navItemBase, navItemInactive, "mx-2 mt-2 justify-center")}>
+        {minimized ? <PanelLeftOpen className="h-4 w-4" /> : <><PanelLeftClose className="h-4 w-4" /><span>Minimize sidebar</span></>}
+      </button>}
+      {!minimized && <>
       {client ? (
         <ClientSidebarContent
           clientId={client.id}
@@ -36,6 +45,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <AgencySidebarContent onNavigate={onNavigate} />
       )}
       <ThemeToggle />
+      </>}
     </aside>
   );
 }
@@ -89,10 +99,12 @@ function ClientSidebarContent({
   clientDetail: string;
   onNavigate?: () => void;
 }) {
+  const location = useLocation();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     delivery: true,
     account: false,
   });
+  const [expandedModule, setExpandedModule] = useState<Record<string, boolean>>({});
 
   return (
     <>
@@ -142,10 +154,38 @@ function ClientSidebarContent({
                 <div className="mt-0.5 space-y-0.5 pl-2">
                   {group.children?.map((child) => {
                     const Icon = child.icon;
+                    const path = `/clients/${clientId}/${group.path}/${child.path}`;
+                    if (child.sidebarViews) {
+                      const isCurrent = location.pathname === path || location.pathname.startsWith(`${path}/`);
+                      const isOpen = expandedModule[child.id] ?? isCurrent;
+                      const selectedView = new URLSearchParams(location.search).get("view") ?? child.sidebarViews[0].id;
+                      return <div key={child.id}>
+                        <button type="button" aria-expanded={isOpen}
+                          onClick={() => setExpandedModule((current) => ({ ...current, [child.id]: !isOpen }))}
+                          className={cn(navItemBase, "w-full justify-between", isCurrent ? navItemActive : navItemInactive)}>
+                          <span className="flex min-w-0 items-center gap-2.5">
+                            {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                            <span className="text-left">{child.label}</span>
+                          </span>
+                          <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", isOpen && "rotate-180")} aria-hidden="true" />
+                        </button>
+                        {isOpen && <div className="ml-7 space-y-0.5 border-l border-sidebar-border pl-2">
+                          {child.sidebarViews.map((view) => {
+                            const target = view.id === child.sidebarViews![0].id ? path : `${path}?view=${view.id}`;
+                            const selected = isCurrent && selectedView === view.id;
+                            return <Link key={view.id} to={target} onClick={onNavigate}
+                              aria-current={selected ? "page" : undefined}
+                              className={cn(navItemBase, "text-xs", selected ? navItemActive : navItemInactive)}>
+                              {view.label}
+                            </Link>;
+                          })}
+                        </div>}
+                      </div>;
+                    }
                     return (
                       <NavLink
                         key={child.id}
-                        to={`/clients/${clientId}/${group.path}/${child.path}`}
+                        to={path}
                         onClick={onNavigate}
                         className={({ isActive }) =>
                           cn(navItemBase, isActive ? navItemActive : navItemInactive)

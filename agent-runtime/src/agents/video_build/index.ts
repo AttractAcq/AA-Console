@@ -43,6 +43,7 @@ interface ReelBrief {
   content_format: string | null;
   format_code: string | null;
   frame_plan: string[] | null;
+  visual_direction: string | null;
 }
 
 interface FrameRow {
@@ -50,6 +51,7 @@ interface FrameRow {
   position: number;
   storage_path: string | null;
   provider_job_id: string | null;
+  provider_retry_count: number;
   clip_path: string | null;
 }
 
@@ -122,7 +124,7 @@ async function framesForBrief(sb: SupabaseClient, briefId: string): Promise<Fram
   if (!newest) return [];
   const { data, error: frameError } = await sb
     .from("client_media_frames")
-    .select("id, position, storage_path, provider_job_id, clip_path")
+    .select("id, position, storage_path, provider_job_id, provider_retry_count, clip_path")
     .eq("asset_id", newest.id);
   if (frameError) throw new Error(`Could not load shot frames: ${frameError.message}`);
   return (data ?? []) as FrameRow[];
@@ -157,7 +159,7 @@ export async function runVideoBuildJob(
 
   const { data, error } = await sb
     .from("client_briefs")
-    .select("id, client_id, title, media_type, content_format, format_code, frame_plan")
+    .select("id, client_id, title, media_type, content_format, format_code, frame_plan, visual_direction")
     .eq("id", job.input_id)
     .maybeSingle();
   if (error) throw new Error(`Failed to load brief: ${error.message}`);
@@ -297,7 +299,8 @@ export async function runVideoBuildJob(
     shots: plan.shots,
     frames: frameRefs,
     stillUrlByPosition: stillUrls,
-    modelId: decision.modelDraft,
+    modelId: decision.modelFinal,
+    visualDirection: brief.visual_direction,
   });
   if (!prepared.ok) {
     await appendEvent(sb, job.id, prepared.message, "warn", {
@@ -346,11 +349,17 @@ export async function runVideoBuildJob(
         });
         continue;
       }
+      const retryCount = frames.find((frame) => frame.id === call.frameId)?.provider_retry_count ?? 0;
       const accepted = await client.submitI2V({
         modelId: call.modelId,
         prompt: call.prompt,
         imageUrl: call.imageUrl,
-        motions: [{ id: call.motionId, strength: call.strength }],
+        durationSec: call.durationSec,
+        motions: call.motionId ? [{ id: call.motionId, strength: call.strength }] : undefined,
+        // A frame row is one generation intent. If code changes the payload
+        // after an ambiguous timeout, Higgsfield returns a mismatch instead
+        // of accepting and charging for a second shot.
+        idempotencyKey: `aa-video-frame-${call.frameId}${retryCount > 0 ? `-r${retryCount}` : ""}`,
       });
       const { error: saveError } = await sb
         .from("client_media_frames")
@@ -370,6 +379,14 @@ export async function runVideoBuildJob(
         });
         return failed(message);
       }
+      await appendEvent(sb, job.id, `Submitted shot ${call.position} to Higgsfield.`, "info", {
+        stage: "motion",
+        position: call.position,
+        model_id: call.modelId,
+        request_id: accepted.requestId,
+        prompt: call.prompt,
+        duration_sec: call.durationSec,
+      });
       const polled = await client.pollStatus(accepted.requestId);
       const clipPath = await persistCompletedClip(sb, {
         clientId: job.client_id,
@@ -435,6 +452,7 @@ export async function runVideoBuildJob(
       // slot_has_job_in_flight, and an hour later the tick starts a second
       // build while these clips are still rendering and already paid for.
       p_params: job.params ?? {},
+      p_current_job_id: job.id,
     });
     if (scheduleError) {
       // Nothing will collect them if this did not land, so say so loudly and
@@ -450,6 +468,40 @@ export async function runVideoBuildJob(
     return { ok: true, retryable: false };
   }
 
-  await handOffToSlot(sb, job, "video_build");
+  // A v5 run owns its edit step and exact QA evidence. The generic brief
+  // route below must not create a second, unlinked video_edit job.
+  if (typeof job.params?.v5_workflow_run_id === "string"
+    && typeof job.params?.v5_step_key === "string") {
+    await appendEvent(sb, job.id, "Clips complete. The v5 workflow will queue the reel edit.");
+    return { ok: true, retryable: false };
+  }
+
+  // To editing, not copywriting. This agent makes stills and submits the
+  // Higgsfield clips; it does not produce a video. Advancing straight to
+  // copywriting is what put uncut reels in front of people, because QA reads
+  // dimensions that only video_edit writes and treats a null as nothing to
+  // check.
+  const slotId = (job.params as { slot_id?: unknown } | null)?.slot_id;
+  if (typeof slotId === "string" && slotId.length > 0) {
+    await handOffToSlot(sb, job, "video_build", "editing");
+  } else {
+    // A manually approved brief has no engine slot to enqueue editing. Use
+    // the same guarded RPC as the UI, after all clips have landed. The RPC
+    // locks the asset and returns an in-flight cut if this job is retried.
+    const { data: latest, error: assetError } = await sb.from("client_media_assets")
+      .select("id")
+      .eq("brief_id", brief.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const assetId = latest?.[0]?.id;
+    if (assetError || !assetId) {
+      return failed(`Clips completed, but the reel asset could not be found: ${assetError?.message ?? "missing asset"}.`, true);
+    }
+    const { error: cutError } = await sb.rpc("request_video_edit", { p_asset_id: assetId });
+    if (cutError && !cutError.message.includes("already has a cut")) {
+      return failed(`Clips completed, but the cut could not be queued: ${cutError.message}.`, true);
+    }
+    await appendEvent(sb, job.id, "Clips complete. The reel cut is queued for editing.");
+  }
   return { ok: true, retryable: false };
 }

@@ -102,14 +102,19 @@ export const EDL_SCHEMA: Record<string, unknown> = {
         required: ["text", "start_sec", "end_sec", "position"],
         properties: {
           text: { type: "string" },
-          start_sec: { type: "number" },
-          end_sec: { type: "number" },
+          start_sec: { type: "number", description: "When it appears, in seconds from the start of the finished reel." },
+          end_sec: { type: "number", description: "When it disappears, in seconds from the start of the finished reel." },
           position: { type: "string", enum: [...CAPTION_POSITIONS] },
         },
       },
     },
     end_card_text: { type: "string", description: "Call to action on a closing card, or empty for none." },
-    end_card_sec: { type: "number" },
+    end_card_sec: {
+      type: "number",
+      description:
+        `How long the end card holds, in seconds — a duration, not a time on the reel. ` +
+        `Between 1 and ${MAX_END_CARD_SEC}, and it counts towards the runtime cap. Use 0 when there is no end card.`,
+    },
     notes: { type: "string", description: "Why this cut, for the human reviewer." },
   },
 };
@@ -242,6 +247,7 @@ export function validateEdl(edl: Edl, context: EdlContext): string[] {
   }
 
   const total = totalDuration(edl);
+  const cutEnd = segmentsDuration(edl.segments);
   if (total > context.max_total_sec) {
     problems.push(`The reel runs ${total.toFixed(1)}s. This format allows ${context.max_total_sec}s.`);
   }
@@ -273,7 +279,10 @@ export function validateEdl(edl: Edl, context: EdlContext): string[] {
       problems.push(`${label} is on screen for under ${MIN_CAPTION_SEC}s, too short to read.`);
     }
     if (caption.start_sec < 0 || caption.end_sec > total + 0.05) {
-      problems.push(`${label} runs outside the reel.`);
+      problems.push(`${label} runs outside the reel (${caption.start_sec.toFixed(1)}–${caption.end_sec.toFixed(1)}s; export ends ${total.toFixed(1)}s). Shorten or move it within the actual cut.`);
+    }
+    if (edl.end_card_text && caption.end_sec > cutEnd + 0.05) {
+      problems.push(`${label} overlaps the separate end card. End captions at ${cutEnd.toFixed(1)}s or place the call to action over the final shot without an end card.`);
     }
   });
   // A caption over a shot that already carries its line puts two texts in two

@@ -11,7 +11,7 @@ const base: PeriodSummary = {
     { external_id: "c1", campaign_ref: "HD-C002", target_role: "implants", mapped: true,
       spend: 150, impressions: 1500, clicks: 15, conversions: 3, days_active: 2 },
   ],
-  organic_account: { impressions: 2700, best_day_reach: 1100, engagements: 120, days_covered: 2 },
+  organic_account: { impressions: 2700, impression_days: 30, best_day_reach: 1100, engagements: 120, days_covered: 2 },
   organic_posts: [
     { external_id: "p1", ref_number: "AA-ORG-016", media_type: "video", mapped: true,
       as_at: "2026-09-03", impressions: 4600, reach: 3400, engagements: 210 },
@@ -56,7 +56,7 @@ describe("reporting commentary input", () => {
   it("names a surface that has no data instead of omitting it", () => {
     const out = formatSummary({
       ...base,
-      organic_account: { impressions: 0, best_day_reach: 0, engagements: 0, days_covered: 0 },
+      organic_account: { impressions: 0, impression_days: 30, best_day_reach: 0, engagements: 0, days_covered: 0 },
       organic_posts: [],
     });
     expect(out).toContain("ORGANIC ACCOUNT: no data ingested");
@@ -77,5 +77,33 @@ describe("reporting commentary input", () => {
       paid_campaigns: [{ ...base.paid_campaigns[0]!, campaign_ref: null, target_role: null, mapped: false }],
     });
     expect(out).toContain("not in the console, external id c1");
+  });
+});
+
+describe("an account figure the endpoint cannot give", () => {
+  it("says it is not available rather than printing a zero", () => {
+    // The model is told every figure in the summary is usable, so a 0 here
+    // would be repeated to a client as a real result.
+    const out = formatSummary({
+      ...base,
+      organic_account: { impressions: null, impression_days: 0, best_day_reach: 1100, engagements: 120, days_covered: 2 },
+    });
+    expect(out).toMatch(/Impressions across the period: not available/);
+    expect(out).toMatch(/not a result/);
+    expect(out).toMatch(/Do not report it as zero or as a fall/);
+    // The figures that do exist are still there.
+    expect(out).toContain("Best single day for reach: 1100");
+  });
+
+  it("prints the number when there is one", () => {
+    expect(formatSummary(base)).toContain("Impressions across the period: 2700");
+  });
+
+  it("treats zero recorded days as not available even if the sum came back 0", () => {
+    const out = formatSummary({
+      ...base,
+      organic_account: { impressions: 0, impression_days: 0, best_day_reach: 1100, engagements: 120, days_covered: 2 },
+    });
+    expect(out).toMatch(/not available/);
   });
 });

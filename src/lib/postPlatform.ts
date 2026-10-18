@@ -17,6 +17,20 @@ export const POST_PLATFORMS = [
 
 export type PostPlatform = (typeof POST_PLATFORMS)[number]["value"];
 
+/** AA Console's currently supported production shapes for each destination. */
+export const PLATFORM_FORMATS: Record<PostPlatform, readonly string[]> = {
+  instagram: ["single", "carousel", "story", "reel"],
+  facebook: ["single", "carousel", "story", "reel"],
+  tiktok: ["single", "carousel", "reel"],
+  linkedin: ["single", "carousel"],
+  youtube: ["single", "reel"],
+};
+
+export function platformAllowsFormat(platform: string, format: string): boolean {
+  return Object.hasOwn(PLATFORM_FORMATS, platform)
+    && PLATFORM_FORMATS[platform as PostPlatform].includes(format);
+}
+
 export function platformLabel(value: string | null | undefined): string {
   const raw = (value ?? "").trim();
   if (!raw) return "—";

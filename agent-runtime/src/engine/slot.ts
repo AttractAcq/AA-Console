@@ -163,6 +163,12 @@ export async function handOffToSlot(
   sb: SupabaseClient,
   job: AgentJobRow,
   agentKey: string,
+  /**
+   * Where the slot goes next. `copywriting` for a build that produced the
+   * finished thing; `editing` for a reel, whose clips are not the asset —
+   * video_build makes footage and video_edit makes the video.
+   */
+  nextStage: "copywriting" | "editing" = "copywriting",
 ): Promise<void> {
   const slotId = slotIdOf(job);
   if (!slotId || !job.input_id) return;
@@ -182,10 +188,10 @@ export async function handOffToSlot(
     return;
   }
 
-  await advanceSlot(sb, slotId, "copywriting", {
+  await advanceSlot(sb, slotId, nextStage, {
     agentKey,
     jobId: job.id,
     assetId,
-    note: "Asset built.",
+    note: nextStage === "editing" ? "Shots built. The cut comes next." : "Asset built.",
   });
 }

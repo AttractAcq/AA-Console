@@ -34,7 +34,7 @@ export function Tabs({
   }
 
   return (
-    <div role="tablist" className="flex gap-6 border-b border-border">
+    <div role="tablist" className="flex gap-6 overflow-x-auto border-b border-border">
       {tabs.map((tab, index) => {
         const selected = tab.id === activeId;
         return (
@@ -51,7 +51,7 @@ export function Tabs({
             onClick={() => onChange(tab.id)}
             onKeyDown={(event) => handleKeyDown(event, index)}
             className={cn(
-              "-mb-px border-b-2 px-1 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              "-mb-px shrink-0 border-b-2 px-1 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               selected
                 ? "border-primary font-medium text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground",

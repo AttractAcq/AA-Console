@@ -72,12 +72,14 @@ type Conversation = {
 
 type PageOption = { id: string; title: string };
 
-export function SalesOverviewPanel() {
+export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: string; campaignName?: string } = {}) {
   const { clientId } = useParams<{ clientId: string }>();
   const [agents, setAgents] = useState<SalesAgent[]>([]);
   const [pages, setPages] = useState<PageOption[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [builds, setBuilds] = useState<Record<string, { status: string }>>({});
+  const [linkedAgentIds, setLinkedAgentIds] = useState<string[]>([]);
+  const [linkedAgentVersions, setLinkedAgentVersions] = useState<Record<string, number | null>>({});
   const [buildOpen, setBuildOpen] = useState(false);
   const [briefing, setBriefing] = useState(false);
   const [aiPurpose, setAiPurpose] = useState<string | null>(null);
@@ -97,7 +99,7 @@ export function SalesOverviewPanel() {
       setLoading(false);
       return;
     }
-    const [agentRes, pageRes, convRes, jobRes] = await Promise.all([
+    const [agentRes, pageRes, convRes, jobRes, linkRes, versionRes] = await Promise.all([
       supabase
         .from("client_sales_agents")
         .select(
@@ -128,11 +130,22 @@ export function SalesOverviewPanel() {
         .eq("client_id", clientId)
         .eq("agent_key", "sales_agent")
         .order("created_at", { ascending: false }),
+      campaignId ? supabase.from("campaign_artifacts")
+        .select("sales_agent_id, manifest_id").eq("client_id", clientId)
+        .eq("campaign_id", campaignId).eq("kind", "sales_agent")
+        : Promise.resolve({ data: [], error: null }),
+      campaignId ? supabase.from("campaign_manifest_versions")
+        .select("id, version").eq("client_id", clientId).eq("campaign_id", campaignId)
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
     setAgents((agentRes.data ?? []) as SalesAgent[]);
     setPages((pageRes.data ?? []) as PageOption[]);
     setConversations((convRes.data ?? []) as Conversation[]);
+    setLinkedAgentIds((linkRes.data ?? []).flatMap((link) => link.sales_agent_id ? [link.sales_agent_id] : []));
+    const versions = new Map((versionRes.data ?? []).map((row) => [row.id, row.version]));
+    setLinkedAgentVersions(Object.fromEntries((linkRes.data ?? []).filter((link) => link.sales_agent_id)
+      .map((link) => [link.sales_agent_id!, link.manifest_id ? versions.get(link.manifest_id) ?? null : null])));
 
     // Newest first, so the first sighting of an agent id is its latest job.
     const latest: Record<string, { status: string }> = {};
@@ -141,7 +154,7 @@ export function SalesOverviewPanel() {
     }
     setBuilds(latest);
     setLoading(false);
-  }, [clientId]);
+  }, [clientId, campaignId]);
 
   useEffect(() => {
     void refresh();
@@ -150,6 +163,7 @@ export function SalesOverviewPanel() {
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
   const open = agents.find((a) => a.id === openId);
+  const visibleAgents = campaignId ? agents.filter((agent) => linkedAgentIds.includes(agent.id)) : agents;
   const openConversations = conversations.filter((c) => c.sales_agent_id === openId);
 
   const setStatus = async (agent: SalesAgent, status: string) => {
@@ -230,7 +244,7 @@ export function SalesOverviewPanel() {
 
   return (
     <div>
-      <AgentActivityBar inFlight={inFlight} failures={recentFailures} />
+      {!campaignId && <AgentActivityBar inFlight={inFlight} failures={recentFailures} />}
 
       <div className="mb-4 flex justify-end">
         <Button icon={Plus} onClick={() => setBuildOpen(true)}>
@@ -246,11 +260,11 @@ export function SalesOverviewPanel() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : agents.length === 0 ? (
-        <EmptyState label="No sales agents built yet" />
+      ) : visibleAgents.length === 0 ? (
+        <EmptyState label={campaignId ? "No sales agent linked to this campaign yet" : "No sales agents built yet"} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {agents.map((a) => {
+          {visibleAgents.map((a) => {
             const mine = conversations.filter((c) => c.sales_agent_id === a.id);
             const captured = mine.filter((c) => c.lead_id).length;
             const qualified = mine.filter((c) => c.qualified).length;
@@ -280,6 +294,7 @@ export function SalesOverviewPanel() {
                   </p>
                 )}
                 <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{a.purpose}</p>
+                {campaignId && <p className="mt-1 text-xs text-muted-foreground">Build: {a.built_at ? new Date(a.built_at).toLocaleString() : "pending"} · Package: {linkedAgentVersions[a.id] ? `v${linkedAgentVersions[a.id]}` : "not version-bound"} · Public approval: {a.approved_at ? "approved" : "not approved"} · Exact-version deploy approval: not available yet</p>}
 
                 {a.built_at ? (
                   <>
@@ -400,11 +415,14 @@ export function SalesOverviewPanel() {
           setAiPurpose(null);
         }}
         title="Build Sales Agent"
-        draftKey={`sales-agent:${clientId}`}
+        draftKey={campaignId ? undefined : `sales-agent:${clientId}`}
         intro="Queues the Sales Agent Builder. It needs your offer strategy and ICP, takes a couple of minutes, and this page fills in on its own when it finishes."
-        fields={fields}
+        fields={campaignId ? [
+          { name: "campaign_id", label: "Campaign", kind: "select", options: [{ value: campaignId, label: campaignName ?? "Current campaign" }] } as FieldDef,
+          ...fields,
+        ] : fields}
         submitLabel="Build"
-        initialValues={aiPurpose ? { purpose: aiPurpose, role: briefRole } : undefined}
+        initialValues={campaignId ? { campaign_id: campaignId, ...(aiPurpose ? { purpose: aiPurpose, role: briefRole } : {}) } : aiPurpose ? { purpose: aiPurpose, role: briefRole } : undefined}
         actions={
           <button
             type="button"
@@ -428,6 +446,13 @@ export function SalesOverviewPanel() {
             .select("id")
             .single();
           if (error) throw error;
+
+          if (campaignId) {
+            const { error: linkError } = await supabase.from("campaign_artifacts").insert({
+              campaign_id: campaignId, client_id: clientId, kind: "sales_agent", sales_agent_id: data.id,
+            });
+            if (linkError) throw new Error(linkError.message);
+          }
 
           const { error: jobError } = await supabase.rpc("enqueue_agent_job", {
             p_agent_key: "sales_agent",

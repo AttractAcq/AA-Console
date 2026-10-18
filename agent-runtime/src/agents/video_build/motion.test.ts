@@ -101,6 +101,44 @@ describe("motion without Higgsfield credentials", () => {
 });
 
 describe("prepareMotionCalls", () => {
+  it("directs Kling footage from the beat without a DoP motion id", () => {
+    const plan = prepareMotionCalls({
+      shots: [shot("A founder opens a workshop door", "not-a-catalog-id")],
+      frames: [frames[0]!],
+      stillUrlByPosition: urls,
+      modelId: "kling-video/v3.0/4k/image-to-video",
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.calls[0]).toMatchObject({
+      kind: "submit",
+      modelId: "kling-video/v3.0/4k/image-to-video",
+      motionId: null,
+      durationSec: 3,
+      prompt: expect.stringContaining("A founder opens a workshop door"),
+    });
+  });
+  it("carries the shared visual direction into every submitted shot prompt", () => {
+    const plan = prepareMotionCalls({
+      shots: [shot("Slide the report fully out of frame", MOTION), shot("Open the blank specimen", MOTION)],
+      frames: [
+        { id: "frame-1", position: 1, providerJobId: null },
+        { id: "frame-2", position: 2, providerJobId: null },
+      ],
+      stillUrlByPosition: new Map([[1, "https://cdn.example.test/1.png"], [2, "https://cdn.example.test/2.png"]]),
+      modelId: "higgsfield-ai/dop/lite",
+      visualDirection: "One desk, one pair of weathered hands; no other person enters.",
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    for (const call of plan.calls) {
+      expect(call.kind).toBe("submit");
+      if (call.kind === "submit") {
+        expect(call.prompt).toContain("One desk, one pair of weathered hands");
+        expect(call.prompt).toContain("Execute the beat's visible action");
+      }
+    }
+  });
   const frames: MotionFrameRef[] = [
     { id: "frame-1", position: 1, providerJobId: null },
     { id: "frame-2", position: 2, providerJobId: null },
@@ -166,12 +204,44 @@ describe("prepareMotionCalls", () => {
     expect(plan.calls[0]).toMatchObject({
       kind: "submit",
       position: 1,
-      prompt: "Name it",
+      prompt: expect.stringContaining("Visible action to perform: Name it"),
       imageUrl: "https://cdn.example.test/1.png",
       motionId: MOTION,
       strength: 1,
       modelId: "higgsfield-ai/dop/lite",
+      durationSec: 3,
     });
+  });
+
+  it("carries the exact pre-action state to image-to-video rather than relying on the still alone", () => {
+    const opening = "The blank sheet is mostly in shadow, with only its leading edge entering the light.";
+    const plan = prepareMotionCalls({
+      shots: [{ ...shot("The sheet slides fully into the light", MOTION), opening_state: opening }],
+      frames: [frames[0]!],
+      stillUrlByPosition: new Map([[1, "https://cdn.example.test/1.png"]]),
+      modelId: "kling-video/v2.5-turbo/pro/image-to-video",
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok || plan.calls[0]?.kind !== "submit") return;
+    expect(plan.calls[0].prompt).toContain(`Frame-zero physical state: ${opening}`);
+    expect(plan.calls[0].prompt).toContain("perform the action visibly");
+    expect(plan.calls[0].prompt).toContain("replace the action with a camera move");
+  });
+
+  it("keeps even a long branded shot below Kling's provider prompt cap", () => {
+    const plan = prepareMotionCalls({
+      shots: [{ ...shot(`Slide the document ${"carefully ".repeat(100)}`, MOTION),
+        opening_state: `At frame zero ${"unmarked document ".repeat(100)}` }],
+      frames: [frames[0]!],
+      stillUrlByPosition: new Map([[1, "https://cdn.example.test/1.png"]]),
+      modelId: "kling-video/v2.5-turbo/pro/image-to-video",
+      visualDirection: `Same physical set ${"green desk and paper ".repeat(150)}`,
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok || plan.calls[0]?.kind !== "submit") return;
+    expect(plan.calls[0].prompt.length).toBeLessThanOrEqual(2_000);
+    expect(plan.calls[0].prompt).toContain("Frame-zero physical state");
+    expect(plan.calls[0].prompt).toContain("Visible action to perform");
   });
 
   it("polls a shot that already has a request id instead of submitting it again", () => {
@@ -248,9 +318,10 @@ describe("motionFollowUp", () => {
     });
   });
 
-  it("does not retry a failed or nsfw shot", () => {
+  it("does not retry a failed, nsfw or canceled shot", () => {
     expect(motionFollowUp(["nsfw"])).toMatchObject({ outcome: "failed", retryable: false });
     expect(motionFollowUp(["failed"])).toMatchObject({ outcome: "failed", retryable: false });
+    expect(motionFollowUp(["canceled"])).toMatchObject({ outcome: "failed", retryable: false });
   });
 });
 

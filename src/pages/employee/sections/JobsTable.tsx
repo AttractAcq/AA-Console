@@ -10,6 +10,7 @@ type Job = {
   due_date: string | null;
   compensation: number | null;
   completed_at: string | null;
+  stage: string;
   brief_id: string | null;
   clients: { name: string } | null;
   client_briefs: { brief_ref: string | null } | null;
@@ -26,8 +27,15 @@ type Brief = {
 
 /**
  * Avatars call them jobs, editors call them projects — same
- * job_assignments rows, split on whether they have been completed.
+ * job_assignments rows, split on whether they are finished.
+ *
+ * "Finished" is approved or withdrawn, not delivered. Splitting on
+ * completed_at alone used to mean a file arriving moved the job into the
+ * past list, where a rejection could never bring it back. Current now shows
+ * the stage, so work waiting on a reviewer is visibly not the maker's to do
+ * while still not being filed as done.
  */
+const FINISHED = ["approved", "cancelled"] as const;
 export function JobsTable({
   memberId,
   scope,
@@ -52,14 +60,14 @@ export function JobsTable({
       let query = supabase
         .from("job_assignments")
         .select(
-          "id, title, due_date, compensation, completed_at, brief_id, clients(name), client_briefs(brief_ref)",
+          "id, title, due_date, compensation, completed_at, stage, brief_id, clients(name), client_briefs(brief_ref)",
         )
         .eq("member_id", memberId);
 
       query =
         scope === "current"
-          ? query.is("completed_at", null).order("due_date", { nullsFirst: false })
-          : query.not("completed_at", "is", null).order("completed_at", { ascending: false });
+          ? query.not("stage", "in", `(${FINISHED.join(",")})`).order("due_date", { nullsFirst: false })
+          : query.in("stage", FINISHED).order("completed_at", { ascending: false });
 
       const { data, error } = await query;
       if (error) throw error;
@@ -105,8 +113,18 @@ export function JobsTable({
 
   const columns =
     scope === "current"
-      ? [noun, "Client", "Due Date", "Compensation", "Brief"]
-      : [noun, "Client", "Completed", "Compensation", "Brief"];
+      ? [noun, "Client", "Due Date", "State", "Compensation", "Brief"]
+      : [noun, "Client", "Completed", "State", "Compensation", "Brief"];
+
+  const STATE: Record<string, string> = {
+    assigned: "New",
+    accepted: "Accepted",
+    declined: "Declined",
+    delivered: "With the reviewer",
+    rework: "Needs another version",
+    approved: "Approved",
+    cancelled: "Withdrawn",
+  };
 
   const money = (v: number | null) => (v === null ? "—" : Number(v).toFixed(2));
 
@@ -123,6 +141,7 @@ export function JobsTable({
           job.title,
           job.clients?.name ?? "—",
           scope === "current" ? (job.due_date ?? "—") : (job.completed_at?.slice(0, 10) ?? "—"),
+          STATE[job.stage] ?? job.stage,
           money(job.compensation),
           job.brief_id ? (
             <button

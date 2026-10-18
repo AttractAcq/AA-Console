@@ -62,7 +62,7 @@ export interface ReferenceImage {
 export async function renderImage(
   config: RuntimeConfig,
   prompt: string,
-  opts: { size: string; quality: string; reference?: ReferenceImage | null },
+  opts: { size: string; quality: string; reference?: ReferenceImage | null; model?: string },
 ): Promise<RenderedImage> {
   if (!config.openaiApiKey) {
     throw new RenderError(
@@ -80,7 +80,7 @@ export async function renderImage(
       // multipart: the file goes as a part, and Content-Type must be left
       // for fetch to set so the boundary is correct.
       const form = new FormData();
-      form.append("model", config.imageModel);
+      form.append("model", opts.model ?? config.imageModel);
       form.append("prompt", prompt);
       form.append("size", opts.size);
       form.append("quality", opts.quality);
@@ -105,7 +105,7 @@ export async function renderImage(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: config.imageModel,
+          model: opts.model ?? config.imageModel,
           prompt,
           size: opts.size,
           quality: opts.quality,

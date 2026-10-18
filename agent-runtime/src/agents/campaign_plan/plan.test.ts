@@ -1,6 +1,6 @@
 import { templateFor } from "../../campaigns/templates.js";
-import { describe, expect, it } from "vitest";
-import { SUBMIT_TOOL, submitToolFor } from "./index.js";
+import { describe, expect, it, vi } from "vitest";
+import { SUBMIT_TOOL, runCampaignPlanJob, savedPlanNeedsFinalization, submitToolFor } from "./index.js";
 import { unsupportedStrictKeywords } from "../../tools/schema.js";
 import {
   asAmount,
@@ -9,11 +9,75 @@ import {
   campaignIdeas,
   normaliseChannels,
   planProblem,
+  planRouteProblem,
   planSummary,
   resolveNeeds,
   MAX_CONTENT,
   type CampaignPlan,
 } from "./plan.js";
+
+describe("v6 campaign route validation", () => {
+  it("keeps organic campaigns out of ad channels", () => {
+    expect(planRouteProblem("organic", null, ["instagram", "google_business_profile"])).toBeNull();
+    expect(planRouteProblem("organic", null, ["meta_ads"])).toMatch(/organic/i);
+  });
+
+  it("keeps paid campaigns on their selected platform", () => {
+    expect(planRouteProblem("paid", "meta", ["facebook", "instagram"])).toBeNull();
+    expect(planRouteProblem("paid", "meta", ["google_ads"])).toMatch(/Meta/i);
+    expect(planRouteProblem("paid", "google", ["search"])).toBeNull();
+    expect(planRouteProblem("paid", "google", ["facebook"])).toMatch(/Google/i);
+  });
+});
+
+describe("planner crash recovery", () => {
+  it("finishes the same saved job without asking the model to plan again", () => {
+    const base = { built_at: "2026-10-16T10:00:00Z", job_id: "planner-1",
+      content_ideas_generated_at: "2026-10-16T10:01:00Z", ideate_on_plan: true };
+    expect(savedPlanNeedsFinalization(base, "planner-1")).toBe(true);
+    expect(savedPlanNeedsFinalization(base, "planner-2")).toBe(false);
+    expect(savedPlanNeedsFinalization({ ...base, content_ideas_generated_at: null,
+      ideate_on_plan: false }, "planner-1")).toBe(true);
+    expect(savedPlanNeedsFinalization({ ...base, built_at: null }, "planner-1")).toBe(false);
+  });
+
+  it("relinks the original snapshot and approved offer after a saved-plan crash", async () => {
+    const campaign = {
+      id: "campaign-1", client_id: "client-1", acquisition_mode: "organic",
+      offer_version_id: "offer-1", built_at: "2026-10-16T10:00:00Z",
+      content_ideas_generated_at: "2026-10-16T10:01:00Z",
+      ideate_on_plan: true, job_id: "job-1",
+    };
+    const rpc = vi.fn(async (name: string) => {
+      if (name === "capture_campaign_intelligence_snapshot_v6")
+        return { data: { id: "snapshot-1" }, error: null };
+      if (name === "capture_campaign_offer_v6")
+        return { data: { id: "offer-1" }, error: null };
+      if (name === "create_campaign_manifest_v6")
+        return { data: { id: "manifest-1" }, error: null };
+      return { data: null, error: null };
+    });
+    const sb = {
+      from: () => ({ select: () => ({ eq: () => ({ eq: () => ({
+        maybeSingle: async () => ({ data: campaign, error: null }),
+      }) }) }) }),
+      rpc,
+    } as unknown as Parameters<typeof runCampaignPlanJob>[0];
+    const result = await runCampaignPlanJob(
+      sb, {} as Parameters<typeof runCampaignPlanJob>[1],
+      {} as Parameters<typeof runCampaignPlanJob>[2],
+      { id: "job-1", client_id: "client-1", input_table: "client_campaigns",
+        input_id: "campaign-1" } as Parameters<typeof runCampaignPlanJob>[3],
+      Date.now() + 60_000,
+    );
+    expect(result).toMatchObject({ ok: true });
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual([
+      "capture_campaign_intelligence_snapshot_v6", "capture_campaign_offer_v6",
+      "create_campaign_manifest_v6", "attach_campaign_manifest_intelligence_v6",
+      "attach_campaign_offer_v6",
+    ]);
+  });
+});
 
 const good = (over: Partial<CampaignPlan> = {}): CampaignPlan => ({
   objective: "Book 40 full-arch consultations in January",
@@ -402,10 +466,18 @@ describe("the format a campaign piece runs in", () => {
     );
   });
 
-  it("refuses a format that does not exist", () => {
-    expect(() => campaignIdeas([piece({ content_format: "reel" })], 1)).toThrow(
-      /a format that does not exist: reel/,
-    );
+  it("accepts video reels and refuses image reels", () => {
+    expect(campaignIdeas([piece({ content_format: "reel", media_type: "video" })], 1)[0]!.content_format).toBe("reel");
+    expect(() => campaignIdeas([piece({ content_format: "reel", media_type: "image" })], 1)).toThrow(/a reel is a video/);
+  });
+
+  it("refuses formats a named social destination cannot publish", () => {
+    expect(() => campaignIdeas([piece({ channel: "linkedin", content_format: "reel", media_type: "video" })], 1))
+      .toThrow(/not a supported destination and format pair/);
+    expect(() => campaignIdeas([piece({ channel: "youtube", content_format: "story" })], 1))
+      .toThrow(/not a supported destination and format pair/);
+    expect(campaignIdeas([piece({ channel: "tiktok", content_format: "reel", media_type: "video" })], 1)[0]!.content_format)
+      .toBe("reel");
   });
 
   it("names the piece, so the failure is actionable", () => {
@@ -421,10 +493,10 @@ describe("the submit tool asks for a format", () => {
       items: { properties: Record<string, unknown>; required: string[] };
     }).items;
 
-  it("offers exactly the three formats, as an enum", () => {
+  it("offers the four supported formats, as an enum", () => {
     expect(items(submitToolFor()).properties.content_format).toMatchObject({
       type: "string",
-      enum: ["single", "carousel", "story"],
+      enum: ["single", "carousel", "story", "reel"],
     });
   });
 
@@ -441,7 +513,7 @@ describe("the submit tool asks for a format", () => {
     const description = String(
       (items(submitToolFor()).properties.content_format as { description: string }).description,
     );
-    expect(description).toContain("restates one point five times");
+    expect(description).toContain("only when the argument genuinely needs it");
   });
 
   it("stays free of the keywords a strict schema rejects", () => {

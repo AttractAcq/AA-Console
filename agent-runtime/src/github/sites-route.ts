@@ -13,11 +13,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
+import { createHash } from "node:crypto";
 import { AuthError, requireAdmin } from "../master/auth.js";
 import { readJsonBody } from "../mcp/http.js";
 import { logger } from "../logging/logger.js";
 import { provisionSite, publishPage, type SiteConfig } from "../sites/provision.js";
 import { supabaseSiteStore } from "../sites/store.js";
+import { pagePath } from "../sites/paths.js";
 import { missingConfig } from "./status.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -50,7 +52,7 @@ export async function handleSitesRoute(
   res: ServerResponse,
   sb: SupabaseClient,
   config: RuntimeConfig,
-  action: "provision" | "publish",
+  action: "provision" | "publish" | "request-page-approval",
 ): Promise<void> {
   const json = (status: number, body: unknown): void => {
     res.writeHead(status, { "Content-Type": "application/json" });
@@ -61,16 +63,6 @@ export async function handleSitesRoute(
     await requireAdmin(sb, req.headers.authorization);
   } catch (err) {
     json(err instanceof AuthError ? err.status : 401, { ok: false, error: "Not permitted." });
-    return;
-  }
-
-  const missing = missingConfig({
-    appId: config.githubAppId ?? undefined,
-    privateKey: config.githubAppPrivateKey ?? undefined,
-  });
-  if (missing.length > 0) {
-    // Names, never values.
-    json(400, { ok: false, error: `The runtime has no GitHub credentials. Missing: ${missing.join(", ")}.` });
     return;
   }
 
@@ -90,6 +82,43 @@ export async function handleSitesRoute(
   const store = supabaseSiteStore(sb);
 
   try {
+    if (action === "request-page-approval") {
+      const pageId = String(body.pageId ?? "");
+      if (!UUID.test(pageId)) {
+        json(400, { ok: false, error: "A page is required." });
+        return;
+      }
+      const page = await store.loadPage(pageId);
+      if (!page || !page.html) throw new Error("A built page is required.");
+      const repo = page.siteRepositoryId
+        ? await store.repoById(page.siteRepositoryId)
+        : await store.readyRepoForClient(page.clientId);
+      if (!repo || repo.clientId !== page.clientId || repo.status !== "ready" || !repo.pagesUrl) {
+        throw new Error("A ready site for this client is required before page approval.");
+      }
+      const path = page.sitePath ?? pagePath(page.title);
+      if (!path) throw new Error("That page needs a safe destination path.");
+      const key = "page-deploy:" + createHash("sha256")
+        .update(JSON.stringify({ pageId, repoId: repo.id, path, html: page.html }))
+        .digest("hex");
+      const { data, error } = await sb.rpc("request_campaign_page_deploy_approval_v6", {
+        p_page_id: pageId, p_idempotency_key: key,
+        p_site_repository_id: repo.id, p_site_path: path,
+      });
+      if (error) throw new Error(error.message);
+      json(200, { ok: true, approvalId: data.id, destination: data.destination,
+        status: data.status });
+      return;
+    }
+
+    const missing = missingConfig({
+      appId: config.githubAppId ?? undefined,
+      privateKey: config.githubAppPrivateKey ?? undefined,
+    });
+    if (missing.length > 0) {
+      json(400, { ok: false, error: `The runtime has no GitHub credentials. Missing: ${missing.join(", ")}.` });
+      return;
+    }
     if (action === "provision") {
       const clientId = String(body.clientId ?? "");
       const repo = String(body.repo ?? "").trim().toLowerCase();

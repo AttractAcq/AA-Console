@@ -86,7 +86,7 @@ const conv = (over: Conv = {}): Conv => ({
 const update = vi.fn();
 const eq = vi.fn();
 
-function show(agents: unknown[] = [built()], convs: Conv[] = [], jobs: Job[] = []) {
+function show(agents: unknown[] = [built()], convs: Conv[] = [], jobs: Job[] = [], campaignId?: string) {
   const chain = {
     eq,
     then: (r: (v: { error: null }) => unknown) => Promise.resolve({ error: null }).then(r),
@@ -103,6 +103,7 @@ function show(agents: unknown[] = [built()], convs: Conv[] = [], jobs: Job[] = [
       if (table === "client_sales_agents") return agents;
       if (table === "client_pages") return [{ id: "page-1", title: "Consult page" }];
       if (table === "sales_agent_conversations") return convs;
+      if (table === "campaign_artifacts") return campaignId ? [{ sales_agent_id: "sa-1" }] : [];
       return forActivityBar ? [] : jobs;
     };
     const chain = {
@@ -119,13 +120,40 @@ function show(agents: unknown[] = [built()], convs: Conv[] = [], jobs: Job[] = [
     };
     return chain;
   });
-  return render(<SalesOverviewPanel />);
+  return render(<SalesOverviewPanel campaignId={campaignId} campaignName={campaignId ? "Winter push" : undefined} />);
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   useParams.mockReturnValue({ clientId: "client-1" });
   getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+});
+
+it("links a sales agent built from Campaign Factory to that campaign", async () => {
+  show([], [], [], "campaign-1");
+  const originalFrom = from.getMockImplementation()!;
+  const link = vi.fn(() => Promise.resolve({ error: null }));
+  from.mockImplementation((table: string) => table === "client_sales_agents"
+    ? { ...originalFrom(table), insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "new-agent" }, error: null }) }) }) }
+    : table === "campaign_artifacts" ? { ...originalFrom(table), insert: link } : originalFrom(table));
+  rpc.mockResolvedValue({ error: null });
+  await userEvent.click(screen.getByRole("button", { name: "Build Sales Agent" }));
+  expect(screen.getByLabelText("Campaign")).toHaveValue("campaign-1");
+  await userEvent.type(screen.getByRole("textbox", { name: "Agent name" }), "Winter setter");
+  await userEvent.selectOptions(screen.getByRole("combobox", { name: "What surface is this agent for" }), "appointment_setter");
+  await userEvent.type(screen.getByRole("textbox", { name: "What this agent is for" }), "Book consultations");
+  await userEvent.click(screen.getByRole("button", { name: "Build" }));
+  await waitFor(() => expect(link).toHaveBeenCalledWith({
+    campaign_id: "campaign-1", client_id: "client-1", kind: "sales_agent", sales_agent_id: "new-agent",
+  }));
+});
+
+it("shows only agents linked to the campaign with their build and approval state", async () => {
+  show([built(), built({ id: "sa-2", name: "Other campaign agent" })], [], [], "campaign-1");
+  expect(await screen.findByText("Consult Qualifier")).toBeInTheDocument();
+  expect(screen.queryByText("Other campaign agent")).not.toBeInTheDocument();
+  expect(screen.getByText(/Public approval: not approved/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Build Sales Agent" })).toBeInTheDocument();
 });
 
 describe("liveStateOf", () => {

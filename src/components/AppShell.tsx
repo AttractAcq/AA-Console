@@ -6,12 +6,20 @@ import { TopBar } from "./TopBar";
 
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarMinimized, setSidebarMinimized] = useState(() => localStorage.getItem("aa-sidebar-minimized") === "true");
   const mainRef = useScrollToTop<HTMLElement>();
+
+  function toggleSidebar() {
+    setSidebarMinimized((current) => {
+      localStorage.setItem("aa-sidebar-minimized", String(!current));
+      return !current;
+    });
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <div className="hidden min-[900px]:block">
-        <Sidebar />
+        <Sidebar minimized={sidebarMinimized} onToggleMinimized={toggleSidebar} />
       </div>
 
       {mobileOpen && (

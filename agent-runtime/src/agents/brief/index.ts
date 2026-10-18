@@ -22,7 +22,8 @@ import { briefSubmitTool, composeBody, composeAvatarBody, composeEditorBody, bri
 import { isMultiFrame } from "../../content/format.js";
 import { loadIdentity, identityWriterBlock } from "../identity.js";
 import { loadUsableProof, renderProof, proofIdForRef } from "../proof.js";
-import { reelBriefProblem, reelPlannerNote } from "./shots.js";
+import { completeMissingFinalReelCaption, reelBriefProblem, reelCopyProblem, reelPlannerNote } from "./shots.js";
+import { loadBrandProfile } from "../creative_build/brand.js";
 
 export async function runBriefJob(
   sb: SupabaseClient,
@@ -99,7 +100,7 @@ export async function runBriefJob(
 
   const { data: idea, error: ideaError } = await sb
     .from("client_ideas")
-    .select("id, title, body, media_type, content_territory, source_question, strategic_reason, content_format")
+    .select("id, title, body, media_type, content_territory, source_question, strategic_reason, content_format, target_platform")
     .eq("id", ideaId)
     .maybeSingle();
   if (ideaError) throw new Error(`Failed to load idea: ${ideaError.message}`);
@@ -123,7 +124,7 @@ export async function runBriefJob(
   // Cleared, unexpired, strongest first — the filtering happens in the
   // database so what arrives is already safe to cite. The held count lets the
   // agent distinguish "no proof exists" from "proof exists, nobody cleared it".
-  const [usable, { count: held }] = await Promise.all([
+  const [availableProof, { count: held }] = await Promise.all([
     loadUsableProof(sb, job.client_id),
     sb
       .from("client_proof_assets")
@@ -131,6 +132,18 @@ export async function runBriefJob(
       .eq("client_id", job.client_id)
       .neq("usage_rights", "approved"),
   ]);
+  let usable = availableProof;
+  const pinnedProofId = typeof job.params?.proof_factory_source_id === "string" ? job.params.proof_factory_source_id : null;
+  if (pinnedProofId) {
+    const { data: selected, error: selectedError } = await sb.from("client_proof_assets")
+      .select("*").eq("id", pinnedProofId).eq("client_id", job.client_id).maybeSingle();
+    if (selectedError) throw new Error(selectedError.message);
+    if (!selected || selected.usage_rights !== "approved" || !selected.permission_basis?.trim()
+      || (selected.expires_on && selected.expires_on < new Date().toISOString().slice(0, 10))) {
+      return { ok: false, retryable: false, failureMessage: "The selected proof is no longer cleared for production." };
+    }
+    usable = [selected];
+  }
   const proof = renderProof(usable, { held: held ?? 0 });
 
   // The real, checkable details. Without these the agent writes
@@ -152,6 +165,7 @@ export async function runBriefJob(
   const contentFormat = idea.content_format ?? "single";
   const reelProblem = reelBriefProblem(contentFormat, idea.media_type);
   if (reelProblem) return { ok: false, retryable: false, failureMessage: reelProblem };
+  const visualBrand = contentFormat === "reel" ? await loadBrandProfile(sb, job.client_id) : null;
 
   const submitTool = briefSubmitTool(
     idea.media_type,
@@ -177,6 +191,8 @@ ABSOLUTE RULES
 
   const prompt = `Write a production brief for this approved idea.
 
+${idea.target_platform ? `DESTINATION\nThis piece is for ${idea.target_platform}. Keep its production direction suitable for that destination and its selected ${contentFormat} format.\n` : ""}
+
 THE IDEA
 Title: ${idea.title}
 Core idea: ${idea.body ?? ""}
@@ -189,6 +205,13 @@ ${contentFormat === "reel"
 
 BRAND STRATEGY — hold this point of view, respect what it says to avoid
 ${strategy || "(none on file)"}
+${visualBrand?.never_do ? `\nVISUAL BRAND EXCLUSIONS — these override any idea or shot suggestion\n${visualBrand.never_do}\n` : ""}
+${contentFormat === "reel" && visualBrand ? `
+VISUAL BRAND PROFILE — authoritative for the rendered reel
+Primary: ${visualBrand.colour_primary ?? "unspecified"}; secondary: ${visualBrand.colour_secondary ?? "unspecified"}; accent: ${visualBrand.colour_accent ?? "unspecified"}; background: ${visualBrand.colour_background ?? "unspecified"}; text: ${visualBrand.colour_text ?? "unspecified"}.
+Heading font: ${visualBrand.font_heading ?? "unspecified"}; body font: ${visualBrand.font_body ?? "unspecified"}.
+Use only these recorded colours. Do not invent hex colours, typefaces, logo treatments or end-card rules. The video editor applies the caption treatment from this profile; describe the words and visual placement, not an unapproved font or palette.
+` : ""}
 
 BUYER LANGUAGE, OBJECTIONS AND FEARS — speak to these, in their words
 ${voice || "(none on file)"}
@@ -245,19 +268,31 @@ Call ${submitTool.name} once when you are done.`;
     costUsd: result.usage.costUsd,
   };
 
-  const title = String(result.submitted.title ?? "").trim() || idea.title;
+  const submitted = contentFormat === "reel"
+    ? completeMissingFinalReelCaption(result.submitted)
+    : result.submitted;
+  if (pinnedProofId && proofIdForRef(usable, submitted.proof_ref) !== pinnedProofId) {
+    return { ok: false, retryable: true, failureMessage: "The brief must cite the selected proof source.", usage };
+  }
+  const title = String(submitted.title ?? "").trim() || idea.title;
   // Composed from the fields rather than written separately: two outputs would
   // be free to disagree, and the one an editor reads would be the unvalidated
   // one. The markdown is a view of the structure.
-  const frames = framePlanColumns(result.submitted, contentFormat);
+  const frames = framePlanColumns(submitted, contentFormat);
   if (frames.problem) {
     // Retryable: the plan is the whole difference between a carousel brief
     // and an image brief. Filing one without it produces exactly the brief
     // this is here to stop, and nothing downstream would notice.
     return { ok: false, retryable: true, failureMessage: frames.problem, usage };
   }
+  const copyProblem = contentFormat === "reel"
+    ? reelCopyProblem(submitted, visualBrand?.never_do ?? "", visualBrand
+      ? [visualBrand.colour_primary, visualBrand.colour_secondary, visualBrand.colour_accent,
+        visualBrand.colour_background, visualBrand.colour_text].filter((value): value is string => Boolean(value))
+      : null) : null;
+  if (copyProblem) return { ok: false, retryable: true, failureMessage: copyProblem, usage };
 
-  const body = composeBody(idea.media_type, result.submitted, contentFormat);
+  const body = composeBody(idea.media_type, submitted, contentFormat);
   if (body.length < 200) {
     return {
       ok: false,
@@ -272,18 +307,19 @@ Call ${submitTool.name} once when you are done.`;
     source_idea_id: idea.id,
     title: title.slice(0, 300),
     body,
-    avatar_brief: idea.media_type === "video" ? composeAvatarBody(result.submitted) : null,
-    editor_brief: idea.media_type === "video" ? composeEditorBody(result.submitted) : null,
-    ...briefColumns(idea.media_type, result.submitted, contentFormat),
+    avatar_brief: idea.media_type === "video" ? composeAvatarBody(submitted) : null,
+    editor_brief: idea.media_type === "video" ? composeEditorBody(submitted) : null,
+    ...briefColumns(idea.media_type, submitted, contentFormat),
     ...frames.columns,
     // The record, not just the prose. A brief that names its proof in words
     // cannot later answer "which proof produced revenue"; a foreign key can.
-    proof_asset_id: proofIdForRef(usable, result.submitted.proof_ref),
+    proof_asset_id: proofIdForRef(usable, submitted.proof_ref),
     media_type: idea.media_type,
     // Carried from the idea rather than decided here. The campaign chose the
     // shape when it planned the piece; a brief that forgets it produces a
     // single image for something planned as a carousel.
     content_format: contentFormat,
+    target_platform: idea.target_platform ?? slot?.platform ?? null,
     status: "draft",
     job_id: job.id,
   });

@@ -54,6 +54,7 @@ const SLOT = {
 
 const PILLAR = {
   id: "pillar-1",
+  client_id: "client-1",
   name: "Proof",
   premise: "Show the work.",
   belongs: "Evidence.",
@@ -80,7 +81,9 @@ const handJob = {
   params: {},
 } as unknown as AgentJobRow;
 
-function database(options: { slot?: unknown; pillar?: unknown } = {}) {
+function database(options: { slot?: unknown; pillar?: unknown; campaign?: unknown;
+  priorArtifacts?: Array<{ record_id: string }>;
+  priorIdeas?: Array<{ id: string; title: string; body: string; source_question: string }> } = {}) {
   const inserted: Record<string, unknown>[] = [];
   const from = vi.fn((table: string) => {
     if (table === "client_ideas") {
@@ -89,6 +92,7 @@ function database(options: { slot?: unknown; pillar?: unknown } = {}) {
           inserted.push(...rows);
           return { error: null };
         }),
+        select: () => ({ in: async () => ({ data: options.priorIdeas ?? [], error: null }) }),
       };
     }
     const query: Record<string, unknown> = {};
@@ -107,11 +111,14 @@ function database(options: { slot?: unknown; pillar?: unknown } = {}) {
             ? ("slot" in options ? options.slot : SLOT)
             : table === "client_content_pillars"
               ? ("pillar" in options ? options.pillar : PILLAR)
+              : table === "client_campaigns"
+                ? ("campaign" in options ? options.campaign :
+                  { id: "campaign-1", client_id: "client-1", status: "planning" })
               : null,
       }),
       then: (resolve: (v: unknown) => unknown) =>
         Promise.resolve({
-          data: table === "client_content_pillars" ? [] : [],
+          data: table === "workflow_artifacts" ? options.priorArtifacts ?? [] : [],
           error: null,
         }).then(resolve),
     });
@@ -121,7 +128,7 @@ function database(options: { slot?: unknown; pillar?: unknown } = {}) {
 }
 
 /** What the model hands back: one well-formed idea, in the wrong shape. */
-function modelReturns(count: number, format = "single") {
+function modelReturns(count: number, format = "single", media = "image") {
   model.mockResolvedValue({
     submitted: {
       ideas: Array.from({ length: count }, (_, i) => ({
@@ -130,7 +137,7 @@ function modelReturns(count: number, format = "single") {
         content_territory: "Proof",
         source_question: "Why does content not compound?",
         strategic_reason: "It answers the question.",
-        media_type: "image",
+        media_type: media,
         content_format: format,
       })),
     },
@@ -208,6 +215,117 @@ describe("ideation for a slot", () => {
 });
 
 describe("ideation when a person asked for it", () => {
+  it("binds a directed package idea to its validated campaign and pillar", async () => {
+    modelReturns(1, "reel", "video");
+    const directed = { ...handJob, params: {
+      target_platform: "instagram", media_type: "video", content_format: "reel",
+      idea_count: 1, campaign_id: "campaign-1", pillar_id: "pillar-1",
+    } } as AgentJobRow;
+    const { sb, inserted } = database();
+    const result = await runIdeationJob(sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(true);
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({ campaign_id: "campaign-1", pillar_id: "pillar-1",
+      target_platform: "instagram", content_format: "reel" });
+    const wrong = database({ campaign: { id: "campaign-1", client_id: "other", status: "planning" } });
+    const refused = await runIdeationJob(wrong.sb, config, agent, directed, Date.now() + 60_000);
+    expect(refused.ok).toBe(false);
+    expect(refused.failureMessage).toMatch(/not active for this client/);
+  });
+
+  it("uses frozen evidence for a v5 run and stops if that snapshot cannot be captured", async () => {
+    const directed = { ...handJob, params: { v5_workflow_run_id: "run-1" } } as AgentJobRow;
+    const first = database();
+    const rpc = vi.fn(async () => ({ data: {
+      creative: [{ asset_id: "asset-1", observed_linked_leads: 2,
+        rejection_reason: "Caption lacked evidence" }], runs: [],
+    }, error: null }));
+    (first.sb as unknown as { rpc: typeof rpc }).rpc = rpc;
+    const result = await runIdeationJob(first.sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("capture_ideation_learning_context", { p_job_id: directed.id });
+    expect((model.mock.calls[0]![0] as { prompt: string }).prompt)
+      .toContain("Caption lacked evidence");
+
+    model.mockClear();
+    const second = database();
+    (second.sb as unknown as { rpc: typeof rpc }).rpc = vi.fn(async () => ({
+      data: null, error: { message: "Snapshot unavailable" },
+    })) as unknown as typeof rpc;
+    const failed = await runIdeationJob(second.sb, config, agent, directed, Date.now() + 60_000);
+    expect(failed.ok).toBe(false);
+    expect(failed.failureMessage).toContain("Snapshot unavailable");
+    expect(model).not.toHaveBeenCalled();
+  });
+
+  it("shows the next daily idea its already accepted angles so it cannot restate them", async () => {
+    modelReturns(1, "single", "image");
+    const directed = { ...handJob, params: {
+      target_platform: "instagram", media_type: "image", content_format: "single",
+      idea_count: 1, campaign_id: "campaign-1", pillar_id: "pillar-1",
+      v5_workflow_run_id: "run-1",
+    } } as AgentJobRow;
+    const { sb } = database({
+      priorArtifacts: [{ record_id: "prior-1" }],
+      priorIdeas: [{ id: "prior-1", title: "Show the counting", body: "Define each step before spending.",
+        source_question: "How will you prove which customers came from this?" }],
+    });
+    (sb as unknown as { rpc: unknown }).rpc = vi.fn(async () => ({ data: { creative: [], runs: [] }, error: null }));
+    const result = await runIdeationJob(sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(true);
+    const prompt = (model.mock.calls[0]![0] as { prompt: string }).prompt;
+    expect(prompt).toContain("Show the counting");
+    expect(prompt).toContain("different buyer question, mechanism and conclusion");
+  });
+
+  it("shows frozen cross-day angles without treating them as performance evidence", async () => {
+    modelReturns(1, "reel", "video");
+    const directed = { ...handJob, params: {
+      target_platform: "instagram", media_type: "video", content_format: "reel",
+      idea_count: 1, campaign_id: "campaign-1", pillar_id: "pillar-1",
+      v5_workflow_run_id: "run-2",
+    } } as AgentJobRow;
+    const { sb } = database();
+    (sb as unknown as { rpc: unknown }).rpc = vi.fn(async () => ({
+      data: { creative: [], runs: [], recent_ideas: [{
+        id: "prior-1", title: "See the report before paying",
+        core_idea: "Put the report on the desk before the campaign begins.",
+        source_question: "What will I receive?",
+      }] }, error: null,
+    }));
+    const result = await runIdeationJob(sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(true);
+    const prompt = (model.mock.calls[0]![0] as { prompt: string }).prompt;
+    expect(prompt).toContain("RECENT ACCEPTED CLIENT IDEAS");
+    expect(prompt).toContain("See the report before paying");
+    expect(prompt).toContain("materially different angle");
+  });
+
+  it("keeps a requested video reel and destination on every idea", async () => {
+    modelReturns(25, "reel", "video");
+    const directed = { ...handJob, params: {
+      target_platform: "instagram", media_type: "video", content_format: "reel",
+    } } as AgentJobRow;
+    const { sb, inserted } = database();
+    const result = await runIdeationJob(sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(true);
+    expect(inserted).toHaveLength(25);
+    expect(inserted.every((row) => row.media_type === "video" && row.content_format === "reel"
+      && row.target_platform === "instagram")).toBe(true);
+    expect((model.mock.calls[0]![0] as { prompt: string }).prompt).toContain("Every idea is for instagram as video in reel format");
+  });
+
+  it("drops the model's wrong shape instead of silently making singles", async () => {
+    modelReturns(25, "single", "image");
+    const directed = { ...handJob, params: {
+      target_platform: "instagram", media_type: "video", content_format: "reel",
+    } } as AgentJobRow;
+    const { sb, inserted } = database();
+    const result = await runIdeationJob(sb, config, agent, directed, Date.now() + 60_000);
+    expect(result.ok).toBe(false);
+    expect(inserted).toHaveLength(0);
+  });
+
   it("still fills a bank, at the unscoped count", async () => {
     modelReturns(25);
     const { sb, inserted } = database();

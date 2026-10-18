@@ -55,6 +55,9 @@ describe("manual idea campaign assignment", () => {
     const dialog = within(screen.getByRole("dialog"));
     await dialog.findByRole("option", { name: "Autumn launch · planning" });
     await userEvent.type(dialog.getByLabelText(/^Idea/), "A human idea");
+    await userEvent.selectOptions(dialog.getByLabelText(/^Destination/), "instagram");
+    await userEvent.selectOptions(dialog.getByLabelText(/^Media type/), "image");
+    await userEvent.selectOptions(dialog.getByLabelText(/^Format/), "single");
     return dialog;
   }
 
@@ -62,7 +65,7 @@ describe("manual idea campaign assignment", () => {
     const dialog = await openManualIdea();
     await userEvent.click(dialog.getByRole("button", { name: "Add idea" }));
     await waitFor(() => expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      client_id: "client-1", title: "A human idea", source: "manual",
+      client_id: "client-1", title: "A human idea", source: "manual", target_platform: "instagram",
     })));
     expect(insert.mock.calls[0][0]).not.toHaveProperty("campaign_id");
     expect(campaignSingle).not.toHaveBeenCalled();
@@ -118,18 +121,64 @@ describe("manual idea campaign assignment", () => {
     expect(screen.getByRole("columnheader", { name: "Campaign" })).toBeInTheDocument();
   });
 });
+it("queues format-directed Auto Idea with a reel destination", async () => {
+  render(<GenerationPanel />);
+  await userEvent.click(await screen.findByRole("button", { name: /Auto Idea/i }));
+  const dialog = within(screen.getByRole("dialog"));
+  await userEvent.selectOptions(dialog.getByLabelText(/^Destination/), "instagram");
+  await userEvent.selectOptions(dialog.getByLabelText(/^Media type/), "video");
+  await userEvent.selectOptions(dialog.getByLabelText(/^Format/), "reel");
+  await userEvent.click(dialog.getByRole("button", { name: "Generate ideas" }));
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("enqueue_scoped_ideation", {
+    p_client_id: "client-1", p_target_platform: "instagram", p_media_type: "video", p_content_format: "reel",
+    p_campaign_id: null, p_idea_count: 5, p_input_table: null, p_input_id: null,
+  }));
+});
+it("queues the chosen Auto Idea quantity and campaign", async () => {
+  render(<GenerationPanel />);
+  await userEvent.click(await screen.findByRole("button", { name: /Auto Idea/i }));
+  const dialog = within(screen.getByRole("dialog"));
+  await dialog.findByRole("option", { name: "Autumn launch · planning" });
+  await userEvent.selectOptions(dialog.getByLabelText(/^Destination/), "instagram");
+  await userEvent.selectOptions(dialog.getByLabelText(/^Media type/), "video");
+  await userEvent.selectOptions(dialog.getByLabelText(/^Format/), "reel");
+  await userEvent.selectOptions(dialog.getByLabelText(/Assign to campaign/), "campaign-1");
+  await userEvent.clear(dialog.getByLabelText(/Number of ideas/));
+  await userEvent.type(dialog.getByLabelText(/Number of ideas/), "8");
+  await userEvent.click(dialog.getByRole("button", { name: "Generate ideas" }));
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("enqueue_scoped_ideation", expect.objectContaining({
+    p_idea_count: 8, p_campaign_id: "campaign-1",
+  })));
+});
+/**
+ * Every row action lives behind that row's menu now, so a test opens it and
+ * then chooses. The trigger is named after the row, which is what keeps four
+ * identical "Delete" items apart.
+ */
+async function openMenu(row: string) {
+  fireEvent.click(await screen.findByRole("button", { name: `Actions for ${row}` }));
+  return within(await screen.findByRole("menu", { name: `Actions for ${row}` }));
+}
+async function choose(row: string, action: string) {
+  fireEvent.click((await openMenu(row)).getByRole("menuitem", { name: action }));
+}
+const closeMenu = () => fireEvent.keyDown(document, { key: "Escape" });
+
 it("scopes manual approval to the selected draft and client, then refreshes", async () => {
   render(<GenerationPanel />);
-  fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+  await choose("draft idea", "Approve");
   expect(await screen.findByText("Idea approved.")).toBeInTheDocument();
   expect(update).toHaveBeenCalledWith({ status: "approved" });
   expect(eq.mock.calls).toEqual(expect.arrayContaining([["id", "draft-1"], ["client_id", "client-1"], ["status", "draft"]]));
   expect(rpc).not.toHaveBeenCalled();
   expect(order).toHaveBeenCalledTimes(2);
 });
-it.each([["Brief", "approved-2", "Brief queued."], ["Approve & brief", "draft-1", "Approved."]])("%s uses the unchanged RPC", async (name, id, notice) => {
+it.each([
+  ["Brief", "approved idea", "approved-2", "Brief queued."],
+  ["Approve & brief", "draft idea", "draft-1", "Approved."],
+])("%s uses the unchanged RPC", async (name, row, id, notice) => {
   render(<GenerationPanel />);
-  fireEvent.click(await screen.findByRole("button", { name }));
+  await choose(row, name);
   expect(rpc).toHaveBeenCalledWith("approve_idea_and_generate_brief", { p_idea_id: id });
   expect(await screen.findByText(new RegExp(notice))).toBeInTheDocument();
   expect(update).not.toHaveBeenCalled();
@@ -138,25 +187,40 @@ it("disables actions while approving and recovers on a stale-row error", async (
   let finish!: (value: unknown) => void;
   single.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
   render(<GenerationPanel />);
-  fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
-  expect(screen.getByRole("button", { name: "Approving…" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Approve & brief" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Brief" })).toBeDisabled();
+  await choose("draft idea", "Approve");
+  // Choosing closes the menu, so the trigger is where the row says it is
+  // working — and every item inside it is disabled while that is true.
+  const trigger = screen.getByRole("button", { name: "Actions for draft idea" });
+  expect(trigger).toHaveTextContent("Working…");
+  expect((await openMenu("draft idea")).getByRole("menuitem", { name: "Approving…" })).toBeDisabled();
+  closeMenu();
   finish({ data: null, error: { message: "No draft row found" } });
   expect(await screen.findByText("No draft row found")).toHaveClass("text-destructive");
-  await waitFor(() => expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled());
+  await waitFor(() => expect(trigger).toHaveTextContent("Actions"));
   expect(screen.queryByText("Idea approved.")).not.toBeInTheDocument();
 });
 it("still offers delete for completed or rejected ideas, but not approve or brief", async () => {
   render(<GenerationPanel />);
   await screen.findByText("briefed idea");
-  // Draft and approved still get approve/brief. Briefed and rejected only get Delete.
-  expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Brief" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Approve & brief" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Delete briefed idea" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Delete rejected idea" })).toBeInTheDocument();
-  expect(screen.getAllByRole("button", { name: /^Delete / })).toHaveLength(4);
+  // Draft and approved still get approve/brief. Briefed and rejected only
+  // get the things that are true of any row: archive and delete.
+  const draft = await openMenu("draft idea");
+  expect(draft.getByRole("menuitem", { name: "Approve" })).toBeInTheDocument();
+  expect(draft.getByRole("menuitem", { name: "Approve & brief" })).toBeInTheDocument();
+  closeMenu();
+  const approved = await openMenu("approved idea");
+  expect(approved.getByRole("menuitem", { name: "Brief" })).toBeInTheDocument();
+  expect(approved.queryByRole("menuitem", { name: "Approve" })).not.toBeInTheDocument();
+  closeMenu();
+  for (const row of ["briefed idea", "rejected idea"]) {
+    const menu = await openMenu(row);
+    expect(menu.getByRole("menuitem", { name: "Delete" })).toBeInTheDocument();
+    expect(menu.getByRole("menuitem", { name: "Archive" })).toBeInTheDocument();
+    expect(menu.queryByRole("menuitem", { name: /Approve|Brief/ })).not.toBeInTheDocument();
+    closeMenu();
+  }
+  // Every row has a menu, so every row can be deleted.
+  expect(screen.getAllByRole("button", { name: /^Actions for / })).toHaveLength(4);
 });
 
 describe("running ideation inside one pillar", () => {
@@ -165,12 +229,16 @@ describe("running ideation inside one pillar", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Pillar Idea/i }));
     const dialog = within(screen.getByRole("dialog"));
     await userEvent.selectOptions(dialog.getByLabelText(/^Pillar/), "pil-1");
+    await userEvent.selectOptions(dialog.getByLabelText(/^Destination/), "instagram");
+    await userEvent.selectOptions(dialog.getByLabelText(/^Media type/), "video");
+    await userEvent.selectOptions(dialog.getByLabelText(/^Format/), "reel");
     await userEvent.click(dialog.getByRole("button", { name: "Run agent" }));
 
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", {
-        p_agent_key: "ideation",
+      expect(rpc).toHaveBeenCalledWith("enqueue_scoped_ideation", {
         p_client_id: "client-1",
+        p_target_platform: "instagram", p_media_type: "video", p_content_format: "reel",
+        p_campaign_id: null, p_idea_count: null,
         p_input_table: "client_content_pillars",
         p_input_id: "pil-1",
       }),
@@ -194,7 +262,7 @@ describe("deleting an idea", () => {
   it("deletes through delete_client_idea after confirm", async () => {
     rpc.mockResolvedValue({ data: [{ deleted_briefs: 0, deleted_assets: 0 }], error: null });
     render(<GenerationPanel />);
-    fireEvent.click(await screen.findByRole("button", { name: "Delete draft idea" }));
+    await choose("draft idea", "Delete");
     await waitFor(() =>
       expect(rpc).toHaveBeenCalledWith("delete_client_idea", { p_idea_id: "draft-1" }),
     );
@@ -206,14 +274,14 @@ describe("deleting an idea", () => {
   it("asks first, and does nothing if the answer is no", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<GenerationPanel />);
-    fireEvent.click(await screen.findByRole("button", { name: "Delete draft idea" }));
+    await choose("draft idea", "Delete");
     await waitFor(() => expect(rpc).not.toHaveBeenCalledWith("delete_client_idea", expect.anything()));
   });
 
   it("surfaces a permission refusal rather than pretending it worked", async () => {
     rpc.mockResolvedValue({ data: null, error: { message: "Only an admin can delete an idea." } });
     render(<GenerationPanel />);
-    fireEvent.click(await screen.findByRole("button", { name: "Delete draft idea" }));
+    await choose("draft idea", "Delete");
     expect(await screen.findByText(/Only an admin can delete an idea/i)).toHaveClass("text-destructive");
     expect(screen.queryByText("Idea deleted.")).not.toBeInTheDocument();
   });

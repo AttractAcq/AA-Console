@@ -27,12 +27,22 @@ import { runReportingJob } from "../agents/reporting/index.js";
 import { runCreativeBuildJob } from "../agents/creative_build/index.js";
 import { runVideoBuildJob } from "../agents/video_build/index.js";
 import { runVideoEditJob } from "../agents/video_edit/index.js";
+import { runSourceVideoEditJob } from "../agents/source_video_edit/index.js";
+import { runMotionDesignJob } from "../agents/motion_design/index.js";
+import { runVideoRepurposeJob } from "../agents/video_repurpose/index.js";
+import { runRepurposeClipJob } from "../agents/video_repurpose/clip-job.js";
 import { runIdeaSelectJob } from "../agents/idea_select/index.js";
 import { runCopywriterJob } from "../agents/copywriter/index.js";
+import { runTokenHealthJob } from "../agents/token_health/index.js";
+import { runQaJob } from "../agents/qa/index.js";
+import { runPublisherJob } from "../agents/publisher/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
+import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
 import { runRepurposeJob } from "../agents/repurpose/index.js";
 import { runProofDiscoveryJob } from "../agents/proof_discovery/index.js";
+import { runProofArtifactJob } from "../agents/proof_artifact/index.js";
+import { runOpportunityDiscoveryJob } from "../agents/opportunity_discovery/index.js";
 import { runSalesAgentJob } from "../agents/sales_agent/index.js";
 import { runCampaignPlanJob } from "../agents/campaign_plan/index.js";
 import { runPageAuditJob } from "../agents/page_audit/index.js";
@@ -46,6 +56,12 @@ export interface JobResult {
   ok: boolean;
   retryable: boolean;
   failureMessage?: string;
+  /**
+   * Not a failure: a refusal that will pass without anybody acting. The
+   * worker holds the job instead of failing it, and leaves the slot where it
+   * is. Only the budget cap sets this today.
+   */
+  hold?: boolean;
   usage?: { inputTokens: number; outputTokens: number; costUsd: number };
 }
 
@@ -77,6 +93,8 @@ const RUNNERS: Record<string, JobRunner> = {
   brief: runBriefJob,
   repurpose: runRepurposeJob,
   proof_discovery: runProofDiscoveryJob,
+  proof_artifact: runProofArtifactJob,
+  opportunity_discovery: runOpportunityDiscoveryJob,
   landing_page: runLandingPageJob,
   // The page, and then the thing standing on it.
   sales_agent: runSalesAgentJob,
@@ -98,9 +116,22 @@ const RUNNERS: Record<string, JobRunner> = {
   // the other half. A model writes the edit decision list, code validates
   // it against the clips and the brief's own claims, ffmpeg renders it.
   video_edit: runVideoEditJob,
+  source_video_edit: runSourceVideoEditJob,
+  motion_design: runMotionDesignJob,
+  video_repurpose_insights: runVideoRepurposeJob,
+  repurpose_clip_extract: runRepurposeClipJob,
   idea_select: runIdeaSelectJob,
   copywriter: runCopywriterJob,
+  token_health: runTokenHealthJob,
+  qa: runQaJob,
+  // The end of the chain, and the only thing here that makes a client's
+  // account say something in public. Does nothing at all unless
+  // PUBLISH_ENABLED is on in this runtime AND publishing is on for that
+  // client: two switches, so turning it on for one account is not turning
+  // it on for every account.
+  publisher: runPublisherJob,
   brief_dispatch: runBriefDispatchJob,
+  client_approval_dispatch: runClientApprovalDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
   // a person in Ads Manager.
   meta_build: runMetaBuildJob,
@@ -135,7 +166,11 @@ export async function dispatchJob(
   // three attempts at the same refusal is three lies about having tried.
   const budget = await checkClientBudget(sb, job.client_id);
   if (!budget.allowed) {
-    return { ok: false, retryable: false, failureMessage: budget.message };
+    // Held, not failed. The cap passes when somebody raises it or when the
+    // month rolls, and neither of those used to bring the work back: the
+    // job was failed non-retryably and its slot with it, so a cap reached
+    // on the 3rd threw away the rest of that client's month.
+    return { ok: false, retryable: false, hold: true, failureMessage: budget.message };
   }
   // Computed here rather than inside each runner so every agent is bounded by
   // construction, including any added later that forgets to ask.

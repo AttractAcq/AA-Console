@@ -103,6 +103,33 @@ describe("MetaBuildSection", () => {
     render(<MetaBuildSection clientId="c" campaign={campaign()} building={false} onChanged={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Set a daily budget/));
   });
+  it("shows the saved manual sheet in the v2 Meta tab without enabling an external build", async () => {
+    from.mockImplementation((table: string) => {
+      if (table === "client_integrations") return answering({ status: "connected", ad_account_id: "act_9", meta_page_id: "77", meta_pixel_id: null });
+      if (table === "agent_jobs") {
+        let key = "";
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = (field: string, value: string) => { if (field === "agent_key") key = value; return chain; };
+        chain.order = () => chain;
+        chain.limit = () => chain;
+        chain.maybeSingle = () => Promise.resolve({ data: key === "meta_build_sheet" ? { id: "sheet-job", status: "completed", error: null } : null, error: null });
+        return chain;
+      }
+      if (table === "agent_job_events") {
+        const chain: Record<string, unknown> = {};
+        chain.select = () => chain;
+        chain.eq = () => chain;
+        chain.order = () => chain;
+        chain.limit = () => Promise.resolve({ data: [{ payload: { sheet: "Campaign: Open day\nCreate paused ads." } }], error: null });
+        return chain;
+      }
+      return answering(null);
+    });
+    render(<MetaBuildSection clientId="c" campaign={campaign()} building={false} onChanged={vi.fn()} externalActionsAvailable={false} showSheetInline />);
+    expect(await screen.findByText(/Create paused ads/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Build in Meta (paused)" })).toBeDisabled();
+  });
   it("records a structure somebody built in Ads Manager by hand", async () => {
     const updates: Record<string, unknown>[] = [];
     from.mockImplementation((table: string) =>

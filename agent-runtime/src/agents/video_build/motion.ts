@@ -110,9 +110,10 @@ export interface MotionSubmitCall {
   frameId: string;
   prompt: string;
   imageUrl: string;
-  motionId: string;
+  motionId: string | null;
   strength: number;
   modelId: string;
+  durationSec: number;
 }
 
 export interface MotionPollCall {
@@ -131,6 +132,38 @@ export type MotionPlan =
       reason: "stills_not_ready" | "motion_preset_pending";
       message: string;
     };
+
+/** Kling image-to-video has no DoP motions parameter in its model contract. */
+export function usesDopMotion(modelId: string): boolean {
+  return !modelId.trim().startsWith("kling-video/");
+}
+
+export function directedShotPrompt(
+  beat: string,
+  position: number,
+  total: number,
+  visualDirection?: string | null,
+  openingState?: string | null,
+): string {
+  // Kling 2.5 rejects prompts over 2,500 characters after accepting the paid
+  // request. Reserve space for the action and start state instead of sending
+  // the entire editorial visual direction on every shot.
+  const bounded = (value: string | null | undefined, limit: number) => {
+    const clean = value?.trim() ?? "";
+    if (clean.length <= limit) return clean;
+    return clean.slice(0, limit).replace(/\s+\S*$/, "").trimEnd();
+  };
+  const sharedDirection = bounded(visualDirection, 450);
+  const prompt = [
+    `Shot ${position} of ${total}. Visible action to perform: ${bounded(beat, 380)}`,
+    openingState?.trim() ? `Frame-zero physical state: ${bounded(openingState, 400)}. Begin here, then perform the action visibly.` : "",
+    sharedDirection ? `Shared continuity: ${sharedDirection}` : "",
+    "Animate the supplied first frame as one continuous, realistic vertical shot. Execute the beat's visible action; do not hold the opening pose or replace the action with a camera move, changing light, dissolve or caption.",
+    "Preserve object count, shape, materials, geometry and lighting. No extra people or props, ghosted duplicates, text, logos, warping or digital zoom. The editor adds captions later.",
+  ].filter(Boolean).join(" ");
+  if (prompt.length > 2_000) throw new Error("The directed shot prompt exceeded the safe Kling budget.");
+  return prompt;
+}
 
 function httpsUrl(value: string | undefined): string | null {
   const trimmed = value?.trim() ?? "";
@@ -152,6 +185,7 @@ export function prepareMotionCalls(input: {
   stillUrlByPosition: ReadonlyMap<number, string>;
   modelId: string;
   strength?: number;
+  visualDirection?: string | null;
 }): MotionPlan {
   const strength = input.strength ?? 1;
   const calls: MotionCall[] = [];
@@ -180,7 +214,7 @@ export function prepareMotionCalls(input: {
       stillProblems.push(position);
       return;
     }
-    if (!motionId) {
+    if (!motionId && usesDopMotion(input.modelId)) {
       motionProblems.push({ position, preset: shot.motion_preset.trim() || "(blank)" });
       return;
     }
@@ -188,11 +222,12 @@ export function prepareMotionCalls(input: {
       kind: "submit",
       position,
       frameId: frame.id,
-      prompt: shot.beat,
+      prompt: directedShotPrompt(shot.beat, position, input.shots.length, input.visualDirection, shot.opening_state),
       imageUrl,
-      motionId,
+      motionId: usesDopMotion(input.modelId) ? motionId : null,
       strength,
       modelId: input.modelId,
+      durationSec: Math.max(3, Math.min(15, Math.ceil(shot.duration_sec))),
     });
   });
 
@@ -254,7 +289,7 @@ export function motionFollowUp(statuses: readonly string[]): MotionFollowUp {
       message: "Motion paused: nothing was submitted. No Higgsfield request was sent.",
     };
   }
-  if (normalized.some((status) => status === "failed" || status === "nsfw")) {
+  if (normalized.some((status) => status === "failed" || status === "nsfw" || status === "canceled")) {
     return {
       outcome: "failed",
       retryable: false,
