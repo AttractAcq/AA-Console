@@ -316,5 +316,6 @@ describe("deleting a campaign content idea", () => {
 it("shows recorded package bindings and labels historical links honestly", async () => {
   links = [{ brief_id: "brief-1", asset_id: null, manifest_id: "manifest-1" }];
   show({ layout: "v2" });
-  expect(await screen.findByText(/Asset version .*Package v3/)).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole("button", { name: /WhatsApp photo triage/ }));
+  expect(screen.getByText(/Asset version .*Package v3/)).toBeInTheDocument();
 });
