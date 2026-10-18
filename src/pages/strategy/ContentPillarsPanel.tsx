@@ -1,3 +1,4 @@
+import { CollapsiblePanel } from "../../components/CollapsiblePanel";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Sparkles } from "lucide-react";
@@ -132,7 +133,7 @@ export function ContentPillarsPanel() {
         <>
           <div className="space-y-3">
             {active.map((p) => (
-              <PillarCard key={p.id} pillar={p} busy={busy} onPatch={patch} />
+              <PillarCard key={`${clientId}:${p.id}`} pillar={p} busy={busy} onPatch={patch} />
             ))}
           </div>
           <p className="text-xs text-muted-foreground">{shareHint(pillars)}</p>
@@ -143,8 +144,7 @@ export function ContentPillarsPanel() {
         <div className="space-y-2 pt-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Retired</h3>
           {retired.map((p) => (
-            <div key={p.id} className="flex items-center justify-between rounded-md border border-border p-3">
-              <span className="text-sm text-muted-foreground">{p.name}</span>
+            <CollapsiblePanel key={`${clientId}:${p.id}`} title={p.name}>
               <button
                 type="button"
                 disabled={busy || active.length >= MAX_PILLARS}
@@ -153,7 +153,7 @@ export function ContentPillarsPanel() {
               >
                 Reinstate
               </button>
-            </div>
+            </CollapsiblePanel>
           ))}
         </div>
       )}
@@ -204,52 +204,54 @@ function PillarCard({
   );
 
   return (
-    <div className="space-y-3 rounded-lg border border-border bg-card p-4">
-      <div className="flex items-center justify-between gap-3">
-        <input
-          aria-label={`Name for ${pillar.name}`}
-          defaultValue={pillar.name}
-          disabled={busy}
-          onBlur={(e) => {
-            const next = e.target.value.trim();
-            if (next && next !== pillar.name) void onPatch(pillar.id, { name: next });
-          }}
-          className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-semibold text-card-foreground hover:border-input focus-visible:border-input focus-visible:outline-none"
-        />
-        <label className="flex shrink-0 items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Share</span>
+    <CollapsiblePanel title={pillar.name}>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
           <input
-            type="number"
-            min={0}
-            max={100}
-            aria-label={`Target share for ${pillar.name}`}
-            defaultValue={pillar.target_share}
+            aria-label={`Name for ${pillar.name}`}
+            defaultValue={pillar.name}
             disabled={busy}
             onBlur={(e) => {
-              const next = Number(e.target.value);
-              if (Number.isFinite(next) && next !== pillar.target_share) {
-                void onPatch(pillar.id, { target_share: Math.max(0, Math.min(100, Math.round(next))) });
-              }
+              const next = e.target.value.trim();
+              if (next && next !== pillar.name) void onPatch(pillar.id, { name: next });
             }}
-            className="w-16 rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
+            className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-semibold text-card-foreground hover:border-input focus-visible:border-input focus-visible:outline-none"
           />
-          <span className="text-xs text-muted-foreground">%</span>
-        </label>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void onPatch(pillar.id, { active: false })}
-          className="shrink-0 text-xs font-medium text-muted-foreground hover:text-destructive disabled:opacity-50"
-        >
-          Retire
-        </button>
-      </div>
+          <label className="flex shrink-0 items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Share</span>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              aria-label={`Target share for ${pillar.name}`}
+              defaultValue={pillar.target_share}
+              disabled={busy}
+              onBlur={(e) => {
+                const next = Number(e.target.value);
+                if (Number.isFinite(next) && next !== pillar.target_share) {
+                  void onPatch(pillar.id, { target_share: Math.max(0, Math.min(100, Math.round(next))) });
+                }
+              }}
+              className="w-16 rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
+            />
+            <span className="text-xs text-muted-foreground">%</span>
+          </label>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onPatch(pillar.id, { active: false })}
+            className="shrink-0 text-xs font-medium text-muted-foreground hover:text-destructive disabled:opacity-50"
+          >
+            Retire
+          </button>
+        </div>
 
-      {field("premise", "What it argues", 1)}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {field("belongs", "What belongs")}
-        {field("does_not_belong", "What does not")}
+        {field("premise", "What it argues", 1)}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {field("belongs", "What belongs")}
+          {field("does_not_belong", "What does not")}
+        </div>
       </div>
-    </div>
+    </CollapsiblePanel>
   );
 }

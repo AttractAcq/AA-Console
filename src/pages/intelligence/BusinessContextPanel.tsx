@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
-import { Panel } from "../../components/Panel";
+import { CollapsiblePanel } from "../../components/CollapsiblePanel";
 import { EmptyState } from "../../components/EmptyState";
 import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef, FormValues } from "../../components/forms/fields";
@@ -98,8 +98,8 @@ export function BusinessContextPanel() {
           {CARDS.map(({ key, label, hero }) => {
             const value = row?.[key];
             return (
-              <Panel
-                key={key}
+              <CollapsiblePanel
+                key={`${clientId}:${key}`}
                 title={label}
                 className={hero ? "sm:col-span-2 lg:col-span-4" : undefined}
               >
@@ -108,7 +108,7 @@ export function BusinessContextPanel() {
                 ) : (
                   <EmptyState label={label} minHeight={hero ? 100 : 80} />
                 )}
-              </Panel>
+              </CollapsiblePanel>
             );
           })}
         </div>
