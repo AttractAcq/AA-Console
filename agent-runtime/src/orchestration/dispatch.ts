@@ -42,6 +42,7 @@ import { deadlineFromNow } from "./deadline.js";
 import { runRepurposeJob } from "../agents/repurpose/index.js";
 import { runProofDiscoveryJob } from "../agents/proof_discovery/index.js";
 import { runProofArtifactJob } from "../agents/proof_artifact/index.js";
+import { runOpportunityDiscoveryJob } from "../agents/opportunity_discovery/index.js";
 import { runSalesAgentJob } from "../agents/sales_agent/index.js";
 import { runCampaignPlanJob } from "../agents/campaign_plan/index.js";
 import { runPageAuditJob } from "../agents/page_audit/index.js";
@@ -93,6 +94,7 @@ const RUNNERS: Record<string, JobRunner> = {
   repurpose: runRepurposeJob,
   proof_discovery: runProofDiscoveryJob,
   proof_artifact: runProofArtifactJob,
+  opportunity_discovery: runOpportunityDiscoveryJob,
   landing_page: runLandingPageJob,
   // The page, and then the thing standing on it.
   sales_agent: runSalesAgentJob,
