@@ -79,6 +79,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [builds, setBuilds] = useState<Record<string, { status: string }>>({});
   const [linkedAgentIds, setLinkedAgentIds] = useState<string[]>([]);
+  const [linkedAgentVersions, setLinkedAgentVersions] = useState<Record<string, number | null>>({});
   const [buildOpen, setBuildOpen] = useState(false);
   const [briefing, setBriefing] = useState(false);
   const [aiPurpose, setAiPurpose] = useState<string | null>(null);
@@ -98,7 +99,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
       setLoading(false);
       return;
     }
-    const [agentRes, pageRes, convRes, jobRes, linkRes] = await Promise.all([
+    const [agentRes, pageRes, convRes, jobRes, linkRes, versionRes] = await Promise.all([
       supabase
         .from("client_sales_agents")
         .select(
@@ -130,8 +131,11 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
         .eq("agent_key", "sales_agent")
         .order("created_at", { ascending: false }),
       campaignId ? supabase.from("campaign_artifacts")
-        .select("sales_agent_id").eq("client_id", clientId)
+        .select("sales_agent_id, manifest_id").eq("client_id", clientId)
         .eq("campaign_id", campaignId).eq("kind", "sales_agent")
+        : Promise.resolve({ data: [], error: null }),
+      campaignId ? supabase.from("campaign_manifest_versions")
+        .select("id, version").eq("client_id", clientId).eq("campaign_id", campaignId)
         : Promise.resolve({ data: [], error: null }),
     ]);
 
@@ -139,6 +143,9 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
     setPages((pageRes.data ?? []) as PageOption[]);
     setConversations((convRes.data ?? []) as Conversation[]);
     setLinkedAgentIds((linkRes.data ?? []).flatMap((link) => link.sales_agent_id ? [link.sales_agent_id] : []));
+    const versions = new Map((versionRes.data ?? []).map((row) => [row.id, row.version]));
+    setLinkedAgentVersions(Object.fromEntries((linkRes.data ?? []).filter((link) => link.sales_agent_id)
+      .map((link) => [link.sales_agent_id!, link.manifest_id ? versions.get(link.manifest_id) ?? null : null])));
 
     // Newest first, so the first sighting of an agent id is its latest job.
     const latest: Record<string, { status: string }> = {};
@@ -287,7 +294,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
                   </p>
                 )}
                 <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{a.purpose}</p>
-                {campaignId && <p className="mt-1 text-xs text-muted-foreground">Build: {a.built_at ? new Date(a.built_at).toLocaleString() : "pending"} · Public approval: {a.approved_at ? "approved" : "not approved"} · Exact-version deploy approval: not available yet</p>}
+                {campaignId && <p className="mt-1 text-xs text-muted-foreground">Build: {a.built_at ? new Date(a.built_at).toLocaleString() : "pending"} · Package: {linkedAgentVersions[a.id] ? `v${linkedAgentVersions[a.id]}` : "not version-bound"} · Public approval: {a.approved_at ? "approved" : "not approved"} · Exact-version deploy approval: not available yet</p>}
 
                 {a.built_at ? (
                   <>
