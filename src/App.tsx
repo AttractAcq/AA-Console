@@ -4,6 +4,7 @@ import { RequireRole } from "./components/RequireRole";
 import { Page } from "./pages/Page";
 import { ClientsPage } from "./pages/ClientsPage";
 import { LoginPage } from "./pages/LoginPage";
+import { LandingPage } from "./pages/marketing/LandingPage";
 import { ClientLoginPage } from "./pages/client/ClientLoginPage";
 import { ClientConsolePage } from "./pages/client/ClientConsolePage";
 import { EmployeeLoginPage } from "./pages/employee/EmployeeLoginPage";
@@ -28,6 +29,14 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
+            {/*
+              AA's public marketing page. Open to everyone: it is the one
+              route here a stranger is meant to reach. It stays off "/" so
+              an admin arriving at the console root still lands on the
+              console rather than on marketing.
+            */}
+            <Route path="/landing" element={<LandingPage />} />
+
             <Route path="/login" element={<LoginPage />} />
 
             <Route path="/client/login" element={<ClientLoginPage />} />
