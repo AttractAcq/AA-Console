@@ -134,7 +134,7 @@ it("preserves the human handoff without automatically building", async () => {
   render(<ProofFactoryV2Panel tab="repurpose" />);
   await waitFor(() => expect(screen.queryByText("Loading proof…")).not.toBeInTheDocument());
   await userEvent.click(screen.getByRole("button", { name: "Repurpose" }));
-  await userEvent.selectOptions(screen.getByLabelText(/^Production\s*\*?$/), "human");
+  await userEvent.selectOptions(screen.getByRole("combobox", { name: /^Production/ }), "human");
   await userEvent.selectOptions(screen.getByLabelText(/Produced asset/), "asset-1");
   await userEvent.type(screen.getByLabelText(/Production instructions/), "Have our editor prepare the quote graphic.");
   await userEvent.click(screen.getByRole("button", { name: "Start production" }));
