@@ -58,21 +58,31 @@ async function publishablePost(
     integration?: string | null;
     publishing?: boolean;
     renderPath?: string | null;
+    format?: string;
+    frames?: number;
+    mediaType?: string;
   } = {},
 ): Promise<{ post: string; asset: string }> {
   const platform = over.platform ?? "instagram";
   const { id: asset } = await one<{ id: string }>(
-    `insert into client_media_assets (client_id, title, storage_path, render_path, human_approved_at, review_status)
+    `insert into client_media_assets (client_id, title, storage_path, render_path, content_format, human_approved_at, review_status)
      values ('${CLIENT}','Built','assets/raw.mp4',
              ${over.renderPath === undefined ? `'assets/cut.mp4'` : over.renderPath === null ? "null" : `'${over.renderPath}'`},
+             '${over.format ?? "single"}'::content_format,
              ${over.approved === false ? "null" : "now()"},
              ${over.approved === false ? "'pending'" : "'approved'"}) returning id`,
   );
   const { id: post } = await one<{ id: string }>(
     `insert into scheduled_posts (client_id, asset_id, scheduled_for, scheduled_at, platform, media_type)
      values ('${CLIENT}','${asset}', current_date, ${over.due ?? "now() - interval '1 hour'"},
-             '${platform}'::post_platform, 'video') returning id`,
+             '${platform}'::post_platform, '${over.mediaType ?? "video"}'::media_type) returning id`,
   );
+  if (over.frames !== undefined) {
+    for (let i = 0; i < over.frames; i += 1) {
+      await db.exec(`insert into client_media_frames (asset_id, position, storage_path)
+                     values ('${asset}', ${i + 1}, 'assets/frame-${i + 1}.png')`);
+    }
+  }
   if (over.caption !== null) {
     await db.exec(`insert into post_copy (scheduled_post_id, platform, caption, hashtags, alt_text, source)
                    values ('${post}','${platform}',
@@ -118,6 +128,10 @@ beforeAll(async () => {
     create type media_type as enum ('image','text','video');
     create type review_status as enum ('pending','approved','rejected');
 
+    -- Migration 161's sweep, which 220 calls because it creates a definer
+    -- function. Stubbed: what it does is 161's own test.
+    create function lock_down_definer_functions() returns integer language sql as $$ select 0 $$;
+
     create table clients (id uuid primary key, name text, timezone text not null default 'Europe/London');
     create table profiles (id uuid primary key, role text);
     create table client_members (client_id uuid, user_id uuid);
@@ -140,7 +154,12 @@ beforeAll(async () => {
     create table client_briefs (id uuid primary key default gen_random_uuid());
     create table client_media_assets (id uuid primary key default gen_random_uuid(),
       client_id uuid, title text, storage_path text, render_path text,
+      content_format content_format not null default 'single',
       review_status review_status not null default 'pending', human_approved_at timestamptz);
+    create table client_media_frames (id uuid primary key default gen_random_uuid(),
+      asset_id uuid references client_media_assets(id) on delete cascade,
+      position integer not null, storage_path text not null, caption text,
+      unique (asset_id, position));
     create table client_asset_reviews (id uuid primary key default gen_random_uuid(),
       asset_id uuid, decision review_status, reason text, reviewed_by uuid,
       created_at timestamptz default now());
@@ -221,6 +240,10 @@ beforeAll(async () => {
     "20261006200000_158_qa.sql",
     "20261006220000_159_approval_inbox.sql",
     "20261006235000_160_publishing.sql",
+    "20261019100000_219_publish_knows_the_format.sql",
+    "20261019110000_220_carousels_go_out_whole.sql",
+    "20261019120000_221_a_story_is_many_posts.sql",
+    "20261019130000_222_the_last_four_surfaces.sql",
   ]) {
     await db.exec(await migration(f));
   }
@@ -230,7 +253,9 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.exec(`reset role;`);
-  await db.exec(`delete from post_copy; delete from scheduled_posts; delete from client_asset_reviews;
+  await db.exec(`delete from post_frame_publications; delete from post_copy;
+                 delete from scheduled_posts; delete from client_asset_reviews;
+                 delete from client_media_frames;
                  delete from content_slots; delete from client_media_assets; delete from client_ideas;
                  delete from client_integrations; delete from client_engine_settings;`);
   await db.exec(`select set_config('request.jwt.claim.sub','${ADMIN}',false);
@@ -669,5 +694,290 @@ describe("approval to published, end to end", () => {
     await asEngine(`select record_post_publish_failure('${post}', 'Rate limited.', true)`);
     const { stage } = await one<{ stage: string }>(`select stage from content_slots where id = '${slot}'`);
     expect(stage).toBe("scheduled");
+  });
+});
+
+/**
+ * Migrations 219, 220 and 221.
+ *
+ * The factory makes four shapes. Before 219 the adapters sent two of them and
+ * nothing anywhere knew the difference, so a carousel reached the Instagram
+ * adapter, which built one container from the cover frame, published it, and
+ * had the database record a carousel as published. 219 made the queue refuse
+ * that, 220 taught the adapters to send a carousel whole, and 221 did stories
+ * -- which are not one publication at all, and so needed somewhere to record
+ * what has actually gone out.
+ */
+describe("the shape, not just the platform", () => {
+  it("refuses a shape whose adapter is not written, and says what would have happened", async () => {
+    // Every shape on Instagram is sendable now, so the unsupported case is
+    // reached the way a real one would be: by the table saying so. Put back
+    // in a finally, because leaving it off would quietly unsupport carousels
+    // for every test after this one.
+    await db.exec(`update platform_format_publishing set supported = false
+                   where platform = 'instagram' and content_format = 'carousel'`);
+    try {
+      const { post } = await publishablePost({ format: "carousel", frames: 3 });
+      expect(await blockerOf(post)).toBe(
+        "A carousel cannot be sent to instagram yet. Publishing it now would post the " +
+          "first frame on its own and record it as published.",
+      );
+    } finally {
+      await db.exec(`update platform_format_publishing set supported = true
+                     where platform = 'instagram' and content_format = 'carousel'`);
+    }
+  });
+
+  it("names the media type when that is what is unsupported", async () => {
+    // Both Facebook story paths work since 222, so the media-specific row is
+    // switched off here to prove the view prefers it over the general one --
+    // which is the whole reason that column exists.
+    await db.exec(`update platform_format_publishing set supported = false
+                   where platform = 'facebook' and content_format = 'story'
+                     and media_type = 'video'`);
+    try {
+      const video = await publishablePost({
+        format: "story", frames: 2, platform: "facebook", integration: "meta", mediaType: "video",
+      });
+      expect(await blockerOf(video.post)).toBe(
+        "A story made of video cannot be sent to facebook yet.",
+      );
+      // The general row still says yes, and a photo story still goes.
+      const photo = await publishablePost({
+        format: "story", frames: 2, platform: "facebook", integration: "meta", mediaType: "image",
+      });
+      expect(await blockerOf(photo.post)).toBeNull();
+    } finally {
+      await db.exec(`update platform_format_publishing set supported = true
+                     where platform = 'facebook' and content_format = 'story'
+                       and media_type = 'video'`);
+    }
+  });
+
+  it("lets through every shape that genuinely publishes", async () => {
+    const single = await publishablePost({ format: "single" });
+    const reel = await publishablePost({ format: "reel" });
+    const carousel = await publishablePost({ format: "carousel", frames: 3 });
+    const story = await publishablePost({ format: "story", frames: 4 });
+    for (const { post } of [single, reel, carousel, story]) {
+      expect(await blockerOf(post)).toBeNull();
+    }
+  });
+
+  it("will not claim an unpublishable shape", async () => {
+    // LinkedIn has no adapter at all, which is the only shape that is
+    // genuinely unsendable now.
+    const story = await publishablePost({
+      format: "story", frames: 2, platform: "linkedin", integration: "linkedin",
+    });
+    const single = await publishablePost({ format: "single" });
+    const claimed = await asEngine<{ post_id: string }>(
+      "select post_id from claim_posts_for_publishing(5)",
+    );
+    expect(claimed.map((c) => c.post_id)).toEqual([single.post]);
+    // And the one it would have mangled is untouched, not failed: nobody has
+    // written a LinkedIn adapter, which is a thing to do rather than an error
+    // against this post.
+    expect(
+      await one<{ publication_status: string; publish_attempts: number }>(
+        `select publication_status, publish_attempts from scheduled_posts where id = '${story.post}'`,
+      ),
+    ).toMatchObject({ publication_status: "scheduled", publish_attempts: 0 });
+  });
+
+  it("says the platform has no adapter before it says anything about the shape", async () => {
+    // A carousel to LinkedIn is unsendable twice over. The sentence a person
+    // needs is the one about LinkedIn, because carousel support would not
+    // help them in the slightest.
+    const { post } = await publishablePost({
+      format: "carousel", frames: 3, platform: "linkedin", integration: "linkedin",
+    });
+    expect(await blockerOf(post)).toBe("There is no adapter for linkedin.");
+  });
+
+  it("refuses the shape before it mentions switches or credentials", async () => {
+    // Publishing off, no integration, no caption AND a shape with no adapter.
+    // The shape is the sentence, because turning publishing on would not make
+    // the post sendable and would send somebody to the wrong screen.
+    await db.exec(`update platform_format_publishing set supported = false
+                   where platform = 'instagram' and content_format = 'story'`);
+    try {
+      const { post } = await publishablePost({
+        format: "story", frames: 2, publishing: false, integration: null, caption: null,
+      });
+      expect(await blockerOf(post)).toContain("A story cannot be sent to instagram");
+    } finally {
+      await db.exec(`update platform_format_publishing set supported = true
+                     where platform = 'instagram' and content_format = 'story'`);
+    }
+  });
+
+  it("carries the shape and its support out of the view, for anything that wants to show it", async () => {
+    const story = await publishablePost({ format: "story", frames: 2 });
+    const carousel = await publishablePost({ format: "carousel", frames: 2 });
+    for (const post of [story.post, carousel.post]) {
+      expect(
+        await one<{ format_supported: boolean }>(
+          `select format_supported from publish_due where post_id = '${post}'`,
+        ),
+      ).toMatchObject({ format_supported: true });
+    }
+    expect(
+      await one<{ content_format: string }>(
+        `select content_format from publish_due where post_id = '${story.post}'`,
+      ),
+    ).toMatchObject({ content_format: "story" });
+  });
+
+  it("states every platform and shape pair rather than leaving gaps to be inferred", async () => {
+    expect(
+      (await rows<{ n: number }>("select count(*)::int as n from platform_format_publishing"))[0]!.n,
+    ).toBe(21); // five platforms times four shapes, plus Facebook's video story
+    // Every shape on both adapters, and nothing anywhere else.
+    expect(
+      await rows(`select 1 from platform_format_publishing
+                   where supported and platform not in ('instagram','facebook')`),
+    ).toHaveLength(0);
+    expect(
+      await rows(`select 1 from platform_format_publishing
+                   where not supported and platform in ('instagram','facebook')`),
+    ).toHaveLength(0);
+  });
+
+  it("says in the row itself which paths have never run against a real page", async () => {
+    // The video surfaces are written from Meta's documented flow and have
+    // never been exercised. Somebody reading this table at two in the
+    // morning should learn that from the table.
+    const unproven = await rows<{ content_format: string }>(
+      `select content_format from platform_format_publishing
+        where note like '%NOT YET EXERCISED%' order by content_format`,
+    );
+    expect(unproven.map((row) => row.content_format)).toEqual(["story", "reel"]);
+  });
+});
+
+describe("a carousel goes out whole", () => {
+  it("hands the adapter every frame, in the order a person laid them out", async () => {
+    const { asset } = await publishablePost({ format: "carousel", frames: 3 });
+    // Inserted 1,2,3; re-pathed out of order to prove the sort is on position
+    // rather than on insertion or on the path itself.
+    await db.exec(`update client_media_frames set storage_path = 'assets/zzz.png'
+                   where asset_id = '${asset}' and position = 1`);
+    const [claimed] = await asEngine<{ frame_paths: string[]; content_format: string }>(
+      "select content_format, frame_paths from claim_posts_for_publishing(5)",
+    );
+    expect(claimed).toMatchObject({ content_format: "carousel" });
+    expect(claimed!.frame_paths).toEqual([
+      "assets/zzz.png",
+      "assets/frame-2.png",
+      "assets/frame-3.png",
+    ]);
+  });
+
+  it("gives a single post no frames at all, so the runtime can tell them apart", async () => {
+    await publishablePost({ format: "single" });
+    const [claimed] = await asEngine<{ frame_paths: string[] | null }>(
+      "select frame_paths from claim_posts_for_publishing(5)",
+    );
+    expect(claimed!.frame_paths).toBeNull();
+  });
+
+  it("refuses a carousel that lost its frames between approval and sending", async () => {
+    const { post, asset } = await publishablePost({ format: "carousel", frames: 3 });
+    expect(await blockerOf(post)).toBeNull();
+    await db.exec(`delete from client_media_frames where asset_id = '${asset}' and position > 1`);
+    expect(await blockerOf(post)).toBe(
+      "A carousel needs at least two frames. This one has 1 on file.",
+    );
+  });
+
+  it("refuses a carousel longer than either platform takes", async () => {
+    const { post, asset } = await publishablePost({ format: "carousel", frames: 10 });
+    expect(await blockerOf(post)).toBeNull();
+    await db.exec(`insert into client_media_frames (asset_id, position, storage_path)
+                   values ('${asset}', 11, 'assets/frame-11.png')`);
+    expect(await blockerOf(post)).toBe(
+      "This carousel has 11 frames. Ten is the most either platform takes.",
+    );
+  });
+
+  it("counts frames per asset, not across the table", async () => {
+    const first = await publishablePost({ format: "carousel", frames: 2 });
+    const second = await publishablePost({ format: "carousel", frames: 3 });
+    await db.exec(`delete from client_media_frames where asset_id = '${first.asset}'`);
+    expect(await blockerOf(first.post)).toContain("has 0 on file");
+    expect(await blockerOf(second.post)).toBeNull();
+  });
+});
+
+describe("a story is many posts", () => {
+  it("refuses a story with nothing in it, and accepts one frame", async () => {
+    const empty = await publishablePost({ format: "story" });
+    expect(await blockerOf(empty.post)).toBe("This story has no frames on file.");
+    // One frame is a short story, not a broken one. A carousel of one would
+    // be refused; this is the difference between the two shapes.
+    const short = await publishablePost({ format: "story", frames: 1 });
+    expect(await blockerOf(short.post)).toBeNull();
+  });
+
+  it("records each frame as it lands, and will not record one twice", async () => {
+    const { post } = await publishablePost({ format: "story", frames: 3 });
+    await asEngine("select * from claim_posts_for_publishing(5)");
+    await asEngine(`select record_frame_published('${post}', 1, 'ig_1')`);
+    await asEngine(`select record_frame_published('${post}', 2, 'ig_2', 'https://ig/2')`);
+    // The same frame again is a crashed runtime telling the truth twice. The
+    // first id stands, because it is the one that matches the platform.
+    await asEngine(`select record_frame_published('${post}', 1, 'ig_different')`);
+
+    expect(
+      await rows<{ position: number; external_id: string }>(
+        `select position, external_id from post_frame_publications
+          where post_id = '${post}' order by position`,
+      ),
+    ).toEqual([
+      { position: 1, external_id: "ig_1" },
+      { position: 2, external_id: "ig_2" },
+    ]);
+  });
+
+  it("will not record a frame against a post nobody claimed", async () => {
+    const { post } = await publishablePost({ format: "story", frames: 2 });
+    await expect(asEngine(`select record_frame_published('${post}', 1, 'ig_1')`)).rejects.toThrow(
+      "not being published",
+    );
+  });
+
+  it("is the publisher's to write, not a person's", async () => {
+    const { post } = await publishablePost({ format: "story", frames: 2 });
+    await asEngine("select * from claim_posts_for_publishing(5)");
+    await expect(db.query(`select record_frame_published('${post}', 1, 'ig_1')`)).rejects.toThrow(
+      "recorded by the publisher",
+    );
+  });
+
+  it("insists a frame that went out has an id", async () => {
+    const { post } = await publishablePost({ format: "story", frames: 2 });
+    await asEngine("select * from claim_posts_for_publishing(5)");
+    await expect(asEngine(`select record_frame_published('${post}', 1, '  ')`)).rejects.toThrow(
+      "has an id",
+    );
+  });
+
+  it("keeps the per-frame record when the post itself is recorded published", async () => {
+    // Three frames out, then the post marked published. The frame rows are
+    // what can still answer "which story posts are these" afterwards.
+    const { post } = await publishablePost({ format: "story", frames: 2 });
+    await asEngine("select * from claim_posts_for_publishing(5)");
+    await asEngine(`select record_frame_published('${post}', 1, 'ig_1')`);
+    await asEngine(`select record_frame_published('${post}', 2, 'ig_2')`);
+    await asEngine(`select record_post_published('${post}', 'ig_1', null)`);
+    expect(
+      await rows(`select 1 from post_frame_publications where post_id = '${post}'`),
+    ).toHaveLength(2);
+    expect(
+      await one<{ publication_status: string }>(
+        `select publication_status from scheduled_posts where id = '${post}'`,
+      ),
+    ).toMatchObject({ publication_status: "published" });
   });
 });

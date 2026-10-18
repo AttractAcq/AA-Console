@@ -9,6 +9,25 @@
  */
 
 import type { Platform } from "../content/platform-limits.js";
+import type { ContentFormat } from "../content/format.js";
+
+/**
+ * One frame of a shape made of frames.
+ *
+ * Images only, because that is what the data model says a carousel is:
+ * `mediaTypesFor('carousel')` is `['image']`, and a swipeable set of clips is
+ * a story rather than a carousel. Instagram would accept a video item; until
+ * an asset can carry one, pretending otherwise here would be a field nothing
+ * could ever set.
+ */
+export interface PublishFrame {
+  /** 1-based, and the order the frames go out in. */
+  readonly position: number;
+  /** A signed, time-limited URL the platform can fetch this frame from. */
+  readonly mediaUrl: string;
+  /** Per-frame copy, where the format carries any. Not every platform shows it. */
+  readonly caption?: string | null;
+}
 
 /** Everything an adapter needs to make one post. Nothing it does not. */
 export interface PublishRequest {
@@ -26,6 +45,19 @@ export interface PublishRequest {
   /** A signed, time-limited URL the platform can fetch the media from. */
   readonly mediaUrl: string;
   readonly mediaKind: "image" | "video";
+  /**
+   * The shape being sent, which an adapter branches on before anything else.
+   *
+   * Before migration 219 this was not here and not anywhere: the adapter was
+   * handed one file and a media kind, so a carousel arrived looking exactly
+   * like a single image and went out as one.
+   */
+  readonly contentFormat: ContentFormat;
+  /**
+   * The ordered frames, for a shape made of them. Undefined for a single post
+   * or a reel, where `mediaUrl` is the whole thing.
+   */
+  readonly frames?: readonly PublishFrame[];
   /** The words, already composed and already within the platform's limits. */
   readonly caption: string;
   readonly firstComment?: string | null;
@@ -71,4 +103,16 @@ export interface PublishAdapter {
    */
   readonly accountColumn: "meta_page_id" | "credential_label" | "ad_account_id";
   publish(request: PublishRequest): Promise<PublishSuccess>;
+  /**
+   * One frame of a story, as its own post.
+   *
+   * Stories are the one shape where a frame set is not a single publication:
+   * neither platform has a multi-frame story container, so five frames are
+   * five posts with five ids. The runner calls this once per frame and
+   * records each one as it lands, which is what lets a retry send the rest
+   * rather than the lot.
+   *
+   * Absent on an adapter that cannot send a story at all.
+   */
+  publishFrame?(request: PublishRequest, frame: PublishFrame): Promise<PublishSuccess>;
 }
