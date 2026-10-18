@@ -559,7 +559,7 @@ export function CampaignExecutionPanel() {
               {packageState.items.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Package scope: {packageState.items.filter((item) => item.required).map((item) => item.item_key.replaceAll("_", " ")).join(", ")}. These are planned dependencies, not completed work.</p>}
               {reqs.length ? <><p className="mt-3 text-xs font-medium">Artifact checks</p><ul className="mt-1 space-y-1">{reqs.map((r) => <li key={r.requirement} className="flex gap-2 text-xs"><span className={r.met ? "text-brand-strong" : "text-destructive"}>{r.met ? "●" : "○"}</span><span className="font-medium">{r.requirement}</span><span className="text-muted-foreground">{r.detail}</span></li>)}</ul></>
                 : <p className="mt-2 text-xs text-muted-foreground">Artifact readiness is unavailable; launch cannot be assessed.</p>}
-              {packageState.manifest && <p className="mt-3 text-xs text-muted-foreground">Content here belongs to this campaign revision. Existing content links identify the campaign, but do not store a separate package version; review the exact asset before requesting external approval.</p>}
+              {packageState.manifest && <p className="mt-3 text-xs text-muted-foreground">New content links record the campaign package active when linked. Older links are marked as not version-bound; review the exact asset before requesting external approval.</p>}
               {packageState.approvals.length > 0 && <p className="mt-3 text-xs text-muted-foreground">Current-package approvals: {packageState.approvals.map((approval) => `${approval.action_key.replaceAll("_", " ")} · ${approval.status}`).join("; ")}</p>}
             </section>
             <div className="relative mt-4">

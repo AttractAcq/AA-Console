@@ -66,7 +66,7 @@ beforeEach(() => {
       order: () => chain,
       then: (resolve: (value: unknown) => unknown) => Promise.resolve({
         error: null,
-        data: table === "client_ideas"
+        data: table === "campaign_manifest_versions" ? [{ id: "manifest-1", version: 3 }] : table === "client_ideas"
           ? ideas
           : table === "campaign_artifacts"
             ? links
@@ -155,7 +155,7 @@ it("shows v2 assets in a table with brief, preview and review actions", async ()
   show({ layout: "v2" });
   expect(await screen.findByRole("table")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /WhatsApp photo triage/ }));
-  expect(screen.getByText(/Asset version · Finished piece/)).toBeInTheDocument();
+  expect(screen.getByText(/Asset version · Finished piece.*Package not version-bound/)).toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "Preview Finished piece" })).toHaveLength(2);
   expect(screen.getAllByRole("button", { name: "Brief" })).toHaveLength(1);
   fireEvent.click(screen.getAllByRole("button", { name: "Actions" })[1]);
@@ -311,4 +311,11 @@ describe("deleting a campaign content idea", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/Only an admin can delete an idea/i);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
+});
+
+it("shows recorded package bindings and labels historical links honestly", async () => {
+  links = [{ brief_id: "brief-1", asset_id: null, manifest_id: "manifest-1" }];
+  show({ layout: "v2" });
+  fireEvent.click(await screen.findByRole("button", { name: /WhatsApp photo triage/ }));
+  expect(screen.getByText(/Asset version .*Package v3/)).toBeInTheDocument();
 });

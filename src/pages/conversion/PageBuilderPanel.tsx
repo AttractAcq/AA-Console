@@ -45,6 +45,7 @@ type PageCampaignLink = {
   id: string;
   page_id: string;
   campaign_id: string;
+  manifest_id: string | null;
 };
 
 export type PageBuilderType = "landing" | "offer" | "recruitment";
@@ -79,6 +80,7 @@ export function PageBuilderPanel({
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [pageLinks, setPageLinks] = useState<PageCampaignLink[]>([]);
   const [pageApprovalState, setPageApprovalState] = useState<Record<string, string>>({});
+  const [manifestVersions, setManifestVersions] = useState<Record<string, number>>({});
   const [repos, setRepos] = useState<SiteRepo[]>([]);
   // The approved ads a recruitment page can be the destination for.
   const [ads, setAds] = useState<{ id: string; title: string | null; ref_number: string | null }[]>([]);
@@ -115,7 +117,7 @@ export function PageBuilderPanel({
           ? Promise.resolve({ data: [], error: null })
           : supabase
           .from("campaign_artifacts")
-          .select("id, page_id, campaign_id")
+          .select("id, page_id, campaign_id, manifest_id")
           .eq("client_id", clientId)
           .eq("kind", "landing_page"),
         // The site this client's pages publish onto. One site holds many
@@ -139,8 +141,8 @@ export function PageBuilderPanel({
           .eq("action_key", "page_deploy").order("requested_at", { ascending: false })
           : Promise.resolve({ data: [], error: null }),
         selectedCampaignId ? supabase.from("campaign_manifest_versions")
-          .select("id").eq("client_id", clientId).eq("campaign_id", selectedCampaignId)
-          .order("version", { ascending: false }).limit(1)
+          .select("id, version").eq("client_id", clientId).eq("campaign_id", selectedCampaignId)
+          .order("version", { ascending: false })
           : Promise.resolve({ data: [], error: null }),
       ]);
       if (pageRows.error) throw pageRows.error;
@@ -150,6 +152,9 @@ export function PageBuilderPanel({
       setCampaigns((campaignRows.data ?? []) as CampaignOption[]);
       const links = (linkRows.data ?? []) as PageCampaignLink[];
       setPageLinks(links);
+      if (selectedCampaignId && !manifestRows.error) {
+        setManifestVersions(Object.fromEntries((manifestRows.data ?? []).map((row) => [row.id, row.version])));
+      }
       if (selectedCampaignId && !approvalRows.error && !manifestRows.error) {
         const latestManifest = manifestRows.data?.[0]?.id;
         const states: Record<string, string> = {};
@@ -362,7 +367,7 @@ export function PageBuilderPanel({
                 {p.status}
                 {p.published_url ? " · live" : p.html ? " · built, not published" : ""}
               </p>
-              {selectedCampaignId && <p className="mt-1 text-xs text-muted-foreground">Revision: {p.current_revision ?? "not built"} · Review request: {pageApprovalState[p.id] ?? "not requested for current package"}. The exact revision is rechecked before deployment.</p>}
+              {selectedCampaignId && <p className="mt-1 text-xs text-muted-foreground">Revision: {p.current_revision ?? "not built"} · Package: {(() => { const id = pageLinks.find((link) => link.page_id === p.id && link.campaign_id === selectedCampaignId)?.manifest_id; return id ? `v${manifestVersions[id] ?? "unknown"}` : "not version-bound"; })()} · Review request: {pageApprovalState[p.id] ?? "not requested for current package"}. The exact revision is rechecked before deployment.</p>}
               {p.html ? (
                 <>
                   {p.meta_description && (

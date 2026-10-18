@@ -816,6 +816,7 @@ export type Database = {
           created_at: string
           id: string
           kind: string
+          manifest_id: string | null
           page_id: string | null
           post_id: string | null
           sales_agent_id: string | null
@@ -828,6 +829,7 @@ export type Database = {
           created_at?: string
           id?: string
           kind: string
+          manifest_id?: string | null
           page_id?: string | null
           post_id?: string | null
           sales_agent_id?: string | null
@@ -840,6 +842,7 @@ export type Database = {
           created_at?: string
           id?: string
           kind?: string
+          manifest_id?: string | null
           page_id?: string | null
           post_id?: string | null
           sales_agent_id?: string | null

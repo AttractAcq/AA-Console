@@ -45,6 +45,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
   const [copying, setCopying] = useState<CampaignAsset | null>(null);
   const [landingUrl, setLandingUrl] = useState<string | null>(null);
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const [artifactPackages, setArtifactPackages] = useState<{ briefs: Map<string, string>; assets: Map<string, string>; versions: Map<string, number> }>({ briefs: new Map(), assets: new Map(), versions: new Map() });
   const [building, setBuilding] = useState<Brief | null>(null);
   const [viewing, setViewing] = useState<Brief | null>(null);
   const [preview, setPreview] = useState<MediaAsset | null>(null);
@@ -63,14 +64,23 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 
   const refresh = useCallback(async () => {
     try {
-      const [ideaRows, links, pageLinks] = await Promise.all([
+      const [ideaRows, links, pageLinks, versionRows] = await Promise.all([
         supabase.from("client_ideas").select("*").eq("client_id", clientId).eq("campaign_id", campaignId).order("campaign_position", { ascending: true }),
-        supabase.from("campaign_artifacts").select("brief_id, asset_id").eq("client_id", clientId).eq("campaign_id", campaignId).eq("kind", "content"),
+        supabase.from("campaign_artifacts").select("brief_id, asset_id, manifest_id").eq("client_id", clientId).eq("campaign_id", campaignId).eq("kind", "content"),
         // Where an ad's link is drafted from: the campaign's own published page.
         supabase.from("campaign_artifacts").select("client_pages(published_url)").eq("client_id", clientId).eq("campaign_id", campaignId).eq("kind", "landing_page"),
+        layout === "v2" ? supabase.from("campaign_manifest_versions")
+          .select("id, version").eq("client_id", clientId).eq("campaign_id", campaignId)
+          : Promise.resolve({ data: [], error: null }),
       ]);
       if (ideaRows.error) throw ideaRows.error;
       if (links.error) throw links.error;
+      if (versionRows.error) throw versionRows.error;
+      setArtifactPackages({
+        briefs: new Map((links.data ?? []).filter((link) => link.brief_id && link.manifest_id).map((link) => [link.brief_id!, link.manifest_id!])),
+        assets: new Map((links.data ?? []).filter((link) => link.asset_id && link.manifest_id).map((link) => [link.asset_id!, link.manifest_id!])),
+        versions: new Map((versionRows.data ?? []).map((row) => [row.id, row.version])),
+      });
       const ids = (links.data ?? []).flatMap((link) => link.brief_id ? [link.brief_id] : []);
       const directAssetIds = (links.data ?? []).flatMap((link) => link.asset_id ? [link.asset_id] : []);
       const [briefRows, byBrief, direct] = await Promise.all([
@@ -93,7 +103,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
     } finally {
       setLoading(false);
     }
-  }, [clientId, campaignId]);
+  }, [clientId, campaignId, layout]);
 
   useEffect(() => { void refresh(); }, [refresh, refreshToken]);
   // Human uploads and reviews do not necessarily finish an agent job.
@@ -236,6 +246,12 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
     </button>;
   };
 
+  const packageForAsset = (asset: CampaignAsset): string => {
+    const manifestId = artifactPackages.assets.get(asset.id)
+      ?? (asset.brief_id ? artifactPackages.briefs.get(asset.brief_id) : undefined);
+    return manifestId ? `Package v${artifactPackages.versions.get(manifestId) ?? "unknown"}` : "Package not version-bound";
+  };
+
   if (layout === "v2") return <section className="mt-4 space-y-3" aria-label="Campaign content production">
     <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold">Content production</h3><p className="text-xs text-muted-foreground">{ready} ready to distribute · {contentCount} planned · {ideas.length} ideas</p></div><button type="button" className={buttonClass} onClick={() => void refresh()}>Refresh content</button></div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
@@ -249,11 +265,11 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
         const newest = linkedAssets[linkedAssets.length - 1];
         const open = expanded.has(idea.id);
         return <Fragment key={idea.id}><tr className="border-b border-border align-top"><td className="p-3"><button type="button" className="font-medium text-brand-strong hover:underline" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (open) next.delete(idea.id); else next.add(idea.id); return next; })}>{idea.title} {open ? "▾" : "▸"}</button><span className="block text-xs text-muted-foreground">{formatLabel(idea.content_format)} · {idea.media_type}</span></td><td className="p-3">{v2Preview(newest)}</td><td className="p-3 capitalize">{newest ? `Asset · ${newest.review_status}` : linkedBriefs.length ? `Brief · ${linkedBriefs[0].status.replaceAll("_", " ")}` : `Idea · ${idea.status.replaceAll("_", " ")}`}</td><td className="p-3">{linkedBriefs[0] ? <button type="button" className={buttonClass} onClick={() => setViewing(linkedBriefs[0])}>Brief</button> : "—"}</td><td className="p-3"><button type="button" className={buttonClass} aria-expanded={openAssetActions === idea.id} onClick={() => setOpenAssetActions(openAssetActions === idea.id ? null : idea.id)}>Actions</button>{openAssetActions === idea.id && <div className="mt-2 flex flex-wrap gap-2">{idea.status === "draft" && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.from("client_ideas").update({ status: "approved" }).eq("id", idea.id).eq("client_id", clientId).eq("campaign_id", campaignId).eq("status", "draft"), "Idea approved.", { id: idea.id, action: "approve" })}>Approve idea</button>}{(idea.status === "draft" || idea.status === "approved") && <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("approve_idea_and_generate_brief", { p_idea_id: idea.id }), "Brief queued.", { id: idea.id, action: "brief" })}>Approve &amp; brief</button>}<button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void deleteIdea(idea)}>Delete idea</button></div>}</td></tr>
-          {open && <tr className="border-b border-border bg-muted/20"><td colSpan={5} className="p-3"><p className="text-xs text-muted-foreground">{idea.body ?? idea.source_question ?? "No idea detail recorded."}{idea.strategic_reason && ` · ${idea.strategic_reason}`}</p>{linkedBriefs.length === 0 && <p className="mt-2 text-xs text-muted-foreground">{idea.status === "briefed" ? "Brief being written." : "No brief yet."}</p>}{linkedBriefs.map((brief) => <div key={brief.id} className="mt-3 border-l border-border pl-3"><div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">Brief</span><button type="button" className="text-brand-strong hover:underline" onClick={() => setViewing(brief)}>{brief.title}</button><span className="text-xs text-muted-foreground">{brief.status.replaceAll("_", " ")}</span>{(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}</div>{(assetsByBrief.get(brief.id) ?? []).map((asset) => <div key={asset.id} className="mt-2 flex flex-wrap items-center gap-2 border-l border-border pl-3 text-xs"><span>Asset version · {asset.title ?? "Untitled"} · {asset.review_status}</span>{v2Preview(asset)}<button type="button" className={buttonClass} aria-expanded={openAssetActions === asset.id} onClick={() => setOpenAssetActions(openAssetActions === asset.id ? null : asset.id)}>Actions</button>{openAssetActions === asset.id && v2AssetActions(asset as CampaignAsset)}</div>)}</div>)}</td></tr>}
+          {open && <tr className="border-b border-border bg-muted/20"><td colSpan={5} className="p-3"><p className="text-xs text-muted-foreground">{idea.body ?? idea.source_question ?? "No idea detail recorded."}{idea.strategic_reason && ` · ${idea.strategic_reason}`}</p>{linkedBriefs.length === 0 && <p className="mt-2 text-xs text-muted-foreground">{idea.status === "briefed" ? "Brief being written." : "No brief yet."}</p>}{linkedBriefs.map((brief) => <div key={brief.id} className="mt-3 border-l border-border pl-3"><div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">Brief</span><button type="button" className="text-brand-strong hover:underline" onClick={() => setViewing(brief)}>{brief.title}</button><span className="text-xs text-muted-foreground">{brief.status.replaceAll("_", " ")}</span>{(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}</div>{(assetsByBrief.get(brief.id) ?? []).map((asset) => <div key={asset.id} className="mt-2 flex flex-wrap items-center gap-2 border-l border-border pl-3 text-xs"><span>Asset version · {asset.title ?? "Untitled"} · {asset.review_status} · {packageForAsset(asset as CampaignAsset)}</span>{v2Preview(asset)}<button type="button" className={buttonClass} aria-expanded={openAssetActions === asset.id} onClick={() => setOpenAssetActions(openAssetActions === asset.id ? null : asset.id)}>Actions</button>{openAssetActions === asset.id && v2AssetActions(asset as CampaignAsset)}</div>)}</div>)}</td></tr>}
         </Fragment>;
       })}
-      {looseBriefs.map((brief) => <tr key={brief.id} className="border-b border-border"><td className="p-3">Unlinked brief · {brief.title}</td><td className="p-3">{v2Preview((assetsByBrief.get(brief.id) ?? [])[0] as CampaignAsset | undefined)}</td><td className="p-3">{brief.status.replaceAll("_", " ")}</td><td className="p-3"><button type="button" className={buttonClass} onClick={() => setViewing(brief)}>Brief</button></td><td className="p-3">{(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}{(assetsByBrief.get(brief.id) ?? []).map((asset) => <div key={asset.id} className="mt-2 border-t border-border pt-2"><p className="text-xs">{asset.title ?? "Untitled asset"} · {asset.review_status}</p>{v2AssetActions(asset as CampaignAsset)}</div>)}</td></tr>)}
-      {looseAssets.map((asset) => <tr key={asset.id} className="border-b border-border"><td className="p-3">Unlinked asset · {asset.title ?? "Untitled"}</td><td className="p-3">{v2Preview(asset)}</td><td className="p-3">{asset.review_status}</td><td className="p-3">—</td><td className="p-3">{v2AssetActions(asset)}</td></tr>)}
+      {looseBriefs.map((brief) => <tr key={brief.id} className="border-b border-border"><td className="p-3">Unlinked brief · {brief.title}</td><td className="p-3">{v2Preview((assetsByBrief.get(brief.id) ?? [])[0] as CampaignAsset | undefined)}</td><td className="p-3">{brief.status.replaceAll("_", " ")}</td><td className="p-3"><button type="button" className={buttonClass} onClick={() => setViewing(brief)}>Brief</button></td><td className="p-3">{(brief.status === "draft" || brief.status === "approved") && <button type="button" className={buttonClass} onClick={() => setBuilding(brief)}>Approve &amp; Build</button>}{(assetsByBrief.get(brief.id) ?? []).map((asset) => <div key={asset.id} className="mt-2 border-t border-border pt-2"><p className="text-xs">{asset.title ?? "Untitled asset"} · {asset.review_status} · {packageForAsset(asset as CampaignAsset)}</p>{v2AssetActions(asset as CampaignAsset)}</div>)}</td></tr>)}
+      {looseAssets.map((asset) => <tr key={asset.id} className="border-b border-border"><td className="p-3">Unlinked asset · {asset.title ?? "Untitled"}<span className="block text-xs text-muted-foreground">{packageForAsset(asset)}</span></td><td className="p-3">{v2Preview(asset)}</td><td className="p-3">{asset.review_status}</td><td className="p-3">—</td><td className="p-3">{v2AssetActions(asset)}</td></tr>)}
       {assets.length === 0 && briefs.length === 0 && ideas.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No campaign content yet.</td></tr>}
     </tbody></table></div>}
     {rejecting && <div className="rounded-md border border-border p-3"><label className="text-sm">Reason for rejecting {rejecting.title ?? "asset"}<textarea className="mt-2 block w-full rounded-md border border-input bg-background p-2" value={reason} onChange={(event) => setReason(event.target.value)} /></label><div className="mt-2 flex gap-2"><button type="button" className={buttonClass} disabled={busy !== null || !reason.trim()} onClick={() => { const asset = rejecting; void act(() => supabase.rpc("review_media_asset", { p_asset_id: asset.id, p_decision: "rejected", p_reason: reason.trim() }), "Asset rejected with feedback.", { id: asset.id, action: "approve" }); setRejecting(null); }}>Confirm rejection</button><button type="button" className={buttonClass} onClick={() => setRejecting(null)}>Cancel</button></div></div>}
