@@ -80,6 +80,12 @@ export type Database = {
       }
       proof_production_requests: {
         Row: {
+          auto_produce: boolean
+          production_status: string
+          production_error: string | null
+          production_job_id: string | null
+          production_quality: string
+          production_size: string
           id: string
           client_id: string
           source_proof_id: string
@@ -8616,6 +8622,11 @@ export type Database = {
       }
     }
     Functions: {
+      request_proof_auto_production: {
+        Args: { p_request_id: string; p_client_id: string; p_source_proof_id: string; p_source_asset_id: string | null; p_media_type: "image" | "video" | "text"; p_format: "single" | "carousel" | "story" | "reel"; p_direction: string; p_destination: string; p_quality?: string; p_size?: string }
+        Returns: string
+      }
+      decide_proof_delivery: { Args: { p_delivery_id: string; p_approve: boolean }; Returns: undefined }
       request_proof_production_v2: {
         Args: { p_request_id: string; p_client_id: string; p_source_proof_id: string; p_source_asset_id: string | null; p_media_type: "image" | "video" | "text"; p_format: "single" | "carousel" | "story" | "reel"; p_direction: string; p_destination: string }
         Returns: string

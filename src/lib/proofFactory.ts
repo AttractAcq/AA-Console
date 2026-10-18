@@ -7,7 +7,7 @@ export const CAPTURE_METHODS = [
   {
     id: "field_capture",
     label: "Field Capture Portal",
-    description: "Plan and manage a customer feedback collection page.",
+    description: "Mobile photos, video, voice notes and job evidence from employees and technicians.",
   },
   {
     id: "guided_interview",
@@ -19,7 +19,7 @@ export const CAPTURE_METHODS = [
     id: "manual_import",
     label: "Manual Upload & Import",
     description:
-      "Collect proof from employees, contractors and business owners.",
+      "Upload historic projects, certificates and reviews from the AA team or business owner.",
   },
   {
     id: "outcome_followup",

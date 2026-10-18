@@ -116,11 +116,11 @@ it("repurpose queues the selected parent's genuine source and direction", async 
     "Create a concise quote graphic.",
   );
   await userEvent.click(
-    screen.getByRole("button", { name: "Prepare production brief" }),
+    screen.getByRole("button", { name: "Start production" }),
   );
   await waitFor(() =>
     expect(rpc).toHaveBeenCalledWith(
-      "request_proof_production_v2",
+      "request_proof_auto_production",
       expect.objectContaining({
         p_client_id: "client-a",
         p_source_proof_id: "proof-1",

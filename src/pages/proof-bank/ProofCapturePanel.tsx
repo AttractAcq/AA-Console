@@ -1,3 +1,4 @@
+import { ProofCaptureDelivery } from "./ProofCaptureDelivery";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -108,8 +109,8 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
           </div>
           <p className="text-xs text-muted-foreground">
             {method.id === "guided_interview"
-              ? "Save and edit the script here. Conduct the interview in person or in your meeting tool, then upload the evidence."
-              : "Capture setups are saved drafts. Automated delivery and public submission endpoints are not enabled yet. A linked website page alone does not collect submissions."}
+              ? "Save the questions here, then share a capture link for written answers, recordings and supporting evidence."
+              : "Create a private capture link for this setup. Submissions enter Raw for review and permission clearance. A website can link to the capture portal."}
           </p>
           {configs
             .filter((c) => c.method === method.id)
@@ -142,6 +143,7 @@ export function ProofCapturePanel({ clientId }: { clientId: string }) {
                       "Unavailable"}
                   </p>
                 )}
+                <ProofCaptureDelivery clientId={clientId} setup={c} />
               </article>
             ))}
           <FormModal

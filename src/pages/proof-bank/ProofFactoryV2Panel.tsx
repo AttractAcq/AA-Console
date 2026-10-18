@@ -221,9 +221,8 @@ function ProofProductionWorkspace({
           {repurpose
             ? "Choose an approved produced asset and a new output format."
             : "Choose cleared raw evidence and an output format."}{" "}
-          A production brief is generated first; use Create below to configure
-          AI or human production. Finished outputs appear in this table and in
-          Assets → Produced.
+          The brief and AI production run automatically from your instructions.
+          Finished outputs appear in this table and in Assets → Produced.
         </p>
       )}
       {tab === "assets" && (
@@ -423,11 +422,15 @@ function ProofProductionWorkspace({
                   · {r.destination}
                 </span>
                 <span className="text-sm text-muted-foreground">
-                  {b ? b.status : (j?.status ?? "Queued")}
+                  {r.auto_produce
+                    ? r.production_status
+                    : b
+                      ? b.status
+                      : (j?.status ?? "Queued")}
                 </span>
-                {j?.error && (
+                {(r.production_error || j?.error) && (
                   <p role="alert" className="text-sm text-destructive">
-                    {j.error}
+                    {r.production_error || j?.error}
                   </p>
                 )}
                 {b && (
@@ -435,7 +438,16 @@ function ProofProductionWorkspace({
                     <button className={button} onClick={() => setViewBrief(b)}>
                       Brief
                     </button>
-                    <button className={button} onClick={() => setBuilding(b)}>
+                    <button
+                      disabled={
+                        r.auto_produce &&
+                        !["failed", "needs_attention"].includes(
+                          r.production_status,
+                        )
+                      }
+                      className={button}
+                      onClick={() => setBuilding(b)}
+                    >
                       Create
                     </button>
                   </>
@@ -449,7 +461,7 @@ function ProofProductionWorkspace({
         open={form}
         onClose={() => setForm(false)}
         title={repurpose ? "Repurpose proof" : "Produce proof"}
-        submitLabel="Prepare production brief"
+        submitLabel="Start production"
         fields={[
           {
             name: "source",
@@ -497,6 +509,27 @@ function ProofProductionWorkspace({
             })),
           },
           {
+            name: "quality",
+            label: "Image quality",
+            kind: "select",
+            required: true,
+            options: ["low", "medium", "high"].map((value) => ({
+              value,
+              label: categoryLabel(value),
+            })),
+          },
+          {
+            name: "size",
+            label: "Image size (stories use portrait)",
+            kind: "select",
+            required: true,
+            options: [
+              { value: "1024x1536", label: "Portrait" },
+              { value: "1024x1024", label: "Square" },
+              { value: "1536x1024", label: "Landscape" },
+            ],
+          },
+          {
             name: "direction",
             label: "Production instructions",
             kind: "textarea",
@@ -521,6 +554,8 @@ function ProofProductionWorkspace({
           },
         ]}
         initialValues={{
+          quality: "high",
+          size: "1024x1536",
           media_type: "image",
           content_format: "single",
           destination: "Organic Social Media",
@@ -539,9 +574,11 @@ function ProofProductionWorkspace({
           if (!proofId)
             throw new Error("The selected asset has no proof source.");
           const { error: err } = await supabase.rpc(
-            "request_proof_production_v2",
+            "request_proof_auto_production",
             {
               p_request_id: requestId,
+              p_quality: String(v.quality),
+              p_size: f === "story" ? "1024x1536" : String(v.size),
               p_client_id: clientId,
               p_source_proof_id: proofId,
               p_source_asset_id: source?.id ?? null,
@@ -561,7 +598,7 @@ function ProofProductionWorkspace({
         }}
         onSaved={() => {
           setNotice(
-            "Production brief queued. When it is ready, use Create in the request row.",
+            "Production queued. The brief and AI build will run automatically; outputs still require review.",
           );
           void refresh();
         }}

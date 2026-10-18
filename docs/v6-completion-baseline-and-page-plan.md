@@ -267,3 +267,34 @@ These are classifications, not a requirement for eighteen sidebar pages. Existin
 Migration 215 is additive but must precede the v2 frontend. The updated brief worker must be deployed before enabling new proof production requests; otherwise pinned-source jobs could run through an older worker that does not enforce the selection. No external capture automation is activated by this migration. Keep this work separate from PR #215 (collapsible Intelligence/Strategy), which remains an independent change.
 
 Local checks cover migration authorization, cross-client/permission rejection, idempotency, classification validity, same-source approved-parent repurposing, enforced brief lineage, worker source pinning/revocation, v1/v2 route separation and raw/produced workspace behavior. Live portal collection, external messaging and premium output quality remain acceptance gates for the later slices above.
+
+### 18 October 2026 — Proof capture delivery and automatic production
+
+Foundation PR #216 is on main (`66b1d2c`), migration 215 applied, frontend and Railway deployment confirmed. The next release adds migrations 216–217 and the following v2-only capabilities:
+
+- **Public capture:** private, hashed-token links valid for 14 days; revocation and submission quotas; mobile written evidence, photo/video/PDF upload and microphone voice notes (25 MB maximum). The capture setup supplies instructions or interview questions. Every submission is scoped to its client, retains the source, and enters Raw as `not_cleared`. Submission permission does not authorize publication. Published websites can link to this hosted portal; linking an existing page does not turn it into a form.
+- **Automated Requests:** prepare a recipient/channel/service-event request manually or ingest an authenticated internal event at `POST /internal/proof-capture/event`. Event references deduplicate requests within a client. Each request snapshots its message, schedule and private capture URL. The assigned manager/admin reviews and approves external sending. The worker sends due approved requests and records the provider reference. Provider acceptance is distinct from confirmed recipient delivery. Ambiguous sends are quarantined rather than blindly repeated.
+- **Single-form production:** the form saves source evidence, output format, destination, direction, image quality and dimensions, then queues the brief and existing AI builder. A coordinator preserves evidence/parent lineage, checks permission, avoids duplicate builds, waits for retryable jobs, and shows failures needing attention. Image/text and F6/F7 reel production reuse existing engines. Other video formats retain the existing human Create path. Production does not approve publication.
+- **Existing functionality:** v1 remains available. Proof artifacts and media workflows remain in v2. Integration Capture and Outcome Follow-up remain blank pending their separate module builds.
+
+#### Runtime configuration and operations
+
+Email requires `RESEND_API_KEY` and a verified sender (`RESEND_FROM`, default `AA Console <briefs@attractacq.com>`). Alex selected email as the first configured channel. SMS requires `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_SMS_FROM`. WhatsApp additionally requires `TWILIO_WHATSAPP_FROM` and `TWILIO_PROOF_WHATSAPP_CONTENT_SID`: an approved Twilio text template using variable 1 for the request. The queue fetches and displays the template's full rendered text before approval, and snapshots template ID/variables. Credentials belong in Railway, never the browser. `PROOF_CAPTURE_PUBLIC_URL` can override the hosted portal URL. The runtime worker must be enabled.
+
+Internal event payload: `clientId`, `configId`, `channel`, `recipient`, `customerName`, `eventKey`, `triggerEvent`, optional ISO `scheduledAt`. Authenticate with the runtime's existing internal service secret. This endpoint prepares a pending approval; it does not bypass approval. Third-party webhooks must be signature-verified in their future connector before forwarding a normalized event. No broad business-system connector is implied by this endpoint.
+
+#### Proposed next module: Integration Capture (not implemented)
+
+1. Client-specific connections to permitted reviews, CRM, job management and forms, with explicit scopes and field mappings.
+2. Preview selected records before enabling incremental imports; preserve provider, external record ID, timestamps, source URL, permission basis and original attachments.
+3. Deduplicate on client + provider + source ID; retain revisions and handle revoked access/deleted records without silently rewriting previously approved evidence.
+4. Import into Raw, flag missing permission/unsupported claims, and route evidence through the existing clearance and production stages. Public visibility alone is not a blanket permission to republish.
+5. Show connection health, last sync, errors and import history. Start with one connector selected from actual client demand; add others using the same ingestion contract.
+
+#### Proposed next module: Outcome Follow-up (not implemented)
+
+1. A verified completed-service event creates a follow-up plan linked to customer, job and client.
+2. Configure the evidence question, desired outcome metric, delay, reminder limit, channel and responsible manager by service type.
+3. Reuse Automated Requests and its human approval boundary; approved requests send when due. Avoid duplicate requests for the same job/milestone.
+4. Stop reminders on submission, opt-out, cancellation or limit reached; provide suppression and quiet-hour handling before recurring outreach is enabled.
+5. Returned evidence lands in Raw with job/outcome lineage, then becomes eligible for proof production after clearance. Track requested, approved, accepted by provider, responded and overdue separately.
