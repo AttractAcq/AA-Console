@@ -135,6 +135,12 @@ test("same-client authorization reaches the adapter; other-client is denied befo
       brief_id: ideaA,
       idempotency_key: "other-submit",
     },
+    "content.create_upload_url": {
+      client_id: clientB,
+      brief_id: ideaA,
+      content_type: "image/png",
+      idempotency_key: "other-upload",
+    },
     "proof.search": { client_id: clientB },
     "proof.get": { client_id: clientB, proof_id: ideaA },
     "proof.create": {

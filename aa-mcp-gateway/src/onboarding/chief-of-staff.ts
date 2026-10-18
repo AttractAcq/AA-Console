@@ -1,7 +1,13 @@
 /** Reference onboarding definition; contains no credentials and provisions nothing. */
 export const chiefOfStaff = {
   bot_id: "bot_chief_of_staff",
-  grants: ["delivery.*", "campaign.*", "workflow.*", "attribution.*"],
+  grants: [
+    "delivery.*",
+    "campaign.*",
+    "workflow.*",
+    "attribution.*",
+    "content.create_upload_url",
+  ],
   forbidden: [
     "economics",
     "security",
@@ -28,6 +34,8 @@ export const chiefOfStaff = {
     "attribution.get_campaign_performance",
     "attribution.get_conversion_funnel",
     "attribution.get_content_performance",
+    // Eligibility only. The RPC never returns an upload URL or storage path.
+    "content.create_upload_url",
   ],
   writes: [
     "workflow.create_task",

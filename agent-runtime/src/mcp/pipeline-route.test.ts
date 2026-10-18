@@ -165,6 +165,9 @@ beforeAll(async () => {
     '20260925120000_128_lead_stage_enum.sql',
     '20260925121000_129_lead_pipeline_archive.sql',
     '20260925123000_131_bot_lead_stages.sql',
+    // Renumbered from 126: its original timestamp sat before migrations that
+    // are already applied, so db push would have refused it.
+    '20261019190000_228_content_create_upload_url.sql',
   ]) await db.exec(await migration(file));
 }, 60_000);
 afterAll(async () => { await db?.close(); });

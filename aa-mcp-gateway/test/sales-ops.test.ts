@@ -60,7 +60,7 @@ test("Phase 16c: exact discovery set equality for bot_sales_ops (28 = #47's 25 +
   assert.equal(salesOps.grants.length, 28);
   assert.equal(discovered.length, 28);
   // Catalog after #48+#47+#46 (90+7+3+3). Keep attach/enable/build.
-  assert.equal(registry.length, 103);
+  assert.equal(registry.length, 104);
   for (const name of [
     "sales_agents.attach_to_page",
     "sales_agents.set_deployment_enabled",
