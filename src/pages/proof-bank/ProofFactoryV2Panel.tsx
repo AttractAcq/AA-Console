@@ -464,6 +464,19 @@ function ProofProductionWorkspace({
         submitLabel="Start production"
         fields={[
           {
+            name: "production_mode",
+            label: "Production",
+            kind: "select",
+            required: true,
+            options: [
+              { value: "ai", label: "AI — brief and produce automatically" },
+              {
+                value: "human",
+                label: "Human — prepare brief for Create handoff",
+              },
+            ],
+          },
+          {
             name: "source",
             label: repurpose ? "Produced asset" : "Raw proof",
             kind: "select",
@@ -554,6 +567,7 @@ function ProofProductionWorkspace({
           },
         ]}
         initialValues={{
+          production_mode: "ai",
           quality: "high",
           size: "1024x1536",
           media_type: "image",
@@ -574,11 +588,17 @@ function ProofProductionWorkspace({
           if (!proofId)
             throw new Error("The selected asset has no proof source.");
           const { error: err } = await supabase.rpc(
-            "request_proof_auto_production",
+            v.production_mode === "human"
+              ? "request_proof_production_v2"
+              : "request_proof_auto_production",
             {
               p_request_id: requestId,
-              p_quality: String(v.quality),
-              p_size: f === "story" ? "1024x1536" : String(v.size),
+              ...(v.production_mode === "human"
+                ? {}
+                : {
+                    p_quality: String(v.quality),
+                    p_size: f === "story" ? "1024x1536" : String(v.size),
+                  }),
               p_client_id: clientId,
               p_source_proof_id: proofId,
               p_source_asset_id: source?.id ?? null,
@@ -595,11 +615,13 @@ function ProofProductionWorkspace({
             },
           );
           if (err) throw err;
+          setNotice(
+            v.production_mode === "human"
+              ? "Brief queued. Use Create when it is ready to assign human production."
+              : "Production queued. The brief and AI build will run automatically; outputs still require review.",
+          );
         }}
         onSaved={() => {
-          setNotice(
-            "Production queued. The brief and AI build will run automatically; outputs still require review.",
-          );
           void refresh();
         }}
       />
