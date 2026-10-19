@@ -78,6 +78,7 @@ import { ContentJourney } from "../components/ContentJourney";
 import { PlannedModulePanel } from "./v6/PlannedModulePanel";
 import { ContentAssetTable } from "../components/content/ContentAssetTable";
 import { MarketOpportunitiesPanel } from "./opportunities/MarketOpportunitiesPanel";
+import { ProofDistributionPanel } from "./proof-distribution/ProofDistributionPanel";
 
 const strategyTabIds = new Set(["branding-strategy", "content-pillars", "money-model-strategy"]);
 
@@ -102,6 +103,11 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     activate: () => <MarketOpportunitiesPanel view="activate" />,
   },
   "campaign-factory": { overview: () => <CampaignExecutionPanel /> },
+  "proof-distribution": {
+    destinations: () => <ProofDistributionPanel tab="destinations" />,
+    placements: () => <ProofDistributionPanel tab="placements" />,
+    rights: () => <ProofDistributionPanel tab="rights" />,
+  },
   "proof-production-factory": {
     "proof-bank": () => <ProofBankPanel />,
     artifacts: () => <ProofArtifactsPanel />,
@@ -256,7 +262,6 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
 };
 
 const nodePanels: Record<string, () => ReactNode> = {
-  "proof-distribution": () => <PlannedModulePanel module="proof-distribution" />,
   "google-ads-studio": () => <PlannedModulePanel module="google-ads-studio" />,
   "google-profile": () => <PlannedModulePanel module="google-profile" />,
   "lead-magnet-studio": () => <PlannedModulePanel module="lead-magnet-studio" />,

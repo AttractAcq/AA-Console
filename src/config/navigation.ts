@@ -400,7 +400,11 @@ export const v6ModuleNodes: NavNode[] = [
       { id: "story-library", label: "Stories" }, { id: "carousel-library", label: "Carousels" },
     ] },
   { id: "proof-distribution", label: "Proof Distribution", path: "proof-distribution", icon: Share2,
-    capability: "planned" },
+    capability: "expanding", tabs: [
+      { id: "destinations", label: "Destinations" },
+      { id: "placements", label: "Placements" },
+      { id: "rights", label: "Rights" },
+    ] },
   { id: "content-distribution", label: "Organic Content Distribution", path: "content-distribution", icon: Share2,
     capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "distribution-assets", label: "Assets" }, { id: "organic", label: "Organic" },

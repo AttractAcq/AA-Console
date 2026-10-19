@@ -1,13 +1,8 @@
 import { Link, useParams } from "react-router-dom";
 
-type PlannedModule = "proof-distribution" | "google-ads-studio" | "google-profile" | "lead-magnet-studio";
+type PlannedModule = "google-ads-studio" | "google-profile" | "lead-magnet-studio";
 
 const DETAILS: Record<PlannedModule, { outcome: string; dependency: string; related: string; relatedPath: string }> = {
-  "proof-distribution": {
-    outcome: "Publish source-linked, rights-cleared proof artifacts to supported destinations after human approval.",
-    dependency: "Proof Production Factory must retain each source, derivative and usage permission; destination adapters and approval records follow.",
-    related: "Open Proof Production Factory", relatedPath: "proof-production-factory",
-  },
   "google-ads-studio": {
     outcome: "Prepare, approve, deploy and measure paid search campaigns from the campaign plan.",
     dependency: "Campaign mode and approval contracts, Google Ads account access, conversion tracking and a verified destination are required.",
