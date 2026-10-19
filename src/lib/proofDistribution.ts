@@ -80,16 +80,6 @@ export interface PlacementDue {
   blocker: string | null;
 }
 
-/**
- * `set_proof_publishing_enabled` arrives with migration 229 and is not in the
- * generated types until that is applied. One cast in one place, to delete
- * when they are regenerated.
- */
-type UntypedRpc = (name: string, args: Record<string, unknown>) =>
-  Promise<{ data: unknown; error: { message: string } | null }>;
-const callRpc: UntypedRpc = (name, args) =>
-  (supabase.rpc as unknown as UntypedRpc)(name, args);
-
 export async function fetchDestinations(): Promise<Destination[]> {
   const { data, error } = await supabase
     .from("proof_destinations")
@@ -151,7 +141,7 @@ export async function setDestinationEnabled(
 }
 
 export async function setProofPublishingEnabled(clientId: string, enabled: boolean): Promise<void> {
-  const { error } = await callRpc("set_proof_publishing_enabled", {
+  const { error } = await supabase.rpc("set_proof_publishing_enabled", {
     p_client_id: clientId, p_enabled: enabled,
   });
   if (error) throw new Error(error.message);

@@ -16584,6 +16584,36 @@ export type Database = {
         }
         Returns: string
       }
+      set_proof_publishing_enabled: {
+        Args: { p_client_id: string; p_enabled: boolean }
+        Returns: {
+          approval_mode: string
+          auto_approve_briefs: boolean
+          auto_approve_ideas: boolean
+          client_id: string
+          created_at: string
+          enabled: boolean
+          enabled_at: string | null
+          enabled_by: string | null
+          format_mix: Json
+          max_jobs_in_flight: number
+          min_qa_score: number
+          plan_horizon_days: number
+          proof_publishing_enabled: boolean
+          proof_publishing_enabled_at: string | null
+          proof_publishing_enabled_by: string | null
+          publishing_enabled: boolean
+          publishing_enabled_at: string | null
+          publishing_enabled_by: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_engine_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_publishing_enabled: {
         Args: { p_client_id: string; p_enabled: boolean }
         Returns: {
