@@ -5,6 +5,9 @@ import { fetchProofAssets, type ProofAsset } from "../../lib/media";
 import type { Database } from "../../types/database";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
+import {
+  createPlacement, fetchClientDestinations, fetchDestinations, type Destination,
+} from "../../lib/proofDistribution";
 
 type Artifact = Database["public"]["Tables"]["proof_artifact_versions"]["Row"];
 type Signoff = Database["public"]["Tables"]["proof_artifact_signoffs"]["Row"];
@@ -27,6 +30,9 @@ export function ProofArtifactsPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Only the destinations this client is switched on for. */
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [sendTo, setSendTo] = useState<Record<string, string>>({});
 
   const refresh = useCallback(async () => {
     if (!clientId) { setLoading(false); return; }
@@ -53,6 +59,39 @@ export function ProofArtifactsPanel() {
   }, [clientId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  // Where an approved artifact may be sent. A destination the client has not
+  // switched on is not offered, because create_proof_placement_v6 would take
+  // it and proof_placement_due would then sit on it with a blocker nobody
+  // asked for.
+  useEffect(() => {
+    if (!clientId) return;
+    let live = true;
+    void Promise.all([fetchDestinations(), fetchClientDestinations(clientId)])
+      .then(([all, mine]) => {
+        if (live) setDestinations(all.filter((d) => mine.get(d.destination_key)?.enabled));
+      })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [clientId]);
+
+  async function send(artifact: Artifact) {
+    const destination = sendTo[artifact.id];
+    if (!clientId || !destination || busy) return;
+    setBusy(artifact.id); setError(null); setNotice(null);
+    try {
+      await createPlacement({
+        clientId,
+        destinationKey: destination,
+        artifactVersionId: artifact.id,
+      });
+      setNotice("Drafted as a placement. It needs its own approval in Proof Distribution before it goes anywhere.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not create the placement.");
+    } finally {
+      setBusy(null);
+    }
+  }
   const { inFlight, recentFailures } = useAgentJobs(clientId, refresh);
 
   function update(field: keyof typeof blank, value: string) {
@@ -116,7 +155,8 @@ export function ProofArtifactsPanel() {
       <p className="mt-1 text-sm text-muted-foreground">
         Turn a genuine source into a reviewable answer, case study or local snippet.
         Drafts keep the exact source text they used. A human clears the source and claim before approval.
-        Publication is handled later by Proof Distribution.
+        Approving the source and claim says it is true. Sending it somewhere is a second
+        decision, taken in Proof Distribution against the destination.
       </p>
     </div>
     {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
@@ -208,6 +248,45 @@ export function ProofArtifactsPanel() {
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }} className="rounded-lg border border-border px-4 py-2 text-sm">Create revision</button>
               </div>
+              {/* The exit this panel used to lack. Approving the source and
+                  claim says the artifact is true; it is not permission to put
+                  it anywhere, so a placement starts here and is approved
+                  again, against its destination, in Proof Distribution. */}
+              {approved && (
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                  <label className="text-xs text-muted-foreground" htmlFor={`send-${artifact.id}`}>
+                    Send to
+                  </label>
+                  <select
+                    id={`send-${artifact.id}`}
+                    value={sendTo[artifact.id] ?? ""}
+                    onChange={(event) =>
+                      setSendTo((current) => ({ ...current, [artifact.id]: event.target.value }))
+                    }
+                    className="rounded-lg border border-border bg-background p-2 text-sm"
+                  >
+                    <option value="">Choose a destination</option>
+                    {destinations.map((destination) => (
+                      <option key={destination.destination_key} value={destination.destination_key}>
+                        {destination.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={Boolean(busy) || !sendTo[artifact.id]}
+                    onClick={() => void send(artifact)}
+                    className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50"
+                  >
+                    Draft placement
+                  </button>
+                  {destinations.length === 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      No destinations are switched on for this client yet.
+                    </span>
+                  )}
+                </div>
+              )}
             </article>;
           })}
     </section>

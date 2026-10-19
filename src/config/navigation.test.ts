@@ -32,7 +32,11 @@ describe("client delivery navigation", () => {
     expect(v6ModuleNodes.find((node) => node.id === "content-production-factory")?.tabs?.map((tab) => tab.id))
       .toEqual(["generation", "briefs", "create", "edit", "image-library", "video-library",
         "reel-shots", "copy-library", "story-library", "carousel-library"]);
+    // Proof Distribution left this list when it got its three tabs. The
+    // three that remain have no console surface at all.
     expect(v6ModuleNodes.filter((node) => node.capability === "planned").map((node) => node.id))
-      .toEqual(["proof-distribution", "google-ads-studio", "google-profile", "lead-magnet-studio"]);
+      .toEqual(["google-ads-studio", "google-profile", "lead-magnet-studio"]);
+    expect(v6ModuleNodes.find((node) => node.id === "proof-distribution")?.tabs?.map((tab) => tab.id))
+      .toEqual(["destinations", "placements", "rights"]);
   });
 });
