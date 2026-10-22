@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { untypedSupabase } from "./untypedSupabase";
 import type { Database } from "../types/database";
 
 /**
@@ -203,3 +204,61 @@ export const CLASSIFICATION_HINT: Record<string, string> = {
   research: "Not enough known to spend against it.",
   reject: "Weak economics or poor fit.",
 };
+
+/**
+ * Create one campaign from this opportunity, on one route.
+ *
+ * The reasoning, the linked offer version and the link back are the
+ * database's to assemble: migration 232 composes the brief from the
+ * opportunity's own fields so that every caller gets the same brief from the
+ * same opportunity, and re-reads readiness rather than trusting the approval
+ * that happened weeks ago.
+ *
+ * It deliberately does not plan the campaign. Planning is a job with a cost,
+ * and the caller queues it in the same breath it would for a hand-made
+ * campaign, so a creation never silently spends.
+ */
+export async function createCampaignFromOpportunity(args: {
+  opportunityId: string;
+  acquisitionMode: "organic" | "paid";
+  paidPlatform?: "meta" | "google" | null;
+  name?: string | null;
+}): Promise<{ id: string; name: string }> {
+  const { data, error } = await untypedSupabase.rpc("create_campaign_from_opportunity_v6", {
+    p_opportunity_id: args.opportunityId,
+    p_acquisition_mode: args.acquisitionMode,
+    p_paid_platform: args.acquisitionMode === "paid" ? (args.paidPlatform ?? null) : null,
+    ...(args.name?.trim() ? { p_name: args.name.trim() } : {}),
+  });
+  if (error) throw new Error(error.message);
+  // A set-returning function over a row type: one row, which the client
+  // hands back as an array of one.
+  const row = (Array.isArray(data) ? data[0] : data) as { id: string; name: string } | null;
+  if (!row?.id) throw new Error("The campaign was not created.");
+  return row;
+}
+
+/** Why a campaign exists: the opportunity it came from, as it stands now. */
+export interface CampaignOrigin {
+  campaign_id: string;
+  opportunity_id: string;
+  opportunity_name: string;
+  micro_market: string;
+  opportunity_status: string;
+  confidence: string;
+  score: number | null;
+  classification: string | null;
+  open_proof_gaps: number | null;
+  opportunity_blocker: string | null;
+}
+
+export async function fetchCampaignOrigins(clientId: string): Promise<Map<string, CampaignOrigin>> {
+  const { data, error } = await untypedSupabase
+    .from("campaign_origins")
+    .select(
+      "campaign_id, opportunity_id, opportunity_name, micro_market, opportunity_status, confidence, score, classification, open_proof_gaps, opportunity_blocker",
+    )
+    .eq("client_id", clientId);
+  if (error) throw new Error(error.message);
+  return new Map(((data ?? []) as CampaignOrigin[]).map((row) => [row.campaign_id, row]));
+}

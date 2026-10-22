@@ -298,3 +298,36 @@ Internal event payload: `clientId`, `configId`, `channel`, `recipient`, `custome
 3. Reuse Automated Requests and its human approval boundary; approved requests send when due. Avoid duplicate requests for the same job/milestone.
 4. Stop reminders on submission, opt-out, cancellation or limit reached; provide suppression and quiet-hour handling before recurring outreach is enabled.
 5. Returned evidence lands in Raw with job/outcome lineage, then becomes eligible for proof production after clearance. Track requested, approved, accepted by provider, responded and overdue separately.
+
+## 22 October 2026 — an opportunity becomes a campaign
+
+Migrations 225–227 built the Micro-Market Opportunity Engine: find a buying
+situation, evidence it, score it, say what it would have to prove, approve it.
+`opportunity_links` has carried a `campaign` role since 225 with no way to write
+one, so the engine's own note — "a campaign may exist without a recorded
+commercial reason, for now" — described every campaign in the system. A person
+approved an opportunity, opened Campaign Factory, and wrote a brief from memory.
+
+Migration 232 closes it.
+
+| Piece | Where | Behaviour |
+|---|---|---|
+| The brief, from the reasoning | `opportunity_brief_v6` | Composes the micro-market, situation, problem, desired outcome, trigger, positioning, conversion action, the ordered problem/outcome/objection lists and the entry awareness into the brief the planner reads. In SQL, so every caller gets the same brief from the same opportunity. A heading with nothing under it is left out |
+| The hand-off | `create_campaign_from_opportunity_v6` | One route-bound campaign, the linked offer at its signed-off version, and the link written both ways with an event saying why the campaign exists |
+| What it refuses | same | An unapproved opportunity, and one whose `opportunity_readiness` blocker is no longer null — readiness is read at creation rather than trusted from an approval weeks old. The refusal is the same sentence the Activate screen shows |
+| Pressing twice | same | Returns the campaign it already made for that opportunity and route. The other route is a separate campaign, because 203 makes a route immutable; Meta and Google count as different |
+| Reading it back | `campaign_origins` view | Why each campaign exists, as the opportunity stands **now** — a campaign built on something since paused says so rather than carrying a copy of how it looked in October |
+| Console | Activate view gains "Create a campaign" (offered only where the database would accept it); Campaign Factory v2 detail shows the originating opportunity, its status, score, confidence and any current blocker | |
+
+Planning is still queued as its own act by the caller, exactly as the Campaign
+Factory form does it, so creating a campaign never silently spends on a plan. No
+budget or dates are invented from a score.
+
+### Not claimed
+
+- The loop is now closed in one direction only. Observed outcomes still do not flow
+  back into opportunity confidence or scoring; that remains section 4's fourth item
+  and belongs with Attribution OS.
+- `src/types/database.ts` does not know 232. The two new reads go through
+  `src/lib/untypedSupabase.ts`; regenerate after applying and delete that module.
+- Per `AGENTS.md`, prepared for review only.
