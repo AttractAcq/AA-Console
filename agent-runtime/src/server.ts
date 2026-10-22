@@ -1,5 +1,6 @@
 import { handlePublicProof } from "./proof-capture/public-route.js";
 import { handleProofCaptureAdmin } from "./proof-capture/admin-route.js";
+import { handleCampaignActionRequest } from "./campaigns/actions/request-route.js";
 import { startProofCoordinator } from "./proof-capture/coordinator.js";
 // Process entry point: a small health/status HTTP surface plus
 // config.concurrency worker loops in the same process. One process, not a
@@ -274,6 +275,18 @@ const server = http.createServer((req, res) => {
         ? "request-page-approval"
         : "publish";
     void handleSitesRoute(req, res, sb, config, action);
+    return;
+  }
+
+  // Asking for the decision migration 230's executor waits on. Creates a
+  // pending request and nothing else; approving it is still a person in the
+  // Approval Inbox, and performing it is still the sweep.
+  if (req.url === "/admin/campaign-actions/request") {
+    if (req.method !== "POST") {
+      json(405, { ok: false, error: "POST only" });
+      return;
+    }
+    void handleCampaignActionRequest(req, res, sb);
     return;
   }
 

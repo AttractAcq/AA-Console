@@ -62,6 +62,8 @@ export interface Placement {
   proof_id: string | null;
   asset_id: string | null;
   approval_id: string | null;
+  /** The campaign this placement belongs to, where it belongs to one. */
+  campaign_id: string | null;
   external_url: string | null;
   attempts: number;
   placed_at: string | null;
@@ -109,7 +111,7 @@ export async function fetchClientDestinations(clientId: string): Promise<Map<str
 export async function fetchPlacements(clientId: string): Promise<Placement[]> {
   const { data, error } = await supabase
     .from("proof_placements")
-    .select("id, client_id, destination_key, status, source_proof_id, artifact_version_id, proof_id, asset_id, approval_id, external_url, attempts, placed_at, created_at, last_error")
+    .select("id, client_id, destination_key, status, source_proof_id, artifact_version_id, proof_id, asset_id, approval_id, campaign_id, external_url, attempts, placed_at, created_at, last_error")
     .eq("client_id", clientId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);

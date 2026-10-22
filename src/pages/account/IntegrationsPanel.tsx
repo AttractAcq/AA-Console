@@ -76,6 +76,9 @@ const FIELDS: FieldDef[] = [
       { value: "facebook", label: "Facebook" },
       { value: "resend", label: "Resend" },
       { value: "google", label: "Google" },
+      // Proof distribution reads this one: a Business Profile post is made
+      // with a credential of its own, not with the Google Ads one.
+      { value: "google_business", label: "Google Business Profile" },
       { value: "other", label: "Other" },
     ],
   },

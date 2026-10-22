@@ -36,6 +36,8 @@ import { runCopywriterJob } from "../agents/copywriter/index.js";
 import { runTokenHealthJob } from "../agents/token_health/index.js";
 import { runQaJob } from "../agents/qa/index.js";
 import { runPublisherJob } from "../agents/publisher/index.js";
+import { runCampaignActionJob } from "../campaigns/actions/executor.js";
+import { runProofPlacerJob } from "../proof-distribution/placer.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
@@ -130,6 +132,17 @@ const RUNNERS: Record<string, JobRunner> = {
   // client: two switches, so turning it on for one account is not turning
   // it on for every account.
   publisher: runPublisherJob,
+  // The other thing that makes an external system say something, and the
+  // one gate every v6 module ends at. Does nothing unless
+  // CAMPAIGN_ACTIONS_ENABLED is on here AND campaign actions are on for that
+  // client AND the action has an executor AND a person approved that exact
+  // package and version.
+  campaign_action_executor: runCampaignActionJob,
+  // Cleared proof reaching a destination that has an API. Same discipline,
+  // and its own switch: a client can agree to posting on their own feed
+  // without agreeing to their customer's words going on a third party's
+  // profile.
+  proof_placer: runProofPlacerJob,
   brief_dispatch: runBriefDispatchJob,
   client_approval_dispatch: runClientApprovalDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
