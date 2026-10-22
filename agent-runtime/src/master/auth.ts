@@ -70,3 +70,49 @@ export async function requireAdmin(
 
   return { userId: user.id, email: user.email ?? null };
 }
+
+/**
+ * Verifies the caller and that they may act for this client: an admin, or
+ * the manager actually assigned to it.
+ *
+ * The same pair every v6 database function gates on — `is_admin()` or
+ * `active_video_approval_manager(client_id)` — so that a route cannot be a
+ * softer door into something the SQL would have refused. The assignment is
+ * read through the same function the policies use rather than re-derived
+ * here, because two expressions of "who manages this client" is one too
+ * many.
+ */
+export async function requireAdminOrClientManager(
+  sb: SupabaseClient,
+  authorization: string | string[] | undefined,
+  clientId: string,
+): Promise<Caller> {
+  const token = bearer(authorization);
+
+  const { data, error } = await sb.auth.getUser(token);
+  if (error || !data?.user) {
+    throw new AuthError("That session is not valid. Sign in again.");
+  }
+  const user = data.user;
+
+  const [{ data: profile, error: profileError }, { data: manager, error: managerError }] =
+    await Promise.all([
+      sb.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+      sb.rpc("active_video_approval_manager", { p_client_id: clientId }),
+    ]);
+
+  if (profileError || managerError) {
+    // Never fall through to a permissive path on an infrastructure error.
+    logger.error("client_authority_lookup_failed", {
+      userId: user.id,
+      error: (profileError ?? managerError)?.message,
+    });
+    throw new AuthError("Could not verify your role.", 503);
+  }
+  if (profile?.role !== "admin" && manager !== user.id) {
+    logger.warn("client_action_forbidden", { userId: user.id, clientId });
+    throw new AuthError("Only an admin or this client's assigned manager can do that.", 403);
+  }
+
+  return { userId: user.id, email: user.email ?? null };
+}

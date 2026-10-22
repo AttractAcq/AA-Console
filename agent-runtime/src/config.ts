@@ -53,6 +53,18 @@ export interface RuntimeConfig {
    * is the first. Both, or nothing goes out.
    */
   publishEnabled: boolean;
+  /**
+   * Whether this runtime may place cleared proof at external destinations.
+   * Off unless set, and the first of four switches: the client flag, the
+   * per-destination flag and the human placement decision are the others.
+   */
+  proofPublishEnabled: boolean;
+  /**
+   * Whether this runtime may perform campaign actions a person has approved.
+   * Off unless set, and the first of four: the client flag,
+   * campaign_action_executors.supported and the approval itself follow.
+   */
+  campaignActionsEnabled: boolean;
   openaiApiKey: string | null;
   imageModel: string;
   /** Reel keyframes can use a precision-first model without changing static creative. */
@@ -207,6 +219,15 @@ export function loadConfig(): RuntimeConfig {
     // runtime that is up is not meant to post on a client's behalf until
     // somebody has said it should.
     publishEnabled: (optionalEnv("PUBLISH_ENABLED") ?? "false").toLowerCase() === "true",
+    // Three switches rather than one, because they are three different
+    // promises: posting on a client's own feed, putting a customer's words on
+    // somebody else's profile, and letting a machine act on an approved
+    // campaign action. A client can reasonably have agreed to one and not
+    // another, and one variable covering all three would make them one
+    // decision.
+    proofPublishEnabled: (optionalEnv("PROOF_PUBLISH_ENABLED") ?? "false").toLowerCase() === "true",
+    campaignActionsEnabled:
+      (optionalEnv("CAMPAIGN_ACTIONS_ENABLED") ?? "false").toLowerCase() === "true",
     openaiApiKey: optionalEnv("OPENAI_API_KEY") ?? null,
     // Not pinned in code: the correct id is a provider fact that changes
     // faster than this repo does, so a wrong one is a config edit.

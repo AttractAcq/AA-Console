@@ -6,6 +6,7 @@ import { ActionMenu } from "../../components/ActionMenu";
 import { EmptyState } from "../../components/EmptyState";
 import { dayOrDash } from "../../lib/contentRecords";
 import { fetchProofAssets, type ProofAsset } from "../../lib/media";
+import { requestProofPublish } from "../../lib/campaignActions";
 import { supabase } from "../../lib/supabase";
 import {
   LIVE_STATUSES, MODE_HINT,
@@ -308,8 +309,17 @@ function PlacementsTab({
             <span className="block text-xs capitalize text-muted-foreground">{mode}</span>
           </span>,
           <span key="s">{placement.status.replace(/_/g, " ")}</span>,
-          <span key="b" className={blocker ? "text-destructive" : "text-brand-strong"}>
-            {blocker ?? (LIVE_STATUSES.has(placement.status) ? "Live" : "Nothing")}
+          <span key="b" className={blocker || placement.last_error ? "text-destructive" : "text-brand-strong"}>
+            {/* A failed or rejected placement is outside the due view, so its
+                blocker is null while the thing a person needs to read sits in
+                last_error. Showing "Nothing" there said the opposite of the
+                truth. */}
+            {blocker ??
+              (placement.status === "failed" && placement.last_error
+                ? placement.last_error
+                : LIVE_STATUSES.has(placement.status)
+                  ? "Live"
+                  : "Nothing")}
           </span>,
           <span key="w">
             {placement.external_url ? (
@@ -330,6 +340,24 @@ function PlacementsTab({
                     label: "Ask for approval",
                     onSelect: () =>
                       void onAct(placement.id, () => requestApproval(placement.id), "Sent for approval."),
+                  }]
+                : []),
+              // A campaign-bound draft can instead be asked for as one
+              // campaign decision covering every drafted placement on that
+              // campaign. One person answering once about a named set of
+              // payloads, rather than the same person answering the same
+              // question six times in two queues.
+              ...(placement.status === "drafted" && placement.campaign_id
+                ? [{
+                    label: "Ask as one campaign decision",
+                    onSelect: () =>
+                      void onAct(
+                        placement.id,
+                        async () => {
+                          await requestProofPublish(placement.client_id, placement.campaign_id!);
+                        },
+                        "Asked in the Approval Inbox, under Campaign actions.",
+                      ),
                   }]
                 : []),
               ...(placement.status === "awaiting_approval" && placement.approval_id

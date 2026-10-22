@@ -299,6 +299,63 @@ Internal event payload: `clientId`, `configId`, `channel`, `recipient`, `custome
 4. Stop reminders on submission, opt-out, cancellation or limit reached; provide suppression and quiet-hour handling before recurring outreach is enabled.
 5. Returned evidence lands in Raw with job/outcome lineage, then becomes eligible for proof production after clearance. Track requested, approved, accepted by provider, responded and overdue separately.
 
+## 22 October 2026 — the exact-version action executor, and proof distribution's first transport
+
+Section 4's second cross-module requirement ("universal exact-version external
+execution") and section 5's slice 1 were the blocker under every held module:
+migration 206 recorded a human decision about one exact package, action,
+destination and artifact version, and nothing in `agent-runtime` read that table.
+An approved action therefore had no executor, no attempt count, no external id and
+no visible reason for not having happened. This change builds that layer and gives
+it one real consumer.
+
+### What is now built
+
+| Piece | Where | State |
+|---|---|---|
+| Campaign action execution ledger | migration 230: `campaign_action_executions`, `campaign_action_events`, `campaign_action_due`, claim/record/failure functions, reaper, `*/10` sweep cron | Built and tested |
+| Which actions have an executor | migration 230: `campaign_action_executors`, one row per action key | `proof_publish` supported; the other eight carry the sentence saying what is missing |
+| Client switch | `client_engine_settings.campaign_actions_enabled` + `set_campaign_actions_enabled`, with the who-decided stamp kept on the way off | Off for every client |
+| Runtime executor | `agent-runtime/src/campaigns/actions/executor.ts`, agent `campaign_action_executor`, `CAMPAIGN_ACTIONS_ENABLED` | Built; no default handler, so an action with no executor fails loudly |
+| Asking for a decision | `POST /admin/campaign-actions/request` → `request_campaign_proof_publish_v6` | Built. The request is assembled by the database from the real placements and hashes, never by the browser |
+| Campaign → proof bridge | migration 231: `release_campaign_proof_placements`, filling in 218's reserved `campaign_action_approval_id` | Built and tested |
+| Proof placement sweep | `agent-runtime/src/proof-distribution/placer.ts`, agent `proof_placer`, `PROOF_PUBLISH_ENABLED`, sweep/reaper/expiry crons | Built. Re-hashes the live payload immediately before the write and refuses on any difference |
+| Google Business Profile transport | `agent-runtime/src/proof-distribution/google-business.ts` | Code complete, **unproven**: no client has a connected `google_business` credential, so `requires_integration` keeps it unclaimable |
+| Assisted destinations | migration 231 marks Third Party Directories and Proposals & Quotations supported | Usable today: the system holds the exact approved version, a person places it and records the URL, and the retraction trail exists |
+| Operator visibility | Approval Inbox gains an "After the decision" section (state, attempts, blocker, external record, last error) and the client switch; Placements shows a failed placement's error and offers the campaign-level ask | Built |
+
+Four switches gate every external act, and `campaign_action_due` /
+`proof_placement_due` name which one is closed: the runtime flag, the client flag,
+the per-action or per-destination support flag, and the human decision itself.
+
+### A gap this work found in migration 218
+
+218's rights trigger moved live placements to `retraction_required` when permission
+came off a proof, starting its status list at `approved`. A drafted placement and
+one waiting for its decision were both left standing. That was nearly harmless
+while nothing acted on a placement; with a release path reading `awaiting_approval`
+as "waiting on this decision" it was not. Migration 231 adds the two missing
+transitions, teaches the trigger and the calendar sweep about them, and re-checks
+rights inside the release itself. Covered by a test that would have failed before.
+
+### Not claimed, and what would close it
+
+- **No external write has been observed.** The acceptance gate for the Business
+  Profile transport is a post on a real profile with its external id recorded, which
+  needs a connected credential and a verified location. Until then the honest status
+  is "built, inert, unproven".
+- **`proof_publish` is the only wired action.** `page_deploy`, `meta_ad_build` and
+  the rest are each their own slice; what they now have is a gate to be built behind,
+  rather than needing one invented per module.
+- **Types.** `src/types/database.ts` does not yet know 230 and 231. The new reads go
+  through one deliberately untyped client in `src/lib/campaignActions.ts` rather than
+  by hand-editing the generated file; regenerate after the migrations are applied and
+  drop the cast.
+- **Release boundary.** Migrations 230 and 231 are additive and must precede the
+  frontend; 231 must not be applied without the runtime that serves `proof_placer`,
+  or an api-mode placement could be released with nothing to claim it. Per `AGENTS.md`
+  this is prepared for review only: no merge, no production migration, no deploy
+  without Alex via Chief of Staff.
 ## 22 October 2026 — an opportunity becomes a campaign
 
 Migrations 225–227 built the Micro-Market Opportunity Engine: find a buying
