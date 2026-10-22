@@ -388,3 +388,31 @@ budget or dates are invented from a score.
 - `src/types/database.ts` does not know 232. The two new reads go through
   `src/lib/untypedSupabase.ts`; regenerate after applying and delete that module.
 - Per `AGENTS.md`, prepared for review only.
+
+### 22 October 2026 — applied, and what the linter said
+
+Migrations 230, 231 and 232 are applied to production by `supabase db push --linked`;
+`supabase migration list --linked` shows local and remote agreeing on every version, so
+there is nothing pending and nothing remote-only. `src/types/database.ts` was regenerated
+from production (+501 lines, none removed) and `src/lib/untypedSupabase.ts` is gone.
+
+Regenerating caught one real mismatch in the hand-written shapes: `p_paid_platform`
+generates as optional rather than nullable, because its SQL default is null, so passing an
+explicit null for an organic campaign did not compile. Both optional arguments are now
+omitted instead.
+
+The post-DDL security advisor check found two things naming the new objects:
+
+- **Fixed in 233.** `guard_campaign_action_event_append_only` had a mutable `search_path`.
+  230 copied 218's append-only guard pattern and its omission along with it, which is the
+  same miss migration 224 fixed for 218. Same one-line `alter function ... set` fix, plus a
+  catalog assertion so the next guard added without a path fails a test rather than a linter.
+- **Deliberately not fixed.** `flag_proof_placements_for_retraction_v6` is reported as
+  executable by `authenticated` over REST. It is a trigger function, so calling it that way
+  raises and changes nothing, and Postgres checks EXECUTE at `create trigger` rather than at
+  fire time — betting a client's rights workflow on that reading to remove a lint line is the
+  wrong trade. It joins the 169 other definer functions on that list, which is this
+  database's chosen pattern: each gates its own caller in its body.
+
+No `anon` exposure was reported for any new function, which is what `lock_down_definer_functions()`
+at the end of each migration is for.

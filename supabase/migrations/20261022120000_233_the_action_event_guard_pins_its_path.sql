@@ -1,0 +1,35 @@
+-- The same miss as 224, in the migration that copied its shape.
+--
+-- 230 gave `campaign_action_events` an append-only guard modelled on the one
+-- 218 wrote for `proof_placement_events`, and copied the omission along with
+-- the pattern: no `search_path`. Supabase's linter picked it up the moment
+-- 230 was applied, which is the first useful thing that has happened on that
+-- list in a while.
+--
+-- 224's reasoning applies unchanged, so it is worth restating rather than
+-- linking: the function raises and does nothing else, so there is no object
+-- for a hostile search_path to redirect it to and the practical exposure is
+-- nil. It is fixed anyway, because a warning somebody has decided to live
+-- with is a warning nobody reads, and because "it only raises" is true of
+-- the body as written today — the next person to add a condition to it
+-- inherits the mutable path with nothing in the file to tell them.
+--
+-- `alter function ... set` rather than a recreate, so the body is untouched
+-- and this cannot drift from what 230 actually created.
+--
+-- NOT FIXED HERE, AND WHY
+--
+-- The linter also reports `flag_proof_placements_for_retraction_v6` as
+-- executable by `authenticated` over REST. 231 recreated that function, so
+-- this is the cheapest moment to revoke it — and it is deliberately left
+-- alone. It is a trigger function: calling it over REST raises "can only be
+-- called as a trigger" and changes nothing, so there is no exposure to
+-- close. Against that, Postgres checks EXECUTE at `create trigger` rather
+-- than at fire time, and betting a client's rights workflow on that reading
+-- to remove a lint line is the wrong trade. It joins the other hundred and
+-- sixty-odd definer functions on that list, which is a pattern this database
+-- has chosen rather than an accident: every one of them gates its own caller
+-- in its body.
+
+alter function public.guard_campaign_action_event_append_only()
+  set search_path = pg_catalog, public;
