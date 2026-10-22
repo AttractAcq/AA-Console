@@ -1,4 +1,4 @@
-import { untypedSupabase as untyped } from "./untypedSupabase";
+import { supabase } from "./supabase";
 import { callRuntime } from "./callRuntime";
 
 /**
@@ -15,13 +15,6 @@ import { callRuntime } from "./callRuntime";
  * the request has to be built from the real package and the real hashes
  * rather than from whatever a browser sends -- so the button posts to a
  * route that authenticates the person and lets the database assemble it.
- */
-
-/**
- * The tables migrations 230 and 231 add are not in the generated types yet,
- * so the reads below go through the one named cast in `untypedSupabase.ts`
- * rather than a second copy of the same reasoning here. Every shape is still
- * declared explicitly; regenerating the types replaces the cast, not them.
  */
 
 /** One approved action, and why it has or has not happened. */
@@ -52,7 +45,7 @@ export const EXECUTION_HINT: Record<string, string> = {
 };
 
 export async function fetchCampaignActionDue(clientId: string): Promise<CampaignActionDue[]> {
-  const { data, error } = await untyped
+  const { data, error } = await supabase
     .from("campaign_action_due")
     .select(
       "approval_id, client_id, campaign_id, action_key, destination, artifact_version_hash, execution_id, execution_status, attempts, external_id, external_url, last_error, executor_module, blocker",
@@ -64,7 +57,7 @@ export async function fetchCampaignActionDue(clientId: string): Promise<Campaign
 
 /** Whether this client's approved actions may be performed at all. */
 export async function fetchCampaignActionsEnabled(clientId: string): Promise<boolean> {
-  const { data, error } = await untyped
+  const { data, error } = await supabase
     .from("client_engine_settings")
     .select("campaign_actions_enabled")
     .eq("client_id", clientId)
@@ -74,7 +67,7 @@ export async function fetchCampaignActionsEnabled(clientId: string): Promise<boo
 }
 
 export async function setCampaignActionsEnabled(clientId: string, enabled: boolean): Promise<void> {
-  const { error } = await untyped.rpc("set_campaign_actions_enabled", {
+  const { error } = await supabase.rpc("set_campaign_actions_enabled", {
     p_client_id: clientId,
     p_enabled: enabled,
   });

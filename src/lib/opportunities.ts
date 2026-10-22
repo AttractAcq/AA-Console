@@ -1,5 +1,4 @@
 import { supabase } from "./supabase";
-import { untypedSupabase } from "./untypedSupabase";
 import type { Database } from "../types/database";
 
 /**
@@ -224,15 +223,21 @@ export async function createCampaignFromOpportunity(args: {
   paidPlatform?: "meta" | "google" | null;
   name?: string | null;
 }): Promise<{ id: string; name: string }> {
-  const { data, error } = await untypedSupabase.rpc("create_campaign_from_opportunity_v6", {
+  const { data, error } = await supabase.rpc("create_campaign_from_opportunity_v6", {
     p_opportunity_id: args.opportunityId,
     p_acquisition_mode: args.acquisitionMode,
-    p_paid_platform: args.acquisitionMode === "paid" ? (args.paidPlatform ?? null) : null,
+    // Both optional arguments are left out rather than passed as null. They
+    // default to null in SQL, and the generated type says optional rather
+    // than nullable — which are the same thing to the function, and only one
+    // of which compiles.
+    ...(args.acquisitionMode === "paid" && args.paidPlatform
+      ? { p_paid_platform: args.paidPlatform }
+      : {}),
     ...(args.name?.trim() ? { p_name: args.name.trim() } : {}),
   });
   if (error) throw new Error(error.message);
-  // A set-returning function over a row type: one row, which the client
-  // hands back as an array of one.
+  // A function returning one row of a table type: the client hands it back
+  // as an array of one.
   const row = (Array.isArray(data) ? data[0] : data) as { id: string; name: string } | null;
   if (!row?.id) throw new Error("The campaign was not created.");
   return row;
@@ -253,7 +258,7 @@ export interface CampaignOrigin {
 }
 
 export async function fetchCampaignOrigins(clientId: string): Promise<Map<string, CampaignOrigin>> {
-  const { data, error } = await untypedSupabase
+  const { data, error } = await supabase
     .from("campaign_origins")
     .select(
       "campaign_id, opportunity_id, opportunity_name, micro_market, opportunity_status, confidence, score, classification, open_proof_gaps, opportunity_blocker",
