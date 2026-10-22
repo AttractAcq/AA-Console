@@ -16,6 +16,25 @@ const ok = (body: unknown, status = 200) =>
     new Response(typeof body === "string" ? body : JSON.stringify(body), { status }),
   ) as unknown as typeof fetch;
 
+/**
+ * The error from a call that must fail.
+ *
+ * A `.catch` that returns the thrown value gives back a union with the
+ * success type, so every assertion about `retryable` has to be cast. Worse,
+ * it reads as a pass if the call unexpectedly succeeds. This throws in that
+ * case, which is the assertion the file actually wants.
+ */
+async function refusal(
+  request: Parameters<typeof createLocalPost>[0],
+): Promise<PlacementTransportError> {
+  try {
+    await createLocalPost(request);
+  } catch (thrown) {
+    return thrown as PlacementTransportError;
+  }
+  throw new Error("Expected the post to be refused, and it was not.");
+}
+
 const base = {
   accessToken: "a-token",
   accountRef: "accounts/123/locations/456",
@@ -102,9 +121,7 @@ describe("what it sends", () => {
 describe("which failures may be tried again", () => {
   it("retries a rate limit and a server error", async () => {
     for (const status of [408, 429, 500, 503]) {
-      const error = await createLocalPost({ ...base, fetchImpl: ok("slow down", status) }).catch(
-        (thrown: unknown) => thrown as PlacementTransportError,
-      );
+      const error = await refusal({ ...base, fetchImpl: ok("slow down", status) });
       expect(error.retryable, `${status} should be retryable`).toBe(true);
     }
   });
@@ -113,11 +130,9 @@ describe("which failures may be tried again", () => {
     // A revoked token, a location the credential cannot see, a payload it
     // rejected. Three identical refusals in the log is not diligence.
     for (const status of [400, 401, 403, 404]) {
-      const error = await createLocalPost({ ...base, fetchImpl: ok("no", status) }).catch(
-        (thrown: unknown) => thrown as PlacementTransportError,
-      );
+      const error = await refusal({ ...base, fetchImpl: ok("no", status) });
       expect(error.retryable, `${status} should not be retryable`).toBe(false);
-      expect(String(error.message)).toContain(String(status));
+      expect(error.message).toContain(String(status));
     }
   });
 
@@ -125,19 +140,16 @@ describe("which failures may be tried again", () => {
     const fetchImpl = vi.fn(async () => {
       throw new Error("socket hang up");
     }) as unknown as typeof fetch;
-    const error = await createLocalPost({ ...base, fetchImpl }).catch(
-      (thrown: unknown) => thrown as PlacementTransportError,
-    );
+    const error = await refusal({ ...base, fetchImpl });
     expect(error.retryable).toBe(true);
-    expect(String(error.message)).toContain("socket hang up");
+    expect(error.message).toContain("socket hang up");
   });
 
   it("treats an accepted post with no id as a failure to go and look at", async () => {
     // Worse than a plain failure: the post may be live with nothing recorded
     // that could retract it.
-    const error = await createLocalPost({ ...base, fetchImpl: ok({ searchUrl: "https://g.co/p" }) })
-      .catch((thrown: unknown) => thrown as PlacementTransportError);
+    const error = await refusal({ ...base, fetchImpl: ok({ searchUrl: "https://g.co/p" }) });
     expect(error.retryable).toBe(false);
-    expect(String(error.message)).toContain("Check the profile");
+    expect(error.message).toContain("Check the profile");
   });
 });
