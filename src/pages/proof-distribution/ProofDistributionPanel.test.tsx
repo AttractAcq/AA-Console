@@ -15,6 +15,7 @@ import { ProofDistributionPanel } from "./ProofDistributionPanel";
  */
 
 const rpc = vi.fn();
+const requestProofPublish = vi.fn();
 
 const DESTINATIONS = [
   {
@@ -68,6 +69,9 @@ vi.mock("../../lib/supabase", () => ({
     rpc: (...a: unknown[]) => rpc(...(a as [])),
   },
 }));
+vi.mock("../../lib/campaignActions", () => ({
+  requestProofPublish: (...a: unknown[]) => requestProofPublish(...(a as [string, string])),
+}));
 vi.mock("../../lib/media", () => ({
   fetchProofAssets: async () => [
     { id: "p1", title: "Mrs Okafor's review", expires_on: null, permission_basis: "Written consent" },
@@ -78,13 +82,14 @@ const placement = (over: Record<string, unknown> = {}) => ({
   id: "pl1", client_id: "c1", destination_key: "third_party_directory",
   status: "awaiting_manual_placement", source_proof_id: "p1",
   artifact_version_id: "a1", proof_id: null, asset_id: null, approval_id: null,
-  external_url: null, attempts: 0, placed_at: null,
+  campaign_id: null, external_url: null, attempts: 0, placed_at: null,
   created_at: "2026-10-18T00:00:00Z", last_error: null, ...over,
 });
 
 beforeEach(() => {
   vi.clearAllMocks();
   rpc.mockResolvedValue({ data: null, error: null });
+  requestProofPublish.mockResolvedValue("approval-1");
   state.placements = [];
   state.due = [];
   state.clientDestinations = [];
@@ -177,5 +182,45 @@ describe("rights", () => {
     render(<ProofDistributionPanel tab="rights" />);
     const section = (await screen.findByText("Needs taking down")).parentElement!;
     expect(within(section).getByText("https://directory.example/9")).toBeInTheDocument();
+  });
+});
+
+describe("asking for the decision", () => {
+  it("offers the campaign-level ask only for a placement that belongs to a campaign", async () => {
+    state.placements = [placement({ status: "drafted" })];
+    render(<ProofDistributionPanel tab="placements" />);
+    await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+
+    // No campaign, so there is no campaign decision to fold it into.
+    expect(await screen.findByRole("menuitem", { name: "Ask for approval" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: "Ask as one campaign decision" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("asks once for every drafted placement on the campaign", async () => {
+    state.placements = [placement({ status: "drafted", campaign_id: "camp-1" })];
+    render(<ProofDistributionPanel tab="placements" />);
+    await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "Ask as one campaign decision" }),
+    );
+
+    // Through the runtime, because the request has to be built from the real
+    // package rather than from anything the browser sends.
+    await waitFor(() => expect(requestProofPublish).toHaveBeenCalledWith("c1", "camp-1"));
+    expect(await screen.findByText(/under Campaign actions/)).toBeInTheDocument();
+  });
+
+  it("shows a failed placement's error instead of saying nothing is wrong", async () => {
+    // A failed placement is outside proof_placement_due, so its blocker is
+    // null while the thing a person needs to read sits in last_error.
+    state.placements = [placement({
+      status: "failed",
+      last_error: "Google Business Profile refused the post (403): no access",
+    })];
+    render(<ProofDistributionPanel tab="placements" />);
+    expect(await screen.findByText(/refused the post \(403\)/)).toBeInTheDocument();
+    expect(screen.queryByText("Nothing")).not.toBeInTheDocument();
   });
 });
