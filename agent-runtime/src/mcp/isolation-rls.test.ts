@@ -3,6 +3,28 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+/**
+ * Every key anywhere in a payload whose name suggests money, raw parameters
+ * or an error string.
+ *
+ * Checked by key rather than by matching the serialised body against the
+ * seeded cost: /9\.99/ over the whole blob also matches a `created_at` of
+ * ...:59.999, which failed roughly one CI run in a thousand.
+ */
+function leakedKeys(value: unknown, found: string[] = []): string[] {
+  if (Array.isArray(value)) {
+    for (const item of value) leakedKeys(item, found);
+    return found;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, inner] of Object.entries(value)) {
+      if (/cost|usd|spend|price|params|error/i.test(key)) found.push(key);
+      leakedKeys(inner, found);
+    }
+  }
+  return found;
+}
+
 const CLIENT_A = '11111111-1111-4111-8111-111111111111';
 const CLIENT_B = '22222222-2222-4222-8222-222222222222';
 const IDEA_A = '33333333-3333-4333-8333-333333333333';
@@ -2224,7 +2246,8 @@ describe('Phase 14 Engineering Ops isolation', () => {
     )).rows[0]!.result;
     expect(jobs.jobs).toHaveLength(1);
     expect(jobs.jobs[0].id).toBe(JOB_A);
-    expect(JSON.stringify(jobs)).not.toMatch(/SECRET|9\.99/);
+    expect(leakedKeys(jobs), 'the deployment projection must not carry cost, params or error').toEqual([]);
+    expect(JSON.stringify(jobs)).not.toMatch(/SECRET/);
   });
 
   it('replay returns the saved issue; changed payload conflicts', async () => {
@@ -2418,7 +2441,8 @@ describe('Phase 15 Security DevOps isolation', () => {
     expect(status.open_findings).toBe(1);
     expect(status.jobs_by_status.completed).toBe(1);
     expect(status.jobs_by_status.queued).toBeUndefined();
-    expect(JSON.stringify(status)).not.toMatch(/SECRET|9\.99/);
+    expect(leakedKeys(status), 'the status projection must not carry cost, params or error').toEqual([]);
+    expect(JSON.stringify(status)).not.toMatch(/SECRET/);
     const incidents = (await db.query<{ result: any }>(
       `select mcp_security_get_incident_status('bot_security_devops',$1) result`,
       [CLIENT_A],
