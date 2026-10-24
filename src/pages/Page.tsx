@@ -2,6 +2,7 @@ import { ProofFactoryV2Panel } from "./proof-bank/ProofFactoryV2Panel";
 import { LeadMagnetStudioPanel } from "./lead-magnet/LeadMagnetStudioPanel";
 import { LeadCapturePanel } from "./sales/LeadCapturePanel";
 import { CampaignPagePublishPanel } from "./sites/CampaignPagePublishPanel";
+import { OfferLiveUsePanel } from "./offer/OfferLiveUsePanel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -299,6 +300,11 @@ function getPanelBody(
 ): ReactNode {
   if (node.id === "proof-production-factory" && view === "v2") return <ProofFactoryV2Panel tab={activeTab?.id ?? "capture"} />;
   if (node.id === "campaign-factory" && view === "v2") return <CampaignExecutionPanel />;
+  if (node.id === "offer-studio" && view === "v2") {
+    if (activeTab?.id === "offers") return <ServiceOffersPanel />;
+    if (activeTab?.id === "offer-strategy") return <OfferStrategyPanel />;
+    return <OfferLiveUsePanel />;
+  }
   if (node.id === "website-studio" && view === "v2") {
     if (activeTab?.id === "publish") return <CampaignPagePublishPanel />;
     if (activeTab?.id === "sites") return <SitesPanel />;
@@ -339,7 +345,8 @@ export function Page({ node }: { node: NavNode }) {
     : requestedView === "v2" && node.sidebarViews?.some((item) => item.id === "v2") ? "v2" : "v1";
   const v2Blank = view === "v2" && node.id !== "content-production-factory"
     && node.id !== "campaign-factory" && node.id !== "proof-production-factory"
-    && node.id !== "sales-os" && node.id !== "website-studio";
+    && node.id !== "sales-os" && node.id !== "website-studio"
+    && node.id !== "offer-studio";
   const tabs = node.id === "intelligence-os"
     ? node.tabs?.filter((tab) => strategyTabIds.has(tab.id) === (view === "strategy"))
     : node.id === "proof-production-factory" && view === "v2" ? [{id:"capture",label:"Capture"},{id:"produce",label:"Produce"},{id:"repurpose",label:"Repurpose"},{id:"assets",label:"Assets"}]
@@ -355,6 +362,10 @@ export function Page({ node }: { node: NavNode }) {
     : node.id === "website-studio" && view === "v2"
       ? [{ id: "publish", label: "Publish" }, { id: "landing-pages", label: "Pages" },
          { id: "sites", label: "Sites" }, { id: "landing-reporting", label: "Results" }]
+    // Offer Studio v2 leads with Live use: the only thing v1 could not say.
+    : node.id === "offer-studio" && view === "v2"
+      ? [{ id: "live-use", label: "Live use" }, { id: "offers", label: "Service Offers" },
+         { id: "offer-strategy", label: "Offer Strategy" }]
     : node.id === "content-production-factory" && view === "v2"
       ? [
         { id: "generation", label: "Ideation" }, { id: "briefs", label: "Briefs" },

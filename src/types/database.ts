@@ -928,6 +928,13 @@ export type Database = {
             foreignKeyName: "campaign_artifact_offer_inputs_offer_version_id_client_id_fkey"
             columns: ["offer_version_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "offer_claim_evidence"
+            referencedColumns: ["offer_version_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifact_offer_inputs_offer_version_id_client_id_fkey"
+            columns: ["offer_version_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "service_offer_versions"
             referencedColumns: ["id", "client_id"]
           },
@@ -1340,6 +1347,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaign_manifest_versions"
             referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_offers_offer_version_id_client_id_fkey"
+            columns: ["offer_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "offer_claim_evidence"
+            referencedColumns: ["offer_version_id", "client_id"]
           },
           {
             foreignKeyName: "campaign_manifest_offers_offer_version_id_client_id_fkey"
@@ -2736,6 +2750,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "metrics_pulls"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_offer_version_client_fk"
+            columns: ["offer_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "offer_claim_evidence"
+            referencedColumns: ["offer_version_id", "client_id"]
           },
           {
             foreignKeyName: "client_campaigns_offer_version_client_fk"
@@ -7472,6 +7493,13 @@ export type Database = {
             foreignKeyName: "lead_magnets_offer_version_id_client_id_fkey"
             columns: ["offer_version_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "offer_claim_evidence"
+            referencedColumns: ["offer_version_id", "client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_offer_version_id_client_id_fkey"
+            columns: ["offer_version_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "service_offer_versions"
             referencedColumns: ["id", "client_id"]
           },
@@ -10732,6 +10760,13 @@ export type Database = {
             foreignKeyName: "service_offer_signoffs_offer_version_id_client_id_fkey"
             columns: ["offer_version_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "offer_claim_evidence"
+            referencedColumns: ["offer_version_id", "client_id"]
+          },
+          {
+            foreignKeyName: "service_offer_signoffs_offer_version_id_client_id_fkey"
+            columns: ["offer_version_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "service_offer_versions"
             referencedColumns: ["id", "client_id"]
           },
@@ -13914,6 +13949,80 @@ export type Database = {
         Row: {
           mrr: number | null
           paying_clients: number | null
+        }
+        Relationships: []
+      }
+      offer_claim_evidence: {
+        Row: {
+          claim_text: string | null
+          client_id: string | null
+          expires_on: string | null
+          kind: string | null
+          offer_id: string | null
+          offer_version_id: string | null
+          position: number | null
+          problem: string | null
+          proof_asset_id: string | null
+          proof_title: string | null
+          usage_rights: string | null
+          version: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_offer_versions_offer_id_client_id_fkey"
+            columns: ["offer_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "service_offers"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      offer_current_version: {
+        Row: {
+          client_id: string | null
+          current_version: number | null
+          current_version_id: string | null
+          offer_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_offer_versions_offer_id_client_id_fkey"
+            columns: ["offer_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "service_offers"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      offer_version_drift: {
+        Row: {
+          client_id: string | null
+          current_version: number | null
+          drift: string | null
+          label: string | null
+          live: boolean | null
+          live_note: string | null
+          offer_id: string | null
+          offer_version_id: string | null
+          record_id: string | null
+          service_name: string | null
+          superseded: boolean | null
+          surface: string | null
+          version: number | null
+        }
+        Relationships: []
+      }
+      offer_version_usage: {
+        Row: {
+          client_id: string | null
+          label: string | null
+          live: boolean | null
+          live_note: string | null
+          offer_id: string | null
+          offer_version_id: string | null
+          record_id: string | null
+          surface: string | null
+          version: number | null
         }
         Relationships: []
       }
