@@ -411,7 +411,10 @@ export const v6ModuleNodes: NavNode[] = [
       { id: "engine", label: "Engine" },
     ] },
   { id: "google-ads-studio", label: "Google Ads Studio", path: "google-ads-studio", icon: Megaphone,
-    capability: "planned" },
+    capability: "expanding", tabs: [
+      { id: "sheet", label: "Build sheet" }, { id: "account", label: "Account" },
+      { id: "build", label: "Automated build" },
+    ] },
   { id: "meta-ads-studio", label: "Meta Ads Studio", path: "meta-ads-studio", icon: Megaphone,
     capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "campaigns", label: "Campaign Builds" }, { id: "paid", label: "Paid Distribution" },

@@ -5,6 +5,7 @@ import { CampaignPagePublishPanel } from "./sites/CampaignPagePublishPanel";
 import { OfferLiveUsePanel } from "./offer/OfferLiveUsePanel";
 import { MetaBuildApprovalPanel } from "./campaigns/MetaBuildApprovalPanel";
 import { GoogleProfilePanel } from "./google-profile/GoogleProfilePanel";
+import { GoogleAdsStudioPanel } from "./google-ads/GoogleAdsStudioPanel";
 import { MetaProfilePanel } from "./distribution/MetaProfilePanel";
 import { MotionScenesPanel } from "./motion/MotionScenesPanel";
 import { useParams, useSearchParams } from "react-router-dom";
@@ -83,7 +84,6 @@ import { AgentsPanel } from "./team/AgentsPanel";
 import { FinancialsPanel } from "./admin/FinancialsPanel";
 import { SopsPanel } from "./admin/SopsPanel";
 import { ContentJourney } from "../components/ContentJourney";
-import { PlannedModulePanel } from "./v6/PlannedModulePanel";
 import { ContentAssetTable } from "../components/content/ContentAssetTable";
 import { MarketOpportunitiesPanel } from "./opportunities/MarketOpportunitiesPanel";
 import { ProofDistributionPanel } from "./proof-distribution/ProofDistributionPanel";
@@ -156,6 +156,11 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     sites: () => <SitesPanel />,
     "landing-reporting": () => <PagesReportingPanel pageType="landing" />,
     "offer-reporting": () => <PagesReportingPanel pageType="offer" />,
+  },
+  "google-ads-studio": {
+    sheet: () => <GoogleAdsStudioPanel tab="sheet" />,
+    account: () => <GoogleAdsStudioPanel tab="account" />,
+    build: () => <GoogleAdsStudioPanel tab="build" />,
   },
   "google-profile": {
     location: () => <GoogleProfilePanel tab="location" />,
@@ -282,9 +287,6 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
 };
 
 const nodePanels: Record<string, () => ReactNode> = {
-  "google-ads-studio": () => <PlannedModulePanel module="google-ads-studio" />,
-  "google-profile": () => <PlannedModulePanel module="google-profile" />,
-  "lead-magnet-studio": () => <PlannedModulePanel module="lead-magnet-studio" />,
   dashboard: () => <DashboardPanel />,
   // distinct id from the agency dashboard; both live at a path segment
   // called "dashboard" but they are different pages
