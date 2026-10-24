@@ -15,6 +15,28 @@ import {
 } from "vitest";
 import { handleMcpEngineering } from "./engineering-route.js";
 
+/**
+ * Every key anywhere in a payload whose name suggests money, raw parameters
+ * or an error string.
+ *
+ * Checked by key rather than by matching the serialised body against the
+ * seeded cost: /9\.99/ over the whole blob also matches a `created_at` of
+ * ...:59.999, which failed roughly one CI run in a thousand.
+ */
+function leakedKeys(value: unknown, found: string[] = []): string[] {
+  if (Array.isArray(value)) {
+    for (const item of value) leakedKeys(item, found);
+    return found;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, inner] of Object.entries(value)) {
+      if (/cost|usd|spend|price|params|error/i.test(key)) found.push(key);
+      leakedKeys(inner, found);
+    }
+  }
+  return found;
+}
+
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 const PAGE = "33333333-3333-4333-8333-333333333333";
@@ -229,7 +251,15 @@ describe("Phase 14 Engineering HTTP", () => {
     const jobs = await call("get-deployment-status", { client_id: CLIENT });
     expect(jobs.body.jobs).toHaveLength(1);
     expect(jobs.body.jobs[0].id).toBe(JOB);
-    expect(JSON.stringify(jobs.body)).not.toMatch(/SECRET|9\.99/);
+    // The seeded job carries cost_usd 9.99, params {"secret":true} and an
+    // error of 'SECRET ERR'. None of the three belongs in this projection.
+    expect(
+      leakedKeys(jobs.body),
+      "the deployment projection must not carry cost, params or error",
+    ).toEqual([]);
+    // A credential can legitimately turn up anywhere in a payload, and the
+    // seeded one is distinctive enough that this cannot collide.
+    expect(JSON.stringify(jobs.body)).not.toMatch(/SECRET/);
   });
   it("cross-client get is indistinguishable from missing", async () => {
     const made = await call("create-issue", {
