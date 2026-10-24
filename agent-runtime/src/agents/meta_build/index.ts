@@ -215,8 +215,15 @@ export async function runMetaBuildJob(
   if (error) throw new Error(`Could not read the campaign: ${error.message}`);
   if (!campaign) return fail("That campaign no longer exists.");
   if (campaign.client_id !== job.client_id) return fail("That campaign belongs to a different client.");
+  // A v6 campaign is no longer refused outright: migration 239 decides, from
+  // the approval, the package version, the payload hash and whether objects
+  // already exist. Its refusal sentence is the one a person reads, so it is
+  // passed through rather than replaced with something generic.
   if (campaign.acquisition_mode !== "legacy") {
-    return fail("V6 Meta objects require a version-bound human approval before an external build. The activation executor is not connected yet.");
+    const { error: gateError } = await sb.rpc("assert_meta_build_allowed_v6", {
+      p_campaign_id: campaign.id,
+    } as never);
+    if (gateError) return fail(gateError.message);
   }
   const row = campaign as unknown as CampaignRow;
 

@@ -25,8 +25,11 @@ import { AuthError, requireAdminOrClientManager } from "../../master/auth.js";
 import { readJsonBody, UUID } from "../../mcp/http.js";
 import { logger } from "../../logging/logger.js";
 
-/** The actions a person can ask for from here, and how to build each one. */
-const ASKABLE = new Set(["proof_publish"]);
+/** The actions a person can ask for from here, and the function that builds each. */
+const ASKABLE: Readonly<Record<string, string>> = {
+  proof_publish: "request_campaign_proof_publish_v6",
+  meta_ad_build: "request_campaign_meta_build_v6",
+};
 
 export async function handleCampaignActionRequest(
   req: IncomingMessage,
@@ -58,10 +61,11 @@ export async function handleCampaignActionRequest(
     json(400, { ok: false, error: "A client and a campaign are required." });
     return;
   }
-  if (!ASKABLE.has(actionKey)) {
+  const builder = ASKABLE[actionKey];
+  if (!builder) {
     json(400, {
       ok: false,
-      error: `There is nothing to ask for called "${actionKey}". Only proof publication can be requested here so far.`,
+      error: `There is nothing to ask for called "${actionKey}". Askable here: ${Object.keys(ASKABLE).join(", ")}.`,
     });
     return;
   }
@@ -94,7 +98,7 @@ export async function handleCampaignActionRequest(
     return;
   }
 
-  const { data, error } = await sb.rpc("request_campaign_proof_publish_v6", {
+  const { data, error } = await sb.rpc(builder, {
     p_campaign_id: campaignId,
     p_actor: userId,
   } as never);

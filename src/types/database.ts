@@ -811,6 +811,13 @@ export type Database = {
             referencedColumns: ["approval_id"]
           },
           {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
             foreignKeyName: "campaign_action_executions_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
@@ -823,6 +830,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
           },
           {
             foreignKeyName: "campaign_action_executions_client_id_fkey"
@@ -1066,6 +1080,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "campaign_artifacts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
             foreignKeyName: "campaign_artifacts_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -1176,6 +1197,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "campaign_content_pillars_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
             foreignKeyName: "campaign_content_pillars_pillar_id_fkey"
             columns: ["pillar_id"]
             isOneToOne: false
@@ -1244,6 +1272,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_campaigns"
             referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_intelligence_snapshots_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
           },
         ]
       }
@@ -1416,6 +1451,13 @@ export type Database = {
             referencedRelation: "client_campaigns"
             referencedColumns: ["id", "client_id"]
           },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
         ]
       }
       campaign_page_approval_snapshots: {
@@ -1472,6 +1514,13 @@ export type Database = {
             columns: ["approval_id"]
             isOneToOne: true
             referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "meta_build_due"
             referencedColumns: ["approval_id"]
           },
           {
@@ -1584,6 +1633,13 @@ export type Database = {
             columns: ["approval_id"]
             isOneToOne: true
             referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_publications_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "meta_build_due"
             referencedColumns: ["approval_id"]
           },
           {
@@ -2717,6 +2773,13 @@ export type Database = {
             referencedColumns: ["id", "client_id"]
           },
           {
+            foreignKeyName: "client_campaigns_clone_same_client_fkey"
+            columns: ["cloned_from_campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
             foreignKeyName: "client_campaigns_feeds_from_campaign_id_fkey"
             columns: ["feeds_from_campaign_id"]
             isOneToOne: false
@@ -2729,6 +2792,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_feeds_from_campaign_id_fkey"
+            columns: ["feeds_from_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
           },
           {
             foreignKeyName: "client_campaigns_job_id_fkey"
@@ -2984,6 +3054,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_daily_package_settings_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
           },
           {
             foreignKeyName: "client_daily_package_settings_client_id_fkey"
@@ -3346,6 +3423,13 @@ export type Database = {
             referencedColumns: ["id", "client_id"]
           },
           {
+            foreignKeyName: "client_ideas_campaign_client_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
             foreignKeyName: "client_ideas_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -3660,6 +3744,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_launch_packages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
             foreignKeyName: "client_launch_packages_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -3900,6 +3991,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_leads_source_client_campaign_id_fkey"
+            columns: ["source_client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
             foreignKeyName: "client_leads_source_page_id_fkey"
             columns: ["source_page_id"]
             isOneToOne: false
@@ -4027,6 +4125,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_marketing_spend_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
           },
           {
             foreignKeyName: "client_marketing_spend_client_id_fkey"
@@ -6090,6 +6195,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "daily_package_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
             foreignKeyName: "daily_package_items_final_step_id_fkey"
             columns: ["final_step_id"]
             isOneToOne: true
@@ -6974,6 +7086,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lead_capture_endpoints_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
             foreignKeyName: "lead_capture_endpoints_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -7467,6 +7586,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
           },
           {
             foreignKeyName: "lead_magnets_client_id_fkey"
@@ -8500,6 +8626,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "opportunity_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
             foreignKeyName: "opportunity_links_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -9475,6 +9608,13 @@ export type Database = {
             referencedColumns: ["approval_id"]
           },
           {
+            foreignKeyName: "proof_placement_approvals_campaign_action_approval_id_fkey"
+            columns: ["campaign_action_approval_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
             foreignKeyName: "proof_placement_approvals_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -9780,6 +9920,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
           },
           {
             foreignKeyName: "proof_placements_client_id_fkey"
@@ -12593,6 +12740,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "workflow_runs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
             foreignKeyName: "workflow_runs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -13100,6 +13254,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
           },
           {
             foreignKeyName: "opportunity_links_client_id_fkey"
@@ -13687,6 +13848,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lead_capture_endpoints_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
             foreignKeyName: "lead_capture_endpoints_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -13861,6 +14029,38 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaigns"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_build_due: {
+        Row: {
+          approval_id: string | null
+          approval_status: string | null
+          approved_creative: number | null
+          approved_hash: string | null
+          blocker: string | null
+          campaign_id: string | null
+          client_id: string | null
+          current_hash: string | null
+          meta_ad_set_id: string | null
+          meta_built_at: string | null
+          meta_campaign_id: string | null
+          name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -14930,6 +15130,10 @@ export type Database = {
       archive_lead: {
         Args: { p_lead_id: string; p_reason?: string }
         Returns: undefined
+      }
+      assert_meta_build_allowed_v6: {
+        Args: { p_campaign_id: string }
+        Returns: string
       }
       assert_page_publish_allowed_v6: {
         Args: { p_page_id: string }
@@ -16914,6 +17118,10 @@ export type Database = {
         }
         Returns: Json
       }
+      meta_build_payload_hash_v6: {
+        Args: { p_campaign_id: string }
+        Returns: string
+      }
       metrics_period_summary: {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: Json
@@ -17503,6 +17711,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      request_campaign_meta_build_v6: {
+        Args: { p_actor: string; p_campaign_id: string }
+        Returns: string
       }
       request_campaign_page_deploy_approval_v6: {
         Args: {
