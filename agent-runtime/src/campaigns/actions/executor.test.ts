@@ -166,7 +166,7 @@ describe("an action with nothing to perform it", () => {
     // The guard on the other direction: this list and
     // campaign_action_executors.supported have to agree, and the failure
     // mode of them disagreeing is an action claimed and then failed.
-    expect(Object.keys(HANDLERS)).toEqual(["proof_publish"]);
+    expect(Object.keys(HANDLERS)).toEqual(["proof_publish", "page_deploy"]);
   });
 });
 
@@ -187,7 +187,8 @@ describe("one action's failure is its own", () => {
   it("carries on to the next action and reports both", async () => {
     const { sb, calls, events } = database({
       claimed: [
-        { ...ACTION, action_key: "page_deploy", execution_id: "exec-bad" },
+        // Still without an executor, so it is the one that fails loudly.
+        { ...ACTION, action_key: "google_ad_build", execution_id: "exec-bad" },
         { ...ACTION, execution_id: "exec-good" },
       ],
     });

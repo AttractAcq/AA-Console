@@ -804,6 +804,13 @@ export type Database = {
             referencedColumns: ["approval_id"]
           },
           {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
             foreignKeyName: "campaign_action_executions_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
@@ -1447,6 +1454,13 @@ export type Database = {
             referencedColumns: ["approval_id"]
           },
           {
+            foreignKeyName: "campaign_page_approval_snapshots_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
             foreignKeyName: "campaign_page_approval_snapshots_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -1486,6 +1500,125 @@ export type Database = {
             columns: ["site_repository_id"]
             isOneToOne: false
             referencedRelation: "client_site_repositories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_page_publications: {
+        Row: {
+          approval_id: string
+          client_id: string
+          commit_sha: string
+          id: string
+          page_id: string
+          probe_detail: string | null
+          probe_lead_id: string | null
+          probe_status: string | null
+          probed_at: string | null
+          published_at: string
+          published_url: string
+          rendered_sha256: string
+          revision_id: string
+        }
+        Insert: {
+          approval_id: string
+          client_id: string
+          commit_sha: string
+          id?: string
+          page_id: string
+          probe_detail?: string | null
+          probe_lead_id?: string | null
+          probe_status?: string | null
+          probed_at?: string | null
+          published_at?: string
+          published_url: string
+          rendered_sha256: string
+          revision_id: string
+        }
+        Update: {
+          approval_id?: string
+          client_id?: string
+          commit_sha?: string
+          id?: string
+          page_id?: string
+          probe_detail?: string | null
+          probe_lead_id?: string | null
+          probe_status?: string | null
+          probed_at?: string | null
+          published_at?: string
+          published_url?: string
+          rendered_sha256?: string
+          revision_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_page_publications_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_publications_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_publications_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_publications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_publications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_publications_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "client_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_publications_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_publications_probe_lead_id_fkey"
+            columns: ["probe_lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_publications_probe_lead_id_fkey"
+            columns: ["probe_lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_publications_revision_id_fkey"
+            columns: ["revision_id"]
+            isOneToOne: false
+            referencedRelation: "client_page_revisions"
             referencedColumns: ["id"]
           },
         ]
@@ -3543,6 +3676,7 @@ export type Database = {
           dedupe_key: string | null
           email: string | null
           id: string
+          is_probe: boolean
           lost_reason: string | null
           name: string | null
           next_action: string | null
@@ -3581,6 +3715,7 @@ export type Database = {
           dedupe_key?: string | null
           email?: string | null
           id?: string
+          is_probe?: boolean
           lost_reason?: string | null
           name?: string | null
           next_action?: string | null
@@ -3619,6 +3754,7 @@ export type Database = {
           dedupe_key?: string | null
           email?: string | null
           id?: string
+          is_probe?: boolean
           lost_reason?: string | null
           name?: string | null
           next_action?: string | null
@@ -9304,6 +9440,13 @@ export type Database = {
             referencedColumns: ["approval_id"]
           },
           {
+            foreignKeyName: "proof_placement_approvals_campaign_action_approval_id_fkey"
+            columns: ["campaign_action_approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
             foreignKeyName: "proof_placement_approvals_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -12939,6 +13082,38 @@ export type Database = {
           },
         ]
       }
+      campaign_page_publish_due: {
+        Row: {
+          approval_id: string | null
+          blocker: string | null
+          campaign_id: string | null
+          client_id: string | null
+          commit_sha: string | null
+          page_id: string | null
+          probe_detail: string | null
+          probe_status: string | null
+          publication_id: string | null
+          published_url: string | null
+          rendered_sha256: string | null
+          site_path: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "client_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_totals: {
         Row: {
           active_campaigns: number | null
@@ -14649,6 +14824,14 @@ export type Database = {
       }
       assert_page_publish_allowed_v6: {
         Args: { p_page_id: string }
+        Returns: undefined
+      }
+      assert_page_publish_by_approval_v6: {
+        Args: {
+          p_approval_id: string
+          p_current_html: string
+          p_page_id: string
+        }
         Returns: undefined
       }
       attach_campaign_manifest_intelligence_v6: {
@@ -16797,6 +16980,24 @@ export type Database = {
           p_retryable?: boolean
         }
         Returns: undefined
+      }
+      record_campaign_page_probe_v6: {
+        Args: {
+          p_detail: string
+          p_lead_id?: string
+          p_passed: boolean
+          p_publication_id: string
+        }
+        Returns: undefined
+      }
+      record_campaign_page_published_v6: {
+        Args: {
+          p_approval_id: string
+          p_commit_sha: string
+          p_published_url: string
+          p_rendered_sha256: string
+        }
+        Returns: string
       }
       record_client_launch_asset_check: {
         Args: { p_asset_id: string; p_package_id: string; p_qa_evidence: Json }
