@@ -44,6 +44,7 @@ import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { logger } from "../../logging/logger.js";
+import { deployCampaignPage } from "./page-deploy.js";
 
 const DEFAULT_BATCH = 3;
 
@@ -137,6 +138,10 @@ export const releaseProofPlacements: ActionHandler = async (sb, _config, action)
 
 export const HANDLERS: Readonly<Record<string, ActionHandler>> = {
   proof_publish: releaseProofPlacements,
+  // Publishes the exact reviewed bytes, then submits a test form against the
+  // live page and checks a sourced, consented lead arrives. See page-deploy.ts
+  // for why the probe is the half that matters.
+  page_deploy: deployCampaignPage,
 };
 
 export async function runCampaignActionJob(

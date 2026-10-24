@@ -58,7 +58,7 @@ function database(
     if (name === "active_video_approval_manager") {
       return { data: options.manager ?? null, error: null };
     }
-    if (name === "request_campaign_proof_publish_v6") {
+    if (name === "request_campaign_proof_publish_v6" || name === "request_campaign_meta_build_v6") {
       return options.requestError
         ? { data: null, error: { message: options.requestError } }
         : { data: "approval-1", error: null };
@@ -142,10 +142,24 @@ describe("what may be asked for", () => {
     const { code, payload } = await call(sb, {
       clientId: CLIENT,
       campaignId: CAMPAIGN,
-      actionKey: "meta_ad_build",
+      actionKey: "google_ad_build",
     });
     expect(code).toBe(400);
-    expect(payload.error).toContain("Only proof publication");
+    expect(payload.error).toContain("Askable here");
+  });
+
+  it("asks for a Meta build through its own builder", async () => {
+    const { sb, rpc } = database({ manager: USER, role: "smm" });
+    const { code } = await call(sb, {
+      clientId: CLIENT,
+      campaignId: CAMPAIGN,
+      actionKey: "meta_ad_build",
+    });
+    expect(code).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("request_campaign_meta_build_v6", {
+      p_campaign_id: CAMPAIGN,
+      p_actor: USER,
+    });
   });
 
   it("refuses anything that is not a pair of ids", async () => {

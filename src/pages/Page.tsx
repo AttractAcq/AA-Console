@@ -1,4 +1,13 @@
 import { ProofFactoryV2Panel } from "./proof-bank/ProofFactoryV2Panel";
+import { LeadMagnetStudioPanel } from "./lead-magnet/LeadMagnetStudioPanel";
+import { LeadCapturePanel } from "./sales/LeadCapturePanel";
+import { CampaignPagePublishPanel } from "./sites/CampaignPagePublishPanel";
+import { OfferLiveUsePanel } from "./offer/OfferLiveUsePanel";
+import { MetaBuildApprovalPanel } from "./campaigns/MetaBuildApprovalPanel";
+import { GoogleProfilePanel } from "./google-profile/GoogleProfilePanel";
+import { GoogleAdsStudioPanel } from "./google-ads/GoogleAdsStudioPanel";
+import { MetaProfilePanel } from "./distribution/MetaProfilePanel";
+import { MotionScenesPanel } from "./motion/MotionScenesPanel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -75,7 +84,6 @@ import { AgentsPanel } from "./team/AgentsPanel";
 import { FinancialsPanel } from "./admin/FinancialsPanel";
 import { SopsPanel } from "./admin/SopsPanel";
 import { ContentJourney } from "../components/ContentJourney";
-import { PlannedModulePanel } from "./v6/PlannedModulePanel";
 import { ContentAssetTable } from "../components/content/ContentAssetTable";
 import { MarketOpportunitiesPanel } from "./opportunities/MarketOpportunitiesPanel";
 import { ProofDistributionPanel } from "./proof-distribution/ProofDistributionPanel";
@@ -148,6 +156,23 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     sites: () => <SitesPanel />,
     "landing-reporting": () => <PagesReportingPanel pageType="landing" />,
     "offer-reporting": () => <PagesReportingPanel pageType="offer" />,
+  },
+  "google-ads-studio": {
+    sheet: () => <GoogleAdsStudioPanel tab="sheet" />,
+    account: () => <GoogleAdsStudioPanel tab="account" />,
+    build: () => <GoogleAdsStudioPanel tab="build" />,
+  },
+  "google-profile": {
+    location: () => <GoogleProfilePanel tab="location" />,
+    reviews: () => <GoogleProfilePanel tab="reviews" />,
+    posts: () => <GoogleProfilePanel tab="posts" />,
+    metrics: () => <GoogleProfilePanel tab="metrics" />,
+  },
+  "lead-magnet-studio": {
+    magnets: () => <LeadMagnetStudioPanel tab="magnets" />,
+    build: () => <LeadMagnetStudioPanel tab="build" />,
+    delivery: () => <LeadMagnetStudioPanel tab="delivery" />,
+    optins: () => <LeadMagnetStudioPanel tab="optins" />,
   },
   "sales-os": {
     leads: () => <ProspectsLeadsPanel />,
@@ -262,9 +287,6 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
 };
 
 const nodePanels: Record<string, () => ReactNode> = {
-  "google-ads-studio": () => <PlannedModulePanel module="google-ads-studio" />,
-  "google-profile": () => <PlannedModulePanel module="google-profile" />,
-  "lead-magnet-studio": () => <PlannedModulePanel module="lead-magnet-studio" />,
   dashboard: () => <DashboardPanel />,
   // distinct id from the agency dashboard; both live at a path segment
   // called "dashboard" but they are different pages
@@ -290,6 +312,39 @@ function getPanelBody(
 ): ReactNode {
   if (node.id === "proof-production-factory" && view === "v2") return <ProofFactoryV2Panel tab={activeTab?.id ?? "capture"} />;
   if (node.id === "campaign-factory" && view === "v2") return <CampaignExecutionPanel />;
+  if (node.id === "motion-design" && view === "v2") {
+    if (activeTab?.id === "renders") return <MotionScenesPanel tab="renders" />;
+    if (activeTab?.id === "brief") return <MotionDesignPanel />;
+    return <MotionScenesPanel tab="scenes" />;
+  }
+  if (node.id === "meta-profile" && view === "v2") {
+    if (activeTab?.id === "profile") return <MetaProfilePanel tab="profile" />;
+    if (activeTab?.id === "presence") return <MetaProfilePanel tab="presence" />;
+    if (activeTab?.id === "reporting") return <OrganicReportingPanel />;
+    return <MetaProfilePanel tab="identities" />;
+  }
+  if (node.id === "meta-ads-studio" && view === "v2") {
+    if (activeTab?.id === "campaigns") return <CampaignExecutionPanel />;
+    if (activeTab?.id === "paid") return <PaidPanel />;
+    if (activeTab?.id === "reporting") return <PaidReportingPanel />;
+    return <MetaBuildApprovalPanel />;
+  }
+  if (node.id === "offer-studio" && view === "v2") {
+    if (activeTab?.id === "offers") return <ServiceOffersPanel />;
+    if (activeTab?.id === "offer-strategy") return <OfferStrategyPanel />;
+    return <OfferLiveUsePanel />;
+  }
+  if (node.id === "website-studio" && view === "v2") {
+    if (activeTab?.id === "publish") return <CampaignPagePublishPanel />;
+    if (activeTab?.id === "sites") return <SitesPanel />;
+    if (activeTab?.id === "landing-reporting") return <PagesReportingPanel pageType="landing" />;
+    return <PageBuilderPanel pageType="landing" />;
+  }
+  if (node.id === "sales-os" && view === "v2") {
+    if (activeTab?.id === "capture") return <LeadCapturePanel />;
+    if (activeTab?.id === "agents") return <SalesOverviewPanel />;
+    return <ProspectsLeadsPanel />;
+  }
   if (node.id === "content-production-factory" && view === "v2") {
     switch (activeTab?.id) {
       case "generation": return <GenerationPanel showJourney={false} />;
@@ -317,11 +372,44 @@ export function Page({ node }: { node: NavNode }) {
   const requestedView = searchParams.get("view");
   const view = node.id === "intelligence-os" ? requestedView === "strategy" ? "strategy" : "intelligence"
     : requestedView === "v2" && node.sidebarViews?.some((item) => item.id === "v2") ? "v2" : "v1";
-  const v2Blank = view === "v2" && node.id !== "content-production-factory" && node.id !== "campaign-factory" && node.id !== "proof-production-factory";
+  const v2Blank = view === "v2" && node.id !== "content-production-factory"
+    && node.id !== "campaign-factory" && node.id !== "proof-production-factory"
+    && node.id !== "sales-os" && node.id !== "website-studio"
+    && node.id !== "offer-studio" && node.id !== "meta-ads-studio"
+    && node.id !== "meta-profile" && node.id !== "motion-design";
   const tabs = node.id === "intelligence-os"
     ? node.tabs?.filter((tab) => strategyTabIds.has(tab.id) === (view === "strategy"))
     : node.id === "proof-production-factory" && view === "v2" ? [{id:"capture",label:"Capture"},{id:"produce",label:"Produce"},{id:"repurpose",label:"Repurpose"},{id:"assets",label:"Assets"}]
     : node.id === "campaign-factory" && view === "v2" ? undefined
+    // Sales OS v2 leads with Capture, because where a lead came from is the
+    // question v1 could never answer. Pipeline and Agents are v1's panels,
+    // unchanged.
+    : node.id === "sales-os" && view === "v2"
+      ? [{ id: "capture", label: "Capture" }, { id: "leads", label: "Pipeline" },
+         { id: "agents", label: "Agents" }]
+    // Website Studio v2 leads with Publish: the step 212 blocked, and the
+    // only one that can tell published from working.
+    : node.id === "website-studio" && view === "v2"
+      ? [{ id: "publish", label: "Publish" }, { id: "landing-pages", label: "Pages" },
+         { id: "sites", label: "Sites" }, { id: "landing-reporting", label: "Results" }]
+    // Offer Studio v2 leads with Live use: the only thing v1 could not say.
+    : node.id === "offer-studio" && view === "v2"
+      ? [{ id: "live-use", label: "Live use" }, { id: "offers", label: "Service Offers" },
+         { id: "offer-strategy", label: "Offer Strategy" }]
+    // Meta Ads v2 leads with Build, which is the decision that lifts v1's
+    // blanket refusal. Activation is not a tab, because it is not built.
+    // Motion Design v2 adds Scenes and Renders beside v1's own page, which
+    // stays on its first tab: the quick prompt-and-preset path still works.
+    : node.id === "motion-design" && view === "v2"
+      ? [{ id: "scenes", label: "Scenes" }, { id: "renders", label: "Renders" },
+         { id: "brief", label: "Brief" }]
+    // Meta Profile v2 leads with Identities, the question v1 could not ask.
+    : node.id === "meta-profile" && view === "v2"
+      ? [{ id: "identities", label: "Identities" }, { id: "profile", label: "Profile" },
+         { id: "presence", label: "Presence" }, { id: "reporting", label: "Outcomes" }]
+    : node.id === "meta-ads-studio" && view === "v2"
+      ? [{ id: "build", label: "Build" }, { id: "campaigns", label: "Campaign Builds" },
+         { id: "paid", label: "Paid Distribution" }, { id: "reporting", label: "Paid Reporting" }]
     : node.id === "content-production-factory" && view === "v2"
       ? [
         { id: "generation", label: "Ideation" }, { id: "briefs", label: "Briefs" },

@@ -1,6 +1,7 @@
 import { handlePublicProof } from "./proof-capture/public-route.js";
 import { handleProofCaptureAdmin } from "./proof-capture/admin-route.js";
 import { handleCampaignActionRequest } from "./campaigns/actions/request-route.js";
+import { handlePublicLead } from "./lead-capture/public-route.js";
 import { startProofCoordinator } from "./proof-capture/coordinator.js";
 // Process entry point: a small health/status HTTP surface plus
 // config.concurrency worker loops in the same process. One process, not a
@@ -168,6 +169,13 @@ const server = http.createServer((req, res) => {
 
   if (req.url?.startsWith("/public/proof")) {
     void handlePublicProof(req, res, sb);
+    return;
+  }
+  // The only way into this system for somebody who is not signed in. Handled
+  // before the console CORS block, like the other public surfaces: a form on
+  // a client's own site is not one of our listed origins.
+  if (req.url?.startsWith("/public/lead")) {
+    void handlePublicLead(req, res, sb, config);
     return;
   }
   if (req.url === "/internal/proof-capture/event") {

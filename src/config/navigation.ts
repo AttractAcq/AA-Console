@@ -411,14 +411,20 @@ export const v6ModuleNodes: NavNode[] = [
       { id: "engine", label: "Engine" },
     ] },
   { id: "google-ads-studio", label: "Google Ads Studio", path: "google-ads-studio", icon: Megaphone,
-    capability: "planned" },
+    capability: "expanding", tabs: [
+      { id: "sheet", label: "Build sheet" }, { id: "account", label: "Account" },
+      { id: "build", label: "Automated build" },
+    ] },
   { id: "meta-ads-studio", label: "Meta Ads Studio", path: "meta-ads-studio", icon: Megaphone,
     capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "campaigns", label: "Campaign Builds" }, { id: "paid", label: "Paid Distribution" },
       { id: "reporting", label: "Paid Reporting" },
     ] },
   { id: "google-profile", label: "Google Profile", path: "google-profile", icon: Globe,
-    capability: "planned" },
+    capability: "expanding", tabs: [
+      { id: "location", label: "Location" }, { id: "reviews", label: "Reviews" },
+      { id: "posts", label: "Posts" }, { id: "metrics", label: "Metrics" },
+    ] },
   { id: "meta-profile", label: "Meta Profile", path: "meta-profile", icon: Users,
     capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "organic", label: "Posts" }, { id: "reporting", label: "Profile Metrics" },
@@ -435,7 +441,10 @@ export const v6ModuleNodes: NavNode[] = [
       { id: "offer-reporting", label: "Offer Results" },
     ] },
   { id: "lead-magnet-studio", label: "Lead Magnet Studio", path: "lead-magnet-studio", icon: UserPlus,
-    capability: "planned" },
+    capability: "expanding", tabs: [
+      { id: "magnets", label: "Magnets" }, { id: "build", label: "Build" },
+      { id: "delivery", label: "Delivery" }, { id: "optins", label: "Opt-ins" },
+    ] },
   { id: "sales-os", label: "Sales OS", path: "sales-os", icon: MessagesSquare,
     capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "leads", label: "Prospects & Leads" }, { id: "agents", label: "Sales Agents" },

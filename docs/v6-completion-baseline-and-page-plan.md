@@ -416,3 +416,56 @@ The post-DDL security advisor check found two things naming the new objects:
 
 No `anon` exposure was reported for any new function, which is what `lock_down_definer_functions()`
 at the end of each migration is for.
+
+## 24 October 2026 — every module has a console surface
+
+The `capability: "planned"` list is empty. All fifteen Delivery modules now
+resolve to a real panel, and `src/pages/v6/PlannedModulePanel.tsx` has been
+deleted along with the three registrations that used it — a component whose
+only job was to say "this is planned" has no job left. The `planned` renderer
+in `Page.tsx` stays: the type still permits it, and without that sentence a
+future planned module would render an empty page with no explanation.
+
+What changed in this pass, in the order it was built:
+
+| Migration | Slice |
+|---|---|
+| 235, 236 | The lead capture spine, and lead magnets on top of it |
+| 237 | A page goes live on an approval, and proves its form works |
+| 238 | Where each offer version is still live |
+| 239 | A Meta build runs on an approval |
+| 240 | Google Business Profile: location, reviews, replies |
+| 241 | Meta identity health, proposed profile changes, presence |
+| 242 | Motion scenes and render candidates |
+| 243 | The Google Ads build sheet |
+
+Five v2 workspaces left the heading-only list: Sales OS (Capture), Website
+Studio (Publish), Offer Studio (Live use), Meta Ads Studio (Build), Meta
+Profile (Identities) and Motion Design (Scenes, Renders). Organic Content
+Distribution is the one that remains, and its v1 is complete.
+
+### What is still not claimed
+
+Nothing in this pass has produced an observed external effect. Every gate was
+built and tested; none has been through a real account:
+
+- **No lead has arrived from outside.** The spine, the magnet courier and the
+  page probe are complete and inert — capture endpoints ship disabled, and
+  delivery needs the runtime flag, the client flag and a live approval.
+- **No page has been published through the executor**, no Meta objects have
+  been built through the gate, no proof has reached a Business Profile. Each
+  needs its runtime deployed and a client switched on.
+- **Google Ads cannot spend.** `google_ad_build` keeps its "no executor"
+  sentence. The sheet is the provable half and says in its own `missing` list
+  that keyword research has not been done, because seeds are not research.
+- **Nothing has been verified in a browser.** The console needs a real
+  session and a real client. Each page's tests render it and drive it, which
+  is the evidence available without signing in as somebody.
+
+Migrations 235–243 are applied to production and `src/types/database.ts` is
+regenerated from it. Three schema facts corrected along the way, each found by
+production rejecting a migration that a test harness had accepted:
+`campaign_template` and `post_platform` are enums needing casts,
+`client_briefs` carries no `campaign_id` (it runs through the idea), and
+`client_proof_assets` requires `media_type` with `source` rather than
+`source_url`. The harnesses now declare the real types.

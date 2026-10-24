@@ -65,6 +65,12 @@ export interface RuntimeConfig {
    * campaign_action_executors.supported and the approval itself follow.
    */
   campaignActionsEnabled: boolean;
+  /**
+   * Whether this runtime may send approved lead magnets. Off unless set, and
+   * the first of four: the client flag, the capture endpoint and the human
+   * approval of the file and its route are the others.
+   */
+  leadMagnetDeliveryEnabled: boolean;
   openaiApiKey: string | null;
   imageModel: string;
   /** Reel keyframes can use a precision-first model without changing static creative. */
@@ -228,6 +234,8 @@ export function loadConfig(): RuntimeConfig {
     proofPublishEnabled: (optionalEnv("PROOF_PUBLISH_ENABLED") ?? "false").toLowerCase() === "true",
     campaignActionsEnabled:
       (optionalEnv("CAMPAIGN_ACTIONS_ENABLED") ?? "false").toLowerCase() === "true",
+    leadMagnetDeliveryEnabled:
+      (optionalEnv("LEAD_MAGNET_DELIVERY_ENABLED") ?? "false").toLowerCase() === "true",
     openaiApiKey: optionalEnv("OPENAI_API_KEY") ?? null,
     // Not pinned in code: the correct id is a provider fact that changes
     // faster than this repo does, so a wrong one is a config edit.

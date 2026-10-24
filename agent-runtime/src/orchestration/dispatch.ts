@@ -38,6 +38,8 @@ import { runQaJob } from "../agents/qa/index.js";
 import { runPublisherJob } from "../agents/publisher/index.js";
 import { runCampaignActionJob } from "../campaigns/actions/executor.js";
 import { runProofPlacerJob } from "../proof-distribution/placer.js";
+import { runLeadMagnetCourierJob } from "../lead-magnets/courier.js";
+import { runGoogleAdsSheetJob } from "../agents/google_ads_sheet/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
@@ -143,6 +145,10 @@ const RUNNERS: Record<string, JobRunner> = {
   // without agreeing to their customer's words going on a third party's
   // profile.
   proof_placer: runProofPlacerJob,
+  // Keeping the one promise this system makes directly to a stranger: the
+  // exact file somebody approved, once. Re-hashes the bytes before every
+  // send, because a path can be overwritten after it is approved.
+  lead_magnet_courier: runLeadMagnetCourierJob,
   brief_dispatch: runBriefDispatchJob,
   client_approval_dispatch: runClientApprovalDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
@@ -152,6 +158,10 @@ const RUNNERS: Record<string, JobRunner> = {
   // The same build written out for a person, for when there is no usable
   // token. Reads only, and never calls Meta.
   meta_build_sheet: runMetaBuildSheetJob,
+  // The same idea for Google, where there is no adapter at all yet: every
+  // object written out for a hand build. Reads only, calls nothing, and holds
+  // no credential — so it works precisely when the automated path does not.
+  google_ads_sheet: runGoogleAdsSheetJob,
   // outcome until that product decision is made.
 };
 
