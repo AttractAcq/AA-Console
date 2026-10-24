@@ -32,11 +32,14 @@ describe("client delivery navigation", () => {
     expect(v6ModuleNodes.find((node) => node.id === "content-production-factory")?.tabs?.map((tab) => tab.id))
       .toEqual(["generation", "briefs", "create", "edit", "image-library", "video-library",
         "reel-shots", "copy-library", "story-library", "carousel-library"]);
-    // Proof Distribution left this list when it got its three tabs, and Lead
-    // Magnet Studio when it got its four. The two that remain have no console
-    // surface at all.
+    // Proof Distribution left this list when it got its three tabs, Lead
+    // Magnet Studio when it got its four, and Google Profile when it got the
+    // location, reviews and posts surfaces. Google Ads is the last one with
+    // no console surface at all.
     expect(v6ModuleNodes.filter((node) => node.capability === "planned").map((node) => node.id))
-      .toEqual(["google-ads-studio", "google-profile"]);
+      .toEqual(["google-ads-studio"]);
+    expect(v6ModuleNodes.find((node) => node.id === "google-profile")?.tabs?.map((tab) => tab.id))
+      .toEqual(["location", "reviews", "posts", "metrics"]);
     expect(v6ModuleNodes.find((node) => node.id === "lead-magnet-studio")?.tabs?.map((tab) => tab.id))
       .toEqual(["magnets", "build", "delivery", "optins"]);
     expect(v6ModuleNodes.find((node) => node.id === "proof-distribution")?.tabs?.map((tab) => tab.id))

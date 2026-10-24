@@ -4,6 +4,7 @@ import { LeadCapturePanel } from "./sales/LeadCapturePanel";
 import { CampaignPagePublishPanel } from "./sites/CampaignPagePublishPanel";
 import { OfferLiveUsePanel } from "./offer/OfferLiveUsePanel";
 import { MetaBuildApprovalPanel } from "./campaigns/MetaBuildApprovalPanel";
+import { GoogleProfilePanel } from "./google-profile/GoogleProfilePanel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -153,6 +154,12 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     sites: () => <SitesPanel />,
     "landing-reporting": () => <PagesReportingPanel pageType="landing" />,
     "offer-reporting": () => <PagesReportingPanel pageType="offer" />,
+  },
+  "google-profile": {
+    location: () => <GoogleProfilePanel tab="location" />,
+    reviews: () => <GoogleProfilePanel tab="reviews" />,
+    posts: () => <GoogleProfilePanel tab="posts" />,
+    metrics: () => <GoogleProfilePanel tab="metrics" />,
   },
   "lead-magnet-studio": {
     magnets: () => <LeadMagnetStudioPanel tab="magnets" />,

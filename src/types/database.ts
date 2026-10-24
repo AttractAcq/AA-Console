@@ -3334,6 +3334,82 @@ export type Database = {
           },
         ]
       }
+      client_google_locations: {
+        Row: {
+          address: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          last_read_at: string | null
+          last_read_error: string | null
+          location_ref: string
+          missing_fields: string[]
+          primary_phone: string | null
+          profile_snapshot: Json
+          title: string
+          updated_at: string
+          verification_state: string
+          website_url: string | null
+        }
+        Insert: {
+          address?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_read_at?: string | null
+          last_read_error?: string | null
+          location_ref: string
+          missing_fields?: string[]
+          primary_phone?: string | null
+          profile_snapshot?: Json
+          title: string
+          updated_at?: string
+          verification_state?: string
+          website_url?: string | null
+        }
+        Update: {
+          address?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_read_at?: string | null
+          last_read_error?: string | null
+          location_ref?: string
+          missing_fields?: string[]
+          primary_phone?: string | null
+          profile_snapshot?: Json
+          title?: string
+          updated_at?: string
+          verification_state?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_google_locations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_google_locations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_google_locations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_ideas: {
         Row: {
           archived_at: string | null
@@ -6754,6 +6830,310 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      google_profile_changes: {
+        Row: {
+          applied_at: string | null
+          approved_at: string | null
+          approved_by: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          current_value: string | null
+          field: string
+          id: string
+          last_error: string | null
+          location_id: string
+          proposed_value: string
+          reason: string | null
+          rejection_reason: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          applied_at?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          current_value?: string | null
+          field: string
+          id?: string
+          last_error?: string | null
+          location_id: string
+          proposed_value: string
+          reason?: string | null
+          rejection_reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          applied_at?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          current_value?: string | null
+          field?: string
+          id?: string
+          last_error?: string | null
+          location_id?: string
+          proposed_value?: string
+          reason?: string | null
+          rejection_reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_profile_changes_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_changes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_changes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "client_google_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_changes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "google_profile_due"
+            referencedColumns: ["location_id"]
+          },
+        ]
+      }
+      google_review_replies: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          attempts: number
+          body: string
+          body_hash: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          drafted_by_job_id: string | null
+          external_ref: string | null
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          posted_at: string | null
+          rejection_reason: string | null
+          review_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          attempts?: number
+          body: string
+          body_hash: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          drafted_by_job_id?: string | null
+          external_ref?: string | null
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          posted_at?: string | null
+          rejection_reason?: string | null
+          review_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          attempts?: number
+          body?: string
+          body_hash?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          drafted_by_job_id?: string | null
+          external_ref?: string | null
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          posted_at?: string | null
+          rejection_reason?: string | null
+          review_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_review_replies_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_review_replies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_review_replies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_review_replies_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_review_replies_drafted_by_job_id_fkey"
+            columns: ["drafted_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_review_replies_drafted_by_job_id_fkey"
+            columns: ["drafted_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "google_review_replies_drafted_by_job_id_fkey"
+            columns: ["drafted_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "google_review_replies_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "google_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_reviews: {
+        Row: {
+          author_name: string | null
+          captured_proof_id: string | null
+          client_id: string
+          comment: string | null
+          created_at: string
+          gone_at: string | null
+          id: string
+          location_id: string
+          review_ref: string
+          review_url: string | null
+          reviewed_at: string | null
+          seen_at: string
+          star_rating: number | null
+        }
+        Insert: {
+          author_name?: string | null
+          captured_proof_id?: string | null
+          client_id: string
+          comment?: string | null
+          created_at?: string
+          gone_at?: string | null
+          id?: string
+          location_id: string
+          review_ref: string
+          review_url?: string | null
+          reviewed_at?: string | null
+          seen_at?: string
+          star_rating?: number | null
+        }
+        Update: {
+          author_name?: string | null
+          captured_proof_id?: string | null
+          client_id?: string
+          comment?: string | null
+          created_at?: string
+          gone_at?: string | null
+          id?: string
+          location_id?: string
+          review_ref?: string
+          review_url?: string | null
+          reviewed_at?: string | null
+          seen_at?: string
+          star_rating?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_reviews_captured_proof_id_fkey"
+            columns: ["captured_proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reviews_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reviews_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reviews_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "client_google_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reviews_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "google_profile_due"
+            referencedColumns: ["location_id"]
           },
         ]
       }
@@ -13715,6 +14095,69 @@ export type Database = {
         }
         Relationships: []
       }
+      google_profile_due: {
+        Row: {
+          blocker: string | null
+          captured_as_proof: number | null
+          client_id: string | null
+          gone_but_cited: number | null
+          last_read_at: string | null
+          last_read_error: string | null
+          location_id: string | null
+          location_ref: string | null
+          missing_fields: string[] | null
+          reviews: number | null
+          title: string | null
+          unanswered: number | null
+          verification_state: string | null
+        }
+        Insert: {
+          blocker?: never
+          captured_as_proof?: never
+          client_id?: string | null
+          gone_but_cited?: never
+          last_read_at?: string | null
+          last_read_error?: string | null
+          location_id?: string | null
+          location_ref?: string | null
+          missing_fields?: string[] | null
+          reviews?: never
+          title?: string | null
+          unanswered?: never
+          verification_state?: string | null
+        }
+        Update: {
+          blocker?: never
+          captured_as_proof?: never
+          client_id?: string | null
+          gone_but_cited?: never
+          last_read_at?: string | null
+          last_read_error?: string | null
+          location_id?: string | null
+          location_ref?: string | null
+          missing_fields?: string[] | null
+          reviews?: never
+          title?: string | null
+          unanswered?: never
+          verification_state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_google_locations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_google_locations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       held_jobs: {
         Row: {
           agent_key: string | null
@@ -15282,6 +15725,10 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: Json
       }
+      capture_google_review_as_proof_v6: {
+        Args: { p_review_id: string }
+        Returns: string
+      }
       capture_ideation_learning_context: {
         Args: { p_job_id: string }
         Returns: Json
@@ -15990,6 +16437,35 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_google_review_reply_v6: {
+        Args: { p_approved: boolean; p_reason?: string; p_reply_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          attempts: number
+          body: string
+          body_hash: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          drafted_by_job_id: string | null
+          external_ref: string | null
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          posted_at: string | null
+          rejection_reason: string | null
+          review_id: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "google_review_replies"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       decide_lead_magnet_approval_v6: {
         Args: { p_approval_id: string; p_approved: boolean; p_reason?: string }
         Returns: {
@@ -16194,6 +16670,10 @@ export type Database = {
           p_member_ids: string[]
         }
         Returns: number
+      }
+      draft_google_review_reply_v6: {
+        Args: { p_body: string; p_review_id: string }
+        Returns: string
       }
       engine_is_enabled: { Args: { p_client_id: string }; Returns: boolean }
       engine_jobs_in_flight: { Args: { p_client_id: string }; Returns: number }

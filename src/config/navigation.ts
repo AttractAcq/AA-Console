@@ -418,7 +418,10 @@ export const v6ModuleNodes: NavNode[] = [
       { id: "reporting", label: "Paid Reporting" },
     ] },
   { id: "google-profile", label: "Google Profile", path: "google-profile", icon: Globe,
-    capability: "planned" },
+    capability: "expanding", tabs: [
+      { id: "location", label: "Location" }, { id: "reviews", label: "Reviews" },
+      { id: "posts", label: "Posts" }, { id: "metrics", label: "Metrics" },
+    ] },
   { id: "meta-profile", label: "Meta Profile", path: "meta-profile", icon: Users,
     capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "organic", label: "Posts" }, { id: "reporting", label: "Profile Metrics" },

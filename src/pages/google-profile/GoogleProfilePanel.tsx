@@ -1,0 +1,422 @@
+import { useCallback, useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+
+import { Button } from "../../components/Button";
+import { DataTable } from "../../components/DataTable";
+import { ActionMenu } from "../../components/ActionMenu";
+import { EmptyState } from "../../components/EmptyState";
+import { FormModal } from "../../components/forms/FormModal";
+import { dayOrDash } from "../../lib/contentRecords";
+import { supabase } from "../../lib/supabase";
+import type { Database } from "../../types/database";
+
+type Location = Database["public"]["Tables"]["client_google_locations"]["Row"];
+type ProfileDue = Database["public"]["Views"]["google_profile_due"]["Row"];
+type Review = Database["public"]["Tables"]["google_reviews"]["Row"];
+type Reply = Database["public"]["Tables"]["google_review_replies"]["Row"];
+type Placement = Database["public"]["Tables"]["proof_placements"]["Row"];
+
+type Tab = "location" | "reviews" | "posts" | "metrics";
+
+/**
+ * Google Profile.
+ *
+ * The transport arrived before the page: migration 231 brought up the proof
+ * placement sweep and the local-posts adapter, so a cleared proof derivative
+ * can already reach a real profile. What never existed was any record of the
+ * profile itself.
+ *
+ * Reviews are the reason this page matters more than it looks. Proof Bank's
+ * first named source is "online reviews", and until now they were retyped
+ * from a browser tab — so the author, the url and the date were whatever
+ * somebody copied, and a deleted review left a proof asset quoting something
+ * that no longer exists. Capturing one from here carries the thing itself.
+ *
+ * Posts is a mirror, deliberately. Placements are made in Proof Distribution
+ * and performed by the sweep; a second publisher on this page would be two
+ * things that can post to one profile.
+ */
+export function GoogleProfilePanel({ tab }: { tab: Tab }) {
+  const { clientId } = useParams<{ clientId: string }>();
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [due, setDue] = useState<ReadonlyMap<string, ProfileDue>>(new Map());
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [replies, setReplies] = useState<Reply[]>([]);
+  const [placements, setPlacements] = useState<Placement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<Review | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!clientId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const [locs, board, revs, reps, place] = await Promise.all([
+        supabase
+          .from("client_google_locations")
+          .select("*")
+          .eq("client_id", clientId)
+          .order("created_at", { ascending: false }),
+        supabase.from("google_profile_due").select("*").eq("client_id", clientId),
+        supabase
+          .from("google_reviews")
+          .select("*")
+          .eq("client_id", clientId)
+          .order("reviewed_at", { ascending: false })
+          .limit(100),
+        supabase.from("google_review_replies").select("*").eq("client_id", clientId),
+        supabase
+          .from("proof_placements")
+          .select("*")
+          .eq("client_id", clientId)
+          .eq("destination_key", "google_business_profile")
+          .order("created_at", { ascending: false }),
+      ]);
+      for (const result of [locs, board, revs, reps, place]) {
+        if (result.error) throw new Error(result.error.message);
+      }
+      setLocations(locs.data ?? []);
+      setDue(new Map((board.data ?? []).map((r) => [String(r.location_id), r])));
+      setReviews(revs.data ?? []);
+      setReplies(reps.data ?? []);
+      setPlacements(place.data ?? []);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not load the profile.");
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function act(key: string, work: () => Promise<void>, said: string) {
+    if (busy) return;
+    setBusy(key);
+    setNotice(null);
+    setError(null);
+    try {
+      await work();
+      setNotice(said);
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Something went wrong.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const replyFor = (reviewId: string) =>
+    replies.find((r) => r.review_id === reviewId && r.status !== "rejected");
+
+  return (
+    <div className="space-y-5">
+      {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+
+      {tab === "location" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
+            <div>
+              <p className="text-sm font-medium">
+                {locations.length === 0
+                  ? "No location is connected"
+                  : `${locations.length} location${locations.length === 1 ? "" : "s"} connected`}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Reading a profile is not changing one. Every field change and every reply waits
+                for a person, and proof reaches the profile through Proof Distribution.
+              </p>
+            </div>
+            <Button onClick={() => setConnecting(true)}>Connect a location</Button>
+          </div>
+
+          {locations.length === 0 && !loading ? (
+            <EmptyState label="Connect the client's Business Profile location to read it" />
+          ) : (
+            locations.map((location) => {
+              const board = due.get(location.id);
+              return (
+                <section key={location.id} className="rounded-lg border border-border bg-card p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-semibold">{location.title}</h3>
+                      <p className="mt-1 font-mono text-xs text-muted-foreground">
+                        {location.location_ref}
+                      </p>
+                    </div>
+                    <span
+                      className={
+                        location.verification_state === "verified"
+                          ? "text-xs text-brand-strong"
+                          : "text-xs text-destructive"
+                      }
+                    >
+                      {location.verification_state.replace(/_/g, " ")}
+                    </span>
+                  </div>
+
+                  <p
+                    className={
+                      board?.blocker
+                        ? "mt-3 text-sm text-destructive"
+                        : "mt-3 text-sm text-brand-strong"
+                    }
+                  >
+                    {board?.blocker ?? "Readable, and nothing is blocking a change."}
+                  </p>
+
+                  <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-4">
+                    <div>
+                      <dt className="text-muted-foreground">Reviews</dt>
+                      <dd className="text-lg">{board?.reviews ?? 0}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Unanswered</dt>
+                      <dd className={Number(board?.unanswered ?? 0) > 0 ? "text-lg text-destructive" : "text-lg"}>
+                        {board?.unanswered ?? 0}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Captured as proof</dt>
+                      <dd className="text-lg">{board?.captured_as_proof ?? 0}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Gone but cited</dt>
+                      <dd
+                        className={
+                          Number(board?.gone_but_cited ?? 0) > 0 ? "text-lg text-destructive" : "text-lg"
+                        }
+                        title="Reviews that have left the profile while a proof asset still rests on them"
+                      >
+                        {board?.gone_but_cited ?? 0}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  {(location.missing_fields ?? []).length > 0 && (
+                    <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+                      Missing from the profile: {(location.missing_fields ?? []).join(", ")}. Each
+                      is an approved change, not an edit this page makes by itself.
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Last read {dayOrDash(location.last_read_at)}
+                  </p>
+                </section>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {tab === "reviews" && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Capturing a review brings its author, its url and its date with it, and it arrives in
+            the Proof Bank uncleared — a public review is not a blanket permission to republish
+            it.
+          </p>
+          <DataTable
+            columns={["Review", "Rating", "When", "Proof", "Reply", "Actions"]}
+            emptyLabel={loading ? "Loading reviews…" : "No reviews have been read yet"}
+            rows={reviews.map((r) => {
+              const reply = replyFor(r.id);
+              return [
+                <span key="r">
+                  {r.author_name ?? "A Google reviewer"}
+                  <span className="block text-xs text-muted-foreground">
+                    {(r.comment ?? "No words").slice(0, 80)}
+                    {(r.comment ?? "").length > 80 ? "…" : ""}
+                  </span>
+                  {r.gone_at && (
+                    <span className="block text-xs text-destructive">
+                      No longer on the profile
+                    </span>
+                  )}
+                </span>,
+                <span key="s">{r.star_rating ?? "—"}</span>,
+                <span key="w">{dayOrDash(r.reviewed_at)}</span>,
+                <span key="p" className={r.captured_proof_id ? "text-brand-strong" : "text-muted-foreground"}>
+                  {r.captured_proof_id ? "captured" : "not captured"}
+                </span>,
+                <span key="y" className="text-xs">
+                  {reply ? reply.status.replace(/_/g, " ") : "none"}
+                </span>,
+                <ActionMenu
+                  key="a"
+                  name={r.author_name ?? "this review"}
+                  busy={busy === r.id}
+                  items={[
+                    ...(!r.captured_proof_id && r.comment
+                      ? [{
+                          label: "Capture as proof",
+                          onSelect: () =>
+                            void act(
+                              r.id,
+                              async () => {
+                                const { error: rpcError } = await supabase.rpc(
+                                  "capture_google_review_as_proof_v6",
+                                  { p_review_id: r.id },
+                                );
+                                if (rpcError) throw new Error(rpcError.message);
+                              },
+                              "Captured into the Proof Bank, uncleared.",
+                            ),
+                        }]
+                      : []),
+                    ...(!reply && !r.gone_at
+                      ? [{ label: "Draft a reply", onSelect: () => setReplyingTo(r) }]
+                      : []),
+                    ...(reply && (reply.status === "drafted" || reply.status === "awaiting_approval")
+                      ? [
+                          {
+                            label: "Approve this reply",
+                            onSelect: () =>
+                              void act(
+                                r.id,
+                                async () => {
+                                  const { error: rpcError } = await supabase.rpc(
+                                    "decide_google_review_reply_v6",
+                                    { p_reply_id: reply.id, p_approved: true },
+                                  );
+                                  if (rpcError) throw new Error(rpcError.message);
+                                },
+                                "Approved. It posts when the adapter runs.",
+                              ),
+                          },
+                          {
+                            label: "Reject it",
+                            onSelect: () => {
+                              const why = window.prompt("Why is this reply not going out?");
+                              if (why?.trim()) {
+                                void act(
+                                  r.id,
+                                  async () => {
+                                    const { error: rpcError } = await supabase.rpc(
+                                      "decide_google_review_reply_v6",
+                                      { p_reply_id: reply.id, p_approved: false, p_reason: why.trim() },
+                                    );
+                                    if (rpcError) throw new Error(rpcError.message);
+                                  },
+                                  "Rejected.",
+                                );
+                              }
+                            },
+                          },
+                        ]
+                      : []),
+                  ]}
+                />,
+              ];
+            })}
+          />
+        </div>
+      )}
+
+      {tab === "posts" && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            A mirror, not a second publisher. These placements are made in Proof Distribution and
+            performed by the proof placement sweep; two things able to post to one profile is how
+            a client gets the same testimonial twice.
+          </p>
+          <DataTable
+            columns={["Status", "External record", "Attempts", "When"]}
+            emptyLabel={loading ? "Loading…" : "No proof has been placed on this profile"}
+            rows={placements.map((p) => [
+              <span key="s">{p.status.replace(/_/g, " ")}</span>,
+              <span key="e" className="font-mono text-xs">
+                {p.external_url ? (
+                  <a href={p.external_url} target="_blank" rel="noreferrer" className="underline">
+                    {p.external_id ?? "view"}
+                  </a>
+                ) : (
+                  (p.external_id ?? "—")
+                )}
+              </span>,
+              <span key="a">{p.attempts}</span>,
+              <span key="w">{dayOrDash(p.placed_at ?? p.created_at)}</span>,
+            ])}
+          />
+        </div>
+      )}
+
+      {tab === "metrics" && (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h3 className="font-semibold">Profile metrics</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Views, searches and actions come from the Business Profile performance API, which
+            nothing in this runtime calls yet. Rather than show zeroes that look like data, this
+            says so: the ingest is the next slice, and it needs the same{" "}
+            <code className="text-xs">google_business</code> credential the rest of this page is
+            waiting on.
+          </p>
+        </div>
+      )}
+
+      <FormModal
+        open={connecting}
+        onClose={() => setConnecting(false)}
+        title="Connect a Business Profile location"
+        submitLabel="Connect"
+        intro="The location as Google addresses it. Connecting records it; it reads nothing until a google_business credential exists on the Integrations page."
+        fields={[
+          {
+            name: "location_ref", label: "Location", kind: "text", required: true,
+            placeholder: "accounts/1184772/locations/7730991",
+            hint: "Copy it from the Business Profile API or the profile URL. The same handle proof placement uses.",
+          },
+          { name: "title", label: "What it is called", kind: "text", required: true },
+          { name: "address", label: "Address", kind: "text" },
+        ]}
+        onSubmit={async (values) => {
+          if (!clientId) throw new Error("No client selected.");
+          const { error: insertError } = await supabase.from("client_google_locations").insert({
+            client_id: clientId,
+            location_ref: String(values.location_ref).trim(),
+            title: String(values.title).trim(),
+            address: values.address ? String(values.address).trim() : null,
+          });
+          if (insertError) throw new Error(insertError.message);
+          setNotice("Connected. Nothing is read until a credential exists.");
+        }}
+        onSaved={() => {
+          setConnecting(false);
+          void refresh();
+        }}
+      />
+
+      <FormModal
+        open={replyingTo !== null}
+        onClose={() => setReplyingTo(null)}
+        title={replyingTo ? `Reply to ${replyingTo.author_name ?? "a review"}` : "Draft a reply"}
+        submitLabel="Save the draft"
+        intro="A reply is an external effect on somebody else's profile, so it waits for approval. The exact words are hashed: editing them afterwards means asking again."
+        fields={[
+          { name: "body", label: "Reply", kind: "textarea", required: true, rows: 5 },
+        ]}
+        onSubmit={async (values) => {
+          if (!replyingTo) throw new Error("No review selected.");
+          const { error: rpcError } = await supabase.rpc("draft_google_review_reply_v6", {
+            p_review_id: replyingTo.id,
+            p_body: String(values.body),
+          });
+          if (rpcError) throw new Error(rpcError.message);
+          setNotice("Drafted. It waits for a person.");
+        }}
+        onSaved={() => {
+          setReplyingTo(null);
+          void refresh();
+        }}
+      />
+    </div>
+  );
+}
