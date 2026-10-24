@@ -9008,6 +9008,190 @@ export type Database = {
           },
         ]
       }
+      motion_render_candidates: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          attempt: number
+          benchmark_note: string | null
+          brand_qa: string | null
+          brand_qa_detail: string | null
+          claim_qa: string | null
+          claim_qa_detail: string | null
+          client_id: string
+          created_at: string
+          duration_sec: number | null
+          id: string
+          job_id: string | null
+          poster_path: string | null
+          project_id: string
+          rejected_reason: string | null
+          render_path: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          attempt: number
+          benchmark_note?: string | null
+          brand_qa?: string | null
+          brand_qa_detail?: string | null
+          claim_qa?: string | null
+          claim_qa_detail?: string | null
+          client_id: string
+          created_at?: string
+          duration_sec?: number | null
+          id?: string
+          job_id?: string | null
+          poster_path?: string | null
+          project_id: string
+          rejected_reason?: string | null
+          render_path?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          attempt?: number
+          benchmark_note?: string | null
+          brand_qa?: string | null
+          brand_qa_detail?: string | null
+          claim_qa?: string | null
+          claim_qa_detail?: string | null
+          client_id?: string
+          created_at?: string
+          duration_sec?: number | null
+          id?: string
+          job_id?: string | null
+          poster_path?: string | null
+          project_id?: string
+          rejected_reason?: string | null
+          render_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_render_candidates_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "motion_design_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      motion_scenes: {
+        Row: {
+          beat: string
+          client_id: string
+          created_at: string
+          duration_sec: number
+          id: string
+          locked: boolean
+          position: number
+          project_id: string
+          proof_asset_id: string | null
+          script: string | null
+          start_sec: number
+          updated_at: string
+        }
+        Insert: {
+          beat: string
+          client_id: string
+          created_at?: string
+          duration_sec: number
+          id?: string
+          locked?: boolean
+          position: number
+          project_id: string
+          proof_asset_id?: string | null
+          script?: string | null
+          start_sec?: number
+          updated_at?: string
+        }
+        Update: {
+          beat?: string
+          client_id?: string
+          created_at?: string
+          duration_sec?: number
+          id?: string
+          locked?: boolean
+          position?: number
+          project_id?: string
+          proof_asset_id?: string | null
+          script?: string | null
+          start_sec?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_scenes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_scenes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "motion_scenes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "motion_design_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_scenes_proof_asset_id_fkey"
+            columns: ["proof_asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       opportunity_attributes: {
         Row: {
           body: string
@@ -15079,6 +15263,51 @@ export type Database = {
           },
         ]
       }
+      motion_candidate_due: {
+        Row: {
+          accepted_at: string | null
+          attempt: number | null
+          benchmark_note: string | null
+          blocker: string | null
+          brand_qa: string | null
+          brand_qa_detail: string | null
+          candidate_id: string | null
+          claim_qa: string | null
+          claim_qa_detail: string | null
+          client_id: string | null
+          preset: string | null
+          project_id: string | null
+          prompt: string | null
+          rejected_reason: string | null
+          render_path: string | null
+          scenes: number | null
+          scenes_citing_lost_proof: number | null
+          scenes_citing_proof: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_render_candidates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "motion_design_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mrr_from_billing: {
         Row: {
           mrr: number | null
@@ -15725,6 +15954,34 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "job_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      accept_motion_candidate_v6: {
+        Args: { p_accepted: boolean; p_candidate_id: string; p_reason?: string }
+        Returns: {
+          accepted_at: string | null
+          accepted_by: string | null
+          attempt: number
+          benchmark_note: string | null
+          brand_qa: string | null
+          brand_qa_detail: string | null
+          claim_qa: string | null
+          claim_qa_detail: string | null
+          client_id: string
+          created_at: string
+          duration_sec: number | null
+          id: string
+          job_id: string | null
+          poster_path: string | null
+          project_id: string
+          rejected_reason: string | null
+          render_path: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "motion_render_candidates"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -19216,6 +19473,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      seed_motion_scenes_v6: { Args: { p_project_id: string }; Returns: number }
       select_idea_for_slot: {
         Args: { p_slot_id: string }
         Returns: {

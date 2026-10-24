@@ -6,6 +6,7 @@ import { OfferLiveUsePanel } from "./offer/OfferLiveUsePanel";
 import { MetaBuildApprovalPanel } from "./campaigns/MetaBuildApprovalPanel";
 import { GoogleProfilePanel } from "./google-profile/GoogleProfilePanel";
 import { MetaProfilePanel } from "./distribution/MetaProfilePanel";
+import { MotionScenesPanel } from "./motion/MotionScenesPanel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -309,6 +310,11 @@ function getPanelBody(
 ): ReactNode {
   if (node.id === "proof-production-factory" && view === "v2") return <ProofFactoryV2Panel tab={activeTab?.id ?? "capture"} />;
   if (node.id === "campaign-factory" && view === "v2") return <CampaignExecutionPanel />;
+  if (node.id === "motion-design" && view === "v2") {
+    if (activeTab?.id === "renders") return <MotionScenesPanel tab="renders" />;
+    if (activeTab?.id === "brief") return <MotionDesignPanel />;
+    return <MotionScenesPanel tab="scenes" />;
+  }
   if (node.id === "meta-profile" && view === "v2") {
     if (activeTab?.id === "profile") return <MetaProfilePanel tab="profile" />;
     if (activeTab?.id === "presence") return <MetaProfilePanel tab="presence" />;
@@ -368,7 +374,7 @@ export function Page({ node }: { node: NavNode }) {
     && node.id !== "campaign-factory" && node.id !== "proof-production-factory"
     && node.id !== "sales-os" && node.id !== "website-studio"
     && node.id !== "offer-studio" && node.id !== "meta-ads-studio"
-    && node.id !== "meta-profile";
+    && node.id !== "meta-profile" && node.id !== "motion-design";
   const tabs = node.id === "intelligence-os"
     ? node.tabs?.filter((tab) => strategyTabIds.has(tab.id) === (view === "strategy"))
     : node.id === "proof-production-factory" && view === "v2" ? [{id:"capture",label:"Capture"},{id:"produce",label:"Produce"},{id:"repurpose",label:"Repurpose"},{id:"assets",label:"Assets"}]
@@ -390,6 +396,11 @@ export function Page({ node }: { node: NavNode }) {
          { id: "offer-strategy", label: "Offer Strategy" }]
     // Meta Ads v2 leads with Build, which is the decision that lifts v1's
     // blanket refusal. Activation is not a tab, because it is not built.
+    // Motion Design v2 adds Scenes and Renders beside v1's own page, which
+    // stays on its first tab: the quick prompt-and-preset path still works.
+    : node.id === "motion-design" && view === "v2"
+      ? [{ id: "scenes", label: "Scenes" }, { id: "renders", label: "Renders" },
+         { id: "brief", label: "Brief" }]
     // Meta Profile v2 leads with Identities, the question v1 could not ask.
     : node.id === "meta-profile" && view === "v2"
       ? [{ id: "identities", label: "Identities" }, { id: "profile", label: "Profile" },
