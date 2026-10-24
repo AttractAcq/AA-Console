@@ -748,6 +748,27 @@ describe("the proof placement sweep", () => {
   });
 });
 
+describe("the guard that pins its own search path", () => {
+  it("leaves no trigger function from 230 with a mutable path", async () => {
+    // 224 took one of these off Supabase's linter for 218; 230 copied 218's
+    // pattern and its omission, and 233 is the same one-line fix. Asserted
+    // against the catalog rather than the file, so adding a guard without a
+    // path fails here rather than on the linter a week later.
+    await db.exec(await sql("20261022120000_233_the_action_event_guard_pins_its_path.sql"));
+    const mutable = await rows<{ proname: string }>(`
+      select p.proname from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and p.prokind = 'f'
+         and p.proname in ('guard_campaign_action_event_append_only',
+                           'guard_campaign_action_execution')
+         and not exists (
+           select 1 from unnest(coalesce(p.proconfig, '{}')) as c
+            where c like 'search_path=%')`);
+    expect(mutable.map((row) => row.proname)).toEqual([]);
+  });
+});
+
 describe("the grant sweep every definer migration has to end with", () => {
   it("is called by both migrations", async () => {
     // Supabase grants EXECUTE on every new function in `public` to anon,

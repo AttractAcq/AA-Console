@@ -5,13 +5,14 @@ import { Search } from "lucide-react";
 import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
 import { ActionMenu } from "../../components/ActionMenu";
-import { ConfirmModal } from "../../components/forms/FormModal";
+import { ConfirmModal, FormModal } from "../../components/forms/FormModal";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { enqueueAgentJob } from "../../lib/supabase";
 import { dayOrDash } from "../../lib/contentRecords";
 import {
   ATTRIBUTE_KINDS, AWARENESS_STAGES, CLASSIFICATION_HINT, CONFIDENCE_LEVELS,
+  createCampaignFromOpportunity,
   fetchOpportunities, fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
   setAttributes, setAwarenessStage, setConfidence, setFields, setStatus,
   type Opportunity, type OpportunityConfidence, type Readiness, type ScoreFactor,
@@ -52,6 +53,8 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [discovering, setDiscovering] = useState(false);
+  /** The opportunity a campaign is being created from, if any. */
+  const [building, setBuilding] = useState<Opportunity | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -160,6 +163,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
           busy={busy}
           onSelect={select}
           onAct={act}
+          onBuild={setBuilding}
         />
       )}
       {view !== "discover" && view !== "activate" && !selected && (
@@ -178,6 +182,68 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
           setNotice("Looking. Anything found appears here as a hypothesis.");
         }}
         onDone={refresh}
+      />
+
+      {/* Creating the campaign is where the opportunity work either reaches
+          the rest of the system or stops being used. The route is the one
+          question a person has to answer, because 203 makes it immutable:
+          the other route is a second campaign, not an edit. */}
+      <FormModal
+        open={building !== null}
+        onClose={() => setBuilding(null)}
+        title={building ? `Create a campaign for ${building.name}` : "Create a campaign"}
+        submitLabel="Create and plan"
+        intro="The campaign takes this opportunity's problem, outcome, trigger, positioning and objections as its brief, and binds the approved offer it is linked to. The route cannot be changed afterwards — the other route is a second campaign with its own lineage. Planning runs straight after, and costs what a plan costs."
+        fields={[
+          {
+            name: "acquisition_mode", label: "Route", kind: "select", required: true,
+            options: [
+              { value: "organic", label: "Organic" },
+              { value: "paid", label: "Paid" },
+            ],
+            hint: "A campaign is one or the other, for its whole life.",
+          },
+          {
+            name: "paid_platform", label: "Paid platform", kind: "select",
+            showIf: { field: "acquisition_mode", equals: ["paid"] },
+            options: [
+              { value: "meta", label: "Meta Ads" },
+              { value: "google", label: "Google Ads (no builder yet)" },
+            ],
+          },
+          {
+            name: "name", label: "Campaign name", kind: "text",
+            placeholder: building?.name ?? "",
+            hint: "Left blank, it takes the opportunity's name.",
+          },
+        ]}
+        onSubmit={async (values) => {
+          if (!building) throw new Error("No opportunity selected.");
+          const mode = values.acquisition_mode === "paid" ? "paid" : "organic";
+          const platform = values.paid_platform === "google" ? "google" : "meta";
+          if (mode === "paid" && !values.paid_platform) {
+            throw new Error("Choose Meta Ads or Google Ads for a paid campaign.");
+          }
+          const campaign = await createCampaignFromOpportunity({
+            opportunityId: building.id,
+            acquisitionMode: mode,
+            paidPlatform: mode === "paid" ? platform : null,
+            name: typeof values.name === "string" ? values.name : null,
+          });
+          // Queued separately, exactly as the Campaign Factory form does it,
+          // so that creating a campaign never silently spends on a plan.
+          await enqueueAgentJob({
+            agentKey: "campaign_plan",
+            clientId: clientId!,
+            inputTable: "client_campaigns",
+            inputId: campaign.id,
+          });
+          setNotice(`${campaign.name} created. The planner is writing it now.`);
+        }}
+        onSaved={() => {
+          setBuilding(null);
+          void refresh();
+        }}
       />
     </div>
   );
@@ -631,13 +697,14 @@ function StrategizeView({
 }
 
 function ActivateView({
-  opportunities, readiness, busy, onSelect, onAct,
+  opportunities, readiness, busy, onSelect, onAct, onBuild,
 }: {
   opportunities: Opportunity[];
   readiness: ReadonlyMap<string, Readiness>;
   busy: string | null;
   onSelect: (id: string) => void;
   onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
+  onBuild: (opportunity: Opportunity) => void;
 }) {
   const live = opportunities.filter((o) => o.status !== "rejected");
   return (
@@ -674,6 +741,13 @@ function ActivateView({
                       label: "Approve",
                       onSelect: () => void onAct(o.id, () => setStatus(o.id, "approved"), "Approved."),
                     }]
+                  : []),
+                // The hand-off. Offered from approved onwards and only while
+                // nothing is blocking, because the database refuses it
+                // otherwise and a button that always fails is worse than no
+                // button.
+                ...(["approved", "active", "learning", "scaling"].includes(o.status) && !r?.blocker
+                  ? [{ label: "Create a campaign", onSelect: () => onBuild(o) }]
                   : []),
                 ...(o.status === "approved"
                   ? [{

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
+import { fetchCampaignOrigins, type CampaignOrigin } from "../../lib/opportunities";
 import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
@@ -130,6 +131,8 @@ export function CampaignExecutionPanel() {
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [readiness, setReadiness] = useState<Record<string, Requirement[]>>({});
+  /** Why each campaign exists, where an opportunity says so. */
+  const [origins, setOrigins] = useState<ReadonlyMap<string, CampaignOrigin>>(new Map());
   const [newOpen, setNewOpen] = useState(false);
   const [cloneSource, setCloneSource] = useState<Campaign | null>(null);
   const [planIdeaChoices, setPlanIdeaChoices] = useState<Record<string, boolean>>({});
@@ -198,6 +201,18 @@ export function CampaignExecutionPanel() {
       if (error) throw error;
       const rows = (data ?? []) as Campaign[];
       setCampaigns(rows);
+
+      // Lineage, not status: a campaign with no recorded commercial reason
+      // is the normal case for everything made before the opportunity
+      // engine existed, so a failure here leaves the page working and the
+      // line absent rather than failing the load.
+      void fetchCampaignOrigins(clientId)
+        .then((found) => {
+          if (version === request.current) setOrigins(found);
+        })
+        .catch(() => {
+          if (version === request.current) setOrigins(new Map());
+        });
 
       // Readiness is computed in the database from the real artifacts, never
       // stored — so it is fetched per campaign rather than read off a column.
@@ -541,6 +556,38 @@ export function CampaignExecutionPanel() {
                   </p></div>
                 <button type="button" className={buttonClass} onClick={() => setEditing(c)}>Edit campaign</button>
               </div>
+              {/* Why this campaign exists, where something says so. Read from
+                  the opportunity as it stands now rather than copied at
+                  creation: a campaign built on something since paused should
+                  say that, not carry a snapshot of how it looked in October. */}
+              {origins.get(c.id) && (() => {
+                const origin = origins.get(c.id)!;
+                return (
+                  <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3 text-xs">
+                    <p>
+                      <span className="text-muted-foreground">Built for the opportunity </span>
+                      <Link
+                        className="font-medium text-brand-strong underline"
+                        to={`/clients/${clientId}/delivery/market-opportunities?view=evaluate&opportunity=${origin.opportunity_id}`}
+                      >
+                        {origin.opportunity_name}
+                      </Link>
+                      <span className="text-muted-foreground">
+                        {" "}· {origin.opportunity_status}
+                        {origin.score != null && ` · scored ${origin.score}`}
+                        {origin.classification && ` (${origin.classification})`}
+                        {" "}· {origin.confidence.replaceAll("_", " ")}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-muted-foreground">{origin.micro_market}</p>
+                    {origin.opportunity_blocker && (
+                      <p className="mt-1 text-destructive">
+                        The opportunity behind this is no longer ready: {origin.opportunity_blocker}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
               <dl className="mt-4 grid gap-4 border-t border-border pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 <div><dt className="text-muted-foreground">Brief</dt><dd className="whitespace-pre-wrap">{c.brief}</dd></div>
                 <div><dt className="text-muted-foreground">Objective</dt><dd>{c.objective ?? "Awaiting plan"}</dd></div>

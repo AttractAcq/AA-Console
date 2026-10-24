@@ -658,6 +658,202 @@ export type Database = {
           },
         ]
       }
+      campaign_action_events: {
+        Row: {
+          actor: string
+          client_id: string
+          detail: string | null
+          event: string
+          execution_id: string
+          external_ref: string | null
+          id: string
+          occurred_at: string
+        }
+        Insert: {
+          actor: string
+          client_id: string
+          detail?: string | null
+          event: string
+          execution_id: string
+          external_ref?: string | null
+          id?: string
+          occurred_at?: string
+        }
+        Update: {
+          actor?: string
+          client_id?: string
+          detail?: string | null
+          event?: string
+          execution_id?: string
+          external_ref?: string | null
+          id?: string
+          occurred_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_action_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_events_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_events_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_action_executions: {
+        Row: {
+          action_key: string
+          approval_id: string
+          artifact_version_hash: string
+          attempts: number
+          campaign_id: string
+          claimed_at: string | null
+          client_id: string
+          created_at: string
+          executed_at: string | null
+          external_id: string | null
+          external_url: string | null
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          manifest_id: string
+          result: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          action_key: string
+          approval_id: string
+          artifact_version_hash: string
+          attempts?: number
+          campaign_id: string
+          claimed_at?: string | null
+          client_id: string
+          created_at?: string
+          executed_at?: string | null
+          external_id?: string | null
+          external_url?: string | null
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          manifest_id: string
+          result?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          action_key?: string
+          approval_id?: string
+          artifact_version_hash?: string
+          attempts?: number
+          campaign_id?: string
+          claimed_at?: string | null
+          client_id?: string
+          created_at?: string
+          executed_at?: string | null
+          external_id?: string | null
+          external_url?: string | null
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          manifest_id?: string
+          result?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_action_executions_action_key_fkey"
+            columns: ["action_key"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_executors"
+            referencedColumns: ["action_key"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      campaign_action_executors: {
+        Row: {
+          action_key: string
+          executor_module: string
+          note: string
+          supported: boolean
+        }
+        Insert: {
+          action_key: string
+          executor_module: string
+          note: string
+          supported?: boolean
+        }
+        Update: {
+          action_key?: string
+          executor_module?: string
+          note?: string
+          supported?: boolean
+        }
+        Relationships: []
+      }
       campaign_artifact_offer_inputs: {
         Row: {
           artifact_id: string
@@ -1242,6 +1438,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "campaign_action_approvals"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
           },
           {
             foreignKeyName: "campaign_page_approval_snapshots_client_id_fkey"
@@ -2740,6 +2943,9 @@ export type Database = {
           approval_mode: string
           auto_approve_briefs: boolean
           auto_approve_ideas: boolean
+          campaign_actions_enabled: boolean
+          campaign_actions_enabled_at: string | null
+          campaign_actions_enabled_by: string | null
           client_id: string
           created_at: string
           enabled: boolean
@@ -2761,6 +2967,9 @@ export type Database = {
           approval_mode?: string
           auto_approve_briefs?: boolean
           auto_approve_ideas?: boolean
+          campaign_actions_enabled?: boolean
+          campaign_actions_enabled_at?: string | null
+          campaign_actions_enabled_by?: string | null
           client_id: string
           created_at?: string
           enabled?: boolean
@@ -2782,6 +2991,9 @@ export type Database = {
           approval_mode?: string
           auto_approve_briefs?: boolean
           auto_approve_ideas?: boolean
+          campaign_actions_enabled?: boolean
+          campaign_actions_enabled_at?: string | null
+          campaign_actions_enabled_by?: string | null
           client_id?: string
           created_at?: string
           enabled?: boolean
@@ -2800,6 +3012,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_engine_settings_campaign_actions_enabled_by_fkey"
+            columns: ["campaign_actions_enabled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_engine_settings_client_id_fkey"
             columns: ["client_id"]
@@ -7269,6 +7488,13 @@ export type Database = {
             foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "campaign_origins"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "market_opportunities"
             referencedColumns: ["id"]
           },
@@ -7334,6 +7560,13 @@ export type Database = {
             foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "campaign_origins"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "market_opportunities"
             referencedColumns: ["id"]
           },
@@ -7388,6 +7621,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_origins"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_events_opportunity_id_fkey"
@@ -7476,6 +7716,13 @@ export type Database = {
             foreignKeyName: "opportunity_links_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "campaign_origins"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "market_opportunities"
             referencedColumns: ["id"]
           },
@@ -7537,6 +7784,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_origins"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
@@ -7630,6 +7884,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_origins"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_scores_opportunity_id_fkey"
@@ -8390,6 +8651,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaign_action_approvals"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_campaign_action_approval_id_fkey"
+            columns: ["campaign_action_approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
           },
           {
             foreignKeyName: "proof_placement_approvals_client_id_fkey"
@@ -11948,6 +12216,85 @@ export type Database = {
           },
         ]
       }
+      campaign_action_due: {
+        Row: {
+          action_key: string | null
+          approval_id: string | null
+          artifact_version_hash: string | null
+          attempts: number | null
+          blocker: string | null
+          campaign_id: string | null
+          client_id: string | null
+          destination: string | null
+          execution_id: string | null
+          execution_status: string | null
+          executor_module: string | null
+          external_id: string | null
+          external_url: string | null
+          last_error: string | null
+          manifest_id: string | null
+          scope: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_action_approvals_manifest_id_campaign_id_client_i_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_manifest_versions"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+        ]
+      }
+      campaign_origins: {
+        Row: {
+          buying_situation: string | null
+          campaign_id: string | null
+          classification: string | null
+          client_id: string | null
+          confidence:
+            | Database["public"]["Enums"]["opportunity_confidence"]
+            | null
+          micro_market: string | null
+          open_proof_gaps: number | null
+          opportunity_blocker: string | null
+          opportunity_id: string | null
+          opportunity_name: string | null
+          opportunity_status:
+            | Database["public"]["Enums"]["opportunity_status"]
+            | null
+          score: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       campaign_totals: {
         Row: {
           active_campaigns: number | null
@@ -13702,6 +14049,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      claim_campaign_actions: {
+        Args: { p_limit?: number }
+        Returns: {
+          action_key: string
+          approval_id: string
+          artifact_version_hash: string
+          attempt: number
+          campaign_id: string
+          client_id: string
+          destination: string
+          execution_id: string
+          manifest_id: string
+          scope: Json
+        }[]
+      }
       claim_daily_recovery_alert: {
         Args: { p_lease_seconds?: number; p_worker: string }
         Returns: {
@@ -13922,6 +14284,67 @@ export type Database = {
           p_visual_direction: string
         }
         Returns: string
+      }
+      create_campaign_from_opportunity_v6: {
+        Args: {
+          p_acquisition_mode: string
+          p_name?: string
+          p_opportunity_id: string
+          p_paid_platform?: string
+        }
+        Returns: {
+          acquisition_mode: string
+          ad_campaign_id: string | null
+          archived_at: string | null
+          audience: string | null
+          brief: string
+          budget: number | null
+          built_at: string | null
+          channels: string[]
+          client_id: string
+          cloned_from_campaign_id: string | null
+          content_count: number
+          content_ideas_generated_at: string | null
+          conversion_event: string | null
+          core_message: string | null
+          created_at: string
+          daily_budget: number | null
+          ends_on: string | null
+          entry_state: Database["public"]["Enums"]["audience_state"] | null
+          exit_state: Database["public"]["Enums"]["audience_state"] | null
+          feeds_from_campaign_id: string | null
+          id: string
+          ideate_on_plan: boolean
+          job_id: string | null
+          kpi_metric: string | null
+          kpi_target: number | null
+          launched_at: string | null
+          meta_ad_set_id: string | null
+          meta_built_at: string | null
+          meta_campaign_id: string | null
+          mirrors_template:
+            | Database["public"]["Enums"]["campaign_template"]
+            | null
+          name: string
+          needs_landing_page: boolean
+          needs_sales_agent: boolean
+          objective: string | null
+          offer_summary: string | null
+          offer_version_id: string | null
+          optimisation_event: string | null
+          paid_platform: string | null
+          starts_on: string | null
+          status: string
+          target_countries: string[]
+          template: Database["public"]["Enums"]["campaign_template"] | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_campaigns"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_campaign_manifest_v6: {
         Args: {
@@ -14441,6 +14864,7 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_campaign_action_sweep: { Args: never; Returns: string }
       enqueue_format_ideation: {
         Args: {
           p_client_id: string
@@ -14464,6 +14888,7 @@ export type Database = {
         Args: { p_days?: number }
         Returns: number
       }
+      enqueue_proof_placement_sweep: { Args: never; Returns: string }
       enqueue_publish_sweep: { Args: never; Returns: string }
       enqueue_scoped_ideation: {
         Args: {
@@ -15313,6 +15738,10 @@ export type Database = {
         }[]
       }
       next_ref_number: { Args: { p_client_id: string }; Returns: string }
+      opportunity_brief_v6: {
+        Args: { p_opportunity_id: string }
+        Returns: string
+      }
       pause_agent_job: {
         Args: { p_job_id: string; p_reason: string }
         Returns: {
@@ -15410,6 +15839,8 @@ export type Database = {
           created: string
         }[]
       }
+      reap_stale_campaign_action_claims: { Args: never; Returns: number }
+      reap_stale_proof_placement_claims: { Args: never; Returns: number }
       reap_stale_publish_claims: {
         Args: { p_older_than?: string }
         Returns: number
@@ -15452,6 +15883,23 @@ export type Database = {
           steps_for_qa: number
           steps_queued: number
         }[]
+      }
+      record_campaign_action_executed: {
+        Args: {
+          p_execution_id: string
+          p_external_id?: string
+          p_external_url?: string
+          p_result?: Json
+        }
+        Returns: undefined
+      }
+      record_campaign_action_failure: {
+        Args: {
+          p_execution_id: string
+          p_reason: string
+          p_retryable?: boolean
+        }
+        Returns: undefined
       }
       record_client_launch_asset_check: {
         Args: { p_asset_id: string; p_package_id: string; p_qa_evidence: Json }
@@ -15788,6 +16236,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      release_campaign_proof_placements: {
+        Args: { p_execution_id: string }
+        Returns: Json
+      }
       remove_engine_window: {
         Args: { p_window_id: string }
         Returns: undefined
@@ -15867,6 +16319,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      request_campaign_proof_publish_v6: {
+        Args: { p_actor: string; p_campaign_id: string }
+        Returns: string
       }
       request_human_video_edit: {
         Args: { p_asset_id: string; p_due_date?: string; p_member_id: string }
@@ -16397,6 +16853,39 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_campaign_actions_enabled: {
+        Args: { p_client_id: string; p_enabled: boolean }
+        Returns: {
+          approval_mode: string
+          auto_approve_briefs: boolean
+          auto_approve_ideas: boolean
+          campaign_actions_enabled: boolean
+          campaign_actions_enabled_at: string | null
+          campaign_actions_enabled_by: string | null
+          client_id: string
+          created_at: string
+          enabled: boolean
+          enabled_at: string | null
+          enabled_by: string | null
+          format_mix: Json
+          max_jobs_in_flight: number
+          min_qa_score: number
+          plan_horizon_days: number
+          proof_publishing_enabled: boolean
+          proof_publishing_enabled_at: string | null
+          proof_publishing_enabled_by: string | null
+          publishing_enabled: boolean
+          publishing_enabled_at: string | null
+          publishing_enabled_by: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_engine_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_content_approval_owner: {
         Args: { p_user_id: string }
         Returns: undefined
@@ -16411,6 +16900,9 @@ export type Database = {
           approval_mode: string
           auto_approve_briefs: boolean
           auto_approve_ideas: boolean
+          campaign_actions_enabled: boolean
+          campaign_actions_enabled_at: string | null
+          campaign_actions_enabled_by: string | null
           client_id: string
           created_at: string
           enabled: boolean
@@ -16475,6 +16967,9 @@ export type Database = {
           approval_mode: string
           auto_approve_briefs: boolean
           auto_approve_ideas: boolean
+          campaign_actions_enabled: boolean
+          campaign_actions_enabled_at: string | null
+          campaign_actions_enabled_by: string | null
           client_id: string
           created_at: string
           enabled: boolean
@@ -16590,6 +17085,9 @@ export type Database = {
           approval_mode: string
           auto_approve_briefs: boolean
           auto_approve_ideas: boolean
+          campaign_actions_enabled: boolean
+          campaign_actions_enabled_at: string | null
+          campaign_actions_enabled_by: string | null
           client_id: string
           created_at: string
           enabled: boolean
@@ -16620,6 +17118,9 @@ export type Database = {
           approval_mode: string
           auto_approve_briefs: boolean
           auto_approve_ideas: boolean
+          campaign_actions_enabled: boolean
+          campaign_actions_enabled_at: string | null
+          campaign_actions_enabled_by: string | null
           client_id: string
           created_at: string
           enabled: boolean
