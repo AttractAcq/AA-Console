@@ -5,6 +5,7 @@ import { CampaignPagePublishPanel } from "./sites/CampaignPagePublishPanel";
 import { OfferLiveUsePanel } from "./offer/OfferLiveUsePanel";
 import { MetaBuildApprovalPanel } from "./campaigns/MetaBuildApprovalPanel";
 import { GoogleProfilePanel } from "./google-profile/GoogleProfilePanel";
+import { MetaProfilePanel } from "./distribution/MetaProfilePanel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -308,6 +309,12 @@ function getPanelBody(
 ): ReactNode {
   if (node.id === "proof-production-factory" && view === "v2") return <ProofFactoryV2Panel tab={activeTab?.id ?? "capture"} />;
   if (node.id === "campaign-factory" && view === "v2") return <CampaignExecutionPanel />;
+  if (node.id === "meta-profile" && view === "v2") {
+    if (activeTab?.id === "profile") return <MetaProfilePanel tab="profile" />;
+    if (activeTab?.id === "presence") return <MetaProfilePanel tab="presence" />;
+    if (activeTab?.id === "reporting") return <OrganicReportingPanel />;
+    return <MetaProfilePanel tab="identities" />;
+  }
   if (node.id === "meta-ads-studio" && view === "v2") {
     if (activeTab?.id === "campaigns") return <CampaignExecutionPanel />;
     if (activeTab?.id === "paid") return <PaidPanel />;
@@ -360,7 +367,8 @@ export function Page({ node }: { node: NavNode }) {
   const v2Blank = view === "v2" && node.id !== "content-production-factory"
     && node.id !== "campaign-factory" && node.id !== "proof-production-factory"
     && node.id !== "sales-os" && node.id !== "website-studio"
-    && node.id !== "offer-studio" && node.id !== "meta-ads-studio";
+    && node.id !== "offer-studio" && node.id !== "meta-ads-studio"
+    && node.id !== "meta-profile";
   const tabs = node.id === "intelligence-os"
     ? node.tabs?.filter((tab) => strategyTabIds.has(tab.id) === (view === "strategy"))
     : node.id === "proof-production-factory" && view === "v2" ? [{id:"capture",label:"Capture"},{id:"produce",label:"Produce"},{id:"repurpose",label:"Repurpose"},{id:"assets",label:"Assets"}]
@@ -382,6 +390,10 @@ export function Page({ node }: { node: NavNode }) {
          { id: "offer-strategy", label: "Offer Strategy" }]
     // Meta Ads v2 leads with Build, which is the decision that lifts v1's
     // blanket refusal. Activation is not a tab, because it is not built.
+    // Meta Profile v2 leads with Identities, the question v1 could not ask.
+    : node.id === "meta-profile" && view === "v2"
+      ? [{ id: "identities", label: "Identities" }, { id: "profile", label: "Profile" },
+         { id: "presence", label: "Presence" }, { id: "reporting", label: "Outcomes" }]
     : node.id === "meta-ads-studio" && view === "v2"
       ? [{ id: "build", label: "Build" }, { id: "campaigns", label: "Campaign Builds" },
          { id: "paid", label: "Paid Distribution" }, { id: "reporting", label: "Paid Reporting" }]
