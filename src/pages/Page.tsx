@@ -1,5 +1,6 @@
 import { ProofFactoryV2Panel } from "./proof-bank/ProofFactoryV2Panel";
 import { LeadMagnetStudioPanel } from "./lead-magnet/LeadMagnetStudioPanel";
+import { LeadCapturePanel } from "./sales/LeadCapturePanel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -297,6 +298,11 @@ function getPanelBody(
 ): ReactNode {
   if (node.id === "proof-production-factory" && view === "v2") return <ProofFactoryV2Panel tab={activeTab?.id ?? "capture"} />;
   if (node.id === "campaign-factory" && view === "v2") return <CampaignExecutionPanel />;
+  if (node.id === "sales-os" && view === "v2") {
+    if (activeTab?.id === "capture") return <LeadCapturePanel />;
+    if (activeTab?.id === "agents") return <SalesOverviewPanel />;
+    return <ProspectsLeadsPanel />;
+  }
   if (node.id === "content-production-factory" && view === "v2") {
     switch (activeTab?.id) {
       case "generation": return <GenerationPanel showJourney={false} />;
@@ -324,11 +330,19 @@ export function Page({ node }: { node: NavNode }) {
   const requestedView = searchParams.get("view");
   const view = node.id === "intelligence-os" ? requestedView === "strategy" ? "strategy" : "intelligence"
     : requestedView === "v2" && node.sidebarViews?.some((item) => item.id === "v2") ? "v2" : "v1";
-  const v2Blank = view === "v2" && node.id !== "content-production-factory" && node.id !== "campaign-factory" && node.id !== "proof-production-factory";
+  const v2Blank = view === "v2" && node.id !== "content-production-factory"
+    && node.id !== "campaign-factory" && node.id !== "proof-production-factory"
+    && node.id !== "sales-os";
   const tabs = node.id === "intelligence-os"
     ? node.tabs?.filter((tab) => strategyTabIds.has(tab.id) === (view === "strategy"))
     : node.id === "proof-production-factory" && view === "v2" ? [{id:"capture",label:"Capture"},{id:"produce",label:"Produce"},{id:"repurpose",label:"Repurpose"},{id:"assets",label:"Assets"}]
     : node.id === "campaign-factory" && view === "v2" ? undefined
+    // Sales OS v2 leads with Capture, because where a lead came from is the
+    // question v1 could never answer. Pipeline and Agents are v1's panels,
+    // unchanged.
+    : node.id === "sales-os" && view === "v2"
+      ? [{ id: "capture", label: "Capture" }, { id: "leads", label: "Pipeline" },
+         { id: "agents", label: "Agents" }]
     : node.id === "content-production-factory" && view === "v2"
       ? [
         { id: "generation", label: "Ideation" }, { id: "briefs", label: "Briefs" },

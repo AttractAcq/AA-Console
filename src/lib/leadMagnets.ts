@@ -2,6 +2,8 @@ import { supabase } from "./supabase";
 import { uploadThen } from "./options";
 import type { Database } from "../types/database";
 
+export type { CaptureDue, CaptureEndpoint, LeadSubmission } from "./leadCapture";
+
 /**
  * Lead Magnet Studio, from the browser's side.
  *
@@ -18,9 +20,6 @@ export type LeadMagnet = Database["public"]["Tables"]["lead_magnets"]["Row"];
 export type LeadMagnetVersion = Database["public"]["Tables"]["lead_magnet_versions"]["Row"];
 export type LeadMagnetApproval = Database["public"]["Tables"]["lead_magnet_approvals"]["Row"];
 export type LeadMagnetDue = Database["public"]["Views"]["lead_magnet_due"]["Row"];
-export type CaptureEndpoint = Database["public"]["Tables"]["lead_capture_endpoints"]["Row"];
-export type CaptureDue = Database["public"]["Views"]["lead_capture_due"]["Row"];
-export type LeadSubmission = Database["public"]["Tables"]["lead_submissions"]["Row"];
 
 export const MAGNET_FORMATS = [
   { value: "pdf_guide", label: "PDF guide" },
@@ -75,36 +74,6 @@ export async function fetchDeliveriesDue(clientId: string): Promise<LeadMagnetDu
     .from("lead_magnet_due")
     .select("*")
     .eq("client_id", clientId);
-  if (error) throw new Error(error.message);
-  return data ?? [];
-}
-
-export async function fetchEndpoints(
-  clientId: string,
-): Promise<{ endpoints: CaptureEndpoint[]; due: Map<string, CaptureDue> }> {
-  const [rows, blockers] = await Promise.all([
-    supabase
-      .from("lead_capture_endpoints")
-      .select("*")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false }),
-    supabase.from("lead_capture_due").select("*").eq("client_id", clientId),
-  ]);
-  if (rows.error) throw new Error(rows.error.message);
-  if (blockers.error) throw new Error(blockers.error.message);
-  return {
-    endpoints: rows.data ?? [],
-    due: new Map((blockers.data ?? []).map((row) => [String(row.endpoint_id), row])),
-  };
-}
-
-export async function fetchSubmissions(clientId: string): Promise<LeadSubmission[]> {
-  const { data, error } = await supabase
-    .from("lead_submissions")
-    .select("*")
-    .eq("client_id", clientId)
-    .order("created_at", { ascending: false })
-    .limit(200);
   if (error) throw new Error(error.message);
   return data ?? [];
 }
@@ -234,61 +203,6 @@ export async function revokeApproval(approvalId: string, reason: string): Promis
   const { error } = await supabase.rpc("revoke_lead_magnet_approval_v6", {
     p_approval_id: approvalId,
     p_reason: reason,
-  });
-  if (error) throw new Error(error.message);
-}
-
-/**
- * Open a capture endpoint, and hand the token back exactly once.
- *
- * Only the hash is stored, so this is the only moment the token exists in a
- * readable form. Losing it means issuing a new endpoint rather than reading
- * the old one back.
- */
-export async function createEndpoint(args: {
-  clientId: string;
-  purpose: "magnet_optin" | "page_form" | "agent_handoff";
-  consentWording: string;
-  campaignId?: string | null;
-  pageId?: string | null;
-  sourceChannel?: string | null;
-  magnetVersionId?: string | null;
-  days?: number;
-}): Promise<{ endpointId: string; token: string }> {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  const token = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  const hash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-
-  const { data, error } = await supabase.rpc("create_lead_capture_endpoint_v6", {
-    p_client_id: args.clientId,
-    p_purpose: args.purpose,
-    p_token_hash: hash,
-    p_consent_wording: args.consentWording.trim(),
-    ...(args.campaignId ? { p_campaign_id: args.campaignId } : {}),
-    ...(args.pageId ? { p_page_id: args.pageId } : {}),
-    ...(args.sourceChannel ? { p_source_channel: args.sourceChannel } : {}),
-    ...(args.days ? { p_days: args.days } : {}),
-  });
-  if (error) throw new Error(error.message);
-  const row = (Array.isArray(data) ? data[0] : data) as { id: string } | null;
-  if (!row?.id) throw new Error("The endpoint was not created.");
-
-  if (args.magnetVersionId) {
-    const bound = await supabase
-      .from("lead_capture_endpoints")
-      .update({ magnet_version_id: args.magnetVersionId })
-      .eq("id", row.id);
-    if (bound.error) throw new Error(bound.error.message);
-  }
-  return { endpointId: row.id, token };
-}
-
-export async function setEndpointEnabled(endpointId: string, enabled: boolean): Promise<void> {
-  const { error } = await supabase.rpc("set_lead_capture_enabled_v6", {
-    p_endpoint_id: endpointId,
-    p_enabled: enabled,
   });
   if (error) throw new Error(error.message);
 }

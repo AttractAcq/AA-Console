@@ -29,10 +29,16 @@ vi.mock("../../lib/leadMagnets", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("../../lib/leadMagnets");
   return {
     ...actual,
-    fetchMagnets, fetchVersions, fetchApprovals, fetchDeliveriesDue, fetchEndpoints,
-    fetchSubmissions, fetchDeliverySwitch, setDeliveryEnabled, requestApproval,
-    decideApproval, revokeApproval, createEndpoint, setEndpointEnabled,
+    fetchMagnets, fetchVersions, fetchApprovals, fetchDeliveriesDue,
+    fetchDeliverySwitch, setDeliveryEnabled, requestApproval,
+    decideApproval, revokeApproval,
   };
+});
+// The endpoint and submission reads are shared with Sales OS, so they live in
+// their own module rather than in the magnet's.
+vi.mock("../../lib/leadCapture", async () => {
+  const actual = await vi.importActual<Record<string, unknown>>("../../lib/leadCapture");
+  return { ...actual, fetchEndpoints, fetchSubmissions, createEndpoint, setEndpointEnabled };
 });
 vi.mock("../../lib/supabase", () => ({
   supabase: {

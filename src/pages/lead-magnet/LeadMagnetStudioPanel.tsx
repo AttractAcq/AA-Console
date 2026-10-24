@@ -10,13 +10,16 @@ import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import {
   CHANNEL_HINT, MAGNET_FORMATS,
-  addVersion, createEndpoint, createMagnet, decideApproval, fetchApprovals,
-  fetchDeliveriesDue, fetchDeliverySwitch, fetchEndpoints, fetchMagnets,
-  fetchSubmissions, fetchVersions, requestApproval, revokeApproval,
-  setDeliveryEnabled, setEndpointEnabled,
-  type CaptureDue, type CaptureEndpoint, type LeadMagnet, type LeadMagnetApproval,
-  type LeadMagnetDue, type LeadMagnetVersion, type LeadSubmission,
+  addVersion, createMagnet, decideApproval, fetchApprovals,
+  fetchDeliveriesDue, fetchDeliverySwitch, fetchMagnets,
+  fetchVersions, requestApproval, revokeApproval, setDeliveryEnabled,
+  type LeadMagnet, type LeadMagnetApproval,
+  type LeadMagnetDue, type LeadMagnetVersion,
 } from "../../lib/leadMagnets";
+import {
+  createEndpoint, fetchEndpoints, fetchSubmissions, setEndpointEnabled,
+  type CaptureDue, type CaptureEndpoint, type LeadSubmission,
+} from "../../lib/leadCapture";
 
 /**
  * Lead Magnet Studio.
