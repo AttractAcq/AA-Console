@@ -38,6 +38,7 @@ import { runQaJob } from "../agents/qa/index.js";
 import { runPublisherJob } from "../agents/publisher/index.js";
 import { runCampaignActionJob } from "../campaigns/actions/executor.js";
 import { runProofPlacerJob } from "../proof-distribution/placer.js";
+import { runLeadMagnetCourierJob } from "../lead-magnets/courier.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
 import { deadlineFromNow } from "./deadline.js";
@@ -143,6 +144,10 @@ const RUNNERS: Record<string, JobRunner> = {
   // without agreeing to their customer's words going on a third party's
   // profile.
   proof_placer: runProofPlacerJob,
+  // Keeping the one promise this system makes directly to a stranger: the
+  // exact file somebody approved, once. Re-hashes the bytes before every
+  // send, because a path can be overwritten after it is approved.
+  lead_magnet_courier: runLeadMagnetCourierJob,
   brief_dispatch: runBriefDispatchJob,
   client_approval_dispatch: runClientApprovalDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
