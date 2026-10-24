@@ -2952,6 +2952,9 @@ export type Database = {
           enabled_at: string | null
           enabled_by: string | null
           format_mix: Json
+          lead_magnet_delivery_enabled: boolean
+          lead_magnet_delivery_enabled_at: string | null
+          lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
           plan_horizon_days: number
@@ -2976,6 +2979,9 @@ export type Database = {
           enabled_at?: string | null
           enabled_by?: string | null
           format_mix?: Json
+          lead_magnet_delivery_enabled?: boolean
+          lead_magnet_delivery_enabled_at?: string | null
+          lead_magnet_delivery_enabled_by?: string | null
           max_jobs_in_flight?: number
           min_qa_score?: number
           plan_horizon_days?: number
@@ -3000,6 +3006,9 @@ export type Database = {
           enabled_at?: string | null
           enabled_by?: string | null
           format_mix?: Json
+          lead_magnet_delivery_enabled?: boolean
+          lead_magnet_delivery_enabled_at?: string | null
+          lead_magnet_delivery_enabled_by?: string | null
           max_jobs_in_flight?: number
           min_qa_score?: number
           plan_horizon_days?: number
@@ -3032,6 +3041,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_engine_settings_lead_magnet_delivery_enabled_by_fkey"
+            columns: ["lead_magnet_delivery_enabled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_engine_settings_proof_publishing_enabled_by_fkey"
@@ -3518,9 +3534,13 @@ export type Database = {
           appointment_outcome: string | null
           cash_collected: number | null
           client_id: string
+          consent_evidence: Json | null
+          consent_given_at: string | null
+          consent_wording: string | null
           contact: string | null
           created_at: string
           created_by: string | null
+          dedupe_key: string | null
           email: string | null
           id: string
           lost_reason: string | null
@@ -3537,9 +3557,12 @@ export type Database = {
           source_asset_id: string | null
           source_campaign_id: string | null
           source_channel: string | null
+          source_click_id: string | null
+          source_client_campaign_id: string | null
           source_page_id: string | null
           source_post_id: string | null
           source_sales_agent_id: string | null
+          source_utm: Json | null
           stage: Database["public"]["Enums"]["lead_stage"]
           stage_at: string
           updated_at: string
@@ -3549,9 +3572,13 @@ export type Database = {
           appointment_outcome?: string | null
           cash_collected?: number | null
           client_id: string
+          consent_evidence?: Json | null
+          consent_given_at?: string | null
+          consent_wording?: string | null
           contact?: string | null
           created_at?: string
           created_by?: string | null
+          dedupe_key?: string | null
           email?: string | null
           id?: string
           lost_reason?: string | null
@@ -3568,9 +3595,12 @@ export type Database = {
           source_asset_id?: string | null
           source_campaign_id?: string | null
           source_channel?: string | null
+          source_click_id?: string | null
+          source_client_campaign_id?: string | null
           source_page_id?: string | null
           source_post_id?: string | null
           source_sales_agent_id?: string | null
+          source_utm?: Json | null
           stage?: Database["public"]["Enums"]["lead_stage"]
           stage_at?: string
           updated_at?: string
@@ -3580,9 +3610,13 @@ export type Database = {
           appointment_outcome?: string | null
           cash_collected?: number | null
           client_id?: string
+          consent_evidence?: Json | null
+          consent_given_at?: string | null
+          consent_wording?: string | null
           contact?: string | null
           created_at?: string
           created_by?: string | null
+          dedupe_key?: string | null
           email?: string | null
           id?: string
           lost_reason?: string | null
@@ -3599,9 +3633,12 @@ export type Database = {
           source_asset_id?: string | null
           source_campaign_id?: string | null
           source_channel?: string | null
+          source_click_id?: string | null
+          source_client_campaign_id?: string | null
           source_page_id?: string | null
           source_post_id?: string | null
           source_sales_agent_id?: string | null
+          source_utm?: Json | null
           stage?: Database["public"]["Enums"]["lead_stage"]
           stage_at?: string
           updated_at?: string
@@ -3689,6 +3726,20 @@ export type Database = {
             columns: ["source_campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_leads_source_client_campaign_id_fkey"
+            columns: ["source_client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_leads_source_client_campaign_id_fkey"
+            columns: ["source_client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
             referencedColumns: ["id"]
           },
           {
@@ -6692,6 +6743,123 @@ export type Database = {
           },
         ]
       }
+      lead_capture_endpoints: {
+        Row: {
+          campaign_id: string | null
+          client_id: string
+          consent_wording: string
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          expires_at: string
+          id: string
+          magnet_version_id: string | null
+          max_submissions: number
+          page_id: string | null
+          purpose: string
+          revoked_at: string | null
+          source_channel: string | null
+          submissions: number
+          token_hash: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          client_id: string
+          consent_wording: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          expires_at: string
+          id?: string
+          magnet_version_id?: string | null
+          max_submissions?: number
+          page_id?: string | null
+          purpose: string
+          revoked_at?: string | null
+          source_channel?: string | null
+          submissions?: number
+          token_hash: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string | null
+          client_id?: string
+          consent_wording?: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          expires_at?: string
+          id?: string
+          magnet_version_id?: string | null
+          max_submissions?: number
+          page_id?: string | null
+          purpose?: string
+          revoked_at?: string | null
+          source_channel?: string | null
+          submissions?: number
+          token_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_capture_endpoints_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_magnet_version_id_fkey"
+            columns: ["magnet_version_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "client_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_events: {
         Row: {
           body: string | null
@@ -6797,6 +6965,482 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      lead_magnet_approvals: {
+        Row: {
+          client_id: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          magnet_version_id: string
+          payload_hash: string
+          rejection_reason: string | null
+          requested_at: string
+          requested_by: string | null
+          revoked_at: string | null
+          revoked_reason: string | null
+          scope: Json
+          status: string
+        }
+        Insert: {
+          client_id: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          magnet_version_id: string
+          payload_hash: string
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          scope: Json
+          status?: string
+        }
+        Update: {
+          client_id?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          magnet_version_id?: string
+          payload_hash?: string
+          rejection_reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          scope?: Json
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_magnet_approvals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_approvals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_approvals_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_approvals_magnet_version_id_fkey"
+            columns: ["magnet_version_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_approvals_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_magnet_deliveries: {
+        Row: {
+          attempts: number
+          channel: string
+          claimed_at: string | null
+          client_id: string
+          created_at: string
+          id: string
+          last_error: string | null
+          lead_id: string | null
+          lease_until: string | null
+          magnet_version_id: string
+          provider_ref: string | null
+          recipient: string
+          sent_at: string | null
+          status: string
+          submission_id: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          channel: string
+          claimed_at?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          lead_id?: string | null
+          lease_until?: string | null
+          magnet_version_id: string
+          provider_ref?: string | null
+          recipient: string
+          sent_at?: string | null
+          status?: string
+          submission_id: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          channel?: string
+          claimed_at?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          lead_id?: string | null
+          lease_until?: string | null
+          magnet_version_id?: string
+          provider_ref?: string | null
+          recipient?: string
+          sent_at?: string | null
+          status?: string
+          submission_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_magnet_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_magnet_version_id_fkey"
+            columns: ["magnet_version_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: true
+            referencedRelation: "lead_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_magnet_versions: {
+        Row: {
+          client_id: string
+          content_sha256: string
+          created_at: string
+          created_by: string | null
+          created_by_job_id: string | null
+          delivery_body: string | null
+          delivery_channel: string
+          delivery_subject: string | null
+          file_bytes: number
+          id: string
+          magnet_id: string
+          media_type: string
+          storage_path: string
+          version: number
+        }
+        Insert: {
+          client_id: string
+          content_sha256: string
+          created_at?: string
+          created_by?: string | null
+          created_by_job_id?: string | null
+          delivery_body?: string | null
+          delivery_channel: string
+          delivery_subject?: string | null
+          file_bytes: number
+          id?: string
+          magnet_id: string
+          media_type: string
+          storage_path: string
+          version: number
+        }
+        Update: {
+          client_id?: string
+          content_sha256?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_job_id?: string | null
+          delivery_body?: string | null
+          delivery_channel?: string
+          delivery_subject?: string | null
+          file_bytes?: number
+          id?: string
+          magnet_id?: string
+          media_type?: string
+          storage_path?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_magnet_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_versions_created_by_job_id_fkey"
+            columns: ["created_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_versions_created_by_job_id_fkey"
+            columns: ["created_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_versions_created_by_job_id_fkey"
+            columns: ["created_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_versions_magnet_id_client_id_fkey"
+            columns: ["magnet_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnets"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      lead_magnets: {
+        Row: {
+          archived_at: string | null
+          audience: string | null
+          campaign_id: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          format: string
+          id: string
+          name: string
+          objective: string
+          offer_version_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          audience?: string | null
+          campaign_id?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          format: string
+          id?: string
+          name: string
+          objective: string
+          offer_version_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          audience?: string | null
+          campaign_id?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          format?: string
+          id?: string
+          name?: string
+          objective?: string
+          offer_version_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_magnets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_offer_version_id_client_id_fkey"
+            columns: ["offer_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "service_offer_versions"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      lead_submissions: {
+        Row: {
+          click_id: string | null
+          client_id: string
+          consent_evidence: Json
+          consent_given_at: string
+          consent_wording: string
+          created_at: string
+          email: string | null
+          endpoint_id: string
+          id: string
+          idempotency_key: string
+          lead_id: string | null
+          message: string | null
+          name: string | null
+          phone: string | null
+          rejected_reason: string | null
+          status: string
+          utm: Json | null
+        }
+        Insert: {
+          click_id?: string | null
+          client_id: string
+          consent_evidence?: Json
+          consent_given_at: string
+          consent_wording: string
+          created_at?: string
+          email?: string | null
+          endpoint_id: string
+          id?: string
+          idempotency_key: string
+          lead_id?: string | null
+          message?: string | null
+          name?: string | null
+          phone?: string | null
+          rejected_reason?: string | null
+          status?: string
+          utm?: Json | null
+        }
+        Update: {
+          click_id?: string | null
+          client_id?: string
+          consent_evidence?: Json
+          consent_given_at?: string
+          consent_wording?: string
+          created_at?: string
+          email?: string | null
+          endpoint_id?: string
+          id?: string
+          idempotency_key?: string
+          lead_id?: string | null
+          message?: string | null
+          name?: string | null
+          phone?: string | null
+          rejected_reason?: string | null
+          status?: string
+          utm?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_submissions_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "lead_capture_due"
+            referencedColumns: ["endpoint_id"]
+          },
+          {
+            foreignKeyName: "lead_submissions_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "lead_capture_endpoints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_submissions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_submissions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
           },
         ]
       }
@@ -12774,6 +13418,155 @@ export type Database = {
           },
         ]
       }
+      lead_capture_due: {
+        Row: {
+          became_leads: number | null
+          blocker: string | null
+          campaign_id: string | null
+          client_id: string | null
+          enabled: boolean | null
+          endpoint_id: string | null
+          expires_at: string | null
+          max_submissions: number | null
+          page_id: string | null
+          purpose: string | null
+          received: number | null
+          submissions: number | null
+        }
+        Insert: {
+          became_leads?: never
+          blocker?: never
+          campaign_id?: string | null
+          client_id?: string | null
+          enabled?: boolean | null
+          endpoint_id?: string | null
+          expires_at?: string | null
+          max_submissions?: number | null
+          page_id?: string | null
+          purpose?: string | null
+          received?: never
+          submissions?: number | null
+        }
+        Update: {
+          became_leads?: never
+          blocker?: never
+          campaign_id?: string | null
+          client_id?: string | null
+          enabled?: boolean | null
+          endpoint_id?: string | null
+          expires_at?: string | null
+          max_submissions?: number | null
+          page_id?: string | null
+          purpose?: string | null
+          received?: never
+          submissions?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_capture_endpoints_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "client_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages_archive"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_magnet_due: {
+        Row: {
+          attempts: number | null
+          blocker: string | null
+          channel: string | null
+          client_id: string | null
+          delivery_id: string | null
+          last_error: string | null
+          lead_id: string | null
+          magnet_name: string | null
+          magnet_version_id: string | null
+          provider_ref: string | null
+          recipient: string | null
+          status: string | null
+          submission_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_magnet_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_magnet_version_id_fkey"
+            columns: ["magnet_version_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnet_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: true
+            referencedRelation: "lead_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_pipeline_counts: {
         Row: {
           client_id: string | null
@@ -13997,6 +14790,21 @@ export type Database = {
         Args: { p_job_id: string }
         Returns: Json
       }
+      capture_lead_v6: {
+        Args: {
+          p_click_id?: string
+          p_consented?: boolean
+          p_email?: string
+          p_evidence?: Json
+          p_idempotency_key: string
+          p_message?: string
+          p_name?: string
+          p_phone?: string
+          p_token_hash: string
+          p_utm?: Json
+        }
+        Returns: Json
+      }
       capture_offer_version_for_artifact_v6: {
         Args: { p_campaign_id: string; p_offer_version_id: string }
         Returns: Json
@@ -14075,6 +14883,23 @@ export type Database = {
           manager_email: string
           package_day: string
           reason: string
+        }[]
+      }
+      claim_lead_magnet_deliveries: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempt: number
+          channel: string
+          client_id: string
+          content_sha256: string
+          delivery_body: string
+          delivery_id: string
+          delivery_subject: string
+          magnet_name: string
+          magnet_version_id: string
+          media_type: string
+          recipient: string
+          storage_path: string
         }[]
       }
       claim_posts_for_publishing: {
@@ -14417,6 +15242,44 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_lead_capture_endpoint_v6: {
+        Args: {
+          p_campaign_id?: string
+          p_client_id: string
+          p_consent_wording: string
+          p_days?: number
+          p_max_submissions?: number
+          p_page_id?: string
+          p_purpose: string
+          p_source_channel?: string
+          p_token_hash: string
+        }
+        Returns: {
+          campaign_id: string | null
+          client_id: string
+          consent_wording: string
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          expires_at: string
+          id: string
+          magnet_version_id: string | null
+          max_submissions: number
+          page_id: string | null
+          purpose: string
+          revoked_at: string | null
+          source_channel: string | null
+          submissions: number
+          token_hash: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "lead_capture_endpoints"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_market_opportunity_v6: {
         Args: {
           p_buying_situation: string
@@ -14627,6 +15490,30 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "campaign_action_approvals"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      decide_lead_magnet_approval_v6: {
+        Args: { p_approval_id: string; p_approved: boolean; p_reason?: string }
+        Returns: {
+          client_id: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          magnet_version_id: string
+          payload_hash: string
+          rejection_reason: string | null
+          requested_at: string
+          requested_by: string | null
+          revoked_at: string | null
+          revoked_reason: string | null
+          scope: Json
+          status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "lead_magnet_approvals"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -14874,6 +15761,7 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_lead_magnet_sweep: { Args: never; Returns: string }
       enqueue_mcp_brief: {
         Args: {
           p_bot_id: string
@@ -14956,6 +15844,14 @@ export type Database = {
       is_client_user: { Args: { target: string }; Returns: boolean }
       is_member: { Args: { target: string }; Returns: boolean }
       launch_campaign: { Args: { p_campaign_id: string }; Returns: undefined }
+      lead_dedupe_key: {
+        Args: { p_email: string; p_phone: string }
+        Returns: string
+      }
+      lead_magnet_payload_hash_v6: {
+        Args: { p_version_id: string }
+        Returns: string
+      }
       lead_stage_rank: {
         Args: { s: Database["public"]["Enums"]["lead_stage"] }
         Returns: number
@@ -15840,6 +16736,7 @@ export type Database = {
         }[]
       }
       reap_stale_campaign_action_claims: { Args: never; Returns: number }
+      reap_stale_lead_magnet_deliveries: { Args: never; Returns: number }
       reap_stale_proof_placement_claims: { Args: never; Returns: number }
       reap_stale_publish_claims: {
         Args: { p_older_than?: string }
@@ -15946,6 +16843,14 @@ export type Database = {
           p_position: number
           p_post_id: string
         }
+        Returns: undefined
+      }
+      record_lead_magnet_failure: {
+        Args: { p_delivery_id: string; p_reason: string; p_retryable?: boolean }
+        Returns: undefined
+      }
+      record_lead_magnet_sent: {
+        Args: { p_delivery_id: string; p_provider_ref: string }
         Returns: undefined
       }
       record_page_revision: {
@@ -16328,6 +17233,10 @@ export type Database = {
         Args: { p_asset_id: string; p_due_date?: string; p_member_id: string }
         Returns: string
       }
+      request_lead_magnet_approval_v6: {
+        Args: { p_version_id: string }
+        Returns: string
+      }
       request_meta_build: { Args: { p_campaign_id: string }; Returns: string }
       request_meta_build_sheet: {
         Args: { p_campaign_id: string }
@@ -16646,6 +17555,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      revoke_lead_magnet_approval_v6: {
+        Args: { p_approval_id: string; p_reason: string }
+        Returns: undefined
+      }
       sales_runtime_allow: {
         Args: {
           p_deployment_id: string
@@ -16868,6 +17781,9 @@ export type Database = {
           enabled_at: string | null
           enabled_by: string | null
           format_mix: Json
+          lead_magnet_delivery_enabled: boolean
+          lead_magnet_delivery_enabled_at: string | null
+          lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
           plan_horizon_days: number
@@ -16909,6 +17825,9 @@ export type Database = {
           enabled_at: string | null
           enabled_by: string | null
           format_mix: Json
+          lead_magnet_delivery_enabled: boolean
+          lead_magnet_delivery_enabled_at: string | null
+          lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
           plan_horizon_days: number
@@ -16976,6 +17895,73 @@ export type Database = {
           enabled_at: string | null
           enabled_by: string | null
           format_mix: Json
+          lead_magnet_delivery_enabled: boolean
+          lead_magnet_delivery_enabled_at: string | null
+          lead_magnet_delivery_enabled_by: string | null
+          max_jobs_in_flight: number
+          min_qa_score: number
+          plan_horizon_days: number
+          proof_publishing_enabled: boolean
+          proof_publishing_enabled_at: string | null
+          proof_publishing_enabled_by: string | null
+          publishing_enabled: boolean
+          publishing_enabled_at: string | null
+          publishing_enabled_by: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_engine_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_lead_capture_enabled_v6: {
+        Args: { p_enabled: boolean; p_endpoint_id: string }
+        Returns: {
+          campaign_id: string | null
+          client_id: string
+          consent_wording: string
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          expires_at: string
+          id: string
+          magnet_version_id: string | null
+          max_submissions: number
+          page_id: string | null
+          purpose: string
+          revoked_at: string | null
+          source_channel: string | null
+          submissions: number
+          token_hash: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "lead_capture_endpoints"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_lead_magnet_delivery_enabled: {
+        Args: { p_client_id: string; p_enabled: boolean }
+        Returns: {
+          approval_mode: string
+          auto_approve_briefs: boolean
+          auto_approve_ideas: boolean
+          campaign_actions_enabled: boolean
+          campaign_actions_enabled_at: string | null
+          campaign_actions_enabled_by: string | null
+          client_id: string
+          created_at: string
+          enabled: boolean
+          enabled_at: string | null
+          enabled_by: string | null
+          format_mix: Json
+          lead_magnet_delivery_enabled: boolean
+          lead_magnet_delivery_enabled_at: string | null
+          lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
           plan_horizon_days: number
@@ -17094,6 +18080,9 @@ export type Database = {
           enabled_at: string | null
           enabled_by: string | null
           format_mix: Json
+          lead_magnet_delivery_enabled: boolean
+          lead_magnet_delivery_enabled_at: string | null
+          lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
           plan_horizon_days: number
@@ -17127,6 +18116,9 @@ export type Database = {
           enabled_at: string | null
           enabled_by: string | null
           format_mix: Json
+          lead_magnet_delivery_enabled: boolean
+          lead_magnet_delivery_enabled_at: string | null
+          lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
           plan_horizon_days: number

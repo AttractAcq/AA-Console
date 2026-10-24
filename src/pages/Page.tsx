@@ -1,4 +1,5 @@
 import { ProofFactoryV2Panel } from "./proof-bank/ProofFactoryV2Panel";
+import { LeadMagnetStudioPanel } from "./lead-magnet/LeadMagnetStudioPanel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -148,6 +149,12 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     sites: () => <SitesPanel />,
     "landing-reporting": () => <PagesReportingPanel pageType="landing" />,
     "offer-reporting": () => <PagesReportingPanel pageType="offer" />,
+  },
+  "lead-magnet-studio": {
+    magnets: () => <LeadMagnetStudioPanel tab="magnets" />,
+    build: () => <LeadMagnetStudioPanel tab="build" />,
+    delivery: () => <LeadMagnetStudioPanel tab="delivery" />,
+    optins: () => <LeadMagnetStudioPanel tab="optins" />,
   },
   "sales-os": {
     leads: () => <ProspectsLeadsPanel />,

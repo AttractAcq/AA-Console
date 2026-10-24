@@ -435,7 +435,10 @@ export const v6ModuleNodes: NavNode[] = [
       { id: "offer-reporting", label: "Offer Results" },
     ] },
   { id: "lead-magnet-studio", label: "Lead Magnet Studio", path: "lead-magnet-studio", icon: UserPlus,
-    capability: "planned" },
+    capability: "expanding", tabs: [
+      { id: "magnets", label: "Magnets" }, { id: "build", label: "Build" },
+      { id: "delivery", label: "Delivery" }, { id: "optins", label: "Opt-ins" },
+    ] },
   { id: "sales-os", label: "Sales OS", path: "sales-os", icon: MessagesSquare,
     capability: "expanding", sidebarViews: versionViews, tabs: [
       { id: "leads", label: "Prospects & Leads" }, { id: "agents", label: "Sales Agents" },
