@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * The hand-off from an opportunity to a campaign.
@@ -22,12 +22,19 @@ const {
   fetchOpportunities,
   fetchReadiness,
   enqueueAgentJob,
+  fetchStageTemplates,
+  setStageTemplate,
 } = vi.hoisted(() => ({
   createCampaignFromOpportunity: vi.fn(),
   fetchOpportunities: vi.fn(),
   fetchReadiness: vi.fn(),
   enqueueAgentJob: vi.fn(),
+  fetchStageTemplates: vi.fn(),
+  setStageTemplate: vi.fn(),
 }));
+
+/** The query string the panel reads. Defaults to none, so existing tests are unaffected. */
+const search = vi.hoisted(() => ({ value: "" }));
 
 vi.mock("../../lib/opportunities", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("../../lib/opportunities");
@@ -37,6 +44,8 @@ vi.mock("../../lib/opportunities", async () => {
     fetchOpportunities,
     fetchReadiness,
     fetchScoreFactors: async () => [],
+    fetchStageTemplates,
+    setStageTemplate,
   };
 });
 vi.mock("../../lib/supabase", () => ({
@@ -48,7 +57,7 @@ vi.mock("../../lib/useAgentJobs", () => ({
 }));
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ clientId: "client-1" }),
-  useSearchParams: () => [new URLSearchParams(), vi.fn()],
+  useSearchParams: () => [new URLSearchParams(search.value), vi.fn()],
   Link: ({ to, children }: { to: string; children: unknown }) =>
     createElement("a", { href: to }, children as never),
 }));
@@ -187,5 +196,122 @@ describe("creating the campaign", () => {
 
     expect(await screen.findByText(/Scored as reject at 31/)).toBeInTheDocument();
     expect(enqueueAgentJob).not.toHaveBeenCalled();
+  });
+});
+
+
+/**
+ * The template planner — G06.
+ *
+ * The decision it exists for is which of the sixteen moves a given awareness
+ * stage, and the thing worth pinning is that it stays a recommendation: the
+ * trade-off is shown, a reason is required, and nothing is chosen for you.
+ */
+const candidate = (over: Record<string, unknown> = {}) => ({
+  stage_id: "stage-1",
+  opportunity_id: "opp-1",
+  awareness_level: "problem_aware",
+  mindset: "Feels the damp every winter",
+  audience_state: "S1",
+  audience_state_override: null,
+  state_overridden: false,
+  state_note: "Feels the problem and has seen the client in passing.",
+  recommended_template: null,
+  candidate_template: "R1",
+  candidate_name: "Retarget to next step",
+  fn: "spend",
+  entry_state: "S1",
+  exit_state: "S3",
+  destination: "page",
+  kpi: "Cost per booked survey",
+  purpose: "The highest return in the account.",
+  guardrail: "Retargeting an empty pool spends money on nobody.",
+  prerequisite: "P1 or P4 running 14 days or more.",
+  chosen: false,
+  fit: "Moves S1 to S3 via page. Needs: P1 or P4 running 14 days or more.",
+  ...over,
+});
+
+describe("the template planner", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchOpportunities.mockResolvedValue([opportunity()]);
+    fetchReadiness.mockResolvedValue(readiness());
+    fetchStageTemplates.mockResolvedValue([candidate()]);
+    setStageTemplate.mockResolvedValue(undefined);
+    // Strategize only renders for a selected opportunity.
+    search.value = "opportunity=opp-1";
+  });
+
+  afterEach(() => {
+    search.value = "";
+  });
+
+  it("shows the trade-off beside each candidate, not just its name", async () => {
+    render(createElement(MarketOpportunitiesPanel, { view: "strategize" }));
+    await waitFor(() => expect(fetchStageTemplates).toHaveBeenCalled());
+
+    expect(await screen.findByText("R1")).toBeTruthy();
+    // The prerequisite and the guardrail are the half a strategist weighs.
+    expect(screen.getByText("P1 or P4 running 14 days or more.")).toBeTruthy();
+    expect(
+      screen.getByText("Retargeting an empty pool spends money on nobody."),
+    ).toBeTruthy();
+  });
+
+  it("will not record a choice without a reason", async () => {
+    render(createElement(MarketOpportunitiesPanel, { view: "strategize" }));
+    await waitFor(() => expect(fetchStageTemplates).toHaveBeenCalled());
+
+    const select = await screen.findByLabelText("Template for problem_aware");
+    await userEvent.selectOptions(select, "R1");
+
+    const record = screen.getByRole("button", { name: "Record choice" });
+    expect(record.hasAttribute("disabled")).toBe(true);
+
+    await userEvent.type(
+      screen.getByLabelText("Why for problem_aware"),
+      "The pool from P1 is warm enough to harvest",
+    );
+    expect(record.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("records the stage, the template and the reason", async () => {
+    render(createElement(MarketOpportunitiesPanel, { view: "strategize" }));
+    await waitFor(() => expect(fetchStageTemplates).toHaveBeenCalled());
+
+    await userEvent.selectOptions(
+      await screen.findByLabelText("Template for problem_aware"), "R1",
+    );
+    await userEvent.type(screen.getByLabelText("Why for problem_aware"), "Pool is warm");
+    await userEvent.click(screen.getByRole("button", { name: "Record choice" }));
+
+    await waitFor(() =>
+      expect(setStageTemplate).toHaveBeenCalledWith("stage-1", "R1", "Pool is warm"),
+    );
+  });
+
+  it("says what a chosen template is, rather than leaving it to the dropdown", async () => {
+    fetchStageTemplates.mockResolvedValue([
+      candidate({ chosen: true, recommended_template: "R1" }),
+    ]);
+    render(createElement(MarketOpportunitiesPanel, { view: "strategize" }));
+    expect(await screen.findByText(/chosen: R1 — Retarget to next step/)).toBeTruthy();
+  });
+
+  it("marks an overridden audience state, so a local rule is not mistaken for the map", async () => {
+    fetchStageTemplates.mockResolvedValue([
+      candidate({ state_overridden: true, audience_state_override: "S1", state_note: null }),
+    ]);
+    render(createElement(MarketOpportunitiesPanel, { view: "strategize" }));
+    expect(await screen.findByText(/S1 \(overridden\)/)).toBeTruthy();
+  });
+
+  it("asks for a stage before offering templates", async () => {
+    fetchStageTemplates.mockResolvedValue([]);
+    render(createElement(MarketOpportunitiesPanel, { view: "strategize" }));
+    expect(
+      await screen.findByText(/Save an awareness stage above and its candidates appear here/),
+    ).toBeTruthy();
   });
 });

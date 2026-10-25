@@ -414,6 +414,24 @@ export type Database = {
         }
         Relationships: []
       }
+      awareness_audience_map: {
+        Row: {
+          audience_state: string
+          awareness_level: string
+          note: string
+        }
+        Insert: {
+          audience_state: string
+          awareness_level: string
+          note: string
+        }
+        Update: {
+          audience_state?: string
+          awareness_level?: string
+          note?: string
+        }
+        Relationships: []
+      }
       brief_dispatches: {
         Row: {
           assignment_id: string | null
@@ -1748,6 +1766,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      campaign_template_matrix: {
+        Row: {
+          code: Database["public"]["Enums"]["campaign_template"]
+          ctas: string[]
+          destination: string
+          entry_state: string
+          exit_state: string
+          fn: string
+          guardrail: string
+          kpi: string
+          mirrors: boolean
+          name: string
+          objective: string | null
+          optimisation: string | null
+          prerequisite: string | null
+          purpose: string
+        }
+        Insert: {
+          code: Database["public"]["Enums"]["campaign_template"]
+          ctas?: string[]
+          destination: string
+          entry_state: string
+          exit_state: string
+          fn: string
+          guardrail: string
+          kpi: string
+          mirrors?: boolean
+          name: string
+          objective?: string | null
+          optimisation?: string | null
+          prerequisite?: string | null
+          purpose: string
+        }
+        Update: {
+          code?: Database["public"]["Enums"]["campaign_template"]
+          ctas?: string[]
+          destination?: string
+          entry_state?: string
+          exit_state?: string
+          fn?: string
+          guardrail?: string
+          kpi?: string
+          mirrors?: boolean
+          name?: string
+          objective?: string | null
+          optimisation?: string | null
+          prerequisite?: string | null
+          purpose?: string
+        }
+        Relationships: []
       }
       campaigns: {
         Row: {
@@ -9461,11 +9530,19 @@ export type Database = {
             referencedRelation: "opportunity_readiness"
             referencedColumns: ["opportunity_id"]
           },
+          {
+            foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
         ]
       }
       opportunity_awareness_stages: {
         Row: {
           asset_direction: string | null
+          audience_state_override: string | null
           client_id: string
           created_at: string
           distribution_note: string | null
@@ -9473,10 +9550,15 @@ export type Database = {
           message: string
           mindset: string
           opportunity_id: string
+          recommended_template:
+            | Database["public"]["Enums"]["campaign_template"]
+            | null
           stage: string
+          template_rationale: string | null
         }
         Insert: {
           asset_direction?: string | null
+          audience_state_override?: string | null
           client_id: string
           created_at?: string
           distribution_note?: string | null
@@ -9484,10 +9566,15 @@ export type Database = {
           message: string
           mindset: string
           opportunity_id: string
+          recommended_template?:
+            | Database["public"]["Enums"]["campaign_template"]
+            | null
           stage: string
+          template_rationale?: string | null
         }
         Update: {
           asset_direction?: string | null
+          audience_state_override?: string | null
           client_id?: string
           created_at?: string
           distribution_note?: string | null
@@ -9495,7 +9582,11 @@ export type Database = {
           message?: string
           mindset?: string
           opportunity_id?: string
+          recommended_template?:
+            | Database["public"]["Enums"]["campaign_template"]
+            | null
           stage?: string
+          template_rationale?: string | null
         }
         Relationships: [
           {
@@ -9532,6 +9623,34 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunity_readiness"
             referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_recommended_template_fkey"
+            columns: ["recommended_template"]
+            isOneToOne: false
+            referencedRelation: "awareness_stage_templates"
+            referencedColumns: ["candidate_template"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_recommended_template_fkey"
+            columns: ["recommended_template"]
+            isOneToOne: false
+            referencedRelation: "campaign_template_matrix"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_recommended_template_fkey"
+            columns: ["recommended_template"]
+            isOneToOne: false
+            referencedRelation: "customer_lifecycle_templates"
+            referencedColumns: ["code"]
           },
         ]
       }
@@ -9597,6 +9716,13 @@ export type Database = {
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
             referencedColumns: ["opportunity_id"]
           },
         ]
@@ -9704,6 +9830,13 @@ export type Database = {
             referencedColumns: ["opportunity_id"]
           },
           {
+            foreignKeyName: "opportunity_links_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
             foreignKeyName: "opportunity_links_record_id_fkey"
             columns: ["record_id"]
             isOneToOne: false
@@ -9774,6 +9907,13 @@ export type Database = {
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
             referencedColumns: ["opportunity_id"]
           },
           {
@@ -9874,6 +10014,13 @@ export type Database = {
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
             referencedColumns: ["opportunity_id"]
           },
           {
@@ -14361,6 +14508,102 @@ export type Database = {
           },
         ]
       }
+      awareness_stage_templates: {
+        Row: {
+          audience_state: string | null
+          audience_state_override: string | null
+          awareness_level: string | null
+          candidate_name: string | null
+          candidate_template:
+            | Database["public"]["Enums"]["campaign_template"]
+            | null
+          chosen: boolean | null
+          client_id: string | null
+          destination: string | null
+          entry_state: string | null
+          exit_state: string | null
+          fit: string | null
+          fn: string | null
+          guardrail: string | null
+          kpi: string | null
+          mindset: string | null
+          opportunity_id: string | null
+          optimisation: string | null
+          prerequisite: string | null
+          purpose: string | null
+          recommended_template:
+            | Database["public"]["Enums"]["campaign_template"]
+            | null
+          stage_id: string | null
+          state_note: string | null
+          state_overridden: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_origins"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_recommended_template_fkey"
+            columns: ["recommended_template"]
+            isOneToOne: false
+            referencedRelation: "awareness_stage_templates"
+            referencedColumns: ["candidate_template"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_recommended_template_fkey"
+            columns: ["recommended_template"]
+            isOneToOne: false
+            referencedRelation: "campaign_template_matrix"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_recommended_template_fkey"
+            columns: ["recommended_template"]
+            isOneToOne: false
+            referencedRelation: "customer_lifecycle_templates"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       campaign_action_due: {
         Row: {
           action_key: string | null
@@ -14763,6 +15006,39 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
         ]
+      }
+      customer_lifecycle_templates: {
+        Row: {
+          code: Database["public"]["Enums"]["campaign_template"] | null
+          entry_state: string | null
+          exit_state: string | null
+          fn: string | null
+          name: string | null
+          prerequisite: string | null
+          purpose: string | null
+          why_unmapped: string | null
+        }
+        Insert: {
+          code?: Database["public"]["Enums"]["campaign_template"] | null
+          entry_state?: string | null
+          exit_state?: string | null
+          fn?: string | null
+          name?: string | null
+          prerequisite?: string | null
+          purpose?: string | null
+          why_unmapped?: never
+        }
+        Update: {
+          code?: Database["public"]["Enums"]["campaign_template"] | null
+          entry_state?: string | null
+          exit_state?: string | null
+          fn?: string | null
+          name?: string | null
+          prerequisite?: string | null
+          purpose?: string | null
+          why_unmapped?: never
+        }
+        Relationships: []
       }
       distribution_due: {
         Row: {
@@ -15663,6 +15939,92 @@ export type Database = {
         }
         Relationships: []
       }
+      opportunity_campaign_plan: {
+        Row: {
+          asset_direction: string | null
+          awareness_level: string | null
+          client_id: string | null
+          destination: string | null
+          distribution_note: string | null
+          entry_state: string | null
+          exit_state: string | null
+          fn: string | null
+          message: string | null
+          opportunity: string | null
+          opportunity_id: string | null
+          prerequisite: string | null
+          stage_id: string | null
+          step: number | null
+          template: Database["public"]["Enums"]["campaign_template"] | null
+          template_name: string | null
+          template_rationale: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_origins"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_recommended_template_fkey"
+            columns: ["template"]
+            isOneToOne: false
+            referencedRelation: "awareness_stage_templates"
+            referencedColumns: ["candidate_template"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_recommended_template_fkey"
+            columns: ["template"]
+            isOneToOne: false
+            referencedRelation: "campaign_template_matrix"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_recommended_template_fkey"
+            columns: ["template"]
+            isOneToOne: false
+            referencedRelation: "customer_lifecycle_templates"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       opportunity_readiness: {
         Row: {
           awareness_stages: number | null
@@ -15677,6 +16039,33 @@ export type Database = {
           opportunity_id: string | null
           score: number | null
           status: Database["public"]["Enums"]["opportunity_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      opportunity_template_readiness: {
+        Row: {
+          awareness_levels_covered: number | null
+          blocker: string | null
+          client_id: string | null
+          name: string | null
+          opportunity_id: string | null
+          stages: number | null
+          stages_with_template: number | null
         }
         Relationships: [
           {
@@ -19779,6 +20168,36 @@ export type Database = {
         }
       }
       select_render: { Args: { p_render_id: string }; Returns: undefined }
+      set_awareness_stage_template_v6: {
+        Args: {
+          p_audience_state_override?: string
+          p_rationale?: string
+          p_stage_id: string
+          p_template?: Database["public"]["Enums"]["campaign_template"]
+        }
+        Returns: {
+          asset_direction: string | null
+          audience_state_override: string | null
+          client_id: string
+          created_at: string
+          distribution_note: string | null
+          id: string
+          message: string
+          mindset: string
+          opportunity_id: string
+          recommended_template:
+            | Database["public"]["Enums"]["campaign_template"]
+            | null
+          stage: string
+          template_rationale: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "opportunity_awareness_stages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_brief_sound_treatment: {
         Args: {
           p_brief_id: string
@@ -20591,9 +21010,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: ["admin", "employee", "client"],

@@ -14,8 +14,10 @@ import {
   ATTRIBUTE_KINDS, AWARENESS_STAGES, CLASSIFICATION_HINT, CONFIDENCE_LEVELS,
   createCampaignFromOpportunity,
   fetchOpportunities, fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
+  fetchStageTemplates, setStageTemplate,
   setAttributes, setAwarenessStage, setConfidence, setFields, setStatus,
   type Opportunity, type OpportunityConfidence, type Readiness, type ScoreFactor,
+  type StageTemplateCandidate,
 } from "../../lib/opportunities";
 
 /**
@@ -617,8 +619,10 @@ function StrategizeView({
         <section className="space-y-2 rounded-xl border border-border bg-card p-5">
           <h3 className="font-semibold">Awareness journey</h3>
           <p className="text-xs text-muted-foreground">
-            What this person has to understand at each step. Not the campaign templates&rsquo; S0–S6:
-            that axis is reach, this one is understanding.
+            What this person has to understand at each step. Still a different axis from the
+            templates&rsquo; S0–S6 &mdash; that one is what relationship they have with this client,
+            this one is what they understand. The planner below bridges them, saying which states a
+            stage&rsquo;s people are usually in and therefore which templates can reach them.
           </p>
           <select
             aria-label="Stage"
@@ -659,6 +663,8 @@ function StrategizeView({
             Save stage
           </button>
         </section>
+
+        <StageTemplatePlanner opportunityId={opportunity.id} busy={busy} onAct={onAct} />
 
         <section className="space-y-2 rounded-xl border border-border bg-card p-5">
           <h3 className="font-semibold">What it would have to prove</h3>
@@ -781,5 +787,159 @@ function ActivateView({
         })}
       />
     </div>
+  );
+}
+
+
+/**
+ * Which template moves each awareness stage — G06.
+ *
+ * The decision this exists for is the one that used to be tribal knowledge:
+ * a stage says what its people understand, the templates say what audience
+ * state they enter at, and nothing joined the two. Migration 244's map does,
+ * so this shows the candidates with the trade-off beside each one.
+ *
+ * It recommends and does not choose. Every candidate carries its guardrail —
+ * the way that template is most often got wrong — because the trade-off is
+ * the half a strategist is actually weighing, and a list of options with no
+ * cost attached would just be a dropdown.
+ */
+function StageTemplatePlanner({
+  opportunityId, busy, onAct,
+}: {
+  opportunityId: string;
+  busy: boolean;
+  onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
+}) {
+  const [candidates, setCandidates] = useState<StageTemplateCandidate[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const [why, setWhy] = useState<Record<string, string>>({});
+
+  const refresh = useCallback(async () => {
+    try {
+      setCandidates(await fetchStageTemplates(opportunityId));
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not load template candidates.");
+    } finally {
+      setLoading(false);
+    }
+  }, [opportunityId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  /** One group per stage, because the choice is per stage. */
+  const stages = new Map<string, StageTemplateCandidate[]>();
+  for (const row of candidates) {
+    const list = stages.get(row.stage_id) ?? [];
+    list.push(row);
+    stages.set(row.stage_id, list);
+  }
+
+  if (loading) {
+    return (
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h3 className="font-semibold">Which template moves them</h3>
+        <p className="text-xs text-muted-foreground">Loading…</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-3 rounded-xl border border-border bg-card p-5">
+      <h3 className="font-semibold">Which template moves them</h3>
+      <p className="text-xs text-muted-foreground">
+        The sixteen that enter where each stage&rsquo;s people stand, with the way each one is most
+        often got wrong. Choosing one records a reason; it does not build anything.
+      </p>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+
+      {stages.size === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Save an awareness stage above and its candidates appear here.
+        </p>
+      ) : (
+        [...stages.entries()].map(([stageId, rows]) => {
+          const first = rows[0]!;
+          const chosen = rows.find((r) => r.chosen);
+          const states = [...new Set(rows.map((r) => r.audience_state))].sort();
+          return (
+            <div key={stageId} className="rounded-lg border border-border p-3">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <span className="text-sm font-medium">{first.awareness_level}</span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {states.join(" / ")}
+                  {first.state_overridden && " (overridden)"}
+                </span>
+                {chosen && (
+                  <span className="text-xs text-brand-strong">
+                    chosen: {chosen.candidate_template} — {chosen.candidate_name}
+                  </span>
+                )}
+              </div>
+              {first.state_note && (
+                <p className="mt-1 text-xs text-muted-foreground">{first.state_note}</p>
+              )}
+
+              <DataTable
+                columns={["Template", "Does", "Needs", "Most often got wrong"]}
+                emptyLabel="No template enters where these people stand"
+                rows={rows.map((r) => [
+                  <span key="t" className={r.chosen ? "font-mono text-brand-strong" : "font-mono"}>
+                    {r.candidate_template}
+                    <span className="block text-xs text-muted-foreground">{r.candidate_name}</span>
+                  </span>,
+                  <span key="d" className="text-xs">{r.fit}</span>,
+                  <span key="n" className="text-xs">{r.prerequisite ?? "—"}</span>,
+                  <span key="g" className="text-xs text-muted-foreground">{r.guardrail}</span>,
+                ])}
+              />
+
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <select
+                  aria-label={`Template for ${first.awareness_level}`}
+                  value={picked[stageId] ?? chosen?.candidate_template ?? ""}
+                  onChange={(e) => setPicked((p) => ({ ...p, [stageId]: e.target.value }))}
+                  className="rounded-lg border border-border bg-background p-2 text-sm"
+                >
+                  <option value="">Choose a template…</option>
+                  {rows.map((r) => (
+                    <option key={r.candidate_template} value={r.candidate_template}>
+                      {r.candidate_template} — {r.candidate_name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  aria-label={`Why for ${first.awareness_level}`}
+                  placeholder="Why this one, for this stage"
+                  value={why[stageId] ?? ""}
+                  onChange={(e) => setWhy((w) => ({ ...w, [stageId]: e.target.value }))}
+                  className="min-w-[14rem] flex-1 rounded-lg border border-border bg-background p-2 text-sm"
+                />
+                <Button
+                  disabled={busy || !picked[stageId] || !(why[stageId] ?? "").trim()}
+                  onClick={() =>
+                    void onAct(
+                      opportunityId,
+                      async () => {
+                        await setStageTemplate(stageId, picked[stageId]!, why[stageId]!.trim());
+                        await refresh();
+                      },
+                      "Template recorded for this stage.",
+                    )
+                  }
+                >
+                  Record choice
+                </Button>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </section>
   );
 }
