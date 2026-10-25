@@ -137,8 +137,11 @@ describe("sending", () => {
 });
 
 describe("a channel with no sender", () => {
-  it("has a sender only for email", () => {
-    expect(Object.keys(SENDERS)).toEqual(["email"]);
+  it("has a sender for every channel the registry calls supported", () => {
+    // The guard on the other direction: this list and
+    // message_channels.supported have to agree, and the failure mode of them
+    // disagreeing is a message claimed and then failed.
+    expect(Object.keys(SENDERS)).toEqual(["email", "instagram_dm", "messenger"]);
   });
 
   it("fails loudly and non-retryably rather than dropping the message", async () => {

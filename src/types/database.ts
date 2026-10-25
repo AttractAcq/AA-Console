@@ -8364,6 +8364,318 @@ export type Database = {
           },
         ]
       }
+      dm_conversations: {
+        Row: {
+          campaign_id: string | null
+          client_id: string
+          closed_reason: string | null
+          created_at: string
+          id: string
+          identity_id: string
+          last_inbound_at: string | null
+          last_outbound_at: string | null
+          lead_id: string | null
+          platform: string
+          status: string
+          unread_inbound: number
+          updated_at: string
+          window_expires_at: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          client_id: string
+          closed_reason?: string | null
+          created_at?: string
+          id?: string
+          identity_id: string
+          last_inbound_at?: string | null
+          last_outbound_at?: string | null
+          lead_id?: string | null
+          platform: string
+          status?: string
+          unread_inbound?: number
+          updated_at?: string
+          window_expires_at?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          client_id?: string
+          closed_reason?: string | null
+          created_at?: string
+          id?: string
+          identity_id?: string
+          last_inbound_at?: string | null
+          last_outbound_at?: string | null
+          lead_id?: string | null
+          platform?: string
+          status?: string
+          unread_inbound?: number
+          updated_at?: string
+          window_expires_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_identity_id_fkey"
+            columns: ["identity_id"]
+            isOneToOne: false
+            referencedRelation: "dm_identities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+        ]
+      }
+      dm_identities: {
+        Row: {
+          client_id: string
+          display_name: string | null
+          external_user_id: string
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          lead_id: string | null
+          platform: string
+        }
+        Insert: {
+          client_id: string
+          display_name?: string | null
+          external_user_id: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          lead_id?: string | null
+          platform: string
+        }
+        Update: {
+          client_id?: string
+          display_name?: string | null
+          external_user_id?: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          lead_id?: string | null
+          platform?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_identities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "dm_identities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "dm_identities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_identities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "dm_identities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_identities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+        ]
+      }
+      dm_messages: {
+        Row: {
+          body: string | null
+          client_id: string
+          conversation_id: string
+          created_at: string
+          direction: string
+          external_message_id: string | null
+          id: string
+          occurred_at: string
+          outbound_message_id: string | null
+        }
+        Insert: {
+          body?: string | null
+          client_id: string
+          conversation_id: string
+          created_at?: string
+          direction: string
+          external_message_id?: string | null
+          id?: string
+          occurred_at?: string
+          outbound_message_id?: string | null
+        }
+        Update: {
+          body?: string | null
+          client_id?: string
+          conversation_id?: string
+          created_at?: string
+          direction?: string
+          external_message_id?: string | null
+          id?: string
+          occurred_at?: string
+          outbound_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "dm_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "dm_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "dm_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "dm_conversation_due"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "dm_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "dm_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_messages_outbound_message_id_fkey"
+            columns: ["outbound_message_id"]
+            isOneToOne: false
+            referencedRelation: "outbound_message_due"
+            referencedColumns: ["message_id"]
+          },
+          {
+            foreignKeyName: "dm_messages_outbound_message_id_fkey"
+            columns: ["outbound_message_id"]
+            isOneToOne: false
+            referencedRelation: "outbound_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       engine_controls: {
         Row: {
           enabled: boolean
@@ -19281,6 +19593,112 @@ export type Database = {
           },
         ]
       }
+      dm_conversation_due: {
+        Row: {
+          blocker: string | null
+          campaign_id: string | null
+          client_id: string | null
+          conversation_id: string | null
+          display_name: string | null
+          external_user_id: string | null
+          hours_left: number | null
+          last_inbound_at: string | null
+          last_inbound_body: string | null
+          last_outbound_at: string | null
+          lead_id: string | null
+          platform: string | null
+          status: string | null
+          unread_inbound: number | null
+          window_expires_at: string | null
+          window_open: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_conversations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+        ]
+      }
       engine_activity: {
         Row: {
           clients_considered: number | null
@@ -22439,6 +22857,10 @@ export type Database = {
           spend: number
         }[]
       }
+      client_for_meta_recipient_v6: {
+        Args: { p_recipient_id: string }
+        Returns: string
+      }
       client_timezone: { Args: { p_client_id: string }; Returns: string }
       clone_campaign_for_route: {
         Args: {
@@ -22448,6 +22870,31 @@ export type Database = {
           p_target_mode: string
         }
         Returns: string
+      }
+      close_dm_conversation_v6: {
+        Args: { p_conversation_id: string; p_reason: string }
+        Returns: {
+          campaign_id: string | null
+          client_id: string
+          closed_reason: string | null
+          created_at: string
+          id: string
+          identity_id: string
+          last_inbound_at: string | null
+          last_outbound_at: string | null
+          lead_id: string | null
+          platform: string
+          status: string
+          unread_inbound: number
+          updated_at: string
+          window_expires_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "dm_conversations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       complete_daily_recovery_alert: {
         Args: {
@@ -23216,6 +23663,10 @@ export type Database = {
           p_member_ids: string[]
         }
         Returns: number
+      }
+      dm_reply_refusal_v6: {
+        Args: { p_conversation_id: string }
+        Returns: string
       }
       draft_google_review_reply_v6: {
         Args: { p_body: string; p_review_id: string }
@@ -24180,6 +24631,31 @@ export type Database = {
         }
         Returns: Json
       }
+      merge_dm_lead_v6: {
+        Args: { p_conversation_id: string; p_lead_id: string }
+        Returns: {
+          campaign_id: string | null
+          client_id: string
+          closed_reason: string | null
+          created_at: string
+          id: string
+          identity_id: string
+          last_inbound_at: string | null
+          last_outbound_at: string | null
+          lead_id: string | null
+          platform: string
+          status: string
+          unread_inbound: number
+          updated_at: string
+          window_expires_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "dm_conversations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       message_payload_hash_v6: {
         Args: { p_body: string; p_channel: string; p_subject: string }
         Returns: string
@@ -24507,6 +24983,22 @@ export type Database = {
           p_missing: string[]
         }
         Returns: string
+      }
+      record_inbound_dm_v6: {
+        Args: {
+          p_body: string
+          p_client_id: string
+          p_display_name?: string
+          p_external_message_id: string
+          p_external_user_id: string
+          p_occurred_at?: string
+          p_platform: string
+        }
+        Returns: {
+          conversation_id: string
+          is_new: boolean
+          lead_id: string
+        }[]
       }
       record_lead_magnet_failure: {
         Args: { p_delivery_id: string; p_reason: string; p_retryable?: boolean }

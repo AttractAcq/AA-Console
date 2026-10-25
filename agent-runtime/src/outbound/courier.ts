@@ -30,6 +30,7 @@ import type { JobResult } from "../orchestration/dispatch.js";
 import type { AgentJobRow } from "../queue.js";
 import { appendEvent } from "../queue.js";
 import { logger } from "../logging/logger.js";
+import { DmSendError, sendDm } from "../dm/send.js";
 
 const DEFAULT_BATCH = 10;
 const SEND_TIMEOUT_MS = 20_000;
@@ -119,10 +120,62 @@ type Sender = (
   config: RuntimeConfig,
   message: ClaimedMessage,
   fetchImpl?: typeof fetch,
+  sb?: SupabaseClient,
 ) => Promise<string>;
+
+/**
+ * A DM reply. The address is the person's scoped id, and the sender is the
+ * client's page — read here rather than carried on the message, because a
+ * page id can change and the reply should go from whatever is connected now.
+ */
+export async function sendDirectMessage(
+  config: RuntimeConfig,
+  message: ClaimedMessage,
+  fetchImpl: typeof fetch = fetch,
+  sb?: SupabaseClient,
+): Promise<string> {
+  if (!sb) {
+    throw new SendError("A DM reply needs the database to read the page and the token.", false);
+  }
+  const { data: integration, error } = await sb
+    .from("client_integrations")
+    .select("meta_page_id")
+    .eq("client_id", message.client_id)
+    .eq("provider", "meta")
+    .maybeSingle();
+  if (error) throw new SendError(`Could not read the Meta integration: ${error.message}`, true);
+  const senderId = (integration as { meta_page_id?: string } | null)?.meta_page_id;
+  if (!senderId) {
+    throw new SendError("This client has no connected Meta page to reply from.", false);
+  }
+
+  const { data: token, error: tokenError } = await sb.rpc("integration_secret", {
+    p_client_id: message.client_id,
+    p_provider: "meta",
+  } as never);
+  if (tokenError) throw new SendError(`Could not read the Meta credential: ${tokenError.message}`, true);
+  if (typeof token !== "string" || !token) {
+    throw new SendError("This client's Meta credential is missing.", false);
+  }
+
+  try {
+    return await sendDm({
+      accessToken: token,
+      senderId,
+      recipientId: message.address,
+      text: message.rendered_body,
+      fetchImpl,
+    });
+  } catch (thrown) {
+    const retryable = thrown instanceof DmSendError ? thrown.retryable : false;
+    throw new SendError(thrown instanceof Error ? thrown.message : String(thrown), retryable);
+  }
+}
 
 export const SENDERS: Readonly<Record<string, Sender>> = {
   email: sendEmail,
+  instagram_dm: sendDirectMessage,
+  messenger: sendDirectMessage,
 };
 
 /**
@@ -173,7 +226,7 @@ export async function deliverClaimedMessages(
           false,
         );
       }
-      const externalId = await sender(config, message, fetchImpl);
+      const externalId = await sender(config, message, fetchImpl, sb);
 
       const { error: recordError } = await sb.rpc("record_outbound_message_sent", {
         p_message_id: message.message_id,
