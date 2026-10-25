@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import type { Database } from "../types/database";
 
 /**
  * Proof Distribution, from the browser's side.
@@ -206,3 +207,34 @@ export async function recordRetracted(placementId: string, detail?: string): Pro
 export const LIVE_STATUSES: ReadonlySet<string> = new Set(["placed", "verified"]);
 /** The statuses that mean somebody has to go and take something down. */
 export const RETRACTION_STATUSES: ReadonlySet<string> = new Set(["retraction_required"]);
+
+/**
+ * Where a client's proof actually is — G09 and G10.
+ *
+ * Until migration 246, this question could only be answered for the
+ * destinations that had an adapter. A proof-derived reel on Instagram and a
+ * case study on the client's own site were the two places the proof was most
+ * likely to be and the two places nothing could find it.
+ *
+ * It is the question on exactly one day: when a customer withdraws their
+ * permission. So the view leads with proof that is live somewhere and whose
+ * rights are no longer approved.
+ */
+export type ProofSurfaceCoverage =
+  Database["public"]["Views"]["proof_surface_coverage"]["Row"];
+
+export async function fetchProofSurfaceCoverage(
+  clientId: string,
+): Promise<ProofSurfaceCoverage[]> {
+  const { data, error } = await supabase
+    .from("proof_surface_coverage")
+    .select("*")
+    .eq("client_id", clientId);
+  if (error) throw new Error(error.message);
+  // Problems first, then the most widely used proof: both orderings a person
+  // wants, and neither is the view's job to guess.
+  return ((data ?? []) as ProofSurfaceCoverage[]).sort((a, b) => {
+    if (Boolean(a.problem) !== Boolean(b.problem)) return a.problem ? -1 : 1;
+    return (b.live_placements ?? 0) - (a.live_placements ?? 0);
+  });
+}

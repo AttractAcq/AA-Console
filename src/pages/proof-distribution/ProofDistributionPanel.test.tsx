@@ -34,6 +34,7 @@ const state = {
   placements: [] as Record<string, unknown>[],
   due: [] as Record<string, unknown>[],
   clientDestinations: [] as Record<string, unknown>[],
+  coverage: [] as Record<string, unknown>[],
   publishing: false,
 };
 
@@ -43,6 +44,7 @@ function result(table: string) {
     case "client_proof_destinations": return { data: state.clientDestinations, error: null };
     case "proof_placements": return { data: state.placements, error: null };
     case "proof_placement_due": return { data: state.due, error: null };
+    case "proof_surface_coverage": return { data: state.coverage, error: null };
     case "client_engine_settings":
       return { data: { proof_publishing_enabled: state.publishing }, error: null };
     default: return { data: [], error: null };
@@ -87,6 +89,7 @@ const placement = (over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
+  state.coverage = [];
   vi.clearAllMocks();
   rpc.mockResolvedValue({ data: null, error: null });
   requestProofPublish.mockResolvedValue("approval-1");
@@ -222,5 +225,70 @@ describe("asking for the decision", () => {
     render(<ProofDistributionPanel tab="placements" />);
     expect(await screen.findByText(/refused the post \(403\)/)).toBeInTheDocument();
     expect(screen.queryByText("Nothing")).not.toBeInTheDocument();
+  });
+});
+
+
+/**
+ * Where this proof actually is — G09 and G10.
+ *
+ * The question the Rights tab could not answer before migration 246: not
+ * "what is this placement doing" but "for this piece of proof, everywhere it
+ * reached". The two surfaces that were invisible are the ones asserted here.
+ */
+const coverage = (over: Record<string, unknown> = {}) => ({
+  client_id: "c1",
+  proof_asset_id: "p1",
+  title: "Mrs Okafor's review",
+  proof_type: "review",
+  usage_rights: "approved",
+  expires_on: null,
+  live_placements: 2,
+  bound_not_published: 0,
+  needs_retracting: 0,
+  live_on: ["organic_social", "main_website"],
+  problem: null,
+  ...over,
+});
+
+describe("where this proof actually is", () => {
+  it("lists the surfaces a piece of proof reached, including site and social", async () => {
+    state.coverage = [coverage()];
+    render(<ProofDistributionPanel tab="rights" />);
+    expect(await screen.findByText("Where this proof actually is")).toBeTruthy();
+    expect(screen.getByText("organic_social, main_website")).toBeTruthy();
+    expect(screen.getByText("1 of 1 piece(s) of proof are live somewhere.")).toBeTruthy();
+  });
+
+  it("leads with proof that is live on lapsed rights", async () => {
+    state.coverage = [
+      coverage({ proof_asset_id: "p2", title: "A clean one", problem: null }),
+      coverage({
+        usage_rights: "not_cleared",
+        problem: "This proof is live somewhere and its rights are not_cleared.",
+      }),
+    ];
+    render(<ProofDistributionPanel tab="rights" />);
+    expect(
+      await screen.findByText("This proof is live somewhere and its rights are not_cleared."),
+    ).toBeTruthy();
+    const alerts = screen.getAllByRole("alert").map((a) => a.textContent);
+    expect(alerts.some((t) => t?.includes("1 piece(s) of proof need attention"))).toBe(true);
+    // The problem row sorts above the clean one.
+    const body = document.body.textContent ?? "";
+    expect(body.indexOf("not_cleared")).toBeLessThan(body.indexOf("A clean one"));
+  });
+
+  it("shows bound-but-unpublished as its own state, not as live", async () => {
+    state.coverage = [
+      coverage({
+        live_placements: 0, bound_not_published: 1, live_on: [],
+        problem: "Bound into a page that has not published, so it is not live anywhere yet.",
+      }),
+    ];
+    render(<ProofDistributionPanel tab="rights" />);
+    expect(await screen.findByText("nowhere")).toBeTruthy();
+    expect(screen.getByText(/has not published, so it is not live anywhere yet/)).toBeTruthy();
+    expect(screen.getByText("0 of 1 piece(s) of proof are live somewhere.")).toBeTruthy();
   });
 });

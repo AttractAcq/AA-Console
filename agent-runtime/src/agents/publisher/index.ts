@@ -323,6 +323,26 @@ export async function runPublisherJob(
       if (recordError) throw new Error(`Published, but could not record it: ${recordError.message}`);
 
       published += 1;
+
+      // G10: record that the proof behind this post reached a public surface.
+      // Deliberately after the publish is recorded and deliberately unable to
+      // fail it: the post is already out, and losing a lineage row is worth a
+      // warning rather than a retry that would publish it twice. The function
+      // is idempotent and returns null for a post with no proof behind it.
+      const { error: lineageError } = await sb.rpc("record_proof_placement_for_post_v6", {
+        p_post_id: post.post_id,
+      } as never);
+      if (lineageError) {
+        logger.warn("proof_lineage_not_recorded", {
+          jobId: job.id, postId: post.post_id, error: lineageError.message,
+        });
+        await appendEvent(
+          sb, job.id,
+          `Published, but the proof behind it was not recorded: ${lineageError.message}`,
+          "warn", { post_id: post.post_id },
+        );
+      }
+
       await appendEvent(sb, job.id, `${post.platform}: ${result.detail ?? "published"}.`, "info", {
         post_id: post.post_id,
         external_id: result.externalId,

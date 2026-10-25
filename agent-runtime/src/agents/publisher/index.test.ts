@@ -51,6 +51,7 @@ function database(
     alreadyOut?: Array<{ position: number; external_id: string; external_url: string | null }>;
     framesReadError?: string;
     frameRecordError?: string;
+    lineageError?: string;
   } = {},
 ) {
   const events: Record<string, unknown>[] = [];
@@ -64,6 +65,9 @@ function database(
     }
     if (name === "record_frame_published" && options.frameRecordError) {
       return { data: null, error: { message: options.frameRecordError } };
+    }
+    if (name === "record_proof_placement_for_post_v6" && options.lineageError) {
+      return { data: null, error: { message: options.lineageError } };
     }
     return { data: null, error: null };
   });
@@ -462,5 +466,47 @@ describe("a story, which is not one publication", () => {
     await runPublisherJob(sb, on, agent, job);
     expect(publishFrame).toHaveBeenCalledTimes(1);
     expect(failureFor(rpc, "post-1")).toBeUndefined();
+  });
+});
+
+/**
+ * G10 — the proof behind a post, recorded once it is out.
+ *
+ * The record exists so that on the day a customer withdraws permission, the
+ * published reel is findable. What matters here is the ordering and the
+ * blast radius: it happens after the publish is recorded, and it cannot fail
+ * a post that is already out in the world.
+ */
+describe("recording the proof behind a published post", () => {
+  it("records it after the publish, not before", async () => {
+    const { sb, rpc } = database();
+    await runPublisherJob(sb, on, agent, job);
+
+    const names = rpc.mock.calls.map((c) => c[0]);
+    expect(names).toContain("record_proof_placement_for_post_v6");
+    expect(argsOf(rpc, "record_proof_placement_for_post_v6")).toMatchObject({ p_post_id: "post-1" });
+    // The publication is recorded first: if that write fails the post is
+    // retried, and a lineage row for a post we are about to retry is noise.
+    expect(names.indexOf("record_post_published"))
+      .toBeLessThan(names.indexOf("record_proof_placement_for_post_v6"));
+  });
+
+  it("does not record it for a post that failed to publish", async () => {
+    publish.mockRejectedValueOnce(new Error("Instagram said no"));
+    const { sb, rpc } = database();
+    await runPublisherJob(sb, on, agent, job);
+    expect(rpc.mock.calls.map((c) => c[0])).not.toContain("record_proof_placement_for_post_v6");
+  });
+
+  it("warns but does not fail the post when the lineage row cannot be written", async () => {
+    const { sb, rpc, events } = database({ lineageError: "placements are locked" });
+    const result = await runPublisherJob(sb, on, agent, job);
+
+    // The post is out. Failing it here would publish it twice on the retry.
+    expect(result.ok).toBe(true);
+    expect(failureFor(rpc, "post-1")).toBeUndefined();
+    expect(
+      events.some((e) => String(e.description).includes("the proof behind it was not recorded")),
+    ).toBe(true);
   });
 });

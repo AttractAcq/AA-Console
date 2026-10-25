@@ -288,6 +288,24 @@ export async function runMetaBuildJob(
     .eq("id", row.id);
   if (stampError) throw new Error(`Built, but could not record when: ${stampError.message}`);
 
+  // G10: the proof behind this campaign's creative is now carried by real ad
+  // objects. Recorded after the build is stamped and unable to fail it -- the
+  // objects exist at Meta either way, and a retry would try to build them
+  // again. Idempotent per external object and proof.
+  if (row.meta_campaign_id) {
+    const { error: lineageError } = await sb.rpc("record_proof_placement_for_ad_v6", {
+      p_campaign_id: row.id,
+      p_external_id: row.meta_campaign_id,
+    } as never);
+    if (lineageError) {
+      await appendEvent(
+        sb, job.id,
+        `Built, but the proof behind the creative was not recorded: ${lineageError.message}`,
+        "warn",
+      );
+    }
+  }
+
   await appendEvent(sb, job.id, "Built and paused. Review it in Ads Manager and launch from there.");
   return { ok: true, retryable: false };
 }

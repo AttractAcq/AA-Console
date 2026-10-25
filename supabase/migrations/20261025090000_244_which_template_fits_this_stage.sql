@@ -54,7 +54,7 @@
 -- The sixteen, as rows
 -- ---------------------------------------------------------------------------
 
-create table public.campaign_template_matrix (
+create table if not exists public.campaign_template_matrix (
   code campaign_template primary key,
   name text not null,
 
@@ -106,9 +106,17 @@ insert into public.campaign_template_matrix (
   ('O1'::campaign_template, 'Promotional', 'spend', 'S2', 'S5', 'OUTCOME_SALES', 'OFFSITE_CONVERSIONS', array['GET_OFFER','SHOP_NOW']::text[], 'page', 'Revenue inside the window', 'The deadline does the work, not the discount.', 'A deadline that moves never works again. People learn it in one cycle.', 'A real offer with a real end date.', false),
   ('O2'::campaign_template, 'Event or webinar', 'build', 'S0', 'S3', 'OUTCOME_LEADS', 'LEAD_GENERATION', array['SIGN_UP']::text[], 'page', 'Attendance, not registrations', 'A date creates urgency an offer cannot.', 'Registrations are free to give and free to skip. Optimising to them fills an empty room.', 'A date.', false),
   ('X1'::campaign_template, 'Lookalike scale', 'spend', 'S0', 'S3', null, null, '{}'::text[], 'page', 'Cost per acquisition against the template it scales', 'Takes a template that works and points it at people like the best pool we own.', 'A 1% lookalike seeded on customers beats a 5% seeded on visitors.', 'A seed of 100 or more, ideally 1,000.', true),
-  ('X2'::campaign_template, 'Test', 'learn', 'S0', 'S0', null, null, '{}'::text[], 'page', 'Confidence, not cost per acquisition', 'Buys information about one creative, audience or offer.', 'One variable, a fixed budget, and it stops on the date rather than on a feeling.', null, true);
+  ('X2'::campaign_template, 'Test', 'learn', 'S0', 'S0', null, null, '{}'::text[], 'page', 'Confidence, not cost per acquisition', 'Buys information about one creative, audience or offer.', 'One variable, a fixed budget, and it stops on the date rather than on a feeling.', null, true)
+on conflict (code) do update set
+  name = excluded.name, fn = excluded.fn, entry_state = excluded.entry_state,
+  exit_state = excluded.exit_state, objective = excluded.objective,
+  optimisation = excluded.optimisation, ctas = excluded.ctas,
+  destination = excluded.destination, kpi = excluded.kpi, purpose = excluded.purpose,
+  guardrail = excluded.guardrail, prerequisite = excluded.prerequisite,
+  mirrors = excluded.mirrors;
 
 alter table public.campaign_template_matrix enable row level security;
+drop policy if exists campaign_template_matrix_read on public.campaign_template_matrix;
 create policy campaign_template_matrix_read on public.campaign_template_matrix
   for select to authenticated using (true);
 grant select on public.campaign_template_matrix to authenticated;
@@ -118,7 +126,7 @@ grant all on public.campaign_template_matrix to service_role;
 -- The missing link: where a person at each awareness level stands
 -- ---------------------------------------------------------------------------
 
-create table public.awareness_audience_map (
+create table if not exists public.awareness_audience_map (
   awareness_level text not null check (awareness_level in
     ('unaware', 'problem_aware', 'solution_aware', 'product_aware', 'most_aware')),
   audience_state text not null check (audience_state in ('S0','S1','S2','S3','S4','S5','S6')),
@@ -157,6 +165,7 @@ insert into public.awareness_audience_map (awareness_level, audience_state, note
 on conflict (awareness_level, audience_state) do update set note = excluded.note;
 
 alter table public.awareness_audience_map enable row level security;
+drop policy if exists awareness_audience_map_read on public.awareness_audience_map;
 create policy awareness_audience_map_read on public.awareness_audience_map
   for select to authenticated using (true);
 grant select on public.awareness_audience_map to authenticated;
@@ -287,7 +296,7 @@ grant select on opportunity_template_readiness to authenticated;
 -- Recording the choice
 -- ---------------------------------------------------------------------------
 
-create function public.set_awareness_stage_template_v6(
+create or replace function public.set_awareness_stage_template_v6(
   p_stage_id uuid,
   p_template campaign_template default null,
   p_rationale text default null,

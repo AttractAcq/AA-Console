@@ -2810,6 +2810,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_briefs_proof_asset_id_fkey"
+            columns: ["proof_asset_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+          {
             foreignKeyName: "client_briefs_sound_asset_id_fkey"
             columns: ["sound_asset_id"]
             isOneToOne: false
@@ -3960,6 +3967,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_ideas_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+          {
             foreignKeyName: "client_ideas_slot_id_fkey"
             columns: ["slot_id"]
             isOneToOne: false
@@ -5046,6 +5060,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_proof_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_frames_proof_asset_id_fkey"
+            columns: ["proof_asset_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
           },
         ]
       }
@@ -6865,6 +6886,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "daily_package_items_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+          {
             foreignKeyName: "daily_package_items_slot_id_fkey"
             columns: ["slot_id"]
             isOneToOne: true
@@ -7786,6 +7814,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_proof_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reviews_captured_proof_id_fkey"
+            columns: ["captured_proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
           },
           {
             foreignKeyName: "google_reviews_client_id_fkey"
@@ -9793,6 +9828,13 @@ export type Database = {
             referencedRelation: "client_proof_assets"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "motion_scenes_proof_asset_id_fkey"
+            columns: ["proof_asset_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
         ]
       }
       opportunity_attributes: {
@@ -10265,6 +10307,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_proof_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
           },
         ]
       }
@@ -10843,6 +10892,13 @@ export type Database = {
             referencedRelation: "client_proof_assets"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "proof_artifact_versions_source_proof_id_fkey"
+            columns: ["source_proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
         ]
       }
       proof_capture_configs: {
@@ -11043,6 +11099,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_proof_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_capture_submissions_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
           },
         ]
       }
@@ -11553,11 +11616,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "proof_placements_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+          {
             foreignKeyName: "proof_placements_source_proof_id_fkey"
             columns: ["source_proof_id"]
             isOneToOne: false
             referencedRelation: "client_proof_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_source_proof_id_fkey"
+            columns: ["source_proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
           },
         ]
       }
@@ -11750,6 +11827,13 @@ export type Database = {
             referencedRelation: "client_proof_assets"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "proof_production_requests_source_proof_id_fkey"
+            columns: ["source_proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
         ]
       }
       proof_request_deliveries: {
@@ -11931,6 +12015,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_proof_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_events_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
           },
         ]
       }
@@ -15637,6 +15728,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_briefs_proof_asset_id_fkey"
+            columns: ["proof_asset_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+          {
             foreignKeyName: "client_media_assets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -16376,6 +16474,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "client_briefs_proof_asset_id_fkey"
+            columns: ["proof_asset_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+          {
             foreignKeyName: "scheduled_posts_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -16931,6 +17036,44 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_proof_assets"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_source_proof_id_fkey"
+            columns: ["source_proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+        ]
+      }
+      proof_surface_coverage: {
+        Row: {
+          bound_not_published: number | null
+          client_id: string | null
+          expires_on: string | null
+          live_on: string[] | null
+          live_placements: number | null
+          needs_retracting: number | null
+          problem: string | null
+          proof_asset_id: string | null
+          proof_type: string | null
+          title: string | null
+          usage_rights: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_proof_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_proof_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -17706,6 +17849,49 @@ export type Database = {
       auto_rebuild_rejected_reel_sources: {
         Args: { p_limit?: number }
         Returns: number
+      }
+      bind_proof_placement_to_page_v6: {
+        Args: {
+          p_page_id: string
+          p_placement_id: string
+          p_revision_id: string
+        }
+        Returns: {
+          approval_id: string | null
+          artifact_version_id: string | null
+          asset_id: string | null
+          attempts: number
+          bound_revision_id: string | null
+          bound_version_hash: string | null
+          campaign_id: string | null
+          claimed_at: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          destination_key: string
+          external_id: string | null
+          external_url: string | null
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lease_until: string | null
+          payload_hash: string
+          placed_at: string | null
+          placed_by: string | null
+          production_request_id: string | null
+          proof_id: string | null
+          retracted_at: string | null
+          source_proof_id: string
+          status: string
+          updated_at: string
+          verified_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "proof_placements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       brief_video_repurpose_candidate: {
         Args: {
@@ -20072,6 +20258,19 @@ export type Database = {
         }
         Returns: undefined
       }
+      record_proof_placement_for_ad_v6: {
+        Args: {
+          p_approval_id?: string
+          p_campaign_id: string
+          p_external_id: string
+          p_external_url?: string
+        }
+        Returns: number
+      }
+      record_proof_placement_for_post_v6: {
+        Args: { p_post_id: string }
+        Returns: string
+      }
       record_proof_retracted_v6: {
         Args: { p_detail?: string; p_placement_id: string }
         Returns: undefined
@@ -20257,6 +20456,45 @@ export type Database = {
       release_campaign_proof_placements: {
         Args: { p_execution_id: string }
         Returns: Json
+      }
+      release_proof_to_sales_agent_v6: {
+        Args: { p_deployment_id: string; p_placement_id: string }
+        Returns: {
+          approval_id: string | null
+          artifact_version_id: string | null
+          asset_id: string | null
+          attempts: number
+          bound_revision_id: string | null
+          bound_version_hash: string | null
+          campaign_id: string | null
+          claimed_at: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          destination_key: string
+          external_id: string | null
+          external_url: string | null
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lease_until: string | null
+          payload_hash: string
+          placed_at: string | null
+          placed_by: string | null
+          production_request_id: string | null
+          proof_id: string | null
+          retracted_at: string | null
+          source_proof_id: string
+          status: string
+          updated_at: string
+          verified_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "proof_placements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       remove_engine_window: {
         Args: { p_window_id: string }
