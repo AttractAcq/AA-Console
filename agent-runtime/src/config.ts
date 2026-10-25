@@ -78,6 +78,11 @@ export interface RuntimeConfig {
   /** Which provider writes the creative concept. */
   conceptProvider: "openai" | "anthropic";
   conceptModel: string;
+  /**
+   * Whether this runtime may send governed messages to individual leads.
+   * Off means the courier claims nothing and says so, rather than pretending.
+   */
+  outboundMessagingEnabled: boolean;
   /** Transactional email. Absent means a brief is still assigned, just not emailed. */
   resendApiKey: string | null;
   resendFrom: string;
@@ -249,6 +254,7 @@ export function loadConfig(): RuntimeConfig {
         ? "anthropic"
         : "openai",
     conceptModel: optionalEnv("CREATIVE_CONCEPT_MODEL") ?? "gpt-5.6-sol",
+    outboundMessagingEnabled: optionalEnv("OUTBOUND_MESSAGING_ENABLED") === "true",
     resendApiKey: optionalEnv("RESEND_API_KEY") ?? null,
     resendFrom: optionalEnv("RESEND_FROM") ?? "AA Console <briefs@attractacq.com>",
     // A brief email reaches a real person. An unset CONSOLE_URL used to put

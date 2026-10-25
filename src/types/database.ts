@@ -3744,6 +3744,10 @@ export type Database = {
           lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
+          outbound_daily_cap: number
+          outbound_messaging_enabled: boolean
+          outbound_messaging_enabled_at: string | null
+          outbound_messaging_enabled_by: string | null
           plan_horizon_days: number
           proof_publishing_enabled: boolean
           proof_publishing_enabled_at: string | null
@@ -3772,6 +3776,10 @@ export type Database = {
           lead_magnet_delivery_enabled_by?: string | null
           max_jobs_in_flight?: number
           min_qa_score?: number
+          outbound_daily_cap?: number
+          outbound_messaging_enabled?: boolean
+          outbound_messaging_enabled_at?: string | null
+          outbound_messaging_enabled_by?: string | null
           plan_horizon_days?: number
           proof_publishing_enabled?: boolean
           proof_publishing_enabled_at?: string | null
@@ -3800,6 +3808,10 @@ export type Database = {
           lead_magnet_delivery_enabled_by?: string | null
           max_jobs_in_flight?: number
           min_qa_score?: number
+          outbound_daily_cap?: number
+          outbound_messaging_enabled?: boolean
+          outbound_messaging_enabled_at?: string | null
+          outbound_messaging_enabled_by?: string | null
           plan_horizon_days?: number
           proof_publishing_enabled?: boolean
           proof_publishing_enabled_at?: string | null
@@ -3841,6 +3853,13 @@ export type Database = {
           {
             foreignKeyName: "client_engine_settings_lead_magnet_delivery_enabled_by_fkey"
             columns: ["lead_magnet_delivery_enabled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_engine_settings_outbound_messaging_enabled_by_fkey"
+            columns: ["outbound_messaging_enabled_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -9339,6 +9358,65 @@ export type Database = {
           },
         ]
       }
+      lead_suppressions: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          dedupe_key: string
+          detail: string | null
+          id: string
+          reason: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          dedupe_key: string
+          detail?: string | null
+          id?: string
+          reason: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          dedupe_key?: string
+          detail?: string | null
+          id?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_suppressions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_suppressions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_suppressions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_suppressions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       market_opportunities: {
         Row: {
           buying_situation: string
@@ -9681,6 +9759,317 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "metrics_pulls"
             referencedColumns: ["job_id"]
+          },
+        ]
+      }
+      message_channels: {
+        Row: {
+          can_initiate: boolean
+          channel_key: string
+          note: string
+          supported: boolean
+          transport: string
+        }
+        Insert: {
+          can_initiate?: boolean
+          channel_key: string
+          note: string
+          supported?: boolean
+          transport: string
+        }
+        Update: {
+          can_initiate?: boolean
+          channel_key?: string
+          note?: string
+          supported?: boolean
+          transport?: string
+        }
+        Relationships: []
+      }
+      message_template_approvals: {
+        Row: {
+          approved_at: string
+          approved_by: string | null
+          channel_key: string
+          client_id: string
+          consent_basis: string
+          id: string
+          purpose: string
+          revoked_at: string | null
+          revoked_by: string | null
+          revoked_reason: string | null
+          status: string
+          template_version_id: string
+        }
+        Insert: {
+          approved_at?: string
+          approved_by?: string | null
+          channel_key: string
+          client_id: string
+          consent_basis: string
+          id?: string
+          purpose: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          revoked_reason?: string | null
+          status?: string
+          template_version_id: string
+        }
+        Update: {
+          approved_at?: string
+          approved_by?: string | null
+          channel_key?: string
+          client_id?: string
+          consent_basis?: string
+          id?: string
+          purpose?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          revoked_reason?: string | null
+          status?: string
+          template_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_template_approvals_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_approvals_channel_key_fkey"
+            columns: ["channel_key"]
+            isOneToOne: false
+            referencedRelation: "message_channels"
+            referencedColumns: ["channel_key"]
+          },
+          {
+            foreignKeyName: "message_template_approvals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_template_approvals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_approvals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_template_approvals_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_approvals_template_version_id_fkey"
+            columns: ["template_version_id"]
+            isOneToOne: false
+            referencedRelation: "message_template_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_template_versions: {
+        Row: {
+          body: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          payload_hash: string
+          placeholders: string[]
+          subject: string | null
+          template_id: string
+          version: number
+        }
+        Insert: {
+          body: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          payload_hash: string
+          placeholders?: string[]
+          subject?: string | null
+          template_id: string
+          version: number
+        }
+        Update: {
+          body?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          payload_hash?: string
+          placeholders?: string[]
+          subject?: string | null
+          template_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_template_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_template_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_template_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_templates: {
+        Row: {
+          archived_at: string | null
+          campaign_id: string | null
+          channel_key: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          purpose: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          campaign_id?: string | null
+          channel_key: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          purpose: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          campaign_id?: string | null
+          channel_key?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          purpose?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_templates_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "message_templates_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "message_templates_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_templates_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_templates_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "message_templates_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "message_templates_channel_key_fkey"
+            columns: ["channel_key"]
+            isOneToOne: false
+            referencedRelation: "message_channels"
+            referencedColumns: ["channel_key"]
+          },
+          {
+            foreignKeyName: "message_templates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_templates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_templates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -11000,6 +11389,180 @@ export type Database = {
           to_status?: Database["public"]["Enums"]["opportunity_status"]
         }
         Relationships: []
+      }
+      outbound_messages: {
+        Row: {
+          address: string
+          approval_id: string
+          attempts: number
+          campaign_id: string | null
+          channel_key: string
+          claimed_at: string | null
+          client_id: string
+          consent_given_at: string | null
+          consent_wording: string | null
+          created_at: string
+          external_id: string | null
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lead_id: string
+          lease_until: string | null
+          rendered_body: string
+          rendered_subject: string | null
+          sent_at: string | null
+          status: string
+          template_version_id: string
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          approval_id: string
+          attempts?: number
+          campaign_id?: string | null
+          channel_key: string
+          claimed_at?: string | null
+          client_id: string
+          consent_given_at?: string | null
+          consent_wording?: string | null
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          idempotency_key: string
+          last_error?: string | null
+          lead_id: string
+          lease_until?: string | null
+          rendered_body: string
+          rendered_subject?: string | null
+          sent_at?: string | null
+          status?: string
+          template_version_id: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          approval_id?: string
+          attempts?: number
+          campaign_id?: string | null
+          channel_key?: string
+          claimed_at?: string | null
+          client_id?: string
+          consent_given_at?: string | null
+          consent_wording?: string | null
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          idempotency_key?: string
+          last_error?: string | null
+          lead_id?: string
+          lease_until?: string | null
+          rendered_body?: string
+          rendered_subject?: string | null
+          sent_at?: string | null
+          status?: string
+          template_version_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outbound_messages_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "message_template_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_channel_key_fkey"
+            columns: ["channel_key"]
+            isOneToOne: false
+            referencedRelation: "message_channels"
+            referencedColumns: ["channel_key"]
+          },
+          {
+            foreignKeyName: "outbound_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_template_version_id_fkey"
+            columns: ["template_version_id"]
+            isOneToOne: false
+            referencedRelation: "message_template_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       platform_format_publishing: {
         Row: {
@@ -17904,6 +18467,112 @@ export type Database = {
           },
         ]
       }
+      outbound_message_due: {
+        Row: {
+          approval_status: string | null
+          attempts: number | null
+          blocker: string | null
+          campaign_id: string | null
+          channel_key: string | null
+          client_id: string | null
+          consent_basis: string | null
+          external_id: string | null
+          last_error: string | null
+          lead_id: string | null
+          message_id: string | null
+          purpose: string | null
+          sent_at: string | null
+          status: string | null
+          template_name: string | null
+          template_version: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outbound_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_channel_key_fkey"
+            columns: ["channel_key"]
+            isOneToOne: false
+            referencedRelation: "message_channels"
+            referencedColumns: ["channel_key"]
+          },
+          {
+            foreignKeyName: "outbound_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+        ]
+      }
       pages_archive: {
         Row: {
           archived_at: string | null
@@ -18679,6 +19348,32 @@ export type Database = {
         Args: { p_lead_id: string; p_note: string }
         Returns: undefined
       }
+      add_message_template_version_v6: {
+        Args: {
+          p_body: string
+          p_placeholders?: string[]
+          p_subject: string
+          p_template_id: string
+        }
+        Returns: {
+          body: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          payload_hash: string
+          placeholders: string[]
+          subject: string | null
+          template_id: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "message_template_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       add_workflow_agent_step: {
         Args: {
           p_agent_key: string
@@ -18852,6 +19547,29 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "engine_decisions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      approve_message_template_v6: {
+        Args: { p_consent_basis: string; p_template_version_id: string }
+        Returns: {
+          approved_at: string
+          approved_by: string | null
+          channel_key: string
+          client_id: string
+          consent_basis: string
+          id: string
+          purpose: string
+          revoked_at: string | null
+          revoked_by: string | null
+          revoked_reason: string | null
+          status: string
+          template_version_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "message_template_approvals"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -19236,6 +19954,19 @@ export type Database = {
           media_type: string
           recipient: string
           storage_path: string
+        }[]
+      }
+      claim_outbound_messages: {
+        Args: { p_limit?: number }
+        Returns: {
+          address: string
+          attempts: number
+          channel_key: string
+          client_id: string
+          lead_id: string
+          message_id: string
+          rendered_body: string
+          rendered_subject: string
         }[]
       }
       claim_posts_for_publishing: {
@@ -19633,6 +20364,33 @@ export type Database = {
           p_purchase_trigger?: string
         }
         Returns: string
+      }
+      create_message_template_v6: {
+        Args: {
+          p_campaign_id?: string
+          p_channel_key: string
+          p_client_id: string
+          p_name: string
+          p_purpose: string
+        }
+        Returns: {
+          archived_at: string | null
+          campaign_id: string | null
+          channel_key: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          purpose: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "message_templates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_proof_artifact_v6: {
         Args: {
@@ -20178,6 +20936,7 @@ export type Database = {
         Args: { p_days?: number }
         Returns: number
       }
+      enqueue_outbound_sweep: { Args: never; Returns: string }
       enqueue_proof_placement_sweep: { Args: never; Returns: string }
       enqueue_publish_sweep: { Args: never; Returns: string }
       enqueue_scoped_ideation: {
@@ -21024,6 +21783,10 @@ export type Database = {
         }
         Returns: Json
       }
+      message_payload_hash_v6: {
+        Args: { p_body: string; p_channel: string; p_subject: string }
+        Returns: string
+      }
       meta_build_payload_hash_v6: {
         Args: { p_campaign_id: string }
         Returns: string
@@ -21141,8 +21904,42 @@ export type Database = {
           created: string
         }[]
       }
+      queue_lead_message_v6: {
+        Args: { p_lead_id: string; p_template_version_id: string }
+        Returns: {
+          address: string
+          approval_id: string
+          attempts: number
+          campaign_id: string | null
+          channel_key: string
+          claimed_at: string | null
+          client_id: string
+          consent_given_at: string | null
+          consent_wording: string | null
+          created_at: string
+          external_id: string | null
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lead_id: string
+          lease_until: string | null
+          rendered_body: string
+          rendered_subject: string | null
+          sent_at: string | null
+          status: string
+          template_version_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "outbound_messages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       reap_stale_campaign_action_claims: { Args: never; Returns: number }
       reap_stale_lead_magnet_deliveries: { Args: never; Returns: number }
+      reap_stale_outbound_claims: { Args: never; Returns: number }
       reap_stale_proof_placement_claims: { Args: never; Returns: number }
       reap_stale_publish_claims: {
         Args: { p_older_than?: string }
@@ -21284,6 +22081,14 @@ export type Database = {
       }
       record_lead_magnet_sent: {
         Args: { p_delivery_id: string; p_provider_ref: string }
+        Returns: undefined
+      }
+      record_outbound_message_failure: {
+        Args: { p_message_id: string; p_reason: string; p_retryable?: boolean }
+        Returns: undefined
+      }
+      record_outbound_message_sent: {
+        Args: { p_external_id: string; p_message_id: string }
         Returns: undefined
       }
       record_page_revision: {
@@ -21633,6 +22438,13 @@ export type Database = {
       remove_engine_window: {
         Args: { p_window_id: string }
         Returns: undefined
+      }
+      render_message_v6: {
+        Args: {
+          p_body: string
+          p_lead: Database["public"]["Tables"]["client_leads"]["Row"]
+        }
+        Returns: string
       }
       renew_agent_job_lease: {
         Args: {
@@ -22048,6 +22860,10 @@ export type Database = {
         Args: { p_approval_id: string; p_reason: string }
         Returns: undefined
       }
+      revoke_message_template_approval_v6: {
+        Args: { p_approval_id: string; p_reason: string }
+        Returns: undefined
+      }
       sales_runtime_allow: {
         Args: {
           p_deployment_id: string
@@ -22307,6 +23123,10 @@ export type Database = {
           lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
+          outbound_daily_cap: number
+          outbound_messaging_enabled: boolean
+          outbound_messaging_enabled_at: string | null
+          outbound_messaging_enabled_by: string | null
           plan_horizon_days: number
           proof_publishing_enabled: boolean
           proof_publishing_enabled_at: string | null
@@ -22352,6 +23172,10 @@ export type Database = {
           lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
+          outbound_daily_cap: number
+          outbound_messaging_enabled: boolean
+          outbound_messaging_enabled_at: string | null
+          outbound_messaging_enabled_by: string | null
           plan_horizon_days: number
           proof_publishing_enabled: boolean
           proof_publishing_enabled_at: string | null
@@ -22423,6 +23247,10 @@ export type Database = {
           lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
+          outbound_daily_cap: number
+          outbound_messaging_enabled: boolean
+          outbound_messaging_enabled_at: string | null
+          outbound_messaging_enabled_by: string | null
           plan_horizon_days: number
           proof_publishing_enabled: boolean
           proof_publishing_enabled_at: string | null
@@ -22488,6 +23316,10 @@ export type Database = {
           lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
+          outbound_daily_cap: number
+          outbound_messaging_enabled: boolean
+          outbound_messaging_enabled_at: string | null
+          outbound_messaging_enabled_by: string | null
           plan_horizon_days: number
           proof_publishing_enabled: boolean
           proof_publishing_enabled_at: string | null
@@ -22574,6 +23406,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_outbound_messaging_enabled: {
+        Args: { p_client_id: string; p_enabled: boolean }
+        Returns: undefined
+      }
       set_post_copy: {
         Args: {
           p_alt_text?: string
@@ -22610,6 +23446,10 @@ export type Database = {
           lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
+          outbound_daily_cap: number
+          outbound_messaging_enabled: boolean
+          outbound_messaging_enabled_at: string | null
+          outbound_messaging_enabled_by: string | null
           plan_horizon_days: number
           proof_publishing_enabled: boolean
           proof_publishing_enabled_at: string | null
@@ -22647,6 +23487,10 @@ export type Database = {
           lead_magnet_delivery_enabled_by: string | null
           max_jobs_in_flight: number
           min_qa_score: number
+          outbound_daily_cap: number
+          outbound_messaging_enabled: boolean
+          outbound_messaging_enabled_at: string | null
+          outbound_messaging_enabled_by: string | null
           plan_horizon_days: number
           proof_publishing_enabled: boolean
           proof_publishing_enabled_at: string | null
@@ -22724,6 +23568,15 @@ export type Database = {
         Returns: string
       }
       start_onboarding: { Args: { p_client_id: string }; Returns: undefined }
+      suppress_lead_v6: {
+        Args: {
+          p_client_id: string
+          p_dedupe_key: string
+          p_detail?: string
+          p_reason: string
+        }
+        Returns: string
+      }
       sweep_expired_proof_placements: { Args: never; Returns: number }
       title_overlap: {
         Args: { p_candidate: string; p_other: string }

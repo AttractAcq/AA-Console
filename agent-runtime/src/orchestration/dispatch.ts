@@ -39,6 +39,7 @@ import { runPublisherJob } from "../agents/publisher/index.js";
 import { runCampaignActionJob } from "../campaigns/actions/executor.js";
 import { runProofPlacerJob } from "../proof-distribution/placer.js";
 import { runLeadMagnetCourierJob } from "../lead-magnets/courier.js";
+import { runOutboundCourierJob } from "../outbound/courier.js";
 import { runGoogleAdsSheetJob } from "../agents/google_ads_sheet/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
@@ -149,6 +150,9 @@ const RUNNERS: Record<string, JobRunner> = {
   // exact file somebody approved, once. Re-hashes the bytes before every
   // send, because a path can be overwritten after it is approved.
   lead_magnet_courier: runLeadMagnetCourierJob,
+  // G02: the governed send. Every rule lives in claim_outbound_messages, so
+  // this worker never decides whether somebody consented.
+  outbound_courier: runOutboundCourierJob,
   brief_dispatch: runBriefDispatchJob,
   client_approval_dispatch: runClientApprovalDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
