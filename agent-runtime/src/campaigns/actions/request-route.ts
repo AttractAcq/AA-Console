@@ -29,6 +29,9 @@ import { logger } from "../../logging/logger.js";
 const ASKABLE: Readonly<Record<string, string>> = {
   proof_publish: "request_campaign_proof_publish_v6",
   meta_ad_build: "request_campaign_meta_build_v6",
+  // Takes a sequence id as well as the campaign, so it is requested with an
+  // extra argument the other two do not need.
+  lead_message: "request_campaign_lead_message_v6",
 };
 
 export async function handleCampaignActionRequest(
@@ -98,9 +101,19 @@ export async function handleCampaignActionRequest(
     return;
   }
 
+  // lead_message names a sequence as well as a campaign; the other two take
+  // only the campaign. Passed through rather than defaulted, because guessing
+  // which sequence somebody meant is not a thing to guess.
+  const sequenceId = String(body.sequenceId ?? "");
+  if (actionKey === "lead_message" && !UUID.test(sequenceId)) {
+    json(400, { ok: false, error: "Say which sequence these leads should be enrolled into." });
+    return;
+  }
+
   const { data, error } = await sb.rpc(builder, {
     p_campaign_id: campaignId,
     p_actor: userId,
+    ...(actionKey === "lead_message" ? { p_sequence_id: sequenceId } : {}),
   } as never);
   if (error) {
     // The database's own sentence, which is written to be read by whoever

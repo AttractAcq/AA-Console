@@ -136,12 +136,59 @@ export const releaseProofPlacements: ActionHandler = async (sb, _config, action)
   };
 };
 
+
+/**
+ * G11: enrol this campaign's own leads into one approved sequence.
+ *
+ * Sends nothing. The courier sends each message afterwards under 249's
+ * per-message rules, so consent, suppression and the daily cap still apply
+ * to every one — which is why enrolling a hundred people is not the same
+ * risk as sending a hundred emails.
+ *
+ * Enrolling nobody is a non-retryable failure rather than a success: the
+ * approval said some leads were eligible, and if none are by the time the
+ * sweep runs then something changed and a person should see why.
+ */
+export const enrolCampaignLeads: ActionHandler = async (sb, _config, action) => {
+  const { data, error } = await sb.rpc("enrol_campaign_leads_in_sequence_v6", {
+    p_execution_id: action.execution_id,
+  } as never);
+  if (error) throw new ActionError(`Could not enrol the leads: ${error.message}`, true);
+
+  const outcome = (data ?? {}) as {
+    enrolled?: number; skipped?: unknown[]; sequence_name?: string;
+  };
+  const enrolled = Number(outcome.enrolled ?? 0);
+  const skipped = Array.isArray(outcome.skipped) ? outcome.skipped : [];
+
+  if (enrolled === 0) {
+    const why = skipped
+      .map((item) => String((item as { reason?: string }).reason ?? "no reason recorded"))
+      .slice(0, 3)
+      .join(" ");
+    throw new ActionError(
+      `Nobody was enrolled. ${why || "No lead from this campaign was eligible by the time this ran."}`,
+      false,
+    );
+  }
+
+  return {
+    result: { enrolled, skipped, sequence: outcome.sequence_name ?? null },
+    detail:
+      skipped.length === 0
+        ? `Enrolled ${enrolled} lead${enrolled === 1 ? "" : "s"} into ${outcome.sequence_name ?? "the sequence"}.`
+        : `Enrolled ${enrolled}, skipped ${skipped.length}.`,
+  };
+};
+
 export const HANDLERS: Readonly<Record<string, ActionHandler>> = {
   proof_publish: releaseProofPlacements,
   // Publishes the exact reviewed bytes, then submits a test form against the
   // live page and checks a sourced, consented lead arrives. See page-deploy.ts
   // for why the probe is the half that matters.
   page_deploy: deployCampaignPage,
+  // Enrols leads; the courier is what actually sends.
+  lead_message: enrolCampaignLeads,
 };
 
 export async function runCampaignActionJob(

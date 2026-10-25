@@ -9248,6 +9248,111 @@ export type Database = {
           },
         ]
       }
+      lead_sequence_enrollments: {
+        Row: {
+          client_id: string
+          created_at: string
+          enrolled_by: string | null
+          exit_reason: string | null
+          exited_at: string | null
+          id: string
+          last_sent_at: string | null
+          last_step: number | null
+          lead_id: string
+          next_due_at: string | null
+          sequence_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          enrolled_by?: string | null
+          exit_reason?: string | null
+          exited_at?: string | null
+          id?: string
+          last_sent_at?: string | null
+          last_step?: number | null
+          lead_id: string
+          next_due_at?: string | null
+          sequence_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          enrolled_by?: string | null
+          exit_reason?: string | null
+          exited_at?: string | null
+          id?: string
+          last_sent_at?: string | null
+          last_step?: number | null
+          lead_id?: string
+          next_due_at?: string | null
+          sequence_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_sequence_enrollments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_sequence_enrollments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_sequence_enrollments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_sequence_enrollments_enrolled_by_fkey"
+            columns: ["enrolled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_sequence_enrollments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_sequence_enrollments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
+          },
+          {
+            foreignKeyName: "lead_sequence_enrollments_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_sequence_due"
+            referencedColumns: ["sequence_id"]
+          },
+          {
+            foreignKeyName: "lead_sequence_enrollments_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_sequences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_submissions: {
         Row: {
           click_id: string | null
@@ -10740,6 +10845,211 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proof_surface_coverage"
             referencedColumns: ["proof_asset_id"]
+          },
+        ]
+      }
+      nurture_sequence_steps: {
+        Row: {
+          client_id: string
+          created_at: string
+          delay_hours: number
+          id: string
+          position: number
+          sequence_id: string
+          template_version_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          delay_hours: number
+          id?: string
+          position: number
+          sequence_id: string
+          template_version_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          delay_hours?: number
+          id?: string
+          position?: number
+          sequence_id?: string
+          template_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nurture_sequence_steps_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_steps_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_steps_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_steps_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_sequence_due"
+            referencedColumns: ["sequence_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_steps_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_sequences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_steps_template_version_id_fkey"
+            columns: ["template_version_id"]
+            isOneToOne: false
+            referencedRelation: "message_template_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nurture_sequences: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          archived_at: string | null
+          campaign_id: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          enrolled_automatically: boolean
+          exit_stages: Database["public"]["Enums"]["lead_stage"][]
+          id: string
+          name: string
+          purpose: string
+          trigger_after_hours: number
+          trigger_stage: Database["public"]["Enums"]["lead_stage"]
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          archived_at?: string | null
+          campaign_id?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          enrolled_automatically?: boolean
+          exit_stages?: Database["public"]["Enums"]["lead_stage"][]
+          id?: string
+          name: string
+          purpose: string
+          trigger_after_hours?: number
+          trigger_stage: Database["public"]["Enums"]["lead_stage"]
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          archived_at?: string | null
+          campaign_id?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          enrolled_automatically?: boolean
+          exit_stages?: Database["public"]["Enums"]["lead_stage"][]
+          id?: string
+          name?: string
+          purpose?: string
+          trigger_after_hours?: number
+          trigger_stage?: Database["public"]["Enums"]["lead_stage"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nurture_sequences_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -18227,6 +18537,88 @@ export type Database = {
         }
         Relationships: []
       }
+      nurture_sequence_due: {
+        Row: {
+          active: number | null
+          approved_at: string | null
+          blocker: string | null
+          campaign_id: string | null
+          client_id: string | null
+          completed: number | null
+          enrolled_automatically: boolean | null
+          exited: number | null
+          name: string | null
+          purpose: string | null
+          sequence_id: string | null
+          steps: number | null
+          trigger_stage: Database["public"]["Enums"]["lead_stage"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nurture_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       offer_claim_evidence: {
         Row: {
           claim_text: string | null
@@ -19473,6 +19865,7 @@ export type Database = {
         Returns: undefined
       }
       advance_proof_production: { Args: never; Returns: number }
+      advance_sequences_v6: { Args: { p_limit?: number }; Returns: number }
       advance_slot: {
         Args: {
           p_actor?: string
@@ -19570,6 +19963,32 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "message_template_approvals"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      approve_nurture_sequence_v6: {
+        Args: { p_sequence_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          archived_at: string | null
+          campaign_id: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          enrolled_automatically: boolean
+          exit_stages: Database["public"]["Enums"]["lead_stage"][]
+          id: string
+          name: string
+          purpose: string
+          trigger_after_hours: number
+          trigger_stage: Database["public"]["Enums"]["lead_stage"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "nurture_sequences"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -20952,6 +21371,7 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_sequence_sweep: { Args: never; Returns: string }
       enqueue_token_health_job: { Args: never; Returns: string }
       enqueue_workflow_step_job: {
         Args: {
@@ -20960,6 +21380,39 @@ export type Database = {
           p_step: Database["public"]["Tables"]["workflow_steps"]["Row"]
         }
         Returns: string
+      }
+      enrol_campaign_leads_in_sequence_v6: {
+        Args: { p_execution_id: string }
+        Returns: Json
+      }
+      enroll_due_leads_v6: { Args: { p_limit?: number }; Returns: number }
+      enroll_lead_in_sequence_v6: {
+        Args: { p_lead_id: string; p_sequence_id: string }
+        Returns: {
+          client_id: string
+          created_at: string
+          enrolled_by: string | null
+          exit_reason: string | null
+          exited_at: string | null
+          id: string
+          last_sent_at: string | null
+          last_step: number | null
+          lead_id: string
+          next_due_at: string | null
+          sequence_id: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "lead_sequence_enrollments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      exit_lead_from_sequence_v6: {
+        Args: { p_enrollment_id: string; p_reason: string }
+        Returns: undefined
       }
       fail_source_video_edit: {
         Args: { p_error: string; p_request_id: string }
@@ -22491,6 +22944,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      request_campaign_lead_message_v6: {
+        Args: { p_actor: string; p_campaign_id: string; p_sequence_id: string }
+        Returns: string
+      }
       request_campaign_meta_build_v6: {
         Args: { p_actor: string; p_campaign_id: string }
         Returns: string
@@ -23015,6 +23472,10 @@ export type Database = {
         }
       }
       select_render: { Args: { p_render_id: string }; Returns: undefined }
+      sequence_exit_reason_v6: {
+        Args: { p_lead_id: string; p_sequence_id: string }
+        Returns: string
+      }
       set_awareness_stage_template_v6: {
         Args: {
           p_audience_state_override?: string

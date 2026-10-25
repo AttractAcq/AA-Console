@@ -40,6 +40,7 @@ import { runCampaignActionJob } from "../campaigns/actions/executor.js";
 import { runProofPlacerJob } from "../proof-distribution/placer.js";
 import { runLeadMagnetCourierJob } from "../lead-magnets/courier.js";
 import { runOutboundCourierJob } from "../outbound/courier.js";
+import { runNurtureSequencerJob } from "../outbound/sequencer.js";
 import { runGoogleAdsSheetJob } from "../agents/google_ads_sheet/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
@@ -153,6 +154,10 @@ const RUNNERS: Record<string, JobRunner> = {
   // G02: the governed send. Every rule lives in claim_outbound_messages, so
   // this worker never decides whether somebody consented.
   outbound_courier: runOutboundCourierJob,
+  // G11: decides nothing itself. Who receives what, and whether a sequence
+  // has stopped being relevant to them, is read inside one snapshot in the
+  // database rather than across a gap in a worker.
+  nurture_sequencer: runNurtureSequencerJob,
   brief_dispatch: runBriefDispatchJob,
   client_approval_dispatch: runClientApprovalDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays
