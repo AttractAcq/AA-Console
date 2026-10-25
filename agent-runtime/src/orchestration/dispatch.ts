@@ -41,6 +41,7 @@ import { runProofPlacerJob } from "../proof-distribution/placer.js";
 import { runLeadMagnetCourierJob } from "../lead-magnets/courier.js";
 import { runOutboundCourierJob } from "../outbound/courier.js";
 import { runNurtureSequencerJob } from "../outbound/sequencer.js";
+import { runProfileUpdaterJob } from "../profiles/updater.js";
 import { runGoogleAdsSheetJob } from "../agents/google_ads_sheet/index.js";
 import { runBriefDispatchJob } from "../agents/brief_dispatch/index.js";
 import { runClientApprovalDispatchJob } from "../agents/client_approval_dispatch/index.js";
@@ -158,6 +159,9 @@ const RUNNERS: Record<string, JobRunner> = {
   // has stopped being relevant to them, is read inside one snapshot in the
   // database rather than across a gap in a worker.
   nurture_sequencer: runNurtureSequencerJob,
+  // G05: only claims fields the platform lets an adapter write, so an
+  // Instagram bio never reaches it and stays a job for a person.
+  profile_updater: runProfileUpdaterJob,
   brief_dispatch: runBriefDispatchJob,
   client_approval_dispatch: runClientApprovalDispatchJob,
   // Approved assets become a paused Meta campaign. No model; launching stays

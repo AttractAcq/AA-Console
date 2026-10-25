@@ -172,7 +172,7 @@ describe("an action with nothing to perform it", () => {
     // The guard on the other direction: this list and
     // campaign_action_executors.supported have to agree, and the failure
     // mode of them disagreeing is an action claimed and then failed.
-    expect(Object.keys(HANDLERS)).toEqual(["proof_publish", "page_deploy", "lead_message"]);
+    expect(Object.keys(HANDLERS)).toEqual(["proof_publish", "page_deploy", "lead_message", "budget_change"]);
   });
 });
 

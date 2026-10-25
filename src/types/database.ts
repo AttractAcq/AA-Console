@@ -1337,6 +1337,178 @@ export type Database = {
           },
         ]
       }
+      campaign_budget_changes: {
+        Row: {
+          ad_set_external_id: string
+          applied_at: string | null
+          approval_id: string | null
+          attempts: number
+          campaign_id: string
+          claimed_at: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          current_daily_budget: number | null
+          external_ref: string | null
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          proposed_daily_budget: number
+          reason: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          ad_set_external_id: string
+          applied_at?: string | null
+          approval_id?: string | null
+          attempts?: number
+          campaign_id: string
+          claimed_at?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          current_daily_budget?: number | null
+          external_ref?: string | null
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          proposed_daily_budget: number
+          reason: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          ad_set_external_id?: string
+          applied_at?: string | null
+          approval_id?: string | null
+          attempts?: number
+          campaign_id?: string
+          claimed_at?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          current_daily_budget?: number | null
+          external_ref?: string | null
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          proposed_daily_budget?: number
+          reason?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_budget_changes_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_content_pillars: {
         Row: {
           campaign_id: string
@@ -7928,13 +8100,17 @@ export type Database = {
           applied_at: string | null
           approved_at: string | null
           approved_by: string | null
+          attempts: number
+          claimed_at: string | null
           client_id: string
           created_at: string
           created_by: string | null
           current_value: string | null
+          external_ref: string | null
           field: string
           id: string
           last_error: string | null
+          lease_until: string | null
           location_id: string
           proposed_value: string
           reason: string | null
@@ -7946,13 +8122,17 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          attempts?: number
+          claimed_at?: string | null
           client_id: string
           created_at?: string
           created_by?: string | null
           current_value?: string | null
+          external_ref?: string | null
           field: string
           id?: string
           last_error?: string | null
+          lease_until?: string | null
           location_id: string
           proposed_value: string
           reason?: string | null
@@ -7964,13 +8144,17 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          attempts?: number
+          claimed_at?: string | null
           client_id?: string
           created_at?: string
           created_by?: string | null
           current_value?: string | null
+          external_ref?: string | null
           field?: string
           id?: string
           last_error?: string | null
+          lease_until?: string | null
           location_id?: string
           proposed_value?: string
           reason?: string | null
@@ -10183,6 +10367,8 @@ export type Database = {
           applied_at: string | null
           approved_at: string | null
           approved_by: string | null
+          attempts: number
+          claimed_at: string | null
           client_id: string
           created_at: string
           created_by: string | null
@@ -10191,6 +10377,7 @@ export type Database = {
           field: string
           id: string
           last_error: string | null
+          lease_until: string | null
           offer_version_id: string | null
           platform: string
           proposed_value: string
@@ -10203,6 +10390,8 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          attempts?: number
+          claimed_at?: string | null
           client_id: string
           created_at?: string
           created_by?: string | null
@@ -10211,6 +10400,7 @@ export type Database = {
           field: string
           id?: string
           last_error?: string | null
+          lease_until?: string | null
           offer_version_id?: string | null
           platform: string
           proposed_value: string
@@ -10223,6 +10413,8 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          attempts?: number
+          claimed_at?: string | null
           client_id?: string
           created_at?: string
           created_by?: string | null
@@ -10231,6 +10423,7 @@ export type Database = {
           field?: string
           id?: string
           last_error?: string | null
+          lease_until?: string | null
           offer_version_id?: string | null
           platform?: string
           proposed_value?: string
@@ -12175,6 +12368,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      profile_field_support: {
+        Row: {
+          field: string
+          note: string
+          platform: string
+          surface: string
+          writable: boolean
+        }
+        Insert: {
+          field: string
+          note: string
+          platform: string
+          surface: string
+          writable?: boolean
+        }
+        Update: {
+          field?: string
+          note?: string
+          platform?: string
+          surface?: string
+          writable?: boolean
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -16715,6 +16932,90 @@ export type Database = {
           },
         ]
       }
+      budget_change_due: {
+        Row: {
+          ad_set_external_id: string | null
+          applied_at: string | null
+          approval_status: string | null
+          attempts: number | null
+          blocker: string | null
+          campaign_id: string | null
+          change_id: string | null
+          client_id: string | null
+          currency: string | null
+          current_daily_budget: number | null
+          last_error: string | null
+          multiple_of_current: number | null
+          proposed_daily_budget: number | null
+          reason: string | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_budget_changes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       campaign_action_due: {
         Row: {
           action_key: string | null
@@ -19124,6 +19425,24 @@ export type Database = {
           },
         ]
       }
+      profile_change_due: {
+        Row: {
+          applied_at: string | null
+          attempts: number | null
+          blocker: string | null
+          change_id: string | null
+          client_id: string | null
+          current_value: string | null
+          field: string | null
+          last_error: string | null
+          platform: string | null
+          proposed_value: string | null
+          status: string | null
+          surface: string | null
+          writable: boolean | null
+        }
+        Relationships: []
+      }
       proof_placement_due: {
         Row: {
           attempts: number | null
@@ -20061,6 +20380,36 @@ export type Database = {
         Args: { p_lead_id: string; p_reason?: string }
         Returns: undefined
       }
+      assert_budget_change_allowed_v6: {
+        Args: { p_execution_id: string }
+        Returns: {
+          ad_set_external_id: string
+          applied_at: string | null
+          approval_id: string | null
+          attempts: number
+          campaign_id: string
+          claimed_at: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          current_daily_budget: number | null
+          external_ref: string | null
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          proposed_daily_budget: number
+          reason: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_budget_changes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       assert_meta_build_allowed_v6: {
         Args: { p_campaign_id: string }
         Returns: string
@@ -20407,6 +20756,19 @@ export type Database = {
           post_id: string
           provider: string
           scheduled_at: string
+        }[]
+      }
+      claim_profile_changes: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          change_id: string
+          client_id: string
+          field: string
+          location_ref: string
+          platform: string
+          proposed_value: string
+          surface: string
         }[]
       }
       claim_proof_delivery: {
@@ -21070,6 +21432,8 @@ export type Database = {
           applied_at: string | null
           approved_at: string | null
           approved_by: string | null
+          attempts: number
+          claimed_at: string | null
           client_id: string
           created_at: string
           created_by: string | null
@@ -21078,6 +21442,7 @@ export type Database = {
           field: string
           id: string
           last_error: string | null
+          lease_until: string | null
           offer_version_id: string | null
           platform: string
           proposed_value: string
@@ -21356,6 +21721,7 @@ export type Database = {
         Returns: number
       }
       enqueue_outbound_sweep: { Args: never; Returns: string }
+      enqueue_profile_update_sweep: { Args: never; Returns: string }
       enqueue_proof_placement_sweep: { Args: never; Returns: string }
       enqueue_publish_sweep: { Args: never; Returns: string }
       enqueue_scoped_ideation: {
@@ -22437,6 +22803,10 @@ export type Database = {
           steps_queued: number
         }[]
       }
+      record_budget_change_applied: {
+        Args: { p_change_id: string; p_external_ref?: string }
+        Returns: undefined
+      }
       record_campaign_action_executed: {
         Args: {
           p_execution_id: string
@@ -22633,6 +23003,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      record_profile_change_applied: {
+        Args: { p_change_id: string; p_external_ref?: string }
+        Returns: undefined
+      }
+      record_profile_change_failure: {
+        Args: { p_change_id: string; p_reason: string; p_retryable?: boolean }
+        Returns: undefined
       }
       record_proof_placed: {
         Args: {
@@ -22943,6 +23321,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      request_campaign_budget_change_v6: {
+        Args: {
+          p_actor: string
+          p_campaign_id: string
+          p_proposed_daily_budget: number
+          p_reason: string
+        }
+        Returns: string
       }
       request_campaign_lead_message_v6: {
         Args: { p_actor: string; p_campaign_id: string; p_sequence_id: string }

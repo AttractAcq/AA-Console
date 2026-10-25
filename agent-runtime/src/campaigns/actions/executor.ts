@@ -45,6 +45,7 @@ import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { logger } from "../../logging/logger.js";
 import { deployCampaignPage } from "./page-deploy.js";
+import { changeAdSetBudget } from "./budget-change.js";
 
 const DEFAULT_BATCH = 3;
 
@@ -189,6 +190,9 @@ export const HANDLERS: Readonly<Record<string, ActionHandler>> = {
   page_deploy: deployCampaignPage,
   // Enrols leads; the courier is what actually sends.
   lead_message: enrolCampaignLeads,
+  // The only handler that moves money, and the only one whose database check
+  // runs inside the handler rather than in the claim.
+  budget_change: changeAdSetBudget,
 };
 
 export async function runCampaignActionJob(

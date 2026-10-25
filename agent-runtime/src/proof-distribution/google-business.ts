@@ -161,3 +161,121 @@ export async function createLocalPost(request: LocalPostRequest): Promise<LocalP
   }
   return { externalId: name, externalUrl: parsed?.searchUrl?.trim() || null };
 }
+
+/**
+ * Changing one field on a Business Profile location — G05.
+ *
+ * Same honesty as the local post above: this is the real locations endpoint
+ * and it has not been run against a real profile, because no client has a
+ * connected Google Business credential. The acceptance gate is a field
+ * changing on a real profile with its reference recorded.
+ *
+ * ONE FIELD PER CALL, VIA updateMask
+ *
+ * Google patches a location against an explicit `updateMask`, and anything
+ * omitted from the mask is left alone. Sending the whole location object
+ * would mean every unlisted field being overwritten by whatever we happened
+ * to have, which is how an adapter silently erases a client's opening hours.
+ * So each approved change is one field and one mask entry.
+ */
+
+/** The field names Google uses, for the fields we are willing to write. */
+const LOCATION_FIELD: Readonly<Record<string, string>> = {
+  title: "title",
+  description: "profile.description",
+  primary_phone: "phoneNumbers.primaryPhone",
+  website_url: "websiteUri",
+  hours: "regularHours",
+};
+
+export interface LocationPatchRequest {
+  readonly accessToken: string;
+  /** `accounts/{account}/locations/{location}`. */
+  readonly accountRef: string;
+  /** One of the keys of LOCATION_FIELD. */
+  readonly field: string;
+  /** The approved value. For `hours` this is a JSON string Google's shape. */
+  readonly value: string;
+  readonly fetchImpl?: typeof fetch;
+}
+
+/** Builds the nested body Google expects for one field. */
+export function locationPatchBody(field: string, value: string): Record<string, unknown> {
+  switch (field) {
+    case "title":
+      return { title: value };
+    case "description":
+      return { profile: { description: value } };
+    case "primary_phone":
+      return { phoneNumbers: { primaryPhone: value } };
+    case "website_url":
+      return { websiteUri: value };
+    case "hours":
+      // Already the shape Google wants, validated by whoever approved it.
+      // Parsed here only so a malformed value fails before the call rather
+      // than as an opaque 400.
+      return { regularHours: JSON.parse(value) as unknown };
+    default:
+      throw new PlacementTransportError(`No adapter writes the ${field} field.`, false);
+  }
+}
+
+export async function patchLocationField(
+  request: LocationPatchRequest,
+): Promise<{ externalRef: string }> {
+  const mask = LOCATION_FIELD[request.field];
+  if (!mask) {
+    throw new PlacementTransportError(`No adapter writes the ${request.field} field.`, false);
+  }
+  if (!ACCOUNT_REF.test(request.accountRef)) {
+    throw new PlacementTransportError(
+      "That location reference is not in Google's accounts/{a}/locations/{l} form.",
+      false,
+    );
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = locationPatchBody(request.field, request.value);
+  } catch (thrown) {
+    if (thrown instanceof PlacementTransportError) throw thrown;
+    throw new PlacementTransportError(
+      `The approved value for ${request.field} is not in the shape Google accepts: ${
+        thrown instanceof Error ? thrown.message : String(thrown)
+      }`,
+      false,
+    );
+  }
+
+  const fetchImpl = request.fetchImpl ?? fetch;
+  let response: Response;
+  try {
+    response = await fetchImpl(
+      `${API_BASE}/${request.accountRef}?updateMask=${encodeURIComponent(mask)}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${request.accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+    );
+  } catch (thrown) {
+    const reason = thrown instanceof Error ? thrown.message : String(thrown);
+    throw new PlacementTransportError(`Could not reach the Business Profile API: ${reason}`, true);
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    // Narrow, for the same reason the local post is: a 4xx Google chose is
+    // permanent until a person changes something.
+    const retryable = response.status === 429 || response.status >= 500;
+    throw new PlacementTransportError(
+      `Google refused the change (${response.status}): ${(text || "no body").slice(0, 300)}`,
+      retryable,
+    );
+  }
+  return { externalRef: `${request.accountRef}#${request.field}` };
+}
