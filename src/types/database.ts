@@ -678,8 +678,22 @@ export type Database = {
             foreignKeyName: "campaign_action_approvals_manifest_id_campaign_id_client_i_fkey"
             columns: ["manifest_id", "campaign_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["manifest_id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_approvals_manifest_id_campaign_id_client_i_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "campaign_manifest_versions"
             referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_approvals_manifest_id_campaign_id_client_i_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_actions"
+            referencedColumns: ["manifest_id", "campaign_id", "client_id"]
           },
         ]
       }
@@ -832,6 +846,13 @@ export type Database = {
             foreignKeyName: "campaign_action_executions_approval_id_fkey"
             columns: ["approval_id"]
             isOneToOne: true
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
             referencedRelation: "campaign_page_publish_due"
             referencedColumns: ["approval_id"]
           },
@@ -841,6 +862,20 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "meta_build_due"
             referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
           },
           {
             foreignKeyName: "campaign_action_executions_campaign_id_fkey"
@@ -946,8 +981,22 @@ export type Database = {
             foreignKeyName: "campaign_artifact_offer_input_manifest_id_campaign_id_clie_fkey"
             columns: ["manifest_id", "campaign_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["manifest_id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifact_offer_input_manifest_id_campaign_id_clie_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "campaign_manifest_versions"
             referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifact_offer_input_manifest_id_campaign_id_clie_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_actions"
+            referencedColumns: ["manifest_id", "campaign_id", "client_id"]
           },
           {
             foreignKeyName: "campaign_artifact_offer_inputs_job_id_fkey"
@@ -1108,6 +1157,20 @@ export type Database = {
             foreignKeyName: "campaign_artifacts_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
             referencedRelation: "campaigns_archive"
             referencedColumns: ["id"]
           },
@@ -1150,8 +1213,22 @@ export type Database = {
             foreignKeyName: "campaign_artifacts_manifest_identity_fk"
             columns: ["manifest_id", "campaign_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["manifest_id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_manifest_identity_fk"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "campaign_manifest_versions"
             referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_manifest_identity_fk"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_actions"
+            referencedColumns: ["manifest_id", "campaign_id", "client_id"]
           },
           {
             foreignKeyName: "campaign_artifacts_page_id_fkey"
@@ -1235,6 +1312,20 @@ export type Database = {
           pillar_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "campaign_content_pillars_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_content_pillars_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
           {
             foreignKeyName: "campaign_content_pillars_campaign_id_fkey"
             columns: ["campaign_id"]
@@ -1323,6 +1414,20 @@ export type Database = {
             foreignKeyName: "campaign_intelligence_snapshots_campaign_id_client_id_fkey"
             columns: ["campaign_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_intelligence_snapshots_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_intelligence_snapshots_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "campaigns_archive"
             referencedColumns: ["id", "client_id"]
           },
@@ -1373,8 +1478,22 @@ export type Database = {
             foreignKeyName: "campaign_manifest_intelligenc_manifest_id_campaign_id_clie_fkey"
             columns: ["manifest_id", "campaign_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["manifest_id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_intelligenc_manifest_id_campaign_id_clie_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "campaign_manifest_versions"
             referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_intelligenc_manifest_id_campaign_id_clie_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_actions"
+            referencedColumns: ["manifest_id", "campaign_id", "client_id"]
           },
           {
             foreignKeyName: "campaign_manifest_intelligenc_snapshot_id_campaign_id_clie_fkey"
@@ -1415,8 +1534,22 @@ export type Database = {
             foreignKeyName: "campaign_manifest_items_manifest_id_fkey"
             columns: ["manifest_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["manifest_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_items_manifest_id_fkey"
+            columns: ["manifest_id"]
+            isOneToOne: false
             referencedRelation: "campaign_manifest_versions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_items_manifest_id_fkey"
+            columns: ["manifest_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_actions"
+            referencedColumns: ["manifest_id"]
           },
         ]
       }
@@ -1447,8 +1580,22 @@ export type Database = {
             foreignKeyName: "campaign_manifest_offers_manifest_id_campaign_id_client_id_fkey"
             columns: ["manifest_id", "campaign_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["manifest_id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_offers_manifest_id_campaign_id_client_id_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "campaign_manifest_versions"
             referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_offers_manifest_id_campaign_id_client_id_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_actions"
+            referencedColumns: ["manifest_id", "campaign_id", "client_id"]
           },
           {
             foreignKeyName: "campaign_manifest_offers_offer_version_id_client_id_fkey"
@@ -1504,6 +1651,20 @@ export type Database = {
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
           {
             foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
             columns: ["campaign_id", "client_id"]
@@ -1581,6 +1742,13 @@ export type Database = {
             columns: ["approval_id"]
             isOneToOne: true
             referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_launch_readiness"
             referencedColumns: ["approval_id"]
           },
           {
@@ -1700,6 +1868,13 @@ export type Database = {
             columns: ["approval_id"]
             isOneToOne: true
             referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_publications_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_launch_readiness"
             referencedColumns: ["approval_id"]
           },
           {
@@ -2901,6 +3076,20 @@ export type Database = {
             foreignKeyName: "client_campaigns_clone_same_client_fkey"
             columns: ["cloned_from_campaign_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_clone_same_client_fkey"
+            columns: ["cloned_from_campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_clone_same_client_fkey"
+            columns: ["cloned_from_campaign_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "campaigns_archive"
             referencedColumns: ["id", "client_id"]
           },
@@ -2924,6 +3113,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_feeds_from_campaign_id_fkey"
+            columns: ["feeds_from_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_feeds_from_campaign_id_fkey"
+            columns: ["feeds_from_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
           },
           {
             foreignKeyName: "client_campaigns_feeds_from_campaign_id_fkey"
@@ -3194,6 +3397,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_daily_package_settings_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "client_daily_package_settings_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
           {
             foreignKeyName: "client_daily_package_settings_campaign_id_fkey"
             columns: ["campaign_id"]
@@ -3648,6 +3865,20 @@ export type Database = {
             foreignKeyName: "client_ideas_campaign_client_fkey"
             columns: ["campaign_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "client_ideas_campaign_client_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "client_ideas_campaign_client_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "campaigns_archive"
             referencedColumns: ["id", "client_id"]
           },
@@ -3983,6 +4214,20 @@ export type Database = {
             foreignKeyName: "client_launch_packages_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "client_launch_packages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "client_launch_packages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
             referencedRelation: "campaigns_archive"
             referencedColumns: ["id"]
           },
@@ -4244,6 +4489,20 @@ export type Database = {
             foreignKeyName: "client_leads_source_client_campaign_id_fkey"
             columns: ["source_client_campaign_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "client_leads_source_client_campaign_id_fkey"
+            columns: ["source_client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "client_leads_source_client_campaign_id_fkey"
+            columns: ["source_client_campaign_id"]
+            isOneToOne: false
             referencedRelation: "campaigns_archive"
             referencedColumns: ["id"]
           },
@@ -4389,6 +4648,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_marketing_spend_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "client_marketing_spend_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
           },
           {
             foreignKeyName: "client_marketing_spend_client_campaign_id_fkey"
@@ -6525,6 +6798,20 @@ export type Database = {
             foreignKeyName: "daily_package_items_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
             referencedRelation: "campaigns_archive"
             referencedColumns: ["id"]
           },
@@ -7147,6 +7434,20 @@ export type Database = {
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "google_ads_build_sheets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "google_ads_build_sheets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
           {
             foreignKeyName: "google_ads_build_sheets_campaign_id_fkey"
             columns: ["campaign_id"]
@@ -7848,6 +8149,20 @@ export type Database = {
             foreignKeyName: "lead_capture_endpoints_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
             referencedRelation: "campaigns_archive"
             referencedColumns: ["id"]
           },
@@ -8353,6 +8668,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_magnets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
           {
             foreignKeyName: "lead_magnets_campaign_id_fkey"
             columns: ["campaign_id"]
@@ -9763,6 +10092,20 @@ export type Database = {
             foreignKeyName: "opportunity_links_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
             referencedRelation: "campaigns_archive"
             referencedColumns: ["id"]
           },
@@ -10801,6 +11144,13 @@ export type Database = {
             foreignKeyName: "proof_placement_approvals_campaign_action_approval_id_fkey"
             columns: ["campaign_action_approval_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_campaign_action_approval_id_fkey"
+            columns: ["campaign_action_approval_id"]
+            isOneToOne: false
             referencedRelation: "campaign_page_publish_due"
             referencedColumns: ["approval_id"]
           },
@@ -11110,6 +11460,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_page_revisions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "proof_placements_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
           },
           {
             foreignKeyName: "proof_placements_campaign_id_fkey"
@@ -14031,6 +14395,20 @@ export type Database = {
             foreignKeyName: "workflow_runs_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
             referencedRelation: "campaigns_archive"
             referencedColumns: ["id"]
           },
@@ -14628,8 +15006,203 @@ export type Database = {
             foreignKeyName: "campaign_action_approvals_manifest_id_campaign_id_client_i_fkey"
             columns: ["manifest_id", "campaign_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["manifest_id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_approvals_manifest_id_campaign_id_client_i_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "campaign_manifest_versions"
             referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_approvals_manifest_id_campaign_id_client_i_fkey"
+            columns: ["manifest_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_actions"
+            referencedColumns: ["manifest_id", "campaign_id", "client_id"]
+          },
+        ]
+      }
+      campaign_launch_due: {
+        Row: {
+          acquisition_mode: string | null
+          actions_done: number | null
+          campaign_id: string | null
+          client_id: string | null
+          first_blocker: string | null
+          leads_attributed: number | null
+          live: boolean | null
+          name: string | null
+          pages_probed: number | null
+          pages_published: number | null
+          paid_platform: string | null
+          posts_published: number | null
+          proof_placed: number | null
+          required_actions: number | null
+          spend_bindable: boolean | null
+          spend_observed: number | null
+          spending_days: number | null
+          status: string | null
+          status_claims_live: boolean | null
+          template: Database["public"]["Enums"]["campaign_template"] | null
+          verdict: string | null
+          warning: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      campaign_launch_readiness: {
+        Row: {
+          acquisition_mode: string | null
+          action_key: string | null
+          action_supported: boolean | null
+          approval_id: string | null
+          approval_status: string | null
+          attempts: number | null
+          blocker: string | null
+          campaign_id: string | null
+          client_id: string | null
+          executed_at: string | null
+          execution_status: string | null
+          external_id: string | null
+          item_key: string | null
+          last_error: string | null
+          manifest_id: string | null
+          manifest_version: number | null
+          paid_platform: string | null
+          required: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+        ]
+      }
+      campaign_live_evidence: {
+        Row: {
+          acquisition_mode: string | null
+          ad_campaign_id: string | null
+          campaign_id: string | null
+          client_id: string | null
+          leads_attributed: number | null
+          meta_campaign_id: string | null
+          pages_probed: number | null
+          pages_published: number | null
+          paid_platform: string | null
+          posts_published: number | null
+          proof_placed: number | null
+          spend_bindable: boolean | null
+          spend_observed: number | null
+          spending_days: number | null
+        }
+        Insert: {
+          acquisition_mode?: string | null
+          ad_campaign_id?: string | null
+          campaign_id?: string | null
+          client_id?: string | null
+          leads_attributed?: never
+          meta_campaign_id?: string | null
+          pages_probed?: never
+          pages_published?: never
+          paid_platform?: string | null
+          posts_published?: never
+          proof_placed?: never
+          spend_bindable?: never
+          spend_observed?: never
+          spending_days?: never
+        }
+        Update: {
+          acquisition_mode?: string | null
+          ad_campaign_id?: string | null
+          campaign_id?: string | null
+          client_id?: string | null
+          leads_attributed?: never
+          meta_campaign_id?: string | null
+          pages_probed?: never
+          pages_published?: never
+          paid_platform?: string | null
+          posts_published?: never
+          proof_placed?: never
+          spend_bindable?: never
+          spend_observed?: never
+          spending_days?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_campaigns_ad_campaign_id_fkey"
+            columns: ["ad_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -14653,6 +15226,20 @@ export type Database = {
           score: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "opportunity_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
           {
             foreignKeyName: "opportunity_links_campaign_id_fkey"
             columns: ["campaign_id"]
@@ -14726,6 +15313,64 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "pages_archive"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_route_actions: {
+        Row: {
+          acquisition_mode: string | null
+          action_key: string | null
+          campaign_id: string | null
+          client_id: string | null
+          item_key: string | null
+          manifest_id: string | null
+          manifest_version: number | null
+          module_key: string | null
+          paid_platform: string | null
+          required: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_manifest_versions_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
           },
         ]
       }
@@ -15396,6 +16041,20 @@ export type Database = {
           submissions?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_capture_endpoints_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
           {
             foreignKeyName: "lead_capture_endpoints_campaign_id_fkey"
             columns: ["campaign_id"]

@@ -175,7 +175,7 @@ describe("campaign pages", () => {
     useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
     show([planned()], READY);
     expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Plan", "Content"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Plan", "Content", "Launch state"]);
     await userEvent.click(screen.getByRole("button", { name: "Action buttons" }));
     await userEvent.click(screen.getByRole("button", { name: "Launch" }));
     expect(screen.getByRole("dialog", { name: "Confirm campaign action" })).toHaveTextContent("Launch");
@@ -188,7 +188,7 @@ describe("campaign pages", () => {
     useSearchParams.mockReturnValue([new URLSearchParams("view=v2")]);
     show([planned({ acquisition_mode: "paid", paid_platform: "meta" })], READY);
     expect(await screen.findByRole("heading", { name: "Winter full-arch push" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Plan", "Content", "Landing Page", "Sales Agent", "Meta Ads"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Plan", "Content", "Landing Page", "Sales Agent", "Meta Ads", "Launch state"]);
     expect(screen.getAllByText("Book 40 consultations in January")).toHaveLength(2);
     expect(screen.getByText("Chewing is not a cosmetic problem")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "Meta Ads" }));
