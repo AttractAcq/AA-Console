@@ -180,6 +180,13 @@ export type Database = {
             foreignKeyName: "agent_jobs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "agent_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -336,6 +343,13 @@ export type Database = {
             foreignKeyName: "archived_leads_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "archived_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -446,6 +460,123 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_links: {
+        Row: {
+          campaign_id: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          expires_at: string | null
+          id: string
+          purpose: string
+          revoked_at: string | null
+          token_hash: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          expires_at?: string | null
+          id?: string
+          purpose: string
+          revoked_at?: string | null
+          token_hash: string
+        }
+        Update: {
+          campaign_id?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          expires_at?: string | null
+          id?: string
+          purpose?: string
+          revoked_at?: string | null
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "booking_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "booking_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "booking_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "booking_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "booking_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "booking_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "booking_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brief_dispatches: {
         Row: {
           assignment_id: string | null
@@ -527,6 +658,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "brief_dispatches_client_id_fkey"
@@ -754,6 +892,13 @@ export type Database = {
             foreignKeyName: "campaign_action_events_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -932,6 +1077,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "campaign_action_executions_client_id_fkey"
@@ -1234,6 +1386,13 @@ export type Database = {
             foreignKeyName: "campaign_artifacts_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -1478,6 +1637,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "campaign_budget_changes_client_id_fkey"
@@ -1983,6 +2149,13 @@ export type Database = {
             foreignKeyName: "campaign_page_approval_snapshots_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_approval_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -2111,6 +2284,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "meta_build_due"
             referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_page_publications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "campaign_page_publications_client_id_fkey"
@@ -2275,6 +2455,13 @@ export type Database = {
             foreignKeyName: "campaigns_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -2377,6 +2564,13 @@ export type Database = {
             foreignKeyName: "client_agent_inputs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_agent_inputs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -2460,6 +2654,13 @@ export type Database = {
             foreignKeyName: "client_agent_records_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -2504,6 +2705,149 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "metrics_pulls"
             referencedColumns: ["job_id"]
+          },
+        ]
+      }
+      client_appointments: {
+        Row: {
+          booked_by: string | null
+          booked_via: string
+          campaign_id: string | null
+          cancelled_reason: string | null
+          client_id: string
+          created_at: string
+          ends_at: string
+          external_ref: string | null
+          id: string
+          lead_id: string
+          outcome_note: string | null
+          starts_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          booked_by?: string | null
+          booked_via: string
+          campaign_id?: string | null
+          cancelled_reason?: string | null
+          client_id: string
+          created_at?: string
+          ends_at: string
+          external_ref?: string | null
+          id?: string
+          lead_id: string
+          outcome_note?: string | null
+          starts_at: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          booked_by?: string | null
+          booked_via?: string
+          campaign_id?: string | null
+          cancelled_reason?: string | null
+          client_id?: string
+          created_at?: string
+          ends_at?: string
+          external_ref?: string | null
+          id?: string
+          lead_id?: string
+          outcome_note?: string | null
+          starts_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_appointments_booked_by_fkey"
+            columns: ["booked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_appointments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "client_appointments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "client_appointments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_appointments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_appointments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "client_appointments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "client_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_appointments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_appointments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead_progress"
+            referencedColumns: ["lead_id"]
           },
         ]
       }
@@ -2640,6 +2984,13 @@ export type Database = {
             foreignKeyName: "client_assignments_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_assignments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -2695,6 +3046,13 @@ export type Database = {
           noted_on?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_audit_notes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_audit_notes_client_id_fkey"
             columns: ["client_id"]
@@ -2762,6 +3120,13 @@ export type Database = {
             foreignKeyName: "client_billing_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: true
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_billing_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -2776,6 +3141,130 @@ export type Database = {
             foreignKeyName: "client_billing_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: true
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      client_booking_settings: {
+        Row: {
+          buffer_minutes: number
+          client_id: string
+          created_at: string
+          enabled: boolean
+          max_days_ahead: number
+          max_per_day: number
+          min_notice_hours: number
+          slot_minutes: number
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          buffer_minutes?: number
+          client_id: string
+          created_at?: string
+          enabled?: boolean
+          max_days_ahead?: number
+          max_per_day?: number
+          min_notice_hours?: number
+          slot_minutes?: number
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          buffer_minutes?: number
+          client_id?: string
+          created_at?: string
+          enabled?: boolean
+          max_days_ahead?: number
+          max_per_day?: number
+          min_notice_hours?: number
+          slot_minutes?: number
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_booking_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_booking_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_booking_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_booking_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      client_booking_windows: {
+        Row: {
+          client_id: string
+          created_at: string
+          day_of_week: number
+          ends_at_minute: number
+          id: string
+          starts_at_minute: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          day_of_week: number
+          ends_at_minute: number
+          id?: string
+          starts_at_minute: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          day_of_week?: number
+          ends_at_minute?: number
+          id?: string
+          starts_at_minute?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_booking_windows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_booking_windows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_booking_windows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_booking_windows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
           },
@@ -2834,6 +3323,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_brand_profiles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_brand_profiles_client_id_fkey"
             columns: ["client_id"]
@@ -2991,6 +3487,13 @@ export type Database = {
           visual_direction?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_briefs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_briefs_client_id_fkey"
             columns: ["client_id"]
@@ -3183,6 +3686,13 @@ export type Database = {
             foreignKeyName: "client_business_context_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: true
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_business_context_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -3358,6 +3868,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "client_campaigns_client_id_fkey"
@@ -3552,6 +4069,13 @@ export type Database = {
             foreignKeyName: "client_contact_details_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: true
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_contact_details_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -3616,6 +4140,13 @@ export type Database = {
             foreignKeyName: "client_content_pillars_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_content_pillars_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -3664,6 +4195,13 @@ export type Database = {
           uploaded_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_contracts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_contracts_client_id_fkey"
             columns: ["client_id"]
@@ -3772,6 +4310,13 @@ export type Database = {
             foreignKeyName: "client_daily_package_settings_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: true
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_daily_package_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -3828,6 +4373,13 @@ export type Database = {
             foreignKeyName: "client_engine_budgets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_engine_budgets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -3873,6 +4425,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_engine_platforms_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_engine_platforms_client_id_fkey"
             columns: ["client_id"]
@@ -4005,6 +4564,13 @@ export type Database = {
             foreignKeyName: "client_engine_settings_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: true
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_engine_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -4074,6 +4640,13 @@ export type Database = {
           weekday?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "client_engine_windows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_engine_windows_client_id_fkey"
             columns: ["client_id"]
@@ -4150,6 +4723,13 @@ export type Database = {
           website_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_google_locations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_google_locations_client_id_fkey"
             columns: ["client_id"]
@@ -4295,6 +4875,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "client_ideas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "client_ideas_client_id_fkey"
@@ -4452,6 +5039,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_integrations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_integrations_client_id_fkey"
             columns: ["client_id"]
@@ -4670,6 +5264,13 @@ export type Database = {
             foreignKeyName: "client_launch_packages_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_launch_packages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -4815,6 +5416,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_leads_client_id_fkey"
             columns: ["client_id"]
@@ -5123,6 +5731,13 @@ export type Database = {
             foreignKeyName: "client_marketing_spend_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_marketing_spend_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -5279,6 +5894,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "client_media_assets_client_id_fkey"
@@ -5537,6 +6159,13 @@ export type Database = {
             foreignKeyName: "client_onboarding_steps_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_onboarding_steps_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -5613,6 +6242,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_page_findings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_page_findings_client_id_fkey"
             columns: ["client_id"]
@@ -5721,6 +6357,13 @@ export type Database = {
           summary?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_page_revisions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_page_revisions_client_id_fkey"
             columns: ["client_id"]
@@ -5872,6 +6515,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_pages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_pages_client_id_fkey"
             columns: ["client_id"]
@@ -6076,6 +6726,13 @@ export type Database = {
             foreignKeyName: "client_proof_assets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_proof_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -6128,6 +6785,13 @@ export type Database = {
           enabled_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_proof_destinations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_proof_destinations_client_id_fkey"
             columns: ["client_id"]
@@ -6218,6 +6882,13 @@ export type Database = {
           widget_config?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "client_sales_agent_deployments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_sales_agent_deployments_client_id_fkey"
             columns: ["client_id"]
@@ -6358,6 +7029,13 @@ export type Database = {
             foreignKeyName: "client_sales_agents_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_sales_agents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -6469,6 +7147,13 @@ export type Database = {
             foreignKeyName: "client_site_repositories_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_site_repositories_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -6512,6 +7197,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_users_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_users_client_id_fkey"
             columns: ["client_id"]
@@ -6758,6 +7450,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "content_slots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "content_slots_client_id_fkey"
@@ -7031,6 +7730,13 @@ export type Database = {
             foreignKeyName: "creative_generations_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_generations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -7182,6 +7888,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_renders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "creative_renders_client_id_fkey"
@@ -7618,6 +8331,13 @@ export type Database = {
             foreignKeyName: "daily_packages_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "daily_packages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -7726,6 +8446,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "engine_decisions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "engine_decisions_client_id_fkey"
@@ -7861,6 +8588,13 @@ export type Database = {
             foreignKeyName: "finance_entries_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "finance_entries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -7951,6 +8685,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "github_app_installations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "github_app_installations_client_id_fkey"
             columns: ["client_id"]
@@ -8050,6 +8791,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "google_ads_build_sheets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "google_ads_build_sheets_client_id_fkey"
@@ -8174,6 +8922,13 @@ export type Database = {
             foreignKeyName: "google_profile_changes_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -8282,6 +9037,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_review_replies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "google_review_replies_client_id_fkey"
@@ -8406,6 +9168,13 @@ export type Database = {
             foreignKeyName: "google_reviews_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reviews_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -8459,6 +9228,13 @@ export type Database = {
           job_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ideation_learning_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "ideation_learning_snapshots_client_id_fkey"
             columns: ["client_id"]
@@ -8635,6 +9411,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "job_assignments_client_id_fkey"
@@ -8827,6 +9610,13 @@ export type Database = {
             foreignKeyName: "lead_capture_endpoints_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -8919,6 +9709,13 @@ export type Database = {
             foreignKeyName: "lead_events_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -8973,6 +9770,13 @@ export type Database = {
           id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_identities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "lead_identities_client_id_fkey"
             columns: ["client_id"]
@@ -9043,6 +9847,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_magnet_approvals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "lead_magnet_approvals_client_id_fkey"
             columns: ["client_id"]
@@ -9147,6 +9958,13 @@ export type Database = {
             foreignKeyName: "lead_magnet_deliveries_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnet_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -9244,6 +10062,13 @@ export type Database = {
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_magnet_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "lead_magnet_versions_client_id_fkey"
             columns: ["client_id"]
@@ -9392,6 +10217,13 @@ export type Database = {
             foreignKeyName: "lead_magnets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -9479,6 +10311,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_sequence_enrollments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "lead_sequence_enrollments_client_id_fkey"
             columns: ["client_id"]
@@ -9600,6 +10439,13 @@ export type Database = {
             foreignKeyName: "lead_submissions_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -9676,6 +10522,13 @@ export type Database = {
           reason?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_suppressions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "lead_suppressions_client_id_fkey"
             columns: ["client_id"]
@@ -9778,6 +10631,13 @@ export type Database = {
             foreignKeyName: "market_opportunities_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -9857,6 +10717,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "master_ai_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "master_ai_conversations_client_id_fkey"
             columns: ["client_id"]
@@ -9945,6 +10812,13 @@ export type Database = {
             foreignKeyName: "mcp_bot_clients_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "mcp_bot_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -9993,6 +10867,13 @@ export type Database = {
           request_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "mcp_brief_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "mcp_brief_requests_client_id_fkey"
             columns: ["client_id"]
@@ -10137,6 +11018,13 @@ export type Database = {
             foreignKeyName: "message_template_approvals_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_template_approvals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -10208,6 +11096,13 @@ export type Database = {
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "message_template_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "message_template_versions_client_id_fkey"
             columns: ["client_id"]
@@ -10336,6 +11231,13 @@ export type Database = {
             foreignKeyName: "message_templates_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_templates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -10439,6 +11341,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "meta_profile_changes_client_id_fkey"
@@ -10552,6 +11461,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "campaigns"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_daily_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "metrics_daily_client_id_fkey"
@@ -10789,6 +11705,13 @@ export type Database = {
             foreignKeyName: "motion_design_projects_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "motion_design_projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -10906,6 +11829,13 @@ export type Database = {
             foreignKeyName: "motion_render_candidates_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -11001,6 +11931,13 @@ export type Database = {
             foreignKeyName: "motion_scenes_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "motion_scenes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -11070,6 +12007,13 @@ export type Database = {
           template_version_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "nurture_sequence_steps_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "nurture_sequence_steps_client_id_fkey"
             columns: ["client_id"]
@@ -11220,6 +12164,13 @@ export type Database = {
             foreignKeyName: "nurture_sequences_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -11275,6 +12226,13 @@ export type Database = {
           position?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "opportunity_attributes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "opportunity_attributes_client_id_fkey"
             columns: ["client_id"]
@@ -11380,6 +12338,13 @@ export type Database = {
             foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -11477,6 +12442,13 @@ export type Database = {
           opportunity_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "opportunity_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "opportunity_events_client_id_fkey"
             columns: ["client_id"]
@@ -11606,6 +12578,13 @@ export type Database = {
             foreignKeyName: "opportunity_links_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -11696,6 +12675,13 @@ export type Database = {
           satisfied_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "opportunity_proof_requirements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "opportunity_proof_requirements_client_id_fkey"
             columns: ["client_id"]
@@ -11817,6 +12803,13 @@ export type Database = {
           total?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "opportunity_scores_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "opportunity_scores_client_id_fkey"
             columns: ["client_id"]
@@ -12027,6 +13020,13 @@ export type Database = {
             foreignKeyName: "outbound_messages_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -12231,6 +13231,13 @@ export type Database = {
             foreignKeyName: "post_copy_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "post_copy_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -12311,6 +13318,13 @@ export type Database = {
           published_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "post_frame_publications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "post_frame_publications_client_id_fkey"
             columns: ["client_id"]
@@ -12517,6 +13531,13 @@ export type Database = {
             foreignKeyName: "proof_artifact_versions_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -12613,6 +13634,13 @@ export type Database = {
             foreignKeyName: "proof_capture_configs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_capture_configs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -12688,6 +13716,13 @@ export type Database = {
             foreignKeyName: "proof_capture_links_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_capture_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -12756,6 +13791,13 @@ export type Database = {
           submitted_name?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "proof_capture_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "proof_capture_submissions_client_id_fkey"
             columns: ["client_id"]
@@ -12919,6 +13961,13 @@ export type Database = {
             foreignKeyName: "proof_placement_approvals_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -13005,6 +14054,13 @@ export type Database = {
           placement_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "proof_placement_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "proof_placement_events_client_id_fkey"
             columns: ["client_id"]
@@ -13275,6 +14331,13 @@ export type Database = {
             foreignKeyName: "proof_placements_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_placements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -13406,6 +14469,13 @@ export type Database = {
           source_proof_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "proof_production_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "proof_production_requests_client_id_fkey"
             columns: ["client_id"]
@@ -13640,6 +14710,13 @@ export type Database = {
             foreignKeyName: "proof_request_deliveries_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_request_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -13720,6 +14797,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "proof_rights_events_client_id_fkey"
@@ -13918,6 +15002,13 @@ export type Database = {
             foreignKeyName: "recruitment_meta_campaigns_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "recruitment_meta_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -13958,6 +15049,13 @@ export type Database = {
           last_value?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "ref_counters_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "ref_counters_client_id_fkey"
             columns: ["client_id"]
@@ -14034,6 +15132,13 @@ export type Database = {
           transcript?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "sales_agent_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "sales_agent_conversations_client_id_fkey"
             columns: ["client_id"]
@@ -14134,6 +15239,13 @@ export type Database = {
           outcome?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sales_runtime_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "sales_runtime_requests_client_id_fkey"
             columns: ["client_id"]
@@ -14305,6 +15417,13 @@ export type Database = {
             foreignKeyName: "scheduled_posts_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -14456,6 +15575,13 @@ export type Database = {
           service_name?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "service_offers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "service_offers_client_id_fkey"
             columns: ["client_id"]
@@ -15165,6 +16291,13 @@ export type Database = {
             foreignKeyName: "video_render_candidates_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -15275,6 +16408,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "video_repurpose_clip_requests_client_id_fkey"
@@ -15607,6 +16747,13 @@ export type Database = {
             foreignKeyName: "video_repurpose_requests_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -15746,6 +16893,13 @@ export type Database = {
             foreignKeyName: "video_sound_assets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_sound_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -15830,6 +16984,13 @@ export type Database = {
           transcript?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "video_source_edit_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "video_source_edit_requests_client_id_fkey"
             columns: ["client_id"]
@@ -16015,6 +17176,13 @@ export type Database = {
           work_done?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "work_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "work_logs_client_id_fkey"
             columns: ["client_id"]
@@ -16345,6 +17513,13 @@ export type Database = {
             foreignKeyName: "workflow_runs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -16550,6 +17725,13 @@ export type Database = {
             foreignKeyName: "content_slots_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "content_slots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -16591,6 +17773,13 @@ export type Database = {
           warnings: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "content_slots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "content_slots_client_id_fkey"
             columns: ["client_id"]
@@ -16662,6 +17851,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "content_attribution"
             referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "client_media_assets_client_id_fkey"
@@ -16803,6 +17999,13 @@ export type Database = {
             foreignKeyName: "job_assignments_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -16860,6 +18063,13 @@ export type Database = {
           state_overridden: boolean | null
         }
         Relationships: [
+          {
+            foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
             columns: ["client_id"]
@@ -16932,6 +18142,22 @@ export type Database = {
           },
         ]
       }
+      booking_readiness: {
+        Row: {
+          blocker: string | null
+          client_id: string | null
+          enabled: boolean | null
+          live_links: number | null
+          max_per_day: number | null
+          min_notice_hours: number | null
+          name: string | null
+          slot_minutes: number | null
+          timezone: string | null
+          upcoming: number | null
+          windows: number | null
+        }
+        Relationships: []
+      }
       budget_change_due: {
         Row: {
           ad_set_external_id: string | null
@@ -16992,6 +18218,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "campaign_budget_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "campaign_budget_changes_client_id_fkey"
@@ -17085,6 +18318,13 @@ export type Database = {
           warning: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_campaigns_client_id_fkey"
             columns: ["client_id"]
@@ -17235,6 +18475,13 @@ export type Database = {
             foreignKeyName: "client_campaigns_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -17315,6 +18562,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "opportunity_links_client_id_fkey"
@@ -17488,6 +18742,13 @@ export type Database = {
             foreignKeyName: "client_campaigns_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -17519,6 +18780,13 @@ export type Database = {
           upsell_opportunity: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_billing_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_billing_client_id_fkey"
             columns: ["client_id"]
@@ -17576,6 +18844,13 @@ export type Database = {
           title: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_briefs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_briefs_client_id_fkey"
             columns: ["client_id"]
@@ -17734,6 +19009,13 @@ export type Database = {
             foreignKeyName: "client_media_assets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -17830,6 +19112,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "client_media_assets_client_id_fkey"
@@ -17966,6 +19255,13 @@ export type Database = {
             foreignKeyName: "scheduled_posts_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -18057,6 +19353,13 @@ export type Database = {
             foreignKeyName: "client_campaigns_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -18127,6 +19430,13 @@ export type Database = {
             foreignKeyName: "client_google_locations_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_google_locations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -18178,6 +19488,13 @@ export type Database = {
             foreignKeyName: "agent_jobs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "agent_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -18211,6 +19528,13 @@ export type Database = {
           usable: boolean | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_integrations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_integrations_client_id_fkey"
             columns: ["client_id"]
@@ -18324,6 +19648,13 @@ export type Database = {
             foreignKeyName: "lead_capture_endpoints_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_capture_endpoints_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -18374,6 +19705,13 @@ export type Database = {
           submission_id: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_magnet_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "lead_magnet_deliveries_client_id_fkey"
             columns: ["client_id"]
@@ -18432,6 +19770,13 @@ export type Database = {
           pipeline_stage: Database["public"]["Enums"]["pipeline_stage"] | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_leads_client_id_fkey"
             columns: ["client_id"]
@@ -18500,6 +19845,13 @@ export type Database = {
             foreignKeyName: "client_leads_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -18542,6 +19894,13 @@ export type Database = {
           name: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_campaigns_client_id_fkey"
             columns: ["client_id"]
@@ -18610,6 +19969,13 @@ export type Database = {
             foreignKeyName: "client_integrations_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_integrations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -18665,6 +20031,13 @@ export type Database = {
             foreignKeyName: "scheduled_posts_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -18695,6 +20068,13 @@ export type Database = {
           surface: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "metrics_daily_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "metrics_daily_client_id_fkey"
             columns: ["client_id"]
@@ -18760,6 +20140,13 @@ export type Database = {
             foreignKeyName: "agent_jobs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "agent_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -18801,6 +20188,13 @@ export type Database = {
           scenes_citing_proof: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "motion_render_candidates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "motion_render_candidates_client_id_fkey"
             columns: ["client_id"]
@@ -18896,6 +20290,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "nurture_sequences_client_id_fkey"
@@ -19019,6 +20420,13 @@ export type Database = {
             foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -19107,6 +20515,13 @@ export type Database = {
             foreignKeyName: "market_opportunities_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -19137,6 +20552,13 @@ export type Database = {
           stages_with_template: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "market_opportunities_client_id_fkey"
             columns: ["client_id"]
@@ -19233,6 +20655,13 @@ export type Database = {
             foreignKeyName: "outbound_messages_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "outbound_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -19307,6 +20736,13 @@ export type Database = {
           was_published?: never
         }
         Relationships: [
+          {
+            foreignKeyName: "client_pages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_pages_client_id_fkey"
             columns: ["client_id"]
@@ -19406,6 +20842,13 @@ export type Database = {
             foreignKeyName: "scheduled_posts_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -19459,6 +20902,13 @@ export type Database = {
           status: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "proof_placements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "proof_placements_client_id_fkey"
             columns: ["client_id"]
@@ -19522,6 +20972,13 @@ export type Database = {
             foreignKeyName: "client_proof_assets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_proof_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -19568,6 +21025,13 @@ export type Database = {
           scheduled_at: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "scheduled_posts_client_id_fkey"
             columns: ["client_id"]
@@ -19633,6 +21097,13 @@ export type Database = {
             foreignKeyName: "client_sales_agents_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_sales_agents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -19685,6 +21156,13 @@ export type Database = {
             foreignKeyName: "content_slots_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "content_slots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "client_creative_authority"
             referencedColumns: ["client_id"]
           },
@@ -19717,6 +21195,13 @@ export type Database = {
           slot_id: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "engine_decisions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "engine_decisions_client_id_fkey"
             columns: ["client_id"]
@@ -19783,6 +21268,13 @@ export type Database = {
           to_stage: Database["public"]["Enums"]["slot_stage"] | null
         }
         Relationships: [
+          {
+            foreignKeyName: "content_slots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "content_slots_client_id_fkey"
             columns: ["client_id"]
@@ -19869,6 +21361,13 @@ export type Database = {
           title?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
           {
             foreignKeyName: "client_media_assets_client_id_fkey"
             columns: ["client_id"]
@@ -20466,6 +21965,13 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
+      available_slots_v6: {
+        Args: { p_client_id: string; p_days?: number }
+        Returns: {
+          ends_at: string
+          starts_at: string
+        }[]
+      }
       bind_proof_placement_to_page_v6: {
         Args: {
           p_page_id: string
@@ -20508,6 +22014,51 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      book_appointment_v6: {
+        Args: {
+          p_booked_via: string
+          p_campaign_id?: string
+          p_lead_id: string
+          p_starts_at: string
+        }
+        Returns: {
+          booked_by: string | null
+          booked_via: string
+          campaign_id: string | null
+          cancelled_reason: string | null
+          client_id: string
+          created_at: string
+          ends_at: string
+          external_ref: string | null
+          id: string
+          lead_id: string
+          outcome_note: string | null
+          starts_at: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_appointments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      book_from_public_link_v6: {
+        Args: {
+          p_consent_wording: string
+          p_email: string
+          p_name: string
+          p_phone: string
+          p_starts_at: string
+          p_token: string
+        }
+        Returns: {
+          appointment_id: string
+          lead_id: string
+          starts_at: string
+        }[]
       }
       brief_video_repurpose_candidate: {
         Args: {
@@ -20957,6 +22508,33 @@ export type Database = {
           p_visual_direction: string
         }
         Returns: string
+      }
+      create_booking_link_v6: {
+        Args: {
+          p_campaign_id?: string
+          p_client_id: string
+          p_expires_at?: string
+          p_purpose: string
+          p_token_hash: string
+        }
+        Returns: {
+          campaign_id: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          expires_at: string | null
+          id: string
+          purpose: string
+          revoked_at: string | null
+          token_hash: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "booking_links"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_campaign_from_opportunity_v6: {
         Args: {
@@ -22723,6 +24301,13 @@ export type Database = {
           created: string
         }[]
       }
+      public_slots_for_link_v6: {
+        Args: { p_days?: number; p_token: string }
+        Returns: {
+          ends_at: string
+          starts_at: string
+        }[]
+      }
       queue_lead_message_v6: {
         Args: { p_lead_id: string; p_template_version_id: string }
         Returns: {
@@ -22802,6 +24387,31 @@ export type Database = {
           steps_for_qa: number
           steps_queued: number
         }[]
+      }
+      record_appointment_outcome_v6: {
+        Args: { p_appointment_id: string; p_note?: string; p_status: string }
+        Returns: {
+          booked_by: string | null
+          booked_via: string
+          campaign_id: string | null
+          cancelled_reason: string | null
+          client_id: string
+          created_at: string
+          ends_at: string
+          external_ref: string | null
+          id: string
+          lead_id: string
+          outcome_note: string | null
+          starts_at: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_appointments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       record_budget_change_applied: {
         Args: { p_change_id: string; p_external_ref?: string }
@@ -23485,6 +25095,15 @@ export type Database = {
       rerender_generation: {
         Args: { p_generation_id: string; p_quality?: string; p_size?: string }
         Returns: string
+      }
+      resolve_booking_link_v6: {
+        Args: { p_token: string }
+        Returns: {
+          campaign_id: string
+          client_id: string
+          link_id: string
+          purpose: string
+        }[]
       }
       resolve_sales_deployment: {
         Args: { p_public_id: string }
