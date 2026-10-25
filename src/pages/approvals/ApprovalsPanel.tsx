@@ -11,6 +11,7 @@ import { REVIEW_TONE, fetchClientAssets, fetchTextBodies, shortDate, signPaths }
 import type { MediaAsset } from "../../lib/media";
 import { supabase } from "../../lib/supabase";
 import { ContentJourney } from "../../components/ContentJourney";
+import { CreativeAuthorityStrip } from "./CreativeAuthorityStrip";
 import { VideoApprovalRoute } from "../../components/VideoApprovalRoute";
 
 /**
@@ -140,6 +141,9 @@ export function ApprovalsPanel() {
   return (
     <div>
       <ContentJourney clientId={clientId} current="approval" />
+      <div className="mb-4">
+        <CreativeAuthorityStrip />
+      </div>
       <div className="mb-4">
         <FilterPills options={mediaFilters} activeId={activeFilter} onChange={setActiveFilter} />
       </div>

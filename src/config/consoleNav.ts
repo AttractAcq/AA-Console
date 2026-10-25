@@ -18,7 +18,7 @@ import type { EmployeeCategory } from "../lib/identity";
 export type ConsolePage = { id: string; label: string; icon: LucideIcon };
 
 /** Which console a signed-in user sees is decided by role, then category. */
-export type ConsoleKind = "client" | "avatars" | "editors" | "smm";
+export type ConsoleKind = "client" | "avatars" | "editors" | "smm" | "creative_director";
 
 export const CONSOLE_NAV: Record<ConsoleKind, ConsolePage[]> = {
   client: [
@@ -40,6 +40,18 @@ export const CONSOLE_NAV: Record<ConsoleKind, ConsolePage[]> = {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "current-clients", label: "Current Clients", icon: Users },
     { id: "video-editing", label: "Video Editing", icon: FolderOpen },
+    { id: "video-approvals", label: "Video Approvals", icon: ClipboardCheck },
+    { id: "past-clients", label: "Past Clients", icon: UsersRound },
+    { id: "chat", label: "Chat", icon: MessagesSquare },
+    { id: "account", label: "Account", icon: UserCog },
+  ],
+  // The same pages as an SMM, deliberately rather than by oversight: a
+  // creative director's job here is approving creative for the clients they
+  // are assigned to, which is what these pages already are. A console of
+  // their own is product design, not a gap in the seat.
+  creative_director: [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "current-clients", label: "Current Clients", icon: Users },
     { id: "video-approvals", label: "Video Approvals", icon: ClipboardCheck },
     { id: "past-clients", label: "Past Clients", icon: UsersRound },
     { id: "chat", label: "Chat", icon: MessagesSquare },
