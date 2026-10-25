@@ -116,7 +116,7 @@ beforeEach(async () => {
   await db.exec(await sql("20261025140000_249_the_send_path.sql"));
   await db.exec(await sql("20261025220000_257_a_dm_can_be_held.sql"));
   await db.exec(await sql("20261025230000_258_replying_in_the_thread.sql"));
-  await db.exec(await sql("20261025240000_259_which_client_a_message_belongs_to.sql"));
+  await db.exec(await sql("20261025233000_259_which_client_a_message_belongs_to.sql"));
   await db.query(
     `update client_engine_settings set outbound_messaging_enabled = true where client_id = $1`,
     [CLIENT]);
