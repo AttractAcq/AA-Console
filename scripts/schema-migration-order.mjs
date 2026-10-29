@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-// The released baseline is 259. New migration labels must advance in the
-// same order as their timestamps. In particular 261/262 cannot be replayed
-// or released until the separately developed Google Ads migration 260 lands.
+// Production is released through 263. New migration labels must advance in
+// timestamp order. Keep the 260 prerequisite pinned so future clean replays
+// reproduce the same schema even though 260–263 are already released.
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
