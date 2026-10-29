@@ -3,40 +3,9 @@ import type { FormEvent, ReactNode } from "react";
 import { Modal } from "../Modal";
 import { FieldControl, isVisible, titleFromFile } from "./fields";
 import type { FieldDef, FormValues } from "./fields";
+import { clearDraft, readDraft, withoutSensitiveValues, writeDraft } from "./draftStorage";
 
-const DRAFT_PREFIX = "aa-console:draft:";
-
-/** Files cannot be serialised, so drafts keep everything else. */
-function readDraft(key: string | undefined): FormValues | undefined {
-  if (!key) return undefined;
-  try {
-    const raw = localStorage.getItem(DRAFT_PREFIX + key);
-    return raw ? (JSON.parse(raw) as FormValues) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function writeDraft(key: string | undefined, values: FormValues) {
-  if (!key) return;
-  try {
-    const persistable = Object.fromEntries(
-      Object.entries(values).filter(([, v]) => !(v instanceof File)),
-    );
-    localStorage.setItem(DRAFT_PREFIX + key, JSON.stringify(persistable));
-  } catch {
-    /* private mode or quota — drafts are a convenience, never a requirement */
-  }
-}
-
-export function clearDraft(key: string | undefined) {
-  if (!key) return;
-  try {
-    localStorage.removeItem(DRAFT_PREFIX + key);
-  } catch {
-    /* ignore */
-  }
-}
+export { clearDraft } from "./draftStorage";
 
 function blankValues(fields: FieldDef[], initial?: FormValues): FormValues {
   const out: FormValues = {};
@@ -89,7 +58,7 @@ export function FormModal({
   onSaved?: () => void;
 }) {
   const [values, setValues] = useState<FormValues>(() =>
-    blankValues(fields, readDraft(draftKey) ?? initialValues),
+    blankValues(fields, readDraft(draftKey, fields) ?? initialValues),
   );
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
@@ -99,10 +68,11 @@ export function FormModal({
   // into the next one.
   useEffect(() => {
     if (open) {
+      const draft = readDraft(draftKey, fields);
       // A saved draft wins over the stored row, so an unfinished edit is
       // never silently thrown away.
-      setValues(blankValues(fields, readDraft(draftKey) ?? initialValues));
-      setTouched(readDraft(draftKey) ? Object.fromEntries(fields.map((f) => [f.name, true])) : {});
+      setValues(blankValues(fields, draft ?? initialValues));
+      setTouched(draft ? Object.fromEntries(fields.map((f) => [f.name, true])) : {});
       setError(null);
       setBusy(false);
     }
@@ -129,9 +99,14 @@ export function FormModal({
               : "";
         updated[candidate.name] = candidate.derivedFrom.transform(source);
       }
-      writeDraft(draftKey, updated);
+      writeDraft(draftKey, updated, fields);
       return updated;
     });
+  }
+
+  function close() {
+    setValues((previous) => withoutSensitiveValues(previous, fields));
+    onClose();
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -155,7 +130,7 @@ export function FormModal({
       clearDraft(draftKey);
       setBusy(false);
       onSaved?.();
-      onClose();
+      close();
     } catch (err) {
       setBusy(false);
       setError(err instanceof Error ? err.message : "Could not save.");
@@ -163,7 +138,7 @@ export function FormModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={title}>
+    <Modal open={open} onClose={close} title={title}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {intro && <p className="text-sm text-muted-foreground">{intro}</p>}
 
@@ -189,7 +164,7 @@ export function FormModal({
           {actions && <div className="mr-auto">{actions}</div>}
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             className="rounded-md px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Cancel
