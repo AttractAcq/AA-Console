@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 let db: PGlite;
 let adminId: string;
 let linkedId: string;
+let nonmemberId: string;
 let unlinkedId: string;
 let retiredId: string;
 let clientId: string;
@@ -90,6 +91,7 @@ beforeAll(async () => {
 
   adminId = await createUser("admin-270@example.com", "admin");
   linkedId = await createUser("linked-270@example.com", "employee", "smm");
+  nonmemberId = await createUser("nonmember-270@example.com", "employee", "smm");
   retiredId = await createUser("retired-270@example.com", "employee", "smm");
   clientId = await createUser("client-270@example.com", "client");
   const retiredMember = await db.query<{ id: string }>(
@@ -100,6 +102,10 @@ beforeAll(async () => {
   await db.query(
     `insert into public.team_members (user_id, category, name, initials, active)
      values ($1, 'smm', 'Linked', 'LI', true)`, [linkedId],
+  );
+  await db.query(
+    `insert into public.team_members (user_id, category, name, initials, active)
+     values ($1, 'smm', 'Nonmember', 'NM', true)`, [nonmemberId],
   );
 
   unlinkedId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -233,6 +239,20 @@ describe("default-deny Auth and active staff boundary", () => {
         [channelId, id],
       )).toHaveLength(1);
     }
+  });
+
+  it("still requires explicit channel membership for active staff", async () => {
+    expect(await asUser<{ is_channel_member: boolean }>(nonmemberId,
+      "select public.is_channel_member($1)", [channelId],
+    )).toEqual([{ is_channel_member: false }]);
+    expect(await asUser(nonmemberId, "select id from public.team_channels")).toHaveLength(0);
+    expect(await asUser(nonmemberId, "select id from public.team_messages")).toHaveLength(0);
+    expect(await asUser(nonmemberId, "select channel_id from public.channel_members")).toHaveLength(0);
+    expect(await asUser(nonmemberId, "select id from public.chat_participants()")).toHaveLength(0);
+    await expect(asUser(nonmemberId,
+      "insert into public.team_messages (channel_id, author_id, body) values ($1, $2, 'probe') returning id",
+      [channelId, nonmemberId],
+    )).rejects.toThrow(/row-level security/i);
   });
 
   it("blocks self category, role and active-state edits while preserving admin writes", async () => {
