@@ -43,7 +43,9 @@ export function assertSchemaMigrationOrder(filenames, releasedVersion) {
     if (entry.number !== expected) {
       throw new Error(`Expected migration ${expected} before ${entry.name}; released schema cannot skip a dependency`)
     }
-    if (entry.number === 260 && !/google[_-]?ads/i.test(entry.name)) {
+    // Pin the reviewed prerequisite, including its version and filename. A
+    // different migration merely labelled 260 must not satisfy this gate.
+    if (entry.number === 260 && entry.name !== '20261025235000_260_building_the_google_campaign.sql') {
       throw new Error(`Migration 260 must be the Google Ads dependency: ${entry.name}`)
     }
     expected += 1
