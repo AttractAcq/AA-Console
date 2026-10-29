@@ -30,12 +30,17 @@ untouched.
   32-byte random secret encoded as 64 hex characters before Auth hashes it.
   No default password, secret value, or hash is written to a log or source.
 - An explicitly configured seed password shorter than 16 characters fails
-  the migration. Empty settings behave as absent. The known `change-me`
-  password fails too.
-- Existing Auth users with the seeded email addresses retain their password
-  hash, both metadata fields, confirmation timestamp, and update timestamp.
-  Trusted profile fields may be reconciled. A reapplication remains a
-  privileged operation and must not be used as a password reset.
+  the migration. Empty settings behave as absent. The legacy shared employee
+  setting is rejected; SMM, editor, and avatar each have a separate optional
+  setting, and duplicate explicit values are rejected.
+- If **any** seeded email already exists in `auth.users`, the seed block fails
+  before creating or promoting an account. A pre-registered or unconfirmed
+  account cannot inherit the seeded admin, client, or employee role by email
+  match. A repeat replay also fails closed. Existing Auth password hashes,
+  metadata, confirmation, and update timestamps remain unchanged. The
+  restricted provisioning helper separately preserves those Auth fields on
+  an authorized existing-user call; do not use migration 11 as a password
+  reset or profile reconciliation operation.
 - The signup trigger assigns only `employee` and a null category; editable
   Auth user metadata cannot grant admin or client access before migration
   263 runs. Trusted seed provisioning explicitly updates the profile role.
@@ -58,8 +63,9 @@ Do not use `create_console_user()` or rerun migration 11 to reset a password.
 
 `agent-runtime/src/auth-replay.pg.test.ts` executes the tracked migration 11
 SQL against PGlite with pgcrypto test stubs. It tests no-setting replay,
-distinct unknown seed secrets, preservation of existing Auth fields on both
-initial and repeat replay, forged signup metadata, and weak-setting failure.
+distinct unknown seed secrets, rejection of a pre-registered admin email,
+fail-closed repeat replay with unchanged Auth fields, forged signup metadata,
+weak settings, and duplicate/shared employee secrets.
 The existing migration 263 tests then verify the post-upgrade trigger and
 provisioning helper. CI's schema job sets `AA_SCHEMA_REPLAY_RAW_SOURCE=1` to
 exercise the exact tracked file through clean and released-to-head upgrade

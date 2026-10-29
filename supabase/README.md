@@ -29,24 +29,30 @@ creating a new hosted project or rebuilding from a database backup.
 
 ## Seed accounts and passwords
 
-Migration 11 creates five named accounts. Their passwords are **not** in this
-repo. With no setting, each new account receives a different random 32-byte
-secret that is never logged or returned. This includes the first admin: the
-operator must establish access through a verified Supabase Auth recovery or
-invitation flow controlled by the account owner. An optional database setting
-can supply a one-time bootstrap password of at least 16 characters:
+Migration 11 creates five named accounts only if none of their email addresses
+already exists in Auth. Their passwords are **not** in this repo. With no
+setting, each new account receives a different random 32-byte secret that is
+never logged or returned. This includes the first admin: the operator must
+establish access through a verified Supabase Auth recovery or invitation flow
+controlled by the account owner. Optional per-account database settings can
+supply distinct one-time bootstrap passwords of at least 16 characters:
 
 | Setting                       | Account                                 |
 | ----------------------------- | --------------------------------------- |
 | `app.seed_admin_password`     | alex@attractacq.com                     |
 | `app.seed_client_password`    | attractacquisition@attractacq.com       |
-| `app.seed_employee_password`  | smm1 / editor1 / avatar1                |
+| `app.seed_smm_password`       | smm1@attractacq.com                     |
+| `app.seed_editor_password`    | editor1@attractacq.com                  |
+| `app.seed_avatar_password`    | avatar1@attractacq.com                  |
 
 Do not pass those settings in a command line, migration file, PR, or log. A
 setting must be available to the exact database session applying migration 11;
-otherwise the random fallback is used. Re-running the corrected source does
-not rewrite an existing Auth password or metadata. It may still reconcile a
-trusted profile and should be treated as a reviewed migration action.
+otherwise the random fallback is used. The legacy shared
+`app.seed_employee_password` setting is rejected. If a named seed email already
+exists, the seed block stops before any account is provisioned or promoted.
+Re-running migration 11 is therefore a reviewed recovery action, not a way to
+reset passwords. The restricted helper's existing-user path never rewrites
+Auth passwords or metadata.
 
 ## Careful: `migration fetch` overwrites migration 11
 

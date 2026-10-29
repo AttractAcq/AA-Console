@@ -81,7 +81,8 @@ gate. Its manifest records `authSourceReplay: true` and `fixture: false`.
 After that gate passes with the required migration 260 ancestor, remove the
 fixture path in a follow-up commit. The PGlite Auth tests exercise migration
 11 directly with test-only pgcrypto stubs and cover missing settings,
-existing accounts, forged metadata, and weak configured secrets. Full schema
+pre-registered and repeat accounts, forged metadata, and unsafe configured
+secrets. Full schema
 replay remains the required release evidence.
 
 The corrected source still seeds named accounts. B004's controlled Auth Admin

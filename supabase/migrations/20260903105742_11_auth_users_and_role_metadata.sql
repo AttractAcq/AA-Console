@@ -103,14 +103,16 @@ revoke execute on function create_console_user(text, text, app_role, text, team_
 -- ============================================================
 -- The five accounts
 --
--- Passwords are NOT stored here. A database setting may supply a strong
--- one-time bootstrap secret; without it each new account receives a distinct
--- random 32-byte password. Recover access through the approved Auth reset /
--- invitation path; never rely on a committed or shared default password.
+-- Passwords are NOT stored here. Per-account database settings may supply
+-- distinct strong one-time bootstrap secrets; without them each new account
+-- receives a random 32-byte password. Recover access through the approved
+-- Auth reset/invitation path; never rely on a committed or shared default.
 --
 --   select set_config('app.seed_admin_password',    '<secret>', false);
 --   select set_config('app.seed_client_password',   '<secret>', false);
---   select set_config('app.seed_employee_password', '<secret>', false);
+--   select set_config('app.seed_smm_password',      '<secret>', false);
+--   select set_config('app.seed_editor_password',   '<secret>', false);
+--   select set_config('app.seed_avatar_password',   '<secret>', false);
 --
 -- Migration 11 is already recorded in production. This source correction
 -- affects fresh replays only; it does not re-run against that project.
@@ -123,26 +125,58 @@ declare
   v_editor  uuid;
   v_avatar  uuid;
   v_aa      uuid;
+  v_seed_admin  text := nullif(current_setting('app.seed_admin_password', true), '');
+  v_seed_client text := nullif(current_setting('app.seed_client_password', true), '');
+  v_seed_smm    text := nullif(current_setting('app.seed_smm_password', true), '');
+  v_seed_editor text := nullif(current_setting('app.seed_editor_password', true), '');
+  v_seed_avatar text := nullif(current_setting('app.seed_avatar_password', true), '');
+  v_seed       text;
+  v_count      integer;
+  v_unique     integer;
 begin
-  if (nullif(current_setting('app.seed_admin_password', true), '') is not null
-      and (length(current_setting('app.seed_admin_password', true)) < 16
-           or current_setting('app.seed_admin_password', true) = 'change-me'))
-     or (nullif(current_setting('app.seed_client_password', true), '') is not null
-      and (length(current_setting('app.seed_client_password', true)) < 16
-           or current_setting('app.seed_client_password', true) = 'change-me'))
-     or (nullif(current_setting('app.seed_employee_password', true), '') is not null
-      and (length(current_setting('app.seed_employee_password', true)) < 16
-           or current_setting('app.seed_employee_password', true) = 'change-me')) then
-    raise exception 'Seed account passwords must be at least 16 characters';
+  -- An email match is not proof that an account was created by this seed.
+  -- A pre-registered or unconfirmed user must never inherit these roles.
+  -- A repeat replay also stops before touching any existing Auth account.
+  if exists (
+    select 1 from auth.users
+     where lower(email) in (
+       'alex@attractacq.com', 'attractacquisition@attractacq.com',
+       'smm1@attractacq.com', 'editor1@attractacq.com',
+       'avatar1@attractacq.com'
+     )
+  ) then
+    raise exception 'Seed email already exists; review Auth provenance before provisioning';
+  end if;
+
+  if nullif(current_setting('app.seed_employee_password', true), '') is not null then
+    raise exception 'Shared employee seed password is unsupported; use per-account settings';
+  end if;
+
+  foreach v_seed in array array[
+    v_seed_admin, v_seed_client, v_seed_smm, v_seed_editor, v_seed_avatar
+  ] loop
+    if v_seed is not null and length(v_seed) < 16 then
+      raise exception 'Seed account passwords must be at least 16 characters';
+    end if;
+  end loop;
+
+  select count(*), count(distinct configured_password)
+    into v_count, v_unique
+    from unnest(array[
+      v_seed_admin, v_seed_client, v_seed_smm, v_seed_editor, v_seed_avatar
+    ]) as configured(configured_password)
+   where configured_password is not null;
+  if v_count <> v_unique then
+    raise exception 'Seed account passwords must be distinct per account';
   end if;
 
   select id into v_aa from clients where initials = 'AA' limit 1;
 
-  v_admin  := create_console_user('alex@attractacq.com',              coalesce(nullif(current_setting('app.seed_admin_password', true), ''), encode(extensions.gen_random_bytes(32), 'hex')), 'admin',    'Alex Thomas');
-  v_client := create_console_user('attractacquisition@attractacq.com',coalesce(nullif(current_setting('app.seed_client_password', true), ''), encode(extensions.gen_random_bytes(32), 'hex')), 'client',   'Attract Acquisition');
-  v_smm    := create_console_user('smm1@attractacq.com',              coalesce(nullif(current_setting('app.seed_employee_password', true), ''), encode(extensions.gen_random_bytes(32), 'hex')), 'employee', 'SMM 1',    'smm');
-  v_editor := create_console_user('editor1@attractacq.com',           coalesce(nullif(current_setting('app.seed_employee_password', true), ''), encode(extensions.gen_random_bytes(32), 'hex')), 'employee', 'Editor 1', 'editors');
-  v_avatar := create_console_user('avatar1@attractacq.com',           coalesce(nullif(current_setting('app.seed_employee_password', true), ''), encode(extensions.gen_random_bytes(32), 'hex')), 'employee', 'Avatar 1', 'avatars');
+  v_admin  := create_console_user('alex@attractacq.com',              coalesce(v_seed_admin, encode(extensions.gen_random_bytes(32), 'hex')), 'admin',    'Alex Thomas');
+  v_client := create_console_user('attractacquisition@attractacq.com',coalesce(v_seed_client, encode(extensions.gen_random_bytes(32), 'hex')), 'client',   'Attract Acquisition');
+  v_smm    := create_console_user('smm1@attractacq.com',              coalesce(v_seed_smm, encode(extensions.gen_random_bytes(32), 'hex')), 'employee', 'SMM 1',    'smm');
+  v_editor := create_console_user('editor1@attractacq.com',           coalesce(v_seed_editor, encode(extensions.gen_random_bytes(32), 'hex')), 'employee', 'Editor 1', 'editors');
+  v_avatar := create_console_user('avatar1@attractacq.com',           coalesce(v_seed_avatar, encode(extensions.gen_random_bytes(32), 'hex')), 'employee', 'Avatar 1', 'avatars');
 
   -- the client account is scoped to Attract Acquisition
   if v_aa is not null then

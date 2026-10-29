@@ -51,7 +51,7 @@ migration does not rewrite existing profiles or broaden the helper's grants.
 This patch does not discover or demote any existing forged administrator.
 The separate B004 replay correction in `docs/auth-fresh-replay-safety.md`
 changes the tracked migration 11 source so a new database has unique random
-seed secrets and a repeat cannot rewrite an existing Auth password or metadata.
+seed secrets and a repeat fails before touching an existing Auth account.
 Its raw-source CI replay must pass before this historical-file change is
 released. Migration 13 still permits a three-character team-member password,
 and `create_console_user()` still writes Auth tables directly rather than

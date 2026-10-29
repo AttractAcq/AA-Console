@@ -70,27 +70,30 @@ describe("migration 11 source replay", () => {
     }
   });
 
-  it("does not rewrite an existing account's Auth fields on initial or repeat replay", async () => {
+  it.each([
+    "alex@attractacq.com",
+    "attractacquisition@attractacq.com",
+    "smm1@attractacq.com",
+    "editor1@attractacq.com",
+    "avatar1@attractacq.com",
+  ])("rejects pre-registered seed email %s without promoting it or rewriting Auth", async (email) => {
     const db = await replayDatabase();
     try {
       const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
       await db.query(`
         insert into auth.users (id, email, encrypted_password, raw_app_meta_data,
           raw_user_meta_data, email_confirmed_at, updated_at)
-        values ($1, 'alex@attractacq.com', 'existing-hash',
+        values ($1, $2, 'existing-hash',
           '{"legacy":true}', '{"private_note":"owned by Auth"}', null,
           '2026-01-01T00:00:00Z')
-      `, [id]);
+      `, [id, email]);
       const before = (await db.query<{
         encrypted_password: string; raw_app_meta_data: unknown;
         raw_user_meta_data: unknown; email_confirmed_at: string | null; updated_at: string;
       }>(`select encrypted_password, raw_app_meta_data, raw_user_meta_data,
                  email_confirmed_at, updated_at from auth.users where id = $1`, [id])).rows[0]!;
 
-      await applySource11(db);
-      await db.query("select set_config('app.seed_admin_password', $1, false)",
-        ["a-different-explicit-bootstrap-secret"]);
-      await applySource11(db);
+      await expect(applySource11(db)).rejects.toThrow(/Seed email already exists/);
 
       const after = (await db.query<typeof before>(`
         select encrypted_password, raw_app_meta_data, raw_user_meta_data,
@@ -100,7 +103,33 @@ describe("migration 11 source replay", () => {
       const profile = (await db.query<{ role: string }>(`
         select role::text from public.profiles where id = $1
       `, [id])).rows[0]!;
-      expect(profile.role).toBe("admin");
+      expect(profile.role).toBe("employee");
+      expect((await db.query("select id from auth.users")).rows).toHaveLength(1);
+      expect((await db.query("select 1 from public.client_users")).rows).toHaveLength(0);
+      expect((await db.query("select 1 from public.team_members")).rows).toHaveLength(0);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("rejects a repeat historical replay and preserves every seeded Auth row", async () => {
+    const db = await replayDatabase();
+    try {
+      await applySource11(db);
+      const before = (await db.query(`
+        select id, email, encrypted_password, raw_app_meta_data,
+               raw_user_meta_data, email_confirmed_at, updated_at
+          from auth.users order by email
+      `)).rows;
+      await db.query("select set_config('app.seed_admin_password', $1, false)",
+        ["a-different-explicit-bootstrap-secret"]);
+      await expect(applySource11(db)).rejects.toThrow(/Seed email already exists/);
+      const after = (await db.query(`
+        select id, email, encrypted_password, raw_app_meta_data,
+               raw_user_meta_data, email_confirmed_at, updated_at
+          from auth.users order by email
+      `)).rows;
+      expect(after).toEqual(before);
     } finally {
       await db.close();
     }
@@ -128,6 +157,24 @@ describe("migration 11 source replay", () => {
     try {
       await db.query("select set_config('app.seed_admin_password', 'change-me', false)");
       await expect(applySource11(db)).rejects.toThrow(/at least 16 characters/);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("rejects the legacy shared employee password and duplicate per-account secrets", async () => {
+    const db = await replayDatabase();
+    try {
+      await db.query("select set_config('app.seed_employee_password', $1, false)",
+        ["one-shared-employee-password"]);
+      await expect(applySource11(db)).rejects.toThrow(/Shared employee seed password/);
+      await db.query("select set_config('app.seed_employee_password', '', false)");
+      await db.query("select set_config('app.seed_smm_password', $1, false)",
+        ["duplicate-account-secret"]);
+      await db.query("select set_config('app.seed_editor_password', $1, false)",
+        ["duplicate-account-secret"]);
+      await expect(applySource11(db)).rejects.toThrow(/distinct per account/);
+      expect((await db.query("select id from auth.users")).rows).toHaveLength(0);
     } finally {
       await db.close();
     }
