@@ -510,6 +510,7 @@ export function PageBuilderPanel({
           : field) : fields}
         submitLabel="Save page"
         initialValues={selectedCampaignId ? { campaign_id: selectedCampaignId, ...(aiBrief ? { brief: aiBrief } : {}) } : aiBrief ? { brief: aiBrief } : undefined}
+        resetKey={aiBrief}
         actions={
           <button
             type="button"

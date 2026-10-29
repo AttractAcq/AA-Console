@@ -127,6 +127,7 @@ export function BusinessContextPanel() {
         intro="The four required fields are what every downstream agent reads. Partial saves are fine."
         fields={FIELDS}
         initialValues={aiDraft ?? initialValues}
+        resetKey={aiDraft}
         actions={
           <button
             type="button"
@@ -189,8 +190,7 @@ export function BusinessContextPanel() {
           requireNotes={false}
           onClose={() => setResearching(false)}
           onGenerated={(draft, drafted, droppedFields) => {
-            // A saved draft wins over initialValues inside FormModal, so a
-            // half-typed form would silently swallow the research.
+            // Applying generated research deliberately replaces in-progress edits.
             clearDraft(`business-context:${clientId}`);
             setAiDraft(draft);
             setSources(drafted ?? null);

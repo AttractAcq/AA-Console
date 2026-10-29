@@ -4,6 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { toEmail } from "../lib/identity";
 import type { ConsoleRole, EmployeeCategory } from "../lib/identity";
+import { syncDraftIdentity } from "../components/forms/draftStorage";
 
 export type Profile = {
   id: string;
@@ -65,12 +66,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void supabase.auth.getSession().then(async ({ data }) => {
       if (cancelled) return;
+      syncDraftIdentity(data.session?.user.id ?? null);
       setSession(data.session);
       if (data.session) setProfile(await loadProfile(data.session.user.id));
       if (!cancelled) setLoading(false);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      syncDraftIdentity(next?.user.id ?? null);
       setSession(next);
       if (!next) {
         setProfile(null);
@@ -93,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     });
     if (error) throw new Error("Those details don't match an account.");
+    syncDraftIdentity(data.user.id);
 
     const loaded = await loadProfile(data.user.id);
     if (!loaded) {
@@ -104,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    syncDraftIdentity(null);
     await supabase.auth.signOut();
     setProfile(null);
   }, []);

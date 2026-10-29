@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Modal } from "../Modal";
 import { FieldControl, isVisible, titleFromFile } from "./fields";
 import type { FieldDef, FormValues } from "./fields";
-import { clearDraft, readDraft, withoutSensitiveValues, writeDraft } from "./draftStorage";
+import { clearDraft, readDraft, writeDraft } from "./draftStorage";
 
 export { clearDraft } from "./draftStorage";
 
@@ -34,6 +34,7 @@ export function FormModal({
   actions,
   initialValues,
   draftKey,
+  resetKey,
   onSubmit,
   onSaved,
 }: {
@@ -50,47 +51,68 @@ export function FormModal({
   /** Seed values for an edit/upsert form. */
   initialValues?: FormValues;
   /**
-   * Persists what has been typed under this key so it survives closing the
-   * modal and reloading the app. Cleared once the form saves successfully.
+   * Persists only fields allowed by draftStorage's explicit policy for this
+   * key, in this browser tab. Cleared once the form saves successfully.
    */
   draftKey?: string;
+  /** A changed value deliberately replaces in-progress edits, such as an AI-generated draft. */
+  resetKey?: unknown;
   onSubmit: (values: FormValues) => Promise<void>;
   onSaved?: () => void;
 }) {
   const [values, setValues] = useState<FormValues>(() =>
-    blankValues(fields, readDraft(draftKey, fields) ?? initialValues),
+    open ? blankValues(fields, { ...initialValues, ...readDraft(draftKey, fields) }) : blankValues(fields),
   );
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const touched = useRef<Record<string, boolean>>({});
+  const previousInputs = useRef({ open: false, draftKey, resetKey });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Reset every time the modal opens so a cancelled edit never leaks
-  // into the next one.
+  // Preserve edits through live parent refreshes. A new opening, form identity
+  // or explicit reset replaces them with current server values plus safe draft.
   useEffect(() => {
+    const prior = previousInputs.current;
+    const reset = !prior.open || prior.draftKey !== draftKey || prior.resetKey !== resetKey;
+    previousInputs.current = { open, draftKey, resetKey };
     if (open) {
       const draft = readDraft(draftKey, fields);
-      // A saved draft wins over the stored row, so an unfinished edit is
-      // never silently thrown away.
-      setValues(blankValues(fields, draft ?? initialValues));
-      setTouched(draft ? Object.fromEntries(fields.map((f) => [f.name, true])) : {});
-      setError(null);
-      setBusy(false);
+      const seeded = blankValues(fields, { ...initialValues, ...draft });
+      if (reset) {
+        setValues(seeded);
+        touched.current = draft ? Object.fromEntries(Object.keys(draft).map((name) => [name, true])) : {};
+        setError(null);
+        setBusy(false);
+      } else {
+        setValues((previous) => {
+          const updated = { ...previous };
+          let changed = false;
+          for (const field of fields) {
+            if (field.kind === "heading" || touched.current[field.name]
+              || (field.derivedFrom && touched.current[field.derivedFrom.field])) continue;
+            if (updated[field.name] !== seeded[field.name]) {
+              updated[field.name] = seeded[field.name];
+              changed = true;
+            }
+          }
+          return changed ? updated : previous;
+        });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialValues, draftKey]);
+  }, [open, initialValues, draftKey, resetKey]);
 
   const visible = useMemo(() => fields.filter((f) => isVisible(f, values)), [fields, values]);
 
   function setValue(field: FieldDef, next: string | boolean | File | null) {
+    touched.current[field.name] = true;
     setValues((prev) => {
       const updated: FormValues = { ...prev, [field.name]: next };
-      setTouched((t) => ({ ...t, [field.name]: true }));
 
       // Recompute anything derived from this field, unless the user has
       // already typed in the derived field themselves.
       for (const candidate of fields) {
         if (candidate.derivedFrom?.field !== field.name) continue;
-        if (touched[candidate.name]) continue;
+        if (touched.current[candidate.name]) continue;
         const source =
           candidate.kind === "text" && next instanceof File
             ? titleFromFile(next)
@@ -105,7 +127,8 @@ export function FormModal({
   }
 
   function close() {
-    setValues((previous) => withoutSensitiveValues(previous, fields));
+    setValues(blankValues(fields));
+    touched.current = {};
     onClose();
   }
 

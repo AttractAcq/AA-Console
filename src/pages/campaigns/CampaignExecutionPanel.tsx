@@ -703,6 +703,7 @@ export function CampaignExecutionPanel() {
         }
         submitLabel="Plan it"
         initialValues={newCampaignValues}
+        resetKey={aiDraft}
         actions={
           <button
             type="button"
@@ -943,8 +944,7 @@ export function CampaignExecutionPanel() {
           }
           onClose={() => setProposing(false)}
           onGenerated={(draft) => {
-            // A saved draft wins over initialValues inside FormModal, so a
-            // half-typed form would silently swallow the proposal.
+            // Applying the proposal deliberately replaces in-progress edits.
             clearDraft(`campaign:${clientId}`);
             // The template rides along so the form opens on the same choice
             // the proposal was written for. Losing it here would leave a

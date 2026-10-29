@@ -626,6 +626,7 @@ export function RecruitmentPanel() {
             ? { ...aiDraft, apply_url: "", compensation_text: "" }
             : { call_to_action: DEFAULT_CTA }
         }
+        resetKey={aiDraft}
         onSubmit={async (v) => {
           if (!draftRole) return;
           const { error: rpcError } = await supabase.rpc("create_recruitment_brief", {
@@ -660,8 +661,7 @@ export function RecruitmentPanel() {
           payload={{ role: draftRole }}
           onClose={() => setGenerating(false)}
           onGenerated={(draft) => {
-            // A saved draft wins over initialValues inside FormModal, so a
-            // half-typed form would silently swallow what was just generated.
+            // Applying the generated brief deliberately replaces in-progress edits.
             clearDraft(`recruitment-brief:${draftRole}`);
             setAiDraft(draft);
           }}

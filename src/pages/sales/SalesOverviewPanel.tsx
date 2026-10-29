@@ -423,6 +423,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
         ] : fields}
         submitLabel="Build"
         initialValues={campaignId ? { campaign_id: campaignId, ...(aiPurpose ? { purpose: aiPurpose, role: briefRole } : {}) } : aiPurpose ? { purpose: aiPurpose, role: briefRole } : undefined}
+        resetKey={aiPurpose}
         actions={
           <button
             type="button"

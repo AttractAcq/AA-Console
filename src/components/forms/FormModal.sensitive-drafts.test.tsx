@@ -1,112 +1,191 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FormModal } from "./FormModal";
-import { integrationDraftKey, purgeLegacySensitiveDrafts, readDraft, teamMemberDraftKey } from "./draftStorage";
+import {
+  integrationDraftKey, purgeLegacySensitiveDrafts, readDraft, syncDraftIdentity,
+  teamMemberDraftKey, writeDraft,
+} from "./draftStorage";
 import type { FieldDef } from "./fields";
 
 const marker = "opaque-private-marker";
+const currentKey = (key: string) => `aa-console:draft:v3:user-1:${key}`;
+const oldKey = (key: string) => `aa-console:draft:${key}`;
+const envelope = (values: Record<string, unknown>, savedAt = Date.now()) => JSON.stringify({ savedAt, values });
+
 const teamFields: FieldDef[] = [
   { name: "name", label: "Name", kind: "text" },
+  { name: "engagement", label: "Engagement", kind: "select", options: [{ value: "contractor", label: "Contractor" }] },
+  { name: "username", label: "Username", kind: "text" },
   { name: "password", label: "Password", kind: "password" },
 ];
 const integrationFields: FieldDef[] = [
-  { name: "provider", label: "Provider", kind: "text" },
+  { name: "provider", label: "Provider", kind: "select", options: [{ value: "meta", label: "Meta" }] },
+  { name: "credential_label", label: "Account ID", kind: "text" },
   { name: "secret", label: "Credential", kind: "password" },
 ];
 
-beforeEach(() => localStorage.clear());
-afterEach(() => localStorage.clear());
+beforeEach(() => { localStorage.clear(); sessionStorage.clear(); syncDraftIdentity("user-1"); });
+afterEach(() => { localStorage.clear(); sessionStorage.clear(); });
 
-describe("sensitive form drafts", () => {
-  it.each([
-    { name: "Team", draftKey: teamMemberDraftKey("smm"), fields: teamFields, sensitiveLabel: "Password", safeLabel: "Name" },
-    { name: "Vault", draftKey: integrationDraftKey("example"), fields: integrationFields, sensitiveLabel: "Credential", safeLabel: "Provider" },
-  ])("never persists or restores the $name sensitive field", ({ draftKey, fields, sensitiveLabel, safeLabel }) => {
-    const onClose = vi.fn();
-    const props = { open: true, onClose, title: "Draft", draftKey, fields, onSubmit: vi.fn() };
+describe("form draft isolation", () => {
+  it("keeps only a validated provider selection across a reload in the same tab", () => {
+    const draftKey = integrationDraftKey("client-1");
+    syncDraftIdentity("user-1");
+    const props = { open: true, onClose: vi.fn(), title: "Draft", draftKey, fields: integrationFields, onSubmit: vi.fn() };
     const { rerender } = render(<FormModal {...props} />);
 
-    fireEvent.change(screen.getByLabelText(new RegExp(`^${sensitiveLabel}`)), { target: { value: marker } });
-    fireEvent.change(screen.getByLabelText(safeLabel), { target: { value: "Safe value" } });
-    expect(localStorage.getItem(`aa-console:draft:${draftKey}`)).not.toContain(marker);
-    expect(localStorage.getItem(`aa-console:draft:${draftKey}`)).toContain("Safe value");
+    fireEvent.change(screen.getByLabelText("Account ID"), { target: { value: marker } });
+    fireEvent.change(screen.getByLabelText("Credential"), { target: { value: marker } });
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "meta" } });
+
+    expect(sessionStorage.getItem(currentKey(draftKey))).toBe(envelope({ provider: "meta" },
+      JSON.parse(sessionStorage.getItem(currentKey(draftKey))!).savedAt));
+    expect(localStorage.getItem(oldKey(draftKey))).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(onClose).toHaveBeenCalledTimes(1);
     rerender(<FormModal {...props} open={false} />);
     rerender(<FormModal {...props} />);
-    expect(screen.getByLabelText(new RegExp(`^${sensitiveLabel}`))).toHaveValue("");
-    expect(screen.getByLabelText(safeLabel)).toHaveValue("Safe value");
+    expect(screen.getByLabelText("Account ID")).toHaveValue("");
+    expect(screen.getByLabelText("Credential")).toHaveValue("");
+    expect(screen.getByLabelText("Provider")).toHaveValue("meta");
   });
 
-  it("removes old Team and integration drafts without reading or logging their values", () => {
+  it("does not retain team names, usernames, or passwords", () => {
+    const draftKey = teamMemberDraftKey("smm");
+    const props = { open: true, onClose: vi.fn(), title: "Team", draftKey, fields: teamFields, onSubmit: vi.fn() };
+    const { rerender } = render(<FormModal {...props} />);
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: marker } });
+    fireEvent.change(screen.getByLabelText("Username"), { target: { value: marker } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: marker } });
+    expect(sessionStorage.getItem(currentKey(draftKey))).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    rerender(<FormModal {...props} open={false} />);
+    rerender(<FormModal {...props} />);
+    expect(screen.getByLabelText("Name")).toHaveValue("");
+    expect(screen.getByLabelText("Username")).toHaveValue("");
+    expect(screen.getByLabelText("Password")).toHaveValue("");
+  });
+
+  it("deletes every older draft family without reading any old value", () => {
+    for (const key of ["team-member:smm", "team-member-v2:smm", "integration:c", "integration-v2:c",
+      "contact:c", "lead:c", "billing:c", "member-contract-profile:m", "brand:c", "unknown"]) {
+      localStorage.setItem(oldKey(key), JSON.stringify({ secret: marker }));
+    }
+    const read = vi.spyOn(localStorage, "getItem");
     const log = vi.spyOn(console, "log");
     const warn = vi.spyOn(console, "warn");
-    localStorage.setItem("aa-console:draft:team-member:editors", JSON.stringify({ name: "Editor", password: marker }));
-    localStorage.setItem("aa-console:draft:integration:example", JSON.stringify({ provider: "meta", secret: marker }));
-    localStorage.setItem("aa-console:draft:brand:example", JSON.stringify({ name: "Brand draft" }));
-
     purgeLegacySensitiveDrafts();
-
-    expect(localStorage.getItem("aa-console:draft:team-member:editors")).toBeNull();
-    expect(localStorage.getItem("aa-console:draft:integration:example")).toBeNull();
-    expect(localStorage.getItem("aa-console:draft:brand:example")).toContain("Brand draft");
+    expect(localStorage.length).toBe(0);
+    expect(read).not.toHaveBeenCalled();
     expect(log).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
+    read.mockRestore();
     log.mockRestore();
     warn.mockRestore();
   });
 
-  it("keeps versioned safe drafts on reload while clearing old unsafe keys", async () => {
-    const teamKey = `aa-console:draft:${teamMemberDraftKey("smm")}`;
-    const integrationKey = `aa-console:draft:${integrationDraftKey("example")}`;
-    localStorage.setItem(teamKey, JSON.stringify({ name: "Safe team draft" }));
-    localStorage.setItem(integrationKey, JSON.stringify({ provider: "meta" }));
-    localStorage.setItem("aa-console:draft:team-member:smm", JSON.stringify({ password: marker }));
-    localStorage.setItem("aa-console:draft:integration:example", JSON.stringify({ secret: marker }));
-
-    vi.resetModules();
-    await import("./draftStorage"); // module-load cleanup, as on an app reload
-
-    expect(localStorage.getItem(teamKey)).toBe(JSON.stringify({ name: "Safe team draft" }));
-    expect(localStorage.getItem(integrationKey)).toBe(JSON.stringify({ provider: "meta" }));
-    expect(localStorage.getItem("aa-console:draft:team-member:smm")).toBeNull();
-    expect(localStorage.getItem("aa-console:draft:integration:example")).toBeNull();
+  it("does not persist free text or seeded personal and financial values after a safe edit", () => {
+    const key = "proof:client-1";
+    const fields: FieldDef[] = [
+      { name: "media_type", label: "Type", kind: "select", options: [{ value: "image", label: "Image" }] },
+      { name: "source", label: "Source", kind: "text" },
+      { name: "body", label: "Testimonial", kind: "textarea" },
+      { name: "amount", label: "Amount", kind: "number" },
+    ];
+    const values = { media_type: "image", source: marker, body: marker, amount: "10000" };
+    writeDraft(key, values, fields);
+    expect(readDraft(key, fields)).toEqual({ media_type: "image" });
+    expect(sessionStorage.getItem(currentKey(key))).not.toContain(marker);
+    expect(localStorage.length).toBe(0);
   });
 
-  it("scrubs a legacy password from a generic draft before restoring it", () => {
-    const fields: FieldDef[] = [
-      { name: "name", label: "Name", kind: "text" },
-      { name: "private", label: "Private", kind: "password" },
-    ];
-    localStorage.setItem("aa-console:draft:generic", JSON.stringify({ name: "Safe value", private: marker }));
-
-    render(<FormModal open onClose={vi.fn()} title="Draft" fields={fields}
-      draftKey="generic" onSubmit={vi.fn()} />);
-
-    expect(screen.getByLabelText("Name")).toHaveValue("Safe value");
-    expect(screen.getByLabelText("Private")).toHaveValue("");
-    expect(localStorage.getItem("aa-console:draft:generic")).toBe(JSON.stringify({ name: "Safe value" }));
+  it.each([
+    ["contact:c", "email"], ["onboarding:contact:c", "phone"], ["lead:c", "name"],
+    ["member-contract-profile:m", "tax_id"], ["billing:c", "monthly_amount"],
+    ["finance-entry", "amount"], ["spend:c", "description"],
+    ["agent:icp:c", "voice_of_customer"], ["business-context:c", "proof_testimonials"],
+    ["ad-copy:a", "ad_link_url"], ["recruitment-brief:writer", "apply_url"],
+    ["brand:c", "custom_css"], ["unknown-form:c", "name"],
+  ])("denies the private field %s / %s", (key, name) => {
+    const fields: FieldDef[] = [{ name, label: name, kind: "text" }];
+    writeDraft(key, { [name]: marker }, fields);
+    expect(sessionStorage.getItem(currentKey(key))).toBeNull();
   });
 
-  it("removes an unsafe generic draft even when saving its safe fields fails", () => {
-    const fields: FieldDef[] = [
-      { name: "name", label: "Name", kind: "text" },
-      { name: "private", label: "Private", kind: "password" },
+  it("validates selection options and full hex codes before saving or restoring", () => {
+    const brandFields: FieldDef[] = [
+      { name: "colour_primary", label: "Colour", kind: "text" },
+      { name: "custom_css", label: "CSS", kind: "textarea" },
     ];
-    const key = "aa-console:draft:generic-write-failure";
-    const store = new Map([[key, JSON.stringify({ name: "Safe value", private: marker })]]);
-    vi.stubGlobal("localStorage", {
-      getItem: (name: string) => store.get(name) ?? null,
+    writeDraft("brand:c", { colour_primary: "#ABC123", custom_css: marker }, brandFields);
+    expect(readDraft("brand:c", brandFields)).toEqual({ colour_primary: "#ABC123" });
+    writeDraft("brand:c", { colour_primary: marker, custom_css: marker }, brandFields);
+    expect(sessionStorage.getItem(currentKey("brand:c"))).toBeNull();
+
+    sessionStorage.setItem(currentKey("integration-v2:c"), envelope({ provider: marker, secret: marker }));
+    expect(readDraft("integration-v2:c", integrationFields)).toBeUndefined();
+    expect(sessionStorage.getItem(currentKey("integration-v2:c"))).toBeNull();
+  });
+
+  it("deletes unsafe source first even if saving its safe subset fails", () => {
+    const key = currentKey("integration-v2:c");
+    const store = new Map([[key, envelope({ provider: "meta", secret: marker })]]);
+    vi.stubGlobal("sessionStorage", {
+      getItem: (name: string) => name === "aa-console:draft:session-user" ? "user-1" : store.get(name) ?? null,
       removeItem: (name: string) => { store.delete(name); },
       setItem: () => { throw new DOMException("Storage unavailable", "QuotaExceededError"); },
     });
-
     try {
-      expect(readDraft("generic-write-failure", fields)).toEqual({ name: "Safe value" });
+      expect(readDraft("integration-v2:c", integrationFields)).toEqual({ provider: "meta" });
       expect(store.has(key)).toBe(false);
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it("drops malformed and expired drafts and clears drafts on identity change", () => {
+    const key = integrationDraftKey("c");
+    sessionStorage.setItem(currentKey(key), "not-json");
+    expect(readDraft(key, integrationFields)).toBeUndefined();
+    expect(sessionStorage.getItem(currentKey(key))).toBeNull();
+    sessionStorage.setItem(currentKey(key), envelope({ provider: "meta" }, Date.now() - 8 * 24 * 60 * 60 * 1000));
+    expect(readDraft(key, integrationFields)).toBeUndefined();
+    syncDraftIdentity("user-1");
+    writeDraft(key, { provider: "meta" }, integrationFields);
+    syncDraftIdentity("user-1");
+    expect(readDraft(key, integrationFields)).toEqual({ provider: "meta" });
+    syncDraftIdentity("user-2");
+    expect(sessionStorage.getItem(currentKey(key))).toBeNull();
+  });
+
+  it("merges a partial safe draft with server values instead of blanking other fields", () => {
+    const fields: FieldDef[] = [
+      { name: "colour_primary", label: "Colour", kind: "text" },
+      { name: "font_heading", label: "Font", kind: "text" },
+    ];
+    sessionStorage.setItem(currentKey("brand:c"), envelope({ colour_primary: "#ABC123" }));
+    render(<FormModal open onClose={vi.fn()} title="Brand" draftKey="brand:c" fields={fields}
+      initialValues={{ colour_primary: "#000000", font_heading: "Inter" }} onSubmit={vi.fn()} />);
+    expect(screen.getByLabelText("Colour")).toHaveValue("#ABC123");
+    expect(screen.getByLabelText("Font")).toHaveValue("Inter");
+  });
+
+  it("keeps unsaved private edits in memory through refresh, then applies an explicit new draft", () => {
+    const fields: FieldDef[] = [
+      { name: "note", label: "Note", kind: "textarea" },
+      { name: "role_title", label: "Role", kind: "text" },
+    ];
+    const props = { open: true, onClose: vi.fn(), title: "Contact", draftKey: "contact:c", fields, onSubmit: vi.fn() };
+    const { rerender } = render(<FormModal {...props} initialValues={{ note: "Original", role_title: "Owner" }} />);
+    fireEvent.change(screen.getByLabelText("Note"), { target: { value: marker } });
+    rerender(<FormModal {...props} initialValues={{ note: "Server refresh", role_title: "Manager" }} />);
+    expect(screen.getByLabelText("Note")).toHaveValue(marker);
+    expect(screen.getByLabelText("Role")).toHaveValue("Manager");
+    expect(sessionStorage.getItem(currentKey("contact:c"))).toBeNull();
+
+    const generated = { note: "Generated", role_title: "Director" };
+    rerender(<FormModal {...props} initialValues={generated} resetKey={generated} />);
+    expect(screen.getByLabelText("Note")).toHaveValue("Generated");
+    expect(screen.getByLabelText("Role")).toHaveValue("Director");
   });
 });
