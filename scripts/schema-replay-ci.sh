@@ -102,8 +102,26 @@ released_version="$(AA_SCHEMA_MANIFEST="$evidence_dir/manifest.json" node -p \
 assert_migrations initial "$head_version"
 snapshot_schema initial
 
-run_logged reset-released supabase_local db reset --local --no-seed --version "$released_version"
+# Supabase CLI 2.101.0 interprets db reset --version as its global version
+# flag and exits successfully without resetting anything. Remove only the
+# pending files from this disposable project, reset, then put them back for
+# the upgrade path. The source checkout and linked project are untouched.
+pending_dir="$run_dir/pending-migrations"
+mkdir -p "$pending_dir"
+pending_count=0
+for migration_file in "$run_dir"/supabase/migrations/*.sql; do
+  migration_name="${migration_file##*/}"
+  migration_version="${migration_name%%_*}"
+  if [[ "$migration_version" > "$released_version" ]]; then
+    mv "$migration_file" "$pending_dir/$migration_name"
+    pending_count=$((pending_count + 1))
+  fi
+done
+run_logged reset-released supabase_local db reset --local --no-seed
 assert_migrations released "$released_version"
+if (( pending_count > 0 )); then
+  mv "$pending_dir"/*.sql "$run_dir/supabase/migrations/"
+fi
 run_logged upgrade supabase_local migration up --local
 assert_migrations upgrade "$head_version"
 snapshot_schema upgrade

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-10-29T21:37:00Z",
+  "updated_at": "2026-10-29T21:44:00Z",
   "objective": "AA-Console 100/100 autonomous service-business acquisition and content system, subject to exact-version human approval for every external publish, send, deployment, and spend action in one Approval Inbox.",
   "blueprint": {
     "artifact": "docs/AA_CONSOLE_100_BUILD_BLUEPRINT.md",
-    "sha256": "1787013af5ddbc69e120a14c47110b7190aed3fcfac88ac95b84329546d46e62",
+    "sha256": "455875d5b3125c2d5e3d46b508a7aebf7c687a330658e3a1eca9943801b9cd51",
     "build_rows": 106
   },
   "baseline": {
@@ -25,7 +25,7 @@
     "verified": "Mark a build row verified only after its blueprint acceptance evidence is recorded, all prerequisites are verified, and a real external observation is attached where required.",
     "release": "AGENTS.md Phase 6: prepare code, tests, and reviewable PR; merge, production migrations, and Railway deployment require Alex via Chief of Staff.",
     "approvals": "Every external action requires approval of its exact inspectable version in the unified Approval Inbox.",
-    "migration_order": "Draft PR 238 prepares safe, unsupported Google Ads migration 260 from main. Draft PR 235 has review-only 261/262; draft PR 236 has 263 and stacked draft PR 241 handles browser credential drafts; draft PR 237 has 264, stacked draft PR 239 has 265, and stacked draft PR 240 has 266. Release migrations in numeric order through Alex/Chief of Staff. No migration 260–266 has been applied by this build work; full schema replay is pending."
+    "migration_order": "Draft PR 238 prepares safe, unsupported Google Ads migration 260 from main. Draft PR 235 is based on PR 238 and carries review-only 261/262; draft PR 236 has 263 and stacked draft PR 241 handles browser credential drafts; draft PR 237 has 264, stacked draft PR 239 has 265, and stacked draft PR 240 has 266. Release migrations in numeric order through Alex/Chief of Staff. No migration 260\u2013266 has been applied by this build work; the first full schema replay found a CLI reset no-op, and its corrected rerun is pending."
   },
   "r000": {
     "state": "awaiting_release_evidence",
@@ -147,7 +147,9 @@
       "tests": [
         "10 Node schema preparation/order/fingerprint checks passed locally",
         "Fingerprint SQL executed against a disposable PGlite catalog",
-        "CI workflow and replay script pass static syntax checks"
+        "CI workflow and replay script pass static syntax checks",
+        "Exact reviewed 260 migration-order guard and ten local replay/order/fingerprint tests pass at foundation head f7f979c",
+        "First GitHub Actions full startup replay reached all 260\u2013262 migrations; released reset failed its history assertion because Supabase CLI 2.101.0 silently ignored db reset --version"
       ],
       "permission_and_negative_tests": [
         "Missing/out-of-order/duplicate migration 260 fails before Docker or Pages deploy",
@@ -157,7 +159,7 @@
       "real_account_or_client": null,
       "external_proof": null,
       "observed_at": null,
-      "blocker": "Real clean and upgrade replay and generated TypeScript parity require migration 260 in order plus a Docker runner; neither has run on this branch.",
+      "blocker": "Safe migration 260 is an ancestor of the review branch and the order guard passes locally. The first real replay exposed the known Supabase CLI 2.101.0 db reset --version flag collision. A disposable-copy-only reset/upgrade fix is prepared, but a fresh CI clean/upgrade/fingerprint/types pass is still required.",
       "rollback": "CI-only gate and disposable local database; see docs/schema-replay-ci.md.",
       "reviewer": "Independent foundation review; actual replay acceptance still open"
     },
@@ -250,7 +252,7 @@
         "general_chat_client_members": 1,
         "general_chat_cross_client_exposure_proven": false
       },
-      "blocker": "Draft PRs 237, 239 and 240 are unmerged and migrations 264–266 unapplied. Explicit sales/member-to-client entitlement and lead-owner validation, private signed-URL retirement policy, general-chat membership, broader definer review and fail-closed CI identity matrix remain open. Full schema replay and staging/live role evidence are missing; no production exploit or unapproved publication is claimed.",
+      "blocker": "Draft PRs 237, 239 and 240 are unmerged and migrations 264\u2013266 unapplied. Explicit sales/member-to-client entitlement and lead-owner validation, private signed-URL retirement policy, general-chat membership, broader definer review and fail-closed CI identity matrix remain open. Full schema replay and staging/live role evidence are missing; no production exploit or unapproved publication is claimed.",
       "rollback": null,
       "reviewer": "Independent review and re-review found no blocker in migration 265 or 266 narrow slices; B005 overall remains unverified.",
       "additional_prs": [
