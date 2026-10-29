@@ -4,7 +4,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Panel } from "../../components/Panel";
 import { EmptyState } from "../../components/EmptyState";
-import { FormModal, clearDraft } from "../../components/forms/FormModal";
+import { FormModal } from "../../components/forms/FormModal";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
@@ -510,6 +510,7 @@ export function PageBuilderPanel({
           : field) : fields}
         submitLabel="Save page"
         initialValues={selectedCampaignId ? { campaign_id: selectedCampaignId, ...(aiBrief ? { brief: aiBrief } : {}) } : aiBrief ? { brief: aiBrief } : undefined}
+        resetKey={aiBrief}
         actions={
           <button
             type="button"
@@ -598,7 +599,6 @@ export function PageBuilderPanel({
           requireNotes={false}
           onClose={() => setBriefing(false)}
           onGenerated={(draft) => {
-            clearDraft(`page:${pageType}:${clientId}`);
             setAiBrief(draft.ask);
           }}
         />

@@ -60,6 +60,10 @@ only ID and display name. The database trigger checks the same predicate on
 new or changed `owner_member_id`, including admin and service writes. Existing
 historical owner IDs remain readable; editing unrelated fields does not
 silently reassign them. The UI omits an unchanged owner from `update_lead`.
+While the B008 Inbox binding is absent, the picker is empty and no new owner
+can be assigned. The read-only production preflight on 29 October 2026 found
+zero `client_leads`, so this temporary freeze did not strand an existing lead
+there; verify the count again immediately before release.
 On archive recovery, a still eligible owner is retained. A retired or revoked
 historical owner is cleared and a lead event records its prior ID, so recovery
 succeeds without silently reviving access.

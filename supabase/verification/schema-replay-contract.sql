@@ -85,6 +85,19 @@ begin
   ) then
     raise exception 'Assignment asset/client guard missing';
   end if;
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.job_assignments'::regclass
+       and conname = 'job_assignments_asset_client_fk'
+       and contype = 'f' and convalidated
+  ) or not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.job_assignments'::regclass
+       and conname = 'job_assignments_asset_requires_client'
+       and contype = 'c' and convalidated
+  ) then
+    raise exception 'Validated assignment asset/client constraints missing';
+  end if;
 
   if not exists (
     select 1 from information_schema.columns
