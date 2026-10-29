@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-10-29T20:53:00Z",
+  "updated_at": "2026-10-29T21:55:00Z",
   "objective": "AA-Console 100/100 autonomous service-business acquisition and content system, subject to exact-version human approval for every external publish, send, deployment, and spend action in one Approval Inbox.",
   "blueprint": {
     "artifact": "docs/AA_CONSOLE_100_BUILD_BLUEPRINT.md",
-    "sha256": "95136ccf5dd8d6184489b6f40ae0b127969459135efc976d61c36b89c75c5b0b",
+    "sha256": "c7f689b1de911704cf431eb34171d5d35206bb9d7bc38317a542533ff67e619f",
     "build_rows": 106
   },
   "baseline": {
@@ -12,7 +12,11 @@
     "isolated_branch": "codex/100-build-foundation",
     "source_checked_at": "2026-10-29T20:04:00Z",
     "business_context_source": "2 - business/README.md in the local Attract Acquisition workspace",
-    "confirmed_offer_ladder": ["Proof Sprint", "Proof Brand", "Authority Brand"],
+    "confirmed_offer_ladder": [
+      "Proof Sprint",
+      "Proof Brand",
+      "Authority Brand"
+    ],
     "confirmed_market": "South Africa",
     "confirmed_currency": "ZAR",
     "unconfirmed_business_inputs": "Exact prices, terms, client-level business dossiers, account grants and live credentials must be reviewed before commercial or external execution."
@@ -21,7 +25,7 @@
     "verified": "Mark a build row verified only after its blueprint acceptance evidence is recorded, all prerequisites are verified, and a real external observation is attached where required.",
     "release": "AGENTS.md Phase 6: prepare code, tests, and reviewable PR; merge, production migrations, and Railway deployment require Alex via Chief of Staff.",
     "approvals": "Every external action requires approval of its exact inspectable version in the unified Approval Inbox.",
-    "migration_order": "Migration 260 (Google Ads) is on an unmerged branch as of 2026-10-29T20:10Z. Review-only migrations 261 and 262 must not be applied to production before 260 is merged and applied through the authorized release path. CI and Pages deploy now fail if 260 is absent or ordered after them."
+    "migration_order": "Draft PR 238 prepares safe, unsupported Google Ads migration 260 from main. Draft PR 235 is based on PR 238 and carries review-only 261/262; draft PR 236 has 263, stacked draft PRs 241/242 address browser drafts, and stacked draft PR 243 amends historical migration 11; draft PR 237 has 264, stacked draft PRs 239/240 have 265/266. Unpushed B005 branch has review-blocked 267/268. Release migrations in numeric order through Alex/Chief of Staff. No migration 260\u2013268 was applied by this build work. CI has passed released reset, upgrade and clean replay through 262; generated-type parity needs a rerun after updating checked-in types."
   },
   "r000": {
     "state": "awaiting_release_evidence",
@@ -52,23 +56,78 @@
       "model": "claude-opus-5",
       "pid": 1
     },
+    "independent_read_only_base_table_heartbeat": {
+      "source": "supabase db query --linked against the linked production project on 2026-10-29; no write",
+      "worker_id": "agent-runtime:1",
+      "reported_at": "2026-10-29T21:02:44.035116Z",
+      "status": "healthy",
+      "is_live_at_query": true,
+      "enabled": true,
+      "version_prefix_12": "7f08c4b30f77",
+      "full_sha_directly_observed": false,
+      "queue_depth": 0,
+      "active_jobs": 0
+    },
     "view_defect": "User reported two 60-second timeouts on agent_runtime_status over 147,761 heartbeat rows (~44 MB). A read-only DISTINCT ON base-table query returned immediately. Review-only migration 261 rewrites the view and adds a worker/latest index; migration 262 adds bounded seven-day retention.",
     "unknown": [
-      "Railway runtime deployed full SHA directly observed from its active deployment or updated in-band probe",
-      "Railway gateway deployed full SHA",
-      "agent_runtime_status view repaired and observed in the deployed environment"
+      "agent_runtime_status view repaired and freshly observed in the deployed environment",
+      "authenticated browser and gateway behavior probes plus exact release record"
     ],
-    "blocker": "Railway CLI unauthorized. The user-supplied 12-character heartbeat prefix strongly matches main, but is not a direct full-SHA deployment receipt; gateway has no in-band version yet. The status view itself times out until an authorized release applies the reviewed fix.",
-    "production_writes_performed": false
+    "blocker": "Active runtime and gateway full SHAs were directly observed on their production Railway deployment detail pages. Production base-table heartbeat was live, healthy and enabled with the matching runtime prefix. The status view times out until authorized release of the reviewed 261 fix; authenticated probes and exact release record remain open.",
+    "production_writes_performed": false,
+    "railway_github_service_status": {
+      "source": "GitHub commit status authored by railway-app[bot] on 2026-10-29; service-specific receipt, not Railway dashboard readback",
+      "runtime_service": "selfless-wisdom - AA-Console",
+      "runtime_full_sha": "7f08c4b30f77ed662c669b372424898d35c4cc3d",
+      "runtime_description": "Success - runtime.attractacq.com",
+      "runtime_status_observed_at": "2026-10-29T18:12:50Z",
+      "gateway_service": "selfless-wisdom - aa-mcp-gateway",
+      "gateway_main_status": "No deployment needed - watched paths not modified",
+      "gateway_last_successful_github_linked_sha": "c66bc91bb480bd5f94f96506c2dd0aa7a9d5e8cf",
+      "gateway_last_successful_status_at": "2026-10-18T19:12:24Z",
+      "later_first_parent_main_commits_no_gateway_deployment": 12,
+      "gateway_active_sha_directly_observed": true
+    },
+    "railway_dashboard_active_deployments": {
+      "source": "Read-only production Railway dashboard service/deployment detail pages in user-owned Chrome; Deployed via GitHub commit links, approximately 2026-10-29T21:49:00Z",
+      "project": "selfless-wisdom",
+      "runtime": {
+        "service": "AA-Console",
+        "service_id": "89b471e4-f3f8-4cca-8024-404ee349cb9c",
+        "deployment_id": "cfdebbaa-7ec7-48d5-a4cb-e5e285f5be48",
+        "active_full_sha": "7f08c4b30f77ed662c669b372424898d35c4cc3d",
+        "service_card": "online"
+      },
+      "gateway": {
+        "service": "aa-mcp-gateway",
+        "service_id": "474368c2-29aa-494a-8810-e9f1cc6d65e8",
+        "deployment_id": "5374627d-ebb7-4dc0-9890-14f96a445962",
+        "active_full_sha": "c66bc91bb480bd5f94f96506c2dd0aa7a9d5e8cf",
+        "service_card": "online"
+      },
+      "limits": "Dashboard deployment identity and online cards do not prove authenticated behavior or in-band SHA; the gateway /health source does not expose a version."
+    }
   },
   "rows": {
     "B001": {
       "state": "in_progress",
       "implementation_sha": "e931eff",
       "pr": "https://github.com/AttractAcq/AA-Console/pull/235",
-      "migration_ids": ["20261029120000_261_system_readiness_inventory", "20261029130000_262_runtime_heartbeat_retention"],
-      "tests": ["Frontend build and 1,184-test suite passed locally", "Runtime typecheck/build and full suite passed locally: 2,898 passed, 4 skipped", "Gateway typecheck/build and 233-test suite passed locally"],
-      "permission_and_negative_tests": ["Admin-only readiness route denies anonymous and non-admin callers", "Gateway readiness denies missing/wrong service secret", "Catalog and prune RPCs deny anon/authenticated in PGlite fixtures", "Same-PID runtime replicas write distinct heartbeat identities"],
+      "migration_ids": [
+        "20261029120000_261_system_readiness_inventory",
+        "20261029130000_262_runtime_heartbeat_retention"
+      ],
+      "tests": [
+        "Frontend build and 1,184-test suite passed locally",
+        "Runtime typecheck/build and full suite passed locally: 2,898 passed, 4 skipped",
+        "Gateway typecheck/build and 233-test suite passed locally"
+      ],
+      "permission_and_negative_tests": [
+        "Admin-only readiness route denies anonymous and non-admin callers",
+        "Gateway readiness denies missing/wrong service secret",
+        "Catalog and prune RPCs deny anon/authenticated in PGlite fixtures",
+        "Same-PID runtime replicas write distinct heartbeat identities"
+      ],
       "deployed_sha": null,
       "real_account_or_client": null,
       "external_proof": null,
@@ -82,8 +141,14 @@
       "implementation_sha": "e931eff",
       "pr": "https://github.com/AttractAcq/AA-Console/pull/235",
       "migration_ids": [],
-      "tests": ["18 schema auditor and admin view tests passed locally", "Frontend TypeScript build passed"],
-      "permission_and_negative_tests": ["Read-only transaction and remote TLS validation", "Dirty migration source, renamed/out-of-order version, wrong DB identity and redacted next-action fixtures"],
+      "tests": [
+        "18 schema auditor and admin view tests passed locally",
+        "Frontend TypeScript build passed"
+      ],
+      "permission_and_negative_tests": [
+        "Read-only transaction and remote TLS validation",
+        "Dirty migration source, renamed/out-of-order version, wrong DB identity and redacted next-action fixtures"
+      ],
       "deployed_sha": null,
       "real_account_or_client": null,
       "external_proof": null,
@@ -97,45 +162,155 @@
       "implementation_sha": "e931eff",
       "pr": "https://github.com/AttractAcq/AA-Console/pull/235",
       "migration_ids": [],
-      "tests": ["10 Node schema preparation/order/fingerprint checks passed locally", "Fingerprint SQL executed against a disposable PGlite catalog", "CI workflow and replay script pass static syntax checks"],
-      "permission_and_negative_tests": ["Missing/out-of-order/duplicate migration 260 fails before Docker or Pages deploy", "Catalog contract contains RLS, grants, function, cron and fallback-password assertions; database execution remains pending"],
+      "tests": [
+        "10 Node schema preparation/order/fingerprint checks passed locally",
+        "Fingerprint SQL executed against a disposable PGlite catalog",
+        "CI workflow and replay script pass static syntax checks",
+        "Exact reviewed 260 migration-order guard and ten local replay/order/fingerprint tests pass at foundation head f7f979c",
+        "First GitHub Actions full startup replay reached all 260\u2013262 migrations; released reset failed its history assertion because Supabase CLI 2.101.0 silently ignored db reset --version",
+        "GitHub Actions run 40960393551 passed released reset, 260\u2013262 upgrade, clean reset, migration histories, catalog contract and upgrade/clean fingerprint equality; generated types were the only schema-job failure",
+        "Generated database types copied from CI artifact 12935153241; local frontend build passes"
+      ],
+      "permission_and_negative_tests": [
+        "Missing/out-of-order/duplicate migration 260 fails before Docker or Pages deploy",
+        "Catalog contract contains RLS, grants, function, cron and fallback-password assertions; database execution remains pending"
+      ],
       "deployed_sha": null,
       "real_account_or_client": null,
       "external_proof": null,
       "observed_at": null,
-      "blocker": "Real clean and upgrade replay and generated TypeScript parity require migration 260 in order plus a Docker runner; neither has run on this branch.",
+      "blocker": "Fresh CI rerun must prove exact generated-type parity and all jobs after the checked-in type update. Production/staging parity evidence remains separate B002 acceptance.",
       "rollback": "CI-only gate and disposable local database; see docs/schema-replay-ci.md.",
-      "reviewer": "Independent foundation review; actual replay acceptance still open"
+      "reviewer": "Independent foundation review; actual replay acceptance still open",
+      "ci_evidence": {
+        "run": "https://github.com/AttractAcq/AA-Console/actions/runs/40960393551",
+        "artifact_id": 12935153241,
+        "released_reset": "passed",
+        "upgrade": "passed",
+        "clean_reset": "passed",
+        "catalog_contract": "passed",
+        "upgrade_clean_fingerprints_equal": true,
+        "generated_types": "updated locally; rerun pending"
+      }
     },
     "B004": {
       "state": "in_progress",
-      "implementation_sha": null,
-      "pr": null,
-      "migration_ids": [],
-      "tests": [],
-      "permission_and_negative_tests": [],
+      "implementation_sha": "6ff95a2a2c586d65789b8ad7d7e57151a4146008",
+      "pr": "https://github.com/AttractAcq/AA-Console/pull/236",
+      "migration_ids": [
+        "20261029140000_263_auth_signup_role_hardening"
+      ],
+      "tests": [
+        "Five focused embedded-Postgres tests and runtime typecheck passed locally; clean/upgrade replay and deployed test are pending",
+        "Credential draft follow-up: 16 focused tests, 1,188 frontend tests and build passed",
+        "Draft PR 242 audited all 34 production draft-key callers; 1,206 frontend tests and build passed before review fixes",
+        "Draft PR 243 historical migration 11: nine focused embedded-Postgres tests, runtime typecheck and two preparation tests pass; full raw-source replay pending"
+      ],
+      "permission_and_negative_tests": [
+        "Forged role=admin signup metadata yields employee profile and is_admin false in PGlite",
+        "Existing legitimate admin role survives additive migration",
+        "Existing account password hash and Auth metadata remain unchanged on later repeat provisioning; client/team links survive",
+        "Trigger and provisioning helper deny direct anon/authenticated EXECUTE in PGlite",
+        "Passwords and Vault credentials excluded from drafts; old keys purged without reading values; safe draft reload and storage-write failure cases pass"
+      ],
       "deployed_sha": null,
       "real_account_or_client": null,
       "external_proof": null,
       "observed_at": null,
-      "blocker": "Source preflight found client-controlled signup role copied into profiles.role by applied migration 11; production signup setting and existing-admin provenance are unknown. Applied migration 11 also has a known-password fresh-replay fallback and existing-user password rewrite. Reviewable additive fix is being prepared; full B004 requires controlled provisioning, MFA at human decision RPCs, rotation and live provider evidence.",
+      "hosted_signup_containment": {
+        "source": "Direct read-only production Supabase dashboard Authentication > Sign In / Providers page at approximately 2026-10-29T21:49:00Z, corroborating Alex's report",
+        "setting": "Allow new users to sign up",
+        "reported_state": "off",
+        "independent_readback": true,
+        "observed_state": "off",
+        "project": "main PRODUCTION"
+      },
+      "read_only_admin_roster_count": {
+        "source": "supabase db query --linked on 2026-10-29",
+        "admin_profiles": 1,
+        "matches_alex_expected_email": 1,
+        "other_admin_profiles": 0,
+        "missing_auth_user": 0,
+        "full_provenance_verified": false
+      },
+      "blocker": "PRs 236, 241, 242 and 243 are unmerged; migration 263 unapplied. PR 242 independent review found same-role account-switch private-state retention and accidental-close data loss; correction pending. PR 243 historical-source amendment needs independent review, checksum parity and raw-source clean/upgrade CI. Migration 13 short passwords/direct Auth writes, controlled invitations, first-admin recovery, SQL aal2, credential rotation and full admin provenance remain open. Hosted public signup was directly observed off.",
       "rollback": null,
-      "reviewer": "B004 source preflight only; production Auth settings and account provenance unverified"
+      "reviewer": "Independent review and re-review found no remaining blocker in narrow credential-draft PR 241; B004 overall and live Auth settings/account provenance remain open.",
+      "additional_prs": [
+        "https://github.com/AttractAcq/AA-Console/pull/241",
+        "https://github.com/AttractAcq/AA-Console/pull/242",
+        "https://github.com/AttractAcq/AA-Console/pull/243"
+      ],
+      "additional_implementation_shas": [
+        "254d872",
+        "b0a3bb3379eed11d09cee868542b00c915b452b0",
+        "964111c"
+      ]
     },
     "B005": {
-      "state": "not_started",
-      "implementation_sha": null,
-      "pr": null,
-      "migration_ids": [],
-      "tests": [],
-      "permission_and_negative_tests": [],
+      "state": "in_progress",
+      "implementation_sha": "913acec",
+      "pr": "https://github.com/AttractAcq/AA-Console/pull/237",
+      "migration_ids": [
+        "20261029150000_264_low_level_transition_isolation",
+        "20261029160000_265_lead_and_media_entitlements",
+        "20261029170000_266_commercial_reporting_and_storage_scope"
+      ],
+      "tests": [
+        "57 focused embedded-Postgres slot/assignment tests passed",
+        "Runtime typecheck and three schema fingerprint tests passed",
+        "Migration 265 lead/media role matrix: 7 focused embedded-Postgres tests and runtime typecheck passed",
+        "Migration 266 reports/proof/SOP role matrix: 10 focused embedded-Postgres tests and runtime typecheck passed",
+        "Unpushed 267/268 branch: 15 entitlement, 3 contact/conversation, 14 frontend focused tests plus app/runtime typechecks passed before independent review"
+      ],
+      "permission_and_negative_tests": [
+        "Direct same-client low-level slot and assignment transitions denied under authenticated role",
+        "Named human wrappers still work",
+        "Foreign-client assignment asset and later asset reparent denied without state/event change",
+        "Migration 265 denies assigned-editor lead RPC read/write and retired or removed-assignment owner media reads; preserves admin, same-client and six service-role RPC calls",
+        "Migration 266 denies assigned-editor commercial reports/proof reads and retired SOP table/bucket reads; preserves admin/client/service paths"
+      ],
       "deployed_sha": null,
       "real_account_or_client": null,
       "external_proof": null,
       "observed_at": null,
-      "blocker": null,
+      "read_only_production_catalog": {
+        "source": "supabase db query --linked on 2026-10-29",
+        "authenticated_execute_confirmed": [
+          "advance_slot",
+          "advance_assignment",
+          "may_advance_slot",
+          "may_touch_assignment",
+          "advance_lead",
+          "update_lead",
+          "deliver_assignment"
+        ],
+        "anon_execute_confirmed": false,
+        "existing_assignment_asset_client_mismatches": 0,
+        "general_chat_members": 5,
+        "general_chat_client_members": 1,
+        "general_chat_cross_client_exposure_proven": false
+      },
+      "blocker": "Draft PRs 237, 239 and 240 are unmerged; migrations 264\u2013266 unapplied. Unpushed 267/268 are independently review-blocked by lead recovery, stale grant rejection and SECURITY DEFINER privacy bypasses; their entitlement switch remains off. Signed-URL retirement, general chat, fail-closed CI identity matrix, full replay and staging/live role evidence remain open. No production exploit or unapproved publication is claimed.",
       "rollback": null,
-      "reviewer": null
+      "reviewer": "Independent review and re-review found no blocker in migration 265 or 266 narrow slices; B005 overall remains unverified.",
+      "additional_prs": [
+        "https://github.com/AttractAcq/AA-Console/pull/239",
+        "https://github.com/AttractAcq/AA-Console/pull/240"
+      ],
+      "additional_implementation_shas": [
+        "ebf5163",
+        "a7ecc1a"
+      ],
+      "review_blockers": [
+        "Migration 267 breaks recover_lead for archived leads with saved owner while switch off",
+        "Migration 267 cannot reject stale grant after member retirement/relink because identity recheck runs before reject branch",
+        "Migration 268 table RLS is bypassed by broad security-definer DM and outbound message RPCs including dm_reply_refusal_v6"
+      ],
+      "pending_unpushed_migration_ids": [
+        "20261029180000_267_sales_entitlement_boundary",
+        "20261029190000_268_contact_and_conversation_scope"
+      ]
     },
     "B006": {
       "state": "not_started",
@@ -1413,19 +1588,27 @@
       "reviewer": null
     },
     "B091": {
-      "state": "not_started",
-      "implementation_sha": null,
-      "pr": null,
-      "migration_ids": [],
-      "tests": [],
-      "permission_and_negative_tests": [],
+      "state": "in_progress",
+      "implementation_sha": "2e538bbc60e571ce815a8ded9b0b243a1c844371",
+      "pr": "https://github.com/AttractAcq/AA-Console/pull/238",
+      "migration_ids": [
+        "20261025235000_260_building_the_google_campaign"
+      ],
+      "tests": [
+        "52 focused embedded-Postgres/Vitest Google sheet/build/launch tests and runtime typecheck passed; full schema replay pending"
+      ],
+      "permission_and_negative_tests": [
+        "google_ad_build.supported remains false; no handler or external Google Ads write is enabled",
+        "Sheet deletion conflict, exact copy/sheet/account hash and unsupported research blocker covered in focused tests",
+        "Non-admin authorized client reader sees current build despite approval RLS; stale prior built row cannot hide unsupported blocker"
+      ],
       "deployed_sha": null,
       "real_account_or_client": null,
       "external_proof": null,
       "observed_at": null,
-      "blocker": null,
+      "blocker": "Safe migration 260 is draft and unapplied; no runtime Google Ads build handler, connected real-account probe, sourced keyword research, activation or external spend bridge exists. Matching sheet worker and migration require coordinated release; full schema replay and live evidence pending.",
       "rollback": null,
-      "reviewer": null
+      "reviewer": "Independent final review found no remaining blocker in narrow safe 260 branch; full schema replay and live external acceptance remain open."
     },
     "B092": {
       "state": "not_started",

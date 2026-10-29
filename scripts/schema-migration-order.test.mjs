@@ -4,7 +4,7 @@ import { assertSchemaMigrationOrder } from './schema-migration-order.mjs'
 
 const released = '20261025233000'
 const migration259 = '20261025233000_259_which_client_a_message_belongs_to.sql'
-const migration260 = '20261026120000_260_google_ads_executor.sql'
+const migration260 = '20261025235000_260_building_the_google_campaign.sql'
 const migration261 = '20261029120000_261_system_readiness_inventory.sql'
 const migration262 = '20261029130000_262_runtime_heartbeat_retention.sql'
 
@@ -26,7 +26,7 @@ test('260, 261 and 262 in timestamp order pass', () => {
 test('a 260 timestamp after 261 cannot retroactively satisfy the dependency', () => {
   assert.throws(
     () => assertSchemaMigrationOrder([
-      migration259, migration261, '20261029125000_260_google_ads_executor.sql', migration262
+      migration259, migration261, '20261029125000_260_building_the_google_campaign.sql', migration262
     ], released),
     /Expected migration 260 before .*_261_/
   )
@@ -35,12 +35,12 @@ test('a 260 timestamp after 261 cannot retroactively satisfy the dependency', ()
 test('duplicate Supabase versions and unnumbered pending files fail', () => {
   assert.throws(
     () => assertSchemaMigrationOrder([migration259, migration260,
-      '20261026120000_260_duplicate.sql'], released),
+      '20261025235000_260_duplicate.sql'], released),
     /share a Supabase version/
   )
   assert.throws(
     () => assertSchemaMigrationOrder([migration259,
-      '20261026120000_google_ads_executor.sql'], released),
+      '20261025235000_building_the_google_campaign.sql'], released),
     /no logical number/
   )
 })
