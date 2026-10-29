@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-10-29T20:46:00Z",
+  "updated_at": "2026-10-29T20:53:00Z",
   "objective": "AA-Console 100/100 autonomous service-business acquisition and content system, subject to exact-version human approval for every external publish, send, deployment, and spend action in one Approval Inbox.",
   "blueprint": {
     "artifact": "docs/AA_CONSOLE_100_BUILD_BLUEPRINT.md",
-    "sha256": "31d5429bac6a3e8617adbab022d5f6c9fdd2e5b03cee515e7565dbbd38f60e79",
+    "sha256": "95136ccf5dd8d6184489b6f40ae0b127969459135efc976d61c36b89c75c5b0b",
     "build_rows": 106
   },
   "baseline": {
@@ -108,7 +108,7 @@
       "reviewer": "Independent foundation review; actual replay acceptance still open"
     },
     "B004": {
-      "state": "not_started",
+      "state": "in_progress",
       "implementation_sha": null,
       "pr": null,
       "migration_ids": [],
@@ -118,9 +118,9 @@
       "real_account_or_client": null,
       "external_proof": null,
       "observed_at": null,
-      "blocker": null,
+      "blocker": "Source preflight found client-controlled signup role copied into profiles.role by applied migration 11; production signup setting and existing-admin provenance are unknown. Applied migration 11 also has a known-password fresh-replay fallback and existing-user password rewrite. Reviewable additive fix is being prepared; full B004 requires controlled provisioning, MFA at human decision RPCs, rotation and live provider evidence.",
       "rollback": null,
-      "reviewer": null
+      "reviewer": "B004 source preflight only; production Auth settings and account provenance unverified"
     },
     "B005": {
       "state": "not_started",
