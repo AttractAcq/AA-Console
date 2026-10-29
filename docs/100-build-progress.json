@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-10-29T20:57:00Z",
+  "updated_at": "2026-10-29T21:06:00Z",
   "objective": "AA-Console 100/100 autonomous service-business acquisition and content system, subject to exact-version human approval for every external publish, send, deployment, and spend action in one Approval Inbox.",
   "blueprint": {
     "artifact": "docs/AA_CONSOLE_100_BUILD_BLUEPRINT.md",
-    "sha256": "805b77d1c0207377ab18ff461f48354594b1e7ba4a435ab2e38c40bf03d868a8",
+    "sha256": "f2fd074897e84fc033b2ff8202983779b3d64f602649a17f6703ce8813921df4",
     "build_rows": 106
   },
   "baseline": {
@@ -21,7 +21,7 @@
     "verified": "Mark a build row verified only after its blueprint acceptance evidence is recorded, all prerequisites are verified, and a real external observation is attached where required.",
     "release": "AGENTS.md Phase 6: prepare code, tests, and reviewable PR; merge, production migrations, and Railway deployment require Alex via Chief of Staff.",
     "approvals": "Every external action requires approval of its exact inspectable version in the unified Approval Inbox.",
-    "migration_order": "Migration 260 (Google Ads) is on an unmerged branch as of 2026-10-29T20:10Z. Review-only migrations 261 and 262 must not be applied to production before 260 is merged and applied through the authorized release path. CI and Pages deploy now fail if 260 is absent or ordered after them."
+    "migration_order": "Draft PR 238 prepares safe, unsupported Google Ads migration 260 from main. Draft PR 235 has review-only 261/262, followed by draft PR 236 migration 263 and draft PR 237 migration 264. Release all in numeric order through Alex/Chief of Staff; no migration 260–264 has been applied. CI and Pages deploy fail while 260 is absent or out of order."
   },
   "r000": {
     "state": "awaiting_release_evidence",
@@ -52,13 +52,25 @@
       "model": "claude-opus-5",
       "pid": 1
     },
+    "independent_read_only_base_table_heartbeat": {
+      "source": "supabase db query --linked against the linked production project on 2026-10-29; no write",
+      "worker_id": "agent-runtime:1",
+      "reported_at": "2026-10-29T21:02:44.035116Z",
+      "status": "healthy",
+      "is_live_at_query": true,
+      "enabled": true,
+      "version_prefix_12": "7f08c4b30f77",
+      "full_sha_directly_observed": false,
+      "queue_depth": 0,
+      "active_jobs": 0
+    },
     "view_defect": "User reported two 60-second timeouts on agent_runtime_status over 147,761 heartbeat rows (~44 MB). A read-only DISTINCT ON base-table query returned immediately. Review-only migration 261 rewrites the view and adds a worker/latest index; migration 262 adds bounded seven-day retention.",
     "unknown": [
       "Railway runtime deployed full SHA directly observed from its active deployment or updated in-band probe",
       "Railway gateway deployed full SHA",
       "agent_runtime_status view repaired and observed in the deployed environment"
     ],
-    "blocker": "Railway CLI unauthorized. The user-supplied 12-character heartbeat prefix strongly matches main, but is not a direct full-SHA deployment receipt; gateway has no in-band version yet. The status view itself times out until an authorized release applies the reviewed fix.",
+    "blocker": "Railway CLI unauthorized. The independently observed 12-character heartbeat prefix strongly matches main, but is not a direct full-SHA deployment receipt; gateway has no in-band version yet. The status view itself times out until an authorized release applies the reviewed fix.",
     "production_writes_performed": false
   },
   "rows": {
@@ -109,34 +121,36 @@
     },
     "B004": {
       "state": "in_progress",
-      "implementation_sha": "ed30cfbbfbce6f8c6a8e9729cb192a1f9981e6de",
+      "implementation_sha": "6ff95a2a2c586d65789b8ad7d7e57151a4146008",
       "pr": "https://github.com/AttractAcq/AA-Console/pull/236",
       "migration_ids": ["20261029140000_263_auth_signup_role_hardening"],
-      "tests": ["Four focused embedded-Postgres tests and runtime typecheck passed locally; clean/upgrade replay and deployed test are pending"],
-      "permission_and_negative_tests": ["Forged role=admin signup metadata yields employee profile and is_admin false in PGlite", "Existing legitimate admin role survives additive migration", "Trigger function denies direct anon/authenticated EXECUTE in PGlite"],
+      "tests": ["Five focused embedded-Postgres tests and runtime typecheck passed locally; clean/upgrade replay and deployed test are pending"],
+      "permission_and_negative_tests": ["Forged role=admin signup metadata yields employee profile and is_admin false in PGlite", "Existing legitimate admin role survives additive migration", "Existing account password hash and Auth metadata remain unchanged on later repeat provisioning; client/team links survive", "Trigger and provisioning helper deny direct anon/authenticated EXECUTE in PGlite"],
       "deployed_sha": null,
       "real_account_or_client": null,
       "external_proof": null,
       "observed_at": null,
       "hosted_signup_containment": {"source": "Alex's 2026-10-29 dashboard report", "setting": "Authentication > Sign In / Providers > Allow new users to sign up", "reported_state": "off", "independent_readback": false},
-      "blocker": "PR 236 is unmerged and migration 263 unapplied; existing admin provenance and hosted setting readback remain unknown. Applied migration 11 has a known-password fresh-replay fallback and existing-user password rewrite. Full B004 also requires controlled provisioning, MFA at human decision RPCs, credential rotation and live provider evidence.",
+      "read_only_admin_roster_count": {"source": "supabase db query --linked on 2026-10-29", "admin_profiles": 1, "matches_alex_expected_email": 1, "other_admin_profiles": 0, "missing_auth_user": 0, "full_provenance_verified": false},
+      "blocker": "PR 236 is unmerged and migration 263 unapplied; full admin provenance and hosted signup setting readback remain open. Raw replay executes migration 11's known-password fallback and existing-user password rewrite before 263. Full B004 also requires controlled invitations, MFA at human decision RPCs, credential rotation and live provider evidence.",
       "rollback": null,
       "reviewer": "B004 source preflight and narrow code review; production Auth settings and account provenance unverified"
     },
     "B005": {
       "state": "in_progress",
-      "implementation_sha": null,
-      "pr": null,
-      "migration_ids": [],
-      "tests": [],
-      "permission_and_negative_tests": [],
+      "implementation_sha": "913acec",
+      "pr": "https://github.com/AttractAcq/AA-Console/pull/237",
+      "migration_ids": ["20261029150000_264_low_level_transition_isolation"],
+      "tests": ["57 focused embedded-Postgres slot/assignment tests passed", "Runtime typecheck and three schema fingerprint tests passed"],
+      "permission_and_negative_tests": ["Direct same-client low-level slot and assignment transitions denied under authenticated role", "Named human wrappers still work", "Foreign-client assignment asset and later asset reparent denied without state/event change"],
       "deployed_sha": null,
       "real_account_or_client": null,
       "external_proof": null,
       "observed_at": null,
-      "blocker": "Source preflight found direct authenticated low-level slot/assignment state transitions that bypass QA/approval side effects, broad lead mutation grants, retired-owner media-read risk and a manual isolation script that does not fail on findings. No production exploit or unapproved publication is claimed. Corrective code, CI identity matrix, staging catalog and live role evidence remain open.",
+      "read_only_production_catalog": {"source": "supabase db query --linked on 2026-10-29", "authenticated_execute_confirmed": ["advance_slot", "advance_assignment", "may_advance_slot", "may_touch_assignment", "advance_lead", "update_lead", "deliver_assignment"], "anon_execute_confirmed": false, "existing_assignment_asset_client_mismatches": 0},
+      "blocker": "PR 237 is unmerged and migration 264 unapplied. Broad lead mutation grants, retired-owner media-read risk, historical shared-chat membership and the full fail-closed CI identity matrix remain open. No production exploit or unapproved publication is claimed; staging catalog and live role evidence remain open.",
       "rollback": null,
-      "reviewer": "B005 source preflight; production catalog and affected-row state unverified"
+      "reviewer": "B005 source preflight plus direct read-only production grant and mismatch counts; identity behavior after repair unverified"
     },
     "B006": {
       "state": "not_started",
