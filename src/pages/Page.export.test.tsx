@@ -22,7 +22,6 @@ vi.mock("../components/content/ContentAssetsWorkspace", async (importOriginal) =
   ContentAssetsWorkspace: () => <p>Assets workspace</p>,
 }));
 vi.mock("./proof-bank/ProofFactoryV2Panel", () => ({ ProofFactoryV2Panel: ({tab}: {tab: string}) => <p>Proof v2 {tab}</p> }));
-vi.mock("./proof-bank/ProofBankPanel", () => ({ ProofBankPanel: () => <p>Original proof bank</p> }));
 vi.mock("./conversion/PageBuilderPanel", () => ({ PageBuilderPanel: ({ pageType }: { pageType: string }) => <p>Page builder · {pageType}</p> }));
 vi.mock("./reporting/PagesReportingPanel", () => ({ PagesReportingPanel: ({ pageType }: { pageType: string }) => <p>Page results · {pageType}</p> }));
 vi.mock("./sites/CampaignPagePublishPanel", () => ({ CampaignPagePublishPanel: () => <p>Publish panel</p> }));
@@ -109,10 +108,10 @@ it("shows only strategy tabs and its export in the strategy view", async () => {
   expect(downloadModuleZip).toHaveBeenLastCalledWith("client-1", "strategy", intelligenceOs.tabs!.slice(strategyStart));
 });
 
-it("keeps Content Production v1 tabs and gives v2 grouped assets without its stage bar", async () => {
+it("gives Content Production five tabs and no stage bar", async () => {
   const content = v6ModuleNodes.find((node) => node.id === "content-production-factory")!;
   const user = userEvent.setup();
-  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/content-production-factory?view=v2"]}>
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/content-production-factory"]}>
     <Routes><Route path="/clients/:clientId/delivery/content-production-factory" element={<Page node={content} />} /></Routes>
   </MemoryRouter>);
   expect(screen.getByText("Ideation panel · journey false")).toBeInTheDocument();
@@ -129,17 +128,17 @@ it("keeps Content Production v1 tabs and gives v2 grouped assets without its sta
 
 it("renders the campaign factory v2 panel", () => {
   const campaign = v6ModuleNodes.find((node) => node.id === "campaign-factory")!;
-  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/campaign-factory?view=v2"]}>
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/campaign-factory"]}>
     <Routes><Route path="/clients/:clientId/delivery/campaign-factory" element={<Page node={campaign} />} /></Routes>
   </MemoryRouter>);
-  expect(screen.getByRole("heading", { name: "Campaign Factory v2" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Campaign Factory" })).toBeInTheDocument();
   expect(screen.getByText("Campaign table")).toBeInTheDocument();
   expect(screen.queryByText(/Existing tools are available here/)).not.toBeInTheDocument();
 });
 
-it("opens proof v2 stages and preserves the original v1 proof bank", async () => {
+it("opens every proof production stage", async () => {
   const node = v6ModuleNodes.find((n) => n.id === "proof-production-factory")!;
-  const first = render(<MemoryRouter initialEntries={["/clients/client-1/delivery/proof-production-factory?view=v2"]}>
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/proof-production-factory"]}>
     <Routes><Route path="/clients/:clientId/delivery/proof-production-factory" element={<Page node={node}/>} /></Routes>
   </MemoryRouter>);
   expect(screen.getByText("Proof v2 capture")).toBeInTheDocument();
@@ -147,12 +146,6 @@ it("opens proof v2 stages and preserves the original v1 proof bank", async () =>
     await userEvent.click(screen.getByRole("tab", {name}));
     expect(screen.getByText(`Proof v2 ${name.toLowerCase()}`)).toBeInTheDocument();
   }
-  first.unmount();
-  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/proof-production-factory?view=v1"]}>
-    <Routes><Route path="/clients/:clientId/delivery/proof-production-factory" element={<Page node={node}/>} /></Routes>
-  </MemoryRouter>);
-  expect(screen.getByText("Original proof bank")).toBeInTheDocument();
-  expect(screen.queryByRole("tab", {name:"Capture"})).not.toBeInTheDocument();
 });
 
 // The three surfaces v2 did not carry over. Each is the v1 panel itself, in
@@ -161,7 +154,7 @@ it("opens proof v2 stages and preserves the original v1 proof bank", async () =>
 it("gives Website Studio v2 the offer-page builder v1 had", async () => {
   const node = v6ModuleNodes.find((n) => n.id === "website-studio")!;
   const user = userEvent.setup();
-  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/website-studio?view=v2"]}>
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/website-studio"]}>
     <Routes><Route path="/clients/:clientId/delivery/website-studio" element={<Page node={node} />} /></Routes>
   </MemoryRouter>);
   expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
@@ -177,7 +170,7 @@ it("gives Website Studio v2 the offer-page builder v1 had", async () => {
 it("keeps the Posts board on Meta Profile v2", async () => {
   const node = v6ModuleNodes.find((n) => n.id === "meta-profile")!;
   const user = userEvent.setup();
-  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/meta-profile?view=v2"]}>
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/meta-profile"]}>
     <Routes><Route path="/clients/:clientId/delivery/meta-profile" element={<Page node={node} />} /></Routes>
   </MemoryRouter>);
   expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
@@ -189,7 +182,7 @@ it("keeps the Posts board on Meta Profile v2", async () => {
 
 it("sends a link to one of v1's library tabs to Assets, where that library now is", () => {
   const content = v6ModuleNodes.find((node) => node.id === "content-production-factory")!;
-  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/content-production-factory?view=v2&tab=reel-shots"]}>
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/content-production-factory?tab=reel-shots"]}>
     <Routes><Route path="/clients/:clientId/delivery/content-production-factory" element={<Page node={content} />} /></Routes>
   </MemoryRouter>);
   expect(screen.getByRole("tab", { name: "Assets" })).toHaveAttribute("aria-selected", "true");

@@ -162,7 +162,7 @@ export function CampaignActionApprovalsPanel() {
                   <h3 className="font-semibold">{request.action_key.replaceAll("_", " ")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">Destination: {request.destination}</p>
                 </div>
-                <Link className="text-sm text-primary underline" to={`/clients/${clientId}/delivery/campaign-factory/${request.campaign_id}?view=v2`}>
+                <Link className="text-sm text-primary underline" to={`/clients/${clientId}/delivery/campaign-factory/${request.campaign_id}`}>
                   View campaign
                 </Link>
               </div>
@@ -236,7 +236,7 @@ export function CampaignActionApprovalsPanel() {
                   </div>
                   <Link
                     className="text-xs text-primary underline"
-                    to={`/clients/${clientId}/delivery/campaign-factory/${action.campaign_id}?view=v2`}
+                    to={`/clients/${clientId}/delivery/campaign-factory/${action.campaign_id}`}
                   >
                     View campaign
                   </Link>

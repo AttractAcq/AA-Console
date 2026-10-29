@@ -396,7 +396,7 @@ function ProofProductionWorkspace({
                     {a.media_type === "video" && (
                       <Link
                         className="ml-2 underline"
-                        to={`/clients/${clientId}/delivery/content-production-factory?view=v2&tab=edit&brief=${a.brief_id ?? ""}`}
+                        to={`/clients/${clientId}/delivery/content-production-factory?tab=edit&brief=${a.brief_id ?? ""}`}
                       >
                         Edit video
                       </Link>
