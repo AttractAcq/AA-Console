@@ -18,7 +18,9 @@ grant for each client. That avoids giving every editor commercial data.
 `request_client_sales_entitlement` and `decide_client_sales_entitlement` are
 administrator-only security-definer RPCs. The request stores the exact
 client/member/user/action hash. A decision must present that hash; it records
-the human actor, time, status, and note. An approved revoke is immediately
+the human actor, time, status, and note. The decision RPC requires the signed
+Supabase JWT to carry MFA assurance level `aal2`; an `aal1` admin cannot decide.
+An approved revoke is immediately
 effective. Retired or relinked members can still be revoked against the
 original bound identity. Tables allow no direct authenticated write path.
 
@@ -57,6 +59,14 @@ only ID and display name. The database trigger checks the same predicate on
 new or changed `owner_member_id`, including admin and service writes. Existing
 historical owner IDs remain readable; editing unrelated fields does not
 silently reassign them. The UI omits an unchanged owner from `update_lead`.
+
+The client Add Lead form calls `create_manual_lead`. Direct client and employee
+INSERT on `client_leads` has no RLS policy. The RPC accepts identity, follow-up,
+owner, and nonnegative forecast value only. It always starts at
+`profile_visit`, records `source = manual_entry`, and leaves sale, cash,
+appointment outcome, consent, probe, and attribution fields neutral. A later
+stage change uses `advance_lead` so its event is recorded. Existing trusted
+service producers and the administrator table policy keep their write paths.
 
 ## Follow-on work
 

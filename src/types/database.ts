@@ -23115,6 +23115,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_manual_lead: {
+        Args: {
+          p_client_id: string
+          p_name: string
+          p_email?: string | null
+          p_phone?: string | null
+          p_owner_member_id?: string | null
+          p_next_action?: string | null
+          p_next_action_due?: string | null
+          p_opportunity_value?: number | null
+        }
+        Returns: string
+      }
       create_lead_capture_endpoint_v6: {
         Args: {
           p_campaign_id?: string

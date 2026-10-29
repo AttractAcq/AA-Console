@@ -11,11 +11,12 @@ const EDITOR = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 let db: PGlite;
 const migration = (file: string) => readFile(new URL(`../../../supabase/migrations/${file}`, import.meta.url), "utf8");
 
-async function asUser(user: string) {
+async function asUser(user: string, aal: "aal1" | "aal2" = "aal1") {
   await db.exec(`reset role; select set_config('request.jwt.claim.role','authenticated',false);
-    select set_config('request.jwt.claim.sub','${user}',false); set role authenticated;`);
+    select set_config('request.jwt.claim.sub','${user}',false);
+    select set_config('request.jwt.claim.aal','${aal}',false); set role authenticated;`);
 }
-async function asAdmin() { await asUser(ADMIN); }
+async function asAdmin() { await asUser(ADMIN, "aal2"); }
 async function asService() {
   await db.exec(`reset role; select set_config('request.jwt.claim.role','service_role',false);
     select set_config('request.jwt.claim.sub','',false); set role service_role;`);
@@ -35,6 +36,8 @@ beforeAll(async () => {
       $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
     create function auth.role() returns text language sql stable as
       $$ select current_setting('request.jwt.claim.role', true) $$;
+    create function auth.jwt() returns jsonb language sql stable as
+      $$ select jsonb_build_object('aal', current_setting('request.jwt.claim.aal', true)) $$;
     grant usage on schema public, auth to authenticated, service_role, anon;
   `);
   for (const file of [
@@ -100,6 +103,9 @@ beforeAll(async () => {
   await db.exec(await migration("20260925120000_128_lead_stage_enum.sql"));
   await db.exec(await migration("20260925110000_127_retired_team_access.sql"));
   await db.exec(await migration("20260925121000_129_lead_pipeline_archive.sql"));
+  await db.exec(`alter table client_leads
+    add column consent_given_at timestamptz,
+    add column is_probe boolean not null default false;`);
   await db.exec(await migration("20261029160000_265_lead_and_media_entitlements.sql"));
   // The reporting functions in 266 are executed against these representative
   // relations. Their values distinguish each client's commercial result; the
@@ -525,6 +531,42 @@ describe("migration 266: commercial reports and proof/SOP storage", () => {
 });
 
 describe("migration 267: exact-scope sales entitlement boundary", () => {
+  it("accepts client manual entry only through a narrow creation RPC", async () => {
+    await asUser(CLIENT_USER);
+    await expect(db.query(
+      "insert into client_leads(client_id,name,stage,cash_collected,source_channel) values ($1,'Fake cash','cash',100,'paid')",
+      [CLIENT])).rejects.toThrow(/row-level security/);
+    await expect(db.query("select create_manual_lead($1,'  ') as id", [CLIENT]))
+      .rejects.toThrow(/Name is required/);
+    await expect(db.query("select create_manual_lead($1,'Bad value',null,null,null,null,null,-1) as id", [CLIENT]))
+      .rejects.toThrow(/Opportunity value/);
+    await expect(db.query("select create_manual_lead($1,'Other client') as id", [OTHER]))
+      .rejects.toThrow(/Not permitted/);
+    const created = await db.query<{ id: string }>(
+      "select create_manual_lead($1,'  Manual prospect  ','manual@example.com',null,null,'Call tomorrow',null,450) as id",
+      [CLIENT]);
+    const lead = await db.query<{
+      name: string; stage: string; source: string; source_channel: string | null;
+      sale_value: number | null; cash_collected: number | null;
+      appointment_outcome: string | null; consent_given_at: string | null;
+      source_page_id: string | null; is_probe: boolean; created_by: string;
+    }>(`select name,stage,source,source_channel,sale_value,cash_collected,
+         appointment_outcome,consent_given_at,source_page_id,is_probe,created_by
+         from client_leads where id=$1`, [created.rows[0]!.id]);
+    expect(lead.rows[0]).toMatchObject({
+      name: "Manual prospect", stage: "profile_visit", source: "manual_entry",
+      source_channel: null, sale_value: null, cash_collected: null,
+      appointment_outcome: null, consent_given_at: null,
+      source_page_id: null, is_probe: false, created_by: CLIENT_USER,
+    });
+    await asUser(EDITOR);
+    await expect(db.query("select create_manual_lead($1,'Editor entered')", [CLIENT]))
+      .rejects.toThrow(/Not permitted/);
+    await asService();
+    expect((await db.query("select create_manual_lead($1,'Service producer') as id", [OTHER])).rows)
+      .toHaveLength(1);
+  });
+
   it("keeps a reviewed admin grant dormant until an Inbox binding and switch exist", async () => {
     const memberId = await editorMemberId();
     const leadId = await createLead();
@@ -540,6 +582,13 @@ describe("migration 267: exact-scope sales entitlement boundary", () => {
     const id = request.rows[0]!.id;
     const scope = await db.query<{ scope_hash: string }>(
       "select scope_hash from client_sales_entitlement_requests where id=$1", [id]);
+    await asUser(ADMIN, "aal1");
+    await expect(db.query("select decide_client_sales_entitlement($1,$2,true,'Low assurance')",
+      [id, scope.rows[0]!.scope_hash])).rejects.toThrow(/aal2/);
+    await asUser(EDITOR, "aal2");
+    await expect(db.query("select decide_client_sales_entitlement($1,$2,true,'Wrong role')",
+      [id, scope.rows[0]!.scope_hash])).rejects.toThrow(/administrator/);
+    await asAdmin();
     await expect(db.query(
       "select decide_client_sales_entitlement($1,$2,true,'wrong hash')", [id, "0".repeat(64)]))
       .rejects.toThrow(/exact sales access scope/);
@@ -598,14 +647,19 @@ describe("migration 267: exact-scope sales entitlement boundary", () => {
       .rejects.toThrow(/Not permitted/);
     await db.query("select add_lead_note($1,'Sales follow-up')", [ownLead]);
     expect((await db.query("select id from lead_events where lead_id=$1", [ownLead])).rows).toHaveLength(2);
+    await expect(db.query(
+      "insert into client_leads(client_id,name,stage,cash_collected,source) values ($1,'Forged cash','cash',100,'web')",
+      [CLIENT])).rejects.toThrow(/row-level security/);
     const inserted = await db.query<{ id: string }>(
-      "insert into client_leads(client_id,name,stage) values ($1,'Sales entered','qualified') returning id", [CLIENT]);
+      "select create_manual_lead($1,'Sales entered') as id", [CLIENT]);
     expect(inserted.rows).toHaveLength(1);
     await expect(db.query("select advance_lead($1,'appointment')", [otherLead]))
       .rejects.toThrow(/Not permitted/);
     await asUser(CLIENT_USER);
-    expect((await db.query(
-      "insert into client_leads(client_id,name,stage) values ($1,'Client entered','qualified') returning id", [CLIENT])).rows)
+    await expect(db.query(
+      "insert into client_leads(client_id,name,stage,sale_value) values ($1,'Forged sale','sale',9000)",
+      [CLIENT])).rejects.toThrow(/row-level security/);
+    expect((await db.query("select create_manual_lead($1,'Client entered') as id", [CLIENT])).rows)
       .toHaveLength(1);
     await asService();
     expect((await db.query("select id from stalled_leads($1,30)", [OTHER])).rows).toHaveLength(1);

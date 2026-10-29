@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, useParams, insert } = vi.hoisted(() => ({
-  from: vi.fn(), rpc: vi.fn(), useParams: vi.fn(), insert: vi.fn(),
+const { from, rpc, useParams } = vi.hoisted(() => ({
+  from: vi.fn(), rpc: vi.fn(), useParams: vi.fn(),
 }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
 vi.mock("react-router-dom", () => ({ useParams }));
@@ -21,7 +21,6 @@ const lead = (over: Record<string, unknown> = {}) => ({
 function chain(data: unknown[]) {
   const query = {
     select: () => query, eq: () => query, order: () => Promise.resolve({ data, error: null }),
-    insert,
   };
   return query;
 }
@@ -39,7 +38,6 @@ function show(leads: unknown[] = [lead()], archives: unknown[] = [], stalled: un
 beforeEach(() => {
   vi.clearAllMocks();
   useParams.mockReturnValue({ clientId: "client-1" });
-  insert.mockResolvedValue({ error: null });
 });
 
 describe("AA lead funnel", () => {
@@ -50,6 +48,25 @@ describe("AA lead funnel", () => {
     expect(screen.getByRole("option", { name: "Approved owner" })).toBeInTheDocument();
     expect(rpc).toHaveBeenCalledWith("list_client_lead_owners", { p_client_id: "client-1" });
     expect(from).not.toHaveBeenCalledWith("team_members");
+  });
+
+  it("creates a manual lead through the narrow RPC without outcome or attribution fields", async () => {
+    show();
+    await screen.findByText("Naledi K");
+    await userEvent.click(screen.getByRole("button", { name: "Add Lead" }));
+    const dialog = screen.getByRole("dialog", { name: "Add Lead" });
+    expect(within(dialog).getByText(/New leads start at Profile Visits/)).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Initial stage")).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Cash collected")).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Source channel")).not.toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText(/^Name/), "New Prospect");
+    await userEvent.type(within(dialog).getByLabelText("Email"), "new@example.com");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_manual_lead", {
+      p_client_id: "client-1", p_name: "New Prospect", p_email: "new@example.com",
+      p_phone: null, p_owner_member_id: null, p_next_action: null,
+      p_next_action_due: null, p_opportunity_value: null,
+    }));
   });
 
   it("renders the nine stages in order and keeps Lost collapsed", async () => {
@@ -176,7 +193,6 @@ describe("when archived_leads has not been migrated yet", () => {
   function chainError(error: { code: string; message: string }) {
     const query = {
       select: () => query, eq: () => query, order: () => Promise.resolve({ data: null, error }),
-      insert,
     };
     return query;
   }

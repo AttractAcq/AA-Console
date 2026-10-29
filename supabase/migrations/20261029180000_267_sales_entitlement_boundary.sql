@@ -145,6 +145,9 @@ begin
   if auth.role() <> 'authenticated' or not public.is_admin() then
     raise exception 'Only an administrator may decide sales access.';
   end if;
+  if coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
+    raise exception 'MFA assurance level aal2 is required to decide sales access.';
+  end if;
   if p_approve is null then
     raise exception 'Choose approve or reject.';
   end if;
@@ -249,15 +252,56 @@ grant execute on function public.may_manage_client_leads(uuid) to service_role;
 
 create policy cl_sales_read on public.client_leads
   for select to authenticated using (public.has_client_sales_entitlement(client_id));
-create policy cl_client_sales_insert on public.client_leads
-  for insert to authenticated with check (
-    public.is_client_user(client_id) or public.has_client_sales_entitlement(client_id));
 create policy le_sales_read on public.lead_events
   for select to authenticated using (public.has_client_sales_entitlement(client_id));
 create policy lead_identities_sales_read on public.lead_identities
   for select to authenticated using (public.has_client_sales_entitlement(client_id));
 create policy archived_leads_sales_read on public.archived_leads
   for select to authenticated using (public.has_client_sales_entitlement(client_id));
+
+-- The client Add Lead form uses a narrow creation RPC. Direct INSERT would
+-- let a client send stage=cash, collected revenue, outcome, source IDs, probe
+-- status or forged consent even though update_lead governs later edits.
+-- Existing service producers and the admin table policy retain their paths.
+create or replace function public.create_manual_lead(
+  p_client_id uuid, p_name text, p_email text default null, p_phone text default null,
+  p_owner_member_id uuid default null, p_next_action text default null,
+  p_next_action_due date default null, p_opportunity_value numeric default null
+)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare
+  v_id uuid;
+  v_name text := nullif(trim(p_name), '');
+  v_email text := nullif(trim(p_email), '');
+  v_phone text := nullif(trim(p_phone), '');
+begin
+  if auth.role() not in ('authenticated','service_role')
+     or not public.may_manage_client_leads(p_client_id) then
+    raise exception 'Not permitted for this client';
+  end if;
+  if v_name is null then
+    raise exception 'Name is required.';
+  end if;
+  if p_opportunity_value < 0 then
+    raise exception 'Opportunity value must be zero or more.';
+  end if;
+  insert into public.client_leads (
+    client_id,name,email,phone,contact,source,stage,owner_member_id,
+    next_action,next_action_due,opportunity_value,created_by
+  ) values (
+    p_client_id,v_name,v_email,v_phone,coalesce(v_email,v_phone),'manual_entry',
+    'profile_visit',p_owner_member_id,nullif(trim(p_next_action),''),
+    p_next_action_due,p_opportunity_value,auth.uid()
+  ) returning id into v_id;
+  insert into public.lead_events (lead_id,client_id,kind,body,created_by)
+  values (v_id,p_client_id,'note','Created manually.',auth.uid());
+  return v_id;
+end;
+$$;
+revoke execute on function public.create_manual_lead(
+  uuid,text,text,text,uuid,text,date,numeric) from public,anon;
+grant execute on function public.create_manual_lead(
+  uuid,text,text,text,uuid,text,date,numeric) to authenticated,service_role;
 
 -- This older definer trigger used can_access_client, which cannot include a
 -- sales seat without also handing it every creative/strategy surface.

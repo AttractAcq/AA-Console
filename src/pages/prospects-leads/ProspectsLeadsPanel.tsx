@@ -4,15 +4,13 @@ import { AlertTriangle, Archive, Pencil, Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { FormModal } from "../../components/forms/FormModal";
-import type { FieldDef } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
 import { LeadEditModal } from "../../components/leads/LeadEditModal";
 import { ArchivedLeadsModal, type ArchivedLead } from "../../components/leads/ArchivedLeadsModal";
 import { isMissingTable, MIGRATION_PENDING_NOTE } from "../../lib/schemaGaps";
 import { detailFields, leadFieldsPayload, type OwnerOption } from "../../components/leads/leadDetails";
-import { PIPELINE_STAGES, STAGE_OPTIONS, stageLabel, type LeadStage } from "../../components/leads/stages";
+import { PIPELINE_STAGES, stageLabel, type LeadStage } from "../../components/leads/stages";
 import type { Lead } from "../../components/leads/types";
-import type { Database } from "../../types/database";
 
 type Stalled = {
   id: string;
@@ -25,8 +23,9 @@ type Stalled = {
   owner_name: string | null;
 };
 
-const ADD_STAGE: FieldDef = { name: "stage", label: "Initial stage", kind: "select", options: STAGE_OPTIONS.map((stage) => ({ value: stage.id, label: stage.label })) };
-const ADD_INITIAL = { stage: "profile_visit" };
+const MANUAL_LEAD_FIELDS = new Set([
+  "name", "email", "phone", "owner_member_id", "next_action", "next_action_due", "opportunity_value",
+]);
 
 const money = (v: number | null) => (v === null ? null : `R${Number(v).toLocaleString()}`);
 
@@ -265,20 +264,21 @@ export function ProspectsLeadsPanel() {
         onClose={() => setAddOpen(false)}
         title="Add Lead"
         draftKey={`lead:${clientId}`}
-        fields={[...detailFields(owners), ADD_STAGE]}
-        initialValues={ADD_INITIAL}
+        intro="New leads start at Profile Visits. Move the lead afterward to record stage changes."
+        fields={detailFields(owners).filter((field) => MANUAL_LEAD_FIELDS.has(field.name))}
         onSubmit={async (v) => {
           if (!clientId) throw new Error("No client selected.");
           const details = leadFieldsPayload(v);
-          const stage = ((v.stage as string) || "profile_visit") as LeadStage;
-          if (Number(details.cash_collected ?? 0) > 0 && stage !== "shown" && stage !== "cash")
-            throw new Error("Move the lead to Show Ups or Cash Collected before recording cash.");
-          const { error } = await supabase.from("client_leads").insert({
-            client_id: clientId,
-            ...details,
-            contact: details.email ?? details.phone,
-            stage,
-          } as Database["public"]["Tables"]["client_leads"]["Insert"]);
+          const { error } = await supabase.rpc("create_manual_lead", {
+            p_client_id: clientId,
+            p_name: String(details.name),
+            p_email: details.email as string | null,
+            p_phone: details.phone as string | null,
+            p_owner_member_id: details.owner_member_id as string | null,
+            p_next_action: details.next_action as string | null,
+            p_next_action_due: details.next_action_due as string | null,
+            p_opportunity_value: details.opportunity_value as number | null,
+          });
           if (error) throw error;
         }}
         onSaved={refresh}
