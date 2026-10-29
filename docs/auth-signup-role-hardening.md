@@ -3,11 +3,13 @@
 Migration 11 copies `auth.users.raw_user_meta_data.role` and
 `employee_category` into `public.profiles` when an Auth user is inserted.
 Auth user metadata is editable by the user, so that trigger must not choose
-authorization fields. Migration 263 replaces only `public.handle_new_user()`:
-new users receive `employee` and no team category. The trusted
-`create_console_user()` helper still explicitly assigns an admin, client, or
-employee role after the insert trigger runs. The migration does not alter
-existing profiles or the helper's privileges.
+authorization fields. Migration 263 replaces `public.handle_new_user()`:
+new users receive `employee` and no team category. It also replaces the
+restricted `create_console_user()` helper. New account creation still writes
+the supplied seed password and metadata; on an existing account, a repeat
+call leaves `auth.users.encrypted_password` and both metadata fields alone
+while updating the authoritative profile role, category, and name. The
+migration does not rewrite existing profiles or broaden the helper's grants.
 
 ## Release and verification
 
@@ -36,7 +38,8 @@ existing profiles or the helper's privileges.
 4. In a disposable environment, insert an Auth user with metadata
    `{ "role": "admin", "employee_category": "smm" }`. Verify its profile
    remains `employee` with a null category and `public.is_admin()` is false.
-   The focused PGlite suite exercises this and the trusted seed helper.
+   The focused PGlite suite exercises this, repeat provisioning without an
+   Auth password or metadata rewrite, and client/team link preservation.
 5. After an authorized deployment, confirm migration 263 appears under its
    exact timestamp in `supabase_migrations.schema_migrations`, then rerun the
    admin roster audit. Keep the migration and release decision's exact
@@ -47,8 +50,12 @@ existing profiles or the helper's privileges.
 
 This patch does not discover or demote any existing forged administrator.
 It also does not repair migration 11's `change-me` seed password fallback,
-`create_console_user()`'s direct Auth table writes and password reset on
-replay, or migration 13's three-character team-member password minimum.
-Those require separate credential and provisioning changes with their own
-tests and release review. Full B004 acceptance, including hosted signup
-configuration and existing-account audit, remains open.
+`create_console_user()`'s direct Auth table writes, or migration 13's
+three-character team-member password minimum. **A raw schema replay still
+executes migration 11 before 263.** A clean replay therefore runs its seed
+with the original fallback password; a replay against existing seeded
+accounts can reset their Auth passwords and metadata during that earlier
+step. Migration 263 prevents only later repeat calls after it is applied.
+Replay-time seed handling needs its own remedy. Full B004 acceptance,
+including hosted signup configuration and existing-account audit, remains
+open.

@@ -51,10 +51,11 @@ beforeAll(async () => {
     create function extensions.gen_salt(text) returns text language sql as
       $$ select 'test-only-salt'::text $$;
     create function extensions.crypt(text, text) returns text language sql as
-      $$ select 'test-only-hash'::text $$;
+      $$ select 'test-only-hash:' || $1 || ':' || $2 $$;
   `);
 
   await db.exec(await migration("20260903104450_01_foundations_roles_clients.sql"));
+  await db.exec(await migration("20260903104529_02_team_and_operations.sql"));
 
   // Execute migration 11's actual function definitions without its extension
   // install or five environment-specific seed accounts.
@@ -104,19 +105,76 @@ describe("signup role hardening", () => {
     expect(await roleFor(clientId)).toMatchObject({ role: "client", employee_category: null });
     expect(await isAdmin(clientId)).toBe(false);
 
-    // A clean-replay seed can also re-run for an existing account.
+    const authBefore = (await db.query<{
+      encrypted_password: string; raw_app_meta_data: unknown; raw_user_meta_data: unknown;
+    }>(`select encrypted_password, raw_app_meta_data, raw_user_meta_data
+          from auth.users where id = $1`, [clientId])).rows[0]!;
+
+    // A repeat seed may update the trusted profile, but must leave the Auth
+    // password hash and both metadata fields untouched.
     await db.query(
       "select public.create_console_user($1, $2, 'client'::public.app_role, $3)",
-      ["trusted-client@attractacq.com", "test-password", "Trusted Client Updated"],
+      ["trusted-client@attractacq.com", "different-password", "Trusted Client Updated"],
     );
     expect(await roleFor(clientId)).toMatchObject({ role: "client", full_name: "Trusted Client Updated" });
+    const authAfter = (await db.query<{
+      encrypted_password: string; raw_app_meta_data: unknown; raw_user_meta_data: unknown;
+    }>(`select encrypted_password, raw_app_meta_data, raw_user_meta_data
+          from auth.users where id = $1`, [clientId])).rows[0]!;
+    expect(authAfter).toEqual(authBefore);
   });
 
-  it("keeps the trigger function unavailable as a direct RPC to public roles", async () => {
-    const result = await db.query<{ anon: boolean; authenticated: boolean }>(`
+  it("preserves client and team links when trusted provisioning repeats", async () => {
+    const clientAccount = (await db.query<{ create_console_user: string }>(
+      "select public.create_console_user($1, $2, 'client'::public.app_role, $3)",
+      ["linked-client@attractacq.com", "first-password", "Linked Client"],
+    )).rows[0]!.create_console_user;
+    const employeeAccount = (await db.query<{ create_console_user: string }>(
+      "select public.create_console_user($1, $2, 'employee'::public.app_role, $3, 'smm'::public.team_category)",
+      ["linked-employee@attractacq.com", "first-password", "Linked Employee"],
+    )).rows[0]!.create_console_user;
+    const client = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    await db.query("insert into public.clients (id, name, initials) values ($1, 'Linked Client', 'LC')", [client]);
+    await db.query("insert into public.client_users (client_id, user_id) values ($1, $2)", [client, clientAccount]);
+    const member = (await db.query<{ id: string }>(
+      `insert into public.team_members (user_id, category, name, initials, engagement)
+       values ($1, 'smm', 'Linked Employee', 'LE', 'employee') returning id`, [employeeAccount],
+    )).rows[0]!.id;
+    await db.query("insert into public.client_assignments (member_id, client_id) values ($1, $2)", [member, client]);
+
+    await db.query("select public.create_console_user($1, $2, 'client'::public.app_role, $3)",
+      ["linked-client@attractacq.com", "unused-second-password", "Linked Client Updated"]);
+    await db.query("select public.create_console_user($1, $2, 'employee'::public.app_role, $3, 'smm'::public.team_category)",
+      ["linked-employee@attractacq.com", "unused-second-password", "Linked Employee Updated"]);
+
+    expect(await roleFor(clientAccount)).toMatchObject({ role: "client", full_name: "Linked Client Updated" });
+    expect(await roleFor(employeeAccount)).toMatchObject({
+      role: "employee", employee_category: "smm", full_name: "Linked Employee Updated",
+    });
+    expect((await db.query("select 1 from public.client_users where client_id = $1 and user_id = $2",
+      [client, clientAccount])).rows).toHaveLength(1);
+    expect((await db.query("select 1 from public.team_members where id = $1 and user_id = $2 and category = 'smm'",
+      [member, employeeAccount])).rows).toHaveLength(1);
+    expect((await db.query("select 1 from public.client_assignments where member_id = $1 and client_id = $2",
+      [member, client])).rows).toHaveLength(1);
+  });
+
+  it("keeps the trigger and provisioning helper unavailable as direct RPCs to public roles", async () => {
+    const result = await db.query<{
+      anon: boolean; authenticated: boolean;
+      provision_anon: boolean; provision_authenticated: boolean;
+    }>(`
       select has_function_privilege('anon', 'public.handle_new_user()', 'execute') as anon,
-             has_function_privilege('authenticated', 'public.handle_new_user()', 'execute') as authenticated
+             has_function_privilege('authenticated', 'public.handle_new_user()', 'execute') as authenticated,
+             has_function_privilege('anon',
+               'public.create_console_user(text,text,public.app_role,text,public.team_category)',
+               'execute') as provision_anon,
+             has_function_privilege('authenticated',
+               'public.create_console_user(text,text,public.app_role,text,public.team_category)',
+               'execute') as provision_authenticated
     `);
-    expect(result.rows[0]).toEqual({ anon: false, authenticated: false });
+    expect(result.rows[0]).toEqual({
+      anon: false, authenticated: false, provision_anon: false, provision_authenticated: false,
+    });
   });
 });
