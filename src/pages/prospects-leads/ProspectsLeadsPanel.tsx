@@ -65,7 +65,7 @@ export function ProspectsLeadsPanel() {
       supabase.rpc("stalled_leads", { p_client_id: clientId, p_days: 30 }),
       supabase.from("archived_leads").select("id, name, stage_at_archive, lead, events, reason, archived_at, archived_by")
         .eq("client_id", clientId).order("archived_at", { ascending: false }),
-      supabase.from("team_members").select("id, name").eq("active", true).order("name"),
+      supabase.rpc("list_client_lead_owners", { p_client_id: clientId }),
     ]);
     // archived_leads arrives with migration 129, and the pipeline works
     // without it. Folding its error into the panel-wide one meant an

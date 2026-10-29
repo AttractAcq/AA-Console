@@ -129,6 +129,7 @@ beforeAll(async () => {
       with check (can_access_client(client_id) and usage_rights = 'not_cleared');
   `);
   await db.exec(await migration("20261029170000_266_commercial_reporting_and_storage_scope.sql"));
+  await db.exec(await migration("20261029180000_267_sales_entitlement_boundary.sql"));
   // 129 clears the active tables, but archives what it finds rather than
   // dropping it. lead_events.lead_id is ON DELETE CASCADE, so a bare delete
   // would have taken each lead's history with it.
@@ -173,6 +174,8 @@ beforeAll(async () => {
 beforeEach(async () => {
   await db.exec(`reset role; select set_config('request.jwt.claim.role','service_role',false);
     select set_config('request.jwt.claim.sub','',false);
+    delete from client_sales_entitlements; delete from client_sales_entitlement_requests;
+    update client_sales_entitlement_controls set inbox_enforced=false;
     delete from sales_agent_conversations; delete from client_sales_agents;
     delete from mcp_internal.mcp_pipeline_requests;
     delete from archived_leads; delete from client_leads; delete from lead_identities;`);
@@ -188,6 +191,35 @@ async function createLead(stage = "qualified", cash = 0) {
     insert into client_leads (client_id,name,stage,cash_collected,source_channel,opportunity_value)
     values ($1,'Sam', $2::lead_stage,$3,'Instagram',2500) returning id`, [CLIENT, stage, cash]);
   return result.rows[0]!.id;
+}
+
+async function editorMemberId() {
+  await db.exec("reset role");
+  const row = await db.query<{ id: string }>("select id from team_members where user_id=$1", [EDITOR]);
+  await asAdmin();
+  return row.rows[0]!.id;
+}
+
+async function salesDecision(clientId: string, memberId: string, action: "grant" | "revoke") {
+  await asAdmin();
+  const request = await db.query<{ id: string }>(
+    "select request_client_sales_entitlement($1,$2,$3) as id", [clientId, memberId, action]);
+  const id = request.rows[0]!.id;
+  const scope = await db.query<{ scope_hash: string }>(
+    "select scope_hash from client_sales_entitlement_requests where id=$1", [id]);
+  const hash = scope.rows[0]!.scope_hash;
+  await db.query("select decide_client_sales_entitlement($1,$2,true,'Reviewed exact scope')", [id, hash]);
+  return { id, hash };
+}
+
+async function bridgeInboxForFixture(clientId: string, memberId: string) {
+  // Simulates the future B008 verified Inbox binding in a disposable DB.
+  // Migration 267 leaves both of these values disabled in production.
+  await db.exec(`reset role;
+    update client_sales_entitlement_controls set inbox_enforced=true;
+    update client_sales_entitlements
+       set inbox_decision_id=gen_random_uuid()
+     where client_id='${clientId}' and member_id='${memberId}';`);
 }
 
 describe("lead edit and archive RPCs", () => {
@@ -489,5 +521,116 @@ describe("migration 266: commercial reports and proof/SOP storage", () => {
     expect((await rows()).rows).toHaveLength(1);
     await asAnon();
     await expect(rows()).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe("migration 267: exact-scope sales entitlement boundary", () => {
+  it("keeps a reviewed admin grant dormant until an Inbox binding and switch exist", async () => {
+    const memberId = await editorMemberId();
+    const leadId = await createLead();
+    await asUser(EDITOR);
+    await expect(db.query("select request_client_sales_entitlement($1,$2,'grant')", [CLIENT, memberId]))
+      .rejects.toThrow(/administrator/);
+    await asUser(CLIENT_USER);
+    await expect(db.query("select request_client_sales_entitlement($1,$2,'grant')", [CLIENT, memberId]))
+      .rejects.toThrow(/administrator/);
+    await asAdmin();
+    const request = await db.query<{ id: string }>(
+      "select request_client_sales_entitlement($1,$2,'grant') as id", [CLIENT, memberId]);
+    const id = request.rows[0]!.id;
+    const scope = await db.query<{ scope_hash: string }>(
+      "select scope_hash from client_sales_entitlement_requests where id=$1", [id]);
+    await expect(db.query(
+      "select decide_client_sales_entitlement($1,$2,true,'wrong hash')", [id, "0".repeat(64)]))
+      .rejects.toThrow(/exact sales access scope/);
+    await db.query("select decide_client_sales_entitlement($1,$2,true,'Reviewed')", [id, scope.rows[0]!.scope_hash]);
+    const audit = await db.query<{ status: string; requested_by: string; decided_by: string }>(
+      "select status,requested_by,decided_by from client_sales_entitlement_requests where id=$1", [id]);
+    expect(audit.rows[0]).toMatchObject({ status: "approved", requested_by: ADMIN, decided_by: ADMIN });
+    await expect(db.query("update client_sales_entitlements set inbox_decision_id=gen_random_uuid()"))
+      .rejects.toThrow(/permission denied/);
+
+    await asUser(EDITOR);
+    expect((await db.query("select id from client_leads where id=$1", [leadId])).rows).toHaveLength(0);
+    await expect(db.query("select advance_lead($1,'appointment')", [leadId]))
+      .rejects.toThrow(/Not permitted/);
+    await asAdmin();
+    expect((await db.query("select id from list_client_lead_owners($1)", [CLIENT])).rows).toHaveLength(0);
+    await expect(db.query("select update_lead($1,$2)", [leadId, { owner_member_id: memberId }]))
+      .rejects.toThrow(/approved sales owner/);
+  });
+
+  it("does not leak cross-client lead counts through the old aggregation view", async () => {
+    await createLead();
+    await db.exec(`reset role; grant select on lead_pipeline_counts to authenticated;
+      insert into job_assignments(member_id,client_id,title)
+      select id,'${CLIENT}','Edit content' from team_members where user_id='${EDITOR}';`);
+    await asUser(EDITOR);
+    expect((await db.query("select * from lead_pipeline_counts")).rows).toHaveLength(0);
+    await asUser(CLIENT_USER);
+    expect((await db.query("select * from lead_pipeline_counts")).rows).toHaveLength(1);
+  });
+
+  it("scopes the staged sales path and owner to one client after a fixture-only Inbox bridge", async () => {
+    const memberId = await editorMemberId();
+    const ownLead = await createLead();
+    const otherLead = (await db.query<{ id: string }>(
+      "insert into client_leads(client_id,name,stage) values ($1,'Other','qualified') returning id", [OTHER])).rows[0]!.id;
+    await salesDecision(CLIENT, memberId, "grant");
+    await bridgeInboxForFixture(CLIENT, memberId);
+    await asAdmin();
+    expect((await db.query<{ id: string; name: string }>(
+      "select * from list_client_lead_owners($1)", [CLIENT])).rows)
+      .toEqual([{ id: memberId, name: "Editor" }]);
+    expect((await db.query("select * from list_client_lead_owners($1)", [OTHER])).rows).toHaveLength(0);
+    await db.query("select update_lead($1,$2)", [ownLead, { owner_member_id: memberId }]);
+    await expect(db.query("select update_lead($1,$2)", [otherLead, { owner_member_id: memberId }]))
+      .rejects.toThrow(/approved sales owner/);
+    await expect(db.query(
+      "insert into client_leads(client_id,name,stage,owner_member_id) values ($1,'Wrong owner','qualified',$2)",
+      [OTHER, memberId])).rejects.toThrow(/approved sales owner/);
+
+    await asUser(EDITOR);
+    expect((await db.query<{ id: string }>("select id from client_leads order by id")).rows.map((r) => r.id))
+      .toEqual([ownLead]);
+    expect((await db.query("select id from list_client_lead_owners($1)", [CLIENT])).rows).toHaveLength(1);
+    await expect(db.query("select id from list_client_lead_owners($1)", [OTHER]))
+      .rejects.toThrow(/Not permitted/);
+    await db.query("select add_lead_note($1,'Sales follow-up')", [ownLead]);
+    expect((await db.query("select id from lead_events where lead_id=$1", [ownLead])).rows).toHaveLength(2);
+    const inserted = await db.query<{ id: string }>(
+      "insert into client_leads(client_id,name,stage) values ($1,'Sales entered','qualified') returning id", [CLIENT]);
+    expect(inserted.rows).toHaveLength(1);
+    await expect(db.query("select advance_lead($1,'appointment')", [otherLead]))
+      .rejects.toThrow(/Not permitted/);
+    await asUser(CLIENT_USER);
+    expect((await db.query(
+      "insert into client_leads(client_id,name,stage) values ($1,'Client entered','qualified') returning id", [CLIENT])).rows)
+      .toHaveLength(1);
+    await asService();
+    expect((await db.query("select id from stalled_leads($1,30)", [OTHER])).rows).toHaveLength(1);
+  });
+
+  it("drops access on retirement or revocation, and a new grant needs a new Inbox binding", async () => {
+    const memberId = await editorMemberId();
+    const leadId = await createLead();
+    await salesDecision(CLIENT, memberId, "grant");
+    await bridgeInboxForFixture(CLIENT, memberId);
+    await asUser(EDITOR);
+    expect((await db.query("select id from client_leads where id=$1", [leadId])).rows).toHaveLength(1);
+    await db.exec(`reset role; update team_members set active=false where id='${memberId}';`);
+    await asUser(EDITOR);
+    expect((await db.query("select id from client_leads where id=$1", [leadId])).rows).toHaveLength(0);
+    // Retirement must not prevent an administrator from auditing a revoke.
+    await salesDecision(CLIENT, memberId, "revoke");
+    await db.exec(`reset role; update team_members set active=true where id='${memberId}';`);
+    await asUser(EDITOR);
+    expect((await db.query("select id from client_leads where id=$1", [leadId])).rows).toHaveLength(0);
+    await salesDecision(CLIENT, memberId, "grant");
+    await asUser(EDITOR);
+    expect((await db.query("select id from client_leads where id=$1", [leadId])).rows).toHaveLength(0);
+    await bridgeInboxForFixture(CLIENT, memberId);
+    await asUser(EDITOR);
+    expect((await db.query("select id from client_leads where id=$1", [leadId])).rows).toHaveLength(1);
   });
 });

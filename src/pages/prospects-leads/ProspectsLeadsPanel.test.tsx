@@ -28,7 +28,11 @@ function chain(data: unknown[]) {
 
 function show(leads: unknown[] = [lead()], archives: unknown[] = [], stalled: unknown[] = []) {
   from.mockImplementation((table: string) => chain(table === "client_leads" ? leads : table === "archived_leads" ? archives : []));
-  rpc.mockImplementation((name: string) => Promise.resolve({ data: name === "stalled_leads" ? stalled : null, error: null }));
+  rpc.mockImplementation((name: string) => Promise.resolve({
+    data: name === "stalled_leads" ? stalled
+      : name === "list_client_lead_owners" ? [{ id: "owner-a", name: "Approved owner" }] : null,
+    error: null,
+  }));
   return render(<ProspectsLeadsPanel />);
 }
 
@@ -39,6 +43,15 @@ beforeEach(() => {
 });
 
 describe("AA lead funnel", () => {
+  it("shows only client-scoped approved sales owners in the picker", async () => {
+    show();
+    await screen.findByText("Naledi K");
+    await userEvent.click(screen.getByRole("button", { name: "Add Lead" }));
+    expect(screen.getByRole("option", { name: "Approved owner" })).toBeInTheDocument();
+    expect(rpc).toHaveBeenCalledWith("list_client_lead_owners", { p_client_id: "client-1" });
+    expect(from).not.toHaveBeenCalledWith("team_members");
+  });
+
   it("renders the nine stages in order and keeps Lost collapsed", async () => {
     show([lead(), lead({ id: "lost-1", name: "Lost prospect", stage: "lost" })]);
     await screen.findByText("Naledi K");

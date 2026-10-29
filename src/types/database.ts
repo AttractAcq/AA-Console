@@ -23865,6 +23865,10 @@ export type Database = {
         Args: { s: Database["public"]["Enums"]["lead_stage"] }
         Returns: number
       }
+      list_client_lead_owners: {
+        Args: { p_client_id: string }
+        Returns: { id: string; name: string }[]
+      }
       link_opportunity_v6: {
         Args: { p_opportunity_id: string; p_role: string; p_target_id: string }
         Returns: string
