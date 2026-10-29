@@ -26,6 +26,7 @@ const ADMIN = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const EDITOR_USER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const OTHER_USER = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const BRIEF = "44444444-4444-4444-8444-444444444444";
+const FOREIGN_CLIENT = "55555555-5555-4555-8555-555555555555";
 
 async function one<T = Record<string, unknown>>(sql: string): Promise<T> {
   return (await db.query<T>(sql)).rows[0]!;
@@ -39,6 +40,20 @@ async function as<T = Record<string, unknown>>(sub: string, sql: string): Promis
     return (await db.query<T>(sql)).rows;
   } finally {
     await db.exec(`select set_config('request.jwt.claim.sub','${ADMIN}',false);`);
+  }
+}
+
+/** Exercise database grants, not only the JWT claim in a superuser session. */
+async function asAuthenticated<T = Record<string, unknown>>(
+  sub: string, sql: string,
+): Promise<T[]> {
+  await db.exec(`set role authenticated;
+                 select set_config('request.jwt.claim.sub','${sub}',false);`);
+  try {
+    return (await db.query<T>(sql)).rows;
+  } finally {
+    await db.exec(`reset role;
+                   select set_config('request.jwt.claim.sub','${ADMIN}',false);`);
   }
 }
 
@@ -124,6 +139,23 @@ beforeAll(async () => {
   `);
 
   await db.exec(await migration("20261007140000_166_an_assignment_has_states.sql"));
+  // This fixture loads the real assignment writer, not migration 161's slot
+  // writer. Supply its exact signature so the full 264 migration runs here.
+  await db.exec(`
+    create type slot_stage as enum ('planned','scheduled');
+    create function public.may_advance_slot(uuid) returns boolean
+      language sql security definer as $$ select true $$;
+    create function public.advance_slot(
+      uuid, slot_stage, text, text, text, uuid, numeric,
+      uuid, uuid, uuid, uuid, text
+    ) returns uuid language sql security definer as $$ select null::uuid $$;
+    grant execute on function public.may_advance_slot(uuid) to authenticated;
+    grant execute on function public.advance_slot(
+      uuid, slot_stage, text, text, text, uuid, numeric,
+      uuid, uuid, uuid, uuid, text
+    ) to authenticated;
+  `);
+  await db.exec(await migration("20261029150000_264_low_level_transition_isolation.sql"));
   await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
                  select set_config('request.jwt.claim.sub','${ADMIN}',false);`);
 });
@@ -425,5 +457,71 @@ describe("one writer, and a log that cannot be edited", () => {
     await expect(as(EDITOR_USER, `select accept_assignment('${id}')`)).rejects.toThrow(
       /already accepted/,
     );
+  });
+});
+
+describe("B005: assignment decisions use named actions and one client's asset", () => {
+  it("grants the low-level writer only to the service role", async () => {
+    const grants = await one<{ human: boolean; anon: boolean; service: boolean }>(`
+      select
+        has_function_privilege('authenticated',
+          'public.advance_assignment(uuid,assignment_stage,text,text,uuid)', 'execute') as human,
+        has_function_privilege('anon',
+          'public.advance_assignment(uuid,assignment_stage,text,text,uuid)', 'execute') as anon,
+        has_function_privilege('service_role',
+          'public.advance_assignment(uuid,assignment_stage,text,text,uuid)', 'execute') as service
+    `);
+    expect(grants).toEqual({ human: false, anon: false, service: true });
+  });
+
+  it("denies a maker's direct delivered-to-approved transition", async () => {
+    const id = await assignment();
+    const a = await asset();
+    await asAuthenticated(EDITOR_USER, `select deliver_assignment('${id}','${a}')`);
+    await expect(
+      asAuthenticated(EDITOR_USER,
+        `select advance_assignment('${id}','approved'::assignment_stage,'review')`),
+    ).rejects.toThrow(/permission denied/i);
+
+    const beforeReview = await one<{ stage: string; completed_at: string | null }>(
+      `select stage, completed_at from job_assignments where id = '${id}'`,
+    );
+    expect(beforeReview).toEqual({ stage: "delivered", completed_at: null });
+    await db.exec(`select review_media_asset('${a}','approved'::review_status,'Reviewed')`);
+    const afterReview = await one<{ stage: string; completed_at: string | null }>(
+      `select stage, completed_at from job_assignments where id = '${id}'`,
+    );
+    expect(afterReview.stage).toBe("approved");
+    expect(afterReview.completed_at).not.toBeNull();
+  });
+
+  it("rejects a foreign client's asset before delivery or an event is recorded", async () => {
+    const id = await assignment();
+    const { id: foreignAsset } = await one<{ id: string }>(
+      `insert into client_media_assets (client_id, brief_id, member_id, title)
+       values ('${FOREIGN_CLIENT}','${BRIEF}','${EDITOR}','Foreign cut') returning id`,
+    );
+    await expect(
+      asAuthenticated(EDITOR_USER, `select deliver_assignment('${id}','${foreignAsset}')`),
+    ).rejects.toThrow(/Assignment asset must belong to the assignment client/);
+    const row = await one<{ stage: string; asset_id: string | null }>(
+      `select stage, asset_id from job_assignments where id = '${id}'`,
+    );
+    expect(row).toEqual({ stage: "assigned", asset_id: null });
+    const events = await rows(`select id from assignment_events where assignment_id = '${id}'`);
+    expect(events).toEqual([]);
+  });
+
+  it("keeps an already attached asset in the assignment's client", async () => {
+    const id = await assignment();
+    const a = await asset();
+    await asAuthenticated(EDITOR_USER, `select deliver_assignment('${id}','${a}')`);
+    await expect(
+      db.exec(`update client_media_assets set client_id = '${FOREIGN_CLIENT}' where id = '${a}'`),
+    ).rejects.toThrow(/An assigned asset cannot move to another client/);
+    const current = await one<{ client_id: string }>(
+      `select client_id from client_media_assets where id = '${a}'`,
+    );
+    expect(current.client_id).toBe(CLIENT);
   });
 });
