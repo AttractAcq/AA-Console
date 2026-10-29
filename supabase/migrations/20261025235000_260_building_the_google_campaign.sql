@@ -34,6 +34,114 @@
 -- a real account with its resource names recorded.
 
 -- ---------------------------------------------------------------------------
+-- Bind new sheets to the package they were derived for
+-- ---------------------------------------------------------------------------
+
+-- Existing 243 sheets cannot prove which manifest they describe. Keep them
+-- readable for a hand build, but never infer lineage from created_at or the
+-- latest manifest. The NOT VALID check accepts those existing rows while
+-- requiring every post-260 insert to name a manifest.
+alter table public.google_ads_build_sheets
+  add column manifest_id uuid;
+
+alter table public.google_ads_build_sheets
+  add constraint google_ads_build_sheets_manifest_required_260
+    check (manifest_id is not null) not valid,
+  add constraint google_ads_build_sheets_manifest_identity_260
+    foreign key (manifest_id, campaign_id, client_id)
+    references public.campaign_manifest_versions(id, campaign_id, client_id)
+    on delete cascade,
+  add constraint google_ads_build_sheets_build_identity_260
+    unique (id, campaign_id, client_id);
+
+comment on column public.google_ads_build_sheets.manifest_id is
+  'Exact immutable campaign manifest used to derive this sheet. Null means a pre-260 sheet with unknown lineage; it cannot authorize an automated build.';
+
+alter table public.campaign_action_approvals
+  add constraint campaign_action_approvals_build_identity_260
+    unique (id, campaign_id, client_id);
+
+-- The old signature has no manifest identity. It must fail closed after 260
+-- rather than attaching a stale derivation to whatever package is newest at
+-- recording time. The runtime now calls the explicit five-argument RPC.
+create or replace function public.record_google_ads_sheet_v6(
+  p_campaign_id uuid, p_derived jsonb, p_missing text[], p_job_id uuid default null)
+returns uuid language plpgsql security definer
+set search_path = pg_catalog, public as $fn$
+begin
+  raise exception 'A Google build sheet now requires the manifest id captured before derivation. Use record_google_ads_sheet_for_manifest_v6.';
+end $fn$;
+
+create or replace function public.record_google_ads_sheet_for_manifest_v6(
+  p_campaign_id uuid, p_manifest_id uuid, p_derived jsonb,
+  p_missing text[], p_job_id uuid default null)
+returns uuid language plpgsql security definer
+set search_path = pg_catalog, public as $fn$
+declare
+  v_campaign public.client_campaigns%rowtype;
+  v_manifest public.campaign_manifest_versions%rowtype;
+  v_version integer;
+  v_hash text;
+  v_id uuid;
+begin
+  if auth.role() <> 'service_role' then
+    raise exception 'Only the internal service may record a build sheet.';
+  end if;
+  if p_derived is null or jsonb_typeof(p_derived) <> 'object' or p_missing is null then
+    raise exception 'A derived sheet and its explicit missing list are required.';
+  end if;
+
+  -- create_campaign_manifest_v6 locks the same campaign row. A new package
+  -- cannot be committed between this check and the sheet insert.
+  select * into v_campaign from public.client_campaigns
+   where id = p_campaign_id for update;
+  if not found then raise exception 'No such campaign.'; end if;
+  if v_campaign.acquisition_mode <> 'paid' or v_campaign.paid_platform <> 'google' then
+    raise exception 'That campaign is not a paid Google campaign.';
+  end if;
+  select * into v_manifest from public.campaign_manifest_versions
+   where id = p_manifest_id and campaign_id = p_campaign_id
+     and client_id = v_campaign.client_id;
+  if not found then raise exception 'That campaign manifest does not match this campaign and client.'; end if;
+  if v_manifest.acquisition_mode <> 'paid' or v_manifest.paid_platform <> 'google' then
+    raise exception 'The captured package is not a paid Google package.';
+  end if;
+  if exists (select 1 from public.campaign_manifest_versions newer
+              where newer.campaign_id = p_campaign_id
+                and newer.version > v_manifest.version) then
+    raise exception 'The campaign package changed during sheet derivation. Derive again from the latest package.';
+  end if;
+
+  -- Include the exact manifest and the missing list. A replan or completed
+  -- research must produce a new immutable sheet even if other fields match.
+  v_hash := encode(sha256(convert_to(jsonb_build_object(
+    'manifest_id', p_manifest_id,
+    'derived', p_derived,
+    'missing', p_missing)::text, 'UTF8')), 'hex');
+  select id into v_id from public.google_ads_build_sheets
+   where campaign_id = p_campaign_id and manifest_id = p_manifest_id
+     and plan_hash = v_hash
+   order by version desc limit 1;
+  if v_id is not null then return v_id; end if;
+
+  select coalesce(max(version), 0) + 1 into v_version
+    from public.google_ads_build_sheets where campaign_id = p_campaign_id;
+  insert into public.google_ads_build_sheets (
+    campaign_id, client_id, manifest_id, version, derived, missing,
+    plan_hash, created_by_job_id)
+  values (
+    p_campaign_id, v_campaign.client_id, p_manifest_id, v_version,
+    p_derived, p_missing, v_hash, p_job_id)
+  returning id into v_id;
+  return v_id;
+end $fn$;
+
+revoke all on function public.record_google_ads_sheet_for_manifest_v6(
+  uuid, uuid, jsonb, text[], uuid) from public, anon, authenticated;
+grant execute on function public.record_google_ads_sheet_for_manifest_v6(
+  uuid, uuid, jsonb, text[], uuid) to service_role;
+
+-- ---------------------------------------------------------------------------
 -- Copy fields a later Google adapter will need
 -- ---------------------------------------------------------------------------
 
@@ -88,13 +196,11 @@ create table if not exists public.google_ads_builds (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null references public.clients(id) on delete cascade,
   campaign_id uuid not null,
-  approval_id uuid not null unique
-    references public.campaign_action_approvals(id) on delete cascade,
+  approval_id uuid not null unique,
   -- A build must retain its exact sheet while it exists. Deferred NO ACTION
   -- blocks deleting that sheet alone, while a campaign/client cascade can
   -- delete both records in one transaction without trigger-order failures.
-  sheet_id uuid not null references public.google_ads_build_sheets(id)
-    on delete no action deferrable initially deferred,
+  sheet_id uuid not null,
   -- Immutable input snapshot for the later handler. The handler must consume
   -- this rather than re-reading mutable copy after the approval was checked.
   approved_spec jsonb not null check (jsonb_typeof(approved_spec) = 'object'),
@@ -117,7 +223,13 @@ create table if not exists public.google_ads_builds (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   foreign key (campaign_id, client_id)
-    references public.client_campaigns(id, client_id) on delete cascade
+    references public.client_campaigns(id, client_id) on delete cascade,
+  foreign key (approval_id, campaign_id, client_id)
+    references public.campaign_action_approvals(id, campaign_id, client_id)
+    on delete cascade,
+  foreign key (sheet_id, campaign_id, client_id)
+    references public.google_ads_build_sheets(id, campaign_id, client_id)
+    on delete no action deferrable initially deferred
 );
 
 comment on table public.google_ads_builds is
@@ -166,6 +278,7 @@ set search_path = pg_catalog, public as $fn$
     'schema', 'google_ads_build_spec_v1',
     'client_id', (p_sheet).client_id,
     'campaign_id', (p_sheet).campaign_id,
+    'sheet_manifest_id', (p_sheet).manifest_id,
     'sheet_id', (p_sheet).id,
     'sheet_version', (p_sheet).version,
     'sheet_plan_hash', (p_sheet).plan_hash,
@@ -216,6 +329,10 @@ begin
   if auth.role() <> 'service_role' then
     raise exception 'Only the internal service can request a campaign action.';
   end if;
+  if p_actor is null or not exists
+    (select 1 from public.profiles p where p.id = p_actor) then
+    raise exception 'A known requesting actor is required.';
+  end if;
   select * into v_campaign from public.client_campaigns where id = p_campaign_id;
   if not found then raise exception 'No such campaign.'; end if;
   if v_campaign.acquisition_mode <> 'paid' or v_campaign.paid_platform <> 'google' then
@@ -233,6 +350,9 @@ begin
   end if;
   if v_sheet.client_id <> v_campaign.client_id then
     raise exception 'The latest build sheet belongs to another client.';
+  end if;
+  if v_sheet.manifest_id is distinct from v_manifest.id then
+    raise exception 'The latest build sheet has no lineage to the current campaign package. Derive a new sheet for this package.';
   end if;
   if coalesce(array_length(v_sheet.missing, 1), 0) > 0 then
     -- Named, because `keyword_research` is always one of them and a person
@@ -275,6 +395,10 @@ begin
     'google_ads_customer_id', v_integration.google_ads_customer_id);
   v_hash := encode(sha256(convert_to(v_spec::text, 'UTF8')), 'hex');
 
+  -- The requester is not part of the reviewed build specification. Keeping
+  -- actor identity in scope would make a second authorized person collide
+  -- with the same campaign/spec idempotency key. The approval itself is one
+  -- exact action regardless of who asks for it again.
   select * into v_approval from public.request_campaign_action_approval_v6(
     v_manifest.id,
     'google_ad_build:' || p_campaign_id::text || ':' || v_hash,
@@ -285,8 +409,7 @@ begin
       'approved_spec', v_spec,
       'sheet_id', v_sheet.id,
       'copy_id', v_copy.id,
-      'integration_id', v_integration.id,
-      'requested_by', p_actor));
+      'integration_id', v_integration.id));
   return v_approval.id;
 end $fn$;
 
@@ -355,6 +478,9 @@ begin
   if not found then raise exception 'That approval names no build sheet.'; end if;
   if v_sheet.campaign_id <> a.campaign_id or v_sheet.client_id <> a.client_id then
     raise exception 'That approval names a build sheet for another campaign or client.';
+  end if;
+  if v_sheet.manifest_id is distinct from a.manifest_id then
+    raise exception 'That build sheet was not derived from the approved campaign package.';
   end if;
   if exists (select 1 from public.google_ads_build_sheets s
               where s.campaign_id = a.campaign_id and s.version > v_sheet.version) then
@@ -491,6 +617,7 @@ select
   c.name,
   s.id as sheet_id,
   s.version as sheet_version,
+  s.manifest_id as sheet_manifest_id,
   s.missing,
   (cp.campaign_id is not null) as has_copy,
   coalesce((select e.supported from public.campaign_action_executors e
@@ -505,6 +632,10 @@ select
     when c.acquisition_mode <> 'paid' or c.paid_platform <> 'google'
       then 'This is not a paid Google campaign.'
     when s.id is null then 'No build sheet has been derived yet.'
+    when s.manifest_id is null or s.manifest_id is distinct from
+      (select m.id from public.campaign_manifest_versions m
+        where m.campaign_id = c.id order by m.version desc limit 1)
+      then 'The latest sheet is not bound to the current campaign package. Derive a new sheet.'
     when coalesce(array_length(s.missing, 1), 0) > 0
       then 'The sheet is still missing: ' || array_to_string(s.missing, ', ') || '.'
     when cp.campaign_id is null

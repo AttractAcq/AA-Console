@@ -18,6 +18,10 @@ const MANAGER = "55555555-5555-4555-8555-555555555555";
 const OTHER_CLIENT = "11111111-1111-4111-8111-111111111112";
 const OTHER_CAMPAIGN = "66666666-6666-4666-8666-666666666668";
 const WRONG_CAMPAIGN = "66666666-6666-4666-8666-666666666669";
+const SECOND_CAMPAIGN = "66666666-6666-4666-8666-666666666670";
+const SECOND_MANIFEST = "77777777-7777-4777-8777-777777777780";
+const OTHER_MANIFEST = "77777777-7777-4777-8777-777777777781";
+const ACTOR_TWO = "55555555-5555-4555-8555-555555555556";
 
 const sql = (file: string) =>
   readFile(new URL(`../../supabase/migrations/${file}`, import.meta.url), "utf8");
@@ -31,14 +35,18 @@ async function one<T = Record<string, unknown>>(q: string, p: unknown[] = []): P
 const asService = () => db.exec("set test.role = 'service_role'");
 const asHuman = () => db.exec("set test.role = 'authenticated'");
 
-async function record(derived: object, missing: string[] = ["keyword_research"]) {
+async function record(
+  derived: object,
+  missing: string[] = ["keyword_research"],
+  manifestId = MANIFEST,
+) {
   await asService();
-  const row = await one<{ record_google_ads_sheet_v6: string }>(
-    "select record_google_ads_sheet_v6($1,$2,$3)",
-    [CAMPAIGN, JSON.stringify(derived), missing],
+  const row = await one<{ record_google_ads_sheet_for_manifest_v6: string }>(
+    "select record_google_ads_sheet_for_manifest_v6($1,$2,$3,$4)",
+    [CAMPAIGN, manifestId, JSON.stringify(derived), missing],
   );
   await asHuman();
-  return row.record_google_ads_sheet_v6;
+  return row.record_google_ads_sheet_for_manifest_v6;
 }
 
 async function blocker(campaign = CAMPAIGN): Promise<string | null> {
@@ -123,6 +131,9 @@ beforeEach(async () => {
   await db.exec(await sql("20261015230000_206_v6_action_approvals.sql"));
   await db.exec(await sql("20261022090000_230_campaign_action_executor.sql"));
   await db.exec(await sql("20261024170000_243_google_ads_build_sheet.sql"));
+  await asService();
+  await db.query("select record_google_ads_sheet_v6($1,$2,$3)",
+    [CAMPAIGN, JSON.stringify({ legacy: true }), ["keyword_research"]]);
   await db.exec(await sql("20261025235000_260_building_the_google_campaign.sql"));
   await asHuman();
 }, 60000);
@@ -162,11 +173,11 @@ async function completeFixture(): Promise<void> {
   );
 }
 
-async function request(): Promise<string> {
+async function request(actorId = MANAGER): Promise<string> {
   await asService();
   const row = await one<{ request_campaign_google_build_v6: string }>(
     "select request_campaign_google_build_v6($1,$2)",
-    [CAMPAIGN, MANAGER],
+    [CAMPAIGN, actorId],
   );
   return row.request_campaign_google_build_v6;
 }
@@ -194,6 +205,84 @@ async function approveAndClaim(approvalId: string): Promise<string> {
 }
 
 describe("migration 260 remains a prerequisite", () => {
+  it("blocks a legacy sheet with unknown package lineage and rejects old recording calls", async () => {
+    const legacy = await one<{ manifest_id: string | null }>(
+      "select manifest_id from google_ads_build_sheets where campaign_id=$1", [CAMPAIGN],
+    );
+    expect(legacy.manifest_id).toBeNull();
+    expect(await blocker()).toContain("not bound to the current campaign package");
+    await asService();
+    await expect(db.query(
+      "select request_campaign_google_build_v6($1,$2)", [CAMPAIGN, MANAGER],
+    )).rejects.toThrow("no lineage to the current campaign package");
+    await expect(db.query(
+      "select record_google_ads_sheet_v6($1,$2,$3)",
+      [CAMPAIGN, JSON.stringify({ stale: true }), ["keyword_research"]],
+    )).rejects.toThrow("requires the manifest id captured before derivation");
+    await expect(db.query(
+      `insert into google_ads_build_sheets
+         (campaign_id,client_id,version,derived,missing,plan_hash)
+       values ($1,$2,2,'{}'::jsonb,'{}'::text[],repeat('a',64))`,
+      [CAMPAIGN, CLIENT],
+    )).rejects.toThrow(/check constraint/i);
+  });
+
+  it("binds new sheets to the captured latest manifest and rejects a superseded capture", async () => {
+    const initial = await record({ keyword_groups: ["research fixture"] }, []);
+    const first = await one<{ version: number; manifest_id: string; plan_hash: string }>(
+      "select version, manifest_id, plan_hash from google_ads_build_sheets where id=$1", [initial],
+    );
+    expect(first).toMatchObject({ version: 2, manifest_id: MANIFEST });
+
+    await db.query(
+      `insert into client_campaigns(id,client_id,name,acquisition_mode,paid_platform)
+       values ($1,$2,'Second campaign','paid','google')`,
+      [SECOND_CAMPAIGN, CLIENT],
+    );
+    await expect(db.query(
+      `insert into google_ads_build_sheets
+         (campaign_id,client_id,manifest_id,version,derived,missing,plan_hash)
+       values ($1,$2,$3,1,'{}'::jsonb,'{}'::text[],repeat('d',64))`,
+      [SECOND_CAMPAIGN, CLIENT, MANIFEST],
+    )).rejects.toThrow(/foreign key/i);
+
+    await db.query(
+      `insert into campaign_manifest_versions
+         (id,campaign_id,client_id,version,acquisition_mode,paid_platform,plan_hash)
+       values ($1,$2,$3,2,'paid','google',repeat('b',32))`,
+      [SECOND_MANIFEST, CAMPAIGN, CLIENT],
+    );
+    await asService();
+    await expect(db.query(
+      "select record_google_ads_sheet_for_manifest_v6($1,$2,$3,$4)",
+      [CAMPAIGN, MANIFEST, JSON.stringify({ keyword_groups: ["research fixture"] }), []],
+    )).rejects.toThrow("package changed during sheet derivation");
+    await expect(db.query(
+      "select request_campaign_google_build_v6($1,$2)", [CAMPAIGN, MANAGER],
+    )).rejects.toThrow("no lineage to the current campaign package");
+
+    const next = await record({ keyword_groups: ["research fixture"] }, [], SECOND_MANIFEST);
+    const second = await one<{ version: number; manifest_id: string; plan_hash: string }>(
+      "select version, manifest_id, plan_hash from google_ads_build_sheets where id=$1", [next],
+    );
+    expect(second).toMatchObject({ version: 3, manifest_id: SECOND_MANIFEST });
+    expect(second.plan_hash).not.toBe(first.plan_hash);
+  });
+
+  it("returns one exact approval when two actors request the same build", async () => {
+    await completeFixture();
+    await db.query("insert into profiles(id) values ($1)", [ACTOR_TWO]);
+    await db.exec("update campaign_action_executors set supported=true where action_key='google_ad_build'");
+    const first = await request(MANAGER);
+    const second = await request(ACTOR_TWO);
+    expect(second).toBe(first);
+    const approvals = await rows<{ scope: Record<string, unknown> }>(
+      "select scope from campaign_action_approvals where action_key='google_ad_build'",
+    );
+    expect(approvals).toHaveLength(1);
+    expect(approvals[0]!.scope).not.toHaveProperty("requested_by");
+  });
+
   it("rejects null or overlong ad-copy elements before any build can use them", async () => {
     await expect(db.query(
       `insert into google_ads_copy
@@ -391,6 +480,64 @@ describe("migration 260 remains a prerequisite", () => {
       .toHaveLength(0);
   });
 
+  it("rejects build rows whose approval or sheet belongs to another campaign or client", async () => {
+    await completeFixture();
+    await db.exec("update campaign_action_executors set supported=true where action_key='google_ad_build'");
+    const ownApproval = await request();
+    const ownSheet = await one<{ id: string }>(
+      "select id from google_ads_build_sheets where campaign_id=$1 order by version desc limit 1",
+      [CAMPAIGN],
+    );
+
+    await db.query(
+      `insert into client_campaigns(id,client_id,name,acquisition_mode,paid_platform)
+       values ($1,$2,'Second campaign','paid','google')`,
+      [SECOND_CAMPAIGN, CLIENT],
+    );
+    async function foreignPair(campaignId: string, clientId: string, manifestId: string) {
+      await db.query(
+        `insert into campaign_manifest_versions
+           (id,campaign_id,client_id,version,acquisition_mode,paid_platform,plan_hash)
+         values ($1,$2,$3,1,'paid','google',repeat('c',32))`,
+        [manifestId, campaignId, clientId],
+      );
+      const sheet = await one<{ id: string }>(
+        `insert into google_ads_build_sheets
+           (campaign_id,client_id,manifest_id,version,derived,missing,plan_hash)
+         values ($1,$2,$3,1,'{}'::jsonb,'{}'::text[],repeat('c',64)) returning id`,
+        [campaignId, clientId, manifestId],
+      );
+      const approval = await one<{ id: string }>(
+        `insert into campaign_action_approvals
+           (client_id,campaign_id,manifest_id,idempotency_key,action_key,destination,
+            artifact_version_hash,scope,request_hash,status,decided_at,decided_by)
+         values ($1,$2,$3,'other-google-build','google_ad_build',
+                 'google_ads:customers/9999999999',repeat('c',64),'{}'::jsonb,
+                 repeat('c',32),'approved',now(),$4) returning id`,
+        [clientId, campaignId, manifestId, MANAGER],
+      );
+      return { sheetId: sheet.id, approvalId: approval.id };
+    }
+
+    const sameClient = await foreignPair(SECOND_CAMPAIGN, CLIENT, SECOND_MANIFEST);
+    const anotherClient = await foreignPair(OTHER_CAMPAIGN, OTHER_CLIENT, OTHER_MANIFEST);
+    for (const foreign of [sameClient, anotherClient]) {
+      await expect(db.query(
+        `insert into google_ads_builds
+           (client_id,campaign_id,approval_id,sheet_id,approved_spec)
+         values ($1,$2,$3,$4,'{}'::jsonb)`,
+        [CLIENT, CAMPAIGN, foreign.approvalId, ownSheet.id],
+      )).rejects.toThrow(/foreign key/i);
+      await expect(db.query(
+        `insert into google_ads_builds
+           (client_id,campaign_id,approval_id,sheet_id,approved_spec)
+         values ($1,$2,$3,$4,'{}'::jsonb)`,
+        [CLIENT, CAMPAIGN, ownApproval, foreign.sheetId],
+      )).rejects.toThrow(/foreign key/i);
+    }
+    expect(await rows("select id from google_ads_builds")).toHaveLength(0);
+  });
+
   it("keeps copy and build records readable only for an authorized client", async () => {
     await completeFixture();
     await db.exec("update campaign_action_executors set supported=true where action_key='google_ad_build'");
@@ -414,8 +561,9 @@ describe("migration 260 remains a prerequisite", () => {
     );
     const otherSheet = await one<{ id: string }>(
       `insert into google_ads_build_sheets
-         (campaign_id,client_id,version,derived,missing,plan_hash)
-       values ($1,$2,1,'{}'::jsonb,'{}'::text[],repeat('e',64)) returning id`,
+         (campaign_id,client_id,manifest_id,version,derived,missing,plan_hash)
+       values ($1,$2,'77777777-7777-4777-8777-777777777778',1,
+               '{}'::jsonb,'{}'::text[],repeat('e',64)) returning id`,
       [OTHER_CAMPAIGN, OTHER_CLIENT],
     );
     await db.query(
