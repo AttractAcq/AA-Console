@@ -49,13 +49,22 @@ language plpgsql
 security definer
 set search_path = ''
 as $function$
+declare
+  v_asset_client_id uuid;
 begin
-  if new.asset_id is not null and not exists (
-    select 1 from public.client_media_assets a
-    where a.id = new.asset_id and a.client_id = new.client_id
-  ) then
-    raise exception 'Assignment asset must belong to the assignment client'
-      using errcode = '23514';
+  if new.asset_id is not null then
+    -- An asset client update already holds this row lock. Taking the same lock
+    -- here serializes the two writers: whichever goes second checks the first
+    -- transaction's committed client/assignment state.
+    select a.client_id into v_asset_client_id
+      from public.client_media_assets a
+     where a.id = new.asset_id
+     for update;
+    if not found or v_asset_client_id is null
+       or v_asset_client_id is distinct from new.client_id then
+      raise exception 'Assignment asset must belong to the assignment client'
+        using errcode = '23514';
+    end if;
   end if;
   return new;
 end

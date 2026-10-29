@@ -16,6 +16,10 @@ decision. It follows migration 263 and must be released only after 260–263.
   trigger blocks changing an attached asset's `client_id` afterward. The
   migration refuses installation if it finds a pre-existing mismatch; such
   rows require a separate reviewed repair, not silent reassignment.
+- The assignment-side guard locks the referenced asset row with `FOR UPDATE`
+  before checking its client. Asset reparenting takes the same row lock, so
+  concurrent attach and reparent operations serialize and the second writer
+  checks the committed state before either can leave a cross-client link.
 - `schema-replay-contract.sql` asserts grants and trigger presence on clean
   and upgrade replay.
 
@@ -28,7 +32,10 @@ for the unrelated half of each partial fixture. Tests use `SET ROLE
 authenticated` for direct-call denial and positive named-wrapper behavior;
 they also verify catalog grants, same-client asset acceptance, foreign asset
 rejection, unchanged state/event counts after refusal, and asset-reparenting
-refusal. The fixtures are not a substitute for the full migration replay.
+refusal. A focused test checks the installed row-locking guard and both
+sequential transaction orders. PGlite cannot interleave two connections, so
+the fixtures are not a substitute for the full migration replay or a live
+two-session concurrency test.
 
 ## Remaining B005 work
 
