@@ -120,6 +120,11 @@ export async function readLiveTypes(ref, token, source, fetchImpl = fetch) {
   };
 }
 
+export function generatedTypeStatus(production, staging) {
+  const matches = [production?.schemaBodyMatchesCheckedIn, staging?.schemaBodyMatchesCheckedIn];
+  return matches.includes(false) ? "different" : matches.every((match) => match === true) ? "matching" : "unverified";
+}
+
 export async function buildReadOnlyApiReport({ refs, token, fetchImpl = fetch, root = ROOT }) {
   const local = await readLocalMigrations(root);
   const typeSource = await readFile(resolve(root, "src/types/database.ts"), "utf8");
@@ -132,11 +137,10 @@ export async function buildReadOnlyApiReport({ refs, token, fetchImpl = fetch, r
     try { remoteTypes[name] = await readLiveTypes(ref, token, typeSource, fetchImpl); }
     catch (error) { remoteTypes[name] = { error: publicError(error) }; }
   }
-  const productionMatch = remoteTypes.production.schemaBodyMatchesCheckedIn;
   const types = {
     sourceFile: "src/types/database.ts",
     sha256: sha256(typeSource),
-    schemaDerivedComparison: productionMatch === null || productionMatch === undefined ? "unverified" : productionMatch ? "matching" : "different",
+    schemaDerivedComparison: generatedTypeStatus(remoteTypes.production, remoteTypes.staging),
     production: remoteTypes.production,
     staging: remoteTypes.staging,
     generatorFormatNote: "Only the public/GraphQL schema body is compared; generator helper and metadata formatting is excluded.",

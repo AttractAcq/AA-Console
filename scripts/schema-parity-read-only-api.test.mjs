@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CATALOG_QUERIES, HISTORY_SQL } from "./schema-parity.mjs";
 import {
   explicitProjectRefs, scopedReadToken, readOnlyApiQuery, inspectReadOnlyApi,
-  generatedSchemaBody, readLiveTypes,
+  generatedSchemaBody, generatedTypeStatus, readLiveTypes,
 } from "./schema-parity-read-only-api.mjs";
 
 const prod = "bancbdztffokwiifzoiv";
@@ -57,5 +57,14 @@ describe("Management API read-only transport", () => {
     expect(info.schemaBodyMatchesCheckedIn).toBe(true);
     expect(info.exactFileMatchesCheckedIn).toBe(false);
     expect(generatedSchemaBody("new format without schema markers")).toBeNull();
+  });
+
+  it("never calls generated types matching when staging differs or either read is unknown", () => {
+    const matching = { schemaBodyMatchesCheckedIn: true };
+    const different = { schemaBodyMatchesCheckedIn: false };
+    expect(generatedTypeStatus(matching, matching)).toBe("matching");
+    expect(generatedTypeStatus(matching, different)).toBe("different");
+    expect(generatedTypeStatus(different, matching)).toBe("different");
+    expect(generatedTypeStatus(matching, { error: "management_api_http_403" })).toBe("unverified");
   });
 });

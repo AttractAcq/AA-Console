@@ -134,6 +134,12 @@ context. The report includes the runtime's full Git SHA and the manifest's
 migration/type digests. B003's clean/upgrade replay remains the stronger proof
 that tracked migrations apply correctly.
 
+The generated-types check compares both production and staging against the
+checked-in public/GraphQL schema body. The aggregate status is `matching`
+only when both agree; a mismatch in either environment is a named drift
+finding, and an unavailable comparison is `unverified`. This prevents an
+otherwise identical catalog snapshot from concealing staging type drift.
+
 ## Tests and limits
 
 Run `npx vitest run scripts/schema-parity.test.mjs

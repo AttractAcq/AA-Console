@@ -101,6 +101,25 @@ describe("catalog and report", () => {
     expect(report.findings.shown.filter((finding) => finding.type === "recorded_sql_mismatch")).toHaveLength(0);
   });
 
+  it("reports staging generated-types drift even when history and catalogs match", () => {
+    const categories = Object.fromEntries(CATALOG_QUERIES.map(({ name }) => [name, { status: "read", count: 0 }]));
+    const objects = catalogObjects([
+      { kind: "extension", identity: "pgcrypto", definition: "1" },
+      { kind: "extension", identity: "pg_cron", definition: "1" },
+      { kind: "event_trigger", identity: "ensure_rls", definition: "1" },
+    ]);
+    const environment = (name) => ({ name, history: local.map(({ version, name }) => row(version, name)), objects, categories, errors: [] });
+    const types = {
+      sourceFile: "src/types/database.ts", sha256: sha256("types"), schemaDerivedComparison: "different",
+      production: { schemaBodyMatchesCheckedIn: true }, staging: { schemaBodyMatchesCheckedIn: false },
+    };
+    const report = buildReport(local, environment("production"), environment("staging"), types, null, cleanProvenance);
+    expect(report.result).toBe("drift");
+    expect(report.findings.shown.filter((finding) => finding.type === "generated_types_mismatch")).toEqual([
+      expect.objectContaining({ environment: "staging", identity: "src/types/database.ts" }),
+    ]);
+  });
+
   it("marks missing catalog access incomplete rather than equal", () => {
     const categories = Object.fromEntries(CATALOG_QUERIES.map(({ name }) => [name, { status: "read", count: 0 }]));
     const empty = { name: "production", history: [], objects: new Map(), categories, errors: [] };

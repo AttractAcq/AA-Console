@@ -56,4 +56,37 @@ describe("live schema parity", () => {
     expect(JSON.stringify(report)).not.toContain("ddl_command_end");
     expect(calls.filter((call) => call.url.includes("/database/query/read-only"))).toHaveLength(26);
   });
+
+  it("reports staging type drift when migration histories and catalogs otherwise match", async () => {
+    const typeSource = await readFile(new URL("../../../src/types/database.ts", import.meta.url), "utf8");
+    const changedStagingTypes = typeSource.replace("  graphql_public: {", "  graphql_public: { /* staging drift */");
+    expect(changedStagingTypes).not.toBe(typeSource);
+    const fetchImpl = vi.fn(async (url: string | URL | Request, options?: RequestInit) => {
+      const address = String(url);
+      const body = options?.body ? JSON.parse(String(options.body)) as { query: string } : null;
+      const stage = address.includes(refs.staging);
+      if (address.includes("/types/typescript")) return { ok: true, json: async () => ({ types: stage ? changedStagingTypes : typeSource }) } as Response;
+      expect(address).toMatch(/\/database\/query\/read-only$/);
+      if (body?.query === manifest.historySql) return { ok: true, json: async () => manifest.localMigrations.map((row) => ({
+        version: row.version, name: row.name, statement_count: 1,
+        stored_sql_md5: "known", single_statement_trimmed_md5: row.trimmedMd5,
+      })) } as Response;
+      if (body?.query.includes("to_regclass")) return { ok: true, json: async () => [{ present: true }] } as Response;
+      if (body?.query.includes("from pg_extension e")) return { ok: true, json: async () => [
+        { kind: "extension", identity: "pgcrypto", definition: { version: "1" } },
+        { kind: "extension", identity: "pg_cron", definition: { version: "1" } },
+      ] } as Response;
+      if (body?.query.includes("from pg_event_trigger e")) return { ok: true, json: async () => [
+        { kind: "event_trigger", identity: "ensure_rls", definition: { event: "ddl_command_end" } },
+      ] } as Response;
+      return { ok: true, json: async () => [] } as Response;
+    }) as unknown as typeof fetch;
+    const report = await collectSchemaParity(config, fetchImpl);
+    expect(report.result).toBe("drift");
+    expect(report.generatedTypes.schemaDerivedComparison).toBe("different");
+    expect(report.findings.shown.filter((finding) => finding.type === "generated_types_mismatch")).toEqual([
+      expect.objectContaining({ environment: "staging", identity: "src/types/database.ts" }),
+    ]);
+    expect(report.findings.shown).toHaveLength(1);
+  });
 });

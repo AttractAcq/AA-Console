@@ -233,14 +233,17 @@ export async function collectSchemaParity(config: RuntimeConfig, fetchImpl: type
   ]);
   const history = production.history && staging.history ? compareHistory(production.history, staging.history) : null;
   const findings: Finding[] = [...(history?.findings ?? []), ...compareCatalog(production, staging)];
-  const matchingTypes = productionTypes.schemaBodyMatchesCheckedIn;
-  if (matchingTypes === false) findings.push({ type: "generated_types_mismatch", identity: "src/types/database.ts", nextAction: "Regenerate checked-in types from a clean replay and inspect the live schema." });
+  const typeMatches = [productionTypes.schemaBodyMatchesCheckedIn, stagingTypes.schemaBodyMatchesCheckedIn];
+  const schemaDerivedComparison = typeMatches.includes(false) ? "different" : typeMatches.every((match) => match === true) ? "matching" : "unverified";
+  for (const [environment, typeInfo] of [["production", productionTypes], ["staging", stagingTypes]] as const) {
+    if (typeInfo.schemaBodyMatchesCheckedIn === false) findings.push({ type: "generated_types_mismatch", environment, identity: "src/types/database.ts", nextAction: "Regenerate checked-in types from a clean replay and inspect the live schema." });
+  }
   const fullSha = process.env.RAILWAY_GIT_COMMIT_SHA ?? null;
   const gitSha = fullSha && /^[0-9a-f]{40}$/i.test(fullSha) ? fullSha : null;
   const queryIncomplete = !gitSha || !production.history || !staging.history || production.errors.length > 0 || staging.errors.length > 0 ||
     Object.values(production.categories).some((category) => category.status === "unavailable") ||
     Object.values(staging.categories).some((category) => category.status === "unavailable") ||
-    matchingTypes === null || matchingTypes === undefined || stagingTypes.schemaBodyMatchesCheckedIn === null || stagingTypes.schemaBodyMatchesCheckedIn === undefined;
+    typeMatches.some((match) => match === null || match === undefined);
   const observedDrift = findings.some((finding) => finding.type !== "history_sql_payload_unavailable");
   const payloadUnavailable = Object.values(history?.sourceToHistoryBody.storedSqlPayloadUnavailable ?? {}).some((count) => count > 0);
   const ordered = findings.toSorted((a, b) => stableJson(a).localeCompare(stableJson(b)));
@@ -266,7 +269,7 @@ export async function collectSchemaParity(config: RuntimeConfig, fetchImpl: type
     },
     generatedTypes: {
       sourceFile: "src/types/database.ts", sha256: manifest.generatedTypesSha256,
-      schemaDerivedComparison: matchingTypes === undefined || matchingTypes === null ? "unverified" : matchingTypes ? "matching" : "different",
+      schemaDerivedComparison,
       production: productionTypes, staging: stagingTypes,
       generatorFormatNote: "Only the public/GraphQL schema body is compared; generator helper and metadata formatting is excluded.",
     },

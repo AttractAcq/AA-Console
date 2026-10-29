@@ -275,7 +275,13 @@ export function buildReport(local, production, staging, types, baseline = null, 
   for (const environment of [production, staging]) {
     if (environment.categories.extensions?.status === "read" && environment.categories.event_triggers?.status === "read") findings.push(...findRequiredMissing(environment));
   }
-  if (types.schemaDerivedComparison === "different") findings.push({ type: "generated_types_mismatch", identity: types.sourceFile, nextAction: "Regenerate types from a clean replay at pinned service versions and review the diff." });
+  const typeEnvironments = ["production", "staging"].filter((name) => types[name]?.schemaBodyMatchesCheckedIn === false);
+  for (const environment of typeEnvironments) {
+    findings.push({ type: "generated_types_mismatch", environment, identity: types.sourceFile, nextAction: "Regenerate types from a clean replay at pinned service versions and review the diff." });
+  }
+  if (typeEnvironments.length === 0 && types.schemaDerivedComparison === "different") {
+    findings.push({ type: "generated_types_mismatch", identity: types.sourceFile, nextAction: "Regenerate types from a clean replay at pinned service versions and review the diff." });
+  }
   if (baseline) {
     for (const environment of [production, staging]) {
       for (const category of successfulCategories.filter((name) => baseline.categories[name]?.status === "read")) {
