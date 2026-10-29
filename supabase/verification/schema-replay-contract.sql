@@ -87,6 +87,21 @@ begin
   end if;
 
   if not exists (
+    select 1 from pg_trigger
+     where tgrelid = 'public.client_onboarding_steps'::regclass
+       and tgname = 'cos_protect_identity_and_completion'
+       and tgenabled = 'O'
+  ) or not exists (
+    select 1 from pg_policy p
+     where p.polrelid = 'public.client_onboarding_steps'::regclass
+       and p.polname = 'cos_client_update'
+       and p.polwithcheck is not null
+       and pg_get_expr(p.polwithcheck, p.polrelid) <> 'true'
+  ) then
+    raise exception 'Client onboarding update guard or scoped WITH CHECK missing';
+  end if;
+
+  if not exists (
     select 1 from information_schema.columns
      where table_schema = 'public' and table_name = 'outbound_messages'
        and column_name = 'client_id' and is_nullable = 'NO'
