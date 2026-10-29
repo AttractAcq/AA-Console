@@ -19,6 +19,7 @@ const migration271 = '20261029220000_271_profileless_authenticated_scope.sql'
 const migration272 = '20261030100000_272_onboarding_step_integrity.sql'
 const migration273 = '20261030110000_273_canonical_approval_ledger.sql'
 const migration274 = '20261030120000_274_campaign_action_inbox_bridge.sql'
+const migration275 = '20261030130000_275_sales_entitlement_inbox_binding.sql'
 const released263 = '20261029140000'
 
 test('the 261 and 262 history is blocked until 260 exists', () => {
@@ -129,5 +130,19 @@ test('campaign action Inbox bridge follows the canonical ledger', () => {
   assert.throws(
     () => assertSchemaMigrationOrder(files.filter((name) => name !== migration273), released263),
     /Expected migration 273 before .*_274_/,
+  )
+})
+
+test('sales entitlement Inbox binding follows the campaign action bridge', () => {
+  const files = [migration259, migration260, migration261, migration262, migration263,
+    migration264, migration265, migration266, migration267, migration268, migration269,
+    migration270, migration271, migration272, migration273, migration274, migration275]
+  assert.deepEqual(assertSchemaMigrationOrder(files, released263), {
+    releasedVersion: released263, releasedNumber: 263,
+    headVersion: '20261030130000', nextNumber: 276, pendingCount: 12,
+  })
+  assert.throws(
+    () => assertSchemaMigrationOrder(files.filter((name) => name !== migration274), released263),
+    /Expected migration 274 before .*_275_/,
   )
 })
