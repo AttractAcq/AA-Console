@@ -85,6 +85,7 @@ import { FinancialsPanel } from "./admin/FinancialsPanel";
 import { SopsPanel } from "./admin/SopsPanel";
 import { ContentJourney } from "../components/ContentJourney";
 import { ContentAssetTable } from "../components/content/ContentAssetTable";
+import { ContentAssetsWorkspace, LEGACY_LIBRARY_TABS } from "../components/content/ContentAssetsWorkspace";
 import { MarketOpportunitiesPanel } from "./opportunities/MarketOpportunitiesPanel";
 import { ProofDistributionPanel } from "./proof-distribution/ProofDistributionPanel";
 
@@ -356,7 +357,7 @@ function getPanelBody(
       // Briefs, where Approve & build starts the work.
       case "create": return <ContentAssetTable approved={false} />;
       case "edit": return <EditRepurposePanel showJourney={false} />;
-      case "assets": return <ContentAssetTable approved />;
+      case "assets": return <ContentAssetsWorkspace />;
     }
   }
   const renderPanel = activeTab
@@ -422,8 +423,10 @@ export function Page({ node }: { node: NavNode }) {
       ]
       : node.tabs;
   const requestedTab = searchParams.get("tab");
+  const assetLibrary = node.id === "content-production-factory"
+    && requestedTab !== null && LEGACY_LIBRARY_TABS.has(requestedTab);
   const activeTab =
-    tabs && (tabs.find((t) => t.id === requestedTab) ?? tabs[0]);
+    tabs && (tabs.find((t) => t.id === (assetLibrary ? "assets" : requestedTab)) ?? tabs[0]);
   const v6Intelligence = node.id === "intelligence-os";
   const exportModule: ExportModule | null = v6Intelligence
     ? view === "strategy" ? "strategy" : "intelligence"
@@ -438,7 +441,10 @@ export function Page({ node }: { node: NavNode }) {
       const next = new URLSearchParams(current);
       if (id === tabs[0].id) next.delete("tab");
       else next.set("tab", id);
-      if (id !== "assets") next.delete("asset");
+      if (id !== "assets") {
+        next.delete("asset");
+        next.delete("library");
+      }
       return next;
     });
   }

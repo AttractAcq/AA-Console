@@ -16,6 +16,11 @@ vi.mock("./intelligence/MarketPanel", () => ({ MarketPanel: () => <p>Market pane
 vi.mock("./ideation/GenerationPanel", () => ({ GenerationPanel: ({ showJourney = true }: { showJourney?: boolean }) => <p>Ideation panel · journey {String(showJourney)}</p> }));
 vi.mock("./campaigns/CampaignExecutionPanel", () => ({ CampaignExecutionPanel: () => <p>Campaign table</p> }));
 
+// The workspace has its own test; here it stands for "Assets opened".
+vi.mock("../components/content/ContentAssetsWorkspace", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ContentAssetsWorkspace: () => <p>Assets workspace</p>,
+}));
 vi.mock("./proof-bank/ProofFactoryV2Panel", () => ({ ProofFactoryV2Panel: ({tab}: {tab: string}) => <p>Proof v2 {tab}</p> }));
 vi.mock("./proof-bank/ProofBankPanel", () => ({ ProofBankPanel: () => <p>Original proof bank</p> }));
 vi.mock("./conversion/PageBuilderPanel", () => ({ PageBuilderPanel: ({ pageType }: { pageType: string }) => <p>Page builder · {pageType}</p> }));
@@ -114,10 +119,10 @@ it("keeps Content Production v1 tabs and gives v2 grouped assets without its sta
   expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
     "Ideation", "Briefs", "Create", "Edit / Repurpose", "Assets",
   ]);
-  // v2 Assets is the approved assets themselves now, not a group of
-  // libraries: the table renders, and says so when nothing is approved yet.
+  // Assets is the approved table with v1's six libraries nested under it,
+  // which is the shape the 16 October specification asked for.
   await user.click(screen.getByRole("tab", { name: "Assets" }));
-  expect(screen.getByText("Approved assets")).toBeInTheDocument();
+  expect(screen.getByText("Assets workspace")).toBeInTheDocument();
   await user.click(screen.getByRole("tab", { name: "Ideation" }));
   expect(screen.getByText("Ideation panel · journey false")).toBeInTheDocument();
 });
@@ -180,4 +185,13 @@ it("keeps the Posts board on Meta Profile v2", async () => {
   ]);
   await user.click(screen.getByRole("tab", { name: "Posts" }));
   expect(screen.getByText("Organic board")).toBeInTheDocument();
+});
+
+it("sends a link to one of v1's library tabs to Assets, where that library now is", () => {
+  const content = v6ModuleNodes.find((node) => node.id === "content-production-factory")!;
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/content-production-factory?view=v2&tab=reel-shots"]}>
+    <Routes><Route path="/clients/:clientId/delivery/content-production-factory" element={<Page node={content} />} /></Routes>
+  </MemoryRouter>);
+  expect(screen.getByRole("tab", { name: "Assets" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByText("Assets workspace")).toBeInTheDocument();
 });
