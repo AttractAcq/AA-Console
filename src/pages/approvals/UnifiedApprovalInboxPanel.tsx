@@ -38,22 +38,6 @@ export interface UnifiedApprovalDecision {
   decided_at: string;
 }
 
-type ReadResult = {
-  data: unknown[] | null;
-  error: { message: string } | null;
-};
-
-type ReadQuery = {
-  select: (columns: string) => ReadQuery;
-  eq: (column: string, value: string) => ReadQuery;
-  in: (column: string, values: string[]) => ReadQuery;
-  order: (column: string, options?: { ascending: boolean }) => Promise<ReadResult>;
-};
-
-// The canonical view/table are introduced by migration 273+. Keep this small
-// read adapter until generated Database types include them. It cannot write.
-const approvalReadDb = supabase as unknown as { from: (table: string) => ReadQuery };
-
 function printable(value: unknown): string {
   if (value === null || value === undefined) return "Not supplied";
   if (typeof value === "string") return value;
@@ -209,17 +193,21 @@ export function UnifiedApprovalInboxPanel() {
   const refresh = useCallback(async () => {
     if (!clientId) return;
     try {
-      const requestResult = await approvalReadDb.from("approval_inbox_v6")
+      const requestResult = await supabase.from("approval_inbox_v6")
         .select("*").eq("client_id", clientId).order("requested_at", { ascending: false });
       if (requestResult.error) throw requestResult.error;
-      const rows = (requestResult.data ?? []) as UnifiedApprovalRequest[];
+      const rows: UnifiedApprovalRequest[] = requestResult.data ?? [];
       const ids = rows.map((row) => row.id);
-      const decisionResult = ids.length === 0 ? { data: [], error: null } : await approvalReadDb
-        .from("approval_decision_events_v6").select("request_id,decision,actor_id,actor_aal,reason,decided_at")
-        .in("request_id", ids).order("decided_at", { ascending: false });
-      if (decisionResult.error) throw decisionResult.error;
+      let decisionRows: UnifiedApprovalDecision[] = [];
+      if (ids.length > 0) {
+        const decisionResult = await supabase.from("approval_decision_events_v6")
+          .select("request_id,decision,actor_id,actor_aal,reason,decided_at")
+          .in("request_id", ids).order("decided_at", { ascending: false });
+        if (decisionResult.error) throw decisionResult.error;
+        decisionRows = decisionResult.data ?? [];
+      }
       setRequests(rows);
-      setDecisions((decisionResult.data ?? []) as UnifiedApprovalDecision[]);
+      setDecisions(decisionRows);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : (cause as { message?: string }).message ?? "Could not load the unified approval inbox.");

@@ -292,6 +292,194 @@ export type Database = {
         }
         Relationships: []
       }
+      approval_decision_events_v6: {
+        Row: {
+          actor_aal: string
+          actor_id: string
+          artifact_hash: string | null
+          decided_at: string
+          decision: string
+          id: string
+          reason: string | null
+          request_id: string
+          source_decision_ref: string
+        }
+        Insert: {
+          actor_aal: string
+          actor_id: string
+          artifact_hash?: string | null
+          decided_at?: string
+          decision: string
+          id?: string
+          reason?: string | null
+          request_id: string
+          source_decision_ref: string
+        }
+        Update: {
+          actor_aal?: string
+          actor_id?: string
+          artifact_hash?: string | null
+          decided_at?: string
+          decision?: string
+          id?: string
+          reason?: string | null
+          request_id?: string
+          source_decision_ref?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_decision_events_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_decision_events_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_request_evidence_v6: {
+        Row: {
+          account_ref: string | null
+          artifact_hash: string
+          attached_at: string
+          budget: Json | null
+          destination: string | null
+          evidence_hash: string
+          evidence_ref: string
+          id: string
+          preview: Json
+          request_id: string
+          scope: Json
+          source_version: string
+        }
+        Insert: {
+          account_ref?: string | null
+          artifact_hash: string
+          attached_at?: string
+          budget?: Json | null
+          destination?: string | null
+          evidence_hash: string
+          evidence_ref: string
+          id?: string
+          preview: Json
+          request_id: string
+          scope: Json
+          source_version: string
+        }
+        Update: {
+          account_ref?: string | null
+          artifact_hash?: string
+          attached_at?: string
+          budget?: Json | null
+          destination?: string | null
+          evidence_hash?: string
+          evidence_ref?: string
+          id?: string
+          preview?: Json
+          request_id?: string
+          scope?: Json
+          source_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_request_evidence_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_request_evidence_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_requests_v6: {
+        Row: {
+          account_ref: string | null
+          artifact_hash: string | null
+          budget: Json | null
+          client_id: string | null
+          destination: string | null
+          expires_at: string | null
+          id: string
+          owner_role: string | null
+          owning_path: string | null
+          payload_hash: string
+          preview: Json | null
+          preview_blocker: string | null
+          requested_at: string
+          requested_by: string | null
+          scope: Json | null
+          source_id: string
+          source_kind: string
+          source_system: string
+          source_version: string
+          title: string
+        }
+        Insert: {
+          account_ref?: string | null
+          artifact_hash?: string | null
+          budget?: Json | null
+          client_id?: string | null
+          destination?: string | null
+          expires_at?: string | null
+          id?: string
+          owner_role?: string | null
+          owning_path?: string | null
+          payload_hash: string
+          preview?: Json | null
+          preview_blocker?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          scope?: Json | null
+          source_id: string
+          source_kind: string
+          source_system: string
+          source_version: string
+          title: string
+        }
+        Update: {
+          account_ref?: string | null
+          artifact_hash?: string | null
+          budget?: Json | null
+          client_id?: string | null
+          destination?: string | null
+          expires_at?: string | null
+          id?: string
+          owner_role?: string | null
+          owning_path?: string | null
+          payload_hash?: string
+          preview?: Json | null
+          preview_blocker?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          scope?: Json | null
+          source_id?: string
+          source_kind?: string
+          source_system?: string
+          source_version?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       archived_leads: {
         Row: {
           archived_at: string
@@ -19068,6 +19256,30 @@ export type Database = {
           },
         ]
       }
+      approval_inbox_v6: {
+        Row: {
+          account_ref: string | null
+          artifact_hash: string | null
+          budget: Json | null
+          client_id: string | null
+          destination: string | null
+          expires_at: string | null
+          id: string
+          owner_role: string | null
+          owning_path: string | null
+          preview: Json | null
+          preview_blocker: string | null
+          requested_at: string
+          scope: Json | null
+          source_id: string
+          source_kind: string
+          source_system: string
+          source_version: string
+          status: string
+          title: string
+        }
+        Relationships: []
+      }
       approval_queue_slots: {
         Row: {
           asset_id: string | null
@@ -23028,6 +23240,34 @@ export type Database = {
     }
     Functions: {
       aa_house_client_id: { Args: never; Returns: string }
+      attach_approval_evidence_v6: {
+        Args: {
+          p_evidence: Json
+          p_evidence_ref: string
+          p_request_id: string
+          p_source_version: string
+        }
+        Returns: string
+      }
+      can_review_approval_request_v6: {
+        Args: { p_client_id: string; p_owner_role: string }
+        Returns: boolean
+      }
+      record_approval_decision_v6: {
+        Args: {
+          p_artifact_hash: string
+          p_decision: string
+          p_reason?: string
+          p_request_id: string
+          p_source_decision_ref: string
+        }
+        Returns: string
+      }
+      register_approval_request_v6: {
+        Args: { p_request: Json }
+        Returns: string
+      }
+      reject_approval_ledger_mutation_v6: { Args: never; Returns: unknown }
       accept_assignment: {
         Args: { p_assignment_id: string }
         Returns: {
