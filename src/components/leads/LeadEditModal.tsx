@@ -86,6 +86,10 @@ export function LeadEditModal({ lead, owners, onClose, onChanged, onArchived }: 
         event.preventDefault();
         void run(async () => {
           const fields = leadFieldsPayload(values);
+          // A prior owner may have been retired or lost sales access. Sending
+          // the unchanged ID back would make an unrelated edit fail the new
+          // assignment guard. Only a deliberate owner change is revalidated.
+          if (fields.owner_member_id === lead.owner_member_id) delete fields.owner_member_id;
           const { error: saveError } = await supabase.rpc("update_lead", { p_lead_id: lead.id, p_fields: fields });
           if (saveError) throw saveError;
           await onChanged();
