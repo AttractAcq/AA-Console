@@ -469,3 +469,23 @@ production rejecting a migration that a test harness had accepted:
 `client_briefs` carries no `campaign_id` (it runs through the idea), and
 `client_proof_assets` requires `media_type` with `source` rather than
 `source_url`. The harnesses now declare the real types.
+
+## 29 October 2026 — migration 260 waits for the handler that makes it true
+
+Migrations 244–259 are this branch's, and each has the runtime or console half
+that uses it. 260 does not: its last statement flips `google_ad_build` to
+`supported = true` naming `executor_module = 'google_ads_studio'`, and no such
+handler exists — `HANDLERS` in `agent-runtime/src/campaigns/actions/executor.ts`
+holds four keys, none of them this one.
+
+Today `supported is not true` is a blocker in `campaign_action_due`, and the
+claim only takes approvals whose blocker is null, so an approved Google build is
+never picked up. After 260 it is picked up and abandoned at once — the
+`ActionError` is not retryable — under "There is no executor for google ad build
+in this runtime." Applying it makes the system worse at the thing it claims to
+have enabled.
+
+So it is not in this branch. Leaving it here would have meant holding one file
+back by hand at every `supabase db push`, and the next person to run one would
+have applied it without knowing that was needed. The SQL waits on
+`feat/google-ads-build-adapter`, to land with the handler.
