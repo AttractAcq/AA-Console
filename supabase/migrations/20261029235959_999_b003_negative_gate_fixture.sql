@@ -1,0 +1,1 @@
+-- B003 negative gate fixture: intentionally skips logical migration 263; never merge.
