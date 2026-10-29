@@ -4,6 +4,7 @@ import { Button } from "../../components/Button";
 import { TeamMemberCard } from "../../components/TeamMemberCard";
 import { EmptyState } from "../../components/EmptyState";
 import { FormModal } from "../../components/forms/FormModal";
+import { teamMemberDraftKey } from "../../components/forms/draftStorage";
 import { initialsFrom } from "../../components/forms/fields";
 import type { FieldDef } from "../../components/forms/fields";
 import { ENGAGEMENT_OPTIONS } from "../../lib/options";
@@ -184,7 +185,7 @@ export function TeamCategoryPanel({ category }: { category: TeamCategory }) {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title={addButtonLabel}
-        draftKey={`team-member:${category}`}
+        draftKey={teamMemberDraftKey(category)}
         fields={FIELDS}
         submitLabel="Add"
         onSubmit={async (v) => {
