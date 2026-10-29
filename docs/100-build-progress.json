@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-10-29T20:45:00Z",
+  "updated_at": "2026-10-29T20:46:00Z",
   "objective": "AA-Console 100/100 autonomous service-business acquisition and content system, subject to exact-version human approval for every external publish, send, deployment, and spend action in one Approval Inbox.",
   "blueprint": {
     "artifact": "docs/AA_CONSOLE_100_BUILD_BLUEPRINT.md",
-    "sha256": "de1a9b625077ef3b7207609acbe11e10668bf6b7590ecd5147e59cc95453c879",
+    "sha256": "31d5429bac6a3e8617adbab022d5f6c9fdd2e5b03cee515e7565dbbd38f60e79",
     "build_rows": 106
   },
   "baseline": {
@@ -64,8 +64,8 @@
   "rows": {
     "B001": {
       "state": "in_progress",
-      "implementation_sha": null,
-      "pr": null,
+      "implementation_sha": "e931eff",
+      "pr": "https://github.com/AttractAcq/AA-Console/pull/235",
       "migration_ids": ["20261029120000_261_system_readiness_inventory", "20261029130000_262_runtime_heartbeat_retention"],
       "tests": ["Frontend build and 1,184-test suite passed locally", "Runtime typecheck/build and full suite passed locally: 2,898 passed, 4 skipped", "Gateway typecheck/build and 233-test suite passed locally"],
       "permission_and_negative_tests": ["Admin-only readiness route denies anonymous and non-admin callers", "Gateway readiness denies missing/wrong service secret", "Catalog and prune RPCs deny anon/authenticated in PGlite fixtures", "Same-PID runtime replicas write distinct heartbeat identities"],
@@ -79,8 +79,8 @@
     },
     "B002": {
       "state": "in_progress",
-      "implementation_sha": null,
-      "pr": null,
+      "implementation_sha": "e931eff",
+      "pr": "https://github.com/AttractAcq/AA-Console/pull/235",
       "migration_ids": [],
       "tests": ["18 schema auditor and admin view tests passed locally", "Frontend TypeScript build passed"],
       "permission_and_negative_tests": ["Read-only transaction and remote TLS validation", "Dirty migration source, renamed/out-of-order version, wrong DB identity and redacted next-action fixtures"],
@@ -94,8 +94,8 @@
     },
     "B003": {
       "state": "in_progress",
-      "implementation_sha": null,
-      "pr": null,
+      "implementation_sha": "e931eff",
+      "pr": "https://github.com/AttractAcq/AA-Console/pull/235",
       "migration_ids": [],
       "tests": ["10 Node schema preparation/order/fingerprint checks passed locally", "Fingerprint SQL executed against a disposable PGlite catalog", "CI workflow and replay script pass static syntax checks"],
       "permission_and_negative_tests": ["Missing/out-of-order/duplicate migration 260 fails before Docker or Pages deploy", "Catalog contract contains RLS, grants, function, cron and fallback-password assertions; database execution remains pending"],
