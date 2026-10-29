@@ -98,8 +98,11 @@ same-client sales policy and explicit table SELECT grant. The sales path stays
 dormant while `inbox_enforced` is false. PGlite checks the prior assigned-editor
 exposure, the new denial on all ten tables, cross-client isolation, service
 reads, and retirement/revocation after a fixture-only Inbox bridge. The
-workflow attribution policy resolves `client_id` from `workflow_runs`, then
-uses the same sales permission.
+workflow attribution policy resolves `client_id` from `workflow_runs` inside
+`can_read_workflow_lead_attribution`, a narrow security-definer scope helper.
+The existing `workflow_runs` RLS admits creative assignment but a sales-only
+employee may have no such assignment. The fixture uses that real run policy
+and verifies sales attribution visibility without granting direct run rows.
 
 Migration 268 also redefines four security-definer RPCs that bypass table RLS:
 `dm_reply_refusal_v6`, `close_dm_conversation_v6`, `merge_dm_lead_v6`, and
@@ -134,9 +137,50 @@ replays the latest definitions of these authenticated entry points with
 | `capture_sales_agent_lead` | Turn a conversation into a lead, or return its linked lead ID | Same client sales permission; trusted runtime and gateway still work as service |
 | `workflow_run_outcomes` | Return lead counts and collected cash in a workflow report | Same client sales permission |
 
-Booking and booking-link creation also reject an explicitly supplied campaign
-ID belonging to another client. The role matrix includes that cross-client
-case.
+Booking and booking-link creation reject a campaign ID belonging to another
+client. `book_appointment_v6` checks the effective ID after applying the
+lead's saved `source_client_campaign_id` fallback; an old foreign source ID
+cannot silently enter an appointment. `queue_lead_message_v6` makes the same
+check after choosing the template's campaign or the lead's fallback, before
+inserting an outbound message. `create_message_template_v6` checks the
+author-supplied campaign before saving the template. These checks do not
+change message approval or the human Inbox gate.
+
+Migration 269 adds `NOT VALID` same-client composite foreign keys to
+`client_leads`, `client_appointments`, `outbound_messages`,
+`message_templates`, `booking_links`, and `lead_capture_endpoints`. PostgreSQL
+enforces these on new writes, including direct trusted-service writes, and
+preserves `ON DELETE SET NULL` for only the campaign column. Historical
+cross-client links are retained for explicit audit rather than silently
+rewriting attribution. They must be inspected, repaired with an audit trail,
+and the constraints validated before the 100/100 release gate. The fixture
+proves a preexisting mismatch survives for audit, new mismatches are rejected
+at all six tables, and deleting a valid campaign clears only its ID.
+
+Read-only historical audit before validation:
+
+```sql
+with links as (
+  select 'client_leads' as source, id, client_id,
+         source_client_campaign_id as campaign_id from public.client_leads
+  union all select 'client_appointments', id, client_id, campaign_id
+    from public.client_appointments
+  union all select 'outbound_messages', id, client_id, campaign_id
+    from public.outbound_messages
+  union all select 'message_templates', id, client_id, campaign_id
+    from public.message_templates
+  union all select 'booking_links', id, client_id, campaign_id
+    from public.booking_links
+  union all select 'lead_capture_endpoints', id, client_id, campaign_id
+    from public.lead_capture_endpoints
+)
+select links.source, links.id, links.client_id, links.campaign_id,
+       campaigns.client_id as campaign_client_id
+  from links
+  left join public.client_campaigns campaigns on campaigns.id = links.campaign_id
+ where links.campaign_id is not null
+   and campaigns.client_id is distinct from links.client_id;
+```
 
 `enqueue_sequence_sweep()` was callable by every authenticated user and could
 start a global nurture worker. Its authenticated EXECUTE grant is revoked;
@@ -175,3 +219,6 @@ This is a source audit, not evidence of a production deployment.
 - R000/B003: run full clean and upgrade schema replay in CI, generate database
   types from the resulting schema, and verify production SQL/version evidence
   through the release gate before applying any migration.
+- B005: inspect and repair historical campaign/client mismatches, then run
+  `VALIDATE CONSTRAINT` for the six new composite foreign keys. Until then,
+  new writes are guarded but historical attribution is a data-quality gate.

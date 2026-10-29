@@ -6,12 +6,14 @@ const CLIENT = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 const LEAD = "33333333-3333-4333-8333-333333333333";
 const OTHER_LEAD = "44444444-4444-4444-8444-444444444444";
+const DIRTY_LEAD = "44444444-4444-4444-8444-444444444445";
 const SEQUENCE = "55555555-5555-4555-8555-555555555555";
 const ENROLLMENT = "66666666-6666-4666-8666-666666666666";
 const APPOINTMENT = "77777777-7777-4777-8777-777777777777";
 const CONVERSATION = "88888888-8888-4888-8888-888888888888";
 const RUN = "99999999-9999-4999-8999-999999999999";
 const OTHER_CAMPAIGN = "aaaaaaaa-0000-4000-8000-000000000001";
+const LOCAL_CAMPAIGN = "aaaaaaaa-0000-4000-8000-000000000002";
 const PRIVATE_CALLS: Array<[string, unknown[], RegExp | null]> = [
   ["select suppress_lead_v6($1,'','manual')", [CLIENT], /Say who/],
   ["select sequence_exit_reason_v6($1,$2)", [LEAD, SEQUENCE], null],
@@ -123,6 +125,13 @@ beforeEach(async () => {
     create table public.booking_links (
       id uuid primary key default gen_random_uuid(),client_id uuid,campaign_id uuid,
       purpose text,token_hash text,expires_at timestamptz,created_by uuid);
+    create table public.outbound_messages (
+      id uuid primary key default gen_random_uuid(),client_id uuid not null,campaign_id uuid);
+    create table public.lead_capture_endpoints (
+      id uuid primary key default gen_random_uuid(),client_id uuid not null,campaign_id uuid);
+    create table public.message_templates (
+      id uuid primary key default gen_random_uuid(),client_id uuid not null,
+      name text,purpose text,channel_key text,campaign_id uuid,created_by uuid);
     create table public.sales_agent_conversations (
       id uuid primary key,client_id uuid not null,lead_id uuid,contact_email text,
       contact_phone text,contact_name text,qualified boolean,page_id uuid,
@@ -142,6 +151,9 @@ beforeEach(async () => {
     insert into client_leads(id,client_id,dedupe_key,stage,consent_given_at)
       values ('${LEAD}','${CLIENT}','email:lead@example.com','lead',now()),
              ('${OTHER_LEAD}','${OTHER}','email:other@example.com','cash',now());
+    insert into client_leads(id,client_id,dedupe_key,stage,consent_given_at,source_client_campaign_id)
+      values ('${DIRTY_LEAD}','${CLIENT}','email:dirty@example.com','lead',now(),
+              '${OTHER_CAMPAIGN}');
     insert into nurture_sequences(id,client_id,approved_at)
       values ('${SEQUENCE}','${CLIENT}',now());
     insert into lead_sequence_enrollments(id,client_id,lead_id,sequence_id,status)
@@ -152,7 +164,8 @@ beforeEach(async () => {
       values ('${CONVERSATION}','${CLIENT}','${LEAD}');
     insert into workflow_runs(id,client_id,kind,status)
       values ('${RUN}','${CLIENT}','content','complete');
-    insert into client_campaigns(id,client_id) values ('${OTHER_CAMPAIGN}','${OTHER}');
+    insert into client_campaigns(id,client_id) values
+      ('${OTHER_CAMPAIGN}','${OTHER}'),('${LOCAL_CAMPAIGN}','${CLIENT}');
   `);
   await db.exec(await sql("20261029200000_269_authenticated_sales_rpc_scope.sql"));
   await actor("editor");
@@ -160,6 +173,43 @@ beforeEach(async () => {
 afterEach(async () => { await db?.close(); });
 
 describe("migration 269: all authenticated lead/contact SECURITY DEFINER boundaries", () => {
+  it("rejects a foreign campaign when an assigned editor authors a message template", async () => {
+    expect((await db.query<{ broad: boolean }>(
+      `select can_access_client('${CLIENT}') as broad`)).rows[0]?.broad).toBe(true);
+    expect(await refused(
+      "select create_message_template_v6($1,'Reply','objection','email',$2)",
+      [CLIENT, OTHER_CAMPAIGN])).toContain("campaign belongs to a different client");
+    expect((await db.query("select id from message_templates")).rows).toHaveLength(0);
+    await expect(db.query(
+      "select create_message_template_v6($1,'Reply','objection','email',$2)",
+      [CLIENT, LOCAL_CAMPAIGN])).resolves.toBeDefined();
+  });
+
+  it("enforces same-client campaign keys on new direct writes while preserving legacy rows for audit", async () => {
+    expect((await db.query<{ campaign_id: string }>(
+      "select source_client_campaign_id as campaign_id from client_leads where id=$1",
+      [DIRTY_LEAD])).rows[0]?.campaign_id).toBe(OTHER_CAMPAIGN);
+    const directWrites = [
+      "insert into client_leads(id,client_id,source_client_campaign_id) values(gen_random_uuid(),$1,$2)",
+      "insert into client_appointments(id,client_id,campaign_id) values(gen_random_uuid(),$1,$2)",
+      "insert into outbound_messages(client_id,campaign_id) values($1,$2)",
+      "insert into message_templates(client_id,campaign_id) values($1,$2)",
+      "insert into booking_links(client_id,campaign_id) values($1,$2)",
+      "insert into lead_capture_endpoints(client_id,campaign_id) values($1,$2)",
+    ];
+    for (const write of directWrites) {
+      expect(await refused(write, [CLIENT, OTHER_CAMPAIGN]), write)
+        .toMatch(/foreign key constraint/);
+    }
+    const localLead = "aaaaaaaa-0000-4000-8000-000000000003";
+    await db.query("insert into client_leads(id,client_id,source_client_campaign_id) values($1,$2,$3)",
+      [localLead, CLIENT, LOCAL_CAMPAIGN]);
+    await db.query("delete from client_campaigns where id=$1", [LOCAL_CAMPAIGN]);
+    expect((await db.query<{ client_id: string; source_client_campaign_id: string | null }>(
+      "select client_id,source_client_campaign_id from client_leads where id=$1", [localLead]))
+      .rows[0]).toMatchObject({ client_id: CLIENT, source_client_campaign_id: null });
+  });
+
   it("denies a broad assigned editor at every callable private-data boundary", async () => {
     expect((await db.query<{ broad: boolean }>(
       `select can_access_client('${CLIENT}') as broad`)).rows[0]?.broad).toBe(true);
@@ -196,6 +246,8 @@ describe("migration 269: all authenticated lead/contact SECURITY DEFINER boundar
       .toContain("Only the internal service");
     expect(await refused("select book_appointment_v6($1,now(),'person',$2)",
       [LEAD, OTHER_CAMPAIGN])).toContain("campaign belongs to a different client");
+    expect(await refused("select book_appointment_v6($1,now(),'person')", [DIRTY_LEAD]))
+      .toContain("campaign belongs to a different client");
     expect(await refused("select create_booking_link_v6($1,'sales',$2,$3)",
       [CLIENT, "a".repeat(64), OTHER_CAMPAIGN]))
       .toContain("campaign belongs to a different client");

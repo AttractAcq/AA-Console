@@ -172,6 +172,7 @@ declare
   s public.client_booking_settings%rowtype;
   a public.client_appointments%rowtype;
   v_ends timestamptz;
+  v_campaign_id uuid;
 begin
   select * into l from public.client_leads where id = p_lead_id;
   if not found then raise exception 'No such lead.' using errcode = 'P0001'; end if;
@@ -190,9 +191,10 @@ begin
     raise exception 'Only the internal service books on a prospect''s behalf.'
       using errcode = 'P0001';
   end if;
-  if p_campaign_id is not null and not exists (
+  v_campaign_id := coalesce(p_campaign_id, l.source_client_campaign_id);
+  if v_campaign_id is not null and not exists (
     select 1 from public.client_campaigns c
-     where c.id = p_campaign_id and c.client_id = l.client_id) then
+     where c.id = v_campaign_id and c.client_id = l.client_id) then
     raise exception 'That campaign belongs to a different client.' using errcode = 'P0001';
   end if;
 
@@ -225,7 +227,7 @@ begin
   insert into public.client_appointments (
     client_id, lead_id, campaign_id, starts_at, ends_at, booked_via, booked_by)
   values (
-    l.client_id, p_lead_id, coalesce(p_campaign_id, l.source_client_campaign_id),
+    l.client_id, p_lead_id, v_campaign_id,
     p_starts_at, v_ends, p_booked_via,
     case when p_booked_via = 'person' then auth.uid() else null end)
   returning * into a;
@@ -315,6 +317,33 @@ begin
   return v;
 end $$;
 
+-- Template authoring is creative work, but its optional campaign must still
+-- belong to the template client. The queue independently rechecks historical
+-- or service-written rows before a person-specific outbound message exists.
+create or replace function public.create_message_template_v6(
+  p_client_id uuid, p_name text, p_purpose text, p_channel_key text,
+  p_campaign_id uuid default null)
+returns public.message_templates language plpgsql security definer
+set search_path = pg_catalog, public as $$
+declare v public.message_templates%rowtype;
+begin
+  if coalesce(auth.role(), '') <> 'service_role'
+     and not (coalesce(public.is_admin(), false)
+              or coalesce(public.can_access_client(p_client_id), false)) then
+    raise exception 'Not permitted for this client.' using errcode = 'P0001';
+  end if;
+  if p_campaign_id is not null and not exists (
+    select 1 from public.client_campaigns c
+     where c.id = p_campaign_id and c.client_id = p_client_id) then
+    raise exception 'That campaign belongs to a different client.' using errcode = 'P0001';
+  end if;
+  insert into public.message_templates (
+    client_id, name, purpose, channel_key, campaign_id, created_by)
+  values (p_client_id, btrim(p_name), p_purpose, p_channel_key, p_campaign_id, auth.uid())
+  returning * into v;
+  return v;
+end $$;
+
 -- B005 guarded RPC: capture_sales_agent_lead (latest definition from 20260908192515_67_sales_agents.sql).
 create or replace function public.capture_sales_agent_lead(
   p_conversation_id uuid,
@@ -390,6 +419,43 @@ begin
   return v_lead;
 end;
 $$;
+
+-- A campaign ID must remain in its client's namespace even when a trusted
+-- service writes these rows directly. NOT VALID preserves historical rows for
+-- an explicit audit/repair; PostgreSQL enforces each constraint for new
+-- writes immediately. The existing single-column FKs remain in place.
+create unique index if not exists client_campaigns_id_client_id_uq
+  on public.client_campaigns(id, client_id);
+alter table public.client_leads
+  add constraint client_leads_source_campaign_client_fk
+  foreign key (source_client_campaign_id, client_id)
+  references public.client_campaigns(id, client_id)
+  on delete set null (source_client_campaign_id) not valid;
+alter table public.client_appointments
+  add constraint client_appointments_campaign_client_fk
+  foreign key (campaign_id, client_id)
+  references public.client_campaigns(id, client_id)
+  on delete set null (campaign_id) not valid;
+alter table public.outbound_messages
+  add constraint outbound_messages_campaign_client_fk
+  foreign key (campaign_id, client_id)
+  references public.client_campaigns(id, client_id)
+  on delete set null (campaign_id) not valid;
+alter table public.message_templates
+  add constraint message_templates_campaign_client_fk
+  foreign key (campaign_id, client_id)
+  references public.client_campaigns(id, client_id)
+  on delete set null (campaign_id) not valid;
+alter table public.booking_links
+  add constraint booking_links_campaign_client_fk
+  foreign key (campaign_id, client_id)
+  references public.client_campaigns(id, client_id)
+  on delete set null (campaign_id) not valid;
+alter table public.lead_capture_endpoints
+  add constraint lead_capture_endpoints_campaign_client_fk
+  foreign key (campaign_id, client_id)
+  references public.client_campaigns(id, client_id)
+  on delete set null (campaign_id) not valid;
 
 -- B005 guarded RPC: workflow_run_outcomes (latest definition from 20261012150000_196_v5_outcome_attribution.sql).
 create or replace function public.workflow_run_outcomes(p_run_id uuid) returns jsonb
