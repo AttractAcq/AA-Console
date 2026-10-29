@@ -272,12 +272,12 @@ export function ProspectsLeadsPanel() {
           const { error } = await supabase.rpc("create_manual_lead", {
             p_client_id: clientId,
             p_name: String(details.name),
-            p_email: details.email as string | null,
-            p_phone: details.phone as string | null,
-            p_owner_member_id: details.owner_member_id as string | null,
-            p_next_action: details.next_action as string | null,
-            p_next_action_due: details.next_action_due as string | null,
-            p_opportunity_value: details.opportunity_value as number | null,
+            p_email: (details.email as string | null) ?? undefined,
+            p_phone: (details.phone as string | null) ?? undefined,
+            p_owner_member_id: (details.owner_member_id as string | null) ?? undefined,
+            p_next_action: (details.next_action as string | null) ?? undefined,
+            p_next_action_due: (details.next_action_due as string | null) ?? undefined,
+            p_opportunity_value: (details.opportunity_value as number | null) ?? undefined,
           });
           if (error) throw error;
         }}
