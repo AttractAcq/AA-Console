@@ -87,4 +87,14 @@ This check covers schema replay and a stable set of security assertions. B005
 adds the complete cross-client identity and `SECURITY DEFINER` test matrix.
 The `Schema replay (clean, upgrade, catalog, types)` status must also be marked
 required in GitHub branch protection; the workflow file alone cannot change
-that repository setting. The Pages release gate across components is B009.
+that repository setting. On 29 October 2026 after PRs #238 and #235 merged,
+`main` branch protection was set to strict up-to-date mode and admin
+enforcement, with force pushes and deletion disabled. Four GitHub Actions
+checks are required and pinned to app ID 15368: `Schema replay (clean,
+upgrade, catalog, types)`, `Frontend (lint, typecheck, test, build)`, `Agent
+runtime (typecheck, test, build)`, and `MCP gateway (typecheck, test, build)`.
+Temporary ready PR #244 at `ae3fd544176ff1cb191d3a702b00bc8ef2b5fa8d`
+deliberately added an out-of-order migration. Its schema job failed at the
+order guard and GitHub reported `mergeable_state=blocked`; the PR was closed
+unmerged and its fixture branch deleted. Keep all four required checks as new
+migrations land. The Pages release gate across components is B009.
