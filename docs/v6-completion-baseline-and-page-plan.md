@@ -203,7 +203,9 @@ Maintain one row per instruction in the table below before coding. This preserve
 
 | Page/module | Alex's exact change | Existing feature to preserve | Contract/data/API effect | Implemented evidence | Remaining gap |
 |---|---|---|---|---|---|
-| To fill from next instruction | — | — | — | — | — |
+| Ten versioned Delivery pages | Migrate everything that still depends on v1 and archive v1, so it is no longer visible in the application | Every working v1 screen. Four were not substitutable: the six content libraries, Organic Content Distribution (whose v2 was blank), the `proof_discovery` search, and the offer-page builder | None. Navigation, routing and panel registration only; no migration, no RPC removed. `provision_campaign_artifact` keeps existing with no console caller | `?view=` carries Intelligence OS's two halves alone; v2 tab sets are the nodes' own tabs; Assets nests the six libraries; 1135 tests, `tsc -b`, `oxlint` and the production build clean | Organic Content Distribution has no v2 design — its v1 is the page now, relabelled, not replaced |
+| Organic Content Distribution | Rename the Organic tab to Organic Calendar | The posting board itself, unchanged | None | `navigation.ts`, asserted by the delivery-navigation test | — |
+| Fifteen legacy `delivery/*` routes | Archive the v1 pages behind them | The links: bookmarked, pasted and recorded for a year | None | Each path redirects to the v6 page that took over its work, query preserved; a test covers all fifteen and asserts each destination exists | A legacy `?tab=` with no v6 equivalent (`reporting?tab=attribution`, `conversion?tab=primary-landing-pages`) lands on the page's first tab rather than an exact match |
 
 After each batch: (1) compare the delivered UI and behavior against Alex's instruction; (2) walk the relevant current-state subsection above and test that none of its working functions became hidden or unusable; (3) compare the result against its target and acceptance gate; (4) mark each remaining gap as planned, blocked by a named dependency, or evidenced complete; (5) update the implementation record and links. A later instruction may change layout or ordering and should replace that detail here, while unchanged quality, data lineage and approval obligations persist. Do not call v6 complete until the real end-to-end evidence in section 5 is collected.
 
@@ -469,3 +471,67 @@ production rejecting a migration that a test harness had accepted:
 `client_briefs` carries no `campaign_id` (it runs through the idea), and
 `client_proof_assets` requires `media_type` with `source` rather than
 `source_url`. The harnesses now declare the real types.
+
+## 29 October 2026 — v1 archived, and what had to be built first
+
+The v1/v2 switch is gone from all ten pages that carried it. `?view=` used to
+default to v1, so a module's own URL opened the old page; now there is no
+version to choose and what was v2 is simply the page. Intelligence OS keeps
+`?view=` for the two halves it always meant.
+
+This could not be done by deleting. v2 did not yet cover everything v1 did,
+and four of the gaps were not substitutable:
+
+| Gap | What only v1 reached | Closed by |
+|---|---|---|
+| Content Production Factory | Images, Videos, Reel Shots, Copy, Stories, Carousels as six tabs. The approved-assets table cuts the list by image/text/video and by sign-off, which is not a story view, a carousel view, the reel edit stages, or the frame-and-shot view | Assets nests all six, which is what the 16 October specification said it would do before a later pass flattened it. The open library is in `?library=`, keeping v1's tab ids so an old `?tab=reel-shots` link needs no translation |
+| Organic Content Distribution | The whole page: it had the switch and no v2, so `v2Blank` rendered a heading and nothing else | Its v1 is complete, so it keeps its three tabs and stops being called a version. Organic is relabelled **Organic Calendar** |
+| Proof Production Factory | **Find proof online** — the console's only caller of the `proof_discovery` agent | The button, with v1's wording, on the Assets tab of v2 |
+| Website Studio | The offer-page builder. Offer *results* needed nothing: Attribution OS already reports on offer pages | An Offer Pages tab beside Landing Pages, which is why "Pages" had to say which |
+
+Meta Profile also regained v1's Posts board, restoring the duplication v1
+itself had — the same board stays reachable from Organic Content Distribution.
+
+### What archiving v1 removed, deliberately
+
+Campaign Factory needed more than configuration: `CampaignExecutionPanel` read
+`?view=v2` itself and rendered two different pages from it, so removing the
+switch would have left it showing the v1 card list for ever. Deleting that
+branch ended three things:
+
+- **`build()` / `provision_campaign_artifact`** — v1's "Build landing page"
+  and "Build sales agent" buttons. v2 shows each as its own tab, scoped to the
+  campaign, where making one says what it is making; both panels create and
+  link. The RPC still exists in the database with no caller in the console.
+- **The per-run "ideate on plan" override** — it persisted a checkbox only v1
+  drew. The campaign's own `ideate_on_plan`, set on the campaign form, is what
+  the planner reads.
+- **`window.confirm` on delete** — v2 asks in its own dialog, naming the same
+  cascade.
+
+One UX consequence to know about: v2's campaign list is a table, so Launch,
+Run planner and Clone are reached by opening the campaign, where v1 had them
+on every card. Nothing is unreachable; it is one click further.
+
+`ProofBankPanel` is deleted — v1's Proof Bank page, its last unique
+capability having moved to v2 first.
+
+### The fifteen legacy routes
+
+`delivery/media`, `delivery/ideation`, `delivery/distribution` and twelve more
+were still mounted, unlinked, for pages the sidebar stopped offering long ago.
+Each now redirects to the v6 page that took over its work, preserving the
+query, and `delivery/campaign-execution/:campaignId` goes to that campaign
+rather than to the list. A test covers all fifteen and asserts each
+destination is a page that exists.
+
+### Not claimed
+
+- **Nothing has been verified in a browser**, as before: the tests render each
+  page and drive it.
+- **Organic Content Distribution still has no v2 design.** Its v1 is the page
+  now. That is a relabelling, not a replacement, and it is the one page where
+  "the upgrade to v2 has been made" was not true.
+- Most of `CampaignExecutionPanel`'s tests were written against the v1
+  rendering, so the v2 one had almost no direct coverage. They now drive v2.
+  The coverage is new, which also means it is young.
