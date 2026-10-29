@@ -632,9 +632,7 @@ select
     when c.acquisition_mode <> 'paid' or c.paid_platform <> 'google'
       then 'This is not a paid Google campaign.'
     when s.id is null then 'No build sheet has been derived yet.'
-    when s.manifest_id is null or s.manifest_id is distinct from
-      (select m.id from public.campaign_manifest_versions m
-        where m.campaign_id = c.id order by m.version desc limit 1)
+    when s.manifest_id is null or s.manifest_id is distinct from m.id
       then 'The latest sheet is not bound to the current campaign package. Derive a new sheet.'
     when coalesce(array_length(s.missing, 1), 0) > 0
       then 'The sheet is still missing: ' || array_to_string(s.missing, ', ') || '.'
@@ -656,16 +654,25 @@ select
   end as blocker
 from public.client_campaigns c
 left join lateral (
+  select m2.id from public.campaign_manifest_versions m2
+   where m2.campaign_id = c.id order by m2.version desc limit 1) m on true
+left join lateral (
   select * from public.google_ads_build_sheets s2
    where s2.campaign_id = c.id order by s2.version desc limit 1) s on true
 left join public.google_ads_copy cp on cp.campaign_id = c.id
 left join lateral (
-  select * from public.google_ads_builds b2
-   where b2.campaign_id = c.id order by b2.created_at desc limit 1) b on true
+  -- A completed build of an earlier sheet/package is historical evidence,
+  -- not a build of the current sheet. Never let it hide today's blocker.
+  select b2.* from public.google_ads_builds b2
+  join public.campaign_action_approvals a2 on a2.id = b2.approval_id
+   where b2.campaign_id = c.id and b2.client_id = c.client_id
+     and b2.sheet_id = s.id and s.manifest_id = m.id
+     and a2.manifest_id = m.id and a2.action_key = 'google_ad_build'
+   order by b2.created_at desc limit 1) b on true
 where c.archived_at is null;
 
 comment on view google_ads_build_due is
-  'Per Google campaign, what stands between the sheet and a built campaign. A normal derived sheet names keyword_research as missing; even a complete sheet remains blocked while no runtime handler exists.';
+  'Per Google campaign, what stands between its latest manifest-bound sheet and a built campaign. Earlier completed builds remain historical and cannot hide a current blocker. A normal derived sheet names keyword_research as missing; even a complete sheet remains blocked while no runtime handler exists.';
 
 grant select on google_ads_build_due to authenticated;
 

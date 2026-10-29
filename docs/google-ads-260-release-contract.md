@@ -21,6 +21,8 @@ A build retains a required reference to its exact sheet. Deleting that sheet alo
 
 The build's approval id and sheet id each have composite foreign keys with the build's campaign id and client id. A service-role insert cannot attach another campaign's approval or sheet, even when the other campaign belongs to the same client. New sheet manifest lineage also has a composite foreign key to the manifest's campaign and client. These database constraints backstop the RPC checks.
 
+`google_ads_build_due` reports a build only when its sheet and approval belong to the current manifest. A completed build from an earlier package remains in `google_ads_builds` as history but cannot make a newly planned package appear built or conceal its current blocker.
+
 `record_google_build_finished_v6` requires recorded campaign, ad group and ad resource names before marking the build successful. It does not set `client_campaigns.ad_campaign_id`: that column is a foreign key to an internal legacy `campaigns` UUID, not a Google Ads resource or spend binding. Google Ads attribution needs its own verified binding and measured spend before the product can call the campaign live.
 
 ## Remaining work before Google Ads can be enabled

@@ -458,6 +458,55 @@ describe("migration 260 remains a prerequisite", () => {
       .rejects.toThrow("already built");
   });
 
+  it("does not report an old completed build as the build of a new package and sheet", async () => {
+    await completeFixture();
+    await db.exec("update campaign_action_executors set supported=true where action_key='google_ad_build'");
+    const executionId = await approveAndClaim(await request());
+    const built = await one<{ id: string }>(
+      "select (start_google_build_v6($1)).id as id", [executionId],
+    );
+    await db.query("select record_google_build_progress_v6($1,$2)", [
+      built.id,
+      JSON.stringify({
+        campaign_resource: "customers/1234567890/campaigns/7",
+        ad_group_resource: "customers/1234567890/adGroups/8",
+        ad_resources: ["customers/1234567890/adGroupAds/9"],
+      }),
+    ]);
+    await db.query("select record_google_build_finished_v6($1)", [built.id]);
+    const before = await one<{ build_id: string; blocker: string | null }>(
+      "select build_id, blocker from google_ads_build_due where campaign_id=$1", [CAMPAIGN],
+    );
+    expect(before).toMatchObject({ build_id: built.id, blocker: null });
+
+    await db.query(
+      `insert into campaign_manifest_versions
+         (id,campaign_id,client_id,version,acquisition_mode,paid_platform,plan_hash)
+       values ($1,$2,$3,2,'paid','google',repeat('b',32))`,
+      [SECOND_MANIFEST, CAMPAIGN, CLIENT],
+    );
+    const currentSheet = await record(
+      { keyword_groups: [{ keywords: ["new researched term"] }] }, [], SECOND_MANIFEST,
+    );
+    await db.exec("update campaign_action_executors set supported=false where action_key='google_ad_build'");
+    const after = await one<{
+      sheet_id: string; sheet_manifest_id: string; build_id: string | null;
+      build_status: string | null; blocker: string;
+    }>(
+      `select sheet_id, sheet_manifest_id, build_id, build_status, blocker
+         from google_ads_build_due where campaign_id=$1`,
+      [CAMPAIGN],
+    );
+    expect(after).toMatchObject({
+      sheet_id: currentSheet,
+      sheet_manifest_id: SECOND_MANIFEST,
+      build_id: null,
+      build_status: null,
+    });
+    expect(after.blocker).toContain("No runtime handler performs google_ad_build");
+    expect(await rows("select id from google_ads_builds where id=$1", [built.id])).toHaveLength(1);
+  });
+
   it("preserves a build's sheet until the parent campaign is deleted", async () => {
     await completeFixture();
     await db.exec("update campaign_action_executors set supported=true where action_key='google_ad_build'");
