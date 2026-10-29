@@ -13,13 +13,15 @@ migration does not rewrite existing profiles or broaden the helper's grants.
 
 ## Release and verification
 
-1. Review and release migration 260, then 261 and 262, before 263. The
-   migration-order gate blocks 263 while 260 is absent from this branch.
-2. Confirm the hosted Supabase Auth signup setting. The tracked local
-   `supabase/config.toml` enables email signup and disables confirmation;
-   it does not prove the hosted setting. If public signup is enabled, the
-   owner can disable it as a temporary containment step through the approved
-   release path while 263 is reviewed.
+1. Migrations 260–263 were released to production on 29 October 2026.
+   The linked dry run selected only 263 before it was applied, and the
+   remote migration list confirmed its exact timestamp afterward.
+2. Keep hosted Supabase Auth public signup disabled during this rollout. The
+   owner disabled it on 29 October 2026; verify that setting again before
+   enabling signup or invitations. The tracked local `supabase/config.toml`
+   enables email signup and does not prove the hosted setting. A new Auth
+   signup still receives the `employee` role, which has some broad read
+   policies even without a client assignment.
 3. Inspect every **existing** admin profile against a separate trusted
    roster and its creation history. The metadata claim alone is not proof
    of authorization. This read-only query gives the IDs and timestamps to
