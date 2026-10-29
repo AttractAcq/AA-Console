@@ -43,19 +43,46 @@ begin
 end
 $check$;
 
+-- The triggers below give immediate, specific errors, but a trigger's read
+-- can use an older snapshot at REPEATABLE READ. The validated composite FK
+-- is the authoritative invariant under every supported transaction level.
+-- MATCH SIMPLE would skip a row with a null assignment client, so reject
+-- that shape whenever an asset is attached. Existing mismatches were checked
+-- above; the validated constraints also catch a concurrent write during the
+-- migration rather than preserving it as historical data.
+create unique index client_media_assets_id_client_id_uq
+  on public.client_media_assets (id, client_id);
+alter table public.job_assignments
+  add constraint job_assignments_asset_requires_client
+  check (asset_id is null or client_id is not null);
+alter table public.job_assignments
+  add constraint job_assignments_asset_client_fk
+  foreign key (asset_id, client_id)
+  references public.client_media_assets (id, client_id)
+  on delete set null (asset_id);
+
 create or replace function public.guard_assignment_asset_client()
 returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $function$
+declare
+  v_asset_client_id uuid;
 begin
-  if new.asset_id is not null and not exists (
-    select 1 from public.client_media_assets a
-    where a.id = new.asset_id and a.client_id = new.client_id
-  ) then
-    raise exception 'Assignment asset must belong to the assignment client'
-      using errcode = '23514';
+  if new.asset_id is not null then
+    -- An asset client update already holds this row lock. Taking the same lock
+    -- here serializes the two writers: whichever goes second checks the first
+    -- transaction's committed client/assignment state.
+    select a.client_id into v_asset_client_id
+      from public.client_media_assets a
+     where a.id = new.asset_id
+     for update;
+    if not found or v_asset_client_id is null
+       or v_asset_client_id is distinct from new.client_id then
+      raise exception 'Assignment asset must belong to the assignment client'
+        using errcode = '23514';
+    end if;
   end if;
   return new;
 end
