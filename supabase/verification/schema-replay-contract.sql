@@ -60,6 +60,45 @@ begin
     raise exception 'Runtime heartbeat retention grants drifted';
   end if;
 
+  -- Low-level state machines are internal writers. Human decisions enter
+  -- through named, gated wrappers, never through a stage parameter.
+  foreach item in array array[
+    'public.advance_slot(uuid,public.slot_stage,text,text,text,uuid,numeric,uuid,uuid,uuid,uuid,text)',
+    'public.advance_assignment(uuid,public.assignment_stage,text,text,uuid)',
+    'public.may_advance_slot(uuid)',
+    'public.may_touch_assignment(uuid)'
+  ] loop
+    if has_function_privilege('anon', item, 'EXECUTE')
+       or has_function_privilege('authenticated', item, 'EXECUTE')
+       or not has_function_privilege('service_role', item, 'EXECUTE') then
+      raise exception 'Low-level transition grants drifted: %', item;
+    end if;
+  end loop;
+  if not exists (
+    select 1 from pg_trigger
+     where tgrelid = 'public.job_assignments'::regclass
+       and tgname = 'ja_asset_client_guard' and tgenabled = 'O'
+  ) or not exists (
+    select 1 from pg_trigger
+     where tgrelid = 'public.client_media_assets'::regclass
+       and tgname = 'cma_assignment_client_guard' and tgenabled = 'O'
+  ) then
+    raise exception 'Assignment asset/client guard missing';
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.job_assignments'::regclass
+       and conname = 'job_assignments_asset_client_fk'
+       and contype = 'f' and convalidated
+  ) or not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.job_assignments'::regclass
+       and conname = 'job_assignments_asset_requires_client'
+       and contype = 'c' and convalidated
+  ) then
+    raise exception 'Validated assignment asset/client constraints missing';
+  end if;
+
   if not exists (
     select 1 from information_schema.columns
      where table_schema = 'public' and table_name = 'outbound_messages'
