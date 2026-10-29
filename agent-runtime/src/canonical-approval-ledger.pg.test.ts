@@ -298,6 +298,9 @@ describe("canonical approval ledger migration 273", () => {
     await expect(asRole("authenticated", ADMIN, "aal2",
       "select public.fixture_decide_approval($1,'approved',$2,'expired-1')", [expired, HASH],
     )).rejects.toThrow(/expired/i);
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.fixture_decide_approval($1,'rejected',$2,'expired-2','Expired without approval')", [expired, HASH]);
+    expect((await view(expired)).status).toBe("rejected");
     const blocked = await register(candidate({ preview_blocker: "Rights missing" }));
     await expect(asRole("authenticated", ADMIN, "aal2",
       "select public.fixture_decide_approval($1,'approved',$2,'blocked-1')", [blocked, HASH],

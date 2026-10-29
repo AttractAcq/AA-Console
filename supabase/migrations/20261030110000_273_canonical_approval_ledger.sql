@@ -431,7 +431,8 @@ begin
     end if;
   elsif v_latest.id is not null then
     raise exception 'This approval request has already been decided.' using errcode = '23514';
-  elsif v_request.expires_at is not null and v_request.expires_at <= now() then
+  elsif p_decision = 'approved'
+    and v_request.expires_at is not null and v_request.expires_at <= now() then
     raise exception 'This approval request has expired.' using errcode = '23514';
   end if;
 
