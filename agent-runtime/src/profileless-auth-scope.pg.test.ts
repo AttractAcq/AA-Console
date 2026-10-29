@@ -66,9 +66,9 @@ async function asRole<T extends Record<string, unknown>>(
   }
 }
 
-async function grantRoutine(signature: string) {
+async function grantRoutine(signature: string, roles = "authenticated, service_role") {
   await db.exec(`revoke execute on function public.${signature} from public, anon;
-    grant execute on function public.${signature} to authenticated, service_role;`);
+    grant execute on function public.${signature} to ${roles};`);
 }
 
 beforeAll(async () => {
@@ -200,7 +200,10 @@ beforeAll(async () => {
       security definer as $$ select true $$;
   `);
   await grantRoutine("available_slots_v6(uuid,integer)");
-  await grantRoutine("can_run_agent(text,uuid)");
+  // Migration 09 grants this helper only to authenticated. Migration 161 later
+  // removes PUBLIC execution from SECURITY DEFINER functions; service_role
+  // reaches this helper through owner-executable worker RPCs, not directly.
+  await grantRoutine("can_run_agent(text,uuid)", "authenticated");
   await db.exec(`
     grant usage on schema public,auth to authenticated,service_role;
     grant select,insert on all tables in schema public to authenticated;
@@ -303,7 +306,7 @@ describe("profileless authenticated JWT boundary after migration 271", () => {
       )).rows[0]?.allowed).toBe(false);
       expect((await db.query<{ allowed: boolean }>(
         "select has_function_privilege('service_role',$1,'execute') as allowed", [signature],
-      )).rows[0]?.allowed).toBe(true);
+      )).rows[0]?.allowed).toBe(signature !== "public.can_run_agent(text,uuid)");
     }
     await expect(asRole("authenticated", PROFILELESS,
       "select public.enqueue_publish_sweep()")).rejects.toThrow(/permission denied/i);
