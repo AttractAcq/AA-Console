@@ -501,6 +501,7 @@ export const clientNavGroups: NavNode[] = [
       capability: "expanding", tabs: [
         { id: "engine-inbox", label: "Engine" }, { id: "assets", label: "Assets" },
         { id: "campaign-actions", label: "Campaign actions" },
+        { id: "unified", label: "Unified" },
       ] },
     ...v6ModuleNodes,
     { ...legacyUtility("motion-design"), tabs: [
