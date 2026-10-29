@@ -45,7 +45,7 @@ test('raw Auth source mode copies historical migration 11 byte-for-byte', () => 
     writeFileSync(join(migrations,
       '20261025233000_259_released.sql'), '-- fixture release marker\n')
     writeFileSync(join(migrations,
-      '20261025235000_260_google_ads.sql'), '-- fixture dependency marker\n')
+      '20261025235000_260_building_the_google_campaign.sql'), '-- fixture dependency marker\n')
     const authFile = '20260903105742_11_auth_users_and_role_metadata.sql'
     const source = readFileSync(join(repository, 'supabase', 'migrations', authFile))
     writeFileSync(join(migrations, authFile), source)
