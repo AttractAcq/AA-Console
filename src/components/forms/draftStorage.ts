@@ -2,6 +2,11 @@ import type { FieldDef, FormValues } from "./fields";
 
 const DRAFT_PREFIX = "aa-console:draft:";
 
+// Versioned keys let startup cleanup remove drafts written by the old,
+// credential-persisting form without discarding safe drafts on every reload.
+export const teamMemberDraftKey = (category: string) => `team-member-v2:${category}`;
+export const integrationDraftKey = (clientId: string) => `integration-v2:${clientId}`;
+
 function sensitiveNames(fields: FieldDef[]): Set<string> {
   return new Set(fields.filter((field) => field.kind === "password" || field.sensitive)
     .map((field) => field.name));
@@ -51,8 +56,16 @@ export function readDraft(key: string | undefined, fields: FieldDef[]): FormValu
     const sensitive = sensitiveNames(fields);
     const safe = Object.fromEntries(Object.entries(stored).filter(([name]) => !sensitive.has(name)));
     if (Object.keys(safe).length !== Object.keys(stored).length) {
-      if (Object.keys(safe).length) localStorage.setItem(DRAFT_PREFIX + key, JSON.stringify(safe));
-      else clearDraft(key);
+      // Delete the unsafe source first. A failed write (quota, private mode)
+      // must not leave the old serialized sensitive value on disk.
+      localStorage.removeItem(DRAFT_PREFIX + key);
+      if (Object.keys(safe).length) {
+        try {
+          localStorage.setItem(DRAFT_PREFIX + key, JSON.stringify(safe));
+        } catch {
+          // The safe draft is optional; the unsafe source has been removed.
+        }
+      }
     }
     return safe as FormValues;
   } catch {

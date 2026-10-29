@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FormModal } from "./FormModal";
-import { purgeLegacySensitiveDrafts } from "./draftStorage";
+import { integrationDraftKey, purgeLegacySensitiveDrafts, readDraft, teamMemberDraftKey } from "./draftStorage";
 import type { FieldDef } from "./fields";
 
 const marker = "opaque-private-marker";
@@ -19,8 +19,8 @@ afterEach(() => localStorage.clear());
 
 describe("sensitive form drafts", () => {
   it.each([
-    { name: "Team", draftKey: "team-member:smm", fields: teamFields, sensitiveLabel: "Password", safeLabel: "Name" },
-    { name: "Vault", draftKey: "integration:example", fields: integrationFields, sensitiveLabel: "Credential", safeLabel: "Provider" },
+    { name: "Team", draftKey: teamMemberDraftKey("smm"), fields: teamFields, sensitiveLabel: "Password", safeLabel: "Name" },
+    { name: "Vault", draftKey: integrationDraftKey("example"), fields: integrationFields, sensitiveLabel: "Credential", safeLabel: "Provider" },
   ])("never persists or restores the $name sensitive field", ({ draftKey, fields, sensitiveLabel, safeLabel }) => {
     const onClose = vi.fn();
     const props = { open: true, onClose, title: "Draft", draftKey, fields, onSubmit: vi.fn() };
@@ -57,6 +57,23 @@ describe("sensitive form drafts", () => {
     warn.mockRestore();
   });
 
+  it("keeps versioned safe drafts on reload while clearing old unsafe keys", async () => {
+    const teamKey = `aa-console:draft:${teamMemberDraftKey("smm")}`;
+    const integrationKey = `aa-console:draft:${integrationDraftKey("example")}`;
+    localStorage.setItem(teamKey, JSON.stringify({ name: "Safe team draft" }));
+    localStorage.setItem(integrationKey, JSON.stringify({ provider: "meta" }));
+    localStorage.setItem("aa-console:draft:team-member:smm", JSON.stringify({ password: marker }));
+    localStorage.setItem("aa-console:draft:integration:example", JSON.stringify({ secret: marker }));
+
+    vi.resetModules();
+    await import("./draftStorage"); // module-load cleanup, as on an app reload
+
+    expect(localStorage.getItem(teamKey)).toBe(JSON.stringify({ name: "Safe team draft" }));
+    expect(localStorage.getItem(integrationKey)).toBe(JSON.stringify({ provider: "meta" }));
+    expect(localStorage.getItem("aa-console:draft:team-member:smm")).toBeNull();
+    expect(localStorage.getItem("aa-console:draft:integration:example")).toBeNull();
+  });
+
   it("scrubs a legacy password from a generic draft before restoring it", () => {
     const fields: FieldDef[] = [
       { name: "name", label: "Name", kind: "text" },
@@ -70,5 +87,26 @@ describe("sensitive form drafts", () => {
     expect(screen.getByLabelText("Name")).toHaveValue("Safe value");
     expect(screen.getByLabelText("Private")).toHaveValue("");
     expect(localStorage.getItem("aa-console:draft:generic")).toBe(JSON.stringify({ name: "Safe value" }));
+  });
+
+  it("removes an unsafe generic draft even when saving its safe fields fails", () => {
+    const fields: FieldDef[] = [
+      { name: "name", label: "Name", kind: "text" },
+      { name: "private", label: "Private", kind: "password" },
+    ];
+    const key = "aa-console:draft:generic-write-failure";
+    const store = new Map([[key, JSON.stringify({ name: "Safe value", private: marker })]]);
+    vi.stubGlobal("localStorage", {
+      getItem: (name: string) => store.get(name) ?? null,
+      removeItem: (name: string) => { store.delete(name); },
+      setItem: () => { throw new DOMException("Storage unavailable", "QuotaExceededError"); },
+    });
+
+    try {
+      expect(readDraft("generic-write-failure", fields)).toEqual({ name: "Safe value" });
+      expect(store.has(key)).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

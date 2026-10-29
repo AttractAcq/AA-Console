@@ -11,7 +11,7 @@ remaining Auth work; it is not a release approval.
 | `supabase/migrations/20261029140000_263_auth_signup_role_hardening.sql` | New signups receive an unprivileged profile, and later calls to `create_console_user` leave existing Auth credentials alone. | This is a forward fix after 263 runs; it cannot prevent migration 11's earlier replay effects. |
 | `supabase/migrations/20260904074557_13_admin_form_rpcs.sql` | `admin_create_team_member` accepts a three-character password, then calls `create_console_user`, which writes `auth.users` and `auth.identities` directly for a new account. | Team onboarding bypasses a recipient-owned invitation and password setup flow. |
 | `src/pages/operations/TeamCategoryPanel.tsx` | The Add Member form asks an admin to choose and handle a person's password. | The admin knows a reusable credential; a safe invitation flow should remove this field. |
-| `src/components/forms/FormModal.tsx` and `src/pages/account/IntegrationsPanel.tsx` | The shared draft writer formerly serialized every non-file value, including the team password and Vault credential. | Browser localStorage could retain sensitive values after the modal closed. The local B004 follow-up branch removes this draft behavior and purges the two known legacy draft families without inspecting their contents. |
+| `src/components/forms/FormModal.tsx` and `src/pages/account/IntegrationsPanel.tsx` | The shared draft writer formerly serialized every non-file value, including the team password and Vault credential. | Browser localStorage could retain sensitive values after the modal closed. The local B004 follow-up branch removes this draft behavior, changes those forms to versioned draft keys, and purges the two old key families without inspecting their contents. |
 | `src/pages/Page.tsx` and `src/pages/approvals/*` | The Approval Inbox is client-scoped and split into content, engine, and campaign-action tabs. | A team invitation has no global unified approval entry or exact-version decision yet. |
 
 The owner reports that hosted Supabase **Allow new users to sign up** is off.
@@ -78,3 +78,11 @@ That is an attestation, not an independent dashboard readback. Local
 
 The current B004 follow-up branch implements only the browser draft protection
 in this sequence. No invitation is sent or enabled by it.
+
+## Separate B004 browser draft policy
+
+Team profile, lead, contact and billing forms also use persisted browser
+drafts for personal or commercial information. The password/Vault change does
+not decide whether that broader data should be kept in localStorage. B004
+needs a separate field-by-field inventory, explicit retention policy, safe
+migration of existing drafts, and tests for whichever fields are excluded.
