@@ -36,5 +36,14 @@ This slice does not change lead RPC entitlements, retired owner's storage
 read policy, historical shared chat membership, or the full cross-identity
 RLS/definer matrix. Those remain B005 acceptance work. It also does not
 establish the later exact-version unified Approval Inbox contract in B008.
-Production grants, existing asset relationships, and hosted identity
-behavior have not been inspected by this local change.
+## Read-only production catalog check, 29 October 2026
+
+Using the linked project's read-only `supabase db query --linked`, the
+`authenticated` role currently has `EXECUTE` on `advance_slot`,
+`advance_assignment`, `may_advance_slot`, `may_touch_assignment`,
+`advance_lead`, `update_lead`, and `deliver_assignment`; `anon` lacks those
+grants. A separate count found zero existing `job_assignments` whose attached
+`client_media_assets.client_id` differs from the assignment client. These
+queries confirm the current grants and absence of this specific data conflict.
+They do not demonstrate that a user exploited them, validate the deployed
+function bodies, or replace staging identity tests after migration 264.
