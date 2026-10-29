@@ -56,6 +56,27 @@ export function createServer(
           res.setHeader("retry-after", "60");
           return json(429, { error: "rate_limited", request_id });
         }
+        if (req.url === "/internal/readiness") {
+          if (req.method !== "GET")
+            return json(405, { error: "method_not_allowed", request_id });
+          // This is a process identity probe, not an MCP tool or a public
+          // health check. The gateway and runtime already share this secret.
+          if (!c.AA_MCP_SERVICE_SECRET)
+            return json(503, { error: "readiness_unconfigured", request_id });
+          const token = /^Bearer ([^\s]+)$/.exec(req.headers.authorization ?? "")?.[1] ?? "";
+          if (!timingSafeEqual(digest(c.AA_MCP_SERVICE_SECRET), digest(token)))
+            return json(401, { error: "unauthorized", request_id });
+          const rawSha = process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.SOURCE_VERSION ?? "";
+          return json(200, {
+            ok: true,
+            sha: /^[0-9a-f]{40}$/i.test(rawSha) ? rawSha.toLowerCase() : null,
+            observedAt: new Date().toISOString(),
+            configured: {
+              aaInternalApi: Boolean(c.AA_INTERNAL_API_URL),
+              botAuthMode: c.BOT_AUTH_MODE,
+            },
+          });
+        }
         const admin = req.url?.startsWith("/admin/approvals");
         let identity;
         let reviewer;

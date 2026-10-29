@@ -39,6 +39,8 @@ export interface RuntimeConfig {
   publicRuntimeBase: string;
   /** Dedicated MCP gateway credential. Missing disables the MCP endpoint. */
   mcpServiceSecret?: string | null;
+  /** HTTPS origin of the gateway's service-authenticated readiness probe. */
+  gatewayUrl: string | null;
   /** Ceiling on Master AI spend across every conversation in one UTC day. */
   masterAiDailyLimitUsd: number;
   /** Ceiling on Master AI spend within a single conversation, all time. */
@@ -115,6 +117,19 @@ function requireEnv(name: string): string {
 function optionalEnv(name: string): string | undefined {
   const value = process.env[name];
   return value && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function gatewayOrigin(): string | null {
+  const raw = optionalEnv("AA_MCP_GATEWAY_URL");
+  if (!raw) return null;
+  let url: URL;
+  try { url = new URL(raw); } catch { throw new Error("AA_MCP_GATEWAY_URL must be an origin"); }
+  const local = url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname)
+    && process.env.NODE_ENV !== "production";
+  if ((url.protocol !== "https:" && !local) || url.username || url.password || url.search || url.hash || url.pathname !== "/") {
+    throw new Error("AA_MCP_GATEWAY_URL must be an HTTPS origin");
+  }
+  return url.origin;
 }
 
 function intEnv(name: string, fallback: number): number {
@@ -209,6 +224,7 @@ export function loadConfig(): RuntimeConfig {
     publicRuntimeBase:
       (optionalEnv("PUBLIC_RUNTIME_BASE") ?? "https://runtime.attractacq.com").replace(/\/+$/, ""),
     mcpServiceSecret: optionalEnv("AA_MCP_SERVICE_SECRET") ?? null,
+    gatewayUrl: gatewayOrigin(),
     // Calibrated against real use rather than guessed: 13 turns had cost
     // $1.15 in total, the dearest single turn $0.16, and the busiest day
     // $1.10. These sit far above that, so they never interrupt ordinary

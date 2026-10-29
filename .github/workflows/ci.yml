@@ -6,6 +6,37 @@ on:
   pull_request:
 
 jobs:
+  schema-replay:
+    name: Schema replay (clean, upgrade, catalog, types)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check isolated replay preparation
+        run: node --test scripts/prepare-schema-replay.test.mjs scripts/schema-migration-order.test.mjs scripts/schema-replay-fingerprint.test.mjs
+      - name: Require sequential migration dependencies
+        run: node scripts/schema-migration-order.mjs
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.101.0
+      - name: Install Postgres client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Replay schema and compare types
+        env:
+          AA_SCHEMA_EVIDENCE_DIR: schema-replay-evidence
+        run: bash scripts/schema-replay-ci.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: schema-replay-${{ github.run_id }}-${{ github.run_attempt }}
+          path: schema-replay-evidence/
+          if-no-files-found: warn
+
   frontend:
     name: Frontend (lint, typecheck, test, build)
     runs-on: ubuntu-latest

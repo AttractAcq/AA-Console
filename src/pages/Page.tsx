@@ -75,6 +75,8 @@ import { ChatPanel } from "./team/ChatPanel";
 import { AgentsPanel } from "./team/AgentsPanel";
 import { FinancialsPanel } from "./admin/FinancialsPanel";
 import { SopsPanel } from "./admin/SopsPanel";
+import { SystemReadinessPanel } from "./admin/SystemReadinessPanel";
+import { SchemaParityPanel } from "./admin/SchemaParityPanel";
 import { ContentAssetTable } from "../components/content/ContentAssetTable";
 import { ContentAssetsWorkspace, LEGACY_LIBRARY_TABS } from "../components/content/ContentAssetsWorkspace";
 import { MarketOpportunitiesPanel } from "./opportunities/MarketOpportunitiesPanel";
@@ -201,6 +203,8 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "campaign-actions": () => <CampaignActionApprovalsPanel />,
   },
   admin: {
+    "system-readiness": () => <SystemReadinessPanel />,
+    "schema-parity": () => <SchemaParityPanel />,
     financials: () => <FinancialsPanel />,
     sops: () => <SopsPanel />,
   },
