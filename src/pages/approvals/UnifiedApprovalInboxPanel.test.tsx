@@ -3,8 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from } = vi.hoisted(() => ({ from: vi.fn() }));
-vi.mock("../../lib/supabase", () => ({ supabase: { from } }));
+const { from, rpc, getAAL } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), getAAL: vi.fn() }));
+vi.mock("../../lib/supabase", () => ({ supabase: {
+  from, rpc, auth: { mfa: { getAuthenticatorAssuranceLevel: getAAL } },
+} }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
   useParams: () => ({ clientId: "client-1" }),
@@ -38,13 +40,26 @@ let requests: unknown[];
 let decisions: unknown[];
 let requestError: { message: string } | null;
 let decisionError: { message: string } | null;
+let freshRequest: unknown | undefined;
+
+const readyCampaign = {
+  ...request, source_system: "aa_console", expires_at: "2030-01-01T00:00:00Z",
+};
 
 function wireDatabase() {
   from.mockImplementation((table: string) => {
+    let id: string | null = null;
     const query = {
       select: () => query,
-      eq: () => query,
+      eq: (column: string, value: string) => {
+        if (column === "id") id = value;
+        return query;
+      },
       in: () => query,
+      maybeSingle: async () => ({
+        data: freshRequest === undefined ? requests.find((row) => (row as { id: string }).id === id) ?? null : freshRequest,
+        error: requestError,
+      }),
       order: async () => table === "approval_inbox_v6"
         ? { data: requests, error: requestError }
         : { data: decisions, error: decisionError },
@@ -63,6 +78,9 @@ beforeEach(() => {
   decisions = [];
   requestError = null;
   decisionError = null;
+  freshRequest = undefined;
+  getAAL.mockResolvedValue({ data: { currentLevel: "aal2" }, error: null });
+  rpc.mockResolvedValue({ data: null, error: null });
   wireDatabase();
 });
 
@@ -145,5 +163,111 @@ describe("unified approval inbox", () => {
     expect(iframe).toHaveAttribute("sandbox", "");
     expect(iframe).toHaveAttribute("referrerpolicy", "no-referrer");
     expect(iframe.getAttribute("srcdoc")).toContain("default-src 'none'");
+  });
+
+  it("decides a complete campaign action through its owning RPC and refreshes history", async () => {
+    const user = userEvent.setup();
+    requests = [readyCampaign];
+    rpc.mockImplementation(async () => {
+      requests = [{ ...readyCampaign, status: "approved" }];
+      decisions = [{ request_id: readyCampaign.id, decision: "approved", actor_id: "human-1",
+        actor_aal: "aal2", reason: null, decided_at: "2026-10-30T09:00:00Z" }];
+      return { data: null, error: null };
+    });
+    show();
+    const card = await screen.findByRole("article", { name: "Build the Meta ad" });
+    await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_campaign_action_approval_v6", {
+      p_request_id: "action-1", p_decision: "approved",
+    }));
+    await waitFor(() => expect(screen.getByText("Decision history (1)")).toBeInTheDocument());
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("requires a reason and fresh AAL2 for campaign rejection", async () => {
+    const user = userEvent.setup();
+    requests = [readyCampaign];
+    show();
+    const card = await screen.findByRole("article", { name: "Build the Meta ad" });
+    const reject = within(card).getByRole("button", { name: "Reject with reason" });
+    expect(reject).toBeDisabled();
+    await user.type(within(card).getByRole("textbox", { name: "Reason to reject" }), "Wrong account");
+    expect(reject).toBeEnabled();
+    await user.click(reject);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_campaign_action_approval_v6", {
+      p_request_id: "action-1", p_decision: "rejected", p_reason: "Wrong account",
+    }));
+    expect(getAAL.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("disables decisions without AAL2", async () => {
+    requests = [readyCampaign];
+    getAAL.mockResolvedValue({ data: { currentLevel: "aal1" }, error: null });
+    show();
+    const card = await screen.findByRole("article", { name: "Build the Meta ad" });
+    expect(await within(card).findByText(/Complete MFA to reach AAL2/)).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Approve exact version" })).toBeDisabled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rechecks AAL2 at click time before reading or deciding", async () => {
+    const user = userEvent.setup();
+    requests = [readyCampaign];
+    getAAL.mockResolvedValueOnce({ data: { currentLevel: "aal2" }, error: null })
+      .mockResolvedValue({ data: { currentLevel: "aal1" }, error: null });
+    show();
+    const card = await screen.findByRole("article", { name: "Build the Meta ad" });
+    await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Complete MFA to reach AAL2/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the exact canonical version before calling the owning RPC", async () => {
+    const user = userEvent.setup();
+    requests = [readyCampaign];
+    freshRequest = { ...readyCampaign, artifact_hash: "b".repeat(64) };
+    show();
+    const card = await screen.findByRole("article", { name: "Build the Meta ad" });
+    await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/exact request changed/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("offers no decision on blocked or already decided cards and only rejection after expiry", async () => {
+    const user = userEvent.setup();
+    requests = [
+      { ...readyCampaign, id: "blocked", preview_blocker: "Missing exact creative" },
+      { ...readyCampaign, id: "empty", title: "Empty preview", preview: {} },
+      { ...readyCampaign, id: "expired", title: "Expired action", status: "expired",
+        expires_at: "2020-01-01T00:00:00Z" },
+      { ...readyCampaign, id: "decided", title: "Decided action", status: "approved" },
+    ];
+    show();
+    await screen.findByText("Build the Meta ad");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "all");
+    expect(screen.queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Build the Meta ad" }))
+      .queryByRole("button", { name: "Reject with reason" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Empty preview" }))
+      .queryByRole("button", { name: "Reject with reason" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Decided action" }))
+      .queryByRole("button", { name: "Reject with reason" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Expired action" }))
+      .getByRole("button", { name: "Reject with reason" })).toBeDisabled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("can close an expired complete campaign request with a reasoned rejection", async () => {
+    const user = userEvent.setup();
+    requests = [{ ...readyCampaign, status: "expired", expires_at: "2020-01-01T00:00:00Z" }];
+    show();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "expired");
+    const card = await screen.findByRole("article", { name: "Build the Meta ad" });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    await user.type(within(card).getByRole("textbox", { name: "Reason to reject" }), "Approval window closed");
+    await user.click(within(card).getByRole("button", { name: "Reject with reason" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_campaign_action_approval_v6", {
+      p_request_id: "action-1", p_decision: "rejected", p_reason: "Approval window closed",
+    }));
   });
 });

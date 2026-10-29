@@ -65,12 +65,47 @@ function clientSourcePath(path: string | null, clientId: string): string | null 
 
 function previewMissing(request: UnifiedApprovalRequest): string | null {
   if (request.preview_blocker?.trim()) return request.preview_blocker;
-  if (request.preview === null || request.preview === undefined || request.preview === "") {
+  if (!request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)) {
     return "The exact artifact preview is missing.";
   }
+  if (Object.keys(request.preview).length === 0) return "The exact artifact preview is empty.";
   if (!request.artifact_hash?.trim()) return "The artifact version hash is missing.";
   if (!request.source_version?.trim()) return "The source version is missing.";
+  if (!request.expires_at) return "The approval expiry is missing.";
+  if (!request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)
+    || Object.keys(request.scope).length === 0) return "The exact scope is missing.";
   return null;
+}
+
+function isExpired(request: UnifiedApprovalRequest): boolean {
+  return !request.expires_at || !Number.isFinite(Date.parse(request.expires_at))
+    || Date.parse(request.expires_at) <= Date.now();
+}
+
+function isCampaignRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  return request.source_system === "aa_console"
+    && request.source_kind === "campaign_action"
+    && request.client_id === clientId
+    && (request.status === "pending" || request.status === "expired")
+    && !previewMissing(request);
+}
+
+function isCampaignApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  return isCampaignRejectionReady(request, clientId)
+    && request.status === "pending" && !isExpired(request);
+}
+
+function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
+  return left.id === right.id && left.source_id === right.source_id
+    && left.source_version === right.source_version
+    && left.status === right.status
+    && left.expires_at === right.expires_at
+    && left.artifact_hash === right.artifact_hash
+    && left.destination === right.destination
+    && left.account_ref === right.account_ref
+    && JSON.stringify(left.preview) === JSON.stringify(right.preview)
+    && JSON.stringify(left.scope) === JSON.stringify(right.scope)
+    && JSON.stringify(left.budget) === JSON.stringify(right.budget);
 }
 
 function statusTone(status: string): string {
@@ -88,14 +123,20 @@ function exactHtml(preview: unknown): string | null {
   return typeof html === "string" && html.trim() ? html : null;
 }
 
-function RequestCard({ request, history, clientId }: {
+function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
   request: UnifiedApprovalRequest;
   history: UnifiedApprovalDecision[];
   clientId: string;
+  aal: "aal2" | "aal1" | "unavailable";
+  busy: boolean;
+  onDecide: (request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) => Promise<void>;
 }) {
+  const [rejectionReason, setRejectionReason] = useState("");
   const blocker = previewMissing(request);
   const sourcePath = clientSourcePath(request.owning_path, clientId);
   const html = exactHtml(request.preview);
+  const canRejectCampaign = isCampaignRejectionReady(request, clientId);
+  const canApproveCampaign = isCampaignApprovalReady(request, clientId);
 
   return (
     <article className="rounded-xl border border-border bg-card p-5" aria-labelledby={`approval-${request.id}`}>
@@ -126,7 +167,7 @@ function RequestCard({ request, history, clientId }: {
           Incomplete preview: {blocker} This request is not decision-ready.
         </p>
       ) : (
-        <p className="mt-4 text-xs text-muted-foreground">Exact-version snapshot recorded. The owning source still decides this request.</p>
+        <p className="mt-4 text-xs text-muted-foreground">Exact-version snapshot recorded. Decisions use the owning source's approval function.</p>
       )}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -169,6 +210,38 @@ function RequestCard({ request, history, clientId }: {
         )}
       </details>
 
+      {canRejectCampaign && (
+        <div className="mt-4 space-y-3 rounded-lg border border-border p-3">
+          <p className="text-sm font-medium">Campaign action decision</p>
+          <p className="text-xs text-muted-foreground">
+            This calls the campaign action owner for the exact version above. AAL2 is required;
+            the source and database recheck the request before recording a decision.
+          </p>
+          {!canApproveCampaign && <p className="text-xs text-muted-foreground">
+            This request has expired. It can only be closed with a reasoned rejection.
+          </p>}
+          {aal !== "aal2" && <p role="status" className="text-sm text-destructive">
+            {aal === "aal1" ? "Complete MFA to reach AAL2 before deciding." : "MFA level could not be verified; decisions are unavailable."}
+          </p>}
+          <div className="flex flex-wrap gap-2">
+            {canApproveCampaign && <button type="button" disabled={busy || aal !== "aal2"}
+              onClick={() => void onDecide(request, "approved")}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
+              Approve exact version
+            </button>}
+            <label className="min-w-48 flex-1 text-sm">Reason to reject
+              <input value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)}
+                disabled={busy || aal !== "aal2"} className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            </label>
+            <button type="button" disabled={busy || aal !== "aal2" || !rejectionReason.trim()}
+              onClick={() => void onDecide(request, "rejected", rejectionReason.trim())}
+              className="self-end rounded-lg border border-border px-4 py-2 text-sm font-medium disabled:opacity-50">
+              Reject with reason
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mt-4">
         {sourcePath ? (
           <Link className="text-sm font-medium text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -189,6 +262,9 @@ export function UnifiedApprovalInboxPanel() {
   const [loading, setLoading] = useState(true);
   const [loadedClientId, setLoadedClientId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [aal, setAal] = useState<"aal2" | "aal1" | "unavailable">("unavailable");
 
   const refresh = useCallback(async () => {
     if (!clientId) return;
@@ -205,6 +281,13 @@ export function UnifiedApprovalInboxPanel() {
           .in("request_id", ids).order("decided_at", { ascending: false });
         if (decisionResult.error) throw decisionResult.error;
         decisionRows = decisionResult.data ?? [];
+      }
+      try {
+        const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        setAal(assurance.error ? "unavailable"
+          : assurance.data.currentLevel === "aal2" ? "aal2" : "aal1");
+      } catch {
+        setAal("unavailable");
       }
       setRequests(rows);
       setDecisions(decisionRows);
@@ -227,6 +310,49 @@ export function UnifiedApprovalInboxPanel() {
     setLoading(true);
     setError(null);
     void refresh();
+  }
+
+  async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) {
+    if (!clientId || (decision === "approved"
+      ? !isCampaignApprovalReady(request, clientId)
+      : !isCampaignRejectionReady(request, clientId))) return;
+    setBusyId(request.id);
+    setDecisionError(null);
+    try {
+      const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (assurance.error || assurance.data.currentLevel !== "aal2") {
+        setAal(assurance.error ? "unavailable" : "aal1");
+        throw new Error("Complete MFA to reach AAL2 before deciding this request.");
+      }
+      setAal("aal2");
+
+      const current = await supabase.from("approval_inbox_v6").select("*")
+        .eq("id", request.id).eq("client_id", clientId).maybeSingle();
+      if (current.error) throw current.error;
+      if (!current.data || (decision === "approved"
+        ? !isCampaignApprovalReady(current.data, clientId)
+        : !isCampaignRejectionReady(current.data, clientId))
+        || !sameVersion(request, current.data)) {
+        throw new Error("This exact request changed or is no longer pending. Review the refreshed card before deciding.");
+      }
+      if (decision === "rejected" && !reason?.trim()) {
+        throw new Error("Enter a reason before rejecting this request.");
+      }
+      const outcome = await supabase.rpc("decide_campaign_action_approval_v6", {
+        p_request_id: request.source_id,
+        p_decision: decision,
+        ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+      });
+      if (outcome.error) throw outcome.error;
+      setStatusFilter("all");
+      await refresh();
+    } catch (cause) {
+      setDecisionError(cause instanceof Error ? cause.message
+        : (cause as { message?: string }).message ?? "The decision could not be recorded.");
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   const waiting = loading || loadedClientId !== clientId;
@@ -256,8 +382,9 @@ export function UnifiedApprovalInboxPanel() {
         <h2 id="unified-approvals-title" className="text-xl font-semibold">Unified approval inbox</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Canonical requests and decision history appear here as source adapters are connected.
-          Open the owning source to make a decision. The Engine, Assets and Campaign actions tabs
-          remain available for work not yet mirrored here.
+          Complete campaign action requests can be decided here through their owning function.
+          Other requests link to their owning source. Coverage is incomplete: the Engine,
+          Assets and Campaign actions tabs remain available for work not yet mirrored here.
         </p>
       </div>
 
@@ -266,7 +393,8 @@ export function UnifiedApprovalInboxPanel() {
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}
             className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
             <option value="pending">Pending</option><option value="approved">Approved</option>
-            <option value="rejected">Rejected</option><option value="all">All statuses</option>
+            <option value="rejected">Rejected</option><option value="expired">Expired</option>
+            <option value="all">All statuses</option>
           </select>
         </label>
         <label className="min-w-40 flex-1 text-sm font-medium">Source type
@@ -287,6 +415,7 @@ export function UnifiedApprovalInboxPanel() {
       {error && !waiting && <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
         <p>{error}</p><button type="button" onClick={retry} className="mt-2 underline">Retry</button>
       </div>}
+      {decisionError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{decisionError}</p>}
       {clientId && waiting ? <p role="status" className="text-sm text-muted-foreground">Loading canonical requests…</p>
         : error ? null
           : clientId ? <>
@@ -296,7 +425,7 @@ export function UnifiedApprovalInboxPanel() {
                 : "No requests match these filters."}
             </p> : <div className="space-y-4">{visible.map((request) => (
               <RequestCard key={request.id} request={request} history={historyByRequest.get(request.id) ?? []}
-                clientId={clientId ?? ""} />
+                clientId={clientId ?? ""} aal={aal} busy={busyId === request.id} onDecide={decide} />
             ))}</div>}
           </> : null}
     </section>
