@@ -212,6 +212,24 @@ export async function runGoogleAdsSheetJob(
     return fail("A build sheet needs the campaign to describe. Start it from the campaign.");
   }
 
+  // Capture the exact package before reading campaign context. The recording
+  // RPC verifies that this id is still the latest version after derivation;
+  // a replan in between fails closed instead of attaching stale content to a
+  // new package.
+  const { data: manifest, error: manifestError } = await sb
+    .from("campaign_manifest_versions")
+    .select("id, client_id, acquisition_mode, paid_platform")
+    .eq("campaign_id", job.input_id)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (manifestError) throw new Error(`Could not read the campaign package: ${manifestError.message}`);
+  if (!manifest) return fail("This campaign has no package. Plan it before deriving a Google build sheet.");
+  if (manifest.client_id !== job.client_id || manifest.acquisition_mode !== "paid"
+      || manifest.paid_platform !== "google") {
+    return fail("The current package does not belong to this paid Google campaign.");
+  }
+
   const { data, error } = await sb
     .from("client_campaigns")
     .select(
@@ -281,8 +299,9 @@ export async function runGoogleAdsSheetJob(
     approvedCopy,
   });
 
-  const { data: sheetId, error: recordError } = await sb.rpc("record_google_ads_sheet_v6", {
+  const { data: sheetId, error: recordError } = await sb.rpc("record_google_ads_sheet_for_manifest_v6", {
     p_campaign_id: row.id,
+    p_manifest_id: manifest.id,
     p_derived: derived as never,
     p_missing: missing,
     p_job_id: job.id,
