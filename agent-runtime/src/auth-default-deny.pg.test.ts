@@ -3,13 +3,16 @@ import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Execute the repository's Auth trigger/provisioner SQL and migration 270 in
-// Postgres. The small staff tables below reproduce the pre-270 policies so
-// the tests prove a previously reachable chat path closes under real RLS.
+// Postgres. The focused chat setup runs migration 16's actual membership
+// policies and migration 47's name helper before applying 270.
 let db: PGlite;
 let adminId: string;
 let linkedId: string;
 let unlinkedId: string;
 let retiredId: string;
+let clientId: string;
+let channelId: string;
+let retiredMessageId: string;
 let retiredMemberId: string;
 
 const migration = (file: string) =>
@@ -88,6 +91,7 @@ beforeAll(async () => {
   adminId = await createUser("admin-270@example.com", "admin");
   linkedId = await createUser("linked-270@example.com", "employee", "smm");
   retiredId = await createUser("retired-270@example.com", "employee", "smm");
+  clientId = await createUser("client-270@example.com", "client");
   const retiredMember = await db.query<{ id: string }>(
     `insert into public.team_members (user_id, category, name, initials, active)
      values ($1, 'smm', 'Retired', 'RE', false) returning id`, [retiredId],
@@ -110,27 +114,64 @@ beforeAll(async () => {
   await db.exec(`
     create table public.team_channels (id uuid primary key default gen_random_uuid(), name text);
     create table public.team_messages (
-      id uuid primary key default gen_random_uuid(), channel_id uuid,
-      author_id uuid, body text
+      id uuid primary key default gen_random_uuid(),
+      channel_id uuid references public.team_channels(id),
+      author_id uuid references public.profiles(id), body text
     );
     alter table public.team_channels enable row level security;
     alter table public.team_messages enable row level security;
+    create policy tc_admin_all on public.team_channels for all to authenticated
+      using (public.is_admin()) with check (public.is_admin());
     create policy tc_staff_read on public.team_channels for select to authenticated
       using (public.current_role_of() in ('admin','employee'));
     create policy tmsg_staff_read on public.team_messages for select to authenticated
       using (public.current_role_of() in ('admin','employee'));
     create policy tmsg_staff_insert on public.team_messages for insert to authenticated
       with check (public.current_role_of() in ('admin','employee') and author_id = auth.uid());
-    insert into public.team_channels (name) values ('Agency chat');
-    insert into public.team_messages (author_id, body) values
-      ('${adminId}', 'Private team message');
+    create policy tmsg_self_update on public.team_messages for update to authenticated
+      using (author_id = auth.uid()) with check (author_id = auth.uid());
+  `);
+
+  const channelMigration = await migration("20260904084217_16_chat_channel_members.sql");
+  const channelFrom = channelMigration.indexOf("create table channel_members (");
+  const channelUntil = channelMigration.indexOf("-- ---------- realtime ----------", channelFrom);
+  if (channelFrom < 0 || channelUntil < 0) throw new Error("Migration 16 chat policies changed");
+  await db.exec(channelMigration.slice(channelFrom, channelUntil));
+
+  const participantsMigration = await migration("20260906194104_47_chat_participants.sql");
+  const participantsFrom = participantsMigration.indexOf("create or replace function chat_participants()");
+  const participantsUntil = participantsMigration.indexOf("comment on function chat_participants()", participantsFrom);
+  if (participantsFrom < 0 || participantsUntil < 0) throw new Error("Migration 47 chat helper changed");
+  await db.exec(participantsMigration.slice(participantsFrom, participantsUntil));
+
+  channelId = (await db.query<{ id: string }>(
+    "insert into public.team_channels (name) values ('Agency chat') returning id",
+  )).rows[0]!.id;
+  await db.query(
+    `insert into public.channel_members (channel_id, user_id)
+     select $1, id from public.profiles where id = any($2::uuid[])`,
+    [channelId, [adminId, linkedId, unlinkedId, retiredId, clientId]],
+  );
+  await db.query(
+    "insert into public.team_messages (channel_id, author_id, body) values ($1, $2, 'Private team message')",
+    [channelId, adminId],
+  );
+  retiredMessageId = (await db.query<{ id: string }>(
+    `insert into public.team_messages (channel_id, author_id, body)
+     values ($1, $2, 'Retired message') returning id`, [channelId, retiredId],
+  )).rows[0]!.id;
+
+  await db.exec(`
     grant usage on schema public, auth to authenticated;
     grant select, insert, update on all tables in schema public to authenticated;
   `);
 
-  // A role-only rule exposes shared chat to an unlinked Auth user. Preserve
-  // this negative baseline before applying the actual migration.
+  // Explicit channel membership still exposed chat to an employee with no
+  // live team record. Preserve this negative baseline before 270.
   expect(await asUser<{ name: string }>(unlinkedId, "select name from public.team_channels")).toHaveLength(1);
+  expect(await asUser<{ display_name: string }>(retiredId,
+    "select display_name from public.chat_participants()",
+  )).not.toHaveLength(0);
 
   await db.exec(await migration("20261029210000_270_default_deny_auth_and_active_staff.sql"));
 }, 60_000);
@@ -151,27 +192,45 @@ describe("default-deny Auth and active staff boundary", () => {
     expect(await asUser<{ is_admin: boolean; member_id: string | null }>(
       freshId, "select public.is_admin(), public.current_member_id() as member_id",
     )).toEqual([{ is_admin: false, member_id: null }]);
+    expect(await asUser<{ is_channel_member: boolean }>(freshId,
+      "select public.is_channel_member($1)", [channelId],
+    )).toEqual([{ is_channel_member: false }]);
     expect(await asUser(freshId, "select id from public.team_channels")).toHaveLength(0);
   });
 
-  it("hides agency-wide chat from legacy unlinked or retired employees", async () => {
+  it("hides channel content, membership and names from unlinked or retired employees", async () => {
     for (const id of [unlinkedId, retiredId]) {
+      expect(await asUser<{ is_channel_member: boolean }>(id,
+        "select public.is_channel_member($1)", [channelId],
+      )).toEqual([{ is_channel_member: false }]);
       expect(await asUser(id, "select id from public.team_channels")).toHaveLength(0);
       expect(await asUser(id, "select id from public.team_messages")).toHaveLength(0);
+      expect(await asUser(id, "select channel_id from public.channel_members")).toHaveLength(0);
+      expect(await asUser(id, "select id from public.chat_participants()")).toHaveLength(0);
       await expect(asUser(id,
-        "insert into public.team_messages (author_id, body) values ($1, 'probe') returning id", [id],
+        "insert into public.team_messages (channel_id, author_id, body) values ($1, $2, 'probe') returning id",
+        [channelId, id],
       )).rejects.toThrow(/row-level security/i);
     }
+    expect(await asUser(retiredId,
+      "update public.team_messages set body = 'edited' where id = $1 returning id", [retiredMessageId],
+    )).toHaveLength(0);
   });
 
-  it("keeps active staff and administrators able to use shared chat", async () => {
-    for (const id of [linkedId, adminId]) {
+  it("keeps channel members among active staff, clients and admins able to use chat", async () => {
+    for (const id of [linkedId, clientId, adminId]) {
+      expect(await asUser<{ is_channel_member: boolean }>(id,
+        "select public.is_channel_member($1)", [channelId],
+      )).toEqual([{ is_channel_member: true }]);
       expect(await asUser(id, "select id from public.team_channels")).toHaveLength(1);
       expect(await asUser(id,
         "select id from public.team_messages where body = 'Private team message'",
       )).toHaveLength(1);
+      expect(await asUser(id, "select channel_id from public.channel_members")).toHaveLength(5);
+      expect(await asUser(id, "select id from public.chat_participants()")).toHaveLength(5);
       expect(await asUser(id,
-        "insert into public.team_messages (author_id, body) values ($1, 'allowed') returning id", [id],
+        "insert into public.team_messages (channel_id, author_id, body) values ($1, $2, 'allowed') returning id",
+        [channelId, id],
       )).toHaveLength(1);
     }
   });
