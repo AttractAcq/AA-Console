@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clientNavGroups, legacyDeliveryNodes, v6ModuleNodes } from "./navigation";
+import { clientNavGroups, legacyDeliveryNodes, legacyDeliveryRedirects, v6ModuleNodes } from "./navigation";
 
 describe("client delivery navigation", () => {
   it("shows every acquisition module as its own Delivery page with the agreed utilities", () => {
@@ -24,12 +24,24 @@ describe("client delivery navigation", () => {
       .toEqual(["intelligence", "strategy"]);
   });
 
-  it("keeps every replaced v5 Delivery route available during migration", () => {
+  it("sends every replaced v5 Delivery route to the page that took over its work", () => {
+    // The migration these were kept available for is over: each one is a
+    // redirect now, and this is what stops one being archived with nowhere
+    // to send the links that still point at it.
     expect(legacyDeliveryNodes.map((node) => node.path)).toEqual([
       "intelligence", "strategy", "proof-bank", "ideation", "create", "edit-repurpose",
       "approvals", "media", "distribution", "reporting", "campaign-execution",
       "conversion", "sales", "prospects-leads", "economics",
     ]);
+    for (const node of legacyDeliveryNodes) {
+      expect(legacyDeliveryRedirects[node.path]).toBeDefined();
+    }
+    // And every destination is a page that exists.
+    const live = new Set(clientNavGroups.flatMap((group) =>
+      (group.children ?? []).map((child) => child.path)));
+    for (const target of Object.values(legacyDeliveryRedirects)) {
+      expect(live).toContain(target.split("?")[0]);
+    }
     expect(v6ModuleNodes.find((node) => node.id === "content-production-factory")?.tabs?.map((tab) => tab.id))
       .toEqual(["generation", "briefs", "create", "edit", "assets"]);
     // This list is now empty, and that is the point: every one of the fifteen

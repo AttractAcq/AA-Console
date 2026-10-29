@@ -37,11 +37,6 @@ import { GenerationPanel } from "./ideation/GenerationPanel";
 import { ContentArchivePanel } from "./archive/ContentArchivePanel";
 import { ARCHIVE_DOMAINS, SimpleArchivePanel } from "./archive/SimpleArchivePanel";
 import { BriefsPanel } from "./ideation/BriefsPanel";
-import { ImageLibraryPanel } from "./media/ImageLibraryPanel";
-import { StoryLibraryPanel } from "./media/StoryLibraryPanel";
-import { CarouselLibraryPanel } from "./media/CarouselLibraryPanel";
-import { VideoLibraryPanel } from "./media/VideoLibraryPanel";
-import { ReelShotsPanel } from "./media/ReelShotsPanel";
 import { EditRepurposePanel } from "./media/EditRepurposePanel";
 import { MotionDesignPanel } from "./motion/MotionDesignPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
@@ -62,7 +57,6 @@ import { OnboardingPanel } from "./account/OnboardingPanel";
 import { ContactPanel } from "./account/ContactPanel";
 import { BrandPanel } from "./account/BrandPanel";
 import { IntegrationsPanel } from "./account/IntegrationsPanel";
-import { CopyLibraryPanel } from "./media/CopyLibraryPanel";
 import { PaidReportingPanel } from "./reporting/PaidReportingPanel";
 import { OrganicReportingPanel } from "./reporting/OrganicReportingPanel";
 import { PagesReportingPanel } from "./reporting/PagesReportingPanel";
@@ -81,7 +75,6 @@ import { ChatPanel } from "./team/ChatPanel";
 import { AgentsPanel } from "./team/AgentsPanel";
 import { FinancialsPanel } from "./admin/FinancialsPanel";
 import { SopsPanel } from "./admin/SopsPanel";
-import { ContentJourney } from "../components/ContentJourney";
 import { ContentAssetTable } from "../components/content/ContentAssetTable";
 import { ContentAssetsWorkspace, LEGACY_LIBRARY_TABS } from "../components/content/ContentAssetsWorkspace";
 import { MarketOpportunitiesPanel } from "./opportunities/MarketOpportunitiesPanel";
@@ -225,79 +218,15 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "recruitment-pages": () => <RecruitmentPagesPanel />,
     "recruitment-distribution": () => <RecruitmentDistributionPanel />,
   },
-  intelligence: {
-    "business-context": () => <BusinessContextPanel />,
-    market: () => <MarketPanel />,
-    icp: () => <IcpPanel />,
-    competitors: () => <CompetitorsPanel />,
-    "branding-associations": () => <BrandingAssociationsPanel />,
-    "campaign-intelligence": () => <CampaignIntelligencePanel />,
-    "proof-intelligence": () => <ProofIntelligencePanel />,
-  },
-  strategy: {
-    "branding-strategy": () => <BrandingStrategyPanel />,
-    "content-pillars": () => <ContentPillarsPanel />,
-    "offer-strategy": () => <OfferStrategyPanel />,
-    "money-model-strategy": () => <MoneyModelStrategyPanel />,
-  },
-  ideation: {
-    generation: () => <GenerationPanel />,
-    briefs: () => <BriefsPanel />,
-  },
-  media: {
-    "image-library": () => <ImageLibraryPanel />,
-    "story-library": () => <StoryLibraryPanel />,
-    "carousel-library": () => <CarouselLibraryPanel />,
-    "video-library": () => <VideoLibraryPanel />,
-    "reel-shots": () => <ReelShotsPanel />,
-    "copy-library": () => <CopyLibraryPanel />,
-  },
-  "edit-repurpose": {
-    overview: () => <EditRepurposePanel />,
-  },
-  distribution: {
-    "distribution-assets": () => <AssetsPanel />,
-    engine: () => <EnginePanel />,
-    organic: () => <OrganicPanel />,
-    paid: () => <PaidPanel />,
-  },
   sites: {
     overview: () => <SitesPanel />,
     settings: () => <GitHubSettingsPanel />,
-  },
-  sales: {
-    overview: () => <SalesOverviewPanel />,
-  },
-  "campaign-execution": {
-    overview: () => <CampaignExecutionPanel />,
-  },
-  economics: {
-    overview: () => <ClientEconomicsPanel />,
-  },
-  conversion: {
-    "primary-landing-pages": () => <PageBuilderPanel pageType="landing" />,
-    "secondary-offer-pages": () => <PageBuilderPanel pageType="offer" />,
   },
   archive: {
     "content-production": () => <ContentArchivePanel />,
     pages: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.pages!} />,
     campaigns: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.campaigns!} />,
     "sales-agents": () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS["sales-agents"]!} />,
-  },
-  reporting: {
-    organic: () => <OrganicReportingPanel />,
-    paid: () => <PaidReportingPanel />,
-    "landing-pages": () => <PagesReportingPanel pageType="landing" />,
-    "offer-pages": () => <PagesReportingPanel pageType="offer" />,
-    attribution: () => <AttributionPanel />,
-    commentary: () => <CommentaryPanel />,
-  },
-  approvals: {
-    // First, because it is the queue that stops a machine rather than a
-    // person's backlog.
-    "engine-inbox": () => <EngineInboxPanel />,
-    assets: () => <ApprovalsPanel />,
-    "campaign-actions": () => <CampaignActionApprovalsPanel />,
   },
 };
 
@@ -394,7 +323,6 @@ export function Page({ node }: { node: NavNode }) {
       {node.capability === "planned" && <p className="mb-4 text-sm text-muted-foreground">
         This module is visible in v6 and is not connected to an external service yet.
       </p>}
-      {node.id === "distribution" && <ContentJourney clientId={clientId} current="distribution" />}
       {tabs && activeTab && (
         <div className="mb-6">
           <Tabs tabs={tabs} activeId={activeTab.id} onChange={handleTabChange} />

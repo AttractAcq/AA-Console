@@ -358,6 +358,35 @@ export const legacyDeliveryNodes = (legacyClientNavGroups[0]?.children ?? []).fi
   (node) => !["dashboard", "motion-design", "archive"].includes(node.path),
 );
 
+/**
+ * Where each replaced v5 Delivery page sends you now.
+ *
+ * The pages are archived, not the links to them: these paths were bookmarked,
+ * pasted into chat and linked from records for a year. Each one names the v6
+ * page that took over its work, with the tab that matches where it landed.
+ *
+ * A legacy query survives the redirect and wins over the default here, so
+ * `media?tab=reel-shots` still opens the reel shots library — Assets keeps
+ * v1's tab ids for exactly that reason.
+ */
+export const legacyDeliveryRedirects: Record<string, string> = {
+  intelligence: "intelligence-os",
+  strategy: "intelligence-os?view=strategy",
+  "proof-bank": "proof-production-factory",
+  ideation: "content-production-factory",
+  create: "content-production-factory?tab=create",
+  "edit-repurpose": "content-production-factory?tab=edit",
+  approvals: "approval-inbox",
+  media: "content-production-factory?tab=assets",
+  distribution: "content-distribution",
+  reporting: "attribution-os",
+  "campaign-execution": "campaign-factory",
+  conversion: "website-studio",
+  sales: "sales-os?tab=agents",
+  "prospects-leads": "sales-os?tab=leads",
+  economics: "attribution-os?tab=economics",
+};
+
 /** Every acquisition component is a distinct Delivery page, in product order. */
 export const v6ModuleNodes: NavNode[] = [
   { id: "intelligence-os", label: "Intelligence OS", path: "intelligence-os", icon: Brain, capability: "expanding",

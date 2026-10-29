@@ -30,42 +30,38 @@ vi.mock("./distribution/MetaProfilePanel", () => ({ MetaProfilePanel: ({ tab }: 
 vi.mock("./distribution/OrganicPanel", () => ({ OrganicPanel: () => <p>Organic board</p> }));
 vi.mock("./reporting/OrganicReportingPanel", () => ({ OrganicReportingPanel: () => <p>Organic reporting</p> }));
 
-import { legacyDeliveryNodes, v6ModuleNodes } from "../config/navigation";
+import { v6ModuleNodes } from "../config/navigation";
 import { Page } from "./Page";
 
-const intelligence = legacyDeliveryNodes.find((node) => node.id === "intelligence")!;
 const intelligenceOs = v6ModuleNodes.find((node) => node.id === "intelligence-os")!;
 
 beforeEach(() => vi.clearAllMocks());
 
-it("downloads the selected tab as a PDF and all module tabs as a ZIP", async () => {
+it("downloads whichever tab is open as a PDF", async () => {
   const user = userEvent.setup();
   render(
-    <MemoryRouter initialEntries={["/clients/client-1/delivery/intelligence"]}>
+    <MemoryRouter initialEntries={["/clients/client-1/delivery/intelligence-os"]}>
       <Routes>
-        <Route path="/clients/:clientId/delivery/intelligence" element={<Page node={intelligence} />} />
+        <Route path="/clients/:clientId/delivery/intelligence-os" element={<Page node={intelligenceOs} />} />
       </Routes>
     </MemoryRouter>,
   );
 
   await user.click(screen.getByRole("button", { name: "Download PDF" }));
-  expect(downloadTabPdf).toHaveBeenCalledWith("client-1", "intelligence", intelligence.tabs![0]);
+  expect(downloadTabPdf).toHaveBeenCalledWith("client-1", "intelligence", intelligenceOs.tabs![0]);
 
   await user.click(screen.getByRole("tab", { name: "Market" }));
   await user.click(screen.getByRole("button", { name: "Download PDF" }));
-  expect(downloadTabPdf).toHaveBeenLastCalledWith("client-1", "intelligence", intelligence.tabs![1]);
-
-  await user.click(screen.getByRole("button", { name: "Download all" }));
-  expect(downloadModuleZip).toHaveBeenCalledWith("client-1", "intelligence", intelligence.tabs);
+  expect(downloadTabPdf).toHaveBeenLastCalledWith("client-1", "intelligence", intelligenceOs.tabs![1]);
 });
 
 it("shows an export failure and allows retry", async () => {
   downloadTabPdf.mockRejectedValueOnce(new Error("Network unavailable"));
   const user = userEvent.setup();
   render(
-    <MemoryRouter initialEntries={["/clients/client-1/delivery/intelligence"]}>
+    <MemoryRouter initialEntries={["/clients/client-1/delivery/intelligence-os"]}>
       <Routes>
-        <Route path="/clients/:clientId/delivery/intelligence" element={<Page node={intelligence} />} />
+        <Route path="/clients/:clientId/delivery/intelligence-os" element={<Page node={intelligenceOs} />} />
       </Routes>
     </MemoryRouter>,
   );
