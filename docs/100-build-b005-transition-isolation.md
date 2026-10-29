@@ -20,8 +20,13 @@ decision. It follows migration 263 and must be released only after 260–263.
   before checking its client. Asset reparenting takes the same row lock, so
   concurrent attach and reparent operations serialize and the second writer
   checks the committed state before either can leave a cross-client link.
-- `schema-replay-contract.sql` asserts grants and trigger presence on clean
-  and upgrade replay.
+- A validated composite foreign key on `(asset_id, client_id)` is the final
+  database invariant, including transactions at `REPEATABLE READ`. A check
+  requires `client_id` whenever `asset_id` is present, because the assignment
+  client column is historically nullable and a composite foreign key alone
+  would skip that row. Deleting an asset clears only `asset_id`, as before.
+- `schema-replay-contract.sql` asserts grants, enabled triggers, and validated
+  constraints on clean and upgrade replay.
 
 ## Local evidence
 
@@ -33,9 +38,12 @@ authenticated` for direct-call denial and positive named-wrapper behavior;
 they also verify catalog grants, same-client asset acceptance, foreign asset
 rejection, unchanged state/event counts after refusal, and asset-reparenting
 refusal. A focused test checks the installed row-locking guard and both
-sequential transaction orders. PGlite cannot interleave two connections, so
-the fixtures are not a substitute for the full migration replay or a live
-two-session concurrency test.
+sequential transaction orders. It also disables the custom guards in the
+disposable fixture and proves the validated constraints independently reject
+cross-client and null-client links, while asset deletion clears only the
+asset reference. PGlite cannot interleave two connections, so the fixtures
+are not a substitute for the full migration replay or a live two-session
+concurrency test.
 
 ## Remaining B005 work
 

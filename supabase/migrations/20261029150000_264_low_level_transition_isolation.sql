@@ -43,6 +43,24 @@ begin
 end
 $check$;
 
+-- The triggers below give immediate, specific errors, but a trigger's read
+-- can use an older snapshot at REPEATABLE READ. The validated composite FK
+-- is the authoritative invariant under every supported transaction level.
+-- MATCH SIMPLE would skip a row with a null assignment client, so reject
+-- that shape whenever an asset is attached. Existing mismatches were checked
+-- above; the validated constraints also catch a concurrent write during the
+-- migration rather than preserving it as historical data.
+create unique index client_media_assets_id_client_id_uq
+  on public.client_media_assets (id, client_id);
+alter table public.job_assignments
+  add constraint job_assignments_asset_requires_client
+  check (asset_id is null or client_id is not null);
+alter table public.job_assignments
+  add constraint job_assignments_asset_client_fk
+  foreign key (asset_id, client_id)
+  references public.client_media_assets (id, client_id)
+  on delete set null (asset_id);
+
 create or replace function public.guard_assignment_asset_client()
 returns trigger
 language plpgsql
