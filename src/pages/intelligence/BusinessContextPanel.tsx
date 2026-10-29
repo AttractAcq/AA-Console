@@ -8,7 +8,6 @@ import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef, FormValues } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
 import { OnboardingSource } from "../../components/OnboardingSource";
-import { clearDraft } from "../../components/forms/FormModal";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 
 /**
@@ -190,8 +189,6 @@ export function BusinessContextPanel() {
           requireNotes={false}
           onClose={() => setResearching(false)}
           onGenerated={(draft, drafted, droppedFields) => {
-            // Applying generated research deliberately replaces in-progress edits.
-            clearDraft(`business-context:${clientId}`);
             setAiDraft(draft);
             setSources(drafted ?? null);
             setDropped(droppedFields ?? []);

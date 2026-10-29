@@ -178,7 +178,7 @@ describe("form draft isolation", () => {
     expect(screen.getByLabelText("Font")).toHaveValue("Inter");
   });
 
-  it("keeps unsaved private edits in memory through refresh, then applies an explicit new draft", () => {
+  it("keeps private edits through refresh and confirms before an AI draft replaces them", () => {
     const fields: FieldDef[] = [
       { name: "note", label: "Note", kind: "textarea" },
       { name: "role_title", label: "Role", kind: "text" },
@@ -193,8 +193,46 @@ describe("form draft isolation", () => {
 
     const generated = { note: "Generated", role_title: "Director" };
     rerender(<FormModal {...props} initialValues={generated} resetKey={generated} />);
-    expect(screen.getByLabelText("Note")).toHaveValue("Generated");
-    expect(screen.getByLabelText("Role")).toHaveValue("Director");
+    expect(screen.getByLabelText("Note")).toHaveValue(marker);
+    expect(screen.getByLabelText("Role")).toHaveValue("Manager");
+    expect(screen.getByText("Replace your edits with the AI draft?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Keep my edits" }));
+    rerender(<FormModal {...props} initialValues={{ ...generated }} resetKey={generated} />);
+    expect(screen.getByLabelText("Note")).toHaveValue(marker);
+    expect(screen.getByLabelText("Role")).toHaveValue("Manager");
+
+    const nextGenerated = { note: "Second generated", role_title: "Principal" };
+    rerender(<FormModal {...props} initialValues={nextGenerated} resetKey={nextGenerated} />);
+    expect(screen.getByLabelText("Note")).toHaveValue(marker);
+    fireEvent.click(screen.getByRole("button", { name: "Use AI draft" }));
+    expect(screen.getByLabelText("Note")).toHaveValue("Second generated");
+    expect(screen.getByLabelText("Role")).toHaveValue("Principal");
+  });
+
+  it("retains the safe draft if AI output is declined and clears it only when accepted", () => {
+    const fields: FieldDef[] = [
+      { name: "provider", label: "Provider", kind: "select", options: [{ value: "meta", label: "Meta" }, { value: "google", label: "Google" }] },
+      { name: "label", label: "Private label", kind: "text" },
+    ];
+    const draftKey = integrationDraftKey("client-1");
+    const props = { open: true, onClose: vi.fn(), title: "Integration", draftKey, fields, onSubmit: vi.fn() };
+    const { rerender } = render(<FormModal {...props} />);
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "meta" } });
+    fireEvent.change(screen.getByLabelText("Private label"), { target: { value: marker } });
+    expect(readDraft(draftKey, fields)).toEqual({ provider: "meta" });
+
+    const generated = { provider: "google", label: "AI label" };
+    rerender(<FormModal {...props} initialValues={generated} resetKey={generated} />);
+    fireEvent.click(screen.getByRole("button", { name: "Keep my edits" }));
+    expect(readDraft(draftKey, fields)).toEqual({ provider: "meta" });
+    expect(screen.getByLabelText("Private label")).toHaveValue(marker);
+
+    const nextGenerated = { provider: "google", label: "New AI label" };
+    rerender(<FormModal {...props} initialValues={nextGenerated} resetKey={nextGenerated} />);
+    fireEvent.click(screen.getByRole("button", { name: "Use AI draft" }));
+    expect(readDraft(draftKey, fields)).toBeUndefined();
+    expect(screen.getByLabelText("Provider")).toHaveValue("google");
+    expect(screen.getByLabelText("Private label")).toHaveValue("New AI label");
   });
 
   it("guards Cancel, Escape, backdrop, and close button before discarding private edits", () => {

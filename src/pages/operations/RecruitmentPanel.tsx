@@ -4,7 +4,7 @@ import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
-import { FormModal, clearDraft } from "../../components/forms/FormModal";
+import { FormModal } from "../../components/forms/FormModal";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import type { GeneratedBrief } from "../../components/forms/generatedBrief";
 import type { FieldDef } from "../../components/forms/fields";
@@ -661,8 +661,6 @@ export function RecruitmentPanel() {
           payload={{ role: draftRole }}
           onClose={() => setGenerating(false)}
           onGenerated={(draft) => {
-            // Applying the generated brief deliberately replaces in-progress edits.
-            clearDraft(`recruitment-brief:${draftRole}`);
             setAiDraft(draft);
           }}
         />

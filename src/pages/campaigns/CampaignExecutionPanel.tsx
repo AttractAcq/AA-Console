@@ -11,7 +11,6 @@ import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
-import { clearDraft } from "../../components/forms/FormModal";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import {
   NO_TEMPLATE,
@@ -944,8 +943,6 @@ export function CampaignExecutionPanel() {
           }
           onClose={() => setProposing(false)}
           onGenerated={(draft) => {
-            // Applying the proposal deliberately replaces in-progress edits.
-            clearDraft(`campaign:${clientId}`);
             // The template rides along so the form opens on the same choice
             // the proposal was written for. Losing it here would leave a
             // brief aimed at S1 sitting in a campaign with no template.

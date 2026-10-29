@@ -55,7 +55,7 @@ export function FormModal({
    * key, in this browser tab. Cleared once the form saves successfully.
    */
   draftKey?: string;
-  /** A changed value deliberately replaces in-progress edits, such as an AI-generated draft. */
+  /** A changed generated-draft identity asks before replacing in-progress edits. */
   resetKey?: unknown;
   onSubmit: (values: FormValues) => Promise<void>;
   onSaved?: () => void;
@@ -65,42 +65,79 @@ export function FormModal({
   );
   const touched = useRef<Record<string, boolean>>({});
   const dirty = useRef(false);
+  const pendingReplacement = useRef<FormValues | null>(null);
+  const ignoredResetKey = useRef<{ key: unknown } | null>(null);
   const previousInputs = useRef({ open: false, draftKey, resetKey });
   const [error, setError] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmReplace, setConfirmReplace] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // Preserve edits through live parent refreshes. A new opening, form identity
-  // or explicit reset replaces them with current server values plus safe draft.
+  // Preserve edits through live parent refreshes. A new opening or form
+  // identity loads server values plus the safe draft. AI output asks first.
   useEffect(() => {
     const prior = previousInputs.current;
-    const reset = !prior.open || prior.draftKey !== draftKey || prior.resetKey !== resetKey;
+    const generatedReset = prior.open && prior.draftKey === draftKey
+      && resetKey != null && prior.resetKey !== resetKey;
+    const reset = !prior.open || prior.draftKey !== draftKey || generatedReset;
     previousInputs.current = { open, draftKey, resetKey };
-    if (open) {
-      const draft = readDraft(draftKey, fields);
-      const seeded = blankValues(fields, { ...initialValues, ...draft });
-      if (reset) {
-        setValues(seeded);
-        touched.current = draft ? Object.fromEntries(Object.keys(draft).map((name) => [name, true])) : {};
-        dirty.current = false;
-        setConfirmDiscard(false);
-        setError(null);
-        setBusy(false);
-      } else {
-        setValues((previous) => {
-          const updated = { ...previous };
-          let changed = false;
-          for (const field of fields) {
-            if (field.kind === "heading" || touched.current[field.name]
-              || (field.derivedFrom && touched.current[field.derivedFrom.field])) continue;
-            if (updated[field.name] !== seeded[field.name]) {
-              updated[field.name] = seeded[field.name];
-              changed = true;
-            }
-          }
-          return changed ? updated : previous;
-        });
+    if (!open) {
+      pendingReplacement.current = null;
+      ignoredResetKey.current = null;
+      setConfirmReplace(false);
+      return;
+    }
+    if (generatedReset) {
+      // A generated draft can overwrite private in-memory edits. Keep both
+      // versions until the operator explicitly chooses which one to use.
+      const generated = blankValues(fields, initialValues);
+      ignoredResetKey.current = null;
+      setConfirmDiscard(false);
+      if (dirty.current) {
+        pendingReplacement.current = generated;
+        setConfirmReplace(true);
+        return;
       }
+      clearDraft(draftKey);
+      pendingReplacement.current = null;
+      setConfirmReplace(false);
+      setValues(generated);
+      touched.current = {};
+      dirty.current = false;
+      setConfirmDiscard(false);
+      setError(null);
+      setBusy(false);
+      return;
+    }
+    if (pendingReplacement.current) {
+      pendingReplacement.current = blankValues(fields, initialValues);
+      return;
+    }
+    if (ignoredResetKey.current && ignoredResetKey.current.key === resetKey) return;
+    const draft = readDraft(draftKey, fields);
+    const seeded = blankValues(fields, { ...initialValues, ...draft });
+    if (reset) {
+      setValues(seeded);
+      touched.current = draft ? Object.fromEntries(Object.keys(draft).map((name) => [name, true])) : {};
+      dirty.current = false;
+      setConfirmDiscard(false);
+      setConfirmReplace(false);
+      setError(null);
+      setBusy(false);
+    } else {
+      setValues((previous) => {
+        const updated = { ...previous };
+        let changed = false;
+        for (const field of fields) {
+          if (field.kind === "heading" || touched.current[field.name]
+            || (field.derivedFrom && touched.current[field.derivedFrom.field])) continue;
+          if (updated[field.name] !== seeded[field.name]) {
+            updated[field.name] = seeded[field.name];
+            changed = true;
+          }
+        }
+        return changed ? updated : previous;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialValues, draftKey, resetKey]);
@@ -141,6 +178,9 @@ export function FormModal({
     touched.current = {};
     dirty.current = false;
     setConfirmDiscard(false);
+    setConfirmReplace(false);
+    pendingReplacement.current = null;
+    ignoredResetKey.current = null;
     onClose();
   }
 
@@ -201,6 +241,33 @@ export function FormModal({
             <div className="mt-3 flex justify-end gap-2">
               <button type="button" onClick={() => setConfirmDiscard(false)} className="rounded-md border border-border px-3 py-1.5">Keep editing</button>
               <button type="button" onClick={() => close(true)} className="rounded-md bg-destructive px-3 py-1.5 text-destructive-foreground">Leave form</button>
+            </div>
+          </div>
+        )}
+
+        {confirmReplace && (
+          <div role="alert" className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
+            <p className="font-medium text-foreground">Replace your edits with the AI draft?</p>
+            <p className="mt-1 text-muted-foreground">The generated draft will replace the changes currently in this form.</p>
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={() => {
+                pendingReplacement.current = null;
+                ignoredResetKey.current = { key: resetKey };
+                setConfirmReplace(false);
+              }} className="rounded-md border border-border px-3 py-1.5">Keep my edits</button>
+              <button type="button" onClick={() => {
+                const generated = pendingReplacement.current;
+                if (!generated) return;
+                clearDraft(draftKey);
+                setValues(generated);
+                touched.current = {};
+                dirty.current = false;
+                pendingReplacement.current = null;
+                ignoredResetKey.current = null;
+                setConfirmReplace(false);
+                setConfirmDiscard(false);
+                setError(null);
+              }} className="rounded-md bg-primary px-3 py-1.5 text-primary-foreground">Use AI draft</button>
             </div>
           </div>
         )}

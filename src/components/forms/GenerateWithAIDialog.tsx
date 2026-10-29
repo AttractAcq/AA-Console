@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { callRuntime } from "../../lib/callRuntime";
 
@@ -21,21 +21,7 @@ import { callRuntime } from "../../lib/callRuntime";
  *   campaign's steer can be a whole pasted strategy, so it passes `null`; the
  *   endpoints that still cap their notes keep the 4000 default to match.
  */
-export function GenerateWithAIDialog<T>({
-  open,
-  title,
-  intro,
-  label,
-  placeholder,
-  endpoint,
-  payload,
-  requireNotes = true,
-  maxNotesLength = 4000,
-  footnote,
-  extra,
-  onClose,
-  onGenerated,
-}: {
+type GenerateProps<T> = {
   open: boolean;
   title: string;
   intro: string;
@@ -51,14 +37,48 @@ export function GenerateWithAIDialog<T>({
   extra?: ReactNode;
   onClose: () => void;
   onGenerated: (draft: T, sources?: string, dropped?: { field: string; reason: string }[]) => void;
-}) {
+};
+
+export function GenerateWithAIDialog<T>(props: GenerateProps<T>) {
+  if (!props.open) return null;
+  // A new subject gets a fresh dialog. Its old request is invalidated by the
+  // outgoing instance's cleanup, and its private notes cannot cross over.
+  return <GenerateWithAIContent key={JSON.stringify([props.endpoint, props.payload])} {...props} />;
+}
+
+function GenerateWithAIContent<T>({
+  title,
+  intro,
+  label,
+  placeholder,
+  endpoint,
+  payload,
+  requireNotes = true,
+  maxNotesLength = 4000,
+  footnote,
+  extra,
+  onClose,
+  onGenerated,
+}: GenerateProps<T>) {
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const requestId = useRef(0);
 
-  if (!open) return null;
+  // A late runtime response must not apply after the dialog is dismissed,
+  // hidden by its parent, changed to another subject, or unmounted.
+  useEffect(() => () => { requestId.current += 1; }, []);
+
+  const close = () => {
+    requestId.current += 1;
+    setNotes("");
+    setBusy(false);
+    setProblem(null);
+    onClose();
+  };
 
   const generate = async () => {
+    const request = ++requestId.current;
     setBusy(true);
     setProblem(null);
     try {
@@ -67,16 +87,18 @@ export function GenerateWithAIDialog<T>({
         sources?: string;
         dropped?: { field: string; reason: string }[];
       }>(endpoint, { ...payload, notes: notes.trim() });
+      if (request !== requestId.current) return;
       onGenerated(result.draft, result.sources, result.dropped);
-      setNotes("");
-      onClose();
+      close();
     } catch (error) {
+      if (request !== requestId.current) return;
       // The runtime's own sentence — "the ask names a budget", "the primary
       // text is too thin to be an ad" — written to be read by whoever pressed
       // the button, so it is shown rather than replaced with something generic.
       setProblem(error instanceof Error ? error.message : "That did not work.");
+    } finally {
+      if (request === requestId.current) setBusy(false);
     }
-    setBusy(false);
   };
 
   const blocked = busy || (requireNotes && notes.trim().length === 0);
@@ -87,7 +109,7 @@ export function GenerateWithAIDialog<T>({
         type="button"
         aria-label="Close"
         className="absolute inset-0 bg-foreground/40"
-        onClick={onClose}
+        onClick={close}
       />
       <div
         role="dialog"
@@ -127,7 +149,7 @@ export function GenerateWithAIDialog<T>({
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             className="rounded-md px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Cancel
