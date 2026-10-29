@@ -372,3 +372,13 @@ create policy sops_obj_staff_read on storage.objects
   using (bucket_id = 'sops' and (public.is_admin() or
     (public.current_role_of() = 'employee'::public.app_role
       and public.current_member_id() is not null)));
+
+-- The SOP metadata policy from migration 07 had the same retired-profile
+-- leak. Restrict it together with the private file policy so a former team
+-- member can neither list the file path nor request a new signed read.
+drop policy if exists sops_staff_read on public.sops;
+create policy sops_staff_read on public.sops
+  for select to authenticated
+  using (public.is_admin() or
+    (public.current_role_of() = 'employee'::public.app_role
+      and public.current_member_id() is not null));

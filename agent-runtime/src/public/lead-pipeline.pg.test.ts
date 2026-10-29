@@ -44,6 +44,7 @@ beforeAll(async () => {
     "20260903104724_04_intelligence_and_strategy.sql",
     "20260903104816_05_content_chain_proof_ideas_briefs_media.sql",
     "20260903104850_06_distribution_conversion_leads.sql",
+    "20260903104939_07_account_and_admin.sql",
     "20260904080405_14_campaigns.sql",
   ]) await db.exec(await migration(file));
   // Minimal Supabase Storage tables; migration 08 installs the real policies.
@@ -160,6 +161,7 @@ beforeAll(async () => {
     grant all on archived_leads, client_leads, lead_events, lead_identities to authenticated;
     grant select on client_users to authenticated;
     grant select, insert on client_proof_assets to authenticated, service_role;
+    grant select on sops to authenticated, service_role;
     grant usage on schema storage to service_role;
     grant select, insert on storage.objects to service_role;
     grant all on client_sales_agents, sales_agent_conversations to authenticated;
@@ -174,7 +176,7 @@ beforeEach(async () => {
     delete from sales_agent_conversations; delete from client_sales_agents;
     delete from mcp_internal.mcp_pipeline_requests;
     delete from archived_leads; delete from client_leads; delete from lead_identities;`);
-  await db.exec(`delete from storage.objects; delete from client_marketing_spend;
+  await db.exec(`delete from storage.objects; delete from sops; delete from client_marketing_spend;
     delete from content_attribution; delete from client_proof_assets;
     delete from job_assignments; delete from client_assignments;
     update team_members set active=true where user_id='${EDITOR}';`);
@@ -465,5 +467,27 @@ describe("migration 266: commercial reports and proof/SOP storage", () => {
     await expect(objects("sops")).rejects.toThrow(/permission denied/);
     await expect(upload(CLIENT)).rejects.toThrow(/permission denied/);
     await expect(addProof(CLIENT)).rejects.toThrow(/permission denied/);
+  });
+
+  it("hides SOP metadata rows from retired employees and non-staff roles", async () => {
+    await db.exec("reset role");
+    await db.query("insert into sops(title,storage_path) values ('Production guide','guide.pdf')");
+    const rows = () => db.query<{ title: string }>("select title from sops");
+
+    await asUser(EDITOR);
+    expect((await rows()).rows.map((r) => r.title)).toEqual(["Production guide"]);
+    await db.exec(`reset role; update team_members set active=false where user_id='${EDITOR}';`);
+    await asUser(EDITOR);
+    expect((await rows()).rows).toHaveLength(0);
+    await asAdmin();
+    expect((await rows()).rows).toHaveLength(1);
+    await asUser(CLIENT_USER);
+    expect((await rows()).rows).toHaveLength(0);
+    await asUser(OTHER_USER);
+    expect((await rows()).rows).toHaveLength(0);
+    await asService();
+    expect((await rows()).rows).toHaveLength(1);
+    await asAnon();
+    await expect(rows()).rejects.toThrow(/permission denied/);
   });
 });
