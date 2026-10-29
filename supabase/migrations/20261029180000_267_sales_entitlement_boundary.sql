@@ -160,7 +160,9 @@ begin
      public.sales_entitlement_scope_hash(v_req.client_id,v_req.member_id,v_req.bound_user_id,v_req.action) then
     raise exception 'The exact sales access scope changed. Request a new decision.';
   end if;
-  if v_req.action = 'grant' then
+  -- Rejection must remain possible after retirement or account relinking;
+  -- otherwise a stale pending grant cannot be closed or replaced.
+  if p_approve and v_req.action = 'grant' then
     select tm.user_id into v_user_id
       from public.team_members tm
       join public.profiles p on p.id = tm.user_id
@@ -338,6 +340,52 @@ revoke execute on function public.guard_client_lead_owner() from public, anon, a
 create trigger client_leads_owner_scope
   before insert or update of owner_member_id, client_id on public.client_leads
   for each row execute function public.guard_client_lead_owner();
+
+-- Archive recovery restores a historical row. If its old owner no longer
+-- passes the live same-client sales predicate, recover the lead without that
+-- owner and record why. A fresh owner assignment still goes through the guard.
+create or replace function public.recover_lead(p_lead_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  v_archive public.archived_leads%rowtype;
+  v_restored jsonb;
+  v_prior_owner uuid;
+begin
+  select * into v_archive from public.archived_leads
+   where id = p_lead_id for update;
+  if not found then raise exception 'That archived lead no longer exists.'; end if;
+  if not public.may_manage_client_leads(v_archive.client_id) then
+    raise exception 'Not permitted for this client';
+  end if;
+  if v_archive.stage_at_archive in ('lead','sale') then
+    raise exception 'This legacy lead cannot be recovered into an old stage.';
+  end if;
+  v_restored := v_archive.lead;
+  v_prior_owner := nullif(v_restored->>'owner_member_id','')::uuid;
+  if v_prior_owner is not null
+     and not public.is_eligible_lead_owner(v_prior_owner,v_archive.client_id) then
+    v_restored := jsonb_set(v_restored,'{owner_member_id}','null'::jsonb);
+  end if;
+  insert into public.client_leads
+    select * from jsonb_populate_record(null::public.client_leads,v_restored);
+  insert into public.lead_events
+    select * from jsonb_populate_recordset(null::public.lead_events,v_archive.events);
+  insert into public.lead_events (lead_id,client_id,kind,body,created_by)
+  values (p_lead_id,v_archive.client_id,'note',
+    'Recovered from archive on '
+      || to_char(now() at time zone 'UTC','YYYY-MM-DD HH24:MI') || ' UTC',auth.uid());
+  if v_prior_owner is not null and v_restored->>'owner_member_id' is null then
+    insert into public.lead_events (lead_id,client_id,kind,body,created_by)
+    values (p_lead_id,v_archive.client_id,'note',
+      'Archived owner ' || v_prior_owner::text
+        || ' was cleared because same-client sales access is no longer approved.',
+      auth.uid());
+  end if;
+  delete from public.archived_leads where id = p_lead_id;
+end;
+$$;
+revoke execute on function public.recover_lead(uuid) from public, anon;
+grant execute on function public.recover_lead(uuid) to authenticated, service_role;
 
 create or replace function public.list_client_lead_owners(p_client_id uuid)
 returns table (id uuid, name text)

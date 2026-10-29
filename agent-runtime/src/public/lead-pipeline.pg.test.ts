@@ -531,6 +531,52 @@ describe("migration 266: commercial reports and proof/SOP storage", () => {
 });
 
 describe("migration 267: exact-scope sales entitlement boundary", () => {
+  it("closes a stale grant request by rejecting it after the member retires", async () => {
+    const memberId = await editorMemberId();
+    const request = await db.query<{ id: string }>(
+      "select request_client_sales_entitlement($1,$2,'grant') as id", [CLIENT, memberId]);
+    const id = request.rows[0]!.id;
+    const scope = await db.query<{ scope_hash: string }>(
+      "select scope_hash from client_sales_entitlement_requests where id=$1", [id]);
+    await db.exec(`reset role; update team_members set active=false where id='${memberId}';`);
+    await asAdmin();
+    await expect(db.query("select decide_client_sales_entitlement($1,$2,true,'Approve stale')",
+      [id, scope.rows[0]!.scope_hash])).rejects.toThrow(/team member identity changed/);
+    await db.query("select decide_client_sales_entitlement($1,$2,false,'Withdraw stale grant')",
+      [id, scope.rows[0]!.scope_hash]);
+    expect((await db.query<{ status: string; decision_note: string }>(
+      "select status,decision_note from client_sales_entitlement_requests where id=$1", [id])).rows[0])
+      .toMatchObject({ status: "rejected", decision_note: "Withdraw stale grant" });
+    await db.exec("reset role");
+    expect((await db.query("select * from client_sales_entitlements")).rows).toHaveLength(0);
+  });
+
+  it("recovers an archived lead with a prior owner without restoring stale access", async () => {
+    const memberId = await editorMemberId();
+    await salesDecision(CLIENT, memberId, "grant");
+    await bridgeInboxForFixture(CLIENT, memberId);
+    await asAdmin();
+    const id = await createLead();
+    await db.query("select update_lead($1,$2)", [id, { owner_member_id: memberId }]);
+    await db.query("select archive_lead($1,null)", [id]);
+    // A currently eligible owner survives recovery.
+    await db.query("select recover_lead($1)", [id]);
+    expect((await db.query<{ owner_member_id: string | null }>(
+      "select owner_member_id from client_leads where id=$1", [id])).rows[0]?.owner_member_id)
+      .toBe(memberId);
+    await db.query("select archive_lead($1,null)", [id]);
+    await db.exec(`reset role; update team_members set active=false where id='${memberId}';`);
+    await asAdmin();
+    await db.query("select recover_lead($1)", [id]);
+    expect((await db.query<{ owner_member_id: string | null }>(
+      "select owner_member_id from client_leads where id=$1", [id])).rows[0]?.owner_member_id)
+      .toBeNull();
+    expect((await db.query<{ body: string }>(
+      "select body from lead_events where lead_id=$1 and body like 'Archived owner %'", [id])).rows[0]?.body)
+      .toMatch(/was cleared because same-client sales access/);
+    expect((await db.query("select id from archived_leads where id=$1", [id])).rows).toHaveLength(0);
+  });
+
   it("accepts client manual entry only through a narrow creation RPC", async () => {
     await asUser(CLIENT_USER);
     await expect(db.query(
