@@ -420,6 +420,19 @@ begin
 end;
 $$;
 
+-- Keep the security-definer exposure inventory aligned with the client-sales
+-- gates introduced in 265 and 267–268. This must remain a later definition
+-- than migration 168; changing a released migration would alter its checksum.
+create or replace function public.caller_gate_markers()
+returns text language sql immutable set search_path to 'public' as $$
+  select
+    'can_access_client|is_admin\(|auth\.role\(\)|current_role_of|accessible_client_ids'
+    || '|may_advance_slot|may_touch_assignment|may_manage_client_leads'
+    || '|has_client_sales_entitlement|can_read_client_sales_data|can_read_workflow_lead_attribution'
+    || '|advance_slot|advance_assignment'
+    || '|require_active_bot|require_bot_client_grant'
+$$;
+
 -- A campaign ID must remain in its client's namespace even when a trusted
 -- service writes these rows directly. NOT VALID preserves historical rows for
 -- an explicit audit/repair; PostgreSQL enforces each constraint for new
