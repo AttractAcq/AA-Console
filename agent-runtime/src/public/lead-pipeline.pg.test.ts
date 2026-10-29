@@ -16,6 +16,14 @@ async function asUser(user: string) {
     select set_config('request.jwt.claim.sub','${user}',false); set role authenticated;`);
 }
 async function asAdmin() { await asUser(ADMIN); }
+async function asService() {
+  await db.exec(`reset role; select set_config('request.jwt.claim.role','service_role',false);
+    select set_config('request.jwt.claim.sub','',false); set role service_role;`);
+}
+async function asAnon() {
+  await db.exec(`reset role; select set_config('request.jwt.claim.role','anon',false);
+    select set_config('request.jwt.claim.sub','',false); set role anon;`);
+}
 
 beforeAll(async () => {
   db = new PGlite();
@@ -92,6 +100,34 @@ beforeAll(async () => {
   await db.exec(await migration("20260925110000_127_retired_team_access.sql"));
   await db.exec(await migration("20260925121000_129_lead_pipeline_archive.sql"));
   await db.exec(await migration("20261029160000_265_lead_and_media_entitlements.sql"));
+  // The reporting functions in 266 are executed against these representative
+  // relations. Their values distinguish each client's commercial result; the
+  // permission checks are the behavior under test, not attribution maths.
+  await db.exec(`
+    create table client_marketing_spend (
+      id uuid primary key default gen_random_uuid(), client_id uuid not null,
+      spent_on date not null, amount numeric not null, currency text not null,
+      channel text, campaign_id uuid
+    );
+    create view lead_progress as
+      select id as lead_id, client_id, created_at, stage, source_channel,
+        source_campaign_id, coalesce(sale_value,0) as sale_value,
+        coalesce(cash_collected,0) as cash_collected,
+        3::integer as furthest_rank from client_leads;
+    create table content_attribution (
+      client_id uuid not null, asset_ref text, asset_title text, hook text,
+      idea_title text, content_territory text, leads integer, sales integer,
+      cash_collected numeric, spend numeric, impressions bigint,
+      sale_value numeric, asset_created_at timestamptz default now()
+    );
+    -- Migration 209 replaced migration 19's client-only INSERT with this
+    -- broader policy. Reproduce the current policy before applying 266.
+    alter table client_proof_assets add column usage_rights text not null default 'not_cleared';
+    drop policy cpa_client_insert on client_proof_assets;
+    create policy cpa_client_insert on client_proof_assets for insert to authenticated
+      with check (can_access_client(client_id) and usage_rights = 'not_cleared');
+  `);
+  await db.exec(await migration("20261029170000_266_commercial_reporting_and_storage_scope.sql"));
   // 129 clears the active tables, but archives what it finds rather than
   // dropping it. lead_events.lead_id is ON DELETE CASCADE, so a bare delete
   // would have taken each lead's history with it.
@@ -123,6 +159,9 @@ beforeAll(async () => {
       values ('${EDITOR}','editors','Editor','E');
     grant all on archived_leads, client_leads, lead_events, lead_identities to authenticated;
     grant select on client_users to authenticated;
+    grant select, insert on client_proof_assets to authenticated, service_role;
+    grant usage on schema storage to service_role;
+    grant select, insert on storage.objects to service_role;
     grant all on client_sales_agents, sales_agent_conversations to authenticated;
     grant usage on schema mcp_internal to authenticated;
     grant all on mcp_internal.mcp_pipeline_requests to authenticated;
@@ -135,7 +174,9 @@ beforeEach(async () => {
     delete from sales_agent_conversations; delete from client_sales_agents;
     delete from mcp_internal.mcp_pipeline_requests;
     delete from archived_leads; delete from client_leads; delete from lead_identities;`);
-  await db.exec(`delete from storage.objects; delete from job_assignments; delete from client_assignments;
+  await db.exec(`delete from storage.objects; delete from client_marketing_spend;
+    delete from content_attribution; delete from client_proof_assets;
+    delete from job_assignments; delete from client_assignments;
     update team_members set active=true where user_id='${EDITOR}';`);
   await asAdmin();
 });
@@ -292,5 +333,137 @@ describe("migration 265: lead and owned-media entitlements", () => {
     expect((await visible()).rows.map((r) => r.name)).toEqual([`${OTHER}/own-b.png`]);
     await asAdmin();
     expect((await visible()).rows).toHaveLength(2);
+  });
+});
+
+describe("migration 266: commercial reports and proof/SOP storage", () => {
+  const since = "2000-01-01";
+  const until = "2100-01-01";
+  const economics = [
+    "client_economics",
+    "client_economics_by_channel",
+    "client_economics_by_campaign",
+  ] as const;
+
+  it("keeps five definer reports within service, admin or same-client scope", async () => {
+    await createLead();
+    await db.exec("reset role");
+    await db.query("insert into client_leads(client_id,name,stage,source_channel) values ($1,'Other','qualified','Search')", [OTHER]);
+    await db.query(`insert into client_marketing_spend(client_id,spent_on,amount,currency,channel)
+      values ($1,current_date,100,'ZAR','Social'),($2,current_date,200,'ZAR','Search')`, [CLIENT, OTHER]);
+    await db.query(`insert into content_attribution(client_id,asset_ref,asset_title,leads,sales,cash_collected,spend,impressions,sale_value)
+      values ($1,'A-1','Alpha',1,0,0,100,10,0),($2,'B-1','Beta',1,0,0,200,20,0)`, [CLIENT, OTHER]);
+    await db.query(`insert into job_assignments(member_id,client_id,title)
+      select id,$1,'Edit a reel' from team_members where user_id=$2`, [CLIENT, EDITOR]);
+
+    const assertVisible = async (client: string, ref: string) => {
+      const funnel = await db.query<{ leads: number }>("select leads from acquisition_funnel($1,30)", [client]);
+      expect(funnel.rows[0]?.leads).toBe(1);
+      for (const name of economics) {
+        const rows = await db.query<{ spend: number }>(`select * from ${name}($1,$2,$3)`, [client, since, until]);
+        expect(rows.rows.length).toBeGreaterThan(0);
+        expect(rows.rows.reduce((sum, row) => sum + Number(row.spend), 0)).toBe(client === CLIENT ? 100 : 200);
+      }
+      const content = await db.query<{ asset_ref: string }>("select asset_ref from top_content_by_revenue($1,10)", [client]);
+      expect(content.rows.map((r) => r.asset_ref)).toEqual([ref]);
+    };
+    const assertDenied = async (client: string) => {
+      expect((await db.query("select * from acquisition_funnel($1,30)", [client])).rows).toHaveLength(0);
+      for (const name of economics) {
+        await expect(db.query(`select * from ${name}($1,$2,$3)`, [client, since, until]))
+          .rejects.toThrow(/Not permitted/);
+      }
+      expect((await db.query("select * from top_content_by_revenue($1,10)", [client])).rows).toHaveLength(0);
+    };
+
+    await asAdmin();
+    await assertVisible(CLIENT, "A-1");
+    await assertVisible(OTHER, "B-1");
+    await asUser(CLIENT_USER);
+    await assertVisible(CLIENT, "A-1");
+    await assertDenied(OTHER);
+    await asUser(OTHER_USER);
+    await assertVisible(OTHER, "B-1");
+    await assertDenied(CLIENT);
+    await asUser(EDITOR);
+    expect((await db.query<{ allowed: boolean }>("select can_access_client($1) as allowed", [CLIENT])).rows[0]?.allowed).toBe(true);
+    await assertDenied(CLIENT);
+    await db.exec(`reset role; update team_members set active=false where user_id='${EDITOR}';`);
+    await asUser(EDITOR);
+    await assertDenied(CLIENT);
+    await asService();
+    await assertVisible(CLIENT, "A-1");
+    await assertVisible(OTHER, "B-1");
+    await asAnon();
+    await expect(db.query("select * from acquisition_funnel($1,30)", [CLIENT])).rejects.toThrow(/permission denied/);
+    for (const name of economics) {
+      await expect(db.query(`select * from ${name}($1,$2,$3)`, [CLIENT, since, until]))
+        .rejects.toThrow(/permission denied/);
+    }
+    await expect(db.query("select * from top_content_by_revenue($1,10)", [CLIENT])).rejects.toThrow(/permission denied/);
+  });
+
+  it("matches proof metadata and bucket scope, and removes SOP reads on retirement", async () => {
+    await db.exec("reset role");
+    await db.query(`insert into job_assignments(member_id,client_id,title)
+      select id,$1,'Edit a reel' from team_members where user_id=$2`, [CLIENT, EDITOR]);
+    await db.query(`insert into storage.objects(bucket_id,name)
+      values ('proof',$1),('proof',$2),('sops','guide.pdf')`, [`${CLIENT}/a/evidence.png`, `${OTHER}/b/evidence.png`]);
+    await db.query(`insert into client_proof_assets(client_id,media_type,body)
+      values ($1,'text','Client A proof'),($2,'text','Client B proof')`, [CLIENT, OTHER]);
+    const objects = (bucket: string) => db.query<{ name: string }>(
+      "select name from storage.objects where bucket_id=$1 order by name", [bucket]);
+    const proofRows = () => db.query<{ client_id: string }>(
+      "select client_id from client_proof_assets order by client_id");
+    const addProof = (client: string, rights = "not_cleared") => db.query(
+      "insert into client_proof_assets(client_id,media_type,body,usage_rights) values ($1,'text','Evidence',$2)",
+      [client, rights]);
+    const upload = (client: string) => db.query(
+      "insert into storage.objects(bucket_id,name) values ('proof',$1)", [`${client}/new/evidence.png`]);
+
+    await asUser(EDITOR);
+    expect((await db.query<{ allowed: boolean }>("select can_access_client($1) as allowed", [CLIENT])).rows[0]?.allowed).toBe(true);
+    expect((await objects("proof")).rows).toHaveLength(0);
+    expect((await proofRows()).rows).toHaveLength(0);
+    expect((await objects("sops")).rows).toHaveLength(1);
+    await expect(addProof(CLIENT)).rejects.toThrow(/row-level security/);
+    await expect(upload(CLIENT)).rejects.toThrow(/row-level security/);
+    await db.exec(`reset role; update team_members set active=false where user_id='${EDITOR}';`);
+    await asUser(EDITOR);
+    expect((await objects("sops")).rows).toHaveLength(0);
+    expect((await objects("proof")).rows).toHaveLength(0);
+
+    await asUser(CLIENT_USER);
+    expect((await objects("proof")).rows.map((r) => r.name)).toEqual([`${CLIENT}/a/evidence.png`]);
+    expect((await proofRows()).rows.map((r) => r.client_id)).toEqual([CLIENT]);
+    expect((await objects("sops")).rows).toHaveLength(0);
+    await addProof(CLIENT);
+    await upload(CLIENT);
+    await expect(addProof(OTHER)).rejects.toThrow(/row-level security/);
+    await expect(upload(OTHER)).rejects.toThrow(/row-level security/);
+    await expect(addProof(CLIENT, "approved")).rejects.toThrow(/row-level security/);
+    await asUser(OTHER_USER);
+    expect((await objects("proof")).rows.map((r) => r.name)).toEqual([`${OTHER}/b/evidence.png`]);
+    expect((await proofRows()).rows.map((r) => r.client_id)).toEqual([OTHER]);
+    await addProof(OTHER);
+    await upload(OTHER);
+    await expect(addProof(CLIENT)).rejects.toThrow(/row-level security/);
+    await expect(upload(CLIENT)).rejects.toThrow(/row-level security/);
+    await asAdmin();
+    expect((await objects("proof")).rows).toHaveLength(4);
+    expect((await proofRows()).rows.length).toBeGreaterThanOrEqual(4);
+    expect((await objects("sops")).rows).toHaveLength(1);
+    await addProof(OTHER);
+    await upload(OTHER);
+    await asService();
+    expect((await objects("proof")).rows).toHaveLength(5);
+    expect((await objects("sops")).rows).toHaveLength(1);
+    await addProof(OTHER);
+    await upload(OTHER);
+    await asAnon();
+    await expect(objects("proof")).rejects.toThrow(/permission denied/);
+    await expect(objects("sops")).rejects.toThrow(/permission denied/);
+    await expect(upload(CLIENT)).rejects.toThrow(/permission denied/);
+    await expect(addProof(CLIENT)).rejects.toThrow(/permission denied/);
   });
 });
