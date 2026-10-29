@@ -64,8 +64,8 @@ describe("AA lead funnel", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_manual_lead", {
       p_client_id: "client-1", p_name: "New Prospect", p_email: "new@example.com",
-      p_phone: null, p_owner_member_id: null, p_next_action: null,
-      p_next_action_due: null, p_opportunity_value: null,
+      p_phone: undefined, p_owner_member_id: undefined, p_next_action: undefined,
+      p_next_action_due: undefined, p_opportunity_value: undefined,
     }));
   });
 
