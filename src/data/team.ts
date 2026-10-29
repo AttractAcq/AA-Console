@@ -1,4 +1,4 @@
-export type TeamCategory = "avatars" | "editors" | "smm";
+export type TeamCategory = "avatars" | "editors" | "smm" | "creative_director";
 
 export type EngagementType = "Employee" | "Contractor";
 
@@ -13,12 +13,14 @@ export const teamMembers: Record<TeamCategory, TeamMember[]> = {
   avatars: [{ id: "avatar-1", name: "Maya Chen", initials: "MC", engagementType: "Employee" }],
   editors: [{ id: "editor-1", name: "Leo Whitfield", initials: "LW", engagementType: "Employee" }],
   smm: [{ id: "smm-1", name: "Nina Torres", initials: "NT", engagementType: "Employee" }],
+  creative_director: [],
 };
 
 export const teamCategoryLabels: Record<TeamCategory, { label: string; addButtonLabel: string }> = {
   avatars: { label: "Avatars", addButtonLabel: "Add Avatar" },
   editors: { label: "Editors", addButtonLabel: "Add Editor" },
   smm: { label: "SMM", addButtonLabel: "Add SMM" },
+  creative_director: { label: "Creative Directors", addButtonLabel: "Add Creative Director" },
 };
 
 export type MemberSection = { id: string; label: string };

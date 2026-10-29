@@ -2,6 +2,8 @@ import { handlePublicProof } from "./proof-capture/public-route.js";
 import { handleProofCaptureAdmin } from "./proof-capture/admin-route.js";
 import { handleCampaignActionRequest } from "./campaigns/actions/request-route.js";
 import { handlePublicLead } from "./lead-capture/public-route.js";
+import { handlePublicBooking, isBookingRequest } from "./booking/public-route.js";
+import { handleMetaWebhook, isMetaWebhookRequest } from "./dm/webhook.js";
 import { startProofCoordinator } from "./proof-capture/coordinator.js";
 // Process entry point: a small health/status HTTP surface plus
 // config.concurrency worker loops in the same process. One process, not a
@@ -176,6 +178,18 @@ const server = http.createServer((req, res) => {
   // a client's own site is not one of our listed origins.
   if (req.url?.startsWith("/public/lead")) {
     void handlePublicLead(req, res, sb, config);
+    return;
+  }
+  // Meta pushing an inbound message. Unauthenticated by nature, verified by
+  // signature, and handled before the console CORS block.
+  if (isMetaWebhookRequest(req.url)) {
+    void handleMetaWebhook(req, res, sb, config);
+    return;
+  }
+  // A prospect taking a slot in a client's week. Public for the same reason
+  // the lead form is: it lives on the client's own site.
+  if (isBookingRequest(req.url)) {
+    void handlePublicBooking(req, res, sb);
     return;
   }
   if (req.url === "/internal/proof-capture/event") {

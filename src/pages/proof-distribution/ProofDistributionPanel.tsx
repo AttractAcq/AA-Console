@@ -13,7 +13,9 @@ import {
   createPlacement, decideApproval, fetchClientDestinations, fetchDestinations,
   fetchPlacementDue, fetchPlacements, markPlacedByHand, recordRetracted,
   requestApproval, setDestinationEnabled, setProofPublishingEnabled,
+  fetchProofSurfaceCoverage,
   type ClientDestination, type Destination, type Placement, type PlacementDue,
+  type ProofSurfaceCoverage,
 } from "../../lib/proofDistribution";
 
 /**
@@ -442,7 +444,9 @@ function RightsTab({
 
   return (
     <div className="space-y-6">
-      {/* First, because it is the only part of this screen that is a job
+      <SurfaceCoverage />
+
+      {/* Then, because it is the only part of this screen that is a job
           rather than a record. Permission ending while something is live is
           the case the whole table exists for. */}
       <section className="space-y-2">
@@ -542,3 +546,106 @@ function RightsTab({
 
 /** Exported for Proof Artifacts, which is where a placement starts. */
 export { createPlacement };
+
+
+/**
+ * Where this client's proof actually is — G09 and G10.
+ *
+ * The rest of this tab reads placements. This reads proof, and asks the
+ * reverse question: for each piece of proof, which surfaces is it live on.
+ * Until migration 246 that could only be answered for destinations with an
+ * adapter, so a proof-derived reel on Instagram and a case study on the
+ * client's own site — the two most likely places — were invisible.
+ *
+ * Leads with the rows that are a problem, because this screen is read on one
+ * day: when somebody withdraws their permission.
+ */
+function SurfaceCoverage() {
+  const { clientId } = useParams<{ clientId: string }>();
+  const [coverage, setCoverage] = useState<ProofSurfaceCoverage[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!clientId) {
+      setLoading(false);
+      return;
+    }
+    let live = true;
+    void fetchProofSurfaceCoverage(clientId)
+      .then((rows) => {
+        if (live) {
+          setCoverage(rows);
+          setError(null);
+        }
+      })
+      .catch((cause: unknown) => {
+        if (live) setError(cause instanceof Error ? cause.message : "Could not load coverage.");
+      })
+      .finally(() => {
+        if (live) setLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [clientId]);
+
+  const problems = coverage.filter((row) => row.problem);
+  const placed = coverage.filter((row) => (row.live_placements ?? 0) > 0);
+
+  return (
+    <section className="space-y-2">
+      <h3 className="font-semibold">Where this proof actually is</h3>
+      <p className="text-xs text-muted-foreground">
+        Per piece of proof rather than per placement, across every surface — including the
+        client&rsquo;s own site and their social posts, which nothing could see before. This is the
+        table to read the day somebody withdraws permission.
+      </p>
+
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+
+      {problems.length > 0 && (
+        <p role="alert" className="text-sm text-destructive">
+          {problems.length} piece(s) of proof need attention.
+        </p>
+      )}
+
+      <DataTable
+        columns={["Proof", "Rights", "Live on", "Bound, not published", "Problem"]}
+        emptyLabel={loading ? "Loading…" : "No proof has reached a surface yet"}
+        rows={coverage.map((row) => [
+          <span key="p">
+            {row.title ?? "Untitled"}
+            {row.proof_type && (
+              <span className="block text-xs text-muted-foreground">{row.proof_type}</span>
+            )}
+          </span>,
+          <span
+            key="r"
+            className={row.usage_rights === "approved" ? "text-xs" : "text-xs text-destructive"}
+          >
+            {row.usage_rights}
+            {row.expires_on && (
+              <span className="block text-muted-foreground">expires {dayOrDash(row.expires_on)}</span>
+            )}
+          </span>,
+          <span key="l" className="text-xs">
+            {(row.live_on ?? []).length > 0 ? (row.live_on ?? []).join(", ") : "nowhere"}
+          </span>,
+          <span key="b" className="font-mono text-xs tabular-nums">
+            {row.bound_not_published ?? 0}
+          </span>,
+          <span key="x" className={row.problem ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
+            {row.problem ?? "—"}
+          </span>,
+        ])}
+      />
+
+      {!loading && coverage.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {placed.length} of {coverage.length} piece(s) of proof are live somewhere.
+        </p>
+      )}
+    </section>
+  );
+}

@@ -4,6 +4,8 @@ import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { fetchCampaignOrigins, type CampaignOrigin } from "../../lib/opportunities";
+import { fetchLaunchDue, type LaunchDue } from "../../lib/campaignLaunch";
+import { CampaignLaunchGate } from "./CampaignLaunchGate";
 import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
@@ -211,6 +213,7 @@ export function CampaignExecutionPanel() {
   const [metaToolsOpenFor, setMetaToolsOpenFor] = useState<string | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [rowActions, setRowActions] = useState<string | null>(null);
+  const [launchDue, setLaunchDue] = useState<ReadonlyMap<string, LaunchDue>>(new Map());
   const [v2TabSelection, setV2TabSelection] = useState({ campaignId, tab: "plan" });
   const v2Tab = v2TabSelection.campaignId === campaignId ? v2TabSelection.tab : "plan";
   const metaToolsOpen = metaToolsOpenFor === campaignId;
@@ -258,6 +261,11 @@ export function CampaignExecutionPanel() {
       void fetchCampaignOrigins(clientId)
         .then((found) => {
           if (version === request.current) setOrigins(found);
+      // The launch verdict is read for the whole client at once: the campaigns
+      // list wants a live marker per row, not one request per campaign.
+      void fetchLaunchDue(clientId)
+        .then(setLaunchDue)
+        .catch(() => setLaunchDue(new Map()));
         })
         .catch(() => {
           if (version === request.current) setOrigins(new Map());
@@ -555,7 +563,7 @@ export function CampaignExecutionPanel() {
         campaignId ? visibleCampaigns.map((c) => {
           const reqs = readiness[c.id] ?? [];
           const paid = c.acquisition_mode === "paid";
-          const tabs = paid ? [ ["plan", "Plan"], ["content", "Content"], ["landing-page", "Landing Page"], ["sales-agent", "Sales Agent"], ...(c.paid_platform === "meta" ? [["meta-ads", "Meta Ads"]] as const : []) ] as const : [ ["plan", "Plan"], ["content", "Content"] ] as const;
+          const tabs = paid ? [ ["plan", "Plan"], ["content", "Content"], ["landing-page", "Landing Page"], ["sales-agent", "Sales Agent"], ...(c.paid_platform === "meta" ? [["meta-ads", "Meta Ads"]] as const : []), ["launch", "Launch state"] ] as const : [ ["plan", "Plan"], ["content", "Content"], ["launch", "Launch state"] ] as const;
           return <div key={c.id}>
             <section className="rounded-lg border border-border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -629,6 +637,9 @@ export function CampaignExecutionPanel() {
               <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">Campaign plan</h3><p className="text-xs text-muted-foreground">{c.built_at ? `Generated ${new Date(c.built_at).toLocaleString()}` : "Awaiting planner"}</p></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => setEditingPlan(c)}>Edit plan</button><button type="button" className={buttonClass} disabled={busy || planning.has(c.id)} onClick={() => setConfirmAction({ campaign: c, kind: "plan" })}>{c.built_at ? "Regenerate plan" : "Run planner"}</button></div></div>
               <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Objective</dt><dd>{c.objective ?? "—"}</dd></div><div><dt className="text-muted-foreground">Audience</dt><dd>{c.audience ?? "—"}</dd></div><div><dt className="text-muted-foreground">Offer</dt><dd>{c.offer_summary ?? "—"}</dd></div><div><dt className="text-muted-foreground">Core message</dt><dd>{c.core_message ?? "—"}</dd></div><div><dt className="text-muted-foreground">Channels</dt><dd>{c.channels?.join(", ") || "—"}</dd></div><div><dt className="text-muted-foreground">Budget</dt><dd>{c.budget == null ? "—" : c.budget.toLocaleString()}</dd></div><div><dt className="text-muted-foreground">Dates</dt><dd>{c.starts_on ?? "—"} to {c.ends_on ?? "—"}</dd></div><div><dt className="text-muted-foreground">KPI</dt><dd>{c.kpi_metric ?? "—"}{c.kpi_target != null ? ` · target ${c.kpi_target}` : ""}</dd></div><div><dt className="text-muted-foreground">Content pieces</dt><dd>{c.content_count}</dd></div><div><dt className="text-muted-foreground">Required builds</dt><dd>{[c.needs_landing_page && "Landing page", c.needs_sales_agent && "Sales agent"].filter(Boolean).join(", ") || "None"}</dd></div></dl>
             </section>}
+            {v2Tab === "launch" && (launchDue.get(c.id)
+              ? <section className="py-4" aria-label="Launch"><CampaignLaunchGate due={launchDue.get(c.id)!} /></section>
+              : <section className="py-4"><p className="text-sm text-muted-foreground">No launch verdict yet. A campaign needs a package before there is anything to launch.</p></section>)}
             {v2Tab === "content" && clientId && <CampaignContentPanel key={`${clientId}:${c.id}:v2`} clientId={clientId} campaignId={c.id} contentCount={c.content_count} builtAt={c.built_at} contentIdeasGeneratedAt={c.content_ideas_generated_at} template={c.template} mirrorsTemplate={c.mirrors_template} onChanged={refresh} refreshToken={campaigns} layout="v2" />}
             {paid && v2Tab === "landing-page" && clientId && <PageBuilderPanel key={c.id} clientId={clientId} campaignId={c.id} campaignName={c.name} />}
             {paid && v2Tab === "sales-agent" && <SalesOverviewPanel key={c.id} campaignId={c.id} campaignName={c.name} />}

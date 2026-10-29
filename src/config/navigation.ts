@@ -81,6 +81,7 @@ export const agencyNav: NavNode[] = [
       { id: "avatars", label: "Avatars" },
       { id: "editors", label: "Editors" },
       { id: "smm", label: "SMM" },
+      { id: "creative_director", label: "Creative Directors" },
       // Hiring sits after the people already here: the ads, then the pages
       // those ads point at.
       { id: "recruitment", label: "Recruitment" },

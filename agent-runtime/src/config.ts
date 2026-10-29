@@ -78,6 +78,19 @@ export interface RuntimeConfig {
   /** Which provider writes the creative concept. */
   conceptProvider: "openai" | "anthropic";
   conceptModel: string;
+  /**
+   * The Meta app secret, used only to verify the messaging webhook's
+   * signature. Absent means the webhook refuses every delivery rather than
+   * processing unverifiable events.
+   */
+  metaAppSecret: string | null;
+  /** The token Meta echoes during the webhook subscription handshake. */
+  metaWebhookVerifyToken: string | null;
+  /**
+   * Whether this runtime may send governed messages to individual leads.
+   * Off means the courier claims nothing and says so, rather than pretending.
+   */
+  outboundMessagingEnabled: boolean;
   /** Transactional email. Absent means a brief is still assigned, just not emailed. */
   resendApiKey: string | null;
   resendFrom: string;
@@ -249,6 +262,9 @@ export function loadConfig(): RuntimeConfig {
         ? "anthropic"
         : "openai",
     conceptModel: optionalEnv("CREATIVE_CONCEPT_MODEL") ?? "gpt-5.6-sol",
+    metaAppSecret: optionalEnv("META_APP_SECRET") ?? null,
+    metaWebhookVerifyToken: optionalEnv("META_WEBHOOK_VERIFY_TOKEN") ?? null,
+    outboundMessagingEnabled: optionalEnv("OUTBOUND_MESSAGING_ENABLED") === "true",
     resendApiKey: optionalEnv("RESEND_API_KEY") ?? null,
     resendFrom: optionalEnv("RESEND_FROM") ?? "AA Console <briefs@attractacq.com>",
     // A brief email reaches a real person. An unset CONSOLE_URL used to put

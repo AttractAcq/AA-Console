@@ -540,3 +540,30 @@ destination is a page that exists.
 - Most of `CampaignExecutionPanel`'s tests were written against the v1
   rendering, so the v2 one had almost no direct coverage. They now drive v2.
   The coverage is new, which also means it is young.
+
+## 29 October 2026 — migration 260 waits for the handler that makes it true
+
+Migrations 244–259 are applied to production, pushed from the repo with
+`supabase db push` so every version matches its own filename — the history
+table and the migrations directory agree, which is the whole point of not
+applying them any other way. The post-DDL advisor check found no new class of
+finding: no mutable search path anywhere, and every new table carries the read
+policy its migration creates.
+
+Each of the sixteen has the runtime or console half that uses it. 260 does
+not: its last statement flips `google_ad_build` to
+`supported = true` naming `executor_module = 'google_ads_studio'`, and no such
+handler exists — `HANDLERS` in `agent-runtime/src/campaigns/actions/executor.ts`
+holds four keys, none of them this one.
+
+Today `supported is not true` is a blocker in `campaign_action_due`, and the
+claim only takes approvals whose blocker is null, so an approved Google build is
+never picked up. After 260 it is picked up and abandoned at once — the
+`ActionError` is not retryable — under "There is no executor for google ad build
+in this runtime." Applying it makes the system worse at the thing it claims to
+have enabled.
+
+So it is not in this branch. Leaving it here would have meant holding one file
+back by hand at every `supabase db push`, and the next person to run one would
+have applied it without knowing that was needed. The SQL waits on
+`feat/google-ads-build-adapter`, to land with the handler.

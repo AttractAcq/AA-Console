@@ -267,3 +267,93 @@ export async function fetchCampaignOrigins(clientId: string): Promise<Map<string
   if (error) throw new Error(error.message);
   return new Map(((data ?? []) as CampaignOrigin[]).map((row) => [row.campaign_id, row]));
 }
+
+/**
+ * Which template moves this awareness stage — G06.
+ *
+ * Awareness and the templates' S0–S6 are two different axes: one is what a
+ * person understands, the other is what relationship they have with this
+ * client. `awareness_audience_map` in migration 244 is the bridge between
+ * them, and it is a statement about what is usually true rather than an
+ * identity — which is why a stage can override it where the niche differs.
+ */
+export interface StageTemplateCandidate {
+  stage_id: string;
+  opportunity_id: string;
+  awareness_level: string;
+  mindset: string;
+  audience_state: string;
+  audience_state_override: string | null;
+  state_overridden: boolean;
+  state_note: string | null;
+  recommended_template: string | null;
+  candidate_template: string;
+  candidate_name: string;
+  fn: string;
+  entry_state: string;
+  exit_state: string;
+  destination: string;
+  kpi: string;
+  purpose: string;
+  guardrail: string;
+  prerequisite: string | null;
+  chosen: boolean;
+  fit: string;
+}
+
+export async function fetchStageTemplates(opportunityId: string): Promise<StageTemplateCandidate[]> {
+  const { data, error } = await supabase
+    .from("awareness_stage_templates")
+    .select("*")
+    .eq("opportunity_id", opportunityId);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as StageTemplateCandidate[];
+}
+
+/**
+ * Records the choice. A rationale is required by the function, not by this
+ * caller: the refusal sentence it returns is better than anything a form
+ * could say, and it stays true if the rule changes.
+ */
+export async function setStageTemplate(
+  stageId: string,
+  template: string,
+  rationale: string,
+  audienceStateOverride?: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("set_awareness_stage_template_v6", {
+    p_stage_id: stageId,
+    p_template: template as never,
+    p_rationale: rationale,
+    ...(audienceStateOverride ? { p_audience_state_override: audienceStateOverride } : {}),
+  } as never);
+  if (error) throw new Error(error.message);
+}
+
+/** The campaigns this journey implies, in awareness order. */
+export interface CampaignPlanStep {
+  stage_id: string;
+  step: number;
+  awareness_level: string;
+  template: string | null;
+  template_name: string | null;
+  fn: string | null;
+  entry_state: string | null;
+  exit_state: string | null;
+  destination: string | null;
+  prerequisite: string | null;
+  template_rationale: string | null;
+  message: string;
+}
+
+export async function fetchCampaignPlan(opportunityId: string): Promise<CampaignPlanStep[]> {
+  const { data, error } = await supabase
+    .from("opportunity_campaign_plan")
+    .select(
+      "stage_id, step, awareness_level, template, template_name, fn, entry_state, exit_state, destination, prerequisite, template_rationale, message",
+    )
+    .eq("opportunity_id", opportunityId)
+    .order("step");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as CampaignPlanStep[];
+}

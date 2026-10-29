@@ -11,7 +11,7 @@ export type RouteScope = {
 };
 
 function isCategory(v: string | undefined): v is TeamCategory {
-  return v === "avatars" || v === "editors" || v === "smm";
+  return v === "avatars" || v === "editors" || v === "smm" || v === "creative_director";
 }
 
 /**

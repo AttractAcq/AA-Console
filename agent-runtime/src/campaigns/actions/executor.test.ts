@@ -41,6 +41,8 @@ function database(
     release?: { released?: number; skipped?: unknown[] };
     releaseError?: string;
     recordError?: string;
+    enrol?: { enrolled?: number; skipped?: unknown[]; sequence_name?: string };
+    enrolError?: string;
   } = {},
 ) {
   const events: Record<string, unknown>[] = [];
@@ -53,6 +55,10 @@ function database(
     if (name === "release_campaign_proof_placements") {
       if (options.releaseError) return { data: null, error: { message: options.releaseError } };
       return { data: options.release ?? { released: 1, skipped: [] }, error: null };
+    }
+    if (name === "enrol_campaign_leads_in_sequence_v6") {
+      if (options.enrolError) return { data: null, error: { message: options.enrolError } };
+      return { data: options.enrol ?? { enrolled: 1, skipped: [] }, error: null };
     }
     if (name === "record_campaign_action_executed" && options.recordError) {
       return { data: null, error: { message: options.recordError } };
@@ -166,7 +172,7 @@ describe("an action with nothing to perform it", () => {
     // The guard on the other direction: this list and
     // campaign_action_executors.supported have to agree, and the failure
     // mode of them disagreeing is an action claimed and then failed.
-    expect(Object.keys(HANDLERS)).toEqual(["proof_publish", "page_deploy"]);
+    expect(Object.keys(HANDLERS)).toEqual(["proof_publish", "page_deploy", "lead_message", "budget_change"]);
   });
 });
 
@@ -201,5 +207,62 @@ describe("one action's failure is its own", () => {
       p_execution_id: "exec-good",
     });
     expect(events.map((event) => String(event.description))).toContain("1 done, 1 not.");
+  });
+});
+
+/**
+ * G11's handler: enrolling a campaign's leads.
+ *
+ * The thing worth pinning is the blast radius. Enrolling is not sending, so
+ * a hundred enrolments is not a hundred emails — but enrolling nobody when
+ * the approval said somebody was eligible means something changed, and that
+ * should reach a person rather than be recorded as a success.
+ */
+describe("enrolling a campaign's leads", () => {
+  const leadMessage: ClaimedAction = {
+    ...ACTION,
+    action_key: "lead_message",
+    destination: "nurture sequence: Objections",
+    scope: { sequence_id: "seq-1", steps: 3 },
+  };
+
+  it("records what it enrolled and names the sequence", async () => {
+    const { sb, calls, events } = database({
+      claimed: [leadMessage],
+      enrol: { enrolled: 4, skipped: [], sequence_name: "Objections" },
+    });
+    await runCampaignActionJob(sb, on, agent, job);
+
+    const executed = calls.find((c) => c.name === "record_campaign_action_executed");
+    expect(executed).toBeDefined();
+    // The count goes on the row; the sentence goes on the job's events, which
+    // is where a person reads it.
+    expect((executed!.args as { p_result?: { enrolled?: number } }).p_result)
+      .toMatchObject({ enrolled: 4 });
+    expect(events.some((e) => String(e.description).includes("Enrolled 4 leads into Objections.")))
+      .toBe(true);
+  });
+
+  it("fails without retrying when nobody turns out to be eligible", async () => {
+    const { sb, calls } = database({
+      claimed: [leadMessage],
+      enrol: {
+        enrolled: 0,
+        skipped: [{ lead_id: "l-1", reason: "They unsubscribed or complained." }],
+      },
+    });
+    await runCampaignActionJob(sb, on, agent, job);
+    const failed = calls.find((c) => c.name === "record_campaign_action_failure");
+    expect(failed).toBeDefined();
+    const args = failed!.args as { p_retryable?: boolean; p_reason?: string };
+    expect(args.p_retryable).toBe(false);
+    expect(String(args.p_reason)).toContain("unsubscribed");
+  });
+
+  it("retries when the enrolment call itself fails", async () => {
+    const { sb, calls } = database({ claimed: [leadMessage], enrolError: "deadlock detected" });
+    await runCampaignActionJob(sb, on, agent, job);
+    const failed = calls.find((c) => c.name === "record_campaign_action_failure");
+    expect((failed!.args as { p_retryable?: boolean }).p_retryable).toBe(true);
   });
 });

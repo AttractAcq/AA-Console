@@ -185,3 +185,64 @@ export async function readAccountCurrency(account: AdAccount): Promise<string> {
     clearTimeout(timer);
   }
 }
+
+/**
+ * Change one ad set's daily budget — G07.
+ *
+ * Meta updates an object by POSTing to its own id rather than to an edge
+ * under the account, so this does not go through `post` above.
+ *
+ * THE UNIT IS THE TRAP
+ *
+ * `daily_budget` is in the account currency's minor unit: a hundred pounds
+ * is 10000, not 100. Sending 100 would quietly set a one-pound daily budget
+ * and the campaign would look like it had stopped working. The conversion
+ * happens here, once, and the caller passes real money.
+ *
+ * It sends no `status`, so this call can neither activate a paused ad set
+ * nor pause a live one. Changing a budget and changing whether money is
+ * moving are two different decisions and only one of them is approved here.
+ */
+export async function updateAdSetDailyBudget(
+  account: AdAccount,
+  adSetId: string,
+  dailyBudget: number,
+): Promise<{ id: string }> {
+  if (!Number.isFinite(dailyBudget) || dailyBudget <= 0) {
+    throw new MetaWriteError("A daily budget has to be a positive amount.", false);
+  }
+  const minorUnits = Math.round(dailyBudget * 100);
+  if (minorUnits < 100) {
+    // Meta's own floor is currency-dependent and never below one unit. A
+    // sub-unit budget is a conversion mistake, not an intention.
+    throw new MetaWriteError(
+      `A daily budget of ${dailyBudget} is below one currency unit, which is almost always a conversion mistake.`,
+      false,
+    );
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await fetch(`${BASE}/${encodeURIComponent(adSetId)}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${account.accessToken}`,
+      },
+      body: JSON.stringify({ daily_budget: minorUnits }),
+      signal: controller.signal,
+    });
+    const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!response.ok) throw classifyWrite(response.status, body);
+    // Meta answers a successful update with {"success": true} and no id, so
+    // the ad set's own id is the reference worth recording.
+    return { id: adSetId };
+  } catch (error) {
+    if (error instanceof MetaWriteError) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new MetaWriteError(`Could not reach the Marketing API: ${message}`, true);
+  } finally {
+    clearTimeout(timer);
+  }
+}

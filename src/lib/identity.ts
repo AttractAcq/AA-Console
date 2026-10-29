@@ -1,5 +1,5 @@
 export type ConsoleRole = "admin" | "client" | "employee";
-export type EmployeeCategory = "avatars" | "editors" | "smm";
+export type EmployeeCategory = "avatars" | "editors" | "smm" | "creative_director";
 
 /** Where each role lands after signing in. */
 export const HOME_FOR_ROLE: Record<ConsoleRole, string> = {
@@ -31,4 +31,5 @@ export const EMPLOYEE_CATEGORY_LABEL: Record<EmployeeCategory, string> = {
   smm: "Social Media Manager",
   editors: "Editor",
   avatars: "Avatar",
+  creative_director: "Creative Director",
 };
