@@ -24,6 +24,8 @@ export type FieldDef = {
   accept?: string;
   options?: Option[];
   autoComplete?: string;
+  /** Never persist this value in a browser draft. Password fields are always sensitive. */
+  sensitive?: boolean;
   /** Native input type for kind "text" — email/tel bring up the right keyboard. */
   inputType?: "text" | "email" | "tel";
   /** Render only when another field currently holds one of these values. */
