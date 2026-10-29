@@ -4,7 +4,7 @@ import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
-import { FormModal, clearDraft } from "../../components/forms/FormModal";
+import { FormModal } from "../../components/forms/FormModal";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import type { GeneratedBrief } from "../../components/forms/generatedBrief";
 import type { FieldDef } from "../../components/forms/fields";
@@ -626,6 +626,7 @@ export function RecruitmentPanel() {
             ? { ...aiDraft, apply_url: "", compensation_text: "" }
             : { call_to_action: DEFAULT_CTA }
         }
+        resetKey={aiDraft}
         onSubmit={async (v) => {
           if (!draftRole) return;
           const { error: rpcError } = await supabase.rpc("create_recruitment_brief", {
@@ -660,9 +661,6 @@ export function RecruitmentPanel() {
           payload={{ role: draftRole }}
           onClose={() => setGenerating(false)}
           onGenerated={(draft) => {
-            // A saved draft wins over initialValues inside FormModal, so a
-            // half-typed form would silently swallow what was just generated.
-            clearDraft(`recruitment-brief:${draftRole}`);
             setAiDraft(draft);
           }}
         />

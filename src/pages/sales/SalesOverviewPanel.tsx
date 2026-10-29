@@ -9,7 +9,6 @@ import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
 import { ArchiveAction } from "../../components/ArchiveAction";
-import { clearDraft } from "../../components/forms/FormModal";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import { cn } from "../../lib/cn";
 import { liveStateOf, sinceLabel, STATE_TONE } from "./liveState";
@@ -423,6 +422,7 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
         ] : fields}
         submitLabel="Build"
         initialValues={campaignId ? { campaign_id: campaignId, ...(aiPurpose ? { purpose: aiPurpose, role: briefRole } : {}) } : aiPurpose ? { purpose: aiPurpose, role: briefRole } : undefined}
+        resetKey={aiPurpose}
         actions={
           <button
             type="button"
@@ -503,7 +503,6 @@ export function SalesOverviewPanel({ campaignId, campaignName }: { campaignId?: 
           }
           onClose={() => setBriefing(false)}
           onGenerated={(draft) => {
-            clearDraft(`sales-agent:${clientId}`);
             setAiPurpose(draft.ask);
           }}
         />
