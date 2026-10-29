@@ -41,9 +41,10 @@ type GenerateProps<T> = {
 
 export function GenerateWithAIDialog<T>(props: GenerateProps<T>) {
   if (!props.open) return null;
-  // A new subject gets a fresh dialog. Its old request is invalidated by the
-  // outgoing instance's cleanup, and its private notes cannot cross over.
-  return <GenerateWithAIContent key={JSON.stringify([props.endpoint, props.payload])} {...props} />;
+  // A new client or role gets a fresh dialog. Changing an in-dialog choice
+  // (for example the campaign template) keeps the operator's notes intact.
+  const subject = props.payload.clientId ?? props.payload.role ?? null;
+  return <GenerateWithAIContent key={JSON.stringify([props.endpoint, subject])} {...props} />;
 }
 
 function GenerateWithAIContent<T>({
@@ -60,6 +61,7 @@ function GenerateWithAIContent<T>({
   onClose,
   onGenerated,
 }: GenerateProps<T>) {
+  const contextKey = JSON.stringify([endpoint, payload]);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -68,6 +70,11 @@ function GenerateWithAIContent<T>({
   // A late runtime response must not apply after the dialog is dismissed,
   // hidden by its parent, changed to another subject, or unmounted.
   useEffect(() => () => { requestId.current += 1; }, []);
+  useEffect(() => {
+    setBusy(false);
+    setProblem(null);
+    return () => { requestId.current += 1; };
+  }, [contextKey]);
 
   const close = () => {
     requestId.current += 1;

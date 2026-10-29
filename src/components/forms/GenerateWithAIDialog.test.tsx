@@ -81,4 +81,33 @@ describe("AI draft cancellation", () => {
     await act(async () => { pending[1]({ draft: { ask: "new client" } }); });
     expect(onGenerated).toHaveBeenCalledExactlyOnceWith({ ask: "new client" }, undefined, undefined);
   });
+
+  it("keeps notes but rejects a stale result when an in-dialog choice changes", async () => {
+    const pending: Array<(result: { draft: { ask: string } }) => void> = [];
+    runtime.call.mockImplementation(() => new Promise((resolve) => { pending.push(resolve); }));
+    const onGenerated = vi.fn();
+    const onClose = vi.fn();
+    const { rerender } = render(<GenerateWithAIDialog<{ ask: string }> {...props}
+      payload={{ clientId: "client-1", template: "P1" }} open
+      onClose={onClose} onGenerated={onGenerated} />);
+    const dialog = screen.getByRole("dialog", { name: "Draft with AI" });
+    fireEvent.change(screen.getByLabelText("Steer"), { target: { value: "retain these notes" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    rerender(<GenerateWithAIDialog<{ ask: string }> {...props}
+      payload={{ clientId: "client-1", template: "P3" }} open
+      onClose={onClose} onGenerated={onGenerated} />);
+    expect(screen.getByRole("dialog", { name: "Draft with AI" })).toBe(dialog);
+    expect(screen.getByLabelText("Steer")).toHaveValue("retain these notes");
+    expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+    await act(async () => { pending[0]({ draft: { ask: "old template" } }); });
+    expect(onGenerated).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(runtime.call).toHaveBeenLastCalledWith("/draft", {
+      clientId: "client-1", template: "P3", notes: "retain these notes",
+    });
+    await act(async () => { pending[1]({ draft: { ask: "new template" } }); });
+    expect(onGenerated).toHaveBeenCalledExactlyOnceWith({ ask: "new template" }, undefined, undefined);
+  });
 });
