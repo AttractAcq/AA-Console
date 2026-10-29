@@ -7,6 +7,7 @@ const OTHER = "22222222-2222-4222-8222-222222222222";
 const ADMIN = "33333333-3333-4333-8333-333333333333";
 const CLIENT_USER = "44444444-4444-4444-8444-444444444444";
 const OTHER_USER = "55555555-5555-4555-8555-555555555555";
+const EDITOR = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 let db: PGlite;
 const migration = (file: string) => readFile(new URL(`../../../supabase/migrations/${file}`, import.meta.url), "utf8");
 
@@ -32,17 +33,35 @@ beforeAll(async () => {
     "20260903104450_01_foundations_roles_clients.sql",
     "20260903104529_02_team_and_operations.sql",
     "20260903104615_03_agent_registry_and_job_queue.sql",
+    "20260903104724_04_intelligence_and_strategy.sql",
     "20260903104816_05_content_chain_proof_ideas_briefs_media.sql",
     "20260903104850_06_distribution_conversion_leads.sql",
     "20260904080405_14_campaigns.sql",
   ]) await db.exec(await migration(file));
+  // Minimal Supabase Storage tables; migration 08 installs the real policies.
+  // The first folder segment is all the policy needs from foldername().
+  await db.exec(`
+    create schema storage;
+    create table storage.buckets (
+      id text primary key, name text not null, public boolean not null,
+      file_size_limit bigint, allowed_mime_types text[]
+    );
+    create table storage.objects (
+      id uuid primary key default gen_random_uuid(),
+      bucket_id text not null references storage.buckets(id),
+      name text not null, owner uuid
+    );
+    create function storage.foldername(path text) returns text[]
+      language sql immutable as $$ select string_to_array(path, '/') $$;
+    alter table storage.objects enable row level security;
+    grant usage on schema storage to authenticated;
+    grant select, insert on storage.objects to authenticated;
+  `);
+  await db.exec(await migration("20260903105011_08_team_chat_and_storage_buckets.sql"));
+  await db.exec(await migration("20260904094627_19_narrow_employee_client_scope.sql"));
   await db.exec(`
     alter table agents add column if not exists archived_at timestamptz;
     alter table agents add column if not exists requires_input boolean not null default false;
-    create or replace function is_client_user(target uuid)
-    returns boolean language sql stable security definer set search_path = public as $$
-      select exists (select 1 from client_users where user_id = auth.uid() and client_id = target);
-    $$;
   `);
   for (const file of [
     "20260908030000_60_revenue_pipeline.sql",
@@ -70,7 +89,9 @@ beforeAll(async () => {
       values ('88888888-8888-4888-8888-888888888888');
   `);
   await db.exec(await migration("20260925120000_128_lead_stage_enum.sql"));
+  await db.exec(await migration("20260925110000_127_retired_team_access.sql"));
   await db.exec(await migration("20260925121000_129_lead_pipeline_archive.sql"));
+  await db.exec(await migration("20261029160000_265_lead_and_media_entitlements.sql"));
   // 129 clears the active tables, but archives what it finds rather than
   // dropping it. lead_events.lead_id is ON DELETE CASCADE, so a bare delete
   // would have taken each lead's history with it.
@@ -92,12 +113,16 @@ beforeAll(async () => {
     delete from clients;
   `);
   await db.exec(`
-    insert into auth.users (id) values ('${ADMIN}'),('${CLIENT_USER}'),('${OTHER_USER}');
+    insert into auth.users (id) values ('${ADMIN}'),('${CLIENT_USER}'),('${OTHER_USER}'),('${EDITOR}');
     update profiles set role='admin' where id='${ADMIN}';
     update profiles set role='client' where id in ('${CLIENT_USER}','${OTHER_USER}');
+    update profiles set role='employee' where id='${EDITOR}';
     insert into clients (id,name,initials) values ('${CLIENT}','Client A','A'),('${OTHER}','Client B','B');
     insert into client_users (client_id,user_id) values ('${CLIENT}','${CLIENT_USER}'),('${OTHER}','${OTHER_USER}');
+    insert into team_members (user_id,category,name,initials)
+      values ('${EDITOR}','editors','Editor','E');
     grant all on archived_leads, client_leads, lead_events, lead_identities to authenticated;
+    grant select on client_users to authenticated;
     grant all on client_sales_agents, sales_agent_conversations to authenticated;
     grant usage on schema mcp_internal to authenticated;
     grant all on mcp_internal.mcp_pipeline_requests to authenticated;
@@ -110,6 +135,8 @@ beforeEach(async () => {
     delete from sales_agent_conversations; delete from client_sales_agents;
     delete from mcp_internal.mcp_pipeline_requests;
     delete from archived_leads; delete from client_leads; delete from lead_identities;`);
+  await db.exec(`delete from storage.objects; delete from job_assignments; delete from client_assignments;
+    update team_members set active=true where user_id='${EDITOR}';`);
   await asAdmin();
 });
 
@@ -179,5 +206,84 @@ describe("lead edit and archive RPCs", () => {
     await expect(db.query("select recover_lead($1)", [id])).rejects.toThrow(/Not permitted/);
     await asUser(CLIENT_USER);
     expect((await db.query("select id from archived_leads")).rows).toHaveLength(1);
+  });
+});
+
+describe("migration 265: lead and owned-media entitlements", () => {
+  it("rejects every named lead mutation for an assigned editor while preserving admin/client actions", async () => {
+    const id = await createLead();
+    await db.exec("reset role");
+    await db.query(`insert into job_assignments(member_id,client_id,title)
+      select id,$1,'Edit a reel' from team_members where user_id=$2`, [CLIENT, EDITOR]);
+    await asUser(EDITOR);
+    expect((await db.query<{ ok: boolean }>("select can_access_client($1) as ok", [CLIENT])).rows[0]?.ok).toBe(true);
+    expect((await db.query("select id from client_leads where id=$1", [id])).rows).toHaveLength(0);
+    expect((await db.query("select id from stalled_leads($1,30)", [CLIENT])).rows).toHaveLength(0);
+    await expect(db.query("select advance_lead($1,'appointment')", [id])).rejects.toThrow(/Not permitted/);
+    await expect(db.query("select update_lead($1,$2)", [id, { name: "Wrong" }])).rejects.toThrow(/Not permitted/);
+    await expect(db.query("select add_lead_note($1,'Wrong')", [id])).rejects.toThrow(/Not permitted/);
+    await expect(db.query("select archive_lead($1,null)", [id])).rejects.toThrow(/Not permitted/);
+
+    await asAdmin();
+    expect((await db.query("select id from stalled_leads($1,30)", [CLIENT])).rows).toHaveLength(1);
+    await db.query("select archive_lead($1,null)", [id]);
+    await asUser(EDITOR);
+    await expect(db.query("select recover_lead($1)", [id])).rejects.toThrow(/Not permitted/);
+    await asUser(CLIENT_USER);
+    await db.query("select recover_lead($1)", [id]);
+    await db.query("select update_lead($1,$2)", [id, { name: "Client edited" }]);
+    await db.query("select advance_lead($1,'appointment')", [id]);
+    await db.query("select add_lead_note($1,'Client follow-up')", [id]);
+    await db.query("select archive_lead($1,null)", [id]);
+    expect((await db.query("select id from archived_leads where id=$1", [id])).rows).toHaveLength(1);
+    await db.query("select recover_lead($1)", [id]);
+    expect((await db.query<{ name: string; stage: string }>("select name,stage from client_leads where id=$1", [id])).rows[0])
+      .toMatchObject({ name: "Client edited", stage: "appointment" });
+  });
+
+  it("keeps service-role pipeline operations and denies cross-client humans", async () => {
+    const id = await createLead();
+    await asUser(OTHER_USER);
+    await expect(db.query("select advance_lead($1,'appointment')", [id])).rejects.toThrow(/Not permitted/);
+    await db.exec(`reset role; select set_config('request.jwt.claim.role','service_role',false);
+      select set_config('request.jwt.claim.sub','',false); set role service_role;`);
+    await db.query("select advance_lead($1,'appointment')", [id]);
+    await db.exec("reset role");
+    expect((await db.query<{ stage: string }>("select stage from client_leads where id=$1", [id])).rows[0]?.stage)
+      .toBe("appointment");
+    const grant = await db.query<{ allowed: boolean }>(
+      "select has_function_privilege('authenticated', 'public.may_manage_client_leads(uuid)', 'EXECUTE') as allowed");
+    expect(grant.rows[0]?.allowed).toBe(false);
+    await db.exec(`select set_config('request.jwt.claim.role','',false);
+      select set_config('request.jwt.claim.sub','',false);`);
+    expect((await db.query<{ allowed: boolean }>(
+      "select may_manage_client_leads($1) as allowed", [CLIENT])).rows[0]?.allowed).toBe(false);
+    await expect(db.query("select advance_lead($1,'shown')", [id])).rejects.toThrow(/Not permitted/);
+  });
+
+  it("limits an employee's own client-media objects to active assigned clients", async () => {
+    await db.exec("reset role");
+    await db.query(`insert into job_assignments(member_id,client_id,title)
+      select id,$1,'Edit a reel' from team_members where user_id=$2`, [CLIENT, EDITOR]);
+    await db.query("insert into storage.objects(bucket_id,name,owner) values ('client-media',$1,$3),('client-media',$2,$3)",
+      [`${CLIENT}/own-a.png`, `${OTHER}/own-b.png`, EDITOR]);
+    const visible = () => db.query<{ name: string }>("select name from storage.objects where bucket_id='client-media' order by name");
+
+    await asUser(EDITOR);
+    expect((await visible()).rows.map((r) => r.name)).toEqual([`${CLIENT}/own-a.png`]);
+    await db.exec(`reset role; update team_members set active=false where user_id='${EDITOR}';`);
+    await asUser(EDITOR);
+    expect((await visible()).rows).toHaveLength(0);
+
+    await db.exec(`reset role; update team_members set active=true where user_id='${EDITOR}';
+      delete from job_assignments;`);
+    await asUser(EDITOR);
+    expect((await visible()).rows).toHaveLength(0);
+    await asUser(CLIENT_USER);
+    expect((await visible()).rows.map((r) => r.name)).toEqual([`${CLIENT}/own-a.png`]);
+    await asUser(OTHER_USER);
+    expect((await visible()).rows.map((r) => r.name)).toEqual([`${OTHER}/own-b.png`]);
+    await asAdmin();
+    expect((await visible()).rows).toHaveLength(2);
   });
 });
