@@ -507,6 +507,50 @@ describe("migration 260 remains a prerequisite", () => {
     expect(await rows("select id from google_ads_builds where id=$1", [built.id])).toHaveLength(1);
   });
 
+  it("shows a current build to a client reader who cannot see its approval", async () => {
+    await completeFixture();
+    await db.exec("update campaign_action_executors set supported=true where action_key='google_ad_build'");
+    const executionId = await approveAndClaim(await request());
+    const built = await one<{ id: string }>(
+      "select (start_google_build_v6($1)).id as id", [executionId],
+    );
+    await db.query("select record_google_build_progress_v6($1,$2)", [
+      built.id,
+      JSON.stringify({
+        campaign_resource: "customers/1234567890/campaigns/7",
+        ad_group_resource: "customers/1234567890/adGroups/8",
+        ad_resources: ["customers/1234567890/adGroupAds/9"],
+      }),
+    ]);
+    await db.query("select record_google_build_finished_v6($1)", [built.id]);
+    await db.exec("update campaign_action_executors set supported=false where action_key='google_ad_build'");
+
+    // The production approval policy admits an admin or active approval
+    // manager. This client reader is neither, but can read build evidence.
+    await db.exec(`
+      create or replace function public.is_admin() returns boolean language sql
+        as $$select false$$;
+      create or replace function auth.uid() returns uuid language sql
+        as $$select '${ACTOR_TWO}'::uuid$$;
+      grant select on public.client_campaigns, public.campaign_manifest_versions,
+        public.client_integrations to authenticated;
+    `);
+    await db.exec("set role authenticated");
+    try {
+      expect(await rows("select id from campaign_action_approvals where campaign_id=$1", [CAMPAIGN]))
+        .toHaveLength(0);
+      expect(await rows("select id from google_ads_builds where id=$1", [built.id]))
+        .toHaveLength(1);
+      const due = await one<{ build_id: string; build_status: string; blocker: string | null }>(
+        "select build_id, build_status, blocker from google_ads_build_due where campaign_id=$1",
+        [CAMPAIGN],
+      );
+      expect(due).toMatchObject({ build_id: built.id, build_status: "built", blocker: null });
+    } finally {
+      await db.exec("reset role");
+    }
+  });
+
   it("preserves a build's sheet until the parent campaign is deleted", async () => {
     await completeFixture();
     await db.exec("update campaign_action_executors set supported=true where action_key='google_ad_build'");

@@ -662,12 +662,14 @@ left join lateral (
 left join public.google_ads_copy cp on cp.campaign_id = c.id
 left join lateral (
   -- A completed build of an earlier sheet/package is historical evidence,
-  -- not a build of the current sheet. Never let it hide today's blocker.
+  -- not a build of the current sheet. Read only the build and its immutable
+  -- snapshot here: ordinary client users can see builds but approval RLS
+  -- hides approval rows from them in this security_invoker view.
   select b2.* from public.google_ads_builds b2
-  join public.campaign_action_approvals a2 on a2.id = b2.approval_id
    where b2.campaign_id = c.id and b2.client_id = c.client_id
      and b2.sheet_id = s.id and s.manifest_id = m.id
-     and a2.manifest_id = m.id and a2.action_key = 'google_ad_build'
+     and b2.approved_spec->>'sheet_id' = s.id::text
+     and b2.approved_spec->>'sheet_manifest_id' = m.id::text
    order by b2.created_at desc limit 1) b on true
 where c.archived_at is null;
 
