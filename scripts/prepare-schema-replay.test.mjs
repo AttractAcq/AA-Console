@@ -29,15 +29,14 @@ test('preparation refuses repository and nonempty destinations without touching 
   }
 })
 
-test('raw Auth source mode copies historical migration 11 byte-for-byte', () => {
+test('default and explicit raw modes copy historical migration 11 byte-for-byte', () => {
   const scratch = mkdtempSync(join(tmpdir(), 'aa-schema-auth-source-'))
   try {
     const fakeRepository = join(scratch, 'repository')
     const fakeSupabase = join(fakeRepository, 'supabase')
     const migrations = join(fakeSupabase, 'migrations')
     const verification = join(fakeSupabase, 'verification')
-    const destination = join(scratch, 'destination')
-    for (const path of [migrations, verification, destination]) {
+    for (const path of [migrations, verification]) {
       mkdirSync(path, { recursive: true })
     }
     writeFileSync(join(fakeSupabase, 'config.toml'), readFileSync(sourceConfig))
@@ -50,14 +49,28 @@ test('raw Auth source mode copies historical migration 11 byte-for-byte', () => 
     const source = readFileSync(join(repository, 'supabase', 'migrations', authFile))
     writeFileSync(join(migrations, authFile), source)
 
-    const result = spawnSync(process.execPath,
-      [script, destination, 'aa_schema_ci_raw_auth', '55320'],
+    for (const mode of ['default', 'explicit']) {
+      const destination = join(scratch, `destination_${mode}`)
+      mkdirSync(destination)
+      const env = { ...process.env }
+      delete env.AA_SCHEMA_REPLAY_RAW_SOURCE
+      if (mode === 'explicit') env.AA_SCHEMA_REPLAY_RAW_SOURCE = '1'
+      const result = spawnSync(process.execPath,
+        [script, destination, `aa_schema_ci_${mode}_auth`, '55320'],
+        { cwd: fakeRepository, encoding: 'utf8', env })
+      assert.equal(result.status, 0, result.stderr)
+      assert.deepEqual(readFileSync(join(destination, 'supabase', 'migrations', authFile)), source)
+      assert.equal(JSON.parse(result.stdout).fixture, false)
+      assert.equal(JSON.parse(result.stdout).authSourceReplay, true)
+    }
+    const disabled = join(scratch, 'destination_disabled')
+    mkdirSync(disabled)
+    const disabledResult = spawnSync(process.execPath,
+      [script, disabled, 'aa_schema_ci_disabled_auth', '55320'],
       { cwd: fakeRepository, encoding: 'utf8',
-        env: { ...process.env, AA_SCHEMA_REPLAY_RAW_SOURCE: '1' } })
-    assert.equal(result.status, 0, result.stderr)
-    assert.deepEqual(readFileSync(join(destination, 'supabase', 'migrations', authFile)), source)
-    assert.deepEqual(JSON.parse(result.stdout).fixture, false)
-    assert.deepEqual(JSON.parse(result.stdout).authSourceReplay, true)
+        env: { ...process.env, AA_SCHEMA_REPLAY_RAW_SOURCE: '0' } })
+    assert.notEqual(disabledResult.status, 0)
+    assert.match(disabledResult.stderr, /only raw source replay is supported/)
   } finally {
     rmSync(scratch, { recursive: true, force: true })
   }

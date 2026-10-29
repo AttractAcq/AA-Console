@@ -37,15 +37,13 @@ trap cleanup EXIT
 
 node scripts/prepare-schema-replay.mjs "$run_dir" "$project_id" "$port_base" \
   >"$evidence_dir/manifest.json"
-if [[ "${AA_SCHEMA_REPLAY_RAW_SOURCE:-}" == "1" ]]; then
-  auth_file="20260903105742_11_auth_users_and_role_metadata.sql"
-  if ! diff -q "supabase/migrations/$auth_file" \
-      "$run_dir/supabase/migrations/$auth_file" >/dev/null; then
-    echo 'Raw Auth replay requested but migration 11 source bytes differ.' >&2
-    exit 1
-  fi
-  echo 'Raw Auth migration 11 source bytes verified.'
+auth_file="20260903105742_11_auth_users_and_role_metadata.sql"
+if ! diff -q "supabase/migrations/$auth_file" \
+    "$run_dir/supabase/migrations/$auth_file" >/dev/null; then
+  echo 'Raw Auth replay requires identical migration 11 source bytes.' >&2
+  exit 1
 fi
+echo 'Raw Auth migration 11 source bytes verified.'
 echo "Disposable Supabase project: $project_id; evidence: $evidence_dir"
 
 run_logged() {

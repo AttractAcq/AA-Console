@@ -72,21 +72,21 @@ merged. If a PR adds no migration beyond that version, the upgrade path still
 proves the released schema can reset and matches a clean replay; the first
 subsequent migration exercises the incremental apply.
 
-## Temporary seed fixture and raw-source proof
+## Raw-source Auth replay
 
 The B004 review branch corrects migration 11's `change-me` fallback and
-existing-account Auth rewrite in the tracked source. The old disposable
-fixture remains available by default while full clean and upgrade replay of
-the corrected source is verified. Set `AA_SCHEMA_REPLAY_RAW_SOURCE=1` to copy
-the exact tracked migration 11 bytes into the disposable project. CI sets this
-flag for the complete schema replay, upgrade equivalence, catalog, and type
-gate. Its manifest records `authSourceReplay: true` and `fixture: false`.
-After that gate passes with the required migration 260 ancestor, remove the
-fixture path in a follow-up commit. The PGlite Auth tests exercise migration
-11 directly with test-only pgcrypto stubs and cover missing settings,
-pre-registered and repeat accounts, forged metadata, and unsafe configured
-secrets. Full schema
-replay remains the required release evidence.
+existing-account Auth rewrite in the tracked source. The schema harness now
+copies every tracked migration byte-for-byte; the temporary synthetic seed
+injection was removed after the first raw-source full replay passed in
+[CI run 40963048537](https://github.com/AttractAcq/AA-Console/actions/runs/40963048537).
+The replay script always compares the source and disposable migration 11 bytes
+before starting the database. CI explicitly sets
+`AA_SCHEMA_REPLAY_RAW_SOURCE=1`; the raw path is also the local default, and
+disabling it fails closed. The manifest records `authSourceReplay: true` and
+`fixture: false`. The PGlite Auth tests exercise migration 11 directly with
+test-only pgcrypto stubs and cover missing settings, pre-registered and repeat
+accounts, forged metadata, and unsafe configured secrets. Full schema replay
+of this fixture-removal commit remains the required release evidence.
 
 The corrected source still seeds named accounts. B004's controlled Auth Admin
 provisioning, first-admin recovery, password rotation, TOTP at decision paths,

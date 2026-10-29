@@ -69,9 +69,10 @@ weak settings, and duplicate/shared employee secrets.
 The existing migration 263 tests then verify the post-upgrade trigger and
 provisioning helper. CI's schema job sets `AA_SCHEMA_REPLAY_RAW_SOURCE=1` to
 exercise the exact tracked file through clean and released-to-head upgrade
-paths. The old disposable fixture stays in the harness until a green
-raw-source run is recorded; only then remove it. A green source replay, schema
-catalog parity, and generated type diff are required before release.
+paths. Raw-source replay passed in CI run 40963048537, so the disposable seed
+fixture was removed from the harness. The follow-up full CI run on this commit
+must also pass before release. A green source replay, schema catalog parity,
+and generated type diff are required before release.
 
 This patch does not create an invitation workflow, remove direct Auth table
 writes, raise migration 13's three-character password minimum, close old
