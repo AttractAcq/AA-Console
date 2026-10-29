@@ -524,4 +524,79 @@ describe("B005: assignment decisions use named actions and one client's asset", 
     );
     expect(current.client_id).toBe(CLIENT);
   });
+
+  it("locks the asset row before attaching it and rejects a prior reparent", async () => {
+    // PGlite uses one connection, so it cannot interleave two transactions.
+    // Inspect the installed guard's shared-row lock and exercise the order
+    // opposite the preceding test. In PostgreSQL, an asset UPDATE holds this
+    // row lock too; the second writer sees the first writer's committed state.
+    const { definition } = await one<{ definition: string }>(`
+      select pg_get_functiondef('public.guard_assignment_asset_client()'::regprocedure)
+        as definition
+    `);
+    expect(definition).toMatch(/from public\.client_media_assets a\s+where a\.id = new\.asset_id\s+for update/i);
+
+    const id = await assignment();
+    const a = await asset();
+    await db.exec(`update client_media_assets set client_id = '${FOREIGN_CLIENT}' where id = '${a}'`);
+    await expect(
+      asAuthenticated(EDITOR_USER, `select deliver_assignment('${id}','${a}')`),
+    ).rejects.toThrow(/Assignment asset must belong to the assignment client/);
+    const row = await one<{ stage: string; asset_id: string | null }>(
+      `select stage, asset_id from job_assignments where id = '${id}'`,
+    );
+    expect(row).toEqual({ stage: "assigned", asset_id: null });
+  });
+
+  it("rejects changing an attached assignment to a different client", async () => {
+    const id = await assignment();
+    const a = await asset();
+    await asAuthenticated(EDITOR_USER, `select deliver_assignment('${id}','${a}')`);
+    await expect(
+      db.exec(`update job_assignments set client_id = '${FOREIGN_CLIENT}' where id = '${id}'`),
+    ).rejects.toThrow(/Assignment asset must belong to the assignment client/);
+    const row = await one<{ client_id: string; asset_id: string }>(
+      `select client_id, asset_id from job_assignments where id = '${id}'`,
+    );
+    expect(row).toEqual({ client_id: CLIENT, asset_id: a });
+  });
+
+  it("enforces the same-client link through validated constraints even without the custom guards", async () => {
+    const constraints = await rows<{ conname: string; convalidated: boolean }>(`
+      select conname, convalidated from pg_constraint
+       where conrelid = 'public.job_assignments'::regclass
+         and conname in ('job_assignments_asset_requires_client',
+                         'job_assignments_asset_client_fk')
+       order by conname
+    `);
+    expect(constraints).toEqual([
+      { conname: "job_assignments_asset_client_fk", convalidated: true },
+      { conname: "job_assignments_asset_requires_client", convalidated: true },
+    ]);
+
+    const id = await assignment();
+    const a = await asset();
+    await db.exec(`alter table job_assignments disable trigger ja_asset_client_guard;
+                   alter table client_media_assets disable trigger cma_assignment_client_guard;`);
+    try {
+      await expect(db.exec(`update job_assignments
+        set asset_id = '${a}', client_id = '${FOREIGN_CLIENT}' where id = '${id}'`),
+      ).rejects.toThrow(/foreign key constraint/i);
+      await expect(db.exec(`update job_assignments
+        set asset_id = '${a}', client_id = null where id = '${id}'`),
+      ).rejects.toThrow(/check constraint/i);
+      await db.exec(`update job_assignments set asset_id = '${a}' where id = '${id}'`);
+      await expect(db.exec(`update client_media_assets
+        set client_id = '${FOREIGN_CLIENT}' where id = '${a}'`),
+      ).rejects.toThrow(/foreign key constraint/i);
+      await db.exec(`delete from client_media_assets where id = '${a}'`);
+      const row = await one<{ client_id: string; asset_id: string | null }>(
+        `select client_id, asset_id from job_assignments where id = '${id}'`,
+      );
+      expect(row).toEqual({ client_id: CLIENT, asset_id: null });
+    } finally {
+      await db.exec(`alter table job_assignments enable trigger ja_asset_client_guard;
+                     alter table client_media_assets enable trigger cma_assignment_client_guard;`);
+    }
+  });
 });

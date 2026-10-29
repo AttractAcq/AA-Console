@@ -22,8 +22,8 @@ administrator for changes.
 
 ## Release prerequisites
 
-1. Release migrations 263 through 269 in timestamp order before 270. At the
-   time this branch was created, 264–269 were still in the B005 PR stack.
+1. Migrations 263 through 269 were released in timestamp order before 270;
+   the production-linked history and catalog were read back after PR #245.
    Require the schema-order guard and clean/upgrade replay to pass for the
    final exact commit. The production-linked `supabase db push --linked
    --dry-run` must list **only 270** before the production apply.

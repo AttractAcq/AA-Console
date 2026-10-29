@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
 import { FormModal } from "../../components/forms/FormModal";
+import { integrationDraftKey } from "../../components/forms/draftStorage";
 import type { FieldDef } from "../../components/forms/fields";
 import { ACCESS_LEVEL_OPTIONS } from "../../lib/options";
 import { supabase } from "../../lib/supabase";
@@ -299,7 +300,7 @@ export function IntegrationsPanel() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title="Add Integration"
-        draftKey={`integration:${clientId}`}
+        draftKey={clientId ? integrationDraftKey(clientId) : undefined}
         fields={FIELDS}
         submitLabel="Connect"
         onSubmit={async (v) => {

@@ -11,7 +11,6 @@ import type { FieldDef } from "../../components/forms/fields";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { supabase } from "../../lib/supabase";
-import { clearDraft } from "../../components/forms/FormModal";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import {
   NO_TEMPLATE,
@@ -703,6 +702,7 @@ export function CampaignExecutionPanel() {
         }
         submitLabel="Plan it"
         initialValues={newCampaignValues}
+        resetKey={aiDraft}
         actions={
           <button
             type="button"
@@ -943,9 +943,6 @@ export function CampaignExecutionPanel() {
           }
           onClose={() => setProposing(false)}
           onGenerated={(draft) => {
-            // A saved draft wins over initialValues inside FormModal, so a
-            // half-typed form would silently swallow the proposal.
-            clearDraft(`campaign:${clientId}`);
             // The template rides along so the form opens on the same choice
             // the proposal was written for. Losing it here would leave a
             // brief aimed at S1 sitting in a campaign with no template.
