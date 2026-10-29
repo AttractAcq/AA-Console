@@ -1,4 +1,4 @@
-# B005 sales entitlement boundary (migrations 267–268)
+# B005 sales entitlement boundary (migrations 267–269)
 
 This is a reviewable, dormant sales-seat contract. Applying migration 267 does
 not enable employee Sales OS access. The only current production grant is
@@ -20,9 +20,10 @@ administrator-only security-definer RPCs. The request stores the exact
 client/member/user/action hash. A decision must present that hash; it records
 the human actor, time, status, and note. The decision RPC requires the signed
 Supabase JWT to carry MFA assurance level `aal2`; an `aal1` admin cannot decide.
-An approved revoke is immediately
-effective. Retired or relinked members can still be revoked against the
-original bound identity. Tables allow no direct authenticated write path.
+An approved revoke is immediately effective. Retired or relinked members can
+still be revoked against the original bound identity. A stale pending grant can
+be rejected after its member retires or relinks; only approval rechecks current
+membership. Tables allow no direct authenticated write path.
 
 An approved grant is effective only when **all** of these are true:
 
@@ -59,6 +60,9 @@ only ID and display name. The database trigger checks the same predicate on
 new or changed `owner_member_id`, including admin and service writes. Existing
 historical owner IDs remain readable; editing unrelated fields does not
 silently reassign them. The UI omits an unchanged owner from `update_lead`.
+On archive recovery, a still eligible owner is retained. A retired or revoked
+historical owner is cleared and a lead event records its prior ID, so recovery
+succeeds without silently reviving access.
 
 The client Add Lead form calls `create_manual_lead`. Direct client and employee
 INSERT on `client_leads` has no RLS policy. The RPC accepts identity, follow-up,
@@ -70,7 +74,7 @@ service producers and the administrator table policy keep their write paths.
 
 ## Contact and conversation reads (migration 268)
 
-The same sales permission contract now governs SELECT on the nine tables that
+The same sales permission contract now governs SELECT on the ten tables that
 hold contact, consent, scheduling, delivery, send, or message history:
 
 | Table | Protected data |
@@ -78,6 +82,7 @@ hold contact, consent, scheduling, delivery, send, or message history:
 | `lead_submissions` | Submitted contact and consent evidence |
 | `lead_magnet_deliveries` | Recipient addresses and delivery status |
 | `lead_sequence_enrollments` | Lead follow-up state |
+| `workflow_lead_attribution` | Lead IDs, attribution labels, and evidence tied to a workflow run |
 | `lead_suppressions` | Recipient address and suppression reason |
 | `outbound_messages` | Recipient, body, transport, and result |
 | `client_appointments` | Lead booking and attendance |
@@ -92,13 +97,65 @@ A generic job assignment no longer reads these tables. The existing
 same-client sales policy and explicit table SELECT grant. The sales path stays
 dormant while `inbox_enforced` is false. PGlite checks the prior assigned-editor
 exposure, the new denial on all ten tables, cross-client isolation, service
-reads, and retirement/revocation after a fixture-only Inbox bridge.
+reads, and retirement/revocation after a fixture-only Inbox bridge. The
+workflow attribution policy resolves `client_id` from `workflow_runs`, then
+uses the same sales permission.
+
+Migration 268 also redefines four security-definer RPCs that bypass table RLS:
+`dm_reply_refusal_v6`, `close_dm_conversation_v6`, `merge_dm_lead_v6`, and
+`queue_lead_message_v6`. They now require the same client sales permission
+before returning thread details, mutating a conversation, or queueing a
+person-specific message. An unauthorized refusal check returns the same
+generic result as an unknown conversation ID. The DM PGlite fixture proves
+an assigned editor cannot use any of the four, while client, service, and a
+fixture-only live sales member retain scoped operations.
 
 `lead_capture_endpoints`, `booking_links`, message templates, sequence
 templates, and booking window/settings tables retain their existing policies;
 they hold configuration or hashed tokens rather than a prospect's contact or
 conversation. Review their commercial sensitivity separately before opening
 an employee Sales console.
+
+## Authenticated RPCs (migration 269)
+
+Security-definer RPCs can bypass the table policies above. Migration 269
+replays the latest definitions of these authenticated entry points with
+`may_manage_client_leads` in place of broad job-assignment access:
+
+| RPC | Private operation or returned data | New boundary |
+| --- | --- | --- |
+| `suppress_lead_v6` | Suppress a person's dedupe key | Admin, same-client user, active granted sales member, service |
+| `sequence_exit_reason_v6` | Reveal lead consent, suppression, and stage exit reason | Same client as the sequence and lead; unauthorized sequence IDs yield the same generic result as missing ones |
+| `enroll_lead_in_sequence_v6` | Create/read a person's sequence enrollment | Same client sales permission, with the existing approved-sequence and exit checks |
+| `exit_lead_from_sequence_v6` | Change a person's enrollment | Same client sales permission |
+| `book_appointment_v6` | Take a slot and advance a lead | A signed-in permitted person for `person`; only service for `public_link` and `sales_agent` routes |
+| `record_appointment_outcome_v6` | Change attendance and lead stage | Same client sales permission |
+| `create_booking_link_v6` | Create a booking capability and return its hash | Same client sales permission |
+| `capture_sales_agent_lead` | Turn a conversation into a lead, or return its linked lead ID | Same client sales permission; trusted runtime and gateway still work as service |
+| `workflow_run_outcomes` | Return lead counts and collected cash in a workflow report | Same client sales permission |
+
+Booking and booking-link creation also reject an explicitly supplied campaign
+ID belonging to another client. The role matrix includes that cross-client
+case.
+
+`enqueue_sequence_sweep()` was callable by every authenticated user and could
+start a global nurture worker. Its authenticated EXECUTE grant is revoked;
+cron and the trusted service keep the call. The role matrix tests a broad
+assigned editor against every RPC above, checks that an unapproved sales seat
+is dormant, enables a fixture-only sales grant, then tests cross-client,
+retirement, revocation, administrator, client, and service behavior. The test
+also verifies the sweep function's database privilege.
+
+The audit found no further authenticated security-definer lead/contact read
+or mutation entry point using `can_access_client` after 267–269. The
+remaining functions that touch lead/contact rows are service-only producer,
+claim, webhook, and worker functions; manager-only approval revocation
+functions; or the existing guarded lead actions in 265. `available_slots_v6`
+returns appointment availability times without a person's identity or
+contact details. `render_message_v6` formats a caller-supplied lead composite
+and does not fetch a lead. The older broad definitions in historical
+migrations are superseded by the later `CREATE OR REPLACE` definitions here.
+This is a source audit, not evidence of a production deployment.
 
 ## Follow-on work
 
@@ -109,15 +166,12 @@ an employee Sales console.
   employee Sales console route that uses explicit client scope, and permission
   tests for its navigation and lead capture/submission panels. Keep the route
   closed until the Inbox gate is live.
-- B005: narrow authenticated security-definer RPCs that can bypass these row
-  policies before enabling an employee Sales route. Known calls include
-  `close_dm_conversation_v6` and `merge_dm_lead_v6` (migration 259),
-  `queue_lead_message_v6` (migration 249), and
-  `enroll_lead_in_sequence_v6`/`exit_lead_from_sequence_v6` (migration 252):
-  each currently accepts broad `can_access_client` assignment, and some
-  return contact or conversation rows. Audit related authoring and read RPCs
-  in the same pass. `lead_pipeline_counts` is `security_invoker` from 267;
-  contact and conversation row policies are narrowed by 268.
+- B005: treat 268 as a **partial dormant slice** unless 269 is applied and
+  reviewed with it. Do not enable employee Sales access from the 268 table
+  policies alone. `lead_pipeline_counts` is `security_invoker` from 267.
+- B004/privacy: `proof_capture_submissions` holds submitted names and consent
+  but still has broad assignment SELECT in migration 216. Review that
+  adjacent proof workflow separately from lead/contact entitlements.
 - R000/B003: run full clean and upgrade schema replay in CI, generate database
   types from the resulting schema, and verify production SQL/version evidence
   through the release gate before applying any migration.
