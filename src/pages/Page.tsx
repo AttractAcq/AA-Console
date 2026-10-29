@@ -320,6 +320,7 @@ function getPanelBody(
   if (node.id === "meta-profile" && view === "v2") {
     if (activeTab?.id === "profile") return <MetaProfilePanel tab="profile" />;
     if (activeTab?.id === "presence") return <MetaProfilePanel tab="presence" />;
+    if (activeTab?.id === "organic") return <OrganicPanel />;
     if (activeTab?.id === "reporting") return <OrganicReportingPanel />;
     return <MetaProfilePanel tab="identities" />;
   }
@@ -338,6 +339,7 @@ function getPanelBody(
     if (activeTab?.id === "publish") return <CampaignPagePublishPanel />;
     if (activeTab?.id === "sites") return <SitesPanel />;
     if (activeTab?.id === "landing-reporting") return <PagesReportingPanel pageType="landing" />;
+    if (activeTab?.id === "offer-pages") return <PageBuilderPanel pageType="offer" />;
     return <PageBuilderPanel pageType="landing" />;
   }
   if (node.id === "sales-os" && view === "v2") {
@@ -390,8 +392,9 @@ export function Page({ node }: { node: NavNode }) {
     // Website Studio v2 leads with Publish: the step 212 blocked, and the
     // only one that can tell published from working.
     : node.id === "website-studio" && view === "v2"
-      ? [{ id: "publish", label: "Publish" }, { id: "landing-pages", label: "Pages" },
-         { id: "sites", label: "Sites" }, { id: "landing-reporting", label: "Results" }]
+      ? [{ id: "publish", label: "Publish" }, { id: "landing-pages", label: "Landing Pages" },
+         { id: "offer-pages", label: "Offer Pages" }, { id: "sites", label: "Sites" },
+         { id: "landing-reporting", label: "Results" }]
     // Offer Studio v2 leads with Live use: the only thing v1 could not say.
     : node.id === "offer-studio" && view === "v2"
       ? [{ id: "live-use", label: "Live use" }, { id: "offers", label: "Service Offers" },
@@ -406,7 +409,8 @@ export function Page({ node }: { node: NavNode }) {
     // Meta Profile v2 leads with Identities, the question v1 could not ask.
     : node.id === "meta-profile" && view === "v2"
       ? [{ id: "identities", label: "Identities" }, { id: "profile", label: "Profile" },
-         { id: "presence", label: "Presence" }, { id: "reporting", label: "Outcomes" }]
+         { id: "presence", label: "Presence" }, { id: "organic", label: "Posts" },
+         { id: "reporting", label: "Outcomes" }]
     : node.id === "meta-ads-studio" && view === "v2"
       ? [{ id: "build", label: "Build" }, { id: "campaigns", label: "Campaign Builds" },
          { id: "paid", label: "Paid Distribution" }, { id: "reporting", label: "Paid Reporting" }]

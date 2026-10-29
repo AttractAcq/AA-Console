@@ -18,6 +18,13 @@ vi.mock("./campaigns/CampaignExecutionPanel", () => ({ CampaignExecutionPanel: (
 
 vi.mock("./proof-bank/ProofFactoryV2Panel", () => ({ ProofFactoryV2Panel: ({tab}: {tab: string}) => <p>Proof v2 {tab}</p> }));
 vi.mock("./proof-bank/ProofBankPanel", () => ({ ProofBankPanel: () => <p>Original proof bank</p> }));
+vi.mock("./conversion/PageBuilderPanel", () => ({ PageBuilderPanel: ({ pageType }: { pageType: string }) => <p>Page builder · {pageType}</p> }));
+vi.mock("./reporting/PagesReportingPanel", () => ({ PagesReportingPanel: ({ pageType }: { pageType: string }) => <p>Page results · {pageType}</p> }));
+vi.mock("./sites/CampaignPagePublishPanel", () => ({ CampaignPagePublishPanel: () => <p>Publish panel</p> }));
+vi.mock("./sites/SitesPanel", () => ({ SitesPanel: () => <p>Sites panel</p> }));
+vi.mock("./distribution/MetaProfilePanel", () => ({ MetaProfilePanel: ({ tab }: { tab: string }) => <p>Meta profile {tab}</p> }));
+vi.mock("./distribution/OrganicPanel", () => ({ OrganicPanel: () => <p>Organic board</p> }));
+vi.mock("./reporting/OrganicReportingPanel", () => ({ OrganicReportingPanel: () => <p>Organic reporting</p> }));
 
 import { legacyDeliveryNodes, v6ModuleNodes } from "../config/navigation";
 import { Page } from "./Page";
@@ -141,4 +148,36 @@ it("opens proof v2 stages and preserves the original v1 proof bank", async () =>
   </MemoryRouter>);
   expect(screen.getByText("Original proof bank")).toBeInTheDocument();
   expect(screen.queryByRole("tab", {name:"Capture"})).not.toBeInTheDocument();
+});
+
+// The three surfaces v2 did not carry over. Each is the v1 panel itself, in
+// the v2 page, because the point was never a rewrite — it was that archiving
+// v1 must not take a working screen with it.
+it("gives Website Studio v2 the offer-page builder v1 had", async () => {
+  const node = v6ModuleNodes.find((n) => n.id === "website-studio")!;
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/website-studio?view=v2"]}>
+    <Routes><Route path="/clients/:clientId/delivery/website-studio" element={<Page node={node} />} /></Routes>
+  </MemoryRouter>);
+  expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+    "Publish", "Landing Pages", "Offer Pages", "Sites", "Results",
+  ]);
+  await user.click(screen.getByRole("tab", { name: "Offer Pages" }));
+  expect(screen.getByText("Page builder · offer")).toBeInTheDocument();
+  // Landing is still its own builder, and no longer just called "Pages".
+  await user.click(screen.getByRole("tab", { name: "Landing Pages" }));
+  expect(screen.getByText("Page builder · landing")).toBeInTheDocument();
+});
+
+it("keeps the Posts board on Meta Profile v2", async () => {
+  const node = v6ModuleNodes.find((n) => n.id === "meta-profile")!;
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/meta-profile?view=v2"]}>
+    <Routes><Route path="/clients/:clientId/delivery/meta-profile" element={<Page node={node} />} /></Routes>
+  </MemoryRouter>);
+  expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+    "Identities", "Profile", "Presence", "Posts", "Outcomes",
+  ]);
+  await user.click(screen.getByRole("tab", { name: "Posts" }));
+  expect(screen.getByText("Organic board")).toBeInTheDocument();
 });

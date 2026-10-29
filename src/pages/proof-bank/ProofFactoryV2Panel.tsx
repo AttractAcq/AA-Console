@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { supabase } from "../../lib/supabase";
+import { enqueueAgentJob, supabase } from "../../lib/supabase";
 import {
   signPaths,
   fetchTextBodies,
@@ -13,7 +13,7 @@ import {
   categoryLabel,
 } from "../../lib/proofFactory";
 import { CONTENT_FORMATS, formatAllows } from "../../lib/contentFormat";
-import { FormModal } from "../../components/forms/FormModal";
+import { ConfirmModal, FormModal } from "../../components/forms/FormModal";
 import { AddProofModal } from "../../components/proof/AddProofModal";
 import { ProofDetailModal } from "../../components/proof/ProofDetailModal";
 import { MediaDetailModal } from "../../components/MediaDetailModal";
@@ -72,6 +72,7 @@ function ProofProductionWorkspace({
   const [building, setBuilding] = useState<Brief | null>(null);
   const [viewBrief, setViewBrief] = useState<Brief | null>(null);
   const [library, setLibrary] = useState("raw");
+  const [findOpen, setFindOpen] = useState(false);
   const [media, setMedia] = useState("");
   const [format, setFormat] = useState("");
   const [category, setCategory] = useState("");
@@ -209,6 +210,11 @@ function ProofProductionWorkspace({
         {tab === "assets" && (
           <button className={button} onClick={() => setUpload(true)}>
             Add raw proof
+          </button>
+        )}
+        {tab === "assets" && (
+          <button className={button} onClick={() => setFindOpen(true)}>
+            Find proof online
           </button>
         )}
         <button className={button} onClick={() => setArtifacts(!artifacts)}>
@@ -627,6 +633,19 @@ function ProofProductionWorkspace({
         onSaved={() => {
           void refresh();
         }}
+      />
+      <ConfirmModal
+        open={findOpen}
+        onClose={() => setFindOpen(false)}
+        title="Find proof online"
+        body="Searches the web for proof this business has already published — reviews and ratings, directory listings, press, awards, registrations, case studies on their own site. Each find is filed with the URL it came from so you can check it. Nothing is cleared for use: finding a review is not permission to advertise with it, so everything lands awaiting your decision. Takes a few minutes. The two runs so far cost $0.53 and $0.48 — tightening the search budget helped less than expected, because most of the cost is the size of the results rather than the number of searches."
+        confirmLabel="Search"
+        onConfirm={async () => {
+          if (!clientId) throw new Error("No client selected.");
+          await enqueueAgentJob({ agentKey: "proof_discovery", clientId });
+          setNotice("Searching. Anything found appears here awaiting clearance.");
+        }}
+        onDone={() => void refresh()}
       />
       <AddProofModal
         open={upload}

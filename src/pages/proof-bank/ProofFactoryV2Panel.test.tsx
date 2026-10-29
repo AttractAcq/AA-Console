@@ -1,8 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
-const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
-vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
+const { from, rpc, enqueueAgentJob } = vi.hoisted(() => ({
+  from: vi.fn(), rpc: vi.fn(), enqueueAgentJob: vi.fn(),
+}));
+vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc }, enqueueAgentJob }));
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ clientId: "client-a" }),
   Link: ({ children }: { children: React.ReactNode }) => (
@@ -39,6 +41,7 @@ import { ProofFactoryV2Panel } from "./ProofFactoryV2Panel";
 beforeEach(() => {
   vi.clearAllMocks();
   rpc.mockResolvedValue({ data: "request-1", error: null });
+  enqueueAgentJob.mockResolvedValue(undefined);
   const rows: Record<string, unknown[]> = {
     client_proof_assets: [
       {
@@ -140,4 +143,16 @@ it("preserves the human handoff without automatically building", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Start production" }));
   await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_proof_production_v2", expect.objectContaining({p_source_proof_id:"proof-1"})));
   expect(rpc.mock.calls[0][1]).not.toHaveProperty("p_quality");
+});
+it("can still send the proof discovery agent looking, which only v1 could", async () => {
+  render(<ProofFactoryV2Panel tab="assets" />);
+  expect(await screen.findByText("Online Reviews")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Find proof online" }));
+  await userEvent.click(screen.getByRole("button", { name: "Search" }));
+  await waitFor(() =>
+    expect(enqueueAgentJob).toHaveBeenCalledWith({
+      agentKey: "proof_discovery",
+      clientId: "client-a",
+    }),
+  );
 });
