@@ -118,7 +118,11 @@ Set `AA_SCHEMA_PARITY_READ_TOKEN`, `AA_SCHEMA_PARITY_PRODUCTION_REF` and
 fine-grained PAT that has only Database Read on the two named projects, then
 check an authenticated Admin browser read and a denied non-admin read. The
 current legacy Supabase CLI token must not be copied to Railway. The route is
-inert until all three variables are set. It never changes schema or data.
+inert until all three variables are set. The route pins both expected project
+refs and requires its production ref to match the runtime's own `SUPABASE_URL`
+host, so a mistaken two-project configuration cannot appear green. Changing
+the staging project requires a reviewed code change to the pinned ref. It
+never changes schema or data.
 
 `scripts/schema-parity-runtime-manifest.mjs` generates the runtime's bundled
 source manifest from every tracked migration, checked-in generated types and

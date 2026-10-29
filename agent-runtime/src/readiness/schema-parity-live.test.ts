@@ -6,7 +6,7 @@ import { collectSchemaParity, schemaParityConfig } from "./schema-parity-live.js
 
 const token = `sbp_fc${"x".repeat(24)}`;
 const refs = { production: "bancbdztffokwiifzoiv", staging: "vmmertwoboqiazcsougw" };
-const config = { schemaParityReadToken: token, schemaParityProductionRef: refs.production, schemaParityStagingRef: refs.staging } as RuntimeConfig;
+const config = { supabaseUrl: `https://${refs.production}.supabase.co`, schemaParityReadToken: token, schemaParityProductionRef: refs.production, schemaParityStagingRef: refs.staging } as RuntimeConfig;
 
 beforeEach(() => { process.env.RAILWAY_GIT_COMMIT_SHA = "7f08c4b30f77ed662c669b372424898d35c4cc3d"; });
 
@@ -16,6 +16,7 @@ describe("live schema parity", () => {
     expect(schemaParityConfig({ ...config, schemaParityReadToken: "legacy-full-access" })).toBeNull();
     expect(schemaParityConfig({ ...config, schemaParityStagingRef: refs.production })).toBeNull();
     expect(schemaParityConfig({ ...config, schemaParityStagingRef: null })).toBeNull();
+    expect(schemaParityConfig({ ...config, supabaseUrl: `https://${refs.staging}.supabase.co` })).toBeNull();
   });
 
   it("uses only fixed read-only SQL, redacts definitions, and classifies NULL histories as unavailable", async () => {

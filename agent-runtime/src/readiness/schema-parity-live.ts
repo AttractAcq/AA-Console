@@ -12,6 +12,9 @@ type TypeInfo = { sha256?: string; schemaBodySha256?: string | null; schemaBodyM
 
 const BASE = "https://api.supabase.com/v1/projects";
 const REF = /^[a-z0-9]{20}$/;
+// These are public Supabase project identifiers, pinned to prevent a green
+// report from accidentally comparing two other projects after an env typo.
+const EXPECTED_REFS = { production: "bancbdztffokwiifzoiv", staging: "vmmertwoboqiazcsougw" } as const;
 const CATEGORY_PREFIX: Record<string, string> = {
   relations: "relation:", columns: "column:", constraints: "constraint:", indexes: "index:",
   policies: "policy:", functions: "function:", triggers: "trigger:", event_triggers: "event_trigger:",
@@ -38,6 +41,11 @@ export function schemaParityConfig(config: RuntimeConfig): { token: string; refs
   const production = config.schemaParityProductionRef;
   const staging = config.schemaParityStagingRef;
   if (!token || !token.startsWith("sbp_fc") || !production || !staging || !REF.test(production) || !REF.test(staging) || production === staging) return null;
+  if (production !== EXPECTED_REFS.production || staging !== EXPECTED_REFS.staging) return null;
+  let runtimeRef: string | null = null;
+  try { runtimeRef = /^([a-z0-9]{20})\.supabase\.co$/.exec(new URL(config.supabaseUrl).hostname)?.[1] ?? null; }
+  catch { return null; }
+  if (runtimeRef !== production) return null;
   return { token, refs: { production, staging } };
 }
 
