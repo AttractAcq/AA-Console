@@ -247,10 +247,17 @@ describe("migration 265: lead and owned-media entitlements", () => {
     await expect(db.query("select advance_lead($1,'appointment')", [id])).rejects.toThrow(/Not permitted/);
     await db.exec(`reset role; select set_config('request.jwt.claim.role','service_role',false);
       select set_config('request.jwt.claim.sub','',false); set role service_role;`);
+    expect((await db.query("select id from stalled_leads($1,30)", [CLIENT])).rows).toHaveLength(1);
     await db.query("select advance_lead($1,'appointment')", [id]);
+    await db.query("select update_lead($1,$2)", [id, { name: "Service edited" }]);
+    await db.query("select add_lead_note($1,'Service note')", [id]);
+    await db.query("select archive_lead($1,null)", [id]);
+    await db.query("select recover_lead($1)", [id]);
     await db.exec("reset role");
-    expect((await db.query<{ stage: string }>("select stage from client_leads where id=$1", [id])).rows[0]?.stage)
-      .toBe("appointment");
+    expect((await db.query<{ stage: string; name: string }>("select stage,name from client_leads where id=$1", [id])).rows[0])
+      .toMatchObject({ stage: "appointment", name: "Service edited" });
+    expect((await db.query("select id from lead_events where lead_id=$1 and body='Service note'", [id])).rows)
+      .toHaveLength(1);
     const grant = await db.query<{ allowed: boolean }>(
       "select has_function_privilege('authenticated', 'public.may_manage_client_leads(uuid)', 'EXECUTE') as allowed");
     expect(grant.rows[0]?.allowed).toBe(false);

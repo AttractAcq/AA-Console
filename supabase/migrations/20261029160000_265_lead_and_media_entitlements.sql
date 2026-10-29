@@ -135,7 +135,7 @@ begin
 end;
 $$;
 revoke execute on function update_lead(uuid, jsonb) from public, anon;
-grant execute on function update_lead(uuid, jsonb) to authenticated;
+grant execute on function update_lead(uuid, jsonb) to authenticated, service_role;
 
 create or replace function add_lead_note(p_lead_id uuid, p_note text)
 returns void language plpgsql security definer set search_path = public as $$
@@ -150,7 +150,7 @@ begin
 end;
 $$;
 revoke execute on function add_lead_note(uuid, text) from public, anon;
-grant execute on function add_lead_note(uuid, text) to authenticated;
+grant execute on function add_lead_note(uuid, text) to authenticated, service_role;
 
 create or replace function archive_lead(p_lead_id uuid, p_reason text default null)
 returns void language plpgsql security definer set search_path = public as $$
@@ -174,7 +174,7 @@ begin
 end;
 $$;
 revoke execute on function archive_lead(uuid, text) from public, anon;
-grant execute on function archive_lead(uuid, text) to authenticated;
+grant execute on function archive_lead(uuid, text) to authenticated, service_role;
 
 create or replace function recover_lead(p_lead_id uuid)
 returns void language plpgsql security definer set search_path = public as $$
@@ -195,7 +195,7 @@ begin
 end;
 $$;
 revoke execute on function recover_lead(uuid) from public, anon;
-grant execute on function recover_lead(uuid) to authenticated;
+grant execute on function recover_lead(uuid) to authenticated, service_role;
 
 -- An owner may sign/read their own client-media upload only while they are an
 -- active employee and still have the client assignment. Admin and client-user
