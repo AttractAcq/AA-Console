@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CATALOG_QUERIES, HISTORY_SQL } from "./schema-parity.mjs";
 import {
   explicitProjectRefs, scopedReadToken, readOnlyApiQuery, inspectReadOnlyApi,
-  generatedSchemaBody, generatedTypeStatus, readLiveTypes,
+  generatedSchemaBody, generatedTypeStatus, readLiveTypes, requireVerifiedLiveTypes,
 } from "./schema-parity-read-only-api.mjs";
 
 const prod = "bancbdztffokwiifzoiv";
@@ -66,5 +66,12 @@ describe("Management API read-only transport", () => {
     expect(generatedTypeStatus(matching, different)).toBe("different");
     expect(generatedTypeStatus(different, matching)).toBe("different");
     expect(generatedTypeStatus(matching, { error: "management_api_http_403" })).toBe("unverified");
+  });
+
+  it("cannot call a live report green when either type body has an unrecognized format", () => {
+    const report = { result: "matching_snapshots", generatedTypes: { schemaDerivedComparison: generatedTypeStatus({ schemaBodyMatchesCheckedIn: true }, { schemaBodyMatchesCheckedIn: null }) }, limitations: [] };
+    requireVerifiedLiveTypes(report);
+    expect(report.result).toBe("incomplete");
+    expect(report.limitations).toContainEqual(expect.stringMatching(/schema-body format could not be recognized/));
   });
 });

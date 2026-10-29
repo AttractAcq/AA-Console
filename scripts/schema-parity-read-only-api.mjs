@@ -125,6 +125,14 @@ export function generatedTypeStatus(production, staging) {
   return matches.includes(false) ? "different" : matches.every((match) => match === true) ? "matching" : "unverified";
 }
 
+export function requireVerifiedLiveTypes(report) {
+  if (report.generatedTypes.schemaDerivedComparison === "unverified") {
+    report.result = "incomplete";
+    report.limitations.push("At least one live generated-types comparison was unavailable or its schema-body format could not be recognized.");
+  }
+  return report;
+}
+
 export async function buildReadOnlyApiReport({ refs, token, fetchImpl = fetch, root = ROOT }) {
   const local = await readLocalMigrations(root);
   const typeSource = await readFile(resolve(root, "src/types/database.ts"), "utf8");
@@ -152,11 +160,7 @@ export async function buildReadOnlyApiReport({ refs, token, fetchImpl = fetch, r
     queryKind: "catalog and migration SELECT only",
     rawDefinitionsSaved: false,
   };
-  if (remoteTypes.production.error || remoteTypes.staging.error) {
-    report.result = "incomplete";
-    report.limitations.push("At least one live generated-types read failed; type parity is unverified.");
-  }
-  return report;
+  return requireVerifiedLiveTypes(report);
 }
 
 function outputPath(argv) {
