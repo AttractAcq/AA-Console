@@ -369,6 +369,28 @@ describe("migration 260 remains a prerequisite", () => {
       .rejects.toThrow("already built");
   });
 
+  it("preserves a build's sheet until the parent campaign is deleted", async () => {
+    await completeFixture();
+    await db.exec("update campaign_action_executors set supported=true where action_key='google_ad_build'");
+    const executionId = await approveAndClaim(await request());
+    await db.query("select start_google_build_v6($1)", [executionId]);
+    const build = await one<{ id: string; sheet_id: string }>(
+      "select id, sheet_id from google_ads_builds where campaign_id=$1", [CAMPAIGN],
+    );
+
+    await expect(db.query(
+      "delete from google_ads_build_sheets where id=$1", [build.sheet_id],
+    )).rejects.toThrow(/foreign key/i);
+    expect(await rows("select id from google_ads_builds where id=$1", [build.id])).toHaveLength(1);
+    expect(await rows("select id from google_ads_build_sheets where id=$1", [build.sheet_id]))
+      .toHaveLength(1);
+
+    await db.query("delete from client_campaigns where id=$1", [CAMPAIGN]);
+    expect(await rows("select id from google_ads_builds where id=$1", [build.id])).toHaveLength(0);
+    expect(await rows("select id from google_ads_build_sheets where id=$1", [build.sheet_id]))
+      .toHaveLength(0);
+  });
+
   it("keeps copy and build records readable only for an authorized client", async () => {
     await completeFixture();
     await db.exec("update campaign_action_executors set supported=true where action_key='google_ad_build'");
@@ -390,11 +412,17 @@ describe("migration 260 remains a prerequisite", () => {
                '{}'::jsonb,repeat('e',32),'approved',now(),$3)`,
       [OTHER_CLIENT, OTHER_CAMPAIGN, MANAGER],
     );
+    const otherSheet = await one<{ id: string }>(
+      `insert into google_ads_build_sheets
+         (campaign_id,client_id,version,derived,missing,plan_hash)
+       values ($1,$2,1,'{}'::jsonb,'{}'::text[],repeat('e',64)) returning id`,
+      [OTHER_CAMPAIGN, OTHER_CLIENT],
+    );
     await db.query(
       `insert into google_ads_builds
-         (client_id,campaign_id,approval_id,approved_spec)
-       values ($1,$2,'99999999-9999-4999-8999-999999999999','{}'::jsonb)`,
-      [OTHER_CLIENT, OTHER_CAMPAIGN],
+         (client_id,campaign_id,approval_id,sheet_id,approved_spec)
+       values ($1,$2,'99999999-9999-4999-8999-999999999999',$3,'{}'::jsonb)`,
+      [OTHER_CLIENT, OTHER_CAMPAIGN, otherSheet.id],
     );
     await db.query(
       `insert into google_ads_copy

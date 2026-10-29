@@ -16,6 +16,8 @@ The approval scope carries a canonical JSONB specification containing the sheet 
 
 `start_google_build_v6` requires a current, approved, leased execution, the client action switch, the latest sheet, the same copy and connected account, and the same scope, destination and hash. It snapshots the approved specification in `google_ads_builds`; that snapshot cannot be edited. A future handler must use this snapshot for all external writes and recheck account access immediately before them. No handler or API call exists in this branch.
 
+A build retains a required reference to its exact sheet. Deleting that sheet alone is rejected; deleting the parent campaign removes both records together. The deferred foreign key preserves the audit link without breaking campaign cleanup.
+
 `record_google_build_finished_v6` requires recorded campaign, ad group and ad resource names before marking the build successful. It does not set `client_campaigns.ad_campaign_id`: that column is a foreign key to an internal legacy `campaigns` UUID, not a Google Ads resource or spend binding. Google Ads attribution needs its own verified binding and measured spend before the product can call the campaign live.
 
 ## Remaining work before Google Ads can be enabled

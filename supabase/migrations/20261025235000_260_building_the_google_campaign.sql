@@ -90,7 +90,11 @@ create table if not exists public.google_ads_builds (
   campaign_id uuid not null,
   approval_id uuid not null unique
     references public.campaign_action_approvals(id) on delete cascade,
-  sheet_id uuid references public.google_ads_build_sheets(id) on delete set null,
+  -- A build must retain its exact sheet while it exists. Deferred NO ACTION
+  -- blocks deleting that sheet alone, while a campaign/client cascade can
+  -- delete both records in one transaction without trigger-order failures.
+  sheet_id uuid not null references public.google_ads_build_sheets(id)
+    on delete no action deferrable initially deferred,
   -- Immutable input snapshot for the later handler. The handler must consume
   -- this rather than re-reading mutable copy after the approval was checked.
   approved_spec jsonb not null check (jsonb_typeof(approved_spec) = 'object'),
