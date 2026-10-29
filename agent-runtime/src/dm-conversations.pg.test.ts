@@ -70,6 +70,14 @@ beforeEach(async () => {
  create function auth.uid() returns uuid language sql as $$select '${MANAGER}'::uuid$$;
  create function is_admin() returns boolean language sql as $$select coalesce(current_setting('test.admin',true),'true')='true'$$;
  create function can_access_client(uuid) returns boolean language sql as $$select $1='${CLIENT}'::uuid$$;
+ create function may_manage_client_leads(target uuid) returns boolean language sql as $$
+   select auth.role()='service_role' or is_admin()
+     or (target='${CLIENT}'::uuid and current_setting('test.actor',true)='client')
+     or (target='${CLIENT}'::uuid and current_setting('test.actor',true)='sales'
+         and current_setting('test.sales_enabled',true)='true') $$;
+ create function has_client_sales_entitlement(target uuid) returns boolean language sql as $$
+   select target='${CLIENT}'::uuid and current_setting('test.actor',true)='sales'
+     and current_setting('test.sales_enabled',true)='true' $$;
  create function active_video_approval_manager(uuid) returns uuid language sql as $$select '${MANAGER}'::uuid$$;
  create function lock_down_definer_functions() returns integer language sql as $$select 0$$;
  create function set_updated_at() returns trigger language plpgsql as $$begin new.updated_at := now(); return new; end$$;
@@ -117,6 +125,18 @@ beforeEach(async () => {
   await db.exec(await sql("20261025220000_257_a_dm_can_be_held.sql"));
   await db.exec(await sql("20261025230000_258_replying_in_the_thread.sql"));
   await db.exec(await sql("20261025233000_259_which_client_a_message_belongs_to.sql"));
+  // The contact-policy migration also names adjacent tables not needed by
+  // this focused DM fixture; create their minimum schema before replaying it.
+  await db.exec(`
+    create table lead_submissions(client_id uuid);
+    create table lead_magnet_deliveries(client_id uuid);
+    create table lead_sequence_enrollments(client_id uuid);
+    create table client_appointments(client_id uuid);
+    create table sales_agent_conversations(client_id uuid);
+    create table workflow_runs(id uuid primary key,client_id uuid);
+    create table workflow_lead_attribution(run_id uuid);
+  `);
+  await db.exec(await sql("20261029190000_268_contact_and_conversation_scope.sql"));
   await db.query(
     `update client_engine_settings set outbound_messaging_enabled = true where client_id = $1`,
     [CLIENT]);
@@ -228,6 +248,52 @@ describe("the reply window", () => {
     expect((await one<{ r: string }>(
       `select dm_reply_refusal_v6($1) as r`, [conv.conversation_id])).r)
       .toContain("Handled on the phone");
+  });
+});
+
+describe("migration 268 definer boundary", () => {
+  it("blocks assigned editors from DM detail, mutations and queueing while preserving scoped actors", async () => {
+    await asService();
+    const conv = await inbound();
+    const version = await dmTemplate();
+    await db.query("select set_config('test.admin','false',false)");
+    await db.query("select set_config('test.actor','editor',false)");
+    // The legacy assignment predicate remains true, but cannot authorize
+    // a security-definer function that would bypass the new table policies.
+    expect((await one<{ allowed: boolean }>(
+      "select can_access_client($1) as allowed", [CLIENT])).allowed).toBe(true);
+    expect((await one<{ r: string }>(
+      "select dm_reply_refusal_v6($1) as r", [conv.conversation_id])).r)
+      .toBe("That conversation does not exist.");
+    expect(await refusal("select close_dm_conversation_v6($1,'Handled')", [conv.conversation_id]))
+      .toContain("Not permitted");
+    expect(await refusal("select merge_dm_lead_v6($1,$2)", [conv.conversation_id, conv.lead_id]))
+      .toContain("Not permitted");
+    expect(await refusal("select queue_lead_message_v6($1,$2)", [conv.lead_id, version]))
+      .toContain("Not permitted");
+    expect(await rows("select id from outbound_messages")).toHaveLength(0);
+
+    await db.query("select set_config('test.actor','sales',false)");
+    expect(await refusal("select queue_lead_message_v6($1,$2)", [conv.lead_id, version]))
+      .toContain("Not permitted");
+    await db.query("select set_config('test.sales_enabled','true',false)");
+    expect((await one<{ r: string | null }>(
+      "select dm_reply_refusal_v6($1) as r", [conv.conversation_id])).r).toBeNull();
+    const sent = await one<{ id: string }>(
+      "select id from queue_lead_message_v6($1,$2)", [conv.lead_id, version]);
+    expect(sent.id).toBeTruthy();
+
+    await db.query("select set_config('test.actor','client',false)");
+    expect((await one<{ id: string }>(
+      "select id from merge_dm_lead_v6($1,$2)", [conv.conversation_id, conv.lead_id])).id)
+      .toBe(conv.conversation_id);
+    expect((await one<{ status: string }>(
+      "select status from close_dm_conversation_v6($1,'Handled by client')", [conv.conversation_id])).status)
+      .toBe("closed");
+    await asService();
+    expect((await one<{ r: string }>(
+      "select dm_reply_refusal_v6($1) as r", [conv.conversation_id])).r)
+      .toContain("Handled by client");
   });
 });
 

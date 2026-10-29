@@ -9,6 +9,8 @@ const CLIENT_USER = "44444444-4444-4444-8444-444444444444";
 const OTHER_USER = "55555555-5555-4555-8555-555555555555";
 const EDITOR = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const SALES = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const RUN_A = "66666666-6666-4666-8666-666666666666";
+const RUN_B = "77777777-7777-4777-8777-777777777777";
 const TABLES = [
   "lead_submissions", "lead_magnet_deliveries", "lead_sequence_enrollments",
   "lead_suppressions", "outbound_messages", "client_appointments",
@@ -33,6 +35,10 @@ async function rows(table: (typeof TABLES)[number]) {
   return (await db.query<{ client_id: string; marker: string }>(
     `select client_id,marker from public.${table} order by client_id`)).rows;
 }
+async function attributionRows() {
+  return (await db.query<{ marker: string }>(
+    "select marker from public.workflow_lead_attribution order by marker")).rows;
+}
 
 beforeAll(async () => {
   db = new PGlite();
@@ -48,6 +54,20 @@ beforeAll(async () => {
     create table client_users(client_id uuid not null,user_id uuid not null);
     create table team_members(id uuid primary key,user_id uuid not null,active boolean not null);
     create table job_assignments(client_id uuid not null,member_id uuid not null);
+    create table workflow_runs(id uuid primary key,client_id uuid not null);
+    create table workflow_lead_attribution(run_id uuid not null,marker text not null);
+    insert into workflow_runs values ('${RUN_A}','${CLIENT}'),('${RUN_B}','${OTHER}');
+    insert into workflow_lead_attribution values ('${RUN_A}','A'),('${RUN_B}','B');
+    alter table workflow_lead_attribution enable row level security;
+    grant select on workflow_runs,workflow_lead_attribution to authenticated,service_role;
+    -- The definer functions restored by 268 declare these composite row types;
+    -- their behavior is exercised against fuller tables in dm-conversations.
+    create table client_leads(id uuid primary key,client_id uuid not null);
+    create table message_templates(id uuid primary key,client_id uuid not null);
+    create table message_template_versions(id uuid primary key,client_id uuid not null);
+    create table message_template_approvals(id uuid primary key,client_id uuid not null);
+    create table message_channels(channel_key text primary key);
+    create table client_engine_settings(client_id uuid primary key);
     create table sales_gate(inbox_enforced boolean not null);
     insert into sales_gate values(false);
     create table sales_grants(client_id uuid not null,member_id uuid not null,
@@ -73,6 +93,9 @@ beforeAll(async () => {
         select public.is_admin() or public.is_client_user(target) or exists(
           select 1 from public.job_assignments j join public.team_members tm on tm.id=j.member_id
            where j.client_id=target and tm.user_id=auth.uid() and tm.active) $$;
+    create policy workflow_lead_attribution_read on workflow_lead_attribution
+      for select to authenticated using(exists(select 1 from workflow_runs r
+        where r.id=run_id and public.can_access_client(r.client_id)));
     create function public.has_client_sales_entitlement(target uuid) returns boolean
       language sql stable security definer set search_path='' as $$
         select exists(select 1 from public.sales_gate where inbox_enforced) and exists(
@@ -114,6 +137,7 @@ beforeAll(async () => {
   // Prove the prior broad assignment path exposes every contact table.
   await asUser(EDITOR);
   for (const table of BROAD_TABLES) expect(await rows(table)).toHaveLength(1);
+  expect(await attributionRows()).toHaveLength(1);
   await expect(rows("sales_agent_conversations")).rejects.toThrow(/permission denied/);
   await db.exec("reset role");
   const sql = await readFile(new URL(
@@ -128,19 +152,24 @@ describe("migration 268: contact and conversation scope", () => {
     expect((await db.query<{ allowed: boolean }>(
       "select can_access_client($1) as allowed", [CLIENT])).rows[0]?.allowed).toBe(true);
     for (const table of TABLES) expect(await rows(table), table).toHaveLength(0);
+    expect(await attributionRows()).toHaveLength(0);
   });
 
   it("preserves admin, same-client user and service reads without cross-client bleed", async () => {
     await asUser(ADMIN);
     for (const table of TABLES) expect(await rows(table), table).toHaveLength(2);
+    expect(await attributionRows()).toHaveLength(2);
     await asUser(CLIENT_USER);
     for (const table of TABLES) expect((await rows(table)).map((row) => row.marker), table)
       .toEqual(["A"]);
+    expect((await attributionRows()).map((row) => row.marker)).toEqual(["A"]);
     await asUser(OTHER_USER);
     for (const table of TABLES) expect((await rows(table)).map((row) => row.marker), table)
       .toEqual(["B"]);
+    expect((await attributionRows()).map((row) => row.marker)).toEqual(["B"]);
     await asService();
     for (const table of TABLES) expect(await rows(table), table).toHaveLength(2);
+    expect(await attributionRows()).toHaveLength(2);
     await asAnon();
     await expect(rows("lead_submissions")).rejects.toThrow(/permission denied/);
   });
@@ -148,6 +177,7 @@ describe("migration 268: contact and conversation scope", () => {
   it("permits only a live explicitly granted sales member and removes access on retirement or revoke", async () => {
     await asUser(SALES);
     for (const table of TABLES) expect(await rows(table), table).toHaveLength(0);
+    expect(await attributionRows()).toHaveLength(0);
     await db.exec(`reset role;
       insert into sales_grants values
         ('${CLIENT}','dddddddd-dddd-4ddd-8ddd-dddddddddddd','${SALES}',gen_random_uuid(),null);
@@ -155,14 +185,17 @@ describe("migration 268: contact and conversation scope", () => {
     await asUser(SALES);
     for (const table of TABLES) expect((await rows(table)).map((row) => row.marker), table)
       .toEqual(["A"]);
+    expect((await attributionRows()).map((row) => row.marker)).toEqual(["A"]);
     await db.exec(`reset role;
       update team_members set active=false where user_id='${SALES}';`);
     await asUser(SALES);
     for (const table of TABLES) expect(await rows(table), table).toHaveLength(0);
+    expect(await attributionRows()).toHaveLength(0);
     await db.exec(`reset role;
       update team_members set active=true where user_id='${SALES}';
       update sales_grants set revoked_at=now() where bound_user_id='${SALES}';`);
     await asUser(SALES);
     for (const table of TABLES) expect(await rows(table), table).toHaveLength(0);
+    expect(await attributionRows()).toHaveLength(0);
   });
 });
