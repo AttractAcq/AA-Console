@@ -61,30 +61,16 @@ if (!/\[db\.seed\]\s*\n(?:#[^\n]*\n)*enabled = false/.test(config)) {
 }
 writeFileSync(join(target, 'config.toml'), config)
 
-const seedMigration = migrations.find((name) => name.endsWith('_11_auth_users_and_role_metadata.sql'))
+if (process.env.AA_SCHEMA_REPLAY_RAW_SOURCE &&
+    process.env.AA_SCHEMA_REPLAY_RAW_SOURCE !== '1') {
+  throw new Error('Synthetic Auth replay is retired; only raw source replay is supported')
+}
 for (const name of migrations) {
   const input = join(source, 'migrations', name)
   const output = join(target, 'migrations', name)
-  if (name !== seedMigration) {
-    cpSync(input, output)
-    continue
-  }
-  let sql = readFileSync(input, 'utf8')
-  if (sql.includes("current_setting('app.seed_admin_password'")) {
-    // The repository's migration 11 still seeds named accounts. This fixture
-    // is injected into the throwaway copy only, after pgcrypto is installed.
-    // Values are generated inside Postgres, never stored or printed by CI.
-    const marker = 'create extension if not exists pgcrypto with schema extensions;'
-    if (!sql.includes(marker)) throw new Error('Seed migration changed; review CI fixture insertion')
-    const fixture = `\n-- CI-only, per-run synthetic passwords. Remove when B004 retires migration seeding.\n` +
-      ['admin', 'client', 'employee'].map((role) =>
-        `select set_config('app.seed_${role}_password', encode(extensions.gen_random_bytes(24), 'hex'), false);`
-      ).join('\n') + '\n'
-    sql = sql.replace(marker, marker + fixture)
-  }
-  writeFileSync(output, sql)
+  cpSync(input, output)
 }
 
 console.log(JSON.stringify({ projectId, portBase, migrations: migrations.length,
   releasedVersion, headVersion: migrations.at(-1).slice(0, 14),
-  fixture: Boolean(seedMigration) }))
+  fixture: false, authSourceReplay: true }))

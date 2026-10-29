@@ -13,9 +13,9 @@ migration does not rewrite existing profiles or broaden the helper's grants.
 
 ## Release and verification
 
-1. Migrations 260, 261, and 262 were released to production on 29 October
-   2026. Before applying 263, confirm they remain the production migration
-   head and that `supabase db push --linked --dry-run` selects only 263.
+1. Migrations 260–263 were released to production on 29 October 2026.
+   The linked dry run selected only 263 before it was applied, and the
+   remote migration list confirmed its exact timestamp afterward.
 2. Keep hosted Supabase Auth public signup disabled during this rollout. The
    owner disabled it on 29 October 2026; verify that setting again before
    enabling signup or invitations. The tracked local `supabase/config.toml`
@@ -51,13 +51,12 @@ migration does not rewrite existing profiles or broaden the helper's grants.
 ## Remaining B004 work
 
 This patch does not discover or demote any existing forged administrator.
-It also does not repair migration 11's `change-me` seed password fallback,
-`create_console_user()`'s direct Auth table writes, or migration 13's
-three-character team-member password minimum. **A raw schema replay still
-executes migration 11 before 263.** A clean replay therefore runs its seed
-with the original fallback password; a replay against existing seeded
-accounts can reset their Auth passwords and metadata during that earlier
-step. Migration 263 prevents only later repeat calls after it is applied.
-Replay-time seed handling is being addressed separately in PR #243. Full
-B004 acceptance, including an existing-account audit and a default-deny
-pending-user model before public signup is re-enabled, remains open.
+The separate B004 replay correction in `docs/auth-fresh-replay-safety.md`
+changes the tracked migration 11 source so a new database has unique random
+seed secrets and a repeat fails before touching an existing Auth account.
+Its raw-source CI replay must pass before this historical-file change is
+released. Migration 13 still permits a three-character team-member password,
+and `create_console_user()` still writes Auth tables directly rather than
+using controlled Auth Admin invitations. Full B004 acceptance, including
+hosted signup readback, existing-account provenance, MFA at decision RPCs,
+credential rotation, and first-admin recovery evidence, remains open.
