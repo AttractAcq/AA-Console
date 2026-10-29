@@ -2,9 +2,9 @@ import { useState, type ChangeEvent } from "react";
 
 type Status = "read" | "absent" | "unavailable";
 type Category = { status: Status; count: number | null };
-type History = { count: number; head: string | null; digest: string } | null;
+type History = { count: number; head: string | null; digest: string; storedSqlPayloadAvailable?: number; storedSqlPayloadUnavailable?: number } | null;
 type Environment = { migrationHistory: History; categories: Record<string, Category>; errors: { category: string; reason: string; code: string | null }[] };
-type Finding = { type: string; environment?: string; environments?: string[]; kind?: string; identity?: string; version?: string; localVersion?: string; remoteVersion?: string; nextAction?: string };
+type Finding = { type: string; environment?: string; environments?: string[]; kind?: string; identity?: string; version?: string; localVersion?: string; remoteVersion?: string; count?: number; nextAction?: string };
 export type SchemaParityReport = {
   schemaVersion: 1;
   createdAt: string;
@@ -15,7 +15,7 @@ export type SchemaParityReport = {
   localMigrations: { count: number; head: string | null; digest: string };
   environments: Record<string, Environment>;
   generatedTypes: { sourceFile: string; sha256: string; generatedSha256?: string; schemaDerivedComparison: "matching" | "different" | "unverified" };
-  sourceToHistoryBody: { provenEqualSingleStatement: Record<string, number>; unverifiedRepresentationOrDifference: Record<string, number> } | null;
+  sourceToHistoryBody: { provenEqualSingleStatement: Record<string, number>; unverifiedRepresentationOrDifference: Record<string, number>; storedSqlPayloadUnavailable?: Record<string, number> } | null;
   limitations: string[];
   findings: { total: number; shown: Finding[]; omitted: number };
 };
@@ -113,13 +113,13 @@ export function SchemaParityPanel({ report: suppliedReport }: { report?: unknown
   return <section aria-label="Schema parity" className="space-y-5">
     <div>
       <h2 className="text-lg font-semibold">Schema and migration parity</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Import the redacted output of the read-only parity auditor. This page never receives database URLs or runs migrations.</p>
+      <p className="mt-1 text-sm text-muted-foreground">{suppliedReport === undefined ? "Import the redacted output of the read-only parity auditor." : suppliedReport === null ? "A live report is unavailable." : "The admin runtime supplied this redacted, read-only audit."} This page never receives database URLs or runs migrations.</p>
       {suppliedReport === undefined && <label className="mt-3 block text-sm font-medium">Import schema parity JSON
         <input className="mt-1 block w-full max-w-xl rounded-md border border-border bg-card p-2 text-sm" type="file" accept=".json,application/json" onChange={(event) => void importFile(event)} />
       </label>}
     </div>
     {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
-    {suppliedReport !== undefined && !supplied && <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm">The supplied parity report failed validation.</p>}
+    {suppliedReport !== undefined && suppliedReport !== null && !supplied && <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm">The supplied parity report failed validation.</p>}
     {!report && <p role="status" className="rounded-md border border-border p-3 text-sm text-muted-foreground">Schema parity unknown. No validated report is available.</p>}
     {report && <>
       <div role="status" className={`rounded-md border p-4 ${classForResult(report.result)}`}>
@@ -132,10 +132,10 @@ export function SchemaParityPanel({ report: suppliedReport }: { report?: unknown
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-left text-sm">
           <caption className="p-3 text-left font-semibold">Migration history</caption>
-          <thead><tr className="border-y border-border"><th className="p-2">Environment</th><th className="p-2">Entries</th><th className="p-2">Head</th><th className="p-2">Status</th></tr></thead>
+          <thead><tr className="border-y border-border"><th className="p-2">Environment</th><th className="p-2">Entries</th><th className="p-2">Head</th><th className="p-2">Stored SQL payload</th><th className="p-2">Status</th></tr></thead>
           <tbody>
-            <tr><th className="p-2 font-medium">Local working tree</th><td className="p-2">{report.localMigrations.count}</td><td className="p-2 font-mono">{report.localMigrations.head ?? "Unknown"}</td><td className="p-2">Source files</td></tr>
-            {environments.map((name) => <tr key={name} className="border-t border-border"><th className="p-2 font-medium capitalize">{name}</th><td className="p-2">{report.environments[name]?.migrationHistory?.count ?? "Unknown"}</td><td className="p-2 font-mono">{report.environments[name]?.migrationHistory?.head ?? "Unknown"}</td><td className="p-2">{report.environments[name]?.errors.length ? "Incomplete" : "Read"}</td></tr>)}
+            <tr><th className="p-2 font-medium">Local working tree</th><td className="p-2">{report.localMigrations.count}</td><td className="p-2 font-mono">{report.localMigrations.head ?? "Unknown"}</td><td className="p-2">Source files</td><td className="p-2">Source files</td></tr>
+            {environments.map((name) => <tr key={name} className="border-t border-border"><th className="p-2 font-medium capitalize">{name}</th><td className="p-2">{report.environments[name]?.migrationHistory?.count ?? "Unknown"}</td><td className="p-2 font-mono">{report.environments[name]?.migrationHistory?.head ?? "Unknown"}</td><td className="p-2">{report.environments[name]?.migrationHistory?.storedSqlPayloadUnavailable === undefined ? "Unknown" : `${report.environments[name]?.migrationHistory?.storedSqlPayloadUnavailable} unavailable`}</td><td className="p-2">{report.environments[name]?.errors.length ? "Incomplete" : "Read"}</td></tr>)}
           </tbody>
         </table>
       </div>
@@ -161,7 +161,7 @@ export function SchemaParityPanel({ report: suppliedReport }: { report?: unknown
       <div className="rounded-md border border-border p-4">
         <h3 className="font-semibold">Discrepancies</h3>
         {report.findings.shown.length === 0 ? <p className="mt-2 text-sm">No observed differences in the available checks.</p> : <ul className="mt-2 space-y-2 text-sm">{report.findings.shown.map((finding, index) => <li key={`${finding.type}-${finding.identity ?? finding.version ?? index}-${index}`} className="border-t border-border pt-2">
-          <span className="font-medium">{safeText(finding.type)}</span> · {safeText(finding.environment ?? finding.environments?.join(" / ") ?? "source")}: {safeText(finding.identity ?? finding.version ?? finding.localVersion ?? "Unknown")}
+          <span className="font-medium">{safeText(finding.type)}</span> · {safeText(finding.environment ?? finding.environments?.join(" / ") ?? "source")}: {safeText(finding.identity ?? finding.version ?? finding.localVersion ?? (finding.count === undefined ? "Unknown" : `${finding.count} rows`))}
           {finding.remoteVersion && <span> → recorded as {safeText(finding.remoteVersion)}</span>}
           <p className="mt-1 text-muted-foreground">Next action: {finding.nextAction ? safeText(finding.nextAction, 240) : "No suggested action in report."}</p>
         </li>)}</ul>}

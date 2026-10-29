@@ -285,6 +285,8 @@ export function buildReport(local, production, staging, types, baseline = null, 
       }
     }
   }
+  const unavailable = historyComparison && Object.values(historyComparison.storedSqlPayloadUnavailable).some((count) => count > 0);
+  const observedDrift = findings.some((finding) => finding.type !== "history_sql_payload_unavailable");
   const incomplete = provenance.workingTreeClean !== true || provenance.migrationInputsClean !== true ||
     [production, staging, ...(baseline ? [baseline] : [])].some((environment) => environment.errors.length > 0 || !environment.history || CATALOG_QUERIES.some(({ name }) => !["read", "absent"].includes(environment.categories[name]?.status)));
   const bounded = boundedFindings(findings, MAX_FINDINGS);
@@ -293,12 +295,13 @@ export function buildReport(local, production, staging, types, baseline = null, 
     createdAt: new Date().toISOString(),
     gitSha: provenance.headSha,
     sourceProvenance: provenance,
-    result: incomplete ? "incomplete" : bounded.total ? "drift" : "matching_snapshots",
+    result: incomplete ? "incomplete" : observedDrift ? "drift" : unavailable ? "incomplete" : "matching_snapshots",
     scope: baseline ? "production_staging_and_baseline" : "production_and_staging",
     localMigrations: localSummary(local),
     sourceToHistoryBody: historyComparison ? {
       provenEqualSingleStatement: historyComparison.singleStatementVerified,
       unverifiedRepresentationOrDifference: historyComparison.contentUnverified,
+      storedSqlPayloadUnavailable: historyComparison.storedSqlPayloadUnavailable,
     } : null,
     environments: Object.fromEntries([production, staging, ...(baseline ? [baseline] : [])].map((environment) => [environment.name, {
       migrationHistory: environment.history ? historySummary(environment.history) : null,
@@ -309,6 +312,7 @@ export function buildReport(local, production, staging, types, baseline = null, 
     limitations: [
       "A matching migration version does not prove the SQL or object definition matches the source file.",
       "Supabase may store split SQL statements; a source-to-history body hash is only verified when a single stored statement exactly matches the source bytes after trimming trailing whitespace.",
+      "A NULL migration statements payload is unavailable evidence, not a differing SQL body; compare live catalog objects before history repair.",
       ...(baseline ? [] : ["Without a clean replay baseline, matching production/staging snapshots do not prove either matches the tracked migrations."]),
       ...(types.schemaDerivedComparison === "unverified" ? ["Generated database types were not independently regenerated for this report."] : []),
       ...(provenance.workingTreeClean === false ? ["The working tree contains uncommitted or untracked changes; HEAD alone does not identify the audited source."] : []),

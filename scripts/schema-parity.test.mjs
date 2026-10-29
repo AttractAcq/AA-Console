@@ -36,6 +36,15 @@ describe("migration parity classification", () => {
     expect(result.contentUnverified.production).toBe(2);
     expect(result.singleStatementVerified.production).toBe(0);
   });
+
+  it("treats NULL history statements as unavailable evidence instead of 271 invented SQL mismatches", () => {
+    const production = [row("20261025090000", "first", "hash-a"), row("20261025100000", "second", "hash-b")];
+    const staging = [row("20261025090000", "first", null), row("20261025100000", "second", null)];
+    const result = compareHistory(local, production, staging, "production", "staging");
+    expect(result.findings.filter((finding) => finding.type === "recorded_sql_mismatch")).toHaveLength(0);
+    expect(result.findings).toContainEqual(expect.objectContaining({ type: "history_sql_payload_unavailable", environment: "staging", count: 2 }));
+    expect(result.storedSqlPayloadUnavailable).toEqual({ production: 0, staging: 2 });
+  });
 });
 
 describe("catalog and report", () => {
@@ -76,6 +85,20 @@ describe("catalog and report", () => {
     expect(report.sourceToHistoryBody.unverifiedRepresentationOrDifference.production).toBe(2);
     expect(report.generatedTypes.schemaDerivedComparison).toBe("unverified");
     expect(report.limitations.join(" ")).toMatch(/do not prove either matches the tracked migrations/);
+  });
+
+  it("does not report matching snapshots when all stored SQL payloads are NULL", () => {
+    const categories = Object.fromEntries(CATALOG_QUERIES.map(({ name }) => [name, { status: "read", count: 0 }]));
+    const objects = catalogObjects([
+      { kind: "extension", identity: "pgcrypto", definition: "1" },
+      { kind: "extension", identity: "pg_cron", definition: "1" },
+      { kind: "event_trigger", identity: "ensure_rls", definition: "1" },
+    ]);
+    const environment = (name) => ({ name, history: local.map(({ version, name }) => row(version, name, null)), objects, categories, errors: [] });
+    const report = buildReport(local, environment("production"), environment("staging"), { sourceFile: "src/types/database.ts", sha256: sha256("types"), schemaDerivedComparison: "unverified" }, null, cleanProvenance);
+    expect(report.result).toBe("incomplete");
+    expect(report.environments.staging.migrationHistory.storedSqlPayloadUnavailable).toBe(2);
+    expect(report.findings.shown.filter((finding) => finding.type === "recorded_sql_mismatch")).toHaveLength(0);
   });
 
   it("marks missing catalog access incomplete rather than equal", () => {

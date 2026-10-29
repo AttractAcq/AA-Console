@@ -1,0 +1,2016 @@
+{
+  "schemaVersion": 1,
+  "migrationSourceDigest": "5ba90cf386e2fe9eeda7d3017d147dbe290990330c5533d83c5b340c763772f4",
+  "generatedTypesSha256": "6d352eeab50241bfe3385302388d7e22ab2726127f1bd58c36ebf295d804334c",
+  "generatedSchemaBodySha256": "ffa219214b84dd782c5dc3b17fae20f41cd75ad1ea8ccdd0190c3993620ef2b6",
+  "localMigrations": [
+    {
+      "version": "20260903104450",
+      "name": "01_foundations_roles_clients",
+      "filename": "20260903104450_01_foundations_roles_clients.sql",
+      "sha256": "37605b4b4b5d857453dae1bb3ae6272d3af9c4cea1a79137fcc1d7e3e2bed1cf",
+      "trimmedMd5": "f68759f9e849c09179638eee07c2fdba"
+    },
+    {
+      "version": "20260903104529",
+      "name": "02_team_and_operations",
+      "filename": "20260903104529_02_team_and_operations.sql",
+      "sha256": "9713b61346e93badcbb16d0df5248a5e4e6fa8723936c8538ca75a3ac71835c2",
+      "trimmedMd5": "4f6181ddecdd6703a9e04800296f873a"
+    },
+    {
+      "version": "20260903104615",
+      "name": "03_agent_registry_and_job_queue",
+      "filename": "20260903104615_03_agent_registry_and_job_queue.sql",
+      "sha256": "5e19476872debd6162a54c0b29a6f054b659937445dc07283d6a4b8c5efe6525",
+      "trimmedMd5": "049b2550882b7d0e9c0d8205c7a27757"
+    },
+    {
+      "version": "20260903104724",
+      "name": "04_intelligence_and_strategy",
+      "filename": "20260903104724_04_intelligence_and_strategy.sql",
+      "sha256": "6075f591975db6f92a07ba7c19a1ea5d093e428ed46799d0be7363394844060b",
+      "trimmedMd5": "05ce44b474016e15ec9d5f76e830ee4e"
+    },
+    {
+      "version": "20260903104816",
+      "name": "05_content_chain_proof_ideas_briefs_media",
+      "filename": "20260903104816_05_content_chain_proof_ideas_briefs_media.sql",
+      "sha256": "b9fb9dfbaea650995a934ae324dd9682277219e640880ab794226177efc78664",
+      "trimmedMd5": "db143cfdb2d9d9026c270f1ec3fd5f40"
+    },
+    {
+      "version": "20260903104850",
+      "name": "06_distribution_conversion_leads",
+      "filename": "20260903104850_06_distribution_conversion_leads.sql",
+      "sha256": "8b9a3db8f47b6d33470e70a68573194db4e95eedd5970c058a19455c22e12cfd",
+      "trimmedMd5": "3f3c0ab915a8a683c9c5c91e17670990"
+    },
+    {
+      "version": "20260903104939",
+      "name": "07_account_and_admin",
+      "filename": "20260903104939_07_account_and_admin.sql",
+      "sha256": "b2c08023de4150af74acf9daf77f6426b036c65a1f39e277af9f0bc5fb3c748e",
+      "trimmedMd5": "0f1fa8a1f0c056b3154e613592a66be5"
+    },
+    {
+      "version": "20260903105011",
+      "name": "08_team_chat_and_storage_buckets",
+      "filename": "20260903105011_08_team_chat_and_storage_buckets.sql",
+      "sha256": "5fd341fe2650d0cc135afe98cb72ecb7a9a94da150cf4df34e039ff8f6285643",
+      "trimmedMd5": "770dfa20e69c2a274c2826e57227d38b"
+    },
+    {
+      "version": "20260903105111",
+      "name": "09_security_hardening",
+      "filename": "20260903105111_09_security_hardening.sql",
+      "sha256": "40bc357f4fbcbc1345ee121571186a386770fdf935eab26347aecfeaa9cea9f0",
+      "trimmedMd5": "4e17581abe6564f8e60f5684202467ec"
+    },
+    {
+      "version": "20260903105157",
+      "name": "09b_rls_auto_enable",
+      "filename": "20260903105157_09b_rls_auto_enable.sql",
+      "sha256": "4670f500046c61767eb1c8339b31996012d15b6a2e072c24fd4e80b6232913de",
+      "trimmedMd5": "1497e0e27bc6ae691bb50d52c2439513"
+    },
+    {
+      "version": "20260903105158",
+      "name": "10_revoke_internal_function_execute",
+      "filename": "20260903105158_10_revoke_internal_function_execute.sql",
+      "sha256": "cae6bfa610a570f84933b69f3506b93858f6856e18a4db9620e53a0e5b34d7d9",
+      "trimmedMd5": "f2950916dc50555666bfccc092d338fc"
+    },
+    {
+      "version": "20260903105742",
+      "name": "11_auth_users_and_role_metadata",
+      "filename": "20260903105742_11_auth_users_and_role_metadata.sql",
+      "sha256": "bc05a27407ee1a5bb760a53e4c7858f4c434aeb1a9a16416fc4572397c245f07",
+      "trimmedMd5": "c6283d8c5f6ccb693c29178822ce6504"
+    },
+    {
+      "version": "20260903105814",
+      "name": "12_dev_open_read_all_tables",
+      "filename": "20260903105814_12_dev_open_read_all_tables.sql",
+      "sha256": "43190a1a50e4e2d5696217a5e7d6f96768cb14612aba7d8fbb2e382e7d5852ca",
+      "trimmedMd5": "634563e9755fdd925fdfc28ef393c5e8"
+    },
+    {
+      "version": "20260904074557",
+      "name": "13_admin_form_rpcs",
+      "filename": "20260904074557_13_admin_form_rpcs.sql",
+      "sha256": "7bfff5c9ba783d587f31d01191a20bcc580526ef8bd70fbb3535e211b4c9f57a",
+      "trimmedMd5": "ef9a246f6f77b004c1d0175aadabb451"
+    },
+    {
+      "version": "20260904080405",
+      "name": "14_campaigns",
+      "filename": "20260904080405_14_campaigns.sql",
+      "sha256": "3d9e4bb2f1b3a9fbdc35c9a36da1e7ed19787a816b1963cb8f4210a31c3bf96c",
+      "trimmedMd5": "58ca77555e18c980a5b93e6e2b85f107"
+    },
+    {
+      "version": "20260904083559",
+      "name": "15_brief_refs_and_job_link",
+      "filename": "20260904083559_15_brief_refs_and_job_link.sql",
+      "sha256": "ac99ef5879033c4122753b9f8f3c3de33c3ab1ae6010040b80acb6bd62f1ebab",
+      "trimmedMd5": "afad9f44cf2d3974e8cf8d5f4bca404d"
+    },
+    {
+      "version": "20260904084217",
+      "name": "16_chat_channel_members",
+      "filename": "20260904084217_16_chat_channel_members.sql",
+      "sha256": "947ad7ed3f88e70635d47ab8957f6628dd87847a1ec2529ea7aab8c882cb451f",
+      "trimmedMd5": "b553b61a35763ad9e6d1e51f7f696ecd"
+    },
+    {
+      "version": "20260904090246",
+      "name": "17_stamp_human_authored_records",
+      "filename": "20260904090246_17_stamp_human_authored_records.sql",
+      "sha256": "d66f61c5fa69dd8e30885b6526d64fa254600d474a6b8601e8fe05d3dc3ff430",
+      "trimmedMd5": "175fa3c94e2dd9a88e652744c30e2549"
+    },
+    {
+      "version": "20260904094221",
+      "name": "18_rls_lockdown",
+      "filename": "20260904094221_18_rls_lockdown.sql",
+      "sha256": "f6ab6859d26a77fac7af599982f020dd6405432104306213b6764876b6960857",
+      "trimmedMd5": "9768ee3edac31f75b239ce6d2a236be8"
+    },
+    {
+      "version": "20260904094627",
+      "name": "19_narrow_employee_client_scope",
+      "filename": "20260904094627_19_narrow_employee_client_scope.sql",
+      "sha256": "1785988a363fcd225d70953c3102204e7016f64ceb20b16c68918127f78143d2",
+      "trimmedMd5": "1c6615a77f45fc9310ac4bcafdf5e667"
+    },
+    {
+      "version": "20260904182724",
+      "name": "20_job_status_add_claimed",
+      "filename": "20260904182724_20_job_status_add_claimed.sql",
+      "sha256": "20f2a3ea07c8883289c85800ba4beeaf4054b5f6f7d4e0d0794f2c9a46723022",
+      "trimmedMd5": "a670f328179e59e0a421f25c8845d0ca"
+    },
+    {
+      "version": "20260904182810",
+      "name": "21_agent_runtime_claim_protocol",
+      "filename": "20260904182810_21_agent_runtime_claim_protocol.sql",
+      "sha256": "e83ee1757893a5714b69818c9b40a9cc95e3250d74de2dc504626ebaaddd0af6",
+      "trimmedMd5": "526ee33edb1929934d6a9de73723d07a"
+    },
+    {
+      "version": "20260904185839",
+      "name": "22_records_unique_nulls_not_distinct",
+      "filename": "20260904185839_22_records_unique_nulls_not_distinct.sql",
+      "sha256": "dfd6e7130d30163fd40142a31da7a05b44e956fea6afbaa4c0a548fc0f11bc00",
+      "trimmedMd5": "501983122f2ed0e835d9800cfe860319"
+    },
+    {
+      "version": "20260904203418",
+      "name": "23_idea_provenance_fields",
+      "filename": "20260904203418_23_idea_provenance_fields.sql",
+      "sha256": "c33e1f427719ceaabb6bdd0aaeaf7a6308b438e69d66314d33e5f8d16fb8fc42",
+      "trimmedMd5": "75a3e0dd45d8d7c08ea3839bb266191a"
+    },
+    {
+      "version": "20260905072418",
+      "name": "24_agents_archived_at",
+      "filename": "20260905072418_24_agents_archived_at.sql",
+      "sha256": "e08cfa028eeb77d4bc06c6042727b69212383561af0bdd129d555e55122b5ae8",
+      "trimmedMd5": "b4b774083dff072d0efcca603574ab62"
+    },
+    {
+      "version": "20260905072837",
+      "name": "25_master_run_and_claim_gate",
+      "filename": "20260905072837_25_master_run_and_claim_gate.sql",
+      "sha256": "eaa26a689d716620f31fbec34f5d9b3d91179fc3fe2a8680c6f91e0042d21625",
+      "trimmedMd5": "c88bdc21681f4519a0852d0a520343e9"
+    },
+    {
+      "version": "20260905074110",
+      "name": "26_record_domain_add_proof",
+      "filename": "20260905074110_26_record_domain_add_proof.sql",
+      "sha256": "4f37f134337ab05e105f1a24a1eadf256f75b81224077f0f1cdf3848a40c6030",
+      "trimmedMd5": "4346d3edd8169c9165073dca4eeb860f"
+    },
+    {
+      "version": "20260905074218",
+      "name": "27_core_question_templates",
+      "filename": "20260905074218_27_core_question_templates.sql",
+      "sha256": "a8ae1aa7f75975aab0381f32f8997123987bd612c6cea6cb6154c6857b29e48b",
+      "trimmedMd5": "c6139c722c7050bd690d8b522f49dd65"
+    },
+    {
+      "version": "20260905075012",
+      "name": "28_employee_past_client_identity",
+      "filename": "20260905075012_28_employee_past_client_identity.sql",
+      "sha256": "0dccdd8e2fce74fd32ceda407b11012e14453728712686a1d0da6238aeba75e2",
+      "trimmedMd5": "401da1fbdd73be8ce4cfced7e8e6ee18"
+    },
+    {
+      "version": "20260905081711",
+      "name": "29_master_ai",
+      "filename": "20260905081711_29_master_ai.sql",
+      "sha256": "edd6f5b672f51acd0e6951b5341a6d3884eb6738611294ab0daeb8907385cc1f",
+      "trimmedMd5": "d0790c533c6f404f8817d9ac14a5919a"
+    },
+    {
+      "version": "20260905082029",
+      "name": "30_master_ai_describe_table",
+      "filename": "20260905082029_30_master_ai_describe_table.sql",
+      "sha256": "282d9dd45c9da8f238bb57d46fc026aff32a81f939aa58da6fda0023f5224f24",
+      "trimmedMd5": "06a846dfba68c91a22cb4824a473ad25"
+    },
+    {
+      "version": "20260905083244",
+      "name": "31_master_ai_enqueue_as_actor",
+      "filename": "20260905083244_31_master_ai_enqueue_as_actor.sql",
+      "sha256": "fd124c788a1293245fbfcb6acfa2c492225c44f42944e6dd5ff2b59cd999a8a4",
+      "trimmedMd5": "c9ed9cab80f0d53b3533b4d2461e6abf"
+    },
+    {
+      "version": "20260905090029",
+      "name": "32_metrics_ingest_foundations",
+      "filename": "20260905090029_32_metrics_ingest_foundations.sql",
+      "sha256": "a36e6d115bb44d421d3f0473c6d687fd1eae52374b244c76c9dceccc9f8f1b66",
+      "trimmedMd5": "6e4fe4fefbadc09ab0531be796716a57"
+    },
+    {
+      "version": "20260905090122",
+      "name": "33_metrics_basis_and_currency",
+      "filename": "20260905090122_33_metrics_basis_and_currency.sql",
+      "sha256": "24c8b9cbaf380696018508de197c4c9964232653d2b2ef83c62b2d92da878e6a",
+      "trimmedMd5": "93c2b39cbc3cc98783a7112f7839bc09"
+    },
+    {
+      "version": "20260905091424",
+      "name": "34_ingest_toggle_and_schedule",
+      "filename": "20260905091424_34_ingest_toggle_and_schedule.sql",
+      "sha256": "1630c08cdbc8053da21bfa55779c51ebf473a30f206490a159062ff2c88575fb",
+      "trimmedMd5": "c177614469c358c5a4bbbafbd5f42117"
+    },
+    {
+      "version": "20260905091525",
+      "name": "35_ingest_provider_per_surface",
+      "filename": "20260905091525_35_ingest_provider_per_surface.sql",
+      "sha256": "20b65195bf625cae16c0c1636248b0115e8970c68cdb47b7f6302d7d4da39bad",
+      "trimmedMd5": "4498d6bbaf6f5ebb23c942524883961f"
+    },
+    {
+      "version": "20260905092059",
+      "name": "36_record_domain_add_reporting",
+      "filename": "20260905092059_36_record_domain_add_reporting.sql",
+      "sha256": "42aa2acaf5448ad492b6e89513e598a8dbe51fc61edcf76baeeb31c5ab07c062",
+      "trimmedMd5": "4be404ae30a90d9a0159b84c24257833"
+    },
+    {
+      "version": "20260905092132",
+      "name": "37_reporting_commentary_agent",
+      "filename": "20260905092132_37_reporting_commentary_agent.sql",
+      "sha256": "f8e6f3addff78f710eca006e1a2ee6e33738513abb3360d9a3466c29e206643d",
+      "trimmedMd5": "6c6a47712871da5e8072d5350a54bcfe"
+    },
+    {
+      "version": "20260905092355",
+      "name": "38_metrics_period_summary",
+      "filename": "20260905092355_38_metrics_period_summary.sql",
+      "sha256": "02246267849a724b1925e054a3c8c9b06793dfc5844405be70c8ee1f5ba4cf0f",
+      "trimmedMd5": "7a06d1bfb6ebb9621744e96d13ae2189"
+    },
+    {
+      "version": "20260905131703",
+      "name": "39_brief_build_pipeline",
+      "filename": "20260905131703_39_brief_build_pipeline.sql",
+      "sha256": "0ae0dfbf15eeac381821536938b251b6cb9862030b123393152f83e2b536824c",
+      "trimmedMd5": "15d1d3df508ce9d7c224ba458d4fc106"
+    },
+    {
+      "version": "20260905131958",
+      "name": "40_brief_build_rpcs",
+      "filename": "20260905131958_40_brief_build_rpcs.sql",
+      "sha256": "c1b8904ae1f7a0d0ef98ba109286c9ea8fa15ffc2f9184ad934d3cfe09d17ddf",
+      "trimmedMd5": "bfb3c8aef134cb37676dc61293ad9402"
+    },
+    {
+      "version": "20260905134322",
+      "name": "41_creative_reference_image",
+      "filename": "20260905134322_41_creative_reference_image.sql",
+      "sha256": "56492fb33158fc048ef52f6f53b4bf7947558a33c51bc1d3f8c4a81a265f9ca5",
+      "trimmedMd5": "371ba144bac0eb80817fbd713c7a2d0d"
+    },
+    {
+      "version": "20260905143029",
+      "name": "42_creative_renders",
+      "filename": "20260905143029_42_creative_renders.sql",
+      "sha256": "d2d03c05a8d1c901c6f9554044db5835f104938bcf6faab3ac53e6154b72b7f3",
+      "trimmedMd5": "44b157ccba1204914548cb4c1622018e"
+    },
+    {
+      "version": "20260905143101",
+      "name": "43_render_rpcs",
+      "filename": "20260905143101_43_render_rpcs.sql",
+      "sha256": "24301036a98a5a1f906db91968d9dd999dbf22115c29d2964429f6372be15c64",
+      "trimmedMd5": "96fc05e6ad61cc59b9afbc614e09fe31"
+    },
+    {
+      "version": "20260905144645",
+      "name": "44_revoke_anon_channel_member",
+      "filename": "20260905144645_44_revoke_anon_channel_member.sql",
+      "sha256": "13173fa7165d680871b25629f96c8ea38ec9cc98ea27b04739101692b1e68eb9",
+      "trimmedMd5": "dc0a7840ed90a4bfdd4870f8dd930b99"
+    },
+    {
+      "version": "20260905144707",
+      "name": "45_revoke_public_channel_member",
+      "filename": "20260905144707_45_revoke_public_channel_member.sql",
+      "sha256": "3285ef5906a13741f6c0aad5cd5fff75c003b0697e223a6731d881b7cc114906",
+      "trimmedMd5": "2fcc8673eefcd722521da199fb2f96e7"
+    },
+    {
+      "version": "20260906192716",
+      "name": "46_my_account_team",
+      "filename": "20260906192716_46_my_account_team.sql",
+      "sha256": "edcc0601d6bfdb80419bbc28925f0cf73b080c778b2df676c25d183b7aef3b40",
+      "trimmedMd5": "9c4e0df66aec8bba6f9ff23b3208cc95"
+    },
+    {
+      "version": "20260906194104",
+      "name": "47_chat_participants",
+      "filename": "20260906194104_47_chat_participants.sql",
+      "sha256": "ad1e45c4acb650269882220d3d973bbcf2e19cf806702e87a05a78beaaa68e23",
+      "trimmedMd5": "0cb9428345f105969f6e9a1eed5f7a98"
+    },
+    {
+      "version": "20260906195846",
+      "name": "48_client_identity_assets",
+      "filename": "20260906195846_48_client_identity_assets.sql",
+      "sha256": "d9c9c81588bec860235bcdf2c77cd66c13358c53a13414a4c4f5739b0e0e968a",
+      "trimmedMd5": "c5fed0c7a080c19def962cf7a881ecdf"
+    },
+    {
+      "version": "20260906200228",
+      "name": "49_client_contact_details",
+      "filename": "20260906200228_49_client_contact_details.sql",
+      "sha256": "61a1cc6a04ecc743c9b96c8a2255acac4a4f3b173545d24a3382a1b530c8bb1e",
+      "trimmedMd5": "f93720f5dfe0848352881c4200411f50"
+    },
+    {
+      "version": "20260906202513",
+      "name": "50_job_terminal_flag",
+      "filename": "20260906202513_50_job_terminal_flag.sql",
+      "sha256": "a1f90b49cb78e7d72018cf5999804ef10c4bbdc3d0e231239d65698b0b883e0d",
+      "trimmedMd5": "da3190b56fb1ae69167893c887a0b1d2"
+    },
+    {
+      "version": "20260906203623",
+      "name": "51_review_trail_visible_and_drop_dead_audit",
+      "filename": "20260906203623_51_review_trail_visible_and_drop_dead_audit.sql",
+      "sha256": "373e75831cd772c0fbbc1c29b3953e34417ec56df7d62808ef8327bb68483a70",
+      "trimmedMd5": "5fff5ed62e5f5d54addd75c5fb8edfc8"
+    },
+    {
+      "version": "20260907090000",
+      "name": "52_master_ai_spend",
+      "filename": "20260907090000_52_master_ai_spend.sql",
+      "sha256": "643d99d8c3b211619790a77b6adac6918db821c852850300fa937f6e64ddc1c8",
+      "trimmedMd5": "cd5a27ae47c30a2e9472a8fbb8c9b5f3"
+    },
+    {
+      "version": "20260907130000",
+      "name": "53_client_brand_profiles",
+      "filename": "20260907130000_53_client_brand_profiles.sql",
+      "sha256": "a0b4edaf9e2dd8cdcb4bd558ecfdf25eeaa744d2c1fe17ed9b2d0b17fdb743ec",
+      "trimmedMd5": "046cfb5f90fa779d8e79753e6a5a33fd"
+    },
+    {
+      "version": "20260907150000",
+      "name": "54_agents_requires_input",
+      "filename": "20260907150000_54_agents_requires_input.sql",
+      "sha256": "aaf8947f41db6ea2d4014ab760a660b6164bbcc7e695011ec4675c22577f9e04",
+      "trimmedMd5": "2ce7d9c381a13a626be5905b4b59b36f"
+    },
+    {
+      "version": "20260907170000",
+      "name": "55_structured_briefs",
+      "filename": "20260907170000_55_structured_briefs.sql",
+      "sha256": "b9891440dd5fe651d6ff07958d58c967ec269acf5ea6c4e9c72de959464833f6",
+      "trimmedMd5": "792d1110f195484f731b845fb20e5c50"
+    },
+    {
+      "version": "20260907190000",
+      "name": "56_repurposing",
+      "filename": "20260907190000_56_repurposing.sql",
+      "sha256": "dc3a42090a302e37b4a75f2ee6be34a32fcddf84131f105980e276ec56561ad3",
+      "trimmedMd5": "7c4ce5777b91b1cf496b878c09166146"
+    },
+    {
+      "version": "20260907210000",
+      "name": "57_structured_proof",
+      "filename": "20260907210000_57_structured_proof.sql",
+      "sha256": "29078fbf0d7cd50d95c42a8153a9057a00dedd9597c6ecc43466288a8c16a8cb",
+      "trimmedMd5": "7fa50a1c0aad9f669c87415126a5e7d1"
+    },
+    {
+      "version": "20260907230000",
+      "name": "58_proof_discovery",
+      "filename": "20260907230000_58_proof_discovery.sql",
+      "sha256": "c92e4f36c334c589da8fff2e013be5603c78ea6cc74c3363b2d180ede6b6658d",
+      "trimmedMd5": "ec7e6d0581eb182c0d30d18f52a5954a"
+    },
+    {
+      "version": "20260908010000",
+      "name": "59_page_html",
+      "filename": "20260908010000_59_page_html.sql",
+      "sha256": "101ea7f4d4b6f25344215a8e34ea36d350e877e63fc009c554485fa44eafd748",
+      "trimmedMd5": "bc8fc27f9e3d8a2d860f9ed9260aabae"
+    },
+    {
+      "version": "20260908030000",
+      "name": "60_revenue_pipeline",
+      "filename": "20260908030000_60_revenue_pipeline.sql",
+      "sha256": "66858e8310c429314120f6469e9d3444f5cb1b51dffc478a6fb48f6374e079e3",
+      "trimmedMd5": "d9be0b9a1b192804b3442bb9a5d4426c"
+    },
+    {
+      "version": "20260908040000",
+      "name": "61_lead_operations",
+      "filename": "20260908040000_61_lead_operations.sql",
+      "sha256": "10b71666299c7eba378358fa7f05e9fc56a20df90d7a7d7af05238f3350fb01f",
+      "trimmedMd5": "463ff45b591d813ff1f08a38b8d5191c"
+    },
+    {
+      "version": "20260908060000",
+      "name": "62_attribution",
+      "filename": "20260908060000_62_attribution.sql",
+      "sha256": "4eb2aa127fd29e4cdef468cb4571445de4ee9fd06e5c2f2c728eeeb5348d3fb9",
+      "trimmedMd5": "b5a5102455726c0c5890772e5146ec48"
+    },
+    {
+      "version": "20260908080000",
+      "name": "63_mcp_brief_enqueue",
+      "filename": "20260908080000_63_mcp_brief_enqueue.sql",
+      "sha256": "525db97466e52487b8efeac9b7ef8cb37897feedf90044443e0c71cbe13f25e3",
+      "trimmedMd5": "39d2a55b9eac8e04dd25f65e4e1fdde5"
+    },
+    {
+      "version": "20260908080100",
+      "name": "64_brief_job_idempotency",
+      "filename": "20260908080100_64_brief_job_idempotency.sql",
+      "sha256": "0284755ca4c5b4dca3e599b358c6388e76efe73f2c98bdab50c1f78caa76d3d5",
+      "trimmedMd5": "0721970e1c0dd3ae695fb9417713c385"
+    },
+    {
+      "version": "20260908190000",
+      "name": "65_mcp_bot_auth_registry",
+      "filename": "20260908190000_65_mcp_bot_auth_registry.sql",
+      "sha256": "a2c3e3524f17682afe7774966d64d2168ca331bd649228784337fc99e1ac6649",
+      "trimmedMd5": "94d738f4e32fe0e98c72cf0a42e387a7"
+    },
+    {
+      "version": "20260908192515",
+      "name": "67_sales_agents",
+      "filename": "20260908192515_67_sales_agents.sql",
+      "sha256": "f8aa24694c790100b2a9fdff7f252bfba0f2e91d73309b2d42e78f4c83bc315a",
+      "trimmedMd5": "85b43e3c41aa6bd8c26406f6995baf9b"
+    },
+    {
+      "version": "20260908200000",
+      "name": "66_mcp_domain_rls_bot_isolation",
+      "filename": "20260908200000_66_mcp_domain_rls_bot_isolation.sql",
+      "sha256": "cfdb6dfe3d7d24629a0385eb359026f5efa5a3983a7ee426cfe10677ff5f3105",
+      "trimmedMd5": "c12e165a0606a98aee045922a6a6f646"
+    },
+    {
+      "version": "20260908230000",
+      "name": "68_mcp_production_manager",
+      "filename": "20260908230000_68_mcp_production_manager.sql",
+      "sha256": "15174f61a517c94b77e33d3cb6ffd679b614cb23e884d4054fbf1011ece172f5",
+      "trimmedMd5": "c2a930b87b39540f520acbe8050cade3"
+    },
+    {
+      "version": "20260908240000",
+      "name": "69_mcp_phase5_read_rpc_volatile",
+      "filename": "20260908240000_69_mcp_phase5_read_rpc_volatile.sql",
+      "sha256": "c376c32ce2f079c30a0021b0cfc65f413374703cbc82d9c1e8e8d93fdd87abbc",
+      "trimmedMd5": "33a2e5c2c7ef3d0ccec8885e488fea19"
+    },
+    {
+      "version": "20260909000000",
+      "name": "70_mcp_approval_engine",
+      "filename": "20260909000000_70_mcp_approval_engine.sql",
+      "sha256": "9adfb6e6974fbaff35bfb34e397ac9fccabfcef0eaed523a9de3be01d42e7776",
+      "trimmedMd5": "74940b95a4eaad39e48cf5b85ce7bfbf"
+    },
+    {
+      "version": "20260909010000",
+      "name": "71_mcp_client_delivery",
+      "filename": "20260909010000_71_mcp_client_delivery.sql",
+      "sha256": "2b39931fef40c7ba67a04eba5a96e05b7f95fb71d83d0d9a4d766945131edb7b",
+      "trimmedMd5": "e021fa51013e63f1d3f55b540798bedb"
+    },
+    {
+      "version": "20260909020000",
+      "name": "72_campaign_execution",
+      "filename": "20260909020000_72_campaign_execution.sql",
+      "sha256": "c171eeaf84e51ab4b198f1ae5ec17f74c89aff3ec95bf5a9388c23378425d612",
+      "trimmedMd5": "fd14ba2c7b97c42c1bf57f0ada30a236"
+    },
+    {
+      "version": "20260909020100",
+      "name": "72_mcp_cos_orchestration",
+      "filename": "20260909020100_72_mcp_cos_orchestration.sql",
+      "sha256": "527b5078609d789b35f4db6a2da9824c93b250c9ffb385c9232d5bf367fde630",
+      "trimmedMd5": "e354d507e3b6a6d0d33ed42c7f852eea"
+    },
+    {
+      "version": "20260909030000",
+      "name": "73_mcp_marketing_director",
+      "filename": "20260909030000_73_mcp_marketing_director.sql",
+      "sha256": "c4b705f327392fce3ced63345e435e3ee1ded0338843cdb0a61b4626ce2f56fb",
+      "trimmedMd5": "df9586c0aca6f86123af3631fec9d2fd"
+    },
+    {
+      "version": "20260909040000",
+      "name": "74_mcp_production_bot_decide",
+      "filename": "20260909040000_74_mcp_production_bot_decide.sql",
+      "sha256": "67bbc315ad383aeb398a182b312d2a6619a6a285cd750d8115459cd0b3c32091",
+      "trimmedMd5": "63b9c79b518d384746da25e9f08cd600"
+    },
+    {
+      "version": "20260909050000",
+      "name": "75_mcp_distribution_manager",
+      "filename": "20260909050000_75_mcp_distribution_manager.sql",
+      "sha256": "1b95a27aef671c745a62a53f4c5a7d793a859506236cf7f0b4ba0330cd75fa5a",
+      "trimmedMd5": "3ec8d5081676cc22e5d4208e2bc844ce"
+    },
+    {
+      "version": "20260909105749",
+      "name": "72_campaign_execution_history_compat",
+      "filename": "20260909105749_72_campaign_execution_history_compat.sql",
+      "sha256": "afdb8a5755712cdfbbf216f38866227e4ad4c31bda99bcefa6cc86a7708550c0",
+      "trimmedMd5": "257338595de9639b38055a6a99c24e2d"
+    },
+    {
+      "version": "20260910000000",
+      "name": "76_mcp_sales_ops",
+      "filename": "20260910000000_76_mcp_sales_ops.sql",
+      "sha256": "1f9d21c4038aef8673b203b555b83c99920511dfa7b450be775f67f52378885b",
+      "trimmedMd5": "2b7ef45428932f97ec2a376a0ba1ab45"
+    },
+    {
+      "version": "20260910010000",
+      "name": "77_campaign_content_ideas",
+      "filename": "20260910010000_77_campaign_content_ideas.sql",
+      "sha256": "0fa15af7792eb996155bcf380859cea16439c003268549774ffbdf0d7d4fe2f0",
+      "trimmedMd5": "89eabb73126841099cbdcca4a5863f9c"
+    },
+    {
+      "version": "20260911205529",
+      "name": "79_client_marketing_spend",
+      "filename": "20260911205529_79_client_marketing_spend.sql",
+      "sha256": "04222893244d5645964c89d443c8330d466eec1a7b0b143b8173e05fe1628727",
+      "trimmedMd5": "4dd99b8134218217436060243f2cb151"
+    },
+    {
+      "version": "20260911210000",
+      "name": "78_mcp_admin_calendar",
+      "filename": "20260911210000_78_mcp_admin_calendar.sql",
+      "sha256": "ecf9d8722d8116eb538e4a6c7087425b9508b28099d25a48f6ba17b811b7a569",
+      "trimmedMd5": "99d8a4f791d843457ceadf590280e3a7"
+    },
+    {
+      "version": "20260912000000",
+      "name": "80_site_deployment",
+      "filename": "20260912000000_80_site_deployment.sql",
+      "sha256": "4b9ffff6da7aab4e14c0ebe4492c459af3b6674089bf4edde3ad92cfc8b21129",
+      "trimmedMd5": "dc5156aab8a3f253ed4984c81f8a8b85"
+    },
+    {
+      "version": "20260912010000",
+      "name": "81_page_publishing",
+      "filename": "20260912010000_81_page_publishing.sql",
+      "sha256": "aa34976574a6910527cb3da84121943a517c291d4c61b7a78494855e3168933a",
+      "trimmedMd5": "5c0cdfea44ccce41be12fdb4a4595c0c"
+    },
+    {
+      "version": "20260913000000",
+      "name": "82_page_revisions",
+      "filename": "20260913000000_82_page_revisions.sql",
+      "sha256": "d50eb538dfc1a0a910d60faa85020266f22d4e6e9380b03e775cc3054406dcdd",
+      "trimmedMd5": "27e5858ecf6fa4d4ccbd09d7f71c1be2"
+    },
+    {
+      "version": "20260913010000",
+      "name": "83_page_polish_agents",
+      "filename": "20260913010000_83_page_polish_agents.sql",
+      "sha256": "58d5d62f2580329c11af257defa2a4878794c587df53580f5e544911c3a7af8c",
+      "trimmedMd5": "68b0f091146c3396cd4a416bb5e7ba9e"
+    },
+    {
+      "version": "20260915120000",
+      "name": "84_mcp_sales_agent_factory",
+      "filename": "20260915120000_84_mcp_sales_agent_factory.sql",
+      "sha256": "2b452666e36854338567020047305e4a72047f3663b90aa3b240d7680bbf3e4c",
+      "trimmedMd5": "0f986c7ed4e726f822b9a41c9bcce86f"
+    },
+    {
+      "version": "20260915180000",
+      "name": "85_mcp_finance_controller",
+      "filename": "20260915180000_85_mcp_finance_controller.sql",
+      "sha256": "a9485debfb531e12c06e1ffb9be809b051a3e60b6b2c14b46c4db0a85e9ca09d",
+      "trimmedMd5": "f463cede5c81eb4e415f6ccfa4342445"
+    },
+    {
+      "version": "20260915200000",
+      "name": "86_mcp_engineering_ops",
+      "filename": "20260915200000_86_mcp_engineering_ops.sql",
+      "sha256": "5f8e0519f2aa046b008be949cfed603fe76e5fbbf9ae9cefcf1adb03964f386f",
+      "trimmedMd5": "2b8790e6ed149e0370a84abc4b5363be"
+    },
+    {
+      "version": "20260915220000",
+      "name": "87_mcp_security_devops",
+      "filename": "20260915220000_87_mcp_security_devops.sql",
+      "sha256": "a5ea5713ae7673952df385e2d4ce6f60f5039f1ec7fddac0320c47b7e239fc2d",
+      "trimmedMd5": "9c28320913b32b2a3696dcc289c97147"
+    },
+    {
+      "version": "20260916000000",
+      "name": "88_campaign_build_one",
+      "filename": "20260916000000_88_campaign_build_one.sql",
+      "sha256": "420adbcb2caf0b1853b41791e85d3ebc343ff78d19e6e57c3788b1a41a58e1c5",
+      "trimmedMd5": "cd7c7b3eb894cd2491e5a5db8bb98036"
+    },
+    {
+      "version": "20260916130000",
+      "name": "89_mcp_conversion_campaign",
+      "filename": "20260916130000_89_mcp_conversion_campaign.sql",
+      "sha256": "70da5ba4c2c025c0a15f3b4caf508fe1a41422f3ae5f5f6770dd0e7f95ada829",
+      "trimmedMd5": "59f83de07100066b91f1965bca8172a0"
+    },
+    {
+      "version": "20260916140000",
+      "name": "90_mcp_sales_proof_production",
+      "filename": "20260916140000_90_mcp_sales_proof_production.sql",
+      "sha256": "9a17d4fa3ab80b8de49fb54c4d5faca5ba1c2dbe65a273b442ba2e2dce8865db",
+      "trimmedMd5": "385bf107bcc132a32bad08f6250af368"
+    },
+    {
+      "version": "20260916150000",
+      "name": "91_mcp_attribution_brand_sites",
+      "filename": "20260916150000_91_mcp_attribution_brand_sites.sql",
+      "sha256": "dab823086445ca23366143e1d862f11d9f8e780985ae1c5addb9ebd47cab66d5",
+      "trimmedMd5": "e3eec7133f56cea678d135ac6e615dd3"
+    },
+    {
+      "version": "20260916170000",
+      "name": "92_team_member_contract_profile",
+      "filename": "20260916170000_92_team_member_contract_profile.sql",
+      "sha256": "142d0848270b5093c681e6217753871f1ce8beaceda67f97785e0c7da966f90b",
+      "trimmedMd5": "3b46213679459639d8beb335dd5bf5c0"
+    },
+    {
+      "version": "20260916180000",
+      "name": "93_assign_production_ai_render",
+      "filename": "20260916180000_93_assign_production_ai_render.sql",
+      "sha256": "76158f515af1096705951c117fe2d6d0fc6df7087ede548cdd06ff5921cf5a2e",
+      "trimmedMd5": "803d52e03eabc126a805ea13f9036de2"
+    },
+    {
+      "version": "20260917000000",
+      "name": "94_team_recruitment",
+      "filename": "20260917000000_94_team_recruitment.sql",
+      "sha256": "30d135c5857c7a39bae4d561eb5f8bd4f40ec4c6a50d4011cfec4fc57884627c",
+      "trimmedMd5": "f61002918cd8508dd560043c7a9fd4b2"
+    },
+    {
+      "version": "20260919000000",
+      "name": "89_delete_recruitment_ad",
+      "filename": "20260919000000_89_delete_recruitment_ad.sql",
+      "sha256": "c295fafb3a65d154b2772dc9c814ba5986231aa799cb18704afe4ff41ed71d12",
+      "trimmedMd5": "2ec4aad753d9ecbd6732229293ce0533"
+    },
+    {
+      "version": "20260919010000",
+      "name": "90_recruitment_page_type",
+      "filename": "20260919010000_90_recruitment_page_type.sql",
+      "sha256": "c1b8a14751c7ceb203f5389b4ad35e3e1cabcfac5266b1e57ae7778641a1ce32",
+      "trimmedMd5": "77de350c3984037a5e22d69c167be528"
+    },
+    {
+      "version": "20260919020000",
+      "name": "91_page_reference_asset",
+      "filename": "20260919020000_91_page_reference_asset.sql",
+      "sha256": "830c96ddb94743f205cd00b44937b3e2d520df42201847702e85b576315fb446",
+      "trimmedMd5": "66d3a50c00c8c5529d44c2efa09e0777"
+    },
+    {
+      "version": "20260919180000",
+      "name": "95_video_dual_briefs",
+      "filename": "20260919180000_95_video_dual_briefs.sql",
+      "sha256": "7f529112f1c04545829dcc2421a452f791f3561ac37078a4b4947b5c0b8cadc2",
+      "trimmedMd5": "eb4a24bb3e9854fbd32f6b5ca268faf9"
+    },
+    {
+      "version": "20260920120000",
+      "name": "96_campaign_templates",
+      "filename": "20260920120000_96_campaign_templates.sql",
+      "sha256": "0fc9867c4c711460b56f8d08cd7172a8aa9afe7b7481d430100fb44d2aa7a1e9",
+      "trimmedMd5": "21d856954ea4586d6c01f8124ae2d9a4"
+    },
+    {
+      "version": "20260920140000",
+      "name": "97_ad_creative_copy",
+      "filename": "20260920140000_97_ad_creative_copy.sql",
+      "sha256": "da30cf9831a4037e836224b2fde410e231e7922b6a4a1c5d0fe538822dbbd3eb",
+      "trimmedMd5": "7ac5aa62650c1b0af35d52e5dcf45488"
+    },
+    {
+      "version": "20260920150000",
+      "name": "98_meta_object_ids",
+      "filename": "20260920150000_98_meta_object_ids.sql",
+      "sha256": "d9615e02eb2b9170d0d991987d64a11b1a263ee8914841044c07874a6c7bc736",
+      "trimmedMd5": "9882ee95d5aeb59c962d7a31b9ae1381"
+    },
+    {
+      "version": "20260920160000",
+      "name": "99_scheduled_post_platform",
+      "filename": "20260920160000_99_scheduled_post_platform.sql",
+      "sha256": "7d070d15b2f1be84f8ced240417f149fd5f641f08918596c22d6a91e420c8354",
+      "trimmedMd5": "4cd7e5356c2d6f24cb7a9d47adeedccb"
+    },
+    {
+      "version": "20260920170000",
+      "name": "100_ad_account_id",
+      "filename": "20260920170000_100_ad_account_id.sql",
+      "sha256": "dcd7043f9c47b6546cb82139f7693903917902dd81f599dc84c1dbda3349de7b",
+      "trimmedMd5": "8313373d7e28f809001c277ec92757cb"
+    },
+    {
+      "version": "20260920180000",
+      "name": "101_campaign_feeds_from",
+      "filename": "20260920180000_101_campaign_feeds_from.sql",
+      "sha256": "355ab44ba1b669c7645e5f38fed0631fbe623d3db795f74d1742f2f21ef4e3c2",
+      "trimmedMd5": "a6fed10b51a2f5727bce852af5c17baa"
+    },
+    {
+      "version": "20260920190000",
+      "name": "102_content_pillars",
+      "filename": "20260920190000_102_content_pillars.sql",
+      "sha256": "7e469d8b03438a97702150ccf5ec642c3f8ee7f1f5367f8d68de70dcdc0496d8",
+      "trimmedMd5": "8f17b6439f2fc6550c76e90970fb7402"
+    },
+    {
+      "version": "20260920200000",
+      "name": "103_idea_source_pillar",
+      "filename": "20260920200000_103_idea_source_pillar.sql",
+      "sha256": "c7474a5a4aa5bf7ba102b9e8b9a0d899cc4fdf4b8a2d2b684aaf3fb26d92d3d3",
+      "trimmedMd5": "cb4e25bf36e29be204695c385aefea2f"
+    },
+    {
+      "version": "20260920210000",
+      "name": "104_campaign_pillars",
+      "filename": "20260920210000_104_campaign_pillars.sql",
+      "sha256": "faf3c6885368b6e2e757bc541d56c3f76d339eba68006f0ec4e7bb18d4c3caa4",
+      "trimmedMd5": "ce7f80818d556e702582b40ddfe9f3e0"
+    },
+    {
+      "version": "20260920220000",
+      "name": "105_human_approval_gate",
+      "filename": "20260920220000_105_human_approval_gate.sql",
+      "sha256": "95806abbe2f28676da327122b387e8f1e53ae432405abdecda93da575fcd058e",
+      "trimmedMd5": "e1f0489df0c87717849e4c3cdd5e2826"
+    },
+    {
+      "version": "20260920230000",
+      "name": "106_remake_rejected_asset",
+      "filename": "20260920230000_106_remake_rejected_asset.sql",
+      "sha256": "d33622f04963956dc57278ddb76603a14195c53bc5f14f9f8e77852ea8b54bf1",
+      "trimmedMd5": "036294a59fe6c37e37f33c9ac90659df"
+    },
+    {
+      "version": "20260920240000",
+      "name": "107_asset_decision_recorded",
+      "filename": "20260920240000_107_asset_decision_recorded.sql",
+      "sha256": "c1ce9d394b61caabc590979d149dcaf1ccc3f3bbda60863f822fd3cd9a933102",
+      "trimmedMd5": "f3f02ddea88fc63b14485ee4934adc13"
+    },
+    {
+      "version": "20260921000000",
+      "name": "108_regenerate_asset",
+      "filename": "20260921000000_108_regenerate_asset.sql",
+      "sha256": "466085c63ef8bd08cc404032a65d277bc7e7063d8bb079f75c2a00e660a39245",
+      "trimmedMd5": "a56682f293ba10e6e7d190884ad8a8c9"
+    },
+    {
+      "version": "20260921010000",
+      "name": "109_content_formats",
+      "filename": "20260921010000_109_content_formats.sql",
+      "sha256": "abea468ad54934654b43e4377c104803bcf734661767dcc7cc7fc7df3032d98a",
+      "trimmedMd5": "7814ec3a31f2c40cf8ce039f383d1163"
+    },
+    {
+      "version": "20260921020000",
+      "name": "110_save_framed_asset",
+      "filename": "20260921020000_110_save_framed_asset.sql",
+      "sha256": "6d962fba87a37b8d7f9a06cd8335fc7cf590c9c08b260df3746fec2c1fc01501",
+      "trimmedMd5": "dc3bd85e6b1253dfcaf89a368b570c8d"
+    },
+    {
+      "version": "20260921030000",
+      "name": "111_idea_content_format",
+      "filename": "20260921030000_111_idea_content_format.sql",
+      "sha256": "0515f314d5c25a941faf230d5b6b1c26d7d3a6de75a841e0692e6aa7bcf20342",
+      "trimmedMd5": "4cd2634180d3bda5526f71e09de06b0f"
+    },
+    {
+      "version": "20260921040000",
+      "name": "112_format_fits_media",
+      "filename": "20260921040000_112_format_fits_media.sql",
+      "sha256": "3fe33980e8bbf565f76c4ff84115e4474faa2e181a11a8aa0fa8eccaeffcfdae",
+      "trimmedMd5": "ab13f1d2999608d14537ff9c5789fe4f"
+    },
+    {
+      "version": "20260921050000",
+      "name": "113_brief_frame_plan",
+      "filename": "20260921050000_113_brief_frame_plan.sql",
+      "sha256": "6a7f78ca15946a8385c9b1a41f63e00965719a91090f20c4c2439c04fa663656",
+      "trimmedMd5": "faa2523f59dbb9df05cb7bed1017ec8f"
+    },
+    {
+      "version": "20260921060000",
+      "name": "114_build_brief_with_frames",
+      "filename": "20260921060000_114_build_brief_with_frames.sql",
+      "sha256": "9bbf162b4853a44a28c4e121a96eeccc72b1ee4cc751c8f38c1dab7afd5e25ed",
+      "trimmedMd5": "e83eaae65bf7f27dd275fc39d472ee65"
+    },
+    {
+      "version": "20260921070000",
+      "name": "115_regenerate_frame",
+      "filename": "20260921070000_115_regenerate_frame.sql",
+      "sha256": "2f1ea4e39c07569de973f33ac809640c1e638c4e398efa01d4ff45798d59e125",
+      "trimmedMd5": "b687221febc7e87395e8e30d57586116"
+    },
+    {
+      "version": "20260921080000",
+      "name": "116_story_is_vertical",
+      "filename": "20260921080000_116_story_is_vertical.sql",
+      "sha256": "ba5e9937efd5b3984cf4117b0509b47f9c6f2cd56d2f650ce98f69027620fa31",
+      "trimmedMd5": "aae9c13cfa0df2396b4497fcea63d6ce"
+    },
+    {
+      "version": "20260921090000",
+      "name": "117_keep_the_frame_plan",
+      "filename": "20260921090000_117_keep_the_frame_plan.sql",
+      "sha256": "fbae8baca3133b6caa8e7d18010aee4b7852b7128add38ab53ea8d7f29e6d154",
+      "trimmedMd5": "43cc9edefa481c96f9c380fa6ef397bc"
+    },
+    {
+      "version": "20260921100000",
+      "name": "118_content_archive",
+      "filename": "20260921100000_118_content_archive.sql",
+      "sha256": "3a11c40c6638c36103c99653b76fe1fa7158279756929d17a10462e46369dece",
+      "trimmedMd5": "a75ee5e97ff93d82915fd195983b68c9"
+    },
+    {
+      "version": "20260921110000",
+      "name": "119_content_archive_view",
+      "filename": "20260921110000_119_content_archive_view.sql",
+      "sha256": "106c9f1c6f5a6a1e3900c3e27af3a79ad1d6945c7b91538ced3205ee5af88f39",
+      "trimmedMd5": "df84871ceeb90153329488a30591dabc"
+    },
+    {
+      "version": "20260921120000",
+      "name": "109_delete_campaign_and_idea",
+      "filename": "20260921120000_109_delete_campaign_and_idea.sql",
+      "sha256": "a19d8a14d831fd3ad11f647184a3ed1eb0a0d408a72baae9dd64c944948cbd28",
+      "trimmedMd5": "92df087f5eee0c6f6279791ac3b20803"
+    },
+    {
+      "version": "20260921123000",
+      "name": "120_archive_excludes_recruitment",
+      "filename": "20260921123000_120_archive_excludes_recruitment.sql",
+      "sha256": "e1a6a7e91db649beb5475c20c2a9819b06b4d164837c90cad8c4e3b0898a18c4",
+      "trimmedMd5": "8c48847fae10db017e187d4c0d2da1b5"
+    },
+    {
+      "version": "20260921130000",
+      "name": "121_archive_the_other_domains",
+      "filename": "20260921130000_121_archive_the_other_domains.sql",
+      "sha256": "0eecaf22bd9a2f91eb0deadefe771612d8ea4754729498c16e8b3feda825bdff",
+      "trimmedMd5": "3c036ed7364f005475c1f0bb386a9337"
+    },
+    {
+      "version": "20260922100000",
+      "name": "122_distribution_due",
+      "filename": "20260922100000_122_distribution_due.sql",
+      "sha256": "3b64ddef4ca41424853d88cf7e4d6cd9c0b626a970fdcf5023ce14f11d951716",
+      "trimmedMd5": "83c574910f9cdf92390409c1494c8d05"
+    },
+    {
+      "version": "20260922110000",
+      "name": "123_due_shows_the_unpublishable",
+      "filename": "20260922110000_123_due_shows_the_unpublishable.sql",
+      "sha256": "870253c398d87df6cff7102a8f1d7da568be338da7289e6d270d4de94d7987ac",
+      "trimmedMd5": "e4ac1030c6e90a83642e26c55a115937"
+    },
+    {
+      "version": "20260922120000",
+      "name": "124_connected_means_eligible",
+      "filename": "20260922120000_124_connected_means_eligible.sql",
+      "sha256": "ad07f1462949cb880f2a488d1ac43ea2d2caa16ca7239807563061bf676bb7b9",
+      "trimmedMd5": "7dea4e442e651542f40e0f58d602bc7d"
+    },
+    {
+      "version": "20260923100000",
+      "name": "125_meta_build",
+      "filename": "20260923100000_125_meta_build.sql",
+      "sha256": "5c79904e8f064286e21bf10c15d4f1b4345c222ec65a2c41032a4ebac28b16e1",
+      "trimmedMd5": "78eae418109f53075e68dffb21a9321c"
+    },
+    {
+      "version": "20260925100000",
+      "name": "126_manual_campaign_ideas",
+      "filename": "20260925100000_126_manual_campaign_ideas.sql",
+      "sha256": "b5501328a69a830178cabe5dea0c93b5bd02687f824e44df62fe12c9672fa928",
+      "trimmedMd5": "472ead5d31d8b2332884f6ac70bf2728"
+    },
+    {
+      "version": "20260925110000",
+      "name": "127_retired_team_access",
+      "filename": "20260925110000_127_retired_team_access.sql",
+      "sha256": "f7392286238f5e00065cf8c4734c1e004fad96ac5451bd4cf57fd1193633c218",
+      "trimmedMd5": "825de8a6a43a079debff6a879b05862a"
+    },
+    {
+      "version": "20260925120000",
+      "name": "128_lead_stage_enum",
+      "filename": "20260925120000_128_lead_stage_enum.sql",
+      "sha256": "450a0c32e51ff41c8d8e062614d6387f303669118380c20fd8123082989b4832",
+      "trimmedMd5": "6aa7aa9e629f3560fff807eed519d22e"
+    },
+    {
+      "version": "20260925121000",
+      "name": "129_lead_pipeline_archive",
+      "filename": "20260925121000_129_lead_pipeline_archive.sql",
+      "sha256": "e3a6b4cd551f8eb522d40e833a42e7e385c754e37764b7622b9ec230dfcee243",
+      "trimmedMd5": "7155ea2da6cf04ce7b7088b5eaa55937"
+    },
+    {
+      "version": "20260925122000",
+      "name": "130_lead_reporting_bot_stages",
+      "filename": "20260925122000_130_lead_reporting_bot_stages.sql",
+      "sha256": "dd8294a4c2ee3da5784ae41d4551b1e8c7d40c1ca03b61520115769f01db5c73",
+      "trimmedMd5": "584bf388cc399d9277eaed6289979901"
+    },
+    {
+      "version": "20260925123000",
+      "name": "131_bot_lead_stages",
+      "filename": "20260925123000_131_bot_lead_stages.sql",
+      "sha256": "499682e0e5b6b6fd52f056fe021ffa330bfa2056c26e09b5613136b6fd4ca2d9",
+      "trimmedMd5": "fb3aa55c6dbf9b15c8162f08b0f2f400"
+    },
+    {
+      "version": "20260926100000",
+      "name": "132_campaign_plan_without_ideas",
+      "filename": "20260926100000_132_campaign_plan_without_ideas.sql",
+      "sha256": "0351aa59351a7e6d062d2956ce8ea7106a310be9623b4dd8f2b4abfdbaf33352",
+      "trimmedMd5": "a8644d3013868164ffd056d2a7ca4c9d"
+    },
+    {
+      "version": "20260926110000",
+      "name": "133_recruitment_meta_distribution",
+      "filename": "20260926110000_133_recruitment_meta_distribution.sql",
+      "sha256": "1eb14251fb2ba34a3d378917830ff7f61da8216ad25030b6753950b4f4ff6c24",
+      "trimmedMd5": "2928d090e8184d53c15815436a860c42"
+    },
+    {
+      "version": "20260930100000",
+      "name": "134_reel_and_motion_enums",
+      "filename": "20260930100000_134_reel_and_motion_enums.sql",
+      "sha256": "d50ee043ef3fba81ad87397ff13595afe29d568e3f0d8052b541c8ad192794ee",
+      "trimmedMd5": "3d2c71fedab122b7e7fb7bdc11b62950"
+    },
+    {
+      "version": "20260930100100",
+      "name": "135_video_build_schema",
+      "filename": "20260930100100_135_video_build_schema.sql",
+      "sha256": "b4bdfa3471626a46da8e4c1ab7ad6280e9c4b8eff2f4c3daadd0ee5afbba2375",
+      "trimmedMd5": "4e924632a8e1fdfea26a7e830cf66bc8"
+    },
+    {
+      "version": "20261001120000",
+      "name": "136_enqueue_video_build",
+      "filename": "20261001120000_136_enqueue_video_build.sql",
+      "sha256": "7c5144da3457f601b1eb8a88c4e3eec4db1e2f5778e8e3a93df226015dcc870f",
+      "trimmedMd5": "3eac5c037a18c11f05002e803a93c14b"
+    },
+    {
+      "version": "20261001143000",
+      "name": "137_reel_opening_stills",
+      "filename": "20261001143000_137_reel_opening_stills.sql",
+      "sha256": "855a9d049f23cd6f656b0951a9f6a544c2c57bea274e7d140aabec8d469c4095",
+      "trimmedMd5": "0431d9c182d5ab86a0926d0daa0517f3"
+    },
+    {
+      "version": "20261002090000",
+      "name": "138_dispatch_brief_team_category",
+      "filename": "20261002090000_138_dispatch_brief_team_category.sql",
+      "sha256": "1b6c0cfecdbcd31c3b08b570f5bb4fe25a063ae61be0359983152726118d4cc8",
+      "trimmedMd5": "438a5baf5351b1721f1c8623c508fc73"
+    },
+    {
+      "version": "20261002090100",
+      "name": "139_assign_production_columns_and_category",
+      "filename": "20261002090100_139_assign_production_columns_and_category.sql",
+      "sha256": "b13de4b10c16c297708ad4a16f97dd393a43db14be620a57825868fa0d477cf8",
+      "trimmedMd5": "12cd60e620aae740634446c3358f6d60"
+    },
+    {
+      "version": "20261003090000",
+      "name": "140_meta_build_sheet",
+      "filename": "20261003090000_140_meta_build_sheet.sql",
+      "sha256": "b250d7caedf85eabeff2b03d08f6728122ed11e28484dba098639243a9367793",
+      "trimmedMd5": "541cfebdbe0a275ffbcbf1b159d28b9b"
+    },
+    {
+      "version": "20261004100000",
+      "name": "141_video_edit",
+      "filename": "20261004100000_141_video_edit.sql",
+      "sha256": "3b7dd8735169282c3ae6b94460dc0a269362f05f5699d9b3a018da229772e3fc",
+      "trimmedMd5": "8d8b4e058a8b65148914544f52a92c8c"
+    },
+    {
+      "version": "20261004140000",
+      "name": "142_client_spend_caps",
+      "filename": "20261004140000_142_client_spend_caps.sql",
+      "sha256": "0d7c479366d84c9c6425a46a3e1c087d50d70e9daa76600a3aa6f701bdcefea1",
+      "trimmedMd5": "007a30528267729db96ce038ea5ef0f1"
+    },
+    {
+      "version": "20261004180000",
+      "name": "143_scheduled_follow_up",
+      "filename": "20261004180000_143_scheduled_follow_up.sql",
+      "sha256": "0e03ce5690c96c97c559f0aa5a467b7d3c80ef174085c5df3b6176060aa0c696",
+      "trimmedMd5": "02cb7d1c156da0c48011a79a439579f1"
+    },
+    {
+      "version": "20261005120000",
+      "name": "144_post_time_and_timezone",
+      "filename": "20261005120000_144_post_time_and_timezone.sql",
+      "sha256": "9066379881aba8bba759e03f4c2d549177d08be7431f6cf1d0459ac15a49e0ee",
+      "trimmedMd5": "333c2bb7e239e7885d1823ba6d36ffb8"
+    },
+    {
+      "version": "20261005190000",
+      "name": "145_post_copy",
+      "filename": "20261005190000_145_post_copy.sql",
+      "sha256": "f48276497f92aeeb9615e3da32765f2c7fe1ea3eabbf28b4ef2318c9e7d59a35",
+      "trimmedMd5": "77020698779e95ff4222078db7a72592"
+    },
+    {
+      "version": "20261005210000",
+      "name": "146_engine_settings",
+      "filename": "20261005210000_146_engine_settings.sql",
+      "sha256": "bdda48a0bcd7b5ad38fef4cb39869c96332ac03e34857fa5192e8c5e2d654f7b",
+      "trimmedMd5": "052ffc9d3c90b74489ffe5c11cdab745"
+    },
+    {
+      "version": "20261005230000",
+      "name": "147_content_slots",
+      "filename": "20261005230000_147_content_slots.sql",
+      "sha256": "2b8c374cb4cc122e4326a8ba3e063ab8ccac413f01db07d7c3566fa1bc494777",
+      "trimmedMd5": "743842aec9e360e8f97168c66a9efd34"
+    },
+    {
+      "version": "20261006000000",
+      "name": "148_views_run_as_the_caller",
+      "filename": "20261006000000_148_views_run_as_the_caller.sql",
+      "sha256": "f8ad5aee13e2395c9e43ba28debc097550b42221d8325ac93c8b43d0e52ba90d",
+      "trimmedMd5": "ef4fea7b57a18cdebe5c3a7bf8e1abf8"
+    },
+    {
+      "version": "20261006020000",
+      "name": "149_plan_slots",
+      "filename": "20261006020000_149_plan_slots.sql",
+      "sha256": "286075f1abc72ba709a37d08d29ee5ca43a5c35c4b67592750c57fe128b0f625",
+      "trimmedMd5": "6f442112e283c14168248003b0853df9"
+    },
+    {
+      "version": "20261006040000",
+      "name": "150_engine_tick",
+      "filename": "20261006040000_150_engine_tick.sql",
+      "sha256": "f147ba40afb5520e63da1bed159b39763aaaba4e2a10806e3c571b00182cef80",
+      "trimmedMd5": "7dd056b50c14b6359eb3917e1b4f300b"
+    },
+    {
+      "version": "20261006060000",
+      "name": "151_ideas_know_their_slot",
+      "filename": "20261006060000_151_ideas_know_their_slot.sql",
+      "sha256": "b91159a91226e51070bb7d9dea269e23176205ca334a1e70cbcecbb52b36fa6c",
+      "trimmedMd5": "19dbfd30753bb3890b82613ae98afe48"
+    },
+    {
+      "version": "20261006080000",
+      "name": "152_idea_selection_and_policy",
+      "filename": "20261006080000_152_idea_selection_and_policy.sql",
+      "sha256": "3ff2743a81c1594c71344b561a7d1177780bd1253daea0b22c8c0f900e04332f",
+      "trimmedMd5": "e22c673c842f9e7944e2a9b13b5d8823"
+    },
+    {
+      "version": "20261006100000",
+      "name": "153_copywriter",
+      "filename": "20261006100000_153_copywriter.sql",
+      "sha256": "ba4600e8364060cbf6b929355eee57a0ab30ba12b75e1b0023bff17a9c309227",
+      "trimmedMd5": "917308798c1870d14313b8847163c154"
+    },
+    {
+      "version": "20261006120000",
+      "name": "154_follow_up_keeps_its_params",
+      "filename": "20261006120000_154_follow_up_keeps_its_params.sql",
+      "sha256": "9014b7116dd067a1a647345f523c0569d10604c8945a6b6bd3f749e53fafb98e",
+      "trimmedMd5": "1c77a32e415d278ab92b3632ced98315"
+    },
+    {
+      "version": "20261006140000",
+      "name": "155_tick_queues_the_right_input",
+      "filename": "20261006140000_155_tick_queues_the_right_input.sql",
+      "sha256": "f222a008cc460287fd5ead0d1497618f01ec03e5c0ec316dde9832e3204107b9",
+      "trimmedMd5": "1ea80fc368b183f158f178021bd8e7fb"
+    },
+    {
+      "version": "20261006160000",
+      "name": "156_integration_secret_takes_connected",
+      "filename": "20261006160000_156_integration_secret_takes_connected.sql",
+      "sha256": "d4533b19cd1326a41c44eee9e8aaaae7c328e6cde9d37c5e7eb4a9e62dbc4cc2",
+      "trimmedMd5": "02e0a786aeba87ac8a7a5ba3d1633b71"
+    },
+    {
+      "version": "20261006180000",
+      "name": "157_token_health",
+      "filename": "20261006180000_157_token_health.sql",
+      "sha256": "2723701dee920d00e281f9d60ae61ab31e711fa5bf558975c29aa673c8b5ccc4",
+      "trimmedMd5": "41f1ce66c8a7e9242a4af1db78b86cef"
+    },
+    {
+      "version": "20261006200000",
+      "name": "158_qa",
+      "filename": "20261006200000_158_qa.sql",
+      "sha256": "17c4bd15a502e2ef0ab5bd2bd1407aed167e10177bace4353c5841d4dd7469f1",
+      "trimmedMd5": "c243fc04c71e3e0931c9c89c9fdf33d1"
+    },
+    {
+      "version": "20261006220000",
+      "name": "159_approval_inbox",
+      "filename": "20261006220000_159_approval_inbox.sql",
+      "sha256": "d4fdde471f58ed2f4f404601d584e078a83814a85d7fd571d99cfddf39b510ed",
+      "trimmedMd5": "0b6e2315360a014bb8214827f53db4dc"
+    },
+    {
+      "version": "20261006235000",
+      "name": "160_publishing",
+      "filename": "20261006235000_160_publishing.sql",
+      "sha256": "e55d0dfaccd1cf81ed0585c48fda544a271126919afaba960b737d5fa548ede0",
+      "trimmedMd5": "32cd6c097e9b3f6aab68898d5a633de6"
+    },
+    {
+      "version": "20261007090000",
+      "name": "161_anon_cannot_drive_the_engine",
+      "filename": "20261007090000_161_anon_cannot_drive_the_engine.sql",
+      "sha256": "757682da525859541de70423ec2c3536f980a40a6ee18d24c32dd237af2089b3",
+      "trimmedMd5": "2cb9ec9e55567d5dd11025dc9d1e291a"
+    },
+    {
+      "version": "20261007100000",
+      "name": "162_three_the_sweep_could_not_fix",
+      "filename": "20261007100000_162_three_the_sweep_could_not_fix.sql",
+      "sha256": "1666db0d3338fdecd1c6c333f700492deb0f9ff8b53233c44b639b87e88c344c",
+      "trimmedMd5": "a9afff4bc274e28fc34e6d9bca042163"
+    },
+    {
+      "version": "20261007110000",
+      "name": "163_a_job_can_be_held",
+      "filename": "20261007110000_163_a_job_can_be_held.sql",
+      "sha256": "f4ca9b6a2f98dc5ec921cbe91c6e19ce0f9a919950dcce4d91b436c4de67797c",
+      "trimmedMd5": "1b34cfc2a5c37116a21bd117441a2839"
+    },
+    {
+      "version": "20261007120000",
+      "name": "164_holding_and_resuming",
+      "filename": "20261007120000_164_holding_and_resuming.sql",
+      "sha256": "be13f7e14087cc384966199d46c51a3a6999e45b01062cf83e4e5a7506738025",
+      "trimmedMd5": "1e2d535eaab01bdf5b5049c506f2cfe8"
+    },
+    {
+      "version": "20261007130000",
+      "name": "165_a_backfill_can_be_asked_for",
+      "filename": "20261007130000_165_a_backfill_can_be_asked_for.sql",
+      "sha256": "6e93d1f5fbec0e37f655ef039c15d320fcf80b143606b6294363a94196ebdf50",
+      "trimmedMd5": "712d4defa07300f60f05809ba2d606bc"
+    },
+    {
+      "version": "20261007140000",
+      "name": "166_an_assignment_has_states",
+      "filename": "20261007140000_166_an_assignment_has_states.sql",
+      "sha256": "b91f73896155ad56ece39050c975a1fb465968461a1457a0c86c6457e3291942",
+      "trimmedMd5": "f989ab31e38f58441d084a30a1a9e289"
+    },
+    {
+      "version": "20261007150000",
+      "name": "167_a_missing_figure_is_not_a_zero",
+      "filename": "20261007150000_167_a_missing_figure_is_not_a_zero.sql",
+      "sha256": "de2bf9ec2cf73f4767b134f39eb95eab2e66f98be39df7db2f7a8879fbe9369b",
+      "trimmedMd5": "d9b971857d254acd3ec21b32ab18cfa7"
+    },
+    {
+      "version": "20261008090000",
+      "name": "168_the_exposure_view_needs_to_know_every_gate",
+      "filename": "20261008090000_168_the_exposure_view_needs_to_know_every_gate.sql",
+      "sha256": "0904a8c4a5347a18a16773204676e541d22e015ee6f45a1f854596659b0e03eb",
+      "trimmedMd5": "f1b76f433eea8c7c631bfcca485f74b4"
+    },
+    {
+      "version": "20261008100000",
+      "name": "169_a_reel_waits_to_be_cut",
+      "filename": "20261008100000_169_a_reel_waits_to_be_cut.sql",
+      "sha256": "fc231589e93e5683cc4ecfab77430cfc791080e4ea656593b6d751d9f36d53f6",
+      "trimmedMd5": "0bb5ff98d619c2f1a7f0480cdedde96e"
+    },
+    {
+      "version": "20261008110000",
+      "name": "170_the_engine_cuts_the_reel",
+      "filename": "20261008110000_170_the_engine_cuts_the_reel.sql",
+      "sha256": "543bea1ac5125f02809743de89a6cd5262b3b9f0d0c5b76f3db64741a6c79ab9",
+      "trimmedMd5": "93b6c27907cb8d777d5b0506fdbaaed5"
+    },
+    {
+      "version": "20261008120000",
+      "name": "171_the_one_cut_qa_cannot_see",
+      "filename": "20261008120000_171_the_one_cut_qa_cannot_see.sql",
+      "sha256": "a0688d5f9255d17f423b8256ead4323ec088da9b9fd40c8726c3faa07af1dcae",
+      "trimmedMd5": "2b73e4d24911d643e47e0a2e330d8751"
+    },
+    {
+      "version": "20261010100000",
+      "name": "172_content_flow_p0",
+      "filename": "20261010100000_172_content_flow_p0.sql",
+      "sha256": "10f2d59a79d79e91bd70943166b90a3bd8b50f92047e3b84bd620ccb757c537d",
+      "trimmedMd5": "2f9ad22c8d210f51799864ff2caaf01a"
+    },
+    {
+      "version": "20261010110000",
+      "name": "173_campaign_idea_destinations",
+      "filename": "20261010110000_173_campaign_idea_destinations.sql",
+      "sha256": "132b55ae7089a58d2c29baf2bb4007a8151d17f3a4acf13d5b1d942102e35027",
+      "trimmedMd5": "448b96ffd483268866db8dbfcbea7bfb"
+    },
+    {
+      "version": "20261010120000",
+      "name": "174_human_video_edit_handoff",
+      "filename": "20261010120000_174_human_video_edit_handoff.sql",
+      "sha256": "b0b60c6e8dbd9f15cfce2ec02a59ca2e29247511b53514e171b5dbecbfe21434",
+      "trimmedMd5": "4cb58688a48e9e5470f6eff41c0bfa89"
+    },
+    {
+      "version": "20261010130000",
+      "name": "175_video_approval_routing",
+      "filename": "20261010130000_175_video_approval_routing.sql",
+      "sha256": "869b1b8d205bd5b3c3b80da85ab0c27db315f8159e5d4481e02dd5d0962fb5e7",
+      "trimmedMd5": "51d6589dd3be7eee1bbff0bf64275f2a"
+    },
+    {
+      "version": "20261010140000",
+      "name": "176_finish_human_video_without_edit",
+      "filename": "20261010140000_176_finish_human_video_without_edit.sql",
+      "sha256": "c0c45870bd1f001509eebec736c02f776bccbd06eb1334d311898e3d4ea5c538",
+      "trimmedMd5": "eddcb534ebe6e15fa5b4ad3aa8ea4806"
+    },
+    {
+      "version": "20261010150000",
+      "name": "177_video_client_approval_email",
+      "filename": "20261010150000_177_video_client_approval_email.sql",
+      "sha256": "716006a7b60be36e3ef7a3a040f2ce28256fd2bb11edfd47a3707116be031246",
+      "trimmedMd5": "9341ce1fbd745c724a09d5acaf6b69c1"
+    },
+    {
+      "version": "20261010160000",
+      "name": "178_video_edit_intake",
+      "filename": "20261010160000_178_video_edit_intake.sql",
+      "sha256": "4436d064edd7fe1021b1922d53121b0d27b1b83db9c77ee36e6ccaa8a4ae7f12",
+      "trimmedMd5": "1cd9ea2a6a7ce828f60c7c37e50d2690"
+    },
+    {
+      "version": "20261010170000",
+      "name": "179_source_video_ai_edit",
+      "filename": "20261010170000_179_source_video_ai_edit.sql",
+      "sha256": "4268ade96f28cd4cc04ea2d9472334a6e5980f650f56741049d76e959d3ac588",
+      "trimmedMd5": "c479155558f7ae257c071fd3b1997940"
+    },
+    {
+      "version": "20261010180000",
+      "name": "180_source_video_ai_revisions",
+      "filename": "20261010180000_180_source_video_ai_revisions.sql",
+      "sha256": "83951a31ea384f581efbfe962a48843305a4c3778735b1a29a1c166d047012af",
+      "trimmedMd5": "6e881c74635296cfe2f1b7ac43f790d7"
+    },
+    {
+      "version": "20261010190000",
+      "name": "181_motion_design_projects",
+      "filename": "20261010190000_181_motion_design_projects.sql",
+      "sha256": "30980947c0dca2a92b407cb5d87aa653fc73938327832e79b3bef3c46a1d6cb7",
+      "trimmedMd5": "8b598d3df2fc81bbb605dbf5c13d5c18"
+    },
+    {
+      "version": "20261010200000",
+      "name": "182_video_repurpose_insights",
+      "filename": "20261010200000_182_video_repurpose_insights.sql",
+      "sha256": "4d8ba13898f3ef40eba213259c2df3cd4615b3b6ae26d25858ca7adb56e4c529",
+      "trimmedMd5": "996b32cef67b137eaa02d5f614dc59cf"
+    },
+    {
+      "version": "20261010210000",
+      "name": "183_motion_design_attachments",
+      "filename": "20261010210000_183_motion_design_attachments.sql",
+      "sha256": "034ea29b4bba59628854c56090ea037e6879d81aefe789a63e94a1adf1e04bed",
+      "trimmedMd5": "9c7a5ecf800a51511020072bb4836404"
+    },
+    {
+      "version": "20261010220000",
+      "name": "184_video_repurpose_brief_reentry",
+      "filename": "20261010220000_184_video_repurpose_brief_reentry.sql",
+      "sha256": "9aeceae0bf2ad020772b5a579c0e8208a649b15f63d714ea063baf7562a641e1",
+      "trimmedMd5": "2fbe9f0c9a334af762ec535cfa1a976c"
+    },
+    {
+      "version": "20261010230000",
+      "name": "185_repurpose_clip_extract",
+      "filename": "20261010230000_185_repurpose_clip_extract.sql",
+      "sha256": "ddb3124d244143e4d747d551b58d2259d0fda80a23dcabb6943f003face0b75a",
+      "trimmedMd5": "0d310fbeccac4a2aa5514297d6111361"
+    },
+    {
+      "version": "20261011000000",
+      "name": "186_video_distribution_human_gate",
+      "filename": "20261011000000_186_video_distribution_human_gate.sql",
+      "sha256": "6d31137c3b750689afca4ad5f48119a685b3b920d3aed6e3c41ae2371e581fa5",
+      "trimmedMd5": "e84ab5595da4ab3553fffa7157ea3a87"
+    },
+    {
+      "version": "20261011010000",
+      "name": "187_scoped_ideation",
+      "filename": "20261011010000_187_scoped_ideation.sql",
+      "sha256": "0d5fd72f53cfe13088be7d593b8931aaac0b3d653ee7ad739a72d1fb94610dc5",
+      "trimmedMd5": "8850a5b0c5fd117193cb4dd6ac4982fd"
+    },
+    {
+      "version": "20261011080000",
+      "name": "188_reel_stills_before_motion",
+      "filename": "20261011080000_188_reel_stills_before_motion.sql",
+      "sha256": "ac3aa69ba19737ed4b8ca2718ddcfb2b369250321978ce098c6c70d9e74a12f9",
+      "trimmedMd5": "e24f719dfd01ed30d3459dfb937c6ad2"
+    },
+    {
+      "version": "20261011130000",
+      "name": "189_higgsfield_follow_up",
+      "filename": "20261011130000_189_higgsfield_follow_up.sql",
+      "sha256": "f8988bab043a8dab9a568e2eb0b44c43375f63c3298cff8a59183f002fdf7d34",
+      "trimmedMd5": "b0135dfe50176a685e13562d5d541b00"
+    },
+    {
+      "version": "20261012090000",
+      "name": "190_v5_workflow_spine",
+      "filename": "20261012090000_190_v5_workflow_spine.sql",
+      "sha256": "b45334c72a6ed2c5aca85bd5c1274841f0190adfffdca7fd3cf50529e3ac11a6",
+      "trimmedMd5": "6b54e42ad0a047b6a3c6d73edd63e482"
+    },
+    {
+      "version": "20261012100000",
+      "name": "191_v5_daily_package",
+      "filename": "20261012100000_191_v5_daily_package.sql",
+      "sha256": "5995c4a907ed77655b41b2e0c6d9702110b8391f6b12604de0419191c6c92ee2",
+      "trimmedMd5": "dd4eb89bfff6f5705d0933a5dc139dd7"
+    },
+    {
+      "version": "20261012110000",
+      "name": "192_video_render_candidates",
+      "filename": "20261012110000_192_video_render_candidates.sql",
+      "sha256": "9b88a55cc2bf6b3c4f0e154ac709143b2379743c1a3b4f3d7668f83463ed405d",
+      "trimmedMd5": "8f0da50c488f5cc451bf29b6f669788c"
+    },
+    {
+      "version": "20261012120000",
+      "name": "193_v5_launch_package",
+      "filename": "20261012120000_193_v5_launch_package.sql",
+      "sha256": "24dcd6eca09065817294e2e8291ae8a0578dde58982e4ed220823e3f49d2cb54",
+      "trimmedMd5": "da318f745a35a531cc2ee655501f03e7"
+    },
+    {
+      "version": "20261012130000",
+      "name": "194_v5_daily_recovery",
+      "filename": "20261012130000_194_v5_daily_recovery.sql",
+      "sha256": "674215e252ba7c09024977565223b9d89bfbdd417827bf4772ac5a2d0523e0b2",
+      "trimmedMd5": "078adb466f579d3ca60aeeebfe55d075"
+    },
+    {
+      "version": "20261012140000",
+      "name": "195_v5_recovery_alert_delivery",
+      "filename": "20261012140000_195_v5_recovery_alert_delivery.sql",
+      "sha256": "79cae83f0585e008ab7001007584067ad20976dc2b3cbd035527b0ca48cb1a08",
+      "trimmedMd5": "3cac5d1be8634e0ddbf4dc3e1ff8cca5"
+    },
+    {
+      "version": "20261012150000",
+      "name": "196_v5_outcome_attribution",
+      "filename": "20261012150000_196_v5_outcome_attribution.sql",
+      "sha256": "6dbc20dfb52887ce18db29876097d543f3bbb6e1f31d2dffe25fb23bc8d7b537",
+      "trimmedMd5": "12e900a7346299ef065d54fbd377f819"
+    },
+    {
+      "version": "20261012160000",
+      "name": "197_v5_ideation_learning",
+      "filename": "20261012160000_197_v5_ideation_learning.sql",
+      "sha256": "4adba2b8b3711bb1bdd166020dc4778a7766db550b3f331a7de8112ef76420fc",
+      "trimmedMd5": "01fcd83923a0f5beebaae617553b698a"
+    },
+    {
+      "version": "20261012170000",
+      "name": "198_video_sound_policy",
+      "filename": "20261012170000_198_video_sound_policy.sql",
+      "sha256": "9f683ac701c6ec94d95fb8bf02c6a23ec894ec4545f75a1d433a459c7df9d3aa",
+      "trimmedMd5": "3708c2364d190de8929c3dd1d61add1d"
+    },
+    {
+      "version": "20261012180000",
+      "name": "199_video_candidate_revision",
+      "filename": "20261012180000_199_video_candidate_revision.sql",
+      "sha256": "c40e9bebb6aff71a4805867d48bbc0b01943ad0dc88647e3ff3bf4114de7035c",
+      "trimmedMd5": "c73f9746868f1ff2037cd2de00687d10"
+    },
+    {
+      "version": "20261012190000",
+      "name": "200_generated_idea_campaign_position",
+      "filename": "20261012190000_200_generated_idea_campaign_position.sql",
+      "sha256": "d59ac441dccb3d81ae4539b0327c170edf58dbebc6317e79d755ff07b1817cb4",
+      "trimmedMd5": "683d257747da556427ec37b08425d0d4"
+    },
+    {
+      "version": "20261012200000",
+      "name": "201_v5_daily_internal_qa",
+      "filename": "20261012200000_201_v5_daily_internal_qa.sql",
+      "sha256": "afad91efbd99bbf9f8076cf74c2b80cb2c2f9228eff64b2f134c677475646f27",
+      "trimmedMd5": "b6f9f507eb735cef1308ec90b3fa452a"
+    },
+    {
+      "version": "20261012210000",
+      "name": "202_v5_daily_idea_sequence",
+      "filename": "20261012210000_202_v5_daily_idea_sequence.sql",
+      "sha256": "fea4ff37b4368306ac189ae5c8c5c48c40e9757409a9b9f39655b5cabe05176a",
+      "trimmedMd5": "0c79345047abff95013fb7f4288cc42a"
+    },
+    {
+      "version": "20261012220000",
+      "name": "203_v5_daily_creative_routing",
+      "filename": "20261012220000_203_v5_daily_creative_routing.sql",
+      "sha256": "e570e8938a3d9fbf42574b4c9d5eb71b394ca5eb73b5549b822101af2f09ba3a",
+      "trimmedMd5": "e17ca9c9fc7a914bf6a5fed6a653d2b4"
+    },
+    {
+      "version": "20261013090000",
+      "name": "204_v5_motion_followup_qa",
+      "filename": "20261013090000_204_v5_motion_followup_qa.sql",
+      "sha256": "bf9c58856f4fb636f9febe14a304567acb17bff3d75d66cd606c4d9d16372026",
+      "trimmedMd5": "285e7b6287c9c200796b68bccad5dacc"
+    },
+    {
+      "version": "20261013120000",
+      "name": "205_v5_video_upload_recovery",
+      "filename": "20261013120000_205_v5_video_upload_recovery.sql",
+      "sha256": "bc521ae374785c543ebdcf824be6efdcad22c5f0f01c5ed0a360a5693afc6387",
+      "trimmedMd5": "48f1d21d3fe877eecd94538a718aa5d8"
+    },
+    {
+      "version": "20261013150000",
+      "name": "206_v5_video_creative_recovery",
+      "filename": "20261013150000_206_v5_video_creative_recovery.sql",
+      "sha256": "2f14e87171420f45d193c36a661db1c9944a3f7def1230502adf2ef172697320",
+      "trimmedMd5": "2591abf29da0bafad37249affe142a57"
+    },
+    {
+      "version": "20261014140000",
+      "name": "207_v5_reel_source_rebuild",
+      "filename": "20261014140000_207_v5_reel_source_rebuild.sql",
+      "sha256": "5dd89fe4f9cd362f108193376f2f664498836d5b4fbc58da8b90900de315e50f",
+      "trimmedMd5": "deca588332204b332ca7d2bf1a214720"
+    },
+    {
+      "version": "20261014190000",
+      "name": "208_v5_higgsfield_submit_recovery",
+      "filename": "20261014190000_208_v5_higgsfield_submit_recovery.sql",
+      "sha256": "74a25b4f4eb2e166e35a8d5936d9567fc4dcf18d3add90e6815d8f5e336119a6",
+      "trimmedMd5": "2deb5dcd3c15a82c0f7d3f7bc6bb0b6e"
+    },
+    {
+      "version": "20261015090000",
+      "name": "209_v5_blocked_daily_sibling_qa",
+      "filename": "20261015090000_209_v5_blocked_daily_sibling_qa.sql",
+      "sha256": "f270815ed54c2a580275f858b823ed972d8f71c6cb180be23531b58f91735d91",
+      "trimmedMd5": "0a4cb99fb6dd8db42a3359c2ace8fc24"
+    },
+    {
+      "version": "20261015100000",
+      "name": "210_v5_motion_followup_lineage",
+      "filename": "20261015100000_210_v5_motion_followup_lineage.sql",
+      "sha256": "20c2012929af8862f582836dd66c8b15eb18fd166d8f21634bb1417a33d60e97",
+      "trimmedMd5": "f6b2ef25e96dc15c167e3b6cde85d4bf"
+    },
+    {
+      "version": "20261015110000",
+      "name": "211_v5_recent_idea_diversity",
+      "filename": "20261015110000_211_v5_recent_idea_diversity.sql",
+      "sha256": "f711941287087eb17ab37471e335c3c23a42bac965826e2d5f17f29705910aa1",
+      "trimmedMd5": "1ce6bafea30aef1b557c99872fa98c66"
+    },
+    {
+      "version": "20261015120000",
+      "name": "212_v5_failed_higgsfield_prompt_recovery",
+      "filename": "20261015120000_212_v5_failed_higgsfield_prompt_recovery.sql",
+      "sha256": "fea62db4a5fa7aeddf0386323f79a06b485819be32b9138c4eadc860230baf34",
+      "trimmedMd5": "64bedf5f2d9d69b7914ab8dffbbead25"
+    },
+    {
+      "version": "20261015190000",
+      "name": "203_v6_campaign_mode",
+      "filename": "20261015190000_203_v6_campaign_mode.sql",
+      "sha256": "5d22d4aaa2d8477930bb3323884da54b6d4f1f101c3b878a97e73c7a2097cf25",
+      "trimmedMd5": "42cd0fe4bccd544382ceb7f8f8921ee6"
+    },
+    {
+      "version": "20261015210000",
+      "name": "204_v6_mcp_campaign_create",
+      "filename": "20261015210000_204_v6_mcp_campaign_create.sql",
+      "sha256": "b98915b65274077009ec50216c08462eb1f3c79b6f8031486490c7f4ae7504ba",
+      "trimmedMd5": "4c909f44ac033bbb970ba8ff2828b0ba"
+    },
+    {
+      "version": "20261015220000",
+      "name": "205_v6_campaign_manifest",
+      "filename": "20261015220000_205_v6_campaign_manifest.sql",
+      "sha256": "247fbf5cfcdfa60455f8128ee3a4d62d5173670f4e34ce920dedaae35f20dd10",
+      "trimmedMd5": "8e4bd3a151513495d0fff41bfdc0c4e2"
+    },
+    {
+      "version": "20261015230000",
+      "name": "206_v6_action_approvals",
+      "filename": "20261015230000_206_v6_action_approvals.sql",
+      "sha256": "14985d26329abf1acd6a37e568c10bad4cae8854a5687fff676b3fc4645f4f13",
+      "trimmedMd5": "661b878cdd3f35de5360d75b43edd294"
+    },
+    {
+      "version": "20261016000000",
+      "name": "207_v6_intelligence_snapshot",
+      "filename": "20261016000000_207_v6_intelligence_snapshot.sql",
+      "sha256": "4b857133dbcaafb25d73dd7d672dea9caf7d4036c66115d339dff47c9c08e96d",
+      "trimmedMd5": "0ded052fb9f787cf39d3e9a69eec2b17"
+    },
+    {
+      "version": "20261016010000",
+      "name": "208_v6_offer_studio",
+      "filename": "20261016010000_208_v6_offer_studio.sql",
+      "sha256": "b9e842fa5c5fbbd1c2f1fdc89b03692b94b4ba9c8a7d4f7abde320d7862ce96c",
+      "trimmedMd5": "f4c35d49e251dd38687c4d6595912c26"
+    },
+    {
+      "version": "20261016020000",
+      "name": "209_v6_proof_artifacts",
+      "filename": "20261016020000_209_v6_proof_artifacts.sql",
+      "sha256": "46e62e89615ebace0e8c0eb3f85559d1c8388d7adbb70e4a37ef08b8cbfde493",
+      "trimmedMd5": "71746dc93cec916eca2bc7c17567e7de"
+    },
+    {
+      "version": "20261016030000",
+      "name": "210_v6_campaign_offer_binding",
+      "filename": "20261016030000_210_v6_campaign_offer_binding.sql",
+      "sha256": "b6dcb274d8d5308799f4d618d2237dee880b791a6e0271b94b1a23a7b62493c8",
+      "trimmedMd5": "d5e22313694aaa3d187b5117cc7b1ae1"
+    },
+    {
+      "version": "20261016040000",
+      "name": "211_v6_artifact_offer_inputs",
+      "filename": "20261016040000_211_v6_artifact_offer_inputs.sql",
+      "sha256": "11c8cfacf734797c5499c6357ca9bf01ffa8ac181f0077495030b6970ad60a3b",
+      "trimmedMd5": "c9fa963fe39f9d0a45e49f6514933804"
+    },
+    {
+      "version": "20261016050000",
+      "name": "212_v6_page_publish_boundary",
+      "filename": "20261016050000_212_v6_page_publish_boundary.sql",
+      "sha256": "19188cd7c3f406c56569198dd0033854ca31d478b6b59c7c957f6be3880b561c",
+      "trimmedMd5": "1578f03b8d06a2cd98a9df0161621127"
+    },
+    {
+      "version": "20261016060000",
+      "name": "213_v6_page_approval_snapshot",
+      "filename": "20261016060000_213_v6_page_approval_snapshot.sql",
+      "sha256": "73b13726bd2767023345ab31205c76b422ed884d250468999b71f963c43cd6a0",
+      "trimmedMd5": "8d2c76df783039ed1caf57c2fb9bcbfb"
+    },
+    {
+      "version": "20261016200000",
+      "name": "214_v6_campaign_artifact_manifest_binding",
+      "filename": "20261016200000_214_v6_campaign_artifact_manifest_binding.sql",
+      "sha256": "870ba7b3df02eb670df00b6b199920a9b7864a6ddd894968bd8c23940b09d9d1",
+      "trimmedMd5": "050547743c724a43a796124fe6bb6328"
+    },
+    {
+      "version": "20261018100000",
+      "name": "215_proof_factory_v2",
+      "filename": "20261018100000_215_proof_factory_v2.sql",
+      "sha256": "51a7cb457769dbdcf7efcc66becb3fafcfa8830ab6f3db7f0888b4c16c061191",
+      "trimmedMd5": "2dc6686fe43548259f5e1860edbbcc12"
+    },
+    {
+      "version": "20261018110000",
+      "name": "216_proof_capture_delivery",
+      "filename": "20261018110000_216_proof_capture_delivery.sql",
+      "sha256": "4b893fa3bf1edb4b779bd02aebf901efc8c7f915eede0cc546e90c2cfcd54d9a",
+      "trimmedMd5": "930ce44b08d619f6dab927c3740158e8"
+    },
+    {
+      "version": "20261018120000",
+      "name": "217_proof_auto_production",
+      "filename": "20261018120000_217_proof_auto_production.sql",
+      "sha256": "8187820153602b93eef7edb6d3af882bf686589b8af604a314190665fe75aa81",
+      "trimmedMd5": "700bd6ecfa71c85bd011a59ab0f9ac81"
+    },
+    {
+      "version": "20261019090000",
+      "name": "218_proof_distribution_spine",
+      "filename": "20261019090000_218_proof_distribution_spine.sql",
+      "sha256": "882464925de3cc68270bd6036c15484bf3ce47f830f64a1205fd330f61bbcdb2",
+      "trimmedMd5": "8877c129a99b1634612f934cd4122084"
+    },
+    {
+      "version": "20261019100000",
+      "name": "219_publish_knows_the_format",
+      "filename": "20261019100000_219_publish_knows_the_format.sql",
+      "sha256": "e4ab104e9df70a4c7ec85ffda5af8c543fc302267b3be57395b88234902ba6e8",
+      "trimmedMd5": "7c97d4b81b1778de7e6ca8cc2ff7d485"
+    },
+    {
+      "version": "20261019110000",
+      "name": "220_carousels_go_out_whole",
+      "filename": "20261019110000_220_carousels_go_out_whole.sql",
+      "sha256": "dcf81f0fca80437154d3545fafce5eae2553204d07a6a3bfee3b4090e34c900b",
+      "trimmedMd5": "3ddd9b4524abb20d3c9c2d717ab40bd4"
+    },
+    {
+      "version": "20261019120000",
+      "name": "221_a_story_is_many_posts",
+      "filename": "20261019120000_221_a_story_is_many_posts.sql",
+      "sha256": "09d522f75c281b26f677a73663ad10feeac3131c81371433c7f76803ec633b22",
+      "trimmedMd5": "57ac572f383c35c9c48cb392edb87043"
+    },
+    {
+      "version": "20261019130000",
+      "name": "222_the_last_four_surfaces",
+      "filename": "20261019130000_222_the_last_four_surfaces.sql",
+      "sha256": "b7f5f96f5efabc99a778687643e3a8329d8a5cc900097bcb17518fe52b9131d9",
+      "trimmedMd5": "9e3bf682861ef67a621ad9240b1075c3"
+    },
+    {
+      "version": "20261019140000",
+      "name": "223_archive_and_terminate_content",
+      "filename": "20261019140000_223_archive_and_terminate_content.sql",
+      "sha256": "667d59ff263d351f0a6438c99ade4f7d4c1e113468255524fbee0fcf0049c8c7",
+      "trimmedMd5": "a083fd0f0af12ca9b32af7b3d13523e6"
+    },
+    {
+      "version": "20261019150000",
+      "name": "224_the_append_only_guard_pins_its_path",
+      "filename": "20261019150000_224_the_append_only_guard_pins_its_path.sql",
+      "sha256": "1eb05fe22dcb5c4123e9398481ca1f1342e73bebdd2f1f56eaccf2a3166afa4a",
+      "trimmedMd5": "b01e442f72e26850bf79a57697201d70"
+    },
+    {
+      "version": "20261019160000",
+      "name": "225_market_opportunities",
+      "filename": "20261019160000_225_market_opportunities.sql",
+      "sha256": "7f1daaa18aed6b5b668a681d89cc2e3df75c197176005c2e08d5605d891c5b22",
+      "trimmedMd5": "7ec59c112666f7da81bbcb13cbef35f7"
+    },
+    {
+      "version": "20261019170000",
+      "name": "226_opportunity_lifecycle",
+      "filename": "20261019170000_226_opportunity_lifecycle.sql",
+      "sha256": "10c016e14c36d670e85f57acc23543ae400a67366e48176eaca9fe964b148517",
+      "trimmedMd5": "fc481ef5654c7927d220f871e6303856"
+    },
+    {
+      "version": "20261019180000",
+      "name": "227_opportunity_discovery_agent",
+      "filename": "20261019180000_227_opportunity_discovery_agent.sql",
+      "sha256": "8b42c1c95588cf9cc2c4c104310b1fff9b0e28a697983eb98749364f4b430d27",
+      "trimmedMd5": "73d53dea888df9ec4ffa8e60179ace26"
+    },
+    {
+      "version": "20261019190000",
+      "name": "228_content_create_upload_url",
+      "filename": "20261019190000_228_content_create_upload_url.sql",
+      "sha256": "60e3cae9561fd6601286f4cee20892a515f1b74a9c01549ad778ef99eeb14bf5",
+      "trimmedMd5": "7f8ea1a8949e780d440d06e1cbc6f6fb"
+    },
+    {
+      "version": "20261019200000",
+      "name": "229_proof_publishing_switch",
+      "filename": "20261019200000_229_proof_publishing_switch.sql",
+      "sha256": "956b6d5780615e6e9b6ccc7835a3a4a559c0ad39eedfaf6a8f02b435a2f24cf6",
+      "trimmedMd5": "cb89fadf5b59f47d6270f5af424a2a24"
+    },
+    {
+      "version": "20261022090000",
+      "name": "230_campaign_action_executor",
+      "filename": "20261022090000_230_campaign_action_executor.sql",
+      "sha256": "be439b27413d209fe7f1fbc64d835e06b1b470f0dc3ba076ece61b4b9bdfea46",
+      "trimmedMd5": "d8b40c39cea2f77c97a8a1821ab9cadb"
+    },
+    {
+      "version": "20261022100000",
+      "name": "231_proof_placement_execution",
+      "filename": "20261022100000_231_proof_placement_execution.sql",
+      "sha256": "c47ca3160df3c998f5ee936da0807d67bc988fde2a7c7be9c9d1333d75895af3",
+      "trimmedMd5": "716f0ed865222f078d126d42eeb36aa8"
+    },
+    {
+      "version": "20261022110000",
+      "name": "232_campaign_from_opportunity",
+      "filename": "20261022110000_232_campaign_from_opportunity.sql",
+      "sha256": "971e81fb2865a11d9d9466c67be36a1b9c2ea47f1b1dd4279384f70323cd9937",
+      "trimmedMd5": "e62ed434bbe7e1b03aa8dbcf86d0cd02"
+    },
+    {
+      "version": "20261022120000",
+      "name": "233_the_action_event_guard_pins_its_path",
+      "filename": "20261022120000_233_the_action_event_guard_pins_its_path.sql",
+      "sha256": "ac361bf84d0080ab65d3b39ea136dcfed846d7688c8bbb1bef71374d26866ca6",
+      "trimmedMd5": "c18f699087fa1acaf4fa1e46aebf600b"
+    },
+    {
+      "version": "20261022130000",
+      "name": "234_every_remaining_guard_pins_its_path",
+      "filename": "20261022130000_234_every_remaining_guard_pins_its_path.sql",
+      "sha256": "72c698f2e2f754d2e348f6e4c1cccda7d010f828a972150509a3f0561d834823",
+      "trimmedMd5": "c2a946971422e88530b6669cc6de4512"
+    },
+    {
+      "version": "20261024090000",
+      "name": "235_a_lead_can_arrive_from_outside",
+      "filename": "20261024090000_235_a_lead_can_arrive_from_outside.sql",
+      "sha256": "c8c1dbce8f5705cbc327d7bba9e660bf512edaac7040f1011871a12ee1653220",
+      "trimmedMd5": "55ad7b7f99fc50991b31a09d6f07ac16"
+    },
+    {
+      "version": "20261024100000",
+      "name": "236_lead_magnets",
+      "filename": "20261024100000_236_lead_magnets.sql",
+      "sha256": "d2dd2abc5f6b471cf97e386ff00ce63742a9f30b8cd667d2473aea04541d2f55",
+      "trimmedMd5": "32bcb5d8f81adb3a21a80c17398ce4ff"
+    },
+    {
+      "version": "20261024110000",
+      "name": "237_a_page_goes_live_on_an_approval",
+      "filename": "20261024110000_237_a_page_goes_live_on_an_approval.sql",
+      "sha256": "f09433bc84b3552d54572bc0172e0e30587cced789a5f5dc54bf1eba56bb92fa",
+      "trimmedMd5": "1090ccf1f4fe24f7a181a6c876d6fed9"
+    },
+    {
+      "version": "20261024120000",
+      "name": "238_where_each_offer_version_is_live",
+      "filename": "20261024120000_238_where_each_offer_version_is_live.sql",
+      "sha256": "ae55ded5174bed625b882c4bbffacd0293ac569fb75beb11b8a78f128c6157b0",
+      "trimmedMd5": "a00b01893a0c17eca1aeee2cc0adfd09"
+    },
+    {
+      "version": "20261024130000",
+      "name": "239_a_meta_build_runs_on_an_approval",
+      "filename": "20261024130000_239_a_meta_build_runs_on_an_approval.sql",
+      "sha256": "da54172dc967bda5d46a660907543675fc1429806a3c25c0836ad49b660f99e2",
+      "trimmedMd5": "0bbe4cf2c6ae8cedf79db994367abdf5"
+    },
+    {
+      "version": "20261024140000",
+      "name": "240_google_business_profile",
+      "filename": "20261024140000_240_google_business_profile.sql",
+      "sha256": "6c36314855dbb287ffdfb86a80fc5c628a15c886e6d5e89693c6c112703d94bc",
+      "trimmedMd5": "19b019260ebadc5a763c502ca0c0eb1c"
+    },
+    {
+      "version": "20261024150000",
+      "name": "241_meta_profile_presence",
+      "filename": "20261024150000_241_meta_profile_presence.sql",
+      "sha256": "5bc0b9ff9ed88066a03ebbd3e049f9ee253a50db20a2f73dc6c1beeda2e8690d",
+      "trimmedMd5": "aa7c4ac0821af8359a0031b74e56790f"
+    },
+    {
+      "version": "20261024160000",
+      "name": "242_motion_scenes_and_candidates",
+      "filename": "20261024160000_242_motion_scenes_and_candidates.sql",
+      "sha256": "2b03d0aa582ce98b5cfc88550ffa0843d036491ca63ed097ead0ca5a393eadbd",
+      "trimmedMd5": "b1d79c696968206b8f5f61f1f79bbec1"
+    },
+    {
+      "version": "20261024170000",
+      "name": "243_google_ads_build_sheet",
+      "filename": "20261024170000_243_google_ads_build_sheet.sql",
+      "sha256": "4342579635d6f27bd5ceb53e96d67b4aefadbde47ca79f2155d3898786720103",
+      "trimmedMd5": "9ee29c94d19dff88e23bb07acc56aec0"
+    },
+    {
+      "version": "20261025090000",
+      "name": "244_which_template_fits_this_stage",
+      "filename": "20261025090000_244_which_template_fits_this_stage.sql",
+      "sha256": "5dce4c846d79734672c56fdb31085c7acfb3294397946dcaac398be77b631f24",
+      "trimmedMd5": "1c6b6a03e476ba7452a8495d4ef55216"
+    },
+    {
+      "version": "20261025100000",
+      "name": "245_is_this_campaign_actually_live",
+      "filename": "20261025100000_245_is_this_campaign_actually_live.sql",
+      "sha256": "401df70700a696a646ceb83b1cd24572bed3d0b3b234dc9c4a2ac59a2ea34a00",
+      "trimmedMd5": "4204d6713c7d55f48a74995cb27c98e7"
+    },
+    {
+      "version": "20261025110000",
+      "name": "246_proof_reaches_the_surfaces_it_was_made_for",
+      "filename": "20261025110000_246_proof_reaches_the_surfaces_it_was_made_for.sql",
+      "sha256": "152ea1abdf812d36b84fed43c2e01c482463e4aca0259872cf26677dcc441be4",
+      "trimmedMd5": "121a64401ad3881e98d95843b0c60288"
+    },
+    {
+      "version": "20261025120000",
+      "name": "247_creative_decisions_have_a_seat",
+      "filename": "20261025120000_247_creative_decisions_have_a_seat.sql",
+      "sha256": "64775d08723003d1cc0da570bd26d35aed7e475e116068370f3d62b32c6cc2ee",
+      "trimmedMd5": "d4b142bc591e521bc3ebfdab74187604"
+    },
+    {
+      "version": "20261025130000",
+      "name": "248_a_message_can_be_sent_to_a_person",
+      "filename": "20261025130000_248_a_message_can_be_sent_to_a_person.sql",
+      "sha256": "ba9e319f6d648a5ba8f2ab0389d4f0f9ba0f1aad09b9a02a6495998d5277a3ee",
+      "trimmedMd5": "4a166f64c0607f6157d6cce04956c672"
+    },
+    {
+      "version": "20261025140000",
+      "name": "249_the_send_path",
+      "filename": "20261025140000_249_the_send_path.sql",
+      "sha256": "483c17b0bcf4e9324789486c4b5b8e694021b3815f6fe6a0442f6faa12ebb9c8",
+      "trimmedMd5": "d85e6537a14b8681f702037474022147"
+    },
+    {
+      "version": "20261025150000",
+      "name": "250_the_courier_that_sends_it",
+      "filename": "20261025150000_250_the_courier_that_sends_it.sql",
+      "sha256": "7469073acde98bd545d6dcc7a9b1b1cf5bf20e92f2c7c117815e28798f3c3e85",
+      "trimmedMd5": "b2cadff005025e9635231141795dba9e"
+    },
+    {
+      "version": "20261025160000",
+      "name": "251_a_lead_can_be_walked_through_a_sequence",
+      "filename": "20261025160000_251_a_lead_can_be_walked_through_a_sequence.sql",
+      "sha256": "598cafb32ece64ac9fcd0087a0dd6f5c68a6dddf40a6b2de503f22800c82de13",
+      "trimmedMd5": "f32fbedfb9894e1319257cbbc81c44c2"
+    },
+    {
+      "version": "20261025170000",
+      "name": "252_walking_the_sequence",
+      "filename": "20261025170000_252_walking_the_sequence.sql",
+      "sha256": "7a87871d86fd721e682ebe93b082880c19e5d2cbe3c98d568f1b64b1b66272c8",
+      "trimmedMd5": "03087a313dc6e97b23a4ec5f72925f80"
+    },
+    {
+      "version": "20261025180000",
+      "name": "253_a_campaign_can_ask_to_message_its_leads",
+      "filename": "20261025180000_253_a_campaign_can_ask_to_message_its_leads.sql",
+      "sha256": "d5a67f81cb4f5005f3ba42b85a5add348a1ca5bb236a68bf245418ba2145bd04",
+      "trimmedMd5": "5f496bedeb474f5688541f18f480db34"
+    },
+    {
+      "version": "20261025190000",
+      "name": "254_profiles_and_budgets_get_an_executor",
+      "filename": "20261025190000_254_profiles_and_budgets_get_an_executor.sql",
+      "sha256": "ff80f0fa1b3287ff3ec96a65ac4b41f36a147ded770c3503f9562bf4635013fa",
+      "trimmedMd5": "fd5e59ea288aed1280b8dd017d7b0e5b"
+    },
+    {
+      "version": "20261025200000",
+      "name": "255_a_call_can_actually_be_booked",
+      "filename": "20261025200000_255_a_call_can_actually_be_booked.sql",
+      "sha256": "2acd59c45b34365977c29e01b136560c13e00aaa45eca20296e0fec3aa0d737e",
+      "trimmedMd5": "435faa8ee415005467fdc6e5349f6ea1"
+    },
+    {
+      "version": "20261025210000",
+      "name": "256_taking_a_slot",
+      "filename": "20261025210000_256_taking_a_slot.sql",
+      "sha256": "1d6f8eb6d34bbc4dd32cabe75b5120a36774a4dfbc3c3040169e02b29fde8dba",
+      "trimmedMd5": "b6b730b3cbdcf4a1db7d8add77630184"
+    },
+    {
+      "version": "20261025220000",
+      "name": "257_a_dm_can_be_held",
+      "filename": "20261025220000_257_a_dm_can_be_held.sql",
+      "sha256": "ada71a4916d12c5cac747ca7b173853eef06f89a04b0429b9038cebe827fcaa2",
+      "trimmedMd5": "bca31f03e1dc4f0db6c5864f3e2045fd"
+    },
+    {
+      "version": "20261025230000",
+      "name": "258_replying_in_the_thread",
+      "filename": "20261025230000_258_replying_in_the_thread.sql",
+      "sha256": "582a2ef8dc0630cbcc0e9ffba83b33c016e01f9634a116f4d5bd804d6535a425",
+      "trimmedMd5": "2f2ddcba120024baa5f17acdb0730745"
+    },
+    {
+      "version": "20261025233000",
+      "name": "259_which_client_a_message_belongs_to",
+      "filename": "20261025233000_259_which_client_a_message_belongs_to.sql",
+      "sha256": "83012f6e3349cdac1ae7dbaa4d765fa4135ffe7d80a1ace55372f4f22c186c62",
+      "trimmedMd5": "2c4fde0f9f1c6bf62813fed5878658bd"
+    },
+    {
+      "version": "20261025235000",
+      "name": "260_building_the_google_campaign",
+      "filename": "20261025235000_260_building_the_google_campaign.sql",
+      "sha256": "2faa6d2e3494eac3ad92082813566526c376facf52a3c531d77dd84a74963e9e",
+      "trimmedMd5": "75671129d28ae9c2d9812aa102569be3"
+    },
+    {
+      "version": "20261029120000",
+      "name": "261_system_readiness_inventory",
+      "filename": "20261029120000_261_system_readiness_inventory.sql",
+      "sha256": "c317c9788cabf490979e2d6b8e76830b6f2e9c3499ebfbc5583e781e92515032",
+      "trimmedMd5": "2dd55e8df5191b00fef8ccea09e510bb"
+    },
+    {
+      "version": "20261029130000",
+      "name": "262_runtime_heartbeat_retention",
+      "filename": "20261029130000_262_runtime_heartbeat_retention.sql",
+      "sha256": "04f3b9b9bbffbd8f05206f3b3caf9ed7d88b5488a97fa6c8e984e2727a3d2e6c",
+      "trimmedMd5": "55049ccb0764e1cdb05baa4189d2fb06"
+    },
+    {
+      "version": "20261029140000",
+      "name": "263_auth_signup_role_hardening",
+      "filename": "20261029140000_263_auth_signup_role_hardening.sql",
+      "sha256": "a4eaadaf5a09c3649fc6ee0c948c37f986ba5fdd02c883978a4ca99c6cefad62",
+      "trimmedMd5": "b9c34610a93211c5f226e25f9cdb1446"
+    }
+  ],
+  "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
+  "catalogQueries": [
+    {
+      "name": "relations",
+      "sql": "select 'relation' as kind, format('%I.%I',n.nspname,c.relname) as identity,\n      jsonb_build_object('kind',c.relkind,'rls',c.relrowsecurity,'force_rls',c.relforcerowsecurity,\n        'acl',c.relacl::text,'view',case when c.relkind in ('v','m') then pg_get_viewdef(c.oid,true) else null end) as definition\n      from pg_class c join pg_namespace n on n.oid=c.relnamespace\n      where n.nspname in ('public','mcp_internal') and c.relkind in ('r','p','v','m','f')\n      order by identity"
+    },
+    {
+      "name": "columns",
+      "sql": "select 'column' as kind, format('%I.%I.%I',n.nspname,c.relname,a.attname) as identity,\n      jsonb_build_object('type',format_type(a.atttypid,a.atttypmod),'not_null',a.attnotnull,\n        'identity',a.attidentity,'generated',a.attgenerated,'default',pg_get_expr(d.adbin,d.adrelid),\n        'collation',a.attcollation::regcollation::text) as definition\n      from pg_attribute a join pg_class c on c.oid=a.attrelid\n      join pg_namespace n on n.oid=c.relnamespace\n      left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum\n      where n.nspname in ('public','mcp_internal') and c.relkind in ('r','p','v','m','f')\n        and a.attnum>0 and not a.attisdropped order by identity"
+    },
+    {
+      "name": "constraints",
+      "sql": "select 'constraint' as kind, format('%I.%I.%I',n.nspname,c.relname,x.conname) as identity,\n      jsonb_build_object('type',x.contype,'validated',x.convalidated,'definition',pg_get_constraintdef(x.oid,true)) as definition\n      from pg_constraint x join pg_class c on c.oid=x.conrelid\n      join pg_namespace n on n.oid=c.relnamespace\n      where n.nspname in ('public','mcp_internal') order by identity"
+    },
+    {
+      "name": "indexes",
+      "sql": "select 'index' as kind, format('%I.%I',n.nspname,i.relname) as identity,\n      jsonb_build_object('definition',pg_get_indexdef(i.oid),'valid',x.indisvalid,'ready',x.indisready) as definition\n      from pg_index x join pg_class i on i.oid=x.indexrelid\n      join pg_class c on c.oid=x.indrelid join pg_namespace n on n.oid=c.relnamespace\n      where n.nspname in ('public','mcp_internal') order by identity"
+    },
+    {
+      "name": "policies",
+      "sql": "select 'policy' as kind, format('%I.%I.%I',schemaname,tablename,policyname) as identity,\n      jsonb_build_object('permissive',permissive,'roles',roles,'command',cmd,'using',qual,'check',with_check) as definition\n      from pg_policies where schemaname in ('public','mcp_internal','storage')\n      order by identity"
+    },
+    {
+      "name": "functions",
+      "sql": "select 'function' as kind,\n      format('%I.%I(%s)',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) as identity,\n      jsonb_build_object('definition',pg_get_functiondef(p.oid),'acl',p.proacl::text,\n        'security_definer',p.prosecdef,'config',p.proconfig,'owner',pg_get_userbyid(p.proowner)) as definition\n      from pg_proc p join pg_namespace n on n.oid=p.pronamespace\n      where n.nspname in ('public','mcp_internal') and p.prokind in ('f','p','w')\n      order by identity"
+    },
+    {
+      "name": "triggers",
+      "sql": "select 'trigger' as kind, format('%I.%I.%I',n.nspname,c.relname,t.tgname) as identity,\n      jsonb_build_object('definition',pg_get_triggerdef(t.oid,true),'enabled',t.tgenabled) as definition\n      from pg_trigger t join pg_class c on c.oid=t.tgrelid\n      join pg_namespace n on n.oid=c.relnamespace\n      where n.nspname in ('public','mcp_internal') and not t.tgisinternal order by identity"
+    },
+    {
+      "name": "event_triggers",
+      "sql": "select 'event_trigger' as kind, e.evtname as identity,\n      jsonb_build_object('event',e.evtevent,'enabled',e.evtenabled,'tags',e.evttags,\n        'function',e.evtfoid::regprocedure::text) as definition\n      from pg_event_trigger e order by identity"
+    },
+    {
+      "name": "enums",
+      "sql": "select 'enum' as kind, format('%I.%I',n.nspname,t.typname) as identity,\n      jsonb_build_object('labels',array_agg(e.enumlabel order by e.enumsortorder)) as definition\n      from pg_type t join pg_namespace n on n.oid=t.typnamespace\n      join pg_enum e on e.enumtypid=t.oid\n      where n.nspname in ('public','mcp_internal') group by n.nspname,t.typname order by identity"
+    },
+    {
+      "name": "extensions",
+      "sql": "select 'extension' as kind,e.extname as identity,\n      jsonb_build_object('version',e.extversion,'schema',n.nspname) as definition\n      from pg_extension e join pg_namespace n on n.oid=e.extnamespace order by identity"
+    },
+    {
+      "name": "cron",
+      "tableCheck": "cron.job",
+      "sql": "select 'cron' as kind,\n      coalesce(jobname,'unnamed#' || jobid::text) as identity,\n      jsonb_build_object('schedule',schedule,'command',command,'active',active) as definition\n      from cron.job order by identity"
+    }
+  ]
+}
