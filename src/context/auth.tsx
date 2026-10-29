@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
@@ -60,28 +60,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const activeUserId = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    let authEventSeen = false;
+    let requestId = 0;
 
-    void supabase.auth.getSession().then(async ({ data }) => {
-      if (cancelled) return;
-      syncDraftIdentity(data.session?.user.id ?? null);
-      setSession(data.session);
-      if (data.session) setProfile(await loadProfile(data.session.user.id));
-      if (!cancelled) setLoading(false);
+    function applySession(next: Session | null) {
+      const userId = next?.user.id ?? null;
+      const changedUser = activeUserId.current !== userId;
+      const request = ++requestId;
+      activeUserId.current = userId;
+      syncDraftIdentity(userId);
+      setSession(next);
+      if (!userId) {
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+      if (changedUser) {
+        // Do not render the previous account's console while the new profile
+        // loads. A same-role account switch can keep the same route mounted.
+        setProfile(null);
+        setLoading(true);
+      }
+      void loadProfile(userId).then((loaded) => {
+        if (cancelled || request !== requestId || activeUserId.current !== userId) return;
+        setProfile(loaded);
+        setLoading(false);
+      });
+    }
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled && !authEventSeen) applySession(data.session);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      syncDraftIdentity(next?.user.id ?? null);
-      setSession(next);
-      if (!next) {
-        setProfile(null);
-        return;
-      }
-      void loadProfile(next.user.id).then((p) => {
-        if (!cancelled) setProfile(p);
-      });
+      authEventSeen = true;
+      if (!cancelled) applySession(next);
     });
 
     return () => {
@@ -96,20 +113,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     });
     if (error) throw new Error("Those details don't match an account.");
+    activeUserId.current = data.user.id;
     syncDraftIdentity(data.user.id);
+    setSession(data.session);
+    setProfile(null);
+    setLoading(true);
 
     const loaded = await loadProfile(data.user.id);
+    if (activeUserId.current !== data.user.id) {
+      throw new Error("The signed-in account changed. Try again.");
+    }
     if (!loaded) {
       await supabase.auth.signOut();
       throw new Error("This account is unavailable. Ask an admin to check your team profile.");
     }
     setProfile(loaded);
+    setLoading(false);
     return loaded;
   }, []);
 
   const signOut = useCallback(async () => {
     syncDraftIdentity(null);
     await supabase.auth.signOut();
+    activeUserId.current = null;
+    setSession(null);
     setProfile(null);
   }, []);
 
@@ -118,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       profile,
       loading,
-      isAuthenticated: session !== null && profile !== null,
+      isAuthenticated: session !== null && profile?.id === session.user.id,
       signIn,
       signOut,
     }),

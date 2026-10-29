@@ -43,6 +43,8 @@ describe("form draft isolation", () => {
     expect(localStorage.getItem(oldKey(draftKey))).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByText("Leave this form?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Leave form" }));
     rerender(<FormModal {...props} open={false} />);
     rerender(<FormModal {...props} />);
     expect(screen.getByLabelText("Account ID")).toHaveValue("");
@@ -59,6 +61,7 @@ describe("form draft isolation", () => {
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: marker } });
     expect(sessionStorage.getItem(currentKey(draftKey))).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Leave form" }));
     rerender(<FormModal {...props} open={false} />);
     rerender(<FormModal {...props} />);
     expect(screen.getByLabelText("Name")).toHaveValue("");
@@ -71,11 +74,16 @@ describe("form draft isolation", () => {
       "contact:c", "lead:c", "billing:c", "member-contract-profile:m", "brand:c", "unknown"]) {
       localStorage.setItem(oldKey(key), JSON.stringify({ secret: marker }));
     }
+    localStorage.setItem("unrelated:keep", "value");
     const read = vi.spyOn(localStorage, "getItem");
     const log = vi.spyOn(console, "log");
     const warn = vi.spyOn(console, "warn");
     purgeLegacySensitiveDrafts();
-    expect(localStorage.length).toBe(0);
+    for (let index = 0; index < localStorage.length; index += 1) {
+      expect(localStorage.key(index)).not.toMatch(/^aa-console:draft:/);
+    }
+    expect(Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)))
+      .toContain("unrelated:keep");
     expect(read).not.toHaveBeenCalled();
     expect(log).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
@@ -187,5 +195,34 @@ describe("form draft isolation", () => {
     rerender(<FormModal {...props} initialValues={generated} resetKey={generated} />);
     expect(screen.getByLabelText("Note")).toHaveValue("Generated");
     expect(screen.getByLabelText("Role")).toHaveValue("Director");
+  });
+
+  it("guards Cancel, Escape, backdrop, and close button before discarding private edits", () => {
+    const fields: FieldDef[] = [{ name: "note", label: "Private note", kind: "textarea" }];
+    const onClose = vi.fn();
+    render(<FormModal open onClose={onClose} title="Private form" draftKey="contact:c"
+      fields={fields} onSubmit={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Private note"), { target: { value: marker } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("Leave this form?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect(screen.getByLabelText("Private note")).toHaveValue(marker);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("Leave this form?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Close dialog" })[0]);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("Leave this form?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Close dialog" })[1]);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Leave form" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

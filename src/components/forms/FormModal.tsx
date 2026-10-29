@@ -64,8 +64,10 @@ export function FormModal({
     open ? blankValues(fields, { ...initialValues, ...readDraft(draftKey, fields) }) : blankValues(fields),
   );
   const touched = useRef<Record<string, boolean>>({});
+  const dirty = useRef(false);
   const previousInputs = useRef({ open: false, draftKey, resetKey });
   const [error, setError] = useState<string | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Preserve edits through live parent refreshes. A new opening, form identity
@@ -80,6 +82,8 @@ export function FormModal({
       if (reset) {
         setValues(seeded);
         touched.current = draft ? Object.fromEntries(Object.keys(draft).map((name) => [name, true])) : {};
+        dirty.current = false;
+        setConfirmDiscard(false);
         setError(null);
         setBusy(false);
       } else {
@@ -105,6 +109,8 @@ export function FormModal({
 
   function setValue(field: FieldDef, next: string | boolean | File | null) {
     touched.current[field.name] = true;
+    dirty.current = true;
+    setConfirmDiscard(false);
     setValues((prev) => {
       const updated: FormValues = { ...prev, [field.name]: next };
 
@@ -126,9 +132,15 @@ export function FormModal({
     });
   }
 
-  function close() {
+  function close(force = false) {
+    if (!force && dirty.current) {
+      setConfirmDiscard(true);
+      return;
+    }
     setValues(blankValues(fields));
     touched.current = {};
+    dirty.current = false;
+    setConfirmDiscard(false);
     onClose();
   }
 
@@ -153,7 +165,7 @@ export function FormModal({
       clearDraft(draftKey);
       setBusy(false);
       onSaved?.();
-      close();
+      close(true);
     } catch (err) {
       setBusy(false);
       setError(err instanceof Error ? err.message : "Could not save.");
@@ -161,7 +173,7 @@ export function FormModal({
   }
 
   return (
-    <Modal open={open} onClose={close} title={title}>
+    <Modal open={open} onClose={() => close()} title={title}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {intro && <p className="text-sm text-muted-foreground">{intro}</p>}
 
@@ -182,12 +194,23 @@ export function FormModal({
           </p>
         )}
 
+        {confirmDiscard && (
+          <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+            <p className="font-medium text-foreground">Leave this form?</p>
+            <p className="mt-1 text-muted-foreground">Unsaved text, files, and private details will be lost. Safe selections remain available in this tab.</p>
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={() => setConfirmDiscard(false)} className="rounded-md border border-border px-3 py-1.5">Keep editing</button>
+              <button type="button" onClick={() => close(true)} className="rounded-md bg-destructive px-3 py-1.5 text-destructive-foreground">Leave form</button>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
           {/* Left of Cancel, because it acts on the form rather than closing it. */}
           {actions && <div className="mr-auto">{actions}</div>}
           <button
             type="button"
-            onClick={close}
+            onClick={() => close()}
             className="rounded-md px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Cancel
