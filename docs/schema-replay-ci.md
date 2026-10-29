@@ -9,8 +9,8 @@ these are installed by the workflow.
 Before the database starts, `scripts/schema-migration-order.mjs` checks every
 post-259 logical migration label in timestamp order. The next expected label
 is 260. The branch containing migrations 261 and 262 fails this guard until
-the Google Ads migration 260 is present with an earlier timestamp and a
-`google_ads` name. The Pages
+the reviewed `20261025235000_260_building_the_google_campaign.sql` migration
+is present with its exact version and filename. The Pages
 deployment workflow runs the same guard before building or publishing, because
 it is triggered independently of CI. The guard also rejects duplicate
 Supabase timestamps and unnumbered new migrations. Historical labels such as
@@ -29,6 +29,8 @@ and `supabase/migrations/*.sql` into a temporary directory. It never copies
 `supabase/.temp`, which may hold a linked project ref. Every Supabase database
 command passes `--local`. The copied project and its containers are removed at
 exit; the evidence directory is retained.
+
+CLI 2.101.0 has a [known `db reset --version` flag collision](https://github.com/supabase/cli/issues/5350): it can exit successfully while leaving every later migration applied. After the full startup replay, this harness temporarily moves post-release migrations **out of the disposable copy only**, resets that copy to the released schema, verifies its migration history, restores the pending files and applies them with `migration up --local`. The source checkout is never changed. A subsequent full reset checks the clean path again. This makes the upgrade assertion meaningful even on the pinned CLI version.
 
 Supabase startup can print local API keys, so raw CLI output is kept only in
 the temporary directory and deleted at exit. CI uploads the migration filename
@@ -57,7 +59,8 @@ be reproduced locally with the disposable project.
    must exist, and no local seeded user may have migration 11's known fallback
    password.
 5. `supabase gen types --local --schema public,graphql_public` differs from
-   `src/types/database.ts`. The diff and generated file are uploaded with the
+   `src/types/database.ts` after normalizing only the CLI's extra terminal blank line.
+   The diff and generated file are uploaded with the
    CI evidence; update the committed type file only after reviewing the schema
    change.
 
