@@ -1,4 +1,4 @@
-# B005 sales entitlement boundary (migration 267)
+# B005 sales entitlement boundary (migrations 267–268)
 
 This is a reviewable, dormant sales-seat contract. Applying migration 267 does
 not enable employee Sales OS access. The only current production grant is
@@ -68,6 +68,38 @@ appointment outcome, consent, probe, and attribution fields neutral. A later
 stage change uses `advance_lead` so its event is recorded. Existing trusted
 service producers and the administrator table policy keep their write paths.
 
+## Contact and conversation reads (migration 268)
+
+The same sales permission contract now governs SELECT on the nine tables that
+hold contact, consent, scheduling, delivery, send, or message history:
+
+| Table | Protected data |
+| --- | --- |
+| `lead_submissions` | Submitted contact and consent evidence |
+| `lead_magnet_deliveries` | Recipient addresses and delivery status |
+| `lead_sequence_enrollments` | Lead follow-up state |
+| `lead_suppressions` | Recipient address and suppression reason |
+| `outbound_messages` | Recipient, body, transport, and result |
+| `client_appointments` | Lead booking and attendance |
+| `dm_identities` | Social identity and contact link |
+| `dm_conversations` | DM thread identity and state |
+| `dm_messages` | DM content and send/receive history |
+
+`can_read_client_sales_data` delegates to `may_manage_client_leads`: admin,
+same-client user, service role, and a live explicitly entitled sales employee.
+A generic job assignment no longer reads these tables. The existing
+`sales_agent_conversations` admin/client policy remains, with a separate
+same-client sales policy and explicit table SELECT grant. The sales path stays
+dormant while `inbox_enforced` is false. PGlite checks the prior assigned-editor
+exposure, the new denial on all ten tables, cross-client isolation, service
+reads, and retirement/revocation after a fixture-only Inbox bridge.
+
+`lead_capture_endpoints`, `booking_links`, message templates, sequence
+templates, and booking window/settings tables retain their existing policies;
+they hold configuration or hashed tokens rather than a prospect's contact or
+conversation. Review their commercial sensitivity separately before opening
+an employee Sales console.
+
 ## Follow-on work
 
 - B008: add a real unified Inbox record and immutable FK/hash validation for
@@ -77,16 +109,15 @@ service producers and the administrator table policy keep their write paths.
   employee Sales console route that uses explicit client scope, and permission
   tests for its navigation and lead capture/submission panels. Keep the route
   closed until the Inbox gate is live.
-- B005: review related lead-linked tables and older views beyond the core
-  lead, event, archive, identity, and reporting surfaces covered here. In
-  particular, migration 235's `lead_submissions_read` exposes contact and
-  consent details through `can_access_client`; migration 236's
-  `lead_magnet_deliveries_read` exposes recipient addresses; migration 251's
-  `lead_sequence_enrollments_read`, migration 248's `outbound_messages_read`,
-  and migration 257's `dm_messages_read` also use that broad helper. Narrow
-  these in a subsequent B005 slice and test generic creative assignees versus
-  same-client sales actors. The `lead_pipeline_counts` view is changed to
-  `security_invoker` in 267.
+- B005: narrow authenticated security-definer RPCs that can bypass these row
+  policies before enabling an employee Sales route. Known calls include
+  `close_dm_conversation_v6` and `merge_dm_lead_v6` (migration 259),
+  `queue_lead_message_v6` (migration 249), and
+  `enroll_lead_in_sequence_v6`/`exit_lead_from_sequence_v6` (migration 252):
+  each currently accepts broad `can_access_client` assignment, and some
+  return contact or conversation rows. Audit related authoring and read RPCs
+  in the same pass. `lead_pipeline_counts` is `security_invoker` from 267;
+  contact and conversation row policies are narrowed by 268.
 - R000/B003: run full clean and upgrade schema replay in CI, generate database
   types from the resulting schema, and verify production SQL/version evidence
   through the release gate before applying any migration.
