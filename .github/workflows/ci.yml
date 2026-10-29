@@ -29,6 +29,7 @@ jobs:
       - name: Replay schema and compare types
         env:
           AA_SCHEMA_EVIDENCE_DIR: schema-replay-evidence
+          AA_SCHEMA_REPLAY_RAW_SOURCE: '1'
         run: bash scripts/schema-replay-ci.sh
       - uses: actions/upload-artifact@v4
         if: always()
