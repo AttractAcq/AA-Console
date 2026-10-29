@@ -509,9 +509,14 @@ branch ended three things:
 - **`window.confirm` on delete** — v2 asks in its own dialog, naming the same
   cascade.
 
-One UX consequence to know about: v2's campaign list is a table, so Launch,
-Run planner and Clone are reached by opening the campaign, where v1 had them
-on every card. Nothing is unreachable; it is one click further.
+Removing v1's cards briefly took Launch, Run planner and Clone off the list,
+leaving them on a campaign's own page. They are back: `CampaignActions` is one
+component used by both, so a list row offers the same five actions, with the
+same gating and the same confirmation, as the campaign's own page. Acting on
+what you can see while reading down the list is how the screen is used, and
+making somebody open a campaign to discover it cannot be launched is not a
+safeguard. The list's row toggle is **Actions** rather than Edit, since it now
+reveals five things and none of them is editing.
 
 `ProofBankPanel` is deleted — v1's Proof Bank page, its last unique
 capability having moved to v2 first.

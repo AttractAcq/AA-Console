@@ -192,7 +192,7 @@ describe("campaign pages", () => {
     expect(await screen.findByRole("table")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Winter full-arch push" })).toHaveAttribute("href", "/clients/client-1/delivery/campaign-factory/camp-1");
     expect(screen.getByRole("columnheader", { name: "Date" })).toBeInTheDocument();
-    await userEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    await userEvent.click(screen.getAllByRole("button", { name: "Actions" })[0]);
     await userEvent.click(screen.getByRole("button", { name: "Archive" }));
     expect(screen.getByRole("dialog", { name: "Confirm campaign action" })).toHaveTextContent("Archive");
     expect(from).not.toHaveBeenCalledWith("client_campaigns", expect.objectContaining({ archived_at: expect.anything() }));
@@ -858,5 +858,95 @@ describe("deleting a campaign", () => {
     await press("Delete");
     expect(await screen.findByRole("alert")).toHaveTextContent(/Only an admin can delete a campaign/i);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+});
+
+// Launch, Run planner and Clone were on every card in the old page, then only
+// on a campaign's own page for a while. Reading down the list and acting on
+// what you see is how this screen is used.
+describe("acting on a campaign from the list", () => {
+  beforeEach(() => useParams.mockReturnValue({ clientId: "client-1" }));
+
+  async function rowActions(row = 0) {
+    await userEvent.click((await screen.findAllByRole("button", { name: "Actions" }))[row]!);
+    return within(screen.getByRole("group", { name: "Campaign actions" }));
+  }
+
+  it("offers the same five actions a campaign's own page does", async () => {
+    show([planned()], READY);
+    const actions = await rowActions();
+    expect(actions.getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "Archive", "Delete", "Run planner", "Launch", "Clone to another route",
+    ]);
+  });
+
+  it("opens one row's actions at a time", async () => {
+    show([planned(), planned({ id: "camp-2", name: "Spring whitening" })], READY);
+    await rowActions(0);
+    expect(screen.getAllByRole("group", { name: "Campaign actions" })).toHaveLength(1);
+    await rowActions(1);
+    expect(screen.getAllByRole("group", { name: "Campaign actions" })).toHaveLength(1);
+  });
+
+  it("launches a ready campaign, through the same confirmation", async () => {
+    show([planned()], READY);
+    const actions = await rowActions();
+    await userEvent.click(actions.getByRole("button", { name: "Launch" }));
+    expect(screen.getByRole("dialog", { name: "Confirm campaign action" }))
+      .toHaveTextContent("This changes its status to live.");
+    expect(rpc).not.toHaveBeenCalledWith("launch_campaign", expect.anything());
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(rpc).toHaveBeenCalledWith("launch_campaign", { p_campaign_id: "camp-1" });
+  });
+
+  it("refuses to launch from the list exactly where the campaign's page would", async () => {
+    // The gating is the campaign's, not the view's: an unready campaign and a
+    // paid route are both refused here for the reasons they are refused there.
+    show([planned()], NOT_READY);
+    expect((await rowActions()).getByRole("button", { name: "Launch" })).toBeDisabled();
+    expect(screen.getByText(/New routes require version-bound human approval/)).toBeInTheDocument();
+  });
+
+  it("queues the planner for the row it was pressed on", async () => {
+    show([planned({ built_at: null, objective: null }), planned({ id: "camp-2", name: "Spring whitening" })]);
+    const actions = await rowActions(0);
+    await userEvent.click(actions.getByRole("button", { name: "Run planner" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(rpc).toHaveBeenCalledWith("enqueue_agent_job", {
+      p_agent_key: "campaign_plan",
+      p_client_id: "client-1",
+      p_input_table: "client_campaigns",
+      p_input_id: "camp-1",
+    });
+  });
+
+  it("will not queue a planner already running for that campaign", async () => {
+    useAgentJobs.mockReturnValue({
+      inFlight: [{ id: "job-1", agent_key: "campaign_plan", input_id: "camp-1", status: "running",
+        attempts: 1, error: null, created_at: "2026-10-29T10:00:00Z",
+        started_at: "2026-10-29T10:00:01Z", completed_at: null }],
+      recentFailures: [],
+    });
+    show([planned({ built_at: null, objective: null })]);
+    expect((await rowActions()).getByRole("button", { name: "Run planner" })).toBeDisabled();
+  });
+
+  it("clones into another route from the list", async () => {
+    show([planned()], READY);
+    rpc.mockImplementation((name: string) => name === "clone_campaign_for_route"
+      ? Promise.resolve({ data: "new-paid", error: null })
+      : Promise.resolve({ data: READY, error: null }));
+    const actions = await rowActions();
+    await userEvent.click(actions.getByRole("button", { name: "Clone to another route" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "New route" }), "paid");
+    await userEvent.selectOptions(screen.getByLabelText(/Paid platform/i), "meta");
+    await userEvent.click(screen.getByRole("button", { name: "Create separate campaign" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("clone_campaign_for_route", {
+      p_source_campaign_id: "camp-1",
+      p_target_mode: "paid",
+      p_paid_platform: "meta",
+      p_name: "Winter full-arch push · New route",
+    }));
   });
 });
