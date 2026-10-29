@@ -4,30 +4,20 @@
 // tell them apart.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { randomUUID } from "node:crypto";
 import type { RuntimeConfig } from "./config.js";
 import { logger } from "./logging/logger.js";
+import { deployedCommitSha } from "./readiness/version.js";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
-// Hosting platforms that expose the deployed commit, checked in a stable
-// but arbitrary order.
-const COMMIT_ENV_VARS = [
-  "RAILWAY_GIT_COMMIT_SHA",
-  "RENDER_GIT_COMMIT",
-  "VERCEL_GIT_COMMIT_SHA",
-  "SOURCE_VERSION",
-];
-
-function resolveVersion(): string {
-  for (const name of COMMIT_ENV_VARS) {
-    const value = process.env[name];
-    if (value) return value.slice(0, 12);
-  }
-  return "local";
-}
-
 export interface HeartbeatHandle {
   stop: () => void;
+}
+
+/** A process identity must survive identical PIDs across container replicas. */
+export function makeHeartbeatWorkerId(pid = process.pid, instanceId = randomUUID()): string {
+  return `agent-runtime:${pid}:${instanceId}`;
 }
 
 export function startHeartbeat(
@@ -35,8 +25,8 @@ export function startHeartbeat(
   config: RuntimeConfig,
   workerCount: number,
 ): HeartbeatHandle {
-  const workerId = `agent-runtime:${process.pid}`;
-  const version = resolveVersion();
+  const workerId = makeHeartbeatWorkerId();
+  const version = deployedCommitSha();
 
   async function tick(): Promise<void> {
     try {

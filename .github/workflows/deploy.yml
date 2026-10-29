@@ -34,6 +34,11 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Pages runs independently of CI on main. Keep a missing migration
+      # dependency from publishing a frontend built against the wrong schema.
+      - name: Require sequential migration dependencies
+        run: node scripts/schema-migration-order.mjs
+
       - run: npm ci
 
       # A missing key does not fail the build — Vite substitutes undefined
@@ -61,6 +66,8 @@ jobs:
 
       - name: Build
         env:
+          # Non-secret identity of the browser bundle actually published.
+          VITE_BUILD_SHA: ${{ github.sha }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           # Optional. Absent means the Master AI reports itself unconfigured

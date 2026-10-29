@@ -95,6 +95,8 @@ export const agencyNav: NavNode[] = [
     path: "/admin",
     icon: ShieldCheck,
     tabs: [
+      { id: "system-readiness", label: "System readiness" },
+      { id: "schema-parity", label: "Schema parity" },
       { id: "financials", label: "Financials" },
       { id: "sops", label: "SOPs" },
     ],
