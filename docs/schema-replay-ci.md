@@ -59,7 +59,8 @@ be reproduced locally with the disposable project.
    must exist, and no local seeded user may have migration 11's known fallback
    password.
 5. `supabase gen types --local --schema public,graphql_public` differs from
-   `src/types/database.ts`. The diff and generated file are uploaded with the
+   `src/types/database.ts` after normalizing only the CLI's extra terminal blank line.
+   The diff and generated file are uploaded with the
    CI evidence; update the committed type file only after reviewing the schema
    change.
 

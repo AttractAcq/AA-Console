@@ -143,6 +143,10 @@ if ! supabase_local gen types --local --lang typescript --schema public,graphql_
   echo 'Local type generation failed; raw CLI output withheld because it may contain local keys.' >&2
   exit 1
 fi
+# The CLI emits an extra terminal blank line; keep the checked-in file in
+# normal source format while comparing every generated type and relationship.
+node -e 'const fs = require("node:fs"); const path = process.argv[1]; const raw = fs.readFileSync(path, "utf8"); fs.writeFileSync(path, raw.replace(/\n+$/, "\n"));' \
+  "$evidence_dir/database.generated.ts"
 diff -u src/types/database.ts "$evidence_dir/database.generated.ts" \
   >"$evidence_dir/database-types.diff" || {
     head -200 "$evidence_dir/database-types.diff" >&2
