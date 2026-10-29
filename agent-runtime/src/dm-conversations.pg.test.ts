@@ -21,6 +21,9 @@ let db: PGlite;
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const MANAGER = "22222222-2222-4222-8222-222222222222";
+const OTHER_CLIENT = "33333333-3333-4333-8333-333333333333";
+const FOREIGN_CAMPAIGN = "44444444-4444-4444-8444-444444444444";
+const LOCAL_CAMPAIGN = "55555555-5555-4555-8555-555555555555";
 
 const sql = (file: string) =>
   readFile(new URL(`../../supabase/migrations/${file}`, import.meta.url), "utf8");
@@ -252,6 +255,36 @@ describe("the reply window", () => {
 });
 
 describe("migration 268 definer boundary", () => {
+  it("refuses a foreign campaign from either the template or lead fallback", async () => {
+    await asService();
+    const conv = await inbound({ mid: "campaign-mid" });
+    const version = await dmTemplate();
+    await db.query(`insert into client_campaigns(id,client_id) values
+      ($1,$2),($3,$4)`, [FOREIGN_CAMPAIGN, OTHER_CLIENT, LOCAL_CAMPAIGN, CLIENT]);
+    await db.query("update client_leads set source_client_campaign_id=$1 where id=$2",
+      [FOREIGN_CAMPAIGN, conv.lead_id]);
+    await asService();
+    expect(await refusal("select queue_lead_message_v6($1,$2)", [conv.lead_id, version]))
+      .toContain("campaign belongs to a different client");
+    expect(await rows("select id from outbound_messages")).toHaveLength(0);
+
+    await db.query("update client_leads set source_client_campaign_id=null where id=$1",
+      [conv.lead_id]);
+    await db.query(`update message_templates set campaign_id=$1
+      where id=(select template_id from message_template_versions where id=$2)`,
+      [FOREIGN_CAMPAIGN, version]);
+    expect(await refusal("select queue_lead_message_v6($1,$2)", [conv.lead_id, version]))
+      .toContain("campaign belongs to a different client");
+    expect(await rows("select id from outbound_messages")).toHaveLength(0);
+
+    await db.query(`update message_templates set campaign_id=$1
+      where id=(select template_id from message_template_versions where id=$2)`,
+      [LOCAL_CAMPAIGN, version]);
+    const sent = await one<{ campaign_id: string }>(
+      "select campaign_id from queue_lead_message_v6($1,$2)", [conv.lead_id, version]);
+    expect(sent.campaign_id).toBe(LOCAL_CAMPAIGN);
+  });
+
   it("blocks assigned editors from DM detail, mutations and queueing while preserving scoped actors", async () => {
     await asService();
     const conv = await inbound();

@@ -59,6 +59,7 @@ beforeAll(async () => {
     insert into workflow_runs values ('${RUN_A}','${CLIENT}'),('${RUN_B}','${OTHER}');
     insert into workflow_lead_attribution values ('${RUN_A}','A'),('${RUN_B}','B');
     alter table workflow_lead_attribution enable row level security;
+    alter table workflow_runs enable row level security;
     grant select on workflow_runs,workflow_lead_attribution to authenticated,service_role;
     -- The definer functions restored by 268 declare these composite row types;
     -- their behavior is exercised against fuller tables in dm-conversations.
@@ -93,6 +94,8 @@ beforeAll(async () => {
         select public.is_admin() or public.is_client_user(target) or exists(
           select 1 from public.job_assignments j join public.team_members tm on tm.id=j.member_id
            where j.client_id=target and tm.user_id=auth.uid() and tm.active) $$;
+    create policy workflow_runs_read on workflow_runs for select to authenticated
+      using(public.can_access_client(client_id));
     create policy workflow_lead_attribution_read on workflow_lead_attribution
       for select to authenticated using(exists(select 1 from workflow_runs r
         where r.id=run_id and public.can_access_client(r.client_id)));
@@ -178,6 +181,7 @@ describe("migration 268: contact and conversation scope", () => {
     await asUser(SALES);
     for (const table of TABLES) expect(await rows(table), table).toHaveLength(0);
     expect(await attributionRows()).toHaveLength(0);
+    expect((await db.query("select id from workflow_runs")).rows).toHaveLength(0);
     await db.exec(`reset role;
       insert into sales_grants values
         ('${CLIENT}','dddddddd-dddd-4ddd-8ddd-dddddddddddd','${SALES}',gen_random_uuid(),null);
@@ -186,6 +190,7 @@ describe("migration 268: contact and conversation scope", () => {
     for (const table of TABLES) expect((await rows(table)).map((row) => row.marker), table)
       .toEqual(["A"]);
     expect((await attributionRows()).map((row) => row.marker)).toEqual(["A"]);
+    expect((await db.query("select id from workflow_runs")).rows).toHaveLength(0);
     await db.exec(`reset role;
       update team_members set active=false where user_id='${SALES}';`);
     await asUser(SALES);

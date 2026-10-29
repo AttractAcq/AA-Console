@@ -29,14 +29,26 @@ create policy lead_sequence_enrollments_read on public.lead_sequence_enrollments
   for select to authenticated
   using (public.can_read_client_sales_data(client_id));
 
--- Run attribution includes lead IDs, evidence and labels. A workflow job
--- assignment is not permission to inspect the people that workflow acquired.
+-- Run attribution includes lead IDs, evidence and labels. workflow_runs has
+-- its own creative-assignment RLS, so a sales-only seat cannot use an invoker
+-- subquery to resolve run_id -> client_id. Resolve only that scope inside a
+-- definer helper; do not grant the seat workflow_runs SELECT.
+create or replace function public.can_read_workflow_lead_attribution(p_run_id uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.workflow_runs r
+     where r.id = p_run_id
+       and public.can_read_client_sales_data(r.client_id));
+$$;
+revoke execute on function public.can_read_workflow_lead_attribution(uuid)
+  from public, anon;
+grant execute on function public.can_read_workflow_lead_attribution(uuid)
+  to authenticated, service_role;
+
 drop policy if exists workflow_lead_attribution_read on public.workflow_lead_attribution;
 create policy workflow_lead_attribution_read on public.workflow_lead_attribution
   for select to authenticated
-  using (exists (
-    select 1 from public.workflow_runs r
-     where r.id = run_id and public.can_read_client_sales_data(r.client_id)));
+  using (public.can_read_workflow_lead_attribution(run_id));
 
 drop policy if exists lead_suppressions_read on public.lead_suppressions;
 create policy lead_suppressions_read on public.lead_suppressions
@@ -175,6 +187,7 @@ declare
   v_sent_today integer;
   v_cap integer;
   v_key text;
+  v_campaign_id uuid;
 begin
   select * into l from public.client_leads where id = p_lead_id;
   if not found then raise exception 'No such lead.' using errcode = 'P0001'; end if;
@@ -191,6 +204,12 @@ begin
   select * into t from public.message_templates where id = v.template_id;
   if t.client_id <> l.client_id then
     raise exception 'That message belongs to a different client.' using errcode = 'P0001';
+  end if;
+  v_campaign_id := coalesce(t.campaign_id, l.source_client_campaign_id);
+  if v_campaign_id is not null and not exists (
+    select 1 from public.client_campaigns c
+     where c.id = v_campaign_id and c.client_id = l.client_id) then
+    raise exception 'That campaign belongs to a different client.' using errcode = 'P0001';
   end if;
 
   select * into ch from public.message_channels where channel_key = t.channel_key;
@@ -267,7 +286,7 @@ begin
     idempotency_key)
   values (
     l.client_id, p_lead_id, p_template_version_id, a.id, t.channel_key,
-    coalesce(t.campaign_id, l.source_client_campaign_id),
+    v_campaign_id,
     btrim(v_address), v.subject, public.render_message_v6(v.body, l),
     l.consent_given_at, l.consent_wording, v_key)
   on conflict (idempotency_key) do nothing
