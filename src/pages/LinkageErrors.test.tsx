@@ -24,7 +24,6 @@ import { AuditLogPanel } from "./account/AuditLogPanel";
 
 import { DistributionBoard } from "../components/DistributionBoard";
 import { MediaLibrary } from "../components/MediaLibrary";
-import { ProofBankPanel } from "./proof-bank/ProofBankPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { TeamCategoryPanel } from "./operations/TeamCategoryPanel";
 import { RecruitmentPanel } from "./operations/RecruitmentPanel";
@@ -42,7 +41,7 @@ const ActiveOrganic = () => <ActiveOrganicView clientId="client-1" />;
 const ActiveConversion = () => <ActiveConversionView clientId="client-1" />;
 
 beforeEach(() => vi.clearAllMocks());
-const panels = [OrganicDistribution, ImageLibrary, ProofBankPanel, ApprovalsPanel, EditorsTeam, Recruitment, ClientsPage, PageBuilderPanel, GenerationPanel, BriefsPanel, AgentsPanel, CalendarPanel, SopsPanel, CommentaryPanel, ContractsLegalPanel, AuditLogPanel, ActiveOrganic, ActiveConversion, BusinessContextPanel, OnboardingPanel, IntegrationsPanel, BillingSubscriptionPanel, BrandPanel];
+const panels = [OrganicDistribution, ImageLibrary, ApprovalsPanel, EditorsTeam, Recruitment, ClientsPage, PageBuilderPanel, GenerationPanel, BriefsPanel, AgentsPanel, CalendarPanel, SopsPanel, CommentaryPanel, ContractsLegalPanel, AuditLogPanel, ActiveOrganic, ActiveConversion, BusinessContextPanel, OnboardingPanel, IntegrationsPanel, BillingSubscriptionPanel, BrandPanel];
 for (const Component of panels) {
   it(`${Component.name} surfaces database errors and recovers on retry`, async () => {
     let fail = true;

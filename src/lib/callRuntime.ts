@@ -15,6 +15,7 @@ export async function callRuntime<T>(path: string, body: unknown): Promise<T> {
 
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
+  if (!token) throw new Error("Please sign in before using the agent runtime.");
 
   let res: Response;
   try {
@@ -22,7 +23,7 @@ export async function callRuntime<T>(path: string, body: unknown): Promise<T> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(body),
     });

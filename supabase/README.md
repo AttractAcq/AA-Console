@@ -1,13 +1,18 @@
 # Database schema
 
-The 28 migrations in `migrations/` are the full history of the AA Console
-database, exported from the live project (`bancbdztffokwiifzoiv`) with
-`supabase migration fetch`. They match what is applied there
-character-for-character.
+`migrations/` holds the versioned AA Console schema history checked into this
+repository. The files were originally exported from the live Supabase project
+with `supabase migration fetch` so the schema could be reviewed and replayed.
+New migrations have been added since then. From the repository root, count
+the tracked SQL files at your current commit with:
 
-Until this export the schema existed only inside Supabase. There was
-nothing to replay if the project were lost and no way to stand up a
-second environment.
+```bash
+git ls-files 'supabase/migrations/*.sql' | wc -l
+```
+
+The local file count does not prove which migrations are applied to a target
+project. Check that project's migration history and review the pending changes
+before any `supabase db push`.
 
 ## Applying to a fresh project
 

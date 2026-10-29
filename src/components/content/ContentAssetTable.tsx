@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { DataTable } from "../DataTable";
 import { ActionMenu } from "../ActionMenu";
@@ -57,7 +57,6 @@ type BriefRow = {
 export function ContentAssetTable({ approved }: { approved: boolean }) {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [briefs, setBriefs] = useState<ReadonlyMap<string, BriefRow>>(new Map());
@@ -155,9 +154,8 @@ export function ContentAssetTable({ approved }: { approved: boolean }) {
 
   /** Edit and Repurpose both live on their own tab, which owns that work. */
   function openEditTab(asset: MediaAsset) {
-    const v2 = searchParams.get("view") === "v2";
     navigate(
-      `/clients/${clientId}/delivery/content-production-factory?${v2 ? "view=v2&" : ""}tab=edit&asset=${asset.id}`,
+      `/clients/${clientId}/delivery/content-production-factory?tab=edit&asset=${asset.id}`,
     );
   }
 

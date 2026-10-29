@@ -109,7 +109,7 @@ export function CampaignPagePublishPanel() {
                 {row.campaign_id && clientId && (
                   <Link
                     className="block text-xs text-brand-strong underline"
-                    to={`/clients/${clientId}/delivery/campaign-factory/${row.campaign_id}?view=v2`}
+                    to={`/clients/${clientId}/delivery/campaign-factory/${row.campaign_id}`}
                   >
                     View campaign
                   </Link>

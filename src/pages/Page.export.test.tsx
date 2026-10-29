@@ -16,45 +16,52 @@ vi.mock("./intelligence/MarketPanel", () => ({ MarketPanel: () => <p>Market pane
 vi.mock("./ideation/GenerationPanel", () => ({ GenerationPanel: ({ showJourney = true }: { showJourney?: boolean }) => <p>Ideation panel · journey {String(showJourney)}</p> }));
 vi.mock("./campaigns/CampaignExecutionPanel", () => ({ CampaignExecutionPanel: () => <p>Campaign table</p> }));
 
+// The workspace has its own test; here it stands for "Assets opened".
+vi.mock("../components/content/ContentAssetsWorkspace", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ContentAssetsWorkspace: () => <p>Assets workspace</p>,
+}));
 vi.mock("./proof-bank/ProofFactoryV2Panel", () => ({ ProofFactoryV2Panel: ({tab}: {tab: string}) => <p>Proof v2 {tab}</p> }));
-vi.mock("./proof-bank/ProofBankPanel", () => ({ ProofBankPanel: () => <p>Original proof bank</p> }));
+vi.mock("./conversion/PageBuilderPanel", () => ({ PageBuilderPanel: ({ pageType }: { pageType: string }) => <p>Page builder · {pageType}</p> }));
+vi.mock("./reporting/PagesReportingPanel", () => ({ PagesReportingPanel: ({ pageType }: { pageType: string }) => <p>Page results · {pageType}</p> }));
+vi.mock("./sites/CampaignPagePublishPanel", () => ({ CampaignPagePublishPanel: () => <p>Publish panel</p> }));
+vi.mock("./sites/SitesPanel", () => ({ SitesPanel: () => <p>Sites panel</p> }));
+vi.mock("./distribution/MetaProfilePanel", () => ({ MetaProfilePanel: ({ tab }: { tab: string }) => <p>Meta profile {tab}</p> }));
+vi.mock("./distribution/OrganicPanel", () => ({ OrganicPanel: () => <p>Organic board</p> }));
+vi.mock("./reporting/OrganicReportingPanel", () => ({ OrganicReportingPanel: () => <p>Organic reporting</p> }));
 
-import { legacyDeliveryNodes, v6ModuleNodes } from "../config/navigation";
+import { v6ModuleNodes } from "../config/navigation";
 import { Page } from "./Page";
 
-const intelligence = legacyDeliveryNodes.find((node) => node.id === "intelligence")!;
 const intelligenceOs = v6ModuleNodes.find((node) => node.id === "intelligence-os")!;
 
 beforeEach(() => vi.clearAllMocks());
 
-it("downloads the selected tab as a PDF and all module tabs as a ZIP", async () => {
+it("downloads whichever tab is open as a PDF", async () => {
   const user = userEvent.setup();
   render(
-    <MemoryRouter initialEntries={["/clients/client-1/delivery/intelligence"]}>
+    <MemoryRouter initialEntries={["/clients/client-1/delivery/intelligence-os"]}>
       <Routes>
-        <Route path="/clients/:clientId/delivery/intelligence" element={<Page node={intelligence} />} />
+        <Route path="/clients/:clientId/delivery/intelligence-os" element={<Page node={intelligenceOs} />} />
       </Routes>
     </MemoryRouter>,
   );
 
   await user.click(screen.getByRole("button", { name: "Download PDF" }));
-  expect(downloadTabPdf).toHaveBeenCalledWith("client-1", "intelligence", intelligence.tabs![0]);
+  expect(downloadTabPdf).toHaveBeenCalledWith("client-1", "intelligence", intelligenceOs.tabs![0]);
 
   await user.click(screen.getByRole("tab", { name: "Market" }));
   await user.click(screen.getByRole("button", { name: "Download PDF" }));
-  expect(downloadTabPdf).toHaveBeenLastCalledWith("client-1", "intelligence", intelligence.tabs![1]);
-
-  await user.click(screen.getByRole("button", { name: "Download all" }));
-  expect(downloadModuleZip).toHaveBeenCalledWith("client-1", "intelligence", intelligence.tabs);
+  expect(downloadTabPdf).toHaveBeenLastCalledWith("client-1", "intelligence", intelligenceOs.tabs![1]);
 });
 
 it("shows an export failure and allows retry", async () => {
   downloadTabPdf.mockRejectedValueOnce(new Error("Network unavailable"));
   const user = userEvent.setup();
   render(
-    <MemoryRouter initialEntries={["/clients/client-1/delivery/intelligence"]}>
+    <MemoryRouter initialEntries={["/clients/client-1/delivery/intelligence-os"]}>
       <Routes>
-        <Route path="/clients/:clientId/delivery/intelligence" element={<Page node={intelligence} />} />
+        <Route path="/clients/:clientId/delivery/intelligence-os" element={<Page node={intelligenceOs} />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -97,37 +104,37 @@ it("shows only strategy tabs and its export in the strategy view", async () => {
   expect(downloadModuleZip).toHaveBeenLastCalledWith("client-1", "strategy", intelligenceOs.tabs!.slice(strategyStart));
 });
 
-it("keeps Content Production v1 tabs and gives v2 grouped assets without its stage bar", async () => {
+it("gives Content Production five tabs and no stage bar", async () => {
   const content = v6ModuleNodes.find((node) => node.id === "content-production-factory")!;
   const user = userEvent.setup();
-  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/content-production-factory?view=v2"]}>
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/content-production-factory"]}>
     <Routes><Route path="/clients/:clientId/delivery/content-production-factory" element={<Page node={content} />} /></Routes>
   </MemoryRouter>);
   expect(screen.getByText("Ideation panel · journey false")).toBeInTheDocument();
   expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
     "Ideation", "Briefs", "Create", "Edit / Repurpose", "Assets",
   ]);
-  // v2 Assets is the approved assets themselves now, not a group of
-  // libraries: the table renders, and says so when nothing is approved yet.
+  // Assets is the approved table with v1's six libraries nested under it,
+  // which is the shape the 16 October specification asked for.
   await user.click(screen.getByRole("tab", { name: "Assets" }));
-  expect(screen.getByText("Approved assets")).toBeInTheDocument();
+  expect(screen.getByText("Assets workspace")).toBeInTheDocument();
   await user.click(screen.getByRole("tab", { name: "Ideation" }));
   expect(screen.getByText("Ideation panel · journey false")).toBeInTheDocument();
 });
 
 it("renders the campaign factory v2 panel", () => {
   const campaign = v6ModuleNodes.find((node) => node.id === "campaign-factory")!;
-  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/campaign-factory?view=v2"]}>
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/campaign-factory"]}>
     <Routes><Route path="/clients/:clientId/delivery/campaign-factory" element={<Page node={campaign} />} /></Routes>
   </MemoryRouter>);
-  expect(screen.getByRole("heading", { name: "Campaign Factory v2" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Campaign Factory" })).toBeInTheDocument();
   expect(screen.getByText("Campaign table")).toBeInTheDocument();
   expect(screen.queryByText(/Existing tools are available here/)).not.toBeInTheDocument();
 });
 
-it("opens proof v2 stages and preserves the original v1 proof bank", async () => {
+it("opens every proof production stage", async () => {
   const node = v6ModuleNodes.find((n) => n.id === "proof-production-factory")!;
-  const first = render(<MemoryRouter initialEntries={["/clients/client-1/delivery/proof-production-factory?view=v2"]}>
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/proof-production-factory"]}>
     <Routes><Route path="/clients/:clientId/delivery/proof-production-factory" element={<Page node={node}/>} /></Routes>
   </MemoryRouter>);
   expect(screen.getByText("Proof v2 capture")).toBeInTheDocument();
@@ -135,10 +142,45 @@ it("opens proof v2 stages and preserves the original v1 proof bank", async () =>
     await userEvent.click(screen.getByRole("tab", {name}));
     expect(screen.getByText(`Proof v2 ${name.toLowerCase()}`)).toBeInTheDocument();
   }
-  first.unmount();
-  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/proof-production-factory?view=v1"]}>
-    <Routes><Route path="/clients/:clientId/delivery/proof-production-factory" element={<Page node={node}/>} /></Routes>
+});
+
+// The three surfaces v2 did not carry over. Each is the v1 panel itself, in
+// the v2 page, because the point was never a rewrite — it was that archiving
+// v1 must not take a working screen with it.
+it("gives Website Studio v2 the offer-page builder v1 had", async () => {
+  const node = v6ModuleNodes.find((n) => n.id === "website-studio")!;
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/website-studio"]}>
+    <Routes><Route path="/clients/:clientId/delivery/website-studio" element={<Page node={node} />} /></Routes>
   </MemoryRouter>);
-  expect(screen.getByText("Original proof bank")).toBeInTheDocument();
-  expect(screen.queryByRole("tab", {name:"Capture"})).not.toBeInTheDocument();
+  expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+    "Publish", "Landing Pages", "Offer Pages", "Sites", "Results",
+  ]);
+  await user.click(screen.getByRole("tab", { name: "Offer Pages" }));
+  expect(screen.getByText("Page builder · offer")).toBeInTheDocument();
+  // Landing is still its own builder, and no longer just called "Pages".
+  await user.click(screen.getByRole("tab", { name: "Landing Pages" }));
+  expect(screen.getByText("Page builder · landing")).toBeInTheDocument();
+});
+
+it("keeps the Posts board on Meta Profile v2", async () => {
+  const node = v6ModuleNodes.find((n) => n.id === "meta-profile")!;
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/meta-profile"]}>
+    <Routes><Route path="/clients/:clientId/delivery/meta-profile" element={<Page node={node} />} /></Routes>
+  </MemoryRouter>);
+  expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+    "Identities", "Profile", "Presence", "Posts", "Outcomes",
+  ]);
+  await user.click(screen.getByRole("tab", { name: "Posts" }));
+  expect(screen.getByText("Organic board")).toBeInTheDocument();
+});
+
+it("sends a link to one of v1's library tabs to Assets, where that library now is", () => {
+  const content = v6ModuleNodes.find((node) => node.id === "content-production-factory")!;
+  render(<MemoryRouter initialEntries={["/clients/client-1/delivery/content-production-factory?tab=reel-shots"]}>
+    <Routes><Route path="/clients/:clientId/delivery/content-production-factory" element={<Page node={content} />} /></Routes>
+  </MemoryRouter>);
+  expect(screen.getByRole("tab", { name: "Assets" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByText("Assets workspace")).toBeInTheDocument();
 });

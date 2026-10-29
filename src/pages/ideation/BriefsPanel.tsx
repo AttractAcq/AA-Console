@@ -158,14 +158,11 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
   /**
    * Where a finished brief's asset lives.
    *
-   * In v2 that is Create until somebody signs it off, not Assets: Assets is
-   * only what has been approved for distribution. v1 still has a library per
-   * media type, so it keeps its own route.
+   * That is Create until somebody signs it off, not Assets: Assets is only
+   * what has been approved for distribution.
    */
-  function deliveryHref(b: Brief): string {
-    const v2 = searchParams.get("view") === "v2";
-    const legacy = b.media_type === "video" ? "video-library" : b.media_type === "image" ? "image-library" : "copy-library";
-    return `/clients/${clientId}/delivery/content-production-factory?${v2 ? "view=v2&tab=create" : `tab=${legacy}`}`;
+  function deliveryHref(): string {
+    return `/clients/${clientId}/delivery/content-production-factory?tab=create`;
   }
 
   if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
@@ -245,10 +242,10 @@ export function BriefsPanel({ stage = "brief", showJourney = true }: { stage?: "
                 ? b.media_type === "video" && b.content_format === "reel"
                   ? [{
                       label: "Track reel",
-                      onSelect: () => navigate(`/clients/${clientId}/delivery/content-production-factory?${searchParams.get("view") === "v2" ? "view=v2&tab=assets&asset=reel-shots" : "tab=reel-shots"}&brief=${b.id}`),
+                      onSelect: () => navigate(`/clients/${clientId}/delivery/content-production-factory?tab=assets&library=reel-shots&brief=${b.id}`),
                     }]
                   : (assignments.get(b.id) ?? []).some((assignment) => assignment.asset_id)
-                    ? [{ label: "View delivery", onSelect: () => navigate(deliveryHref(b)) }]
+                    ? [{ label: "View delivery", onSelect: () => navigate(deliveryHref()) }]
                     : []
                 : [{ label: "Approve & build", onSelect: () => setBuilding(b) }]),
               { label: "View brief", onSelect: () => setViewing(b) },
