@@ -69,16 +69,24 @@ merged. If a PR adds no migration beyond that version, the upgrade path still
 proves the released schema can reset and matches a clean replay; the first
 subsequent migration exercises the incremental apply.
 
-## Temporary seed fixture and scope
+## Temporary seed fixture and raw-source proof
 
-Migration 11 still creates five named users and falls back to `change-me`.
-Until B004 removes that behavior from the source migration, the replay harness
-adds three `set_config` calls after `pgcrypto` is created **in the disposable
-copy only**. Postgres generates fresh synthetic passwords for this local run;
-the values are never put in a file or log. The contract checks that no local
-account has the fallback password. This fixture is a bridge for B003, not a
-fix to the underlying seed migration; B004 must remove its password-reset
-side effect and move account fixtures to a dedicated nonproduction seeder.
+The B004 review branch corrects migration 11's `change-me` fallback and
+existing-account Auth rewrite in the tracked source. The old disposable
+fixture remains available by default while full clean and upgrade replay of
+the corrected source is verified. Set `AA_SCHEMA_REPLAY_RAW_SOURCE=1` to copy
+the exact tracked migration 11 bytes into the disposable project. CI sets this
+flag for the complete schema replay, upgrade equivalence, catalog, and type
+gate. Its manifest records `authSourceReplay: true` and `fixture: false`.
+After that gate passes with the required migration 260 ancestor, remove the
+fixture path in a follow-up commit. The PGlite Auth tests exercise migration
+11 directly with test-only pgcrypto stubs and cover missing settings,
+existing accounts, forged metadata, and weak configured secrets. Full schema
+replay remains the required release evidence.
+
+The corrected source still seeds named accounts. B004's controlled Auth Admin
+provisioning, first-admin recovery, password rotation, TOTP at decision paths,
+and production account provenance remain separate acceptance gates.
 
 This check covers schema replay and a stable set of security assertions. B005
 adds the complete cross-client identity and `SECURITY DEFINER` test matrix.

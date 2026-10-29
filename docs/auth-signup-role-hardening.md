@@ -49,13 +49,12 @@ migration does not rewrite existing profiles or broaden the helper's grants.
 ## Remaining B004 work
 
 This patch does not discover or demote any existing forged administrator.
-It also does not repair migration 11's `change-me` seed password fallback,
-`create_console_user()`'s direct Auth table writes, or migration 13's
-three-character team-member password minimum. **A raw schema replay still
-executes migration 11 before 263.** A clean replay therefore runs its seed
-with the original fallback password; a replay against existing seeded
-accounts can reset their Auth passwords and metadata during that earlier
-step. Migration 263 prevents only later repeat calls after it is applied.
-Replay-time seed handling needs its own remedy. Full B004 acceptance,
-including hosted signup configuration and existing-account audit, remains
-open.
+The separate B004 replay correction in `docs/auth-fresh-replay-safety.md`
+changes the tracked migration 11 source so a new database has unique random
+seed secrets and a repeat cannot rewrite an existing Auth password or metadata.
+Its raw-source CI replay must pass before this historical-file change is
+released. Migration 13 still permits a three-character team-member password,
+and `create_console_user()` still writes Auth tables directly rather than
+using controlled Auth Admin invitations. Full B004 acceptance, including
+hosted signup readback, existing-account provenance, MFA at decision RPCs,
+credential rotation, and first-admin recovery evidence, remains open.
