@@ -8,7 +8,6 @@ import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef, FormValues } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
 import { OnboardingSource } from "../../components/OnboardingSource";
-import { clearDraft } from "../../components/forms/FormModal";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 
 /**
@@ -127,6 +126,7 @@ export function BusinessContextPanel() {
         intro="The four required fields are what every downstream agent reads. Partial saves are fine."
         fields={FIELDS}
         initialValues={aiDraft ?? initialValues}
+        resetKey={aiDraft}
         actions={
           <button
             type="button"
@@ -189,9 +189,6 @@ export function BusinessContextPanel() {
           requireNotes={false}
           onClose={() => setResearching(false)}
           onGenerated={(draft, drafted, droppedFields) => {
-            // A saved draft wins over initialValues inside FormModal, so a
-            // half-typed form would silently swallow the research.
-            clearDraft(`business-context:${clientId}`);
             setAiDraft(draft);
             setSources(drafted ?? null);
             setDropped(droppedFields ?? []);
