@@ -206,17 +206,18 @@ function exactHtml(preview: unknown): string | null {
   return typeof html === "string" && html.trim() ? html : null;
 }
 
-function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
+function RequestCard({ request, history, clientId, manager, aal, busy, onDecide }: {
   request: UnifiedApprovalRequest;
   history: UnifiedApprovalDecision[];
   clientId: string;
+  manager: boolean;
   aal: "aal2" | "aal1" | "unavailable";
   busy: boolean;
   onDecide: (request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) => Promise<void>;
 }) {
   const [rejectionReason, setRejectionReason] = useState("");
   const blocker = previewMissing(request);
-  const sourcePath = sourcePathForRequest(request, clientId);
+  const sourcePath = manager ? null : sourcePathForRequest(request, clientId);
   const html = exactHtml(request.preview);
   const canReject = isRejectionReady(request, clientId);
   const canApprove = isApprovalReady(request, clientId);
@@ -338,17 +339,21 @@ function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
         {sourcePath ? (
           <Link className="text-sm font-medium text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             to={sourcePath}>View owning source</Link>
-        ) : <span className="text-xs text-muted-foreground">Owning source link unavailable.</span>}
+        ) : <span className="text-xs text-muted-foreground">
+          {manager ? "Owning source is unavailable from the manager console." : "Owning source link unavailable."}
+        </span>}
       </div>
     </article>
   );
 }
 
-export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "client" | "global" }) {
+export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "client" | "global" | "manager" }) {
   const { clientId } = useParams<{ clientId: string }>();
   const location = useLocation();
   const global = scope === "global";
-  const scopeKey = global ? "global" : clientId ?? null;
+  const manager = scope === "manager";
+  const multiClient = global || manager;
+  const scopeKey = multiClient ? scope : clientId ?? null;
   const initialSource = new URLSearchParams(location.search).get("source");
   const [requests, setRequests] = useState<UnifiedApprovalRequest[]>([]);
   const [decisions, setDecisions] = useState<UnifiedApprovalDecision[]>([]);
@@ -369,12 +374,13 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const refreshSequence = useRef(0);
 
   const refresh = useCallback(async () => {
-    if (!global && !clientId) return;
+    if (!multiClient && !clientId) return;
     const sequence = ++refreshSequence.current;
     setLoading(true);
     try {
       let query = supabase.from("approval_inbox_v6").select("*");
-      if (!global) query = query.eq("client_id", clientId!);
+      if (!multiClient) query = query.eq("client_id", clientId!);
+      else if (manager) query = query.eq("owner_role", "admin_or_active_client_manager");
       else if (clientFilter === "agency-wide") query = query.is("client_id", null);
       else if (clientFilter !== "all") query = query.eq("client_id", clientFilter);
       if (statusFilter !== "all") query = query.eq("status", statusFilter);
@@ -420,7 +426,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         setLoading(false);
       }
     }
-  }, [clientId, clientFilter, global, kindFilter, page, scopeKey, sourceDeepLink, statusFilter]);
+  }, [clientId, clientFilter, kindFilter, manager, multiClient, page, scopeKey, sourceDeepLink, statusFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -435,7 +441,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   }
 
   async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) {
-    const targetClientId = global ? request.client_id : clientId;
+    const targetClientId = multiClient ? request.client_id : clientId;
     if (!targetClientId || request.client_id !== targetClientId || (decision === "approved"
       ? !isApprovalReady(request, targetClientId)
       : !isRejectionReady(request, targetClientId))) return;
@@ -523,14 +529,17 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
     <section className="space-y-5" aria-labelledby="unified-approvals-title">
       <div>
         <h2 id="unified-approvals-title" className="text-xl font-semibold">
-          {global ? "Agency approval inbox" : "Unified approval inbox"}
+          {global ? "Agency approval inbox" : manager ? "Manager approval inbox" : "Unified approval inbox"}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {global ? "Canonical requests across every client and the agency house client appear here. "
-            : "Canonical requests and decision history appear here as source adapters are connected. "}
-          Complete campaign action, Google review reply and recruitment brief requests can be decided here through their owning functions.
-          Other requests link to their owning source. Coverage is incomplete: the Engine,
-          Assets and Campaign actions tabs remain available for work not yet mirrored here.
+            : manager ? "Canonical requests for clients currently assigned to you appear here. "
+              : "Canonical requests and decision history appear here as source adapters are connected. "}
+          {manager
+            ? "Complete campaign action and Google review reply requests can be decided here through their owning functions."
+            : "Complete campaign action, Google review reply and recruitment brief requests can be decided here through their owning functions."}
+          {manager ? " Other requests remain read-only. " : " Other requests link to their owning source. "}
+          Coverage is incomplete: work not yet mirrored here remains in its owning queue.
           Pending here reflects the canonical ledger; each owning source is checked again before a decision.
         </p>
       </div>
@@ -593,7 +602,8 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
                 : "No requests match these filters."}
             </p> : <div className="space-y-4">{visible.map((request) => (
               <RequestCard key={request.id} request={request} history={historyByRequest.get(request.id) ?? []}
-                clientId={global ? request.client_id ?? "" : clientId ?? ""}
+                clientId={multiClient ? request.client_id ?? "" : clientId ?? ""}
+                manager={manager}
                 aal={aal} busy={busyId === request.id} onDecide={decide} />
             ))}</div>}
             {(page > 0 || hasNextPage) && <nav aria-label="Approval pages" className="flex items-center gap-3">

@@ -11,6 +11,7 @@ import {
   UsersRound,
   ClipboardList,
   ClipboardCheck,
+  CheckSquare,
   type LucideIcon,
 } from "lucide-react";
 import type { EmployeeCategory } from "../lib/identity";
@@ -38,6 +39,7 @@ export const CONSOLE_NAV: Record<ConsoleKind, ConsolePage[]> = {
   ],
   smm: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "approvals", label: "Approval Inbox", icon: CheckSquare },
     { id: "current-clients", label: "Current Clients", icon: Users },
     { id: "video-editing", label: "Video Editing", icon: FolderOpen },
     { id: "video-approvals", label: "Video Approvals", icon: ClipboardCheck },

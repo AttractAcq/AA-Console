@@ -122,7 +122,7 @@ function wireDatabase() {
   });
 }
 
-function show(scope: "client" | "global" = "client", path = "/approvals") {
+function show(scope: "client" | "global" | "manager" = "client", path = "/approvals") {
   return render(<MemoryRouter initialEntries={[path]}><UnifiedApprovalInboxPanel scope={scope} /></MemoryRouter>);
 }
 
@@ -142,6 +142,26 @@ beforeEach(() => {
 });
 
 describe("unified approval inbox", () => {
+  it("shows only manager-owned cards across assigned clients and no admin source links", async () => {
+    requests = [
+      { ...readyCampaign, id: "manager-client-1", title: "Client one action",
+        owner_role: "admin_or_active_client_manager" },
+      { ...readyCampaign, id: "manager-client-2", title: "Client two action",
+        client_id: "client-2", owner_role: "admin_or_active_client_manager",
+        owning_path: "/clients/client-2/delivery/approval-inbox?tab=campaign-actions" },
+      { ...readyCampaign, id: "house-card", title: "Agency private request",
+        client_id: null, owner_role: "admin" },
+    ];
+    show("manager", "/employee/approvals");
+    expect(await screen.findByRole("heading", { name: "Manager approval inbox" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Client one action" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Client two action" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Agency private request" })).not.toBeInTheDocument();
+    expect(clientEqValues).toEqual([]);
+    expect(screen.queryByRole("link", { name: "View owning source" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Owning source is unavailable from the manager console.")).toHaveLength(2);
+  });
+
   it("shows the exact artifact, destination, account, budget, scope, owner and source", async () => {
     show();
     const card = await screen.findByRole("article", { name: "Build the Meta ad" });
