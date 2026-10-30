@@ -17,7 +17,9 @@ export function isSignedPublicPath(url: string | undefined): boolean {
 }
 
 export function publicBodyLimit(url: string): number {
-  return url === "/public/proof/submit" ? 36 * 1024 * 1024 : 16 * 1024;
+  if (url === "/public/proof/submit") return 36 * 1024 * 1024;
+  if (url.split("?")[0] === "/public/webhooks/meta") return 256 * 1024;
+  return 16 * 1024;
 }
 
 function keyBytes(secret: string): Buffer {

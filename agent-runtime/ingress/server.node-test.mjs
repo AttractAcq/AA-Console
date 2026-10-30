@@ -85,6 +85,50 @@ test("public route strips caller-supplied ingress fields and signs exact body/pa
     "203.0.113.9", item.headers["x-aa-ingress-timestamp"], item.headers["x-aa-ingress-nonce"], bodyHash));
 });
 
+test("Meta webhook GET challenge and signed POST raw bytes reach core at the exact path", async () => {
+  const handshake = "/public/webhooks/meta?hub.mode=subscribe&hub.challenge=challenge%2B1";
+  const getReply = await call(handshake, { "x-real-ip": "203.0.113.9" }, "", "GET");
+  assert.equal(getReply.status, 200);
+  const getItem = received.at(-1);
+  assert.equal(getItem.method, "GET");
+  assert.equal(getItem.url, handshake);
+  assert.equal(getItem.headers["x-aa-ingress-signature"], signIngress(secret, "GET", handshake,
+    "203.0.113.9", getItem.headers["x-aa-ingress-timestamp"], getItem.headers["x-aa-ingress-nonce"],
+    createHash("sha256").update("").digest("hex")));
+
+  const body = Buffer.from(`{"padding":"${"x".repeat(16 * 1024)}"}`);
+  const postPath = "/public/webhooks/meta?source=meta";
+  const metaSignature = `sha256=${"a".repeat(64)}`;
+  const postReply = await call(postPath, {
+    "x-real-ip": "203.0.113.9", "x-hub-signature-256": metaSignature,
+    "content-type": "application/json",
+  }, body);
+  assert.equal(postReply.status, 200);
+  const postItem = received.at(-1);
+  assert.equal(postItem.method, "POST");
+  assert.equal(postItem.url, postPath);
+  assert.deepEqual(postItem.body, body);
+  assert.equal(postItem.headers["x-hub-signature-256"], metaSignature);
+  const bodyHash = createHash("sha256").update(body).digest("hex");
+  assert.equal(postItem.headers["x-aa-ingress-body-sha256"], bodyHash);
+  assert.equal(postItem.headers["x-aa-ingress-signature"], signIngress(secret, "POST", postPath,
+    "203.0.113.9", postItem.headers["x-aa-ingress-timestamp"], postItem.headers["x-aa-ingress-nonce"], bodyHash));
+});
+
+test("Meta webhook body cap and exact route fail closed before core contact", async () => {
+  const accepted = await call("/public/webhooks/meta", { "x-real-ip": "203.0.113.9" },
+    Buffer.alloc(256 * 1024));
+  assert.equal(accepted.status, 200);
+  assert.equal(received.at(-1).body.length, 256 * 1024);
+  const beforeCount = received.length;
+  assert.equal((await call("/public/webhooks/meta", { "x-real-ip": "203.0.113.9" },
+    Buffer.alloc(256 * 1024 + 1))).status, 413);
+  for (const path of ["/public/webhooks/meta-extra", "/public/webhooks/meta/", "/public/webhooks/other"]) {
+    assert.equal((await call(path, { "x-real-ip": "203.0.113.9" }, "{}")).status, 404);
+  }
+  assert.equal(received.length, beforeCount);
+});
+
 test("public ingress refuses a missing client identity and oversized body before forwarding", async () => {
   const beforeCount = received.length;
   assert.equal((await call("/public/lead/submit", {}, "{} ")).status, 503);
@@ -119,6 +163,9 @@ test("production config requires HTTPS and a high-entropy dedicated key", () => 
   assert.throws(() => validateConfig({ ...config, RAILWAY_TCP_PROXY_DOMAIN: "proxy.example" }), /TCP proxy/);
   assert.equal(validateConfig(config).upstream.origin, "https://example.com");
   assert.equal(isPublicPath("/public/sales/v1/widget.js"), true);
+  assert.equal(isPublicPath("/public/webhooks/meta"), true);
+  assert.equal(isPublicPath("/public/webhooks/meta?hub.mode=subscribe"), true);
+  assert.equal(isPublicPath("/public/webhooks/meta-extra"), false);
 });
 
 test("a slowly held public body has an absolute read deadline", async () => {

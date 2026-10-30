@@ -89,6 +89,24 @@ describe("isolated public ingress envelope", () => {
       .rejects.toMatchObject({ status: 503 });
   });
 
+  it("authenticates Meta webhook bodies through 256 KiB while rejecting larger and adjacent paths", async () => {
+    const path = "/public/webhooks/meta?source=meta";
+    const body = Buffer.alloc(256 * 1024, 0x61);
+    const authenticated = await authenticatePublicIngress(request({ url: path, body }), SECRET, claim, NOW);
+    const chunks: Buffer[] = [];
+    for await (const chunk of authenticated) chunks.push(chunk as Buffer);
+    expect(Buffer.concat(chunks)).toEqual(body);
+
+    let claims = 0;
+    const neverClaim = async (): Promise<boolean> => { claims += 1; return true; };
+    await expect(authenticatePublicIngress(request({ url: path, body: Buffer.alloc(256 * 1024 + 1) }),
+      SECRET, neverClaim, NOW)).rejects.toMatchObject({ status: 413 });
+    await expect(authenticatePublicIngress(request({ url: "/public/webhooks/meta-extra",
+      body: Buffer.alloc(16 * 1024 + 1) }), SECRET, neverClaim, NOW))
+      .rejects.toMatchObject({ status: 413 });
+    expect(claims).toBe(0);
+  });
+
   it("times out a signed request whose body never completes", async () => {
     const prepared = request({ body: Buffer.alloc(0) });
     const hanging = new PassThrough() as unknown as IncomingMessage;
@@ -111,5 +129,8 @@ describe("isolated public ingress envelope", () => {
     // variant is a 404, not a valid large proof submission.
     expect(publicBodyLimit("/public/proof/submit")).toBe(36 * 1024 * 1024);
     expect(publicBodyLimit("/public/proof/submit?x=1")).toBe(16 * 1024);
+    expect(publicBodyLimit("/public/webhooks/meta")).toBe(256 * 1024);
+    expect(publicBodyLimit("/public/webhooks/meta?hub.mode=subscribe")).toBe(256 * 1024);
+    expect(publicBodyLimit("/public/webhooks/meta-extra")).toBe(16 * 1024);
   });
 });

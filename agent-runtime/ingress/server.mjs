@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
 const PUBLIC_FAMILIES = ["/public/proof", "/public/lead", "/public/book/v1/", "/public/sales/v1/"];
+const META_WEBHOOK_PATH = "/public/webhooks/meta";
 const DEFAULT_PUBLIC_LIMITS = Object.freeze({ proof: 1, ordinary: 64 });
 const HOP_HEADERS = new Set(["connection", "content-length", "transfer-encoding", "upgrade", "keep-alive",
   "proxy-authorization", "proxy-authenticate", "te", "trailer", "host", "forwarded",
@@ -18,7 +19,8 @@ const HOP_HEADERS = new Set(["connection", "content-length", "transfer-encoding"
   "fastly-client-ip"]);
 
 export function isPublicPath(url) {
-  return typeof url === "string" && PUBLIC_FAMILIES.some((prefix) => url.startsWith(prefix));
+  return typeof url === "string" && (PUBLIC_FAMILIES.some((prefix) => url.startsWith(prefix)) ||
+    url === META_WEBHOOK_PATH || url.startsWith(`${META_WEBHOOK_PATH}?`));
 }
 
 export function normalizeIp(raw) {
@@ -55,7 +57,11 @@ export function scrubHeaders(input) {
   return headers;
 }
 
-function bodyLimit(url) { return url === "/public/proof/submit" ? 36 * 1024 * 1024 : 16 * 1024; }
+function bodyLimit(url) {
+  if (url === "/public/proof/submit") return 36 * 1024 * 1024;
+  if (url.split("?")[0] === META_WEBHOOK_PATH) return 256 * 1024;
+  return 16 * 1024;
+}
 
 export function readBounded(req, limit, timeoutMs = 120_000) {
   if (Number(req.headers["content-length"]) > limit) {
