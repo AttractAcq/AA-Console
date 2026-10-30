@@ -75,6 +75,12 @@ describe("provider onboarding evidence is narrower than a stored integration", (
     expect(result.dailySync.state).toBe("blocked");
     expect(result.action.state).toBe("unknown");
   });
+
+  it("does not describe configured-on sync as runnable when the credential is revoked", () => {
+    const result = providerReadiness("meta", [{ ...row("meta"), status: "revoked" }], "client-a", NOW);
+    expect(result.dailySync).toMatchObject({ state: "blocked" });
+    expect(result.dailySync.reason).toMatch(/configured on, but the credential or account is blocked/);
+  });
 });
 
 describe("integration read boundary", () => {

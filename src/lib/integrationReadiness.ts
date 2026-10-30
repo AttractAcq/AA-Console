@@ -93,7 +93,9 @@ export function providerReadiness(
     ? blocked(`No unambiguous ${provider} daily metrics source is configured.`)
     : !row.ingest_enabled
       ? blocked(`Daily ${provider} metrics sync is off.`)
-      : unknown(`Daily ${provider} metrics sync is on, but account and scope access are unverified.`);
+      : credential.state === "blocked" || account.state === "blocked"
+        ? blocked(`Daily ${provider} metrics sync is configured on, but the credential or account is blocked; it cannot be treated as runnable.`)
+        : unknown(`Daily ${provider} metrics sync is configured on, but account and scope access are unverified.`);
 
   const checks = [credential, account, scopes, action, dailySync];
   return {

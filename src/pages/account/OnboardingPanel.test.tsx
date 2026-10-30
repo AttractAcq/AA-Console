@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -191,6 +191,46 @@ describe("when the database cannot answer", () => {
     view.rerender(<OnboardingPanel />);
     expect(screen.getByText("Loading…")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Provider activation dry run" })).not.toBeInTheDocument();
+  });
+
+  it("keeps client B's result when client A's slower query completes last", async () => {
+    type Result = { data: IntegrationEvidence[]; error: null };
+    let resolveA!: (result: Result) => void;
+    let resolveB!: (result: Result) => void;
+    const slowA = new Promise<Result>((resolve) => { resolveA = resolve; });
+    const fastB = new Promise<Result>((resolve) => { resolveB = resolve; });
+
+    from.mockImplementation((table: string) => {
+      const chain: Record<string, unknown> = {};
+      let scopedClient = "";
+      chain.select = () => chain;
+      chain.eq = (field: string, value: string) => {
+        if (field === "client_id") scopedClient = value;
+        return chain;
+      };
+      chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
+      chain.then = (done: (result: unknown) => unknown) =>
+        (table === "client_integrations"
+          ? scopedClient === "client-1" ? slowA : fastB
+          : Promise.resolve({ data: [], error: null }))
+          .then(done);
+      return chain;
+    });
+
+    const view = render(<OnboardingPanel />);
+    useParams.mockReturnValue({ clientId: "client-2" });
+    view.rerender(<OnboardingPanel />);
+    await act(async () => resolveB({ data: [integration("meta", "client-2")], error: null }));
+    expect(await screen.findByRole("region", { name: "Provider activation dry run" })).toHaveTextContent("Current result: Blocked");
+    expect(screen.getByRole("link", { name: "Review integrations" })).toHaveAttribute(
+      "href", "/clients/client-2/account/integrations",
+    );
+
+    await act(async () => resolveA({ data: [integration("meta", "client-1")], error: null }));
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review integrations" })).toHaveAttribute(
+      "href", "/clients/client-2/account/integrations",
+    );
   });
 
   it("shows an unhealthy integration as blocked and never starts an external action", async () => {

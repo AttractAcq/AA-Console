@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Check, ChevronRight, CircleDashed, CircleDot } from "lucide-react";
 import { FormModal } from "../../components/forms/FormModal";
@@ -142,11 +142,17 @@ export function OnboardingPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [data, setData] = useState<OnboardingData | null>(null);
   const [openStep, setOpenStep] = useState<OnboardingStep | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<{ clientId: string; message: string } | null>(null);
+  const [notice, setNotice] = useState<{ clientId: string; message: string } | null>(null);
+  const activeClient = useRef<string | null>(null);
+  const requestGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
-    if (!clientId) return;
+    // A late save, retry or network response from the previous route must not
+    // supersede the new client's request or leave its page stuck loading.
+    if (!clientId || activeClient.current !== clientId) return;
+    const generation = ++requestGeneration.current;
+    const isCurrent = () => activeClient.current === clientId && requestGeneration.current === generation;
     setLoadError(null);
     try {
       const [contact, business, brand, integrations, manual] = await Promise.all([
@@ -172,6 +178,7 @@ export function OnboardingPanel() {
       if (!integrationRowsAreValid(integrations.data, clientId)) {
         throw new Error("Integration readiness is unavailable or returned another client's data.");
       }
+      if (!isCurrent()) return;
 
       setData({
         clientId,
@@ -186,13 +193,20 @@ export function OnboardingPanel() {
           .map(() => "call" as StepKey),
       });
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Could not load onboarding.");
+      if (isCurrent()) {
+        setLoadError({ clientId, message: error instanceof Error ? error.message : "Could not load onboarding." });
+      }
     }
   }, [clientId]);
 
   useEffect(() => {
+    activeClient.current = clientId ?? null;
     void refresh();
-  }, [refresh]);
+    return () => {
+      activeClient.current = null;
+      requestGeneration.current += 1;
+    };
+  }, [clientId, refresh]);
 
   const next = useMemo(() => (data ? nextStep(data) : null), [data]);
 
@@ -200,7 +214,7 @@ export function OnboardingPanel() {
     if (!clientId) return;
     const { error } = await supabase.rpc("start_onboarding", { p_client_id: clientId });
     if (error) {
-      setLoadError(error.message);
+      setLoadError({ clientId, message: error.message });
       return;
     }
     await supabase
@@ -208,14 +222,14 @@ export function OnboardingPanel() {
       .update({ status: "complete", completed_at: new Date().toISOString() })
       .eq("client_id", clientId)
       .eq("step_key", CALL_STEP_KEY);
-    setNotice("Call marked done.");
+    setNotice({ clientId, message: "Call marked done." });
     void refresh();
   }
 
-  if (loadError) {
+  if (loadError && loadError.clientId === clientId) {
     return (
       <div role="alert" className="text-sm text-destructive">
-        <p>{loadError}</p>
+        <p>{loadError.message}</p>
         <button type="button" onClick={() => void refresh()} className="mt-2 underline">
           Retry
         </button>
@@ -254,9 +268,9 @@ export function OnboardingPanel() {
         </span>
       </div>
 
-      {notice && (
+      {notice?.clientId === clientId && (
         <p role="status" className="text-sm text-brand-strong">
-          {notice}
+          {notice.message}
         </p>
       )}
 
@@ -417,7 +431,8 @@ export function OnboardingPanel() {
             if (error) throw error;
           }}
           onSaved={() => {
-            setNotice(`Saved to ${openStep.livesAt.label}.`);
+            if (activeClient.current !== data.clientId) return;
+            setNotice({ clientId: data.clientId, message: `Saved to ${openStep.livesAt.label}.` });
             setOpenStep(null);
             void refresh();
           }}
