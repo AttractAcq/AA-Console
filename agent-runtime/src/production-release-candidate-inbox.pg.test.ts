@@ -209,6 +209,8 @@ beforeAll(async () => {
   // replay Meta tables, so provide the unrelated branch of the 293 view.
   await db.exec(`create function public.recruitment_meta_build_source_state_v6(uuid)
     returns text language sql stable as $$ select 'unverified'::text $$`);
+  await db.exec(`create function public.organic_publication_source_state_v6(uuid)
+    returns text language sql stable as $$ select 'source_held'::text $$`);
   await db.exec(await migration(
     "20261101100000_293_trusted_production_release_decision.sql"));
   await db.exec("set timezone='UTC'");

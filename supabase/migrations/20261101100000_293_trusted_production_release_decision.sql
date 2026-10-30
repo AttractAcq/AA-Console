@@ -295,7 +295,7 @@ revoke execute on function public.decide_production_release_candidate_v6(uuid,te
 grant execute on function public.decide_production_release_candidate_v6(uuid,text,text,text,text)
   to authenticated;
 
--- Repeat the 290 view, preserving its column order and all non-release
+-- Repeat the 292 view, preserving its column order and all non-release
 -- adapters. The only release changes are the visible trusted packet, current
 -- source-state blocker and decision status when a held card is rejected.
 create or replace view public.approval_inbox_v6 with (security_invoker = true) as
@@ -306,7 +306,8 @@ select
     when r.source_system = 'aa_console' and r.source_kind = 'production_release'
       and d.decision in ('rejected','revoked') then d.decision
     when r.source_system = 'aa_console'
-      and r.source_kind in ('production_release','recruitment_meta_build')
+      and r.source_kind in ('production_release','recruitment_meta_build',
+        'organic_publication')
       and s.source_state = 'source_held'
       and r.expires_at is not null and r.expires_at <= now() then 'expired'
     when s.source_state in ('cancelled','superseded','source_held','unverified')
@@ -338,6 +339,10 @@ select
       and r.source_kind = 'recruitment_meta_build' then coalesce(
         nullif(btrim(r.preview_blocker),''),
         'Recruitment Meta creation still lacks exact media bytes and an AAL2 prewrite gate.')
+    when r.source_system = 'aa_console'
+      and r.source_kind = 'organic_publication' then coalesce(
+        nullif(btrim(r.preview_blocker),''),
+        'Organic publication lacks rights provenance, exact AAL2 approval and prewrite attestation.')
     when r.expires_at is null then 'An expiry is missing.'
     when nullif(btrim(coalesce(r.owner_role,'')),'') is null then 'The decision owner is missing.'
     when e.id is not null then null
@@ -366,6 +371,8 @@ cross join lateral (
       then public.production_release_source_state_v6(r.id)
     when r.source_system = 'aa_console' and r.source_kind = 'recruitment_meta_build'
       then public.recruitment_meta_build_source_state_v6(r.id)
+    when r.source_system = 'aa_console' and r.source_kind = 'organic_publication'
+      then public.organic_publication_source_state_v6(r.id)
     else public.approval_source_state_v6(r.id)
   end as source_state
 ) s;
