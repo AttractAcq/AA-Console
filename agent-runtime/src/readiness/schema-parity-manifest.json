@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "fd2abc9179e22820c45ff7663e34fdd34b2bf12fe5ae416740e3669fdb1fe8ff",
-  "generatedTypesSha256": "e2a4ad57e2233b382872d0f4a38fa0ce9e5d32195b42048ccafa8dd1a9a568f4",
-  "generatedSchemaBodySha256": "55b0b603864c48415e2c4bbe8ba0bed04e348ba773db468872904748ccde7270",
+  "migrationSourceDigest": "6fc5d4124806d466c4422f73e61cfe2d2258cb64aba91d4dcd98d6865295e78f",
+  "generatedTypesSha256": "2d4f66a0788a0c3a07b88e76b424366ac6b5003e6ad5091340173397f138d2f6",
+  "generatedSchemaBodySha256": "c16cebe3e3a7bfabbfc269aba1e8c742a29df73732c9dc06958910f6c29df3b7",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2026,6 +2026,55 @@
       "filename": "20261030100000_272_onboarding_step_integrity.sql",
       "sha256": "c7abc702f5c05de152d4d0c9c4e23373db8261d01b22d5aef9203e7640964eb4",
       "trimmedMd5": "487206ae074d6c8dd6d7a70001a1d116"
+    },
+    {
+      "version": "20261030110000",
+      "name": "273_canonical_approval_ledger",
+      "filename": "20261030110000_273_canonical_approval_ledger.sql",
+      "sha256": "27c243faa5e87cac4fb9172e219245b9f602316429af3c9eb07be4ba9236934e",
+      "trimmedMd5": "c95bad652cad559cafa506afc2e83923"
+    },
+    {
+      "version": "20261030120000",
+      "name": "274_campaign_action_inbox_bridge",
+      "filename": "20261030120000_274_campaign_action_inbox_bridge.sql",
+      "sha256": "37e076454094c7a888231cd770998b05b52b443f5ee3c2370a48163a8683e678",
+      "trimmedMd5": "affa37ec7f974bb61465f9692a72aba1"
+    },
+    {
+      "version": "20261030130000",
+      "name": "275_sales_entitlement_inbox_binding",
+      "filename": "20261030130000_275_sales_entitlement_inbox_binding.sql",
+      "sha256": "13a946c3c477ab57646eacc6ef39800dead560ab8e9849bcfe611812d8e478d3",
+      "trimmedMd5": "9eefd7ed28a28b713aad654fcf05ac28"
+    },
+    {
+      "version": "20261030140000",
+      "name": "276_recruitment_brief_inbox",
+      "filename": "20261030140000_276_recruitment_brief_inbox.sql",
+      "sha256": "7ee65e3786951fbede6a1364f782ca26ed1686e1b3d7cdbdec514da8155407f4",
+      "trimmedMd5": "537388edd7672574bc5f372f31124014"
+    },
+    {
+      "version": "20261030141000",
+      "name": "277_engine_slot_preview_inbox",
+      "filename": "20261030141000_277_engine_slot_preview_inbox.sql",
+      "sha256": "b9588e79a39a93337dc12d03027e85dd5158efe6e7910e3686e8f6e78953607c",
+      "trimmedMd5": "f67a127e18a39f1c7819e95c4b55242b"
+    },
+    {
+      "version": "20261030150000",
+      "name": "278_google_review_reply_inbox",
+      "filename": "20261030150000_278_google_review_reply_inbox.sql",
+      "sha256": "a4739364668fbf7f83b9a850f132651c1ef0a9832a56ee040cf307abaf4a65f3",
+      "trimmedMd5": "184f33796065eb4e0af95ca666b77159"
+    },
+    {
+      "version": "20261030160000",
+      "name": "279_approval_class_coverage",
+      "filename": "20261030160000_279_approval_class_coverage.sql",
+      "sha256": "7bfe198ab378704501c4f74e8ee1286aeb34a7a9c7d37e7a4cc42f6e548c7667",
+      "trimmedMd5": "420757808962332f122d6b54e73ed56e"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

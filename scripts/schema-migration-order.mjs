@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-// Production is released through 263. New migration labels must advance in
-// timestamp order. Keep the 260 prerequisite pinned so future clean replays
-// reproduce the same schema even though 260–263 are already released.
+// The released-migration-version.txt marker is the production baseline. New
+// migration labels must advance in timestamp order. Keep the 260 prerequisite
+// pinned so future clean replays reproduce the same schema.
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
