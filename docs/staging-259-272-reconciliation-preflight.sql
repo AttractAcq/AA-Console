@@ -1,4 +1,4 @@
--- B002 staging-only reconciliation preflight. READ ONLY.
+-- B002 staging-only 259–272 reconciliation preflight. READ ONLY.
 -- Run EACH SELECT separately against the pinned staging project
 -- vmmertwoboqiazcsougw through the Supabase Management API
 -- /database/query/read-only endpoint with a fine-grained Database Read PAT.
@@ -19,10 +19,7 @@ select version, name,
        statements is null as sql_payload_unavailable,
        case when statements is null then null else cardinality(statements) end as statement_count
   from supabase_migrations.schema_migrations
- where version in (
-   '20261025233000', '20261025235000', '20261025240000', '20261025250000',
-   '20261029120000', '20261029130000', '20261029140000'
- )
+ where version >= '20261025233000'
     or name like '259_%' or name like '260_%'
  order by version
 ;
@@ -172,8 +169,8 @@ select jobname, schedule, active
  where jobname = 'prune-runtime-heartbeats'
 ;
 
--- P16. The reviewed 260 helper rejects a NULL array element. Earlier
--- staging behavior accepted it. This SELECT has no writes.
+-- P16. Probe NULL-element behavior independently of function-definition
+-- fingerprints. Current staging and production both return false.
 select public.all_within_length(array[null::text], 30) as null_element_accepted
 ;
 
@@ -193,4 +190,53 @@ select (select count(*) from public.google_ads_copy cp
          left join public.campaign_action_approvals a on a.id = b.approval_id
         where a.id is null or a.client_id is distinct from b.client_id
            or a.campaign_id is distinct from b.campaign_id) as build_approval_mismatches
+;
+
+-- P18. Presence of 261–272 relation prerequisites. A missing object returns
+-- false rather than being silently read as an empty table. The current main
+-- source and the B002 parity feed determine the complete catalog delta.
+select object_name,
+       pg_catalog.to_regclass('public.' || object_name) is not null as present
+  from unnest(array[
+    'agent_runtime_heartbeats', 'client_onboarding_steps',
+    'client_sales_entitlement_controls', 'client_sales_entitlement_requests',
+    'client_sales_entitlements', 'client_leads', 'lead_events',
+    'lead_identities', 'archived_leads', 'team_channels',
+    'channel_members', 'team_messages'
+  ]) as t(object_name)
+ order by object_name
+;
+
+-- P19. Security policy fingerprints for the 264–272 client, staff and Auth
+-- scope. This returns hashes and names only, not potentially private SQL text.
+select schemaname, tablename, policyname, cmd, roles,
+       md5(pg_catalog.jsonb_build_array(qual, with_check)::text)
+         as predicate_md5
+  from pg_catalog.pg_policies
+ where schemaname = 'public'
+   and tablename in (
+     'profiles', 'team_members', 'channel_members', 'team_messages',
+     'client_onboarding_steps', 'leads', 'conversations',
+     'client_sales_entitlements', 'campaign_action_approvals'
+   )
+ order by tablename, policyname
+;
+
+-- P20. Critical 263/270/271/272 function fingerprints and browser execute
+-- grants. LEFT JOIN makes missing functions explicit absent rows.
+select expected.function_name,
+       p.oid::pg_catalog.regprocedure::text as function_signature,
+       md5(pg_catalog.pg_get_functiondef(p.oid)) as definition_md5,
+       case when p.oid is null then null
+            else pg_catalog.has_function_privilege('authenticated', p.oid, 'EXECUTE') end
+         as browser_can_execute
+  from unnest(array[
+     'handle_new_user', 'create_console_user', 'admin_create_team_member',
+     'is_eligible_lead_owner', 'enqueue_agent_job',
+     'guard_client_onboarding_step_update', 'can_access_client',
+     'current_member_id', 'current_role_of'
+   ]) as expected(function_name)
+  left join pg_catalog.pg_proc p on p.proname = expected.function_name
+   and p.pronamespace = 'public'::pg_catalog.regnamespace
+ order by expected.function_name, function_signature
 ;
