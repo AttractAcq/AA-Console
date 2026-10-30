@@ -216,6 +216,18 @@ describe("recruitment brief Inbox adapter 276", () => {
     )).rows[0]!.n).toBe(0);
   });
 
+  it("rejects a different brief's card and hides the transition context from callers", async () => {
+    const first = await createDraft();
+    const second = await createDraft();
+    const otherCard = await requestFor(second);
+    await expect(approveCard(first, otherCard)).rejects.toThrow(/stale|incomplete/i);
+    await expect(asRole("authenticated", ADMIN, "aal2",
+      "select * from approval_private.recruitment_brief_decision_context_v6"))
+      .rejects.toThrow(/permission denied/i);
+    const firstCard = await requestFor(first);
+    await approveCard(first, firstCard);
+  });
+
   it("marks incomplete draft requests blocked instead of presenting them as approvable", async () => {
     const id = await createDraft();
     await db.query("update public.client_briefs set hook='' where id=$1", [id]);
