@@ -110,12 +110,14 @@ export function IntegrationsPanel() {
   const [adSettings, setAdSettings] = useState<MetaSettingsSelection | null>(null);
   const { clientId } = useParams<{ clientId: string }>();
   const [snapshot, setSnapshot] = useState<{ clientId: string; rows: Integration[]; observedAtMs: number } | null>(null);
-  const [saving, setSaving] = useState<{ clientId: string; integrationId: string } | null>(null);
+  const [pendingIngest, setPendingIngest] = useState<Record<string, number>>({});
   const [error, setError] = useState<{ clientId: string; message: string } | null>(null);
   const [loadError, setLoadError] = useState<{ clientId: string; message: string } | null>(null);
   const activeClient = useRef<string | null>(null);
   const routeVisit = useRef(0);
   const nextFormToken = useRef(0);
+  const nextIngestToken = useRef(0);
+  const activeIngestWrites = useRef(new Map<string, number>());
   const activeAddSelection = useRef<AddSelection | null>(null);
   const activeMetaSelection = useRef<MetaSettingsSelection | null>(null);
   const requestGeneration = useRef(0);
@@ -156,6 +158,7 @@ export function IntegrationsPanel() {
     activeAddSelection.current = null;
     setAdSettings(null);
     setAddOpenClient(null);
+    setError(null);
     void refresh();
     return () => {
       activeClient.current = null;
@@ -209,7 +212,13 @@ export function IntegrationsPanel() {
    */
   const setIngest = async (integration: Integration, enabled: boolean) => {
     if (!clientId || activeClient.current !== clientId || integration.client_id !== clientId) return;
-    setSaving({ clientId, integrationId: integration.id });
+    const key = `${clientId}:${integration.id}`;
+    if (activeIngestWrites.current.has(key)) return;
+    const token = ++nextIngestToken.current;
+    const visit = routeVisit.current;
+    const evidenceGeneration = requestGeneration.current;
+    activeIngestWrites.current.set(key, token);
+    setPendingIngest((prev) => ({ ...prev, [key]: token }));
     setError(null);
     // Optimistic: the switch should move under the finger, not after a
     // round trip. Rolled back below if the write is refused.
@@ -225,7 +234,9 @@ export function IntegrationsPanel() {
       .update({ ingest_enabled: enabled })
       .eq("id", integration.id)
       .eq("client_id", clientId);
-    if (updateError) {
+    const sameEvidence = activeClient.current === clientId
+      && routeVisit.current === visit && requestGeneration.current === evidenceGeneration;
+    if (updateError && sameEvidence) {
       setSnapshot((prev) => {
         if (!prev || prev.clientId !== clientId) return prev;
         return {
@@ -233,9 +244,18 @@ export function IntegrationsPanel() {
           rows: prev.rows.map((r) => r.id === integration.id ? { ...r, ingest_enabled: !enabled } : r),
         };
       });
-      if (clientId) setError({ clientId, message: updateError.message });
+      setError({ clientId, message: updateError.message });
     }
-    setSaving((prev) => prev?.clientId === clientId && prev.integrationId === integration.id ? null : prev);
+    // A route revisit or another read has a different evidence snapshot. Read
+    // the server again instead of applying this older result to that snapshot.
+    if (!sameEvidence && activeClient.current === clientId) await refresh();
+    if (activeIngestWrites.current.get(key) === token) activeIngestWrites.current.delete(key);
+    setPendingIngest((prev) => {
+      if (prev[key] !== token) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   };
 
   if (loadError && loadError.clientId === clientId) return <div role="alert"><p>{loadError.message}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
@@ -335,7 +355,7 @@ export function IntegrationsPanel() {
                 role="switch"
                 aria-checked={r.ingest_enabled}
                 aria-label={`Daily sync for ${r.provider}`}
-                disabled={saving?.clientId === clientId && saving.integrationId === r.id}
+                disabled={pendingIngest[`${clientId}:${r.id}`] !== undefined}
                 onClick={() => void setIngest(r, !r.ingest_enabled)}
                 className={cn(
                   "relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50",

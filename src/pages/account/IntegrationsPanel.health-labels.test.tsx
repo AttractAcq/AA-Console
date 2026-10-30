@@ -270,6 +270,61 @@ it("keeps client B's pending sync control disabled when client A's older update 
   await waitFor(() => expect(bSwitch).not.toBeDisabled());
 });
 
+it("keeps a returned client's sync pending and ignores an old visit's failed rollback", async () => {
+  let selectedClient = "client-1";
+  let aServerEnabled = false;
+  const finish = new Map<string, (value: { error: { message: string } | null }) => void>();
+  useParams.mockImplementation(() => ({ clientId: selectedClient }));
+  from.mockImplementation(() => {
+    let readClient = "";
+    const query = {
+      select: () => query,
+      eq: (field: string, value: string) => { if (field === "client_id") readClient = value; return query; },
+      order: async () => ({ data: [{ ...base, id: `meta-${readClient}`, client_id: readClient,
+        provider: "meta", ingest_enabled: readClient === "client-1" ? aServerEnabled : false }], error: null }),
+      update: () => {
+        const updateQuery = {
+          eq: (field: string, value: string) => field === "client_id"
+            ? new Promise<{ error: { message: string } | null }>((resolve) => { finish.set(value, resolve); })
+            : updateQuery,
+        };
+        return updateQuery;
+      },
+    };
+    return query;
+  });
+
+  const rendered = render(<IntegrationsPanel />);
+  fireEvent.click(await screen.findByRole("switch", { name: "Daily sync for meta" }));
+  expect(screen.getByRole("switch", { name: "Daily sync for meta" })).toBeDisabled();
+
+  selectedClient = "client-2";
+  rendered.rerender(<IntegrationsPanel />);
+  const bSwitch = await screen.findByRole("switch", { name: "Daily sync for meta" });
+  await waitFor(() => expect(bSwitch).not.toBeDisabled());
+  fireEvent.click(bSwitch);
+  expect(bSwitch).toBeDisabled();
+
+  // A fresh A read sees a newer server value while A's earlier write is still pending.
+  aServerEnabled = true;
+  selectedClient = "client-1";
+  rendered.rerender(<IntegrationsPanel />);
+  const aSwitch = await screen.findByRole("switch", { name: "Daily sync for meta" });
+  expect(aSwitch).toHaveAttribute("aria-checked", "true");
+  expect(aSwitch).toBeDisabled();
+
+  await act(async () => { finish.get("client-1")?.({ error: { message: "Old visit denied" } }); });
+  await waitFor(() => expect(aSwitch).not.toBeDisabled());
+  expect(aSwitch).toHaveAttribute("aria-checked", "true");
+  expect(screen.queryByText("Old visit denied")).not.toBeInTheDocument();
+
+  selectedClient = "client-2";
+  rendered.rerender(<IntegrationsPanel />);
+  expect(await screen.findByRole("switch", { name: "Daily sync for meta" })).toBeDisabled();
+  await act(async () => { finish.get("client-2")?.({ error: null }); });
+  await waitFor(() => expect(screen.getByRole("switch", { name: "Daily sync for meta" })).not.toBeDisabled());
+});
+
 it("closes the Add Integration form on route change and rejects an old client's stale submit", async () => {
   let selectedClient = "client-1";
   useParams.mockImplementation(() => ({ clientId: selectedClient }));
