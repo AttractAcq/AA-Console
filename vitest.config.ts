@@ -8,7 +8,8 @@ export default defineConfig({
     // Node's built-in test runner owns these standalone replay tests.
     exclude: ["**/node_modules/**", "agent-runtime/**", "aa-mcp-gateway/**",
       "scripts/prepare-schema-replay.test.mjs", "scripts/schema-migration-order.test.mjs",
-      "scripts/schema-replay-fingerprint.test.mjs", "scripts/assert-current-deploy-sha.test.mjs"],
+      "scripts/schema-replay-fingerprint.test.mjs", "scripts/assert-current-deploy-sha.test.mjs",
+      "scripts/staging-reconciliation-workspace.test.mjs"],
     // Component tests need a DOM. The pure-logic suites do not care, and
     // jsdom is cheap enough that splitting the run by environment would
     // cost more in config than it saves in milliseconds.
