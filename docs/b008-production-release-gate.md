@@ -104,6 +104,56 @@ change before that pin requires the final observed runtime SHA, not the first.
    rejection, revocation, stale head, failed CI, changed SQL, missed Railway
    health check and newer-main Pages race. Only then mark class 32 operational.
 
+## Held trusted default-branch check (next source slice)
+
+The new `Production release approval` workflow runs on `pull_request_target`
+for PRs into `main`. Its single job has no skip condition. It checks out the
+protected base commit named by the event, fetches the PR head as Git **object
+data**, and runs only base-branch JavaScript. The script accepts one
+`AA-Release-Request: UUID` line in the PR body as a locator. That line is
+untrusted: the server-side assertion independently reads the canonical Inbox
+card, its latest AAL2 human decision, its fresh trusted attestation, GitHub's
+current PR/base/head and four CI jobs, the committed SQL bytes, and a second
+card **and decision** observation. It compares the result to the event PR and
+base/head before returning green. The trusted checkout mode requires checked
+out `HEAD` to equal the exact GitHub PR base commit. It never checks out or
+executes the PR head in the job with the server credential.
+
+The first installation of this workflow is a bootstrap exception: a base
+without the file cannot compare its bytes. Once the file exists on the base,
+the GitHub verifier rejects PRs that edit or remove it **or its trusted
+execution scripts**, just as it rejects changes to `ci.yml`. A later gate
+upgrade therefore needs a separately reviewed bootstrap procedure and new
+approval; it cannot ride inside an ordinary release candidate. The first
+bootstrap must receive ordinary protected CI and human code review. A PR body
+edit or an explicit rerun of the failed job can
+refresh the read-only check after the AAL2 Inbox decision; a green result is
+still only a snapshot.
+
+**Activation remains held.** The current main protection requires the four
+CI jobs with `strict: true` and `enforce_admins: true`, but does not require
+`Approved production release (trusted)`. The repository's Actions secrets
+currently contain only the public browser build settings; there is no
+`AA_RELEASE_SUPABASE_SERVICE_ROLE_KEY`. Before making the check mandatory,
+review custody and scope for that server credential (prefer a dedicated
+read-only release verifier identity), confirm GitHub's `pull_request_target`
+event policy permits this trusted workflow, install the credential, test a
+red stale/revoked candidate and a green exact candidate, then require the
+check from the GitHub Actions app without a bypass route. No environment
+secret, protection setting or production SQL is changed by this held source
+slice.
+
+**A required green status does not close the release effect gate.** The
+human can revoke after the workflow's last read. GitHub can then merge a
+cached green PR unless a trusted merger re-reads the latest decision
+immediately before the merge API call, binds the expected head SHA, and
+requires the approved base/plan. Even that read has a small distributed
+race until the release decision is leased or locked through the effect.
+Railway still watches `main` with Wait for CI off, so a merge can deploy
+before the new main CI or any Pages `workflow_run` gate. No class-32 pass is
+claimed until the trusted merger, production SQL gate, Railway deploy gate,
+Pages gate and live adverse-case pilot are complete.
+
 ## Focused verification in this held patch
 
 - PGlite: thirteen cases cover the held source, server-only proof, digest/PR/CI/SQL
