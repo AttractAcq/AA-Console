@@ -26,7 +26,7 @@ function client(role: string | null): SupabaseClient {
 
 beforeEach(() => {
   collectSystemReadiness.mockReset();
-  collectSystemReadiness.mockResolvedValue({ capturedAt: "2026-10-29T12:00:00Z", schemaVersion: 1 });
+  collectSystemReadiness.mockResolvedValue({ capturedAt: "2026-10-29T12:00:00Z", schemaVersion: 2 });
 });
 
 it("rejects anonymous and non-admin users before service-role inventory reads", async () => {
@@ -48,7 +48,7 @@ it("serves the exact inventory only to an active admin session", async () => {
     res, client("admin"), {} as RuntimeConfig);
   expect(raw.writeHead).toHaveBeenCalledWith(200, expect.any(Object));
   expect(JSON.parse(raw.end.mock.calls[0]![0] as string)).toEqual({
-    ok: true, capturedAt: "2026-10-29T12:00:00Z", schemaVersion: 1,
+    ok: true, capturedAt: "2026-10-29T12:00:00Z", schemaVersion: 2,
   });
   expect(collectSystemReadiness).toHaveBeenCalledTimes(1);
 });

@@ -7,10 +7,27 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { BotAuthenticator } from "../auth/identity.js";
+import { BotAuthenticator, type FreshIdentity } from "../auth/identity.js";
 import type { ActionEngine } from "../policy/engine.js";
+import { permissionMatches } from "../policy/permissions.js";
+import type { Result, Tool } from "../shared/types.js";
 import type { Config } from "./config.js";
 const digest = (v: string) => createHash("sha256").update(v).digest();
+// These tools read/write the gateway's own SQLite store, so no AA business
+// RPC gets a chance to reject a revoked Bot or removed client grant.
+const GATEWAY_LOCAL_TOOLS = new Set([
+  "workflow.get_pending_approvals",
+  "workflow.get_activity",
+  "workflow.create_approval",
+]);
+// Every write reserves a local idempotency receipt before its AA adapter runs,
+// and high-risk writes can create a local approval card. Recheck AA first.
+const needsFreshAa = (tool: Tool) =>
+  tool.action === "write" || GATEWAY_LOCAL_TOOLS.has(tool.name);
+const hasFreshAaPermission = (fresh: FreshIdentity, tool: Tool) =>
+  tool.permissions.every((permission) =>
+    fresh.aaPermissions.some((grant) => permissionMatches(grant, permission)),
+  );
 export function createServer(
   c: Config,
   engine: ActionEngine,
@@ -63,10 +80,15 @@ export function createServer(
           // health check. The gateway and runtime already share this secret.
           if (!c.AA_MCP_SERVICE_SECRET)
             return json(503, { error: "readiness_unconfigured", request_id });
-          const token = /^Bearer ([^\s]+)$/.exec(req.headers.authorization ?? "")?.[1] ?? "";
+          const token =
+            /^Bearer ([^\s]+)$/.exec(req.headers.authorization ?? "")?.[1] ??
+            "";
           if (!timingSafeEqual(digest(c.AA_MCP_SERVICE_SECRET), digest(token)))
             return json(401, { error: "unauthorized", request_id });
-          const rawSha = process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.SOURCE_VERSION ?? "";
+          const rawSha =
+            process.env.RAILWAY_GIT_COMMIT_SHA ??
+            process.env.SOURCE_VERSION ??
+            "";
           return json(200, {
             ok: true,
             sha: /^[0-9a-f]{40}$/i.test(rawSha) ? rawSha.toLowerCase() : null,
@@ -89,7 +111,9 @@ export function createServer(
           );
           if (!reviewer) throw new Error("unauthorized");
         } else
-          identity = await authenticator.authenticate(req.headers.authorization);
+          identity = await authenticator.authenticate(
+            req.headers.authorization,
+          );
         if (admin && req.url === "/admin/approvals" && req.method === "GET")
           return json(200, { approvals: engine.store.approvals() });
         if (req.method !== "POST")
@@ -128,36 +152,131 @@ export function createServer(
             );
           }
           z.object({}).strict().parse(parsed);
-          return json(200, await engine.executeApproval(match[1], authenticator.identities()));
+          const approval = engine.store.getApproval(match[1]);
+          if (!approval) throw new Error("invalid_transition");
+          const current = await authenticator.freshIdentityForApproval(
+            approval.requested_by_bot,
+            approval.request_token_id,
+          );
+          const tool = engine.tools.find((t) => t.name === approval.tool);
+          if (!tool || !hasFreshAaPermission(current, tool))
+            throw new Error("unauthorized");
+          return json(
+            200,
+            await engine.executeApproval(
+              match[1],
+              [current.identity],
+              current.aaTokenId,
+            ),
+          );
         }
         if (req.url !== "/mcp")
           return json(404, { error: "not_found", request_id });
         const caller = identity!;
+        const freshSensitiveIdentity = async (): Promise<FreshIdentity> => {
+          const current = await authenticator.authenticateFresh(
+            req.headers.authorization,
+          );
+          if (
+            current.identity.bot !== caller.bot ||
+            current.identity.clients.length === 0
+          )
+            throw new Error("unauthorized");
+          return current;
+        };
         const server = new Server(
           { name: "aa-mcp-gateway", version: "0.1.0" },
           { capabilities: { tools: {} } },
         );
-        server.setRequestHandler(ListToolsRequestSchema, async () => ({
-          tools: engine.discover(caller).map((t) => ({
-            name: t.name,
-            description: t.description,
-            inputSchema: z.toJSONSchema(t.input) as any,
-            outputSchema: z.toJSONSchema(t.output) as any,
-            annotations: {
-              readOnlyHint: t.action === "read",
-              destructiveHint: !t.reversible,
-              idempotentHint: t.action === "write",
-              openWorldHint: false,
-            },
-          })),
-        }));
+        server.setRequestHandler(ListToolsRequestSchema, async () => {
+          const visible = engine.discover(caller);
+          let fresh: FreshIdentity | undefined;
+          if (visible.some(needsFreshAa)) {
+            try {
+              fresh = await freshSensitiveIdentity();
+            } catch {
+              fresh = undefined;
+              engine.store.audit({
+                request_id,
+                bot: caller.bot,
+                authorization: "denied",
+                execution_result: "rejected",
+                error: "gateway_sensitive_aa_auth_required",
+              });
+            }
+          }
+          const freshNames = fresh
+            ? new Set(
+                engine
+                  .discover(fresh.identity)
+                  .filter((t) => hasFreshAaPermission(fresh, t))
+                  .map((t) => t.name),
+              )
+            : new Set<string>();
+          return {
+            tools: visible
+              .filter(
+                (t) =>
+                  !needsFreshAa(t) || freshNames.has(t.name),
+              )
+              .map((t) => ({
+                name: t.name,
+                description: t.description,
+                inputSchema: z.toJSONSchema(t.input) as any,
+                outputSchema: z.toJSONSchema(t.output) as any,
+                annotations: {
+                  readOnlyHint: t.action === "read",
+                  destructiveHint: !t.reversible,
+                  idempotentHint: t.action === "write",
+                  openWorldHint: false,
+                },
+              })),
+          };
+        });
         server.setRequestHandler(CallToolRequestSchema, async (request) => {
-          const result = await engine.call(
-            caller,
-            request.params.name,
-            request.params.arguments,
+          let result: Result = {
+            status: "rejected",
+            capability: request.params.name,
             request_id,
+            message: "Tool unavailable or unauthorized.",
+          };
+          const tool = engine.tools.find(
+            (t) => t.name === request.params.name,
           );
+          if (tool && needsFreshAa(tool)) {
+            let current: FreshIdentity | undefined;
+            try {
+              current = await freshSensitiveIdentity();
+              if (!hasFreshAaPermission(current, tool))
+                throw new Error("unauthorized");
+            } catch {
+              current = undefined;
+              engine.store.audit({
+                request_id,
+                bot: caller.bot,
+                tool: request.params.name,
+                authorization: "denied",
+                execution_result: "rejected",
+                error: "gateway_sensitive_aa_auth_required",
+              });
+            }
+            if (current)
+              result = await engine.call(
+                current.identity,
+                request.params.name,
+                request.params.arguments,
+                request_id,
+                undefined,
+                current.aaTokenId,
+              );
+          } else {
+            result = await engine.call(
+              caller,
+              request.params.name,
+              request.params.arguments,
+              request_id,
+            );
+          }
           return {
             content: [{ type: "text", text: JSON.stringify(result) }],
             structuredContent: result,
