@@ -814,3 +814,100 @@ describe("the client switch", () => {
     );
   });
 });
+
+describe("rule 6: a supported flag no handler backs", () => {
+  /**
+   * The four handlers the deployed runtime registers in HANDLERS. Kept here
+   * as a literal rather than imported, because the point of the assertion is
+   * that the database's claim and the runtime's registry agree, and importing
+   * one to check the other proves nothing.
+   */
+  const REGISTERED = ["budget_change", "lead_message", "page_deploy", "proof_publish"];
+  const ATTESTED = "92191b3e854abce86f9f5f8cd7810f86ba318b9d";
+
+  /** Production's flag state before 299, which 230's seed does not reproduce. */
+  async function asProductionBefore299(): Promise<void> {
+    await db.exec(`
+ update campaign_action_executors set supported = true
+  where action_key in ('proof_publish','page_deploy','lead_message','budget_change',
+                       'meta_ad_build','profile_update');
+ update proof_destinations set supported = true;`);
+  }
+
+  const apply299 = async () =>
+    db.exec(await sql("20261030170000_299_rule_six_supported_flags.sql"));
+
+  it("leaves exactly the actions a handler is registered for", async () => {
+    await asProductionBefore299();
+    await apply299();
+
+    const supported = await rows<{ action_key: string }>(
+      "select action_key from campaign_action_executors where supported order by action_key",
+    );
+    expect(supported.map((row) => row.action_key)).toEqual(REGISTERED);
+  });
+
+  it("says what is missing rather than going quiet, for both corrected actions", async () => {
+    await asProductionBefore299();
+    await apply299();
+
+    // The sentence a person reads is the due view's, and it is built from
+    // this flag. What matters here is that the note names the gap.
+    for (const key of ["meta_ad_build", "profile_update"]) {
+      const row = await one<{ supported: boolean; note: string }>(
+        "select supported, note from campaign_action_executors where action_key = $1",
+        [key],
+      );
+      expect(row.supported).toBe(false);
+      expect(row.note).toMatch(/registered|handler/i);
+    }
+  });
+
+  it("stops claiming the two proof destinations the placer has no transport for", async () => {
+    await asProductionBefore299();
+    await apply299();
+
+    const claimable = await rows<{ destination_key: string }>(
+      "select destination_key from proof_destinations where supported and mode = 'api' order by 1",
+    );
+    // google_business is the one provider placer.ts has a branch for.
+    expect(claimable.map((row) => row.destination_key)).toEqual(["google_business_profile"]);
+  });
+
+  it("attests every row it leaves supported to the deployed build", async () => {
+    await asProductionBefore299();
+    await apply299();
+
+    const unattested = await rows<{ action_key: string }>(
+      `select action_key from campaign_action_executors
+        where supported and (handler_attested_sha is null or handler_attested_at is null)`,
+    );
+    expect(unattested).toEqual([]);
+    const attested = await one<{ handler_attested_sha: string }>(
+      "select handler_attested_sha from campaign_action_executors where action_key = 'proof_publish'",
+    );
+    expect(attested.handler_attested_sha).toBe(ATTESTED);
+  });
+
+  it("refuses a later flag flip that names no build", async () => {
+    await asProductionBefore299();
+    await apply299();
+
+    // The next person to do what 239 and 254 did. The constraint is the
+    // whole point: there is no way to advertise support quietly.
+    await expect(
+      db.exec("update campaign_action_executors set supported = true where action_key = 'meta_ad_build'"),
+    ).rejects.toThrow(/campaign_action_executors_supported_needs_attestation/);
+  });
+
+  it("refuses a build identity that is not a full commit", async () => {
+    await asProductionBefore299();
+    await apply299();
+
+    await expect(
+      db.exec(`update campaign_action_executors
+                  set supported = true, handler_attested_sha = '92191b3', handler_attested_at = now()
+                where action_key = 'meta_ad_build'`),
+    ).rejects.toThrow(/campaign_action_executors_attested_sha_shape/);
+  });
+});
