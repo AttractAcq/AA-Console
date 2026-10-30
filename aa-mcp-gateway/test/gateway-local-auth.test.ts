@@ -81,11 +81,15 @@ async function start(
   await once(server, "listening");
   c.PUBLIC_ORIGIN = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   return {
-    async mcp(method: string, params: Record<string, unknown> = {}) {
+    async mcp(
+      method: string,
+      params: Record<string, unknown> = {},
+      token = botToken,
+    ) {
       const response = await fetch(c.PUBLIC_ORIGIN + "/mcp", {
         method: "POST",
         headers: {
-          authorization: `Bearer ${botToken}`,
+          authorization: `Bearer ${token}`,
           "content-type": "application/json",
           accept: "application/json, text/event-stream",
         },
@@ -415,13 +419,20 @@ test("dual AA-only reviewed action cannot execute after its AA permission is rem
   });
   const app = await start(c, engine, auth);
   t.after(app.close);
-  const identity = await auth.authenticate(`Bearer ${botToken}`);
-  const pending = await engine.call(identity, "sites.provision", {
-    client_id: client,
-    repo: "harbour",
-    idempotency_key: "aa-only-provision-0001",
+  const pendingResponse = await app.mcp("tools/call", {
+    name: "sites.provision",
+    arguments: {
+      client_id: client,
+      repo: "harbour",
+      idempotency_key: "aa-only-provision-0001",
+    },
   });
+  const pending = pendingResponse.body.result.structuredContent;
   assert.equal(pending.status, "approval_required");
+  assert.equal(
+    store.getApproval(pending.approval_id!).request_token_id,
+    "33333333-3333-4333-8333-333333333333",
+  );
   engine.decide(pending.approval_id!, "human", "approved");
   permissions = [];
   const denied = await app.execute(pending.approval_id!);
@@ -451,13 +462,20 @@ for (const mode of ["dual", "db"] as const) {
     });
     const app = await start(f.c, engine, f.auth);
     t.after(app.close);
-    const identity = await f.auth.authenticate(`Bearer ${botToken}`);
-    const pending = await engine.call(identity, "sites.provision", {
-      client_id: client,
-      repo: "harbour",
-      idempotency_key: `provision-${mode}-0001`,
+    const pendingResponse = await app.mcp("tools/call", {
+      name: "sites.provision",
+      arguments: {
+        client_id: client,
+        repo: "harbour",
+        idempotency_key: `provision-${mode}-0001`,
+      },
     });
+    const pending = pendingResponse.body.result.structuredContent;
     assert.equal(pending.status, "approval_required");
+    assert.equal(
+      store.getApproval(pending.approval_id!).request_token_id,
+      "33333333-3333-4333-8333-333333333333",
+    );
     engine.decide(pending.approval_id!, "human", "approved");
 
     for (const lost of [
@@ -486,6 +504,176 @@ for (const mode of ["dual", "db"] as const) {
   });
 }
 
+test("revoking token A cannot execute its approved card through token B for the same Bot", async (t) => {
+  const tokenB = "d".repeat(40);
+  const tokenIdA = "33333333-3333-4333-8333-333333333333";
+  const tokenIdB = "44444444-4444-4444-8444-444444444444";
+  const c = config({
+    BOT_AUTH_MODE: "db",
+    BOT_CREDENTIALS_JSON: "[]",
+    REVIEWER_CREDENTIALS_JSON: JSON.stringify([
+      { id: "human", token: reviewerToken },
+    ]),
+    AA_INTERNAL_API_URL: "https://aa.example.test",
+    AA_MCP_SERVICE_SECRET: "c".repeat(40),
+  });
+  let revokedA = false;
+  const auth = BotAuthenticator.fromConfig(c, () => {}, async (hash) => {
+    if (hash === tokenHashHex(botToken))
+      return active("bot_marketing", {
+        token_id: tokenIdA,
+        status: revokedA ? "revoked_token" : "active",
+      });
+    if (hash === tokenHashHex(tokenB))
+      return active("bot_marketing", { token_id: tokenIdB });
+    return { found: false };
+  });
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  let externalWrites = 0;
+  const engine = new ActionEngine(store, registry, {
+    async execute(tool) {
+      externalWrites++;
+      return { status: "completed", capability: tool.name };
+    },
+  });
+  const app = await start(c, engine, auth);
+  t.after(app.close);
+
+  const cardAResponse = await app.mcp("tools/call", {
+    name: "sites.provision",
+    arguments: {
+      client_id: client,
+      repo: "harbour-a",
+      idempotency_key: "token-a-provision",
+    },
+  });
+  const cardA = cardAResponse.body.result.structuredContent;
+  assert.equal(cardA.status, "approval_required");
+  assert.equal(store.getApproval(cardA.approval_id).request_token_id, tokenIdA);
+  engine.decide(cardA.approval_id, "human", "approved");
+
+  const bListed = await app.mcp("tools/list", {}, tokenB);
+  assert.equal(bListed.status, 200);
+  assert.ok(
+    bListed.body.result.tools.some(
+      (tool: { name: string }) => tool.name === "sites.provision",
+    ),
+  );
+  revokedA = true;
+  const deniedA = await app.execute(cardA.approval_id);
+  assert.equal(deniedA.status, 401);
+  assert.equal(externalWrites, 0);
+  assert.equal(
+    store.getApproval(cardA.approval_id).execution_status,
+    "not_started",
+  );
+
+  const cardBResponse = await app.mcp(
+    "tools/call",
+    {
+      name: "sites.provision",
+      arguments: {
+        client_id: client,
+        repo: "harbour-b",
+        idempotency_key: "token-b-provision",
+      },
+    },
+    tokenB,
+  );
+  const cardB = cardBResponse.body.result.structuredContent;
+  assert.equal(cardB.status, "approval_required");
+  assert.equal(store.getApproval(cardB.approval_id).request_token_id, tokenIdB);
+  engine.decide(cardB.approval_id, "human", "approved");
+  const executedB = await app.execute(cardB.approval_id);
+  assert.equal(executedB.status, 200);
+  assert.equal(externalWrites, 1);
+  assert.equal(store.getApproval(cardA.approval_id).status, "approved");
+  const persisted = JSON.stringify(store.approvals());
+  assert.ok(!persisted.includes(botToken));
+  assert.ok(!persisted.includes(tokenB));
+  assert.ok(!persisted.includes(tokenHashHex(botToken)));
+  assert.ok(!persisted.includes(tokenHashHex(tokenB)));
+});
+
+test("legacy approval without a requesting token ID remains unconsumed", async (t) => {
+  const f = fixture("db", "bot_marketing");
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  let externalWrites = 0;
+  const engine = new ActionEngine(store, registry, {
+    async execute(tool) {
+      externalWrites++;
+      return { status: "completed", capability: tool.name };
+    },
+  });
+  const app = await start(f.c, engine, f.auth);
+  t.after(app.close);
+  const identity = await f.auth.authenticate(`Bearer ${botToken}`);
+  const card = await engine.call(identity, "sites.provision", {
+    client_id: client,
+    repo: "legacy",
+    idempotency_key: "legacy-no-token-id",
+  });
+  assert.equal(card.status, "approval_required");
+  assert.equal(store.getApproval(card.approval_id!).request_token_id, null);
+  engine.decide(card.approval_id!, "human", "approved");
+  const denied = await app.execute(card.approval_id!);
+  assert.equal(denied.status, 401);
+  assert.equal(externalWrites, 0);
+  assert.equal(
+    store.getApproval(card.approval_id!).execution_status,
+    "not_started",
+  );
+});
+
+test("after a gateway restart only the original token reauthentication unlocks its card", async (t) => {
+  const f = fixture("db", "bot_marketing");
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  let externalWrites = 0;
+  const engine = new ActionEngine(store, registry, {
+    async execute(tool) {
+      externalWrites++;
+      return { status: "completed", capability: tool.name };
+    },
+  });
+  const first = await start(f.c, engine, f.auth);
+  const pendingResponse = await first.mcp("tools/call", {
+    name: "sites.provision",
+    arguments: {
+      client_id: client,
+      repo: "restart-card",
+      idempotency_key: "restart-card-001",
+    },
+  });
+  const card = pendingResponse.body.result.structuredContent;
+  assert.equal(card.status, "approval_required");
+  engine.decide(card.approval_id, "human", "approved");
+  await first.close();
+
+  const restartedAuth = BotAuthenticator.fromConfig(
+    f.c,
+    () => {},
+    async (hash) => {
+      assert.equal(hash, tokenHashHex(botToken));
+      return active("bot_marketing");
+    },
+  );
+  const restarted = await start(f.c, engine, restartedAuth);
+  t.after(restarted.close);
+  const beforeLogin = await restarted.execute(card.approval_id);
+  assert.equal(beforeLogin.status, 401);
+  assert.equal(externalWrites, 0);
+  assert.equal(store.getApproval(card.approval_id).execution_status, "not_started");
+
+  const login = await restarted.mcp("tools/list");
+  assert.equal(login.status, 200);
+  const afterLogin = await restarted.execute(card.approval_id);
+  assert.equal(afterLogin.status, 200);
+  assert.equal(externalWrites, 1);
+});
+
 test("hosted env mode fails closed for gateway-local sensitive access; loopback fixtures remain usable", async () => {
   const credentials = [
     { bot: "bot_production" as const, clients: [client], token: botToken },
@@ -504,7 +692,7 @@ test("hosted env mode fails closed for gateway-local sensitive access; loopback 
     /unauthorized/,
   );
   await assert.rejects(
-    () => hosted.freshIdentityForBot("bot_production"),
+    () => hosted.freshIdentityForApproval("bot_production", null),
     /unauthorized/,
   );
   const local = BotAuthenticator.fromConfig({

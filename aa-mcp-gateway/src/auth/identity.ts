@@ -61,16 +61,20 @@ export type AaResolveResult = {
 };
 
 export type BotAuthAlert = (event: Record<string, unknown>) => void;
-export type FreshIdentity = { identity: Identity; aaPermissions: string[] };
+export type FreshIdentity = {
+  identity: Identity;
+  aaPermissions: string[];
+  aaTokenId?: string;
+};
 
 type CacheEntry = { expires: number; value: AaResolveResult | null };
 
 export class BotAuthenticator {
   private readonly cache = new Map<string, CacheEntry>();
   private allowLocalPrivilegedEnv = false;
-  // Memory only: reviewer execution can re-resolve the last authenticated
-  // Bot token without storing a bearer or token hash in SQLite/audit.
-  private readonly lastTokenHashByBot = new Map<Bot, string>();
+  // Memory only: reviewer execution re-resolves the exact token that made the
+  // approval request. Approval cards persist only AA's nonsecret token ID.
+  private readonly tokenHashesById = new Map<string, string>();
   constructor(
     private readonly mode: BotAuthMode,
     private readonly credentials: Credential[],
@@ -137,8 +141,11 @@ export class BotAuthenticator {
     );
   }
 
-  /** Recheck the Bot behind a human-approved action before reserving it. */
-  async freshIdentityForBot(bot: unknown): Promise<FreshIdentity> {
+  /** Recheck the exact requesting token before reserving a human-approved action. */
+  async freshIdentityForApproval(
+    bot: unknown,
+    tokenId: unknown,
+  ): Promise<FreshIdentity> {
     if (typeof bot !== "string" || !bots.includes(bot as Bot))
       throw unauthorized();
     const botId = bot as Bot;
@@ -151,10 +158,10 @@ export class BotAuthenticator {
         aaPermissions: [...grants[credential.bot]],
       };
     }
+    if (typeof tokenId !== "string") throw unauthorized();
     const credential = this.credentials.find((c) => c.bot === botId);
-    const rememberedHash = this.lastTokenHashByBot.get(botId);
     const hashHex =
-      rememberedHash ??
+      this.tokenHashesById.get(tokenId) ??
       (credential ? tokenHashHex(credential.token) : undefined);
     if (!hashHex) throw unauthorized();
     const env =
@@ -162,7 +169,8 @@ export class BotAuthenticator {
         ? { bot: credential.bot, clients: [...credential.clients] }
         : undefined;
     const current = await this.freshAaIdentity(hashHex, env);
-    if (current.identity.bot !== botId) throw unauthorized();
+    if (current.identity.bot !== botId || current.aaTokenId !== tokenId)
+      throw unauthorized();
     return current;
   }
 
@@ -178,14 +186,23 @@ export class BotAuthenticator {
       throw unauthorized();
     }
     const identity = this.fromAa(aa, this.mode === "db");
-    if (!identity || (env && this.mismatch(aa, env))) throw unauthorized();
+    if (!identity || !aa?.token_id || (env && this.mismatch(aa, env)))
+      throw unauthorized();
     const current = this.mode === "dual" && env ? env : identity;
-    this.remember(current, hashHex);
-    return { identity: current, aaPermissions: [...(aa?.permissions ?? [])] };
+    this.remember(current, hashHex, aa.token_id);
+    return {
+      identity: current,
+      aaPermissions: [...(aa.permissions ?? [])],
+      aaTokenId: aa.token_id,
+    };
   }
 
-  private remember(identity: Identity, hashHex: string): Identity {
-    this.lastTokenHashByBot.set(identity.bot, hashHex);
+  private remember(
+    identity: Identity,
+    hashHex: string,
+    tokenId?: string,
+  ): Identity {
+    if (tokenId) this.tokenHashesById.set(tokenId, hashHex);
     return identity;
   }
 
@@ -213,7 +230,7 @@ export class BotAuthenticator {
     if (this.mode === "db") {
       const identity = this.fromAa(aa, true);
       if (!identity) throw unauthorized();
-      return this.remember(identity, hashHex);
+      return this.remember(identity, hashHex, aa && aa !== "unavailable" ? aa.token_id : undefined);
     }
     if (aa !== "unavailable" && aa?.found && aa.status !== "active")
       throw unauthorized();
@@ -234,7 +251,7 @@ export class BotAuthenticator {
         (env && this.mismatch(aa, env))
       )
         throw unauthorized();
-      return this.remember(current, hashHex);
+      return this.remember(current, hashHex, aa && aa !== "unavailable" ? aa.token_id : undefined);
     }
     // Security matches Admin: never fall back to env or stale permissions.
     // Prod db mode alone is not this posture — dual must refuse env too.
@@ -249,7 +266,7 @@ export class BotAuthenticator {
         (env && this.mismatch(aa, env))
       )
         throw unauthorized();
-      return this.remember(current, hashHex);
+      return this.remember(current, hashHex, aa && aa !== "unavailable" ? aa.token_id : undefined);
     }
     if (aaIdentity && env) {
       if (this.mismatch(aa, env)) {
@@ -265,10 +282,10 @@ export class BotAuthenticator {
         });
         throw unauthorized();
       }
-      return this.remember(env, hashHex);
+      return this.remember(env, hashHex, aa && aa !== "unavailable" ? aa.token_id : undefined);
     }
     if (aaIdentity) {
-      return this.remember(aaIdentity, hashHex);
+      return this.remember(aaIdentity, hashHex, aa && aa !== "unavailable" ? aa.token_id : undefined);
     }
     if (env) return env;
     throw unauthorized();

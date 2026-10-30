@@ -154,15 +154,20 @@ export function createServer(
           z.object({}).strict().parse(parsed);
           const approval = engine.store.getApproval(match[1]);
           if (!approval) throw new Error("invalid_transition");
-          const current = await authenticator.freshIdentityForBot(
+          const current = await authenticator.freshIdentityForApproval(
             approval.requested_by_bot,
+            approval.request_token_id,
           );
           const tool = engine.tools.find((t) => t.name === approval.tool);
           if (!tool || !hasFreshAaPermission(current, tool))
             throw new Error("unauthorized");
           return json(
             200,
-            await engine.executeApproval(match[1], [current.identity]),
+            await engine.executeApproval(
+              match[1],
+              [current.identity],
+              current.aaTokenId,
+            ),
           );
         }
         if (req.url !== "/mcp")
@@ -261,6 +266,8 @@ export function createServer(
                 request.params.name,
                 request.params.arguments,
                 request_id,
+                undefined,
+                current.aaTokenId,
               );
           } else {
             result = await engine.call(
