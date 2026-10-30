@@ -32,7 +32,7 @@ manifest including every media byte digest and destination field.
 
 The `organic_package_builder` worker reads a scheduled post only if its one
 scheduled Engine slot, approved asset, explicit organic campaign chain, copy
-and connected provider account all match. It downloads each `client-media`
+and currently eligible provider account all match. It downloads each `client-media`
 object, hashes the actual bytes, uploads a content-addressed private copy to
 `publication-media`, downloads that copy again, and verifies byte hash,
 length and MIME type. The immutable package row holds the frozen object paths,

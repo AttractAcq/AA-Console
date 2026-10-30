@@ -81,7 +81,8 @@ begin
   if not found or v_post.client_id is null or v_post.asset_id is null
     or v_post.platform is null or v_post.scheduled_at is null
     or v_post.channel is distinct from 'organic'::public.post_channel
-    or v_post.publication_status <> 'scheduled' or v_post.published_at is not null
+    or v_post.publication_status is distinct from 'scheduled'
+    or v_post.published_at is not null
     then return null; end if;
   select * into v_asset from public.client_media_assets
     where id = v_post.asset_id and client_id = v_post.client_id;
@@ -129,7 +130,8 @@ begin
     into v_account_count, v_account
     from public.client_integrations
    where client_id = v_post.client_id and provider = v_provider
-     and status = 'connected' and credential_secret_id is not null;
+     and public.integration_state_eligible(status, token_expires_at)
+     and credential_secret_id is not null;
   if v_account_count <> 1 or nullif(btrim(v_account), '') is null
     or not coalesce(public.integration_usable(v_post.client_id, v_provider), false)
     then return null; end if;
@@ -377,8 +379,8 @@ begin
   end if;
   if auth.role() is distinct from 'service_role'
     and (auth.role() is distinct from 'authenticated'
-      or not public.can_review_approval_request_v6(
-        v_request.client_id, v_request.owner_role)) then
+      or not coalesce(public.can_review_approval_request_v6(
+        v_request.client_id, v_request.owner_role), false)) then
     return 'unverified';
   end if;
   if v_request.source_id !~*

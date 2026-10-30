@@ -29,6 +29,10 @@ beforeAll(async () => {
       $$select true$$;
     create function public.integration_usable(uuid,text) returns boolean language sql stable as
       $$select true$$;
+    create function public.integration_state_eligible(text,timestamptz)
+      returns boolean language sql stable as
+      $$select $1 in ('connected','active','expiring')
+        and ($2 is null or $2 > now())$$;
     create function public.lock_down_definer_functions() returns integer language sql as
       $$select 0$$;
     create function public.reject_approval_ledger_mutation_v6() returns trigger
@@ -69,7 +73,8 @@ beforeAll(async () => {
     create table post_copy_effective(scheduled_post_id uuid,platform post_platform,
       caption text,hashtags text[],alt_text text,link_url text,first_comment text);
     create table client_integrations(client_id uuid,provider text,status text,
-      credential_secret_id uuid,credential_label text,meta_page_id text);
+      credential_secret_id uuid,credential_label text,meta_page_id text,
+      token_expires_at timestamptz);
     create table platform_publishing(platform post_platform,provider text,supported boolean);
     create table platform_format_publishing(platform post_platform,
       content_format content_format,media_type media_type,supported boolean);
@@ -126,7 +131,7 @@ beforeAll(async () => {
     insert into post_copy_effective values ('${POST}','instagram','The exact caption',
       array['#proof'],'An image',null,null);
     insert into client_integrations values ('${CLIENT}','instagram','connected',
-      gen_random_uuid(),'123456789',null);
+      gen_random_uuid(),'123456789',null,null);
     insert into platform_publishing values ('instagram','instagram',true);
     insert into platform_format_publishing values ('instagram','single',null,true);
     insert into client_engine_settings values ('${CLIENT}',true);
@@ -156,7 +161,7 @@ describe("held exact organic publication package", () => {
       insert into platform_publishing values ('facebook','meta',true);
       insert into platform_format_publishing values ('facebook','single',null,true);
       insert into client_integrations values ('${CLIENT}','meta','connected',
-        gen_random_uuid(),null,'page-42');
+        gen_random_uuid(),null,'page-42',null);
       update scheduled_posts set platform='facebook' where id='${POST}';
       update content_slots set platform='facebook' where id='${SLOT}';
       update post_copy_effective set platform='facebook' where scheduled_post_id='${POST}';
@@ -168,7 +173,19 @@ describe("held exact organic publication package", () => {
       update scheduled_posts set platform='instagram' where id='${POST}';
       update content_slots set platform='instagram' where id='${SLOT}';
       update post_copy_effective set platform='instagram' where scheduled_post_id='${POST}';
+      update client_integrations set status='expiring',
+        token_expires_at=now()+interval '1 hour' where provider='instagram';
     `);
+    expect((await one<{ payload: unknown }>(
+      `select organic_publication_source_snapshot_v6('${POST}') as payload`)).payload)
+      .not.toBeNull();
+    await db.exec(`update client_integrations set token_expires_at=now()-interval '1 second'
+      where provider='instagram'`);
+    expect((await one<{ payload: unknown }>(
+      `select organic_publication_source_snapshot_v6('${POST}') as payload`)).payload)
+      .toBeNull();
+    await db.exec(`update client_integrations set status='connected',token_expires_at=null
+      where provider='instagram'`);
   });
 
   it("registers downloaded-byte evidence and an explicitly blocked unified Inbox card, idempotently", async () => {
@@ -201,6 +218,21 @@ describe("held exact organic publication package", () => {
     expect((await one<{ status: string; source_state: string }>(
       "select status,source_state from approval_inbox_v6 where source_kind='organic_publication'")))
       .toMatchObject({ status: "source_held", source_state: "source_held" });
+    await db.exec(`
+      create or replace function public.can_review_approval_request_v6(uuid,text)
+      returns boolean language sql stable as $$select null::boolean$$;
+      select set_config('request.jwt.claim.role','authenticated',false);
+    `);
+    const requestRow = await one<{ id: string }>(
+      "select id from approval_requests_v6 where source_kind='organic_publication'");
+    expect((await one<{ source_state: string }>(
+      "select organic_publication_source_state_v6($1) as source_state", [requestRow.id]))
+      .source_state).toBe("unverified");
+    await db.exec(`
+      select set_config('request.jwt.claim.role','service_role',false);
+      create or replace function public.can_review_approval_request_v6(uuid,text)
+      returns boolean language sql stable as $$select true$$;
+    `);
     expect((await db.query("select * from organic_publication_package_candidates_v6(5)")).rows)
       .toHaveLength(0);
     expect((await one<{ blocker: string }>(
