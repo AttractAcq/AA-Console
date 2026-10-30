@@ -38,10 +38,9 @@ import type { AgentJobRow } from "../queue.js";
 import { appendEvent } from "../queue.js";
 import { logger } from "../logging/logger.js";
 import { createLocalPost, PlacementTransportError } from "./google-business.js";
+import { PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS, safeProviderErrorMessage } from "../storage/signed-url-policy.js";
 
 const MEDIA_BUCKET = "client-media";
-/** Long enough for Google to fetch an image, short enough not to be a public link. */
-const SIGNED_URL_SECONDS = 60 * 60;
 const DEFAULT_BATCH = 5;
 
 export interface ClaimedPlacement {
@@ -115,7 +114,7 @@ export async function resolvePayload(
 
   const { data: signed, error: signError } = await sb.storage
     .from(MEDIA_BUCKET)
-    .createSignedUrl(path, SIGNED_URL_SECONDS);
+    .createSignedUrl(path, PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS);
   const mediaUrl = signed?.signedUrl?.trim() ?? "";
   if (signError || !mediaUrl.startsWith("https://")) {
     // The destination fetches this URL itself, so anything it cannot reach
@@ -264,7 +263,7 @@ export async function runProofPlacerJob(
     } catch (thrown) {
       failed += 1;
       const retryable = thrown instanceof PlacementTransportError ? thrown.retryable : false;
-      const reason = thrown instanceof Error ? thrown.message : String(thrown);
+      const reason = safeProviderErrorMessage(thrown instanceof Error ? thrown.message : String(thrown));
       const { error: failError } = await sb.rpc("record_proof_placement_failure", {
         p_placement_id: placement.placement_id,
         p_reason: reason,

@@ -82,6 +82,7 @@ describe('content.create_upload_url route', () => {
     expect(minted.body.storage_path).toBe(`${CLIENT}/${PENDING}.png`);
     expect(minted.body.pending_asset_id).toBe(PENDING);
     expect(minted.body.headers['content-type']).toBe('image/png');
+    expect(minted.body.headers['cache-control']).toBe('max-age=60');
     expect(minted.body.token).toBeUndefined();
     expect(JSON.stringify(minted.body)).not.toContain('service_role');
 

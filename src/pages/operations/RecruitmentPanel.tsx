@@ -11,7 +11,8 @@ import type { FieldDef } from "../../components/forms/fields";
 import { MediaCard, StatusBadge } from "../../components/MediaCard";
 import { MediaDetailModal } from "../../components/MediaDetailModal";
 import { cn } from "../../lib/cn";
-import { REVIEW_TONE, signPaths, type MediaAsset } from "../../lib/media";
+import { REVIEW_TONE, type MediaAsset } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import {
   RECRUITMENT_ROLES,
   RECRUITMENT_ROLE_LABEL,
@@ -100,7 +101,7 @@ export function RecruitmentPanel() {
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [pending, setPending] = useState<MediaAsset[]>([]);
   const [approved, setApproved] = useState<MediaAsset[]>([]);
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", [...pending, ...approved].map((asset) => asset.storage_path));
   const [concepts, setConcepts] = useState<Map<string, Record<string, unknown>>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -175,8 +176,6 @@ export function RecruitmentPanel() {
       const brand = brandRes.data as { colour_primary: string | null; imagery_style: string | null } | null;
       setBrandReady(Boolean(brand && (brand.colour_primary || brand.imagery_style)));
 
-      const paths = [...nextPending, ...nextApproved].map((a) => a.storage_path);
-      setUrls(await signPaths("client-media", paths));
 
       const briefIds = [...new Set([...nextPending, ...nextApproved].map((a) => a.brief_id).filter(Boolean))] as string[];
       if (briefIds.length > 0) {

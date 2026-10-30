@@ -30,8 +30,8 @@ beforeEach(() => {
 describe("FrameStrip", () => {
   it("shows every frame, not just the cover", async () => {
     show();
-    await waitFor(() => expect(screen.getByText("3 frames, in order")).toBeTruthy());
-    expect(screen.getAllByRole("img")).toHaveLength(3);
+    await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(3));
+    expect(screen.getByText("3 frames, in order")).toBeTruthy();
     expect(screen.getByAltText("Stop overpaying")).toBeTruthy();
     expect(screen.getByAltText("Frame 3")).toBeTruthy();
   });

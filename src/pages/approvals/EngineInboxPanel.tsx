@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 
 import { Modal } from "../../components/Modal";
 import { VideoApprovalRoute } from "../../components/VideoApprovalRoute";
-import { signPaths } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
 import {
@@ -57,6 +57,13 @@ interface RejectedRow {
   idea_id: string | null;
 }
 
+type AssetFile = {
+  id: string;
+  render_path?: string | null;
+  storage_path?: string | null;
+  media_type?: string | null;
+};
+
 function findingList(label: string, findings: Finding[], tone: string) {
   if (findings.length === 0) return null;
   return (
@@ -77,7 +84,12 @@ export function EngineInboxPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [rows, setRows] = useState<InboxRow[]>([]);
   const [rejected, setRejected] = useState<RejectedRow[]>([]);
-  const [urls, setUrls] = useState<Map<string, { url: string; mediaType: string | null }>>(new Map());
+  const [assetFiles, setAssetFiles] = useState<AssetFile[]>([]);
+  const signedFiles = useSignedPreviewPaths("client-media", assetFiles.map((file) => file.render_path ?? file.storage_path));
+  const urls = new Map(assetFiles.flatMap((file) => {
+    const url = signedFiles.get(file.render_path ?? file.storage_path ?? "");
+    return url ? [[file.id, { url, mediaType: file.media_type ?? null }] as const] : [];
+  }));
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -117,29 +129,11 @@ export function EngineInboxPanel() {
           .from("client_media_assets")
           .select("id, storage_path, render_path, media_type")
           .in("id", assetIds);
-        type AssetFile = {
-          id: string;
-          render_path?: string | null;
-          storage_path?: string | null;
-          media_type?: string | null;
-        };
-        const files = (assets ?? []) as AssetFile[];
         // render_path first: for a reel the cut is the thing being approved,
         // and storage_path is the opening still.
-        const signed = await signPaths(
-          "client-media",
-          files.map((a) => a.render_path ?? a.storage_path ?? ""),
-        );
-        setUrls(
-          new Map(
-            files.flatMap((row) => {
-              const url = signed.get(row.render_path ?? row.storage_path ?? "");
-              return url ? [[row.id, { url, mediaType: row.media_type ?? null }] as const] : [];
-            }),
-          ),
-        );
+        setAssetFiles((assets ?? []) as AssetFile[]);
       } else {
-        setUrls(new Map());
+        setAssetFiles([]);
       }
     } catch (cause) {
       setLoadError(

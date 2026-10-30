@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { ReelShotGrid } from "../../components/ReelShotGrid";
 import { supabase } from "../../lib/supabase";
 import { buildReelMasters } from "../../lib/reelShots";
-import { signPaths } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import type {
@@ -11,7 +11,6 @@ import type {
   ReelBriefInput,
   ReelEditJob,
   ReelFrameRow,
-  ReelMasterView,
 } from "../../lib/reelShots";
 
 /**
@@ -25,7 +24,16 @@ export function ReelShotsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [searchParams] = useSearchParams();
   const focusedBrief = searchParams.get("brief");
-  const [masters, setMasters] = useState<ReelMasterView[]>([]);
+  const [briefs, setBriefs] = useState<ReelBriefInput[]>([]);
+  const [assets, setAssets] = useState<ReelAssetReview[]>([]);
+  const [frames, setFrames] = useState<ReelFrameRow[]>([]);
+  const [editJobs, setEditJobs] = useState<ReelEditJob[]>([]);
+  const signedMedia = useSignedPreviewPaths("client-media", [
+    ...assets.map((asset) => asset.render_path),
+    ...frames.flatMap((frame) => [frame.storage_path, frame.clip_path]),
+  ]);
+  const masters = useMemo(() => buildReelMasters(briefs, assets, frames, editJobs, signedMedia),
+    [briefs, assets, frames, editJobs, signedMedia]);
   const [buildJobs, setBuildJobs] = useState<ReadonlyMap<string, { status: string; error: string | null }>>(new Map());
   const [engineHeldIds, setEngineHeldIds] = useState<ReadonlySet<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -36,7 +44,10 @@ export function ReelShotsPanel() {
   const refresh = useCallback(async () => {
     setLoadError(null);
     if (!clientId) {
-      setMasters([]);
+      setBriefs([]);
+      setAssets([]);
+      setFrames([]);
+      setEditJobs([]);
       setLoading(false);
       return;
     }
@@ -106,24 +117,13 @@ export function ReelShotsPanel() {
       for (const row of buildRes.data ?? []) {
         if (row.input_id && !latestBuilds.has(row.input_id)) latestBuilds.set(row.input_id, { status: row.status, error: row.error });
       }
-      // The shot media and finished cuts are private. Sign all visible files
-      // so the operator can inspect the actual sequence before approval.
+      // Keep only object paths in state. The visible shot grid re-signs its
+      // media through Storage authorization as the short preview URL ages.
       const frameFiles = (frameRes.data ?? []) as ReelFrameRow[];
-      const signedMedia = await signPaths(
-        "client-media",
-        [...assets.map((a) => a.render_path),
-          ...frameFiles.flatMap((frame) => [frame.storage_path, frame.clip_path])]
-          .filter((path): path is string => Boolean(path)),
-      );
-      setMasters(
-        buildReelMasters(
-          briefs,
-          assets,
-          frameFiles,
-          (jobRes.data ?? []) as ReelEditJob[],
-          signedMedia,
-        ),
-      );
+      setBriefs(briefs);
+      setAssets(assets);
+      setFrames(frameFiles);
+      setEditJobs((jobRes.data ?? []) as ReelEditJob[]);
       setBuildJobs(latestBuilds);
       setEngineHeldIds(new Set((slotRes.data ?? []).map((row) => row.asset_id).filter((id): id is string => Boolean(id))));
     } catch (error) {

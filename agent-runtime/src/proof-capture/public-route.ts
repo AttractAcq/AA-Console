@@ -7,6 +7,7 @@ import { admitPublicRequest } from "../public/quota.js";
 import { CAPTURE_HTML } from "./portal.js";
 import { PROOF_CATEGORIES } from "./taxonomy.js";
 import { verifyCaptureFile } from "./files.js";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../storage/signed-url-policy.js";
 export const hashCaptureToken = (token: string) =>
   createHash("sha256").update(token).digest("hex");
 export async function handlePublicProof(
@@ -150,7 +151,7 @@ export async function handlePublicProof(
       path = `${link.client_id}/capture/${link.id}/${body.submissionId}`;
       const { error: uploadError } = await sb.storage
         .from("proof")
-        .upload(path, bytes, { contentType: mime, upsert: false });
+        .upload(path, bytes, { contentType: mime, upsert: false, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS });
       if (uploadError) {
         // Recover an identical upload after a lost response without overwriting evidence.
         const priorFile = await sb.storage.from("proof").download(path);

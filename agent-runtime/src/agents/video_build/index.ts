@@ -25,6 +25,7 @@ import { isPhase1FormatCode, parseStoredShotPlan, serializeShot, type ShotPlanEn
 import { assemblyHandoff } from "./assembly.js";
 import { ClipStoreError, persistCompletedClip } from "./clip.js";
 import { createHiggsfieldClient, HiggsfieldError } from "./higgsfield.js";
+import { RENDER_REFERENCE_FETCH_URL_TTL_SECONDS, safeProviderErrorMessage } from "../../storage/signed-url-policy.js";
 import {
   decideMotion,
   motionFollowUp,
@@ -138,7 +139,7 @@ async function signedStillUrls(
   for (const frame of frames) {
     const path = frame.storage_path?.trim();
     if (!path) continue;
-    const { data, error } = await sb.storage.from(MEDIA_BUCKET).createSignedUrl(path, 60 * 60);
+    const { data, error } = await sb.storage.from(MEDIA_BUCKET).createSignedUrl(path, RENDER_REFERENCE_FETCH_URL_TTL_SECONDS);
     const signed = data?.signedUrl?.trim() ?? "";
     if (error || !signed.startsWith("https://")) continue;
     urls.set(frame.position, signed);
@@ -216,7 +217,7 @@ export async function runVideoBuildJob(
   try {
     stills = await stillsOnFile(sb, brief.id);
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : String(caught);
+    const message = safeProviderErrorMessage(caught instanceof Error ? caught.message : String(caught));
     stills = { count: 0, error: message };
   }
   await appendEvent(sb, job.id, stillsMessage(stills), "info", {
@@ -258,7 +259,7 @@ export async function runVideoBuildJob(
   try {
     frames = await framesForBrief(sb, brief.id);
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : String(caught);
+    const message = safeProviderErrorMessage(caught instanceof Error ? caught.message : String(caught));
     const paused = `Motion paused: ${message} No Higgsfield request was sent.`;
     await appendEvent(sb, job.id, paused, "warn", {
       creative_stage: "motion",
@@ -276,7 +277,7 @@ export async function runVideoBuildJob(
   try {
     stillUrls = await signedStillUrls(sb, frames);
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : String(caught);
+    const message = safeProviderErrorMessage(caught instanceof Error ? caught.message : String(caught));
     const paused = `Motion paused: opening stills could not be signed (${message}). No Higgsfield request was sent.`;
     await appendEvent(sb, job.id, paused, "warn", {
       creative_stage: "motion",
@@ -408,7 +409,9 @@ export async function runVideoBuildJob(
   } catch (caught) {
     const known = caught instanceof HiggsfieldError || caught instanceof ClipStoreError;
     const retryable = caught instanceof HiggsfieldError || caught instanceof ClipStoreError ? caught.retryable : true;
-    const message = known && caught instanceof Error ? caught.message : "Higgsfield could not be reached.";
+    const message = known && caught instanceof Error
+      ? safeProviderErrorMessage(caught.message)
+      : "Higgsfield could not be reached.";
     await appendEvent(sb, job.id, message, "warn", {
       creative_stage: "motion",
       status: "paused",

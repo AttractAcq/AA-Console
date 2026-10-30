@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { signPaths } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { supabase } from "../../lib/supabase";
 
 type Preset = "explainer" | "tutorial" | "hero";
@@ -25,7 +25,7 @@ export function MotionDesignPanel() {
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachSelections, setAttachSelections] = useState<Record<string, string>>({});
-  const [urls, setUrls] = useState<ReadonlyMap<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", projects.flatMap((project) => [project.render_path, project.poster_path]));
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +53,6 @@ export function MotionDesignPanel() {
       setProjects(rows);
       setBriefs((briefResult.data ?? []) as Brief[]);
       setAttachments((attachmentResult.data ?? []) as Attachment[]);
-      setUrls(await signPaths("client-media", rows.flatMap((project) =>
-        [project.render_path, project.poster_path].filter((path): path is string => !!path))));
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load motion projects.");

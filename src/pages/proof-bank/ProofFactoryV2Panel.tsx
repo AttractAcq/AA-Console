@@ -7,6 +7,7 @@ import {
   type ProofAsset,
   type MediaAsset,
 } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import {
   PROOF_DESTINATIONS,
   PROOF_CATEGORIES,
@@ -58,9 +59,9 @@ function ProofProductionWorkspace({
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [requests, setRequests] = useState<Request[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.render_path || asset.storage_path));
   const [textBodies, setTextBodies] = useState<Map<string, string>>(new Map());
-  const [rawUrls, setRawUrls] = useState<Map<string, string>>(new Map());
+  const rawUrls = useSignedPreviewPaths("proof", raw.map((proof) => proof.storage_path));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(false);
@@ -125,29 +126,15 @@ function ProofProductionWorkspace({
       ]);
       if (a.error || j.error) throw a.error ?? j.error;
       const rows = (a.data ?? []) as MediaAsset[];
-      const [signed, proofSigned] = await Promise.all([
-        signPaths(
-          "client-media",
-          rows.map((x) => x.render_path || x.storage_path),
-        ),
-        signPaths(
-          "proof",
-          (r.data ?? []).flatMap((x) =>
-            x.storage_path ? [x.storage_path] : [],
-          ),
-        ),
-      ]);
       setRaw(r.data ?? []);
       setBriefs(bs);
       setRequests(qs);
       setJobs(j.data ?? []);
       setAssets(rows);
-      setUrls(signed);
-      setRawUrls(proofSigned);
       setTextBodies(
         await fetchTextBodies(
           rows.filter((x) => x.media_type === "text"),
-          signed,
+          await signPaths("client-media", rows.filter((row) => row.media_type === "text").map((row) => row.storage_path)),
         ),
       );
       setError(null);
