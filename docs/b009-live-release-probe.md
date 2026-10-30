@@ -45,13 +45,18 @@ requests return 405.
    Compare the two SHAs with the actual Railway deployments and the migration
    head with a separate production read. A 503 is a blocker, not a reason to
    skip the gate.
-3. In a separate PR, make the privileged Pages job fetch this endpoint with a
-   bounded retry immediately before publication. Compare the runtime and
-   gateway SHAs against the CI-tested main commit and the migration head
-   against the reviewed release marker. A mismatch, timeout, stale response,
-   missing field, or 503 must fail publication without using Pages credentials.
-   Test an older runtime, older gateway, pending migration and unreachable
-   endpoint. Keep the already released current-main and four-job CI checks.
+3. In a separate PR, add a reviewed manifest that pins the exact compatible
+   runtime and gateway deployment SHAs plus the released migration head for
+   the browser candidate. Railway path filters can leave an unchanged service
+   on an older commit, so do not require both services to equal the browser's
+   CI-tested main SHA. Verify that each pinned service commit contains the
+   current tracked component code before accepting that pin. Make the
+   privileged Pages job fetch this endpoint with a bounded retry immediately
+   before publication and compare all observed identities with those pins.
+   A mismatch, unpinned component change, timeout, stale response, missing
+   field, or 503 must fail publication before the Pages deploy step. Test an
+   older runtime, older gateway, pending migration and unreachable endpoint.
+   Keep the released current-main and four-job CI checks.
 4. Add the exact PR/SHA/migration/deployment decision and final read-back to
    the unified Approval Inbox. This depends on B008 operational release-class
    coverage; this probe by itself does not close B009 or satisfy that approval.
