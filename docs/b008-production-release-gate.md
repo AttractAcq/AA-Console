@@ -1,6 +1,6 @@
 # B008 production release: exact-version authority and effect boundaries
 
-**Status:** Migrations 293 and 295 and their UI/attester are held preparatory slices. No
+**Status:** Migrations 293, 295 and 297 and their UI/attester/merger source are held preparatory slices. No
 production SQL, merge gate, Railway deployment gate, Pages approval gate or
 external switch is enabled by this document or this patch. Class 32 stays
 blocked until those independent effect gates and a live release pilot pass.
@@ -34,7 +34,7 @@ change before that pin requires the final observed runtime SHA, not the first.
 | Trusted attester to Supabase | A browser tries the proof RPC, a service caller sends a packet for another PR, a changed commit, a different CI run or different SQL bytes. | 293 grants proof submission only to `service_role`, repeats the packet digest and exact candidate binding in SQL, and records append-only evidence. The server process invokes the read-only GitHub verifier itself; it never accepts browser proof JSON. Service-role key custody is a required infrastructure control. |
 | Human decision | A Bot/service account, AAL1 session, non-admin, stale displayed card or changed artifact tries to approve. A new proof arrives after the browser's last read but before its decision RPC. | 293 demands authenticated provisioned admin AAL2, locks the request, compares both expected source hashes, requires fresh trusted proof, and appends the decision. The global Inbox re-reads the whole card before calling the owning RPC. 295 additionally requires the exact displayed GitHub packet SHA-256 under the same request lock, so the bound proof is the one the human saw. Rejection and revocation require reasons. |
 | Approved proof freshness | The 15-minute GitHub attestation expires while CI or review progresses; the approved card becomes held even when every approved byte is unchanged. A service caller tries to refresh with a different packet after the human decides. | 295 binds the original packet digest and proof ID to the AAL2 decision in an append-only table. Its server-only refresh RPC accepts only the identical JSON packet after fresh independent GitHub verification. It locks the request, requires the same latest decision, exact source, original proof and digest, and rejects revocation or expiry. The trusted check refreshes before its read-only assertion. |
-| Approval to merge | The PR head/base or GitHub checks advance after the person decides; an unrelated `gh pr merge` bypasses the Inbox; a previously green check remains green after the human revokes. | **Still open:** a trusted merger must re-run the verifier and latest decision immediately before the exact GitHub merge API call, compare head/base/plan, and fail on mismatch. Make its status mandatory in GitHub protection or merge queue **and** remove direct/bypass merge authority. A cached green status or CLI wrapper alone does not prevent a revoked-plan merge. |
+| Approval to merge | The PR head/base or GitHub checks advance after the person decides; an unrelated `gh pr merge` bypasses the Inbox; a previously green check remains green after the human revokes. | Held 297 adds a database lease that serializes a final AAL2 decision read with revocation and a merger that repeats canonical/GitHub reads before dispatch. **Still open:** install a sole trusted merger identity, make its check mandatory, remove independent direct/bypass merge authority and run a live adverse-case pilot. |
 | Merge to Railway | Railway deploys watched `main` before main CI or the release card is checked. | **Still open:** turn on a verified CI wait for both services and add a deploy-start exact approved-release/manifest check, or hold automatic deployment until a reviewed orchestrator deploys exact SHAs. A premerge approval alone does not prove the squash merge SHA or live service identity. |
 | Main CI to Pages | A newer `main` arrives while an older successful `workflow_run` builds. | The existing `assert-current-deploy-sha.sh` checks tested SHA and current main before and after the live identity wait. Its test simulates `main` advancing and rejects the old run. A later Pages effect gate must also compare the exact approved release scope. |
 | Runtime to browser pin | Railway deploys watched runtime source while the browser manifest pins an older runtime commit. | The existing live identity/source-tree gate rejects the browser build, as observed in Pages run 41015609250. After the final runtime merge is deployed and read back, a separate reviewed manifest-pin commit must name that exact full SHA; its own main CI and Pages gate then publish the browser. |
@@ -77,6 +77,91 @@ change before that pin requires the final observed runtime SHA, not the first.
    run, workflow digest, SQL file, packet field, candidate, or decision fails
    closed. No second human decision is needed for unchanged approved bytes;
    any change requires a new candidate and Inbox decision.
+
+## Held 297 exact merge lease and source contract
+
+The `production_release_merge_leases_v6` table and append-only event ledger
+record one active, dispatched or completed attempt per approved Inbox request.
+An aborted **pre-dispatch** attempt may be retried only after the canonical
+approval, proof and GitHub plan are independently checked again. The lease RPC
+takes the same approval-request row lock as the human decision RPC. If a
+revocation wins that lock, lease acquisition fails. If acquisition wins, the
+decision trigger refuses revocation while the lease is active or dispatched.
+This closes the decision-read-to-merge race at the database boundary without
+letting a service role or agent create an AAL2 human decision.
+
+`scripts/trusted-production-release-merger.mjs` is **held source with no CLI,
+workflow caller or installed credential**. It refreshes only the identical
+human-bound GitHub packet, reads the latest canonical card/decision and exact
+plan, checks current GitHub main and the open PR, requires strict branch
+protection and a sole reviewed merger restriction, verifies all four CI jobs
+plus `Approved production release (trusted)` as successful exact-head checks
+from their pinned GitHub Actions app, and verifies the trusted check's workflow
+run path, protected base SHA and single exact PR/head/base association. A
+missing workflow-run PR association fails closed; GitHub may leave this array
+empty for some event topologies, so the live `pull_request_target` pilot must
+establish that these facts are available before activation. It then acquires
+the lease, repeats the canonical/GitHub checks, and
+calls the dispatch RPC. The future merge call supplies the exact PR head SHA
+and approved merge method. It accepts a completed receipt only after a fresh
+read of the merged PR and evidence that the reported commit is still an
+ancestor of `main`. [GitHub documents the merge API's exact-head `sha`
+precondition](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#merge-a-pull-request)
+and [strict required status checks](https://docs.github.com/en/rest/branches/branch-protection?apiVersion=2022-11-28#update-status-check-protection).
+
+If dispatch or the GitHub merge response is ambiguous, the lease stays
+unresolved. The process never retries the merge or automatically clears a
+dispatched lease. This can temporarily block revocation; the Approval Inbox
+must show that pending outcome before a live pilot. The
+297 database RPC records a claimed observed merge SHA, so its production
+credential must be held only by the reviewed merger process; a general
+service-role key shared with other runtimes is insufficient custody.
+
+### Manual dispatched-lease reconciliation (exception runbook)
+
+1. Stop the merger runner for this request and **do not retry the GitHub
+   merge call**. Record request UUID, lease UUID, exact PR/head/base/packet,
+   dispatch timestamp, the HTTP outcome or timeout, and the latest canonical
+   Inbox decision. If the lease is still `active` and the process has not
+   called dispatch, the trusted runner may use its pre-dispatch abort RPC.
+2. Wait at least five minutes from `dispatched_at`. Read the GitHub PR, its
+   merge status and merge commit, current `main` ref and ancestry, check runs,
+   and the repository audit log twice at different times. Save both raw
+   first-party observations with timestamps in a controlled evidence file;
+   record its SHA-256 and the reviewers' names. An open PR alone is not proof
+   if an asynchronous or queued merge may still be pending.
+3. If the PR is merged, verify the merge commit against the exact approved
+   head and `main` ancestry, then let the trusted merger record `completed`
+   with that full observed SHA. If the effect is still uncertain, leave the
+   lease `dispatched`, keep revocation blocked, and escalate to Alex; never
+   invent a negative outcome.
+4. Only if the saved evidence proves **no merge occurred and none is pending**,
+   a database owner (`postgres`) invokes
+   `reconcile_unmerged_production_release_merge_lease_v6(lease_uuid,
+   evidence_sha256, reason)` through a reviewed SQL session. The function
+   requires an aged dispatch, writes the digest and reason into both lease
+   and append-only event ledger, and has no app, browser or `service_role`
+   execute grant. The operator then re-reads the ledger and the Inbox; a
+   provisioned human AAL2 admin may revoke the approved plan if needed.
+
+**Q020 / activation blocker:** Alex must approve a dedicated merger identity,
+separate read-only GitHub verifier and write-capable merger tokens, and
+server-only Supabase credential custody; ensure GitHub protection allows
+only that identity to change `main` with no bypass, make the trusted check
+mandatory with an exact GitHub Actions app binding, and prove a
+`pull_request_target` job is attached to the *PR head* before this verifier can
+accept it. A base-commit-only check is rejected. The new merger file is not
+yet part of the 293 verifier's protected gate-code path list; adding it there
+needs a separately reviewed trust-root bootstrap because ordinary candidates
+cannot change the verifier itself. None of these settings are changed by 297.
+
+The final distributed window remains between the last GitHub read, the
+database dispatch and GitHub's merge API. The exact-head `sha` precondition
+and strict up-to-date protection are required interlocks; the database lease
+holds revocation throughout. Protection or administrator policy could still
+be changed outside this process, and Railway currently watches `main` with
+Wait for CI off. Class 32 therefore stays blocked until the sole-identity
+policy, Railway/SQL/Pages effect gates, and live race/failure pilot are proven.
 
 ## Required next effect gates, in order
 

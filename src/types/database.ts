@@ -15522,6 +15522,129 @@ export type Database = {
         }
         Relationships: []
       }
+      production_release_merge_lease_events_v6: {
+        Row: {
+          event_order: number
+          id: string
+          lease_id: string
+          observed_merge_sha: string | null
+          reason: string | null
+          reconciliation_evidence_sha256: string | null
+          recorded_at: string
+          state: string
+        }
+        Insert: {
+          event_order?: never
+          id?: string
+          lease_id: string
+          observed_merge_sha?: string | null
+          reason?: string | null
+          reconciliation_evidence_sha256?: string | null
+          recorded_at?: string
+          state: string
+        }
+        Update: {
+          event_order?: never
+          id?: string
+          lease_id?: string
+          observed_merge_sha?: string | null
+          reason?: string | null
+          reconciliation_evidence_sha256?: string | null
+          recorded_at?: string
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_release_merge_lease_events_v6_lease_id_fkey"
+            columns: ["lease_id"]
+            isOneToOne: false
+            referencedRelation: "production_release_merge_leases_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_release_merge_leases_v6: {
+        Row: {
+          abort_reason: string | null
+          aborted_at: string | null
+          base_sha: string
+          completed_at: string | null
+          created_at: string
+          decision_id: string
+          dispatched_at: string | null
+          head_sha: string
+          id: string
+          merge_method: string
+          observed_merge_sha: string | null
+          packet_sha256: string
+          pr_number: number
+          reconciliation_evidence_sha256: string | null
+          request_id: string
+          source_version: string
+          state: string
+        }
+        Insert: {
+          abort_reason?: string | null
+          aborted_at?: string | null
+          base_sha: string
+          completed_at?: string | null
+          created_at?: string
+          decision_id: string
+          dispatched_at?: string | null
+          head_sha: string
+          id?: string
+          merge_method: string
+          observed_merge_sha?: string | null
+          packet_sha256: string
+          pr_number: number
+          reconciliation_evidence_sha256?: string | null
+          request_id: string
+          source_version: string
+          state?: string
+        }
+        Update: {
+          abort_reason?: string | null
+          aborted_at?: string | null
+          base_sha?: string
+          completed_at?: string | null
+          created_at?: string
+          decision_id?: string
+          dispatched_at?: string | null
+          head_sha?: string
+          id?: string
+          merge_method?: string
+          observed_merge_sha?: string | null
+          packet_sha256?: string
+          pr_number?: number
+          reconciliation_evidence_sha256?: string | null
+          request_id?: string
+          source_version?: string
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_release_merge_leases_v6_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "approval_decision_events_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_release_merge_leases_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_release_merge_leases_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_field_support: {
         Row: {
           field: string
@@ -24131,6 +24254,10 @@ export type Database = {
     }
     Functions: {
       aa_house_client_id: { Args: never; Returns: string }
+      abort_production_release_merge_lease_v6: {
+        Args: { p_lease_id: string; p_reason: string }
+        Returns: string
+      }
       accept_assignment: {
         Args: { p_assignment_id: string }
         Returns: {
@@ -24280,6 +24407,18 @@ export type Database = {
         }
       }
       accessible_client_ids: { Args: never; Returns: string[] }
+      acquire_production_release_merge_lease_v6: {
+        Args: {
+          p_base_sha: string
+          p_head_sha: string
+          p_merge_method: string
+          p_packet_sha256: string
+          p_pr_number: number
+          p_request_id: string
+          p_source_version: string
+        }
+        Returns: string
+      }
       acquisition_funnel: {
         Args: { p_client_id: string; p_days?: number }
         Returns: {
@@ -25395,6 +25534,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      complete_production_release_merge_lease_v6: {
+        Args: { p_lease_id: string; p_observed_merge_sha: string }
+        Returns: string
+      }
       complete_repurpose_clip: {
         Args: {
           p_duration_sec: number
@@ -26237,6 +26380,10 @@ export type Database = {
           p_member_ids: string[]
         }
         Returns: number
+      }
+      dispatch_production_release_merge_lease_v6: {
+        Args: { p_lease_id: string }
+        Returns: string
       }
       dm_reply_refusal_v6: {
         Args: { p_conversation_id: string }
@@ -27568,6 +27715,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      reconcile_unmerged_production_release_merge_lease_v6: {
+        Args: {
+          p_evidence_sha256: string
+          p_lease_id: string
+          p_reason: string
+        }
+        Returns: string
       }
       reconcile_workflow_runs: {
         Args: { p_limit?: number }
