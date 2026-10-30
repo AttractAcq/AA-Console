@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-10-29T22:33:00Z",
+  "updated_at": "2026-10-30T00:54:35Z",
   "objective": "AA-Console 100/100 autonomous service-business acquisition and content system, subject to exact-version human approval for every external publish, send, deployment, and spend action in one Approval Inbox.",
   "blueprint": {
     "artifact": "docs/AA_CONSOLE_100_BUILD_BLUEPRINT.md",
-    "sha256": "7b7a424ba000d87949946df968e2476297b05665f2324bbb4e3e5653dd5421cd",
+    "sha256": "82a25626c2792ee6aa65881df624fa95dc2ea8feeaa1144cc78525aa2a2a134f",
     "build_rows": 106
   },
   "baseline": {
-    "github_main_sha": "d5910b9f610318276f1ae63d67ef607c00f96439",
+    "github_main_sha": "f750ee59e16052b273dab5a59aed6e7c36defe57",
     "isolated_branch": "codex/100-build-release-ledger",
-    "source_checked_at": "2026-10-29T22:25:00Z",
+    "source_checked_at": "2026-10-30T00:54:35Z",
     "business_context_source": "2 - business/README.md in the local Attract Acquisition workspace",
     "confirmed_offer_ladder": [
       "Proof Sprint",
@@ -25,14 +25,14 @@
     "verified": "Mark a build row verified only after its stated acceptance evidence is recorded; track prerequisite gaps separately and do not credit dependent end-to-end behavior until all prerequisite rows and real external observations are verified.",
     "release": "Alex directly authorized this active 100/100 build session to merge and release subsequent work to main when CI jobs pass. Main protection strictly requires four up-to-date GitHub Actions checks and enforces admins. Production SQL requires exact dry-run, reviewed migration order and receipt. Alex separately approved AA_MCP_GATEWAY_URL=https://mcp.attractacq.com and the runtime redeploy. Product external actions still need exact-version human Approval Inbox decisions.",
     "approvals": "Every external action requires approval of its exact inspectable version in the unified Approval Inbox.",
-    "migration_order": "Production 260, 261 and 262 were applied in order after exact dry-runs on 2026-10-29. Main is d5910b9. PR #236 prepares pending 263; #237/#239/#240 prepare pending 264–266; an integration branch prepares 267–269. Never reapply 244–262. The schema CI order guard is required and a failing fixture was blocked."
+    "migration_order": "Production migrations 260–272 were applied in order after reviewed linked dry-runs and readbacks; main is f750ee59e16052b273dab5a59aed6e7c36defe57. PR #248 deployed a read-only parity feed and PR #249 merged a SELECT-only staging reconciliation packet; neither adds SQL. Staging remains on alternate 259/260 stamps and lacks 261–272. B008 273–279 and B006 280–282 are local, unreleased work as of this snapshot; B004 283–286 is also unreleased. Never reapply production 244–272 or rewrite staging history without a reviewed data-preserving plan."
   },
   "r000": {
     "state": "verified",
     "closed_at": "2026-10-29T22:25:21Z",
     "authority": "Alex directly authorized CI-conditioned main merges/releases for the 100/100 goal and separately authorized the production Railway gateway URL variable and resulting redeploy.",
     "github_main_sha": "d5910b9f610318276f1ae63d67ef607c00f96439",
-    "release_record": "outputs/AA_CONSOLE_FOUNDATION_RELEASE_RECEIPT_2026-10-29.md",
+    "release_record": "docs/AA_CONSOLE_FOUNDATION_RELEASE_RECEIPT_2026-10-29.md",
     "source_prs": [
       {
         "number": 238,
@@ -93,7 +93,8 @@
         "Frontend build and 1,184-test suite passed locally",
         "Runtime typecheck/build and full suite passed locally: 2,898 passed, 4 skipped",
         "Gateway typecheck/build and 233-test suite passed locally",
-        "Foundation PR #235 all four GitHub Actions jobs green at head c1d409e; schema artifact 12936392677"
+        "Foundation PR #235 all four GitHub Actions jobs green at head c1d409e; schema artifact 12936392677",
+        "PR #248 four protected CI jobs passed at head f494a963721617e85e89c18fdc94bbf9478fd859; production runtime heartbeat later showed the full 8d122308510b4b597e4b747eb117ef3d7f81d000 SHA."
       ],
       "permission_and_negative_tests": [
         "Admin-only readiness route denies anonymous and non-admin callers",
@@ -105,31 +106,39 @@
       "real_account_or_client": "Production admin inventory; individual client integrations not verified",
       "external_proof": "Signed-in production System readiness showed browser/runtime/authenticated gateway full matching SHA, fresh healthy/live enabled worker, migration head 262, 18 active cron jobs and current external-action switches.",
       "observed_at": "2026-10-29T22:25:21Z",
-      "blocker": "Separate authenticated staging inventory/export and full connected-account/credential health evidence remain open.",
+      "blocker": "A saved reproducible authenticated production inventory/export, connected-account and credential health evidence, and separate staging runtime deployment/inventory remain open. The read-only staging catalog preflight is not a full B001 runtime inventory.",
       "rollback": "See docs/100-build-b001-readiness.md and docs/runtime-heartbeat-retention.md; unschedule pruning if needed, preserving action audit rows.",
       "reviewer": "Independent foundation review clean; production release observed; staging acceptance open"
     },
     "B002": {
       "state": "in_progress",
-      "implementation_sha": "d5910b9f610318276f1ae63d67ef607c00f96439",
-      "pr": "https://github.com/AttractAcq/AA-Console/pull/235",
+      "implementation_sha": "8d122308510b4b597e4b747eb117ef3d7f81d000",
+      "pr": "https://github.com/AttractAcq/AA-Console/pull/248",
       "migration_ids": [],
       "tests": [
-        "18 schema auditor and admin view tests passed locally",
-        "Frontend TypeScript build passed",
-        "Foundation schema replay and generated-type parity green in CI run 40962326256; live remote parity remains separate"
+        "PR #248 exact head f494a963721617e85e89c18fdc94bbf9478fd859 passed all four protected GitHub Actions jobs in run 40979883370; merged at 8d122308510b4b597e4b747eb117ef3d7f81d000.",
+        "Read-only Management API CLI, generated source manifest, authenticated admin feed and fail-red generated-types/provenance cases passed focused local tests.",
+        "PR #249 exact head 7a1dc975c2257cfc06329883fb3a997458065527 passed all four protected jobs in run 40981190443; merged docs-only at f750ee59e16052b273dab5a59aed6e7c36defe57.",
+        "The SELECT-only P01–P20 staging reconciliation preflight returned successfully in staging and production: 40 of 40 read-only calls."
       ],
       "permission_and_negative_tests": [
-        "Read-only transaction and remote TLS validation",
-        "Dirty migration source, renamed/out-of-order version, wrong DB identity and redacted next-action fixtures"
+        "Read-only Management API route uses a database-read token only and rejects wrong project identity, invalid origin/TLS and unverified provenance.",
+        "Missing generated schema, missing token and inaccessible data show explicit red/unconfigured states, never a false green.",
+        "Preflight used SELECT only; it did not change staging or production schema/history."
       ],
-      "deployed_sha": "d5910b9f610318276f1ae63d67ef607c00f96439",
-      "real_account_or_client": null,
-      "external_proof": "Signed-in production Schema parity page reports no validated report available.",
-      "observed_at": "2026-10-29T22:25:21Z",
-      "blocker": "No secure read-only staging/production parity reports ingested; staging/production catalog, hashes, RLS, cron and type comparison remains open.",
+      "deployed_sha": "8d122308510b4b597e4b747eb117ef3d7f81d000",
+      "real_account_or_client": "Production and staging Supabase projects were queried read-only; no connected client account behavior was exercised.",
+      "external_proof": "At 00:34 UTC, staging had 277 history rows with alternate 259/260 stamps and all stored SQL payloads NULL, one client and five Auth users; production had 289 history rows through 272 and four NULL payloads. Staging google_ad_build.supported=true conflicts with no verified runtime handler; the client action switch is off. Production support=false. At 00:44 UTC production heartbeat showed live healthy runtime at the full #248 merge SHA.",
+      "observed_at": "2026-10-30T00:44:25Z",
+      "blocker": "Automatic production parity feed is unconfigured pending a fine-grained Supabase Database Read token, production/staging refs and runtime variable setup. Staging needs a reviewed data-preserving repair for alternate 259/260 history and missing 261–272 plus fail-closed Google support correction. No staging SQL repair or full live parity acceptance has occurred.",
       "rollback": "Auditor is read-only; remove admin tab/tool without database mutation.",
-      "reviewer": "Independent foundation review of provenance, TLS and UI findings"
+      "reviewer": "Independent #248 review found no blocker in scoped read-only feed; #249 SELECT-only packet passed all protected checks. B002 live parity remains open.",
+      "additional_prs": [
+        "https://github.com/AttractAcq/AA-Console/pull/249"
+      ],
+      "additional_implementation_shas": [
+        "7a1dc975c2257cfc06329883fb3a997458065527"
+      ]
     },
     "B003": {
       "state": "verified",
@@ -148,7 +157,7 @@
       ],
       "permission_and_negative_tests": [
         "Missing/out-of-order/duplicate migration 260 fails before Docker or Pages deploy",
-        "Catalog contract contains RLS, grants, function, cron and fallback-password assertions; database execution remains pending",
+        "Catalog contract contains RLS, grants, function, cron and fallback-password assertions; database execution passed in released schema replay",
         "Ready PR #244 head ae3fd544 deliberately failed migration order; schema job 123769209844 failed and GitHub mergeable_state=blocked; main unchanged"
       ],
       "deployed_sha": "d5910b9f610318276f1ae63d67ef607c00f96439",
@@ -179,29 +188,30 @@
     },
     "B004": {
       "state": "in_progress",
-      "implementation_sha": "6ff95a2a2c586d65789b8ad7d7e57151a4146008",
-      "pr": "https://github.com/AttractAcq/AA-Console/pull/236",
+      "implementation_sha": "3b9f0e157f45ea61c6ff617c84e06f303877a212",
+      "pr": "https://github.com/AttractAcq/AA-Console/pull/251",
       "migration_ids": [
-        "20261029140000_263_auth_signup_role_hardening"
+        "20261029140000_263_auth_signup_role_hardening",
+        "20261029210000_270_default_deny_auth_and_active_staff",
+        "20261029220000_271_profileless_authenticated_scope",
+        "20261030100000_272_onboarding_step_integrity"
       ],
       "tests": [
-        "Five focused embedded-Postgres tests and runtime typecheck passed locally; clean/upgrade replay and deployed test are pending",
-        "Credential draft follow-up: 16 focused tests, 1,188 frontend tests and build passed",
-        "Draft PR 242 audited all 34 production draft-key callers; 1,206 frontend tests and build passed before review fixes",
-        "Draft PR 243 historical migration 11: nine focused embedded-Postgres tests, runtime typecheck and two preparation tests pass; full raw-source replay pending",
-        "PR #242 final head 5e5cb3f: 1,213 frontend tests and build pass locally; independent reviewer ran 29 focused tests, found no blocker in 34 draft callers and account-switch/AI cancellation behavior"
+        "PRs #236, #243, #241, #242, #247, #250 and #251 each passed all four protected checks before merge.",
+        "Production 263, 270, 271 and 272 were applied after exact linked dry-runs; read-only catalog/function and migration-history checks passed.",
+        "PR #251 exact head 89f223012079eb3d296ffb71c5cf1fdab70e9e5f passed four checks; seven onboarding policy/trigger/function invariants were read back after 272.",
+        "Local unreleased 283 retirement candidate passed 3 focused PGlite tests; local 284–286 controlled-invitation candidate remains under review and has not passed hosted CI."
       ],
       "permission_and_negative_tests": [
-        "Forged role=admin signup metadata yields employee profile and is_admin false in PGlite",
-        "Existing legitimate admin role survives additive migration",
-        "Existing account password hash and Auth metadata remain unchanged on later repeat provisioning; client/team links survive",
-        "Trigger and provisioning helper deny direct anon/authenticated EXECUTE in PGlite",
-        "Passwords and Vault credentials excluded from drafts; old keys purged without reading values; safe draft reload and storage-write failure cases pass"
+        "Forged role=admin signup metadata cannot create an admin profile; production public signup is off.",
+        "Default-deny pending users, inactive staff and profileless authenticated scope are guarded by released 270–272 checks.",
+        "Sensitive browser draft values are excluded across audited forms; historical Auth replay source was corrected without replaying production migration 11.",
+        "Legacy migration-13 password Team-login route remains live until a later reviewed retirement migration."
       ],
-      "deployed_sha": null,
+      "deployed_sha": "8d122308510b4b597e4b747eb117ef3d7f81d000",
       "real_account_or_client": null,
-      "external_proof": null,
-      "observed_at": null,
+      "external_proof": "Production read-only checks confirmed migration head 272 and seven onboarding policy/trigger/function invariants; production runtime heartbeat later showed the full 8d122308510b4b597e4b747eb117ef3d7f81d000 SHA. No controlled invitation was sent or accepted.",
+      "observed_at": "2026-10-30T00:44:25Z",
       "hosted_signup_containment": {
         "source": "Direct read-only production Supabase dashboard Authentication > Sign In / Providers page at approximately 2026-10-29T21:49:00Z, corroborating Alex's report",
         "setting": "Allow new users to sign up",
@@ -218,48 +228,52 @@
         "missing_auth_user": 0,
         "full_provenance_verified": false
       },
-      "blocker": "Draft PRs #236, #241, #242 and #243 remain unmerged; migration 263 unapplied. #242 final independent review clean at 5e5cb3f, but strict four-check CI and stack integration with current main must finish. #243 historical migration 11 source amendment requires final CI/ancestry and checksum decision. Controlled invitations, migration 13, TOTP/aal2, credential rotation and admin provenance remain open; hosted signup remains off.",
+      "blocker": "Controlled exact-recipient Auth invitations, version-pinned email template and verified sender/redirect settings, invitation acceptance/linkage, legacy password-route retirement, MFA/AAL2, credential rotation, sole-admin provenance and live role matrix remain open. Local 283–286 work is unreleased; class #34 stays blocked and auto-send is off.",
       "rollback": null,
-      "reviewer": "Independent review and re-review found no remaining blocker in narrow credential-draft PR 241; B004 overall and live Auth settings/account provenance remain open.",
+      "reviewer": "Released narrow Auth/default-deny/draft/onboarding slices passed protected CI and review; B004 full acceptance remains open.",
       "additional_prs": [
+        "https://github.com/AttractAcq/AA-Console/pull/236",
+        "https://github.com/AttractAcq/AA-Console/pull/243",
         "https://github.com/AttractAcq/AA-Console/pull/241",
         "https://github.com/AttractAcq/AA-Console/pull/242",
-        "https://github.com/AttractAcq/AA-Console/pull/243"
+        "https://github.com/AttractAcq/AA-Console/pull/247",
+        "https://github.com/AttractAcq/AA-Console/pull/250"
       ],
       "additional_implementation_shas": [
-        "ebf6daa",
-        "5e5cb3f2e3e0c5b3a85b3d6e04a230fd2f7211cc",
-        "8a6bbda46b54189df75a0df9183e1e57f2fe21fc"
+        "067f13e87c17adc3684233f2745e071a32a7fe60",
+        "8076ac0bba229a795ba837a707a9da5932be10f7",
+        "7192ca3e97ac21330e25bfaf89747965beb29d7f",
+        "827ad2a0a50cd87746f1b66fe83af8614aca348f",
+        "f75ed8285aa63abb277de8c29255a83d93f6cf9d",
+        "86bb226b487589a377230092d1b35fb6510c8606"
       ]
     },
     "B005": {
       "state": "in_progress",
-      "implementation_sha": "913acec",
-      "pr": "https://github.com/AttractAcq/AA-Console/pull/237",
+      "implementation_sha": "74fa19972b2447a13301e80697dc26883ffd864e",
+      "pr": "https://github.com/AttractAcq/AA-Console/pull/245",
       "migration_ids": [
         "20261029150000_264_low_level_transition_isolation",
         "20261029160000_265_lead_and_media_entitlements",
-        "20261029170000_266_commercial_reporting_and_storage_scope"
+        "20261029170000_266_commercial_reporting_and_storage_scope",
+        "20261029180000_267_sales_entitlement_boundary",
+        "20261029190000_268_contact_and_conversation_scope",
+        "20261029200000_269_authenticated_sales_rpc_scope"
       ],
       "tests": [
-        "57 focused embedded-Postgres slot/assignment tests passed",
-        "Runtime typecheck and three schema fingerprint tests passed",
-        "Migration 265 lead/media role matrix: 7 focused embedded-Postgres tests and runtime typecheck passed",
-        "Migration 266 reports/proof/SOP role matrix: 10 focused embedded-Postgres tests and runtime typecheck passed",
-        "Unpushed 267/268 branch: 15 entitlement, 3 contact/conversation, 14 frontend focused tests plus app/runtime typechecks passed before independent review",
-        "267–269 local focused PGlite 44/44 and runtime typecheck pass; independent review found no blocker in P1/P2 fixes"
+        "PR #245 exact reviewed head d20f84b7da5f71042ad7bc9fa92fc3a51f34a5af passed all four protected CI jobs and independent review.",
+        "Production linked dry-run selected exactly six ordered migrations 264–269; the push and read-only catalog/history checks confirmed all six.",
+        "Focused PGlite identity, assignment race, entitlement, contact and conversation tests passed before release; sales entitlement remains dormant until B008 exact approval binding."
       ],
       "permission_and_negative_tests": [
-        "Direct same-client low-level slot and assignment transitions denied under authenticated role",
-        "Named human wrappers still work",
-        "Foreign-client assignment asset and later asset reparent denied without state/event change",
-        "Migration 265 denies assigned-editor lead RPC read/write and retired or removed-assignment owner media reads; preserves admin, same-client and six service-role RPC calls",
-        "Migration 266 denies assigned-editor commercial reports/proof reads and retired SOP table/bucket reads; preserves admin/client/service paths"
+        "Authenticated direct slot/assignment/lead/sequence bypasses are denied while named wrappers and service role remain scoped.",
+        "Assignment asset/client composite FK was validated; six historical campaign/client FKs intentionally remain unvalidated pending a data audit.",
+        "No authenticated direct sequence sweep EXECUTE; production sales inbox_enforced=false; zero lead/owner rows at release readback."
       ],
-      "deployed_sha": null,
+      "deployed_sha": "8d122308510b4b597e4b747eb117ef3d7f81d000",
       "real_account_or_client": null,
-      "external_proof": null,
-      "observed_at": null,
+      "external_proof": "Production migrations 264–269 and relevant grants/FK state were read back after exact dry-run and apply. The later production runtime heartbeat showed full 8d122308510b4b597e4b747eb117ef3d7f81d000 SHA. This is source/schema release evidence, not live cross-client acceptance.",
+      "observed_at": "2026-10-30T00:44:25Z",
       "read_only_production_catalog": {
         "source": "supabase db query --linked on 2026-10-29",
         "authenticated_execute_confirmed": [
@@ -277,40 +291,41 @@
         "general_chat_client_members": 1,
         "general_chat_cross_client_exposure_proven": false
       },
-      "blocker": "Draft PRs #237, #239 and #240 remain unmerged; migrations 264–266 unapplied. Draft PR #245 head e38c9c stacks 267–269 on #240 and includes current main; local order guard, 44 PGlite tests and independent logic review pass, while four hosted CI jobs are pending. Historical campaign mismatch audit/constraint validation, signed URL retirement, general chat and fail-closed identity matrix remain open. Entitlement switch off.",
+      "blocker": "Audit and validate six historical campaign/client FKs, prove signed-URL retirement, settle general chat scope and proof-adjacent rows, bind dormant sales entitlement to B008, and run live/staging identity matrix. B005 remains in progress.",
       "rollback": null,
-      "reviewer": "Independent narrow reviews of 265–266 and final 267–269 logic clean; current-main integration and hosted CI pending.",
+      "reviewer": "Independent #245 logic review clean for released slices; full B005 role/data acceptance remains open.",
       "additional_prs": [
+        "https://github.com/AttractAcq/AA-Console/pull/237",
         "https://github.com/AttractAcq/AA-Console/pull/239",
-        "https://github.com/AttractAcq/AA-Console/pull/240",
-        "https://github.com/AttractAcq/AA-Console/pull/245"
+        "https://github.com/AttractAcq/AA-Console/pull/240"
       ],
-      "additional_implementation_shas": [
-        "ebf5163",
-        "a7ecc1a",
-        "e38c9c682845270c9407934e7cf2c92476251c83"
-      ],
-      "review_blockers": [],
-      "pending_unpushed_migration_ids": [
-        "20261029180000_267_sales_entitlement_boundary",
-        "20261029190000_268_contact_and_conversation_scope",
-        "20261029200000_269_campaign_scope_integrity"
-      ]
+      "additional_implementation_shas": [],
+      "review_blockers": []
     },
     "B006": {
-      "state": "not_started",
-      "implementation_sha": null,
+      "state": "in_progress",
+      "implementation_sha": "1bd4afd9ee3d9c7a4b02e809e46fc082358c2a8b",
       "pr": null,
-      "migration_ids": [],
-      "tests": [],
-      "permission_and_negative_tests": [],
+      "migration_ids": [
+        "20261101000000_280_public_route_quota",
+        "20261101010000_281_sales_runtime_budget_reservations",
+        "20261101020000_282_public_perimeter_admin_status"
+      ],
+      "tests": [
+        "Local B006 branch at 1bd4afd: 129 focused tests and runtime TypeScript/build passed.",
+        "Independent review identified IPv6 zone-ID parser exception and reserve/settle lock inversion; local candidate fixes both, with a two-connection PostgreSQL test wired for hosted schema replay."
+      ],
+      "permission_and_negative_tests": [
+        "Direct peer versus trusted proxy forwarding is fail-closed; zone-ID XFF input has a focused regression test.",
+        "Shared rate admission, reservation and settlement are designed as atomic database operations; adversarial concurrent lock-order test needs hosted PostgreSQL execution."
+      ],
       "deployed_sha": null,
       "real_account_or_client": null,
       "external_proof": null,
       "observed_at": null,
-      "blocker": null,
+      "blocker": "Local work only. Needs B008 ancestry, independent re-review of fixes, four protected hosted CI checks, exact migration dry-run/release and production proxy/salt/shared-secret attestation. Browser lead-form CORS/origin and live route behavior remain open; public external-effect switches stay off.",
       "rollback": null,
-      "reviewer": null
+      "reviewer": "Independent reviewer found two blockers; local fixes are prepared but not yet hosted-verified."
     },
     "B007": {
       "state": "not_started",
@@ -328,19 +343,34 @@
       "reviewer": null
     },
     "B008": {
-      "state": "not_started",
-      "implementation_sha": null,
+      "state": "in_progress",
+      "implementation_sha": "cf234378e0da6824d35e85225151eb6b6f844d4e",
       "pr": null,
-      "migration_ids": [],
-      "tests": [],
-      "permission_and_negative_tests": [],
+      "migration_ids": [
+        "20261030110000_273_canonical_approval_ledger",
+        "20261030120000_274_campaign_action_inbox_bridge",
+        "20261030130000_275_sales_entitlement_inbox_binding",
+        "20261030140000_276_recruitment_brief_inbox",
+        "20261030141000_277_engine_slot_preview_inbox",
+        "20261030150000_278_google_review_reply_inbox",
+        "20261030160000_279_approval_class_coverage"
+      ],
+      "tests": [
+        "Local B008 branch has passed 61 focused PGlite tests, 77 UI tests, migration-order checks and frontend/runtime builds before current in-progress review edits.",
+        "Production read-only backfill preflight found zero pending campaign actions, page snapshots, entitlement requests, recruitment briefs, Engine waiting slots, historical approval entries and Google replies."
+      ],
+      "permission_and_negative_tests": [
+        "Append-only canonical request/evidence/AAL2 ledger, exact campaign/page and dormant entitlement bindings, locked recruitment selected-request/version/hash decision, and Google reply exact wrapper are implemented locally.",
+        "Engine media preview remains visibly blocked until byte digest/object version is captured; coverage inventory marks missing or blocked classes red.",
+        "No migration 273–279 is applied and no production action switch is enabled."
+      ],
       "deployed_sha": null,
       "real_account_or_client": null,
       "external_proof": null,
       "observed_at": null,
-      "blocker": null,
+      "blocker": "No B008 PR or protected hosted CI yet; local review edits are uncommitted. Most of 34 decision classes remain missing or blocked until exact bytes, owning AAL2 decisions, gateway integration and last-moment executor checks. Auth invitation class #34 needs a version-pinned email template/sender route; production switches stay off.",
       "rollback": null,
-      "reviewer": null
+      "reviewer": "Independent review and local integration continue; no full B008 acceptance."
     },
     "B009": {
       "state": "not_started",
@@ -1580,8 +1610,8 @@
         "20261025235000_260_building_the_google_campaign"
       ],
       "tests": [
-        "52 focused embedded-Postgres/Vitest Google sheet/build/launch tests and runtime typecheck passed; full schema replay pending",
-        "Safe 260 deployed in main d0c60e2 after applicable CI green; later foundation schema replay through 262 green"
+        "52 focused embedded-Postgres/Vitest Google sheet/build/launch tests and runtime typecheck passed.",
+        "Safe migration 260 deployed at main d0c60e27d6b2b72884ed088e79f7825b02a8b65b after applicable green CI; later four-check foundation replay through 262 passed."
       ],
       "permission_and_negative_tests": [
         "google_ad_build.supported remains false; no handler or external Google Ads write is enabled",
@@ -1594,7 +1624,7 @@
       "observed_at": "2026-10-29T22:16:24Z",
       "blocker": "No newly derived manifest-bound sheet observed because production had zero paid Google campaigns and zero google_ads_sheet jobs. Keyword research, connected Google account/developer token, handler, paused external build, activation/spend approval and metrics bridge remain absent.",
       "rollback": null,
-      "reviewer": "Independent final review found no remaining blocker in narrow safe 260 branch; full schema replay and live external acceptance remain open."
+      "reviewer": "Independent final review found no blocker in the narrow safe-260 prerequisite; real Google account/build acceptance remains open."
     },
     "B092": {
       "state": "not_started",
