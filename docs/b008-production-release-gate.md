@@ -107,8 +107,9 @@ change before that pin requires the final observed runtime SHA, not the first.
 - PGlite: eleven cases cover the held source, server-only proof, digest/PR/CI/SQL
   drift, AAL1/member/service rejection, exact admin approval, revocation and
   reasoned rejection.
-- Inbox UI: 32 cases cover global/card routing, AAL2 exact decision and
-  changed-proof rejection on refresh.
+- Inbox UI: 33 cases cover global/card routing, AAL2 exact decision,
+  changed-proof rejection on refresh and reasoned revocation after a proof
+  becomes stale.
 - Attester and read-only premerge assertion: five tests cover exact binding,
   self-fetch/server-only submit, a GitHub head advance before any proof write,
   a changed base and human revocation during recheck.
