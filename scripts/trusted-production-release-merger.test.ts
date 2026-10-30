@@ -58,6 +58,7 @@ test('requires strict protected CI, the trusted exact-head job, sole merger iden
     (f: ReturnType<typeof protectedFacts>) => { f.protection.enforce_admins.enabled = false },
     (f: ReturnType<typeof protectedFacts>) => { f.protection.restrictions.users.push({ login: 'other' }) },
     (f: ReturnType<typeof protectedFacts>) => { f.protection.required_status_checks.checks.pop() },
+    (f: ReturnType<typeof protectedFacts>) => { f.protection.required_status_checks.checks.push({ context: 'Unreviewed check', app_id: 15368 }) },
     (f: ReturnType<typeof protectedFacts>) => { f.checks.check_runs[4].conclusion = 'failure' },
     (f: ReturnType<typeof protectedFacts>) => { f.checks.check_runs[4].head_sha = BASE },
     (f: ReturnType<typeof protectedFacts>) => { f.checks.check_runs[4].app.id = 999 },
