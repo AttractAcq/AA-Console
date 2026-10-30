@@ -23,12 +23,12 @@ export function integrationCapabilitySummary(
     case "instagram":
       return "Account identity, required scopes and publish/ads rights are not verified by the token check.";
     case "google_business":
-      return "Exact location access, OAuth scope and posting rights have not been verified.";
+      return "Provider health unknown. Exact location access, OAuth scope and posting rights have not been verified.";
     case "google_ads":
-      return "OAuth, developer token, customer access and build rights have not been verified.";
+      return "Provider health unknown. OAuth, developer token, customer access and build rights have not been verified.";
     case "resend":
-      return "This row does not verify the runtime email key, sending domain or send permission.";
+      return "Provider health unknown. This row does not verify the runtime email key, sending domain or send permission.";
     default:
-      return "No provider-specific account, scope or action check is recorded.";
+      return "Provider health unknown. No provider-specific account, scope or action check is recorded.";
   }
 }

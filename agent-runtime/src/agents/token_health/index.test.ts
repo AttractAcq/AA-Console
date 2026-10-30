@@ -117,24 +117,36 @@ describe("the daily check", () => {
     expect((events[0]!.payload as { trouble: string[] }).trouble[0]).toMatch(/requires a new credential/);
   });
 
-  it("never sends another provider credential to Meta", async () => {
+  it.each(["google_business", "google_ads", "resend", "other"])(
+    "never sends a %s credential to Meta", async (provider) => {
+      const check = vi.fn(healthy);
+      const { sb, rpc, updates, events } = database([row({ provider })]);
+      await runTokenHealthJob(sb, config, agent, job, 0, { check, now: () => NOW });
+      expect(rpc).not.toHaveBeenCalled();
+      expect(check).not.toHaveBeenCalled();
+      expect(updates).toEqual([]);
+      expect(events[0]!.description).toMatch(/1 skipped/);
+    },
+  );
+
+  it.each(["meta", "instagram"])("preserves active %s and records a qualified health detail", async (provider) => {
+    const { sb, updates } = database([row({ provider, status: "active" })]);
+    await runTokenHealthJob(sb, config, agent, job, 0, { check: healthy, now: () => NOW });
+    expect(updates[0]).toMatchObject({ status: "active", token_expires_at: isoInDays(60) });
+    expect(String(updates[0]!.health_detail)).toMatch(/permissions are not verified/);
+    expect(updates[0]!.filters).toMatchObject({
+      id: "i1", client_id: "c1", provider, status: "active", credential_secret_id: "secret-1",
+    });
+  });
+
+  it("does not try a Meta probe for a row without a credential reference", async () => {
     const check = vi.fn(healthy);
-    const { sb, rpc, updates, events } = database([row({ provider: "google_business" })]);
+    const { sb, rpc, updates, events } = database([row({ provider: "meta", credential_secret_id: null })]);
     await runTokenHealthJob(sb, config, agent, job, 0, { check, now: () => NOW });
     expect(rpc).not.toHaveBeenCalled();
     expect(check).not.toHaveBeenCalled();
     expect(updates).toEqual([]);
     expect(events[0]!.description).toMatch(/1 skipped/);
-  });
-
-  it("preserves active and records a qualified health detail", async () => {
-    const { sb, updates } = database([row({ status: "active" })]);
-    await runTokenHealthJob(sb, config, agent, job, 0, { check: healthy, now: () => NOW });
-    expect(updates[0]).toMatchObject({ status: "active", token_expires_at: isoInDays(60) });
-    expect(String(updates[0]!.health_detail)).toMatch(/permissions are not verified/);
-    expect(updates[0]!.filters).toMatchObject({
-      id: "i1", client_id: "c1", provider: "instagram", status: "active", credential_secret_id: "secret-1",
-    });
   });
 
   it("demotes a definitively invalid token", async () => {
@@ -245,7 +257,32 @@ describe("one client's trouble", () => {
     const result = await runTokenHealthJob(sb, config, agent, job, 0, { check, now: () => NOW });
     expect(result.ok).toBe(true);
     expect(updates.map((update) => update.id)).toEqual(["i2"]);
-    expect((events[0]!.payload as { trouble: string[] }).trouble[0]).toMatch(/socket hang up/);
+    expect((events[0]!.payload as { trouble: string[] }).trouble[0]).toMatch(/result was not confirmed/);
+  });
+
+  it("never persists or logs credential bytes from a probe failure", async () => {
+    const marker = "credential-marker-never-log";
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { sb, updates, events } = database([row({ provider: "meta" })]);
+    await runTokenHealthJob(sb, config, agent, job, 0, {
+      check: async () => { throw new Error(`Request failed for ${marker}`); },
+      now: () => NOW,
+    });
+    expect(updates).toEqual([]);
+    expect(JSON.stringify(events)).not.toContain(marker);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(marker);
+  });
+
+  it("never persists a Meta OAuth error that echoes credential bytes", async () => {
+    const marker = "credential-marker-provider-error";
+    const { sb, updates, events } = database([row({ provider: "meta" })]);
+    await runTokenHealthJob(sb, config, agent, job, 0, {
+      check: async () => ({ data: { is_valid: false, error: { code: 190, message: marker } } }),
+      now: () => NOW,
+    });
+    expect(updates[0]).toMatchObject({ status: "error" });
+    expect(JSON.stringify(updates)).not.toContain(marker);
+    expect(JSON.stringify(events)).not.toContain(marker);
   });
 });
 
@@ -262,6 +299,13 @@ describe("Meta HTTP errors", () => {
       ok: false, status: 503, json: async () => ({ error: { message: "Unavailable" } }),
     }));
     await expect(debugToken("tok")).rejects.toThrow("HTTP 503");
+  });
+
+  it("drops a fetch exception that echoes the token-bearing URL", async () => {
+    const marker = "credential-marker-fetch-error";
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error(`Failed URL containing ${marker}`)));
+    await expect(debugToken(marker)).rejects.toThrow("Meta debug_token transport failed.");
+    await expect(debugToken(marker)).rejects.not.toThrow(marker);
   });
 
   it("raises a rate-limit error rather than treating every HTTP 400 as revocation", async () => {

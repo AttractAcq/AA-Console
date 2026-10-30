@@ -79,7 +79,16 @@ describe("a token that is gone", () => {
       NOW,
     );
     expect(v).toMatchObject({ status: "error", usable: false });
-    expect(v.detail).toMatch(/invalidated/);
+    expect(v.detail).toMatch(/no longer valid/);
+  });
+
+  it("never copies a provider OAuth error message into stored health detail", () => {
+    const marker = "credential-marker-never-persist";
+    const verdict = readTokenHealth({ data: {
+      is_valid: false, error: { code: 190, message: `Invalid token ${marker}` },
+    } }, NOW);
+    expect(verdict).toMatchObject({ status: "error", usable: false });
+    expect(JSON.stringify(verdict)).not.toContain(marker);
   });
 
   it("does not treat a malformed or missing verdict as revocation", () => {
