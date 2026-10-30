@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Modal } from "../Modal";
 import { FieldControl, isVisible, titleFromFile } from "./fields";
 import type { FieldDef, FormValues } from "./fields";
-import { clearDraft, readDraft, withoutSensitiveValues, writeDraft } from "./draftStorage";
+import { clearDraft, readDraft, writeDraft } from "./draftStorage";
 
 export { clearDraft } from "./draftStorage";
 
@@ -34,6 +34,7 @@ export function FormModal({
   actions,
   initialValues,
   draftKey,
+  resetKey,
   onSubmit,
   onSaved,
 }: {
@@ -50,47 +51,111 @@ export function FormModal({
   /** Seed values for an edit/upsert form. */
   initialValues?: FormValues;
   /**
-   * Persists what has been typed under this key so it survives closing the
-   * modal and reloading the app. Cleared once the form saves successfully.
+   * Persists only fields allowed by draftStorage's explicit policy for this
+   * key, in this browser tab. Cleared once the form saves successfully.
    */
   draftKey?: string;
+  /** A changed generated-draft identity asks before replacing in-progress edits. */
+  resetKey?: unknown;
   onSubmit: (values: FormValues) => Promise<void>;
   onSaved?: () => void;
 }) {
   const [values, setValues] = useState<FormValues>(() =>
-    blankValues(fields, readDraft(draftKey, fields) ?? initialValues),
+    open ? blankValues(fields, { ...initialValues, ...readDraft(draftKey, fields) }) : blankValues(fields),
   );
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const touched = useRef<Record<string, boolean>>({});
+  const dirty = useRef(false);
+  const pendingReplacement = useRef<FormValues | null>(null);
+  const ignoredResetKey = useRef<{ key: unknown } | null>(null);
+  const previousInputs = useRef({ open: false, draftKey, resetKey });
   const [error, setError] = useState<string | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmReplace, setConfirmReplace] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // Reset every time the modal opens so a cancelled edit never leaks
-  // into the next one.
+  // Preserve edits through live parent refreshes. A new opening or form
+  // identity loads server values plus the safe draft. AI output asks first.
   useEffect(() => {
-    if (open) {
-      const draft = readDraft(draftKey, fields);
-      // A saved draft wins over the stored row, so an unfinished edit is
-      // never silently thrown away.
-      setValues(blankValues(fields, draft ?? initialValues));
-      setTouched(draft ? Object.fromEntries(fields.map((f) => [f.name, true])) : {});
+    const prior = previousInputs.current;
+    const generatedReset = prior.open && prior.draftKey === draftKey
+      && resetKey != null && prior.resetKey !== resetKey;
+    const reset = !prior.open || prior.draftKey !== draftKey || generatedReset;
+    previousInputs.current = { open, draftKey, resetKey };
+    if (!open) {
+      pendingReplacement.current = null;
+      ignoredResetKey.current = null;
+      setConfirmReplace(false);
+      return;
+    }
+    if (generatedReset) {
+      // A generated draft can overwrite private in-memory edits. Keep both
+      // versions until the operator explicitly chooses which one to use.
+      const generated = blankValues(fields, initialValues);
+      ignoredResetKey.current = null;
+      setConfirmDiscard(false);
+      if (dirty.current) {
+        pendingReplacement.current = generated;
+        setConfirmReplace(true);
+        return;
+      }
+      clearDraft(draftKey);
+      pendingReplacement.current = null;
+      setConfirmReplace(false);
+      setValues(generated);
+      touched.current = {};
+      dirty.current = false;
+      setConfirmDiscard(false);
       setError(null);
       setBusy(false);
+      return;
+    }
+    if (pendingReplacement.current) {
+      pendingReplacement.current = blankValues(fields, initialValues);
+      return;
+    }
+    if (ignoredResetKey.current && ignoredResetKey.current.key === resetKey) return;
+    const draft = readDraft(draftKey, fields);
+    const seeded = blankValues(fields, { ...initialValues, ...draft });
+    if (reset) {
+      setValues(seeded);
+      touched.current = draft ? Object.fromEntries(Object.keys(draft).map((name) => [name, true])) : {};
+      dirty.current = false;
+      setConfirmDiscard(false);
+      setConfirmReplace(false);
+      setError(null);
+      setBusy(false);
+    } else {
+      setValues((previous) => {
+        const updated = { ...previous };
+        let changed = false;
+        for (const field of fields) {
+          if (field.kind === "heading" || touched.current[field.name]
+            || (field.derivedFrom && touched.current[field.derivedFrom.field])) continue;
+          if (updated[field.name] !== seeded[field.name]) {
+            updated[field.name] = seeded[field.name];
+            changed = true;
+          }
+        }
+        return changed ? updated : previous;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialValues, draftKey]);
+  }, [open, initialValues, draftKey, resetKey]);
 
   const visible = useMemo(() => fields.filter((f) => isVisible(f, values)), [fields, values]);
 
   function setValue(field: FieldDef, next: string | boolean | File | null) {
+    touched.current[field.name] = true;
+    dirty.current = true;
+    setConfirmDiscard(false);
     setValues((prev) => {
       const updated: FormValues = { ...prev, [field.name]: next };
-      setTouched((t) => ({ ...t, [field.name]: true }));
 
       // Recompute anything derived from this field, unless the user has
       // already typed in the derived field themselves.
       for (const candidate of fields) {
         if (candidate.derivedFrom?.field !== field.name) continue;
-        if (touched[candidate.name]) continue;
+        if (touched.current[candidate.name]) continue;
         const source =
           candidate.kind === "text" && next instanceof File
             ? titleFromFile(next)
@@ -104,8 +169,18 @@ export function FormModal({
     });
   }
 
-  function close() {
-    setValues((previous) => withoutSensitiveValues(previous, fields));
+  function close(force = false) {
+    if (!force && dirty.current) {
+      setConfirmDiscard(true);
+      return;
+    }
+    setValues(blankValues(fields));
+    touched.current = {};
+    dirty.current = false;
+    setConfirmDiscard(false);
+    setConfirmReplace(false);
+    pendingReplacement.current = null;
+    ignoredResetKey.current = null;
     onClose();
   }
 
@@ -130,7 +205,7 @@ export function FormModal({
       clearDraft(draftKey);
       setBusy(false);
       onSaved?.();
-      close();
+      close(true);
     } catch (err) {
       setBusy(false);
       setError(err instanceof Error ? err.message : "Could not save.");
@@ -138,7 +213,7 @@ export function FormModal({
   }
 
   return (
-    <Modal open={open} onClose={close} title={title}>
+    <Modal open={open} onClose={() => close()} title={title}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {intro && <p className="text-sm text-muted-foreground">{intro}</p>}
 
@@ -159,12 +234,50 @@ export function FormModal({
           </p>
         )}
 
+        {confirmDiscard && (
+          <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+            <p className="font-medium text-foreground">Leave this form?</p>
+            <p className="mt-1 text-muted-foreground">Unsaved text, files, and private details will be lost. Safe selections remain available in this tab.</p>
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={() => setConfirmDiscard(false)} className="rounded-md border border-border px-3 py-1.5">Keep editing</button>
+              <button type="button" onClick={() => close(true)} className="rounded-md bg-destructive px-3 py-1.5 text-destructive-foreground">Leave form</button>
+            </div>
+          </div>
+        )}
+
+        {confirmReplace && (
+          <div role="alert" className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
+            <p className="font-medium text-foreground">Replace your edits with the AI draft?</p>
+            <p className="mt-1 text-muted-foreground">The generated draft will replace the changes currently in this form.</p>
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={() => {
+                pendingReplacement.current = null;
+                ignoredResetKey.current = { key: resetKey };
+                setConfirmReplace(false);
+              }} className="rounded-md border border-border px-3 py-1.5">Keep my edits</button>
+              <button type="button" onClick={() => {
+                const generated = pendingReplacement.current;
+                if (!generated) return;
+                clearDraft(draftKey);
+                setValues(generated);
+                touched.current = {};
+                dirty.current = false;
+                pendingReplacement.current = null;
+                ignoredResetKey.current = null;
+                setConfirmReplace(false);
+                setConfirmDiscard(false);
+                setError(null);
+              }} className="rounded-md bg-primary px-3 py-1.5 text-primary-foreground">Use AI draft</button>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
           {/* Left of Cancel, because it acts on the form rather than closing it. */}
           {actions && <div className="mr-auto">{actions}</div>}
           <button
             type="button"
-            onClick={close}
+            onClick={() => close()}
             className="rounded-md px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Cancel

@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
+import { Fragment } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "../context/auth";
 import { HOME_FOR_ROLE, LOGIN_FOR_ROLE } from "../lib/identity";
@@ -10,7 +11,7 @@ import type { ConsoleRole } from "../lib/identity";
  * authenticated, just not here.
  */
 export function RequireRole({ role, children }: { role: ConsoleRole; children: ReactNode }) {
-  const { profile, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -21,7 +22,7 @@ export function RequireRole({ role, children }: { role: ConsoleRole; children: R
     );
   }
 
-  if (!profile) {
+  if (!profile || !session || profile.id !== session.user.id) {
     return <Navigate to={LOGIN_FOR_ROLE[role]} replace state={{ from: location.pathname }} />;
   }
 
@@ -29,5 +30,7 @@ export function RequireRole({ role, children }: { role: ConsoleRole; children: R
     return <Navigate to={HOME_FOR_ROLE[profile.role]} replace />;
   }
 
-  return children;
+  // A same-role account switch can keep the URL unchanged. Key the entire
+  // protected tree so no previous user's in-memory form state survives it.
+  return <Fragment key={profile.id}>{children}</Fragment>;
 }
