@@ -21876,6 +21876,7 @@ export type Database = {
           headline: string | null
           health_detail: string | null
           ingest_enabled: boolean | null
+          integration_id: string | null
           last_checked_at: string | null
           provider: string | null
           status: string | null
@@ -26237,6 +26238,10 @@ export type Database = {
       integration_secret: {
         Args: { p_client_id: string; p_provider: string }
         Returns: string
+      }
+      integration_state_eligible: {
+        Args: { p_expires_at: string; p_status: string }
+        Returns: boolean
       }
       integration_usable: {
         Args: { p_client_id: string; p_provider: string }

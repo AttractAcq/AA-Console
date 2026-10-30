@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "9260097ce9d78635d0fb70b370fe1c3c1213a13e187de28c803f1446149d753f",
-  "generatedTypesSha256": "53080a79d6f99b34288161c22ede1207e623d34ae45836de00efc2e4692f4c3a",
-  "generatedSchemaBodySha256": "992fe11cbc6465e3c28767ed1350bbbc13b17bfec8a864474f82b35542cb9861",
+  "migrationSourceDigest": "21d266f1dcb70fe5f00d4087d82f9e0579231526afff4275f4c26c7af9daa99c",
+  "generatedTypesSha256": "f3b751e74675ef3af0770f4182f528e297d588b84c5b247a6e940ad1045309e5",
+  "generatedSchemaBodySha256": "825414bc1db0a62191fa7f62c58b1ce0994f9af41035244d9591b0655da88dcd",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2152,6 +2152,13 @@
       "filename": "20261101070000_290_meta_legacy_producer_containment.sql",
       "sha256": "e81ed4dce71fcbe13efc99c0db4be96fb6bef1d20bbf6e19c7e098a98698c92c",
       "trimmedMd5": "4c89e92c09b867a23bcb413f4bfae228"
+    },
+    {
+      "version": "20261101080000",
+      "name": "291_integration_credential_eligibility",
+      "filename": "20261101080000_291_integration_credential_eligibility.sql",
+      "sha256": "832693904f2ef224628f941f5b725db06d63400ddf506a3265ffd6ecf0f49fc8",
+      "trimmedMd5": "22d5b38321a448f088127dc9266927b3"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
