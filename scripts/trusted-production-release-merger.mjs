@@ -106,8 +106,14 @@ export function assertProtectedReleaseBoundary({ plan, branch, pr, protection,
   if (trustedRun?.id !== checkRunId(trusted)
       || trustedRun?.path !== TRUSTED_WORKFLOW
       || trustedRun?.event !== 'pull_request_target'
+      || trustedRun?.head_sha !== plan.baseSha
       || trustedRun?.status !== 'completed' || trustedRun?.conclusion !== 'success'
-      || trustedRun?.repository?.full_name !== REPOSITORY)
+      || trustedRun?.repository?.full_name !== REPOSITORY
+      || !Array.isArray(trustedRun?.pull_requests)
+      || trustedRun.pull_requests.length !== 1
+      || trustedRun.pull_requests[0]?.number !== plan.prNumber
+      || trustedRun.pull_requests[0]?.head?.sha !== plan.headSha
+      || trustedRun.pull_requests[0]?.base?.sha !== plan.baseSha)
     fail('trusted check is not the protected-base release workflow')
   return true
 }

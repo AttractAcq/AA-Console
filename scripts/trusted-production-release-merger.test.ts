@@ -45,8 +45,10 @@ function protectedFacts() {
       details_url: `https://github.com/${REPOSITORY}/actions/runs/123/job/${index + 1}`,
     })) },
     trustedRun: { id: 123, path: '.github/workflows/production-release-approval.yml',
-      event: 'pull_request_target', status: 'completed', conclusion: 'success',
-      repository: { full_name: REPOSITORY } },
+      event: 'pull_request_target', head_sha: BASE,
+      status: 'completed', conclusion: 'success',
+      repository: { full_name: REPOSITORY },
+      pull_requests: [{ number: 297, head: { sha: HEAD }, base: { sha: BASE } }] },
   }
 }
 
@@ -64,6 +66,9 @@ test('requires strict protected CI, the trusted exact-head job, sole merger iden
     (f: ReturnType<typeof protectedFacts>) => { f.checks.check_runs[4].head_sha = BASE },
     (f: ReturnType<typeof protectedFacts>) => { f.checks.check_runs[4].app.id = 999 },
     (f: ReturnType<typeof protectedFacts>) => { f.trustedRun.path = '.github/workflows/ci.yml' },
+    (f: ReturnType<typeof protectedFacts>) => { f.trustedRun.pull_requests = [] },
+    (f: ReturnType<typeof protectedFacts>) => { f.trustedRun.pull_requests[0].head.sha = MERGED },
+    (f: ReturnType<typeof protectedFacts>) => { f.trustedRun.head_sha = HEAD },
     (f: ReturnType<typeof protectedFacts>) => { f.actor.login = 'alex' },
   ]
   for (const attack of attacks) {

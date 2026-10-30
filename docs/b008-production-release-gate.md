@@ -97,7 +97,11 @@ plan, checks current GitHub main and the open PR, requires strict branch
 protection and a sole reviewed merger restriction, verifies all four CI jobs
 plus `Approved production release (trusted)` as successful exact-head checks
 from their pinned GitHub Actions app, and verifies the trusted check's workflow
-run path. It then acquires the lease, repeats the canonical/GitHub checks, and
+run path, protected base SHA and single exact PR/head/base association. A
+missing workflow-run PR association fails closed; GitHub may leave this array
+empty for some event topologies, so the live `pull_request_target` pilot must
+establish that these facts are available before activation. It then acquires
+the lease, repeats the canonical/GitHub checks, and
 calls the dispatch RPC. The future merge call supplies the exact PR head SHA
 and approved merge method. It accepts a completed receipt only after a fresh
 read of the merged PR and evidence that the reported commit is still an
