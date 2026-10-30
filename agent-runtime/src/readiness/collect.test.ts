@@ -2,11 +2,17 @@ import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
 import { collectSystemReadiness } from "./collect.js";
+import { CRON_REGISTRY_HEAD, EXPECTED_CRON_SCHEDULES } from "./cron-catalog.js";
 import { deployedCommitSha } from "./version.js";
 
 const SHA = "a".repeat(40);
 
 function fixture() {
+  const catalogData = {
+    migrationHead: "20261025233000", migrationCount: 259,
+    objects: { tables: 10, views: 5, functions: 4, policies: 3 },
+    cronJobs: [{ name: "engine-tick", schedule: "* * * * *", active: true }],
+  };
   const rows: Record<string, Record<string, unknown>[]> = {
     agent_runtime_status: [{
       worker_id: "agent-runtime:1", version: SHA, reported_at: "2026-10-29T12:00:00Z",
@@ -58,9 +64,7 @@ function fixture() {
       };
     },
     async rpc() {
-      return { data: { migrationHead: "20261025233000", migrationCount: 259,
-        objects: { tables: 10, views: 5, functions: 4, policies: 3 },
-        cronJobs: [{ name: "engine-tick", schedule: "* * * * *", active: true }] }, error: null };
+      return { data: catalogData, error: null };
     },
   } as unknown as SupabaseClient;
   const config = {
@@ -72,7 +76,7 @@ function fixture() {
     mcpServiceSecret: null, gatewayUrl: null, metaAppSecret: null, metaWebhookVerifyToken: null,
     resendApiKey: null,
   } as unknown as RuntimeConfig;
-  return { sb, config, rows };
+  return { sb, config, rows, catalogData };
 }
 
 describe("B001 system inventory", () => {
@@ -118,6 +122,7 @@ describe("B001 system inventory", () => {
     expect(snapshot.evidenceCoverage.cronCatalog.state).toBe("observed");
     expect(snapshot.evidenceCoverage.schemaParity.state).toBe("unknown");
     expect(snapshot.evidenceCoverage.cronExecution.state).toBe("unknown");
+    expect(snapshot.cronScheduleAudit.state).toBe("unknown");
     expect(snapshot.evidenceCoverage.switchInventory.state).toBe("unknown");
     expect(snapshot.evidenceCoverage.credentialValidity.state).toBe("unknown");
     expect(snapshot.evidenceCoverage.providerAccountHealth.state).toBe("unknown");
@@ -190,6 +195,25 @@ describe("B001 system inventory", () => {
     expect(snapshot.evidenceCoverage.gatewayDeployment.state).toBe("error");
     expect(snapshot.evidenceCoverage.schemaCatalog.state).toBe("error");
     expect(snapshot.evidenceCoverage.cronCatalog.state).toBe("error");
+    expect(snapshot.cronScheduleAudit).toMatchObject({ state: "unknown", rows: [] });
+  });
+
+  it("exports configuration drift while leaving cron execution unverified", async () => {
+    const { sb, config, catalogData } = fixture();
+    const jobs = Object.entries(EXPECTED_CRON_SCHEDULES).map(([name, schedule]) => ({
+      name, schedule, active: true,
+    }));
+    jobs.find((job) => job.name === "publish-sweep")!.active = false;
+    catalogData.migrationHead = CRON_REGISTRY_HEAD;
+    catalogData.migrationCount = 296;
+    catalogData.cronJobs = jobs;
+    const snapshot = await collectSystemReadiness(sb, config, fetch, {});
+    expect(snapshot.cronScheduleAudit.state).toBe("drift");
+    expect(snapshot.cronScheduleAudit.rows.find((row) => row.name === "publish-sweep")?.issues)
+      .toEqual(["inactive"]);
+    expect(snapshot.evidenceCoverage.cronCatalog.state).toBe("observed");
+    expect(snapshot.evidenceCoverage.cronExecution.state).toBe("unknown");
+    expect(JSON.stringify(snapshot)).toContain('"cronScheduleAudit"');
   });
 
   it("requires every fresh enabled worker to report the runtime commit before recording fleet evidence", async () => {

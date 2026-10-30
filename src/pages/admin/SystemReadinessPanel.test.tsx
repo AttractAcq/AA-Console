@@ -103,3 +103,35 @@ it("exports the same captured facts shown in the admin view on repeated download
     evidenceCoverage: { providerAccountHealth: { state: "unknown" } },
   });
 });
+
+it("shows and exports a cron catalog anomaly without presenting it as run evidence", async () => {
+  readRuntime.mockResolvedValue({
+    schemaVersion: 2, capturedAt: "2026-10-30T12:00:00Z",
+    environment: { name: "production", railwayEnvironmentId: null, supabaseProjectRef: "project" },
+    runtime: { sha: null, switches: {}, credentialPresence: {},
+      heartbeats: { state: "unknown", checkedAt: "2026-10-30T12:00:00Z", value: null, reason: "No heartbeat." } },
+    gateway: { state: "unknown", checkedAt: "2026-10-30T12:00:00Z", value: null, reason: "No probe." },
+    database: { state: "observed", checkedAt: "2026-10-30T12:00:00Z", reason: null,
+      value: { migrationHead: "20261030160000", migrationCount: 296,
+        objects: { tables: 10, views: 5, functions: 4, policies: 3 },
+        cronJobs: [{ name: "publish-sweep", schedule: "*/10 * * * *", active: false }] } },
+    cronScheduleAudit: { state: "drift", registryHead: "20261030160000",
+      observedHead: "20261030160000", expectedCount: 18, observedCount: 18,
+      reason: "1 cron catalog entry has a schedule anomaly.",
+      rows: [{ name: "publish-sweep", expectedSchedule: "*/10 * * * *",
+        observed: [{ schedule: "*/10 * * * *", active: false }], issues: ["inactive"] }] },
+    global: { state: "unknown", checkedAt: "2026-10-30T12:00:00Z", value: null, reason: "No config." },
+    clients: { state: "unknown", checkedAt: "2026-10-30T12:00:00Z", value: null, reason: "No clients." },
+  });
+  let exported: Blob | null = null;
+  Object.defineProperty(URL, "createObjectURL", { configurable: true, value: (blob: Blob) => {
+    exported = blob; return "blob:readiness";
+  } });
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  render(<SystemReadinessPanel />);
+  expect(await screen.findByRole("alert", { name: "" })).toHaveTextContent("Cron catalog drift");
+  expect(screen.getByRole("row", { name: /publish-sweep/ })).toHaveTextContent("Inactive");
+  expect(screen.getByText(/cron execution remains unverified/i)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Export JSON" }));
+  expect(JSON.parse(await exported!.text()).cronScheduleAudit.rows[0].issues).toEqual(["inactive"]);
+});
