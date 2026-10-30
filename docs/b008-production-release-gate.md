@@ -70,9 +70,10 @@ change before that pin requires the final observed runtime SHA, not the first.
 
 ## Required next effect gates, in order
 
-1. Release the read-only verifier bootstrap #279 on current main after its
-   exact-head CI and live Pages checks. Integrate 291 and 292 before 293;
-   replay the complete schema and regenerate types/manifest from that ancestry.
+1. Keep the read-only verifier bootstrap from merged #279. Integrate 291 and
+   292 before 293; replay the complete schema and regenerate types/manifest
+   from that ancestry. #279's failed Pages run is an expected held release
+   receipt, so browser publication requires the later observed runtime pin.
 2. Build the trusted premerge decision check without executing PR code in a
    secret-bearing context. It must read the latest canonical decision, fresh
    attestation and candidate, re-run GitHub verification at the moment of
