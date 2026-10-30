@@ -26,6 +26,9 @@ export interface RuntimeConfig {
   /** Salt for hashing public-widget caller IPs. A leaked hash must be useless against an IP list. */
   publicIpSalt: string;
   trustedProxies: TrustedProxies;
+  /** Only the isolated public ingress service may sign anonymous requests. */
+  publicIngressSecret: string | null;
+  publicIngressRequired: boolean;
   /** GitHub App identity. The private key never leaves this process. */
   githubAppId: string | null;
   githubAppPrivateKey: string | null;
@@ -227,6 +230,23 @@ export function loadConfig(): RuntimeConfig {
   if (production && sharedSecret === publicIpSalt) {
     throw new Error("PUBLIC_SALES_IP_SALT and AGENT_RUNTIME_SHARED_SECRET must be distinct");
   }
+  const ingressFlag = (optionalEnv("PUBLIC_INGRESS_HMAC_REQUIRED") ?? "false").toLowerCase();
+  if (ingressFlag !== "true" && ingressFlag !== "false") {
+    throw new Error("PUBLIC_INGRESS_HMAC_REQUIRED must be true or false");
+  }
+  const publicIngressRequired = ingressFlag === "true";
+  const publicIngressSecret = production && optionalEnv("PUBLIC_INGRESS_HMAC_KEY")
+    ? productionSecret("PUBLIC_INGRESS_HMAC_KEY")
+    : optionalEnv("PUBLIC_INGRESS_HMAC_KEY") ?? null;
+  const unrelatedSecrets = [sharedSecret, publicIpSalt, optionalEnv("AA_MCP_SERVICE_SECRET"),
+    optionalEnv("SUPABASE_SERVICE_ROLE_KEY"), anthropicApiKey];
+  if (publicIngressRequired && (!publicIngressSecret || unrelatedSecrets.includes(publicIngressSecret))) {
+    throw new Error("PUBLIC_INGRESS_HMAC_KEY must be present and distinct from runtime secrets");
+  }
+  const trustedProxies = parseTrustedProxies(optionalEnv("PUBLIC_TRUSTED_PROXY_CIDRS"));
+  if (production && trustedProxies.count > 0) {
+    throw new Error("PUBLIC_TRUSTED_PROXY_CIDRS cannot establish Railway public-edge trust; leave it unset");
+  }
 
   return {
     supabaseUrl: requireEnv("SUPABASE_URL"),
@@ -246,7 +266,9 @@ export function loadConfig(): RuntimeConfig {
     healthPort: serverPort(),
     sharedSecret,
     publicIpSalt,
-    trustedProxies: parseTrustedProxies(optionalEnv("PUBLIC_TRUSTED_PROXY_CIDRS")),
+    trustedProxies,
+    publicIngressSecret,
+    publicIngressRequired,
     githubAppId: optionalEnv("GITHUB_APP_ID") ?? null,
     githubAppPrivateKey: optionalEnv("GITHUB_APP_PRIVATE_KEY") ?? null,
     githubInstallationId: optionalEnv("GITHUB_APP_INSTALLATION_ID") ?? null,

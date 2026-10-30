@@ -7,6 +7,7 @@ export type RequestProxyDiagnostic = {
   forwardedHops: string[];
   chainStatus: "absent" | "invalid" | "ignored_untrusted_peer" | "trusted_peer";
   trustedProxyCount: number;
+  signedIngressRequired: boolean;
   callerIpUsedForQuota: string | null;
 };
 
@@ -15,10 +16,12 @@ export type RequestProxyDiagnostic = {
 export function requestProxyDiagnostic(
   req: Pick<IncomingMessage, "headers" | "socket">,
   trustedProxies: TrustedProxies,
+  signedIngressRequired = false,
 ): RequestProxyDiagnostic {
   const directPeer = normalizeIp(req.socket.remoteAddress);
-  const callerIpUsedForQuota = resolveCallerIp(req, trustedProxies);
-  const base = { directPeer, trustedProxyCount: trustedProxies.count, callerIpUsedForQuota };
+  const callerIpUsedForQuota = signedIngressRequired ? null : resolveCallerIp(req, trustedProxies);
+  const base = { directPeer, trustedProxyCount: trustedProxies.count,
+    signedIngressRequired, callerIpUsedForQuota };
   const raw = req.headers["x-forwarded-for"];
   if (raw === undefined) return { ...base, forwardedHops: [], chainStatus: "absent" };
   const chain = Array.isArray(raw) ? raw.join(",") : raw;

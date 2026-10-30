@@ -56,6 +56,7 @@ import { currentReleaseProbe } from "./readiness/release-probe.js";
 import { handleSitesRoute } from "./github/sites-route.js";
 import { logger } from "./logging/logger.js";
 import { handleInvitationRequest, handleInvitationSend, handleInvitationAccept, handleInvitationList, handleInvitationInspect } from "./invitations/routes.js";
+import { authenticatePublicIngress, IngressRefusal, isSignedPublicPath } from "./public/ingress-auth.js";
 
 const config = loadConfig();
 const sb = serviceClient(config);
@@ -91,6 +92,33 @@ const workflows =
     : null;
 
 const server = http.createServer((req, res) => {
+  if (config.publicIngressRequired && isSignedPublicPath(req.url)) {
+    void authenticatePublicIngress(req, config.publicIngressSecret!, async (nonceHash, issuedAt) => {
+      const { data, error } = await sb.rpc("claim_public_ingress_nonce_v1", {
+        p_nonce_hash: nonceHash, p_issued_at: issuedAt,
+      } as never);
+      if (error) throw error;
+      return data === true;
+    }).then(
+      (signed) => dispatchRequest(signed, res),
+      (error: unknown) => {
+        const status = error instanceof IngressRefusal ? error.status : 503;
+        logger.warn("public_ingress_refused", {
+          reason: error instanceof IngressRefusal ? error.message : "verification_error",
+        });
+        if (!res.headersSent) {
+          res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store",
+            "Connection": "close" });
+          res.end(JSON.stringify({ error: "Request unavailable" }));
+        }
+      },
+    );
+    return;
+  }
+  dispatchRequest(req, res);
+});
+
+function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
   const json = (status: number, body: unknown): void => {
     res.writeHead(status, { "Content-Type": "application/json" });
     res.end(JSON.stringify(body));
@@ -406,7 +434,7 @@ const server = http.createServer((req, res) => {
   }
 
   json(404, { ok: false, error: "not found" });
-});
+}
 
 server.listen(config.healthPort, "0.0.0.0", () => {
   logger.info("health_server_listening", { port: config.healthPort });

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "639d5976fd49c440f029139a53cda207c65c34c80af0c946b4577a1f12960e4c",
-  "generatedTypesSha256": "560fcefb1b28527ecd33ced4efc57e8c91f67c7d61176648cdd2ca62a0110a72",
-  "generatedSchemaBodySha256": "ad4009c2fed4cfc47b15ba3956a9665a2957a772aaf88617241ca3dd42fb7c35",
+  "migrationSourceDigest": "d19d2358f4cfd20b626186220781520fe2cc82227c88fed499b951f43b8539a3",
+  "generatedTypesSha256": "2faea7a28caaecdce999c4abbbeee68e2a1752ddb1111a30dde3236c4885a6ed",
+  "generatedSchemaBodySha256": "7248fe6c90579f912fbfdcbfe0ab9ba5387148a278fd1f7c87d2cdd8f925e34c",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2080,8 +2080,8 @@
       "version": "20261101000000",
       "name": "280_public_route_quota",
       "filename": "20261101000000_280_public_route_quota.sql",
-      "sha256": "da186b1bbac32456452fcb173f5859d7749e727f76113fc8629ef52718cd3425",
-      "trimmedMd5": "21935815e85954b04966ec276a862c9d"
+      "sha256": "e1bb71ef97e832621c5f7e26dc58b8e3188b94240553eb602d0efa4b1998f9c9",
+      "trimmedMd5": "40683ae384fcb5daddc752110695b205"
     },
     {
       "version": "20261101010000",
