@@ -7,6 +7,7 @@ import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { readAccountCurrency } from "../../meta/ads.js";
+import { metaCreationPrewriteProblem } from "../../meta/creation-gate.js";
 import { buildPlan, buildProblem } from "../../meta/build.js";
 import type { CampaignTemplate } from "../../campaigns/templates.js";
 import { buildFailure, loadIntegration, metaWriter } from "../meta_build/index.js";
@@ -118,6 +119,11 @@ export async function runRecruitmentMetaBuildJob(
   if (!job.client_id || job.input_table !== "recruitment_meta_campaigns" || !job.input_id) {
     return fail("A recruitment Meta build needs a selected AA recruitment campaign.");
   }
+  // Both request_recruitment_meta_build and create_recruitment_meta_campaign
+  // enqueue this runner; the generic authenticated enqueue can do so too.
+  // None provides exact outgoing Inbox approval for its Meta objects.
+  const prewriteProblem = metaCreationPrewriteProblem();
+  if (prewriteProblem) return fail(prewriteProblem);
   const { data: house, error: houseError } = await sb.rpc("aa_house_client_id");
   if (houseError) throw new Error(`Could not find AA's house account: ${houseError.message}`);
   if (job.client_id !== house) return fail("Recruitment ads may only use AA's house account.");

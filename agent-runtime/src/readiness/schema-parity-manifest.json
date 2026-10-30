@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "ab12d4594094751b6900e1130397ba58221e27ba52dbc2781546b27e25f3a938",
-  "generatedTypesSha256": "6bd0f93a75d55d176138458ab2c40c97067c7f762673d2dcbed01993d7d11c48",
-  "generatedSchemaBodySha256": "1715d6830af11c0551abd324fb6eff15add170e173e01dae6ca5d7f0d3c8ce39",
+  "migrationSourceDigest": "684d8e671d0039fe676875fa61af7b6f59eb2411a4287bb40fe30669542bf8de",
+  "generatedTypesSha256": "0d704d70ab2b1fe5c720ef441985f83e69bf35a954559893d409592b17213fa7",
+  "generatedSchemaBodySha256": "3a96b2d1313ecae3490f442aec23193b7185ffd4e9edaf8e6b3d4a97d35a7354",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2166,6 +2166,13 @@
       "filename": "20261101090000_292_organic_publication_package_boundary.sql",
       "sha256": "1252a74d1818b90c47d3906bd921553ead19e3a0c84ae3f7c144bac182c8adeb",
       "trimmedMd5": "e37064763da43de9fe9f59b0c51d695c"
+    },
+    {
+      "version": "20261101100000",
+      "name": "293_trusted_production_release_decision",
+      "filename": "20261101100000_293_trusted_production_release_decision.sql",
+      "sha256": "177ec5e32852e74daf8fbf9e92a7a6c4606659a63845346fd552bdb2b48de7ca",
+      "trimmedMd5": "0d985424c96be1e7105da94c0fdafe37"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
