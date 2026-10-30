@@ -52,10 +52,17 @@ function database(
     framesReadError?: string;
     frameRecordError?: string;
     lineageError?: string;
+    routePost?: Record<string, unknown> | null;
+    routeSlot?: Record<string, unknown> | null;
+    routeIdea?: Record<string, unknown> | null;
+    routeCampaign?: Record<string, unknown> | null;
+    routeReadError?: string;
+    routePostReads?: Array<Record<string, unknown> | null>;
   } = {},
 ) {
   const events: Record<string, unknown>[] = [];
   const signCalls: Array<{ paths: string[]; ttl: number }> = [];
+  let routePostReads = 0;
   const rpc = vi.fn(async (name: string) => {
     if (name === "claim_posts_for_publishing") return { data: options.claimed ?? [POST], error: null };
     if (name === "integration_secret") {
@@ -89,6 +96,47 @@ function database(
       const frames: Record<string, unknown> = {};
       Object.assign(frames, { select: () => frames, eq: async () => result });
       return frames;
+    }
+    if (["scheduled_posts", "content_slots", "client_ideas", "client_campaigns"].includes(table)) {
+      const filters: Record<string, unknown> = {};
+      const chain = {
+        select: () => chain,
+        eq: (column: string, value: unknown) => {
+          filters[column] = value;
+          return chain;
+        },
+        maybeSingle: async () => {
+          const defaults: Record<string, Record<string, unknown>> = {
+            scheduled_posts: {
+              id: filters.id, client_id: POST.client_id, asset_id: POST.asset_id,
+              platform: POST.platform, channel: "organic", publication_status: "publishing",
+              published_at: null,
+            },
+            content_slots: {
+              id: "slot-1", client_id: POST.client_id, asset_id: POST.asset_id,
+              platform: POST.platform, stage: "scheduled", idea_id: "idea-1",
+            },
+            client_ideas: { id: filters.id, client_id: POST.client_id, campaign_id: "campaign-1" },
+            client_campaigns: {
+              id: filters.id, client_id: POST.client_id, acquisition_mode: "organic",
+            },
+          };
+          const overrides: Record<string, Record<string, unknown> | null | undefined> = {
+            scheduled_posts: options.routePost,
+            content_slots: options.routeSlot,
+            client_ideas: options.routeIdea,
+            client_campaigns: options.routeCampaign,
+          };
+          const override = table === "scheduled_posts" && options.routePostReads
+            ? options.routePostReads[Math.min(routePostReads++, options.routePostReads.length - 1)]
+            : overrides[table];
+          return {
+            data: override === null ? null : { ...defaults[table], ...override },
+            error: options.routeReadError ? { message: options.routeReadError } : null,
+          };
+        },
+      };
+      return chain;
     }
     const chain: Record<string, unknown> = {};
     Object.assign(chain, {
@@ -249,6 +297,41 @@ describe("the sweep", () => {
 });
 
 describe("what stops a post before anything is sent", () => {
+  it.each([
+    ["a paid scheduled post", { routePost: { channel: "paid" } }],
+    ["a post without route lineage", { routeSlot: null }],
+    ["a slot without a campaign idea", { routeIdea: { campaign_id: null } }],
+    ["a paid campaign", { routeCampaign: { acquisition_mode: "paid" } }],
+    ["a legacy campaign", { routeCampaign: { acquisition_mode: "legacy" } }],
+    ["a mismatched slot asset", { routeSlot: { asset_id: "other-asset" } }],
+    ["a post no longer claimed", { routePost: { publication_status: "scheduled" } }],
+  ])("refuses %s before credentials, Storage or provider access", async (_case, options) => {
+    const { sb, rpc, signCalls } = database(options);
+    await runPublisherJob(sb, on, agent, job);
+    expect(publish).not.toHaveBeenCalled();
+    expect(rpc.mock.calls.map((call) => call[0])).not.toContain("integration_secret");
+    expect(signCalls).toEqual([]);
+    expect(failureFor(rpc, "post-1")).toMatchObject({
+      p_reason: expect.stringContaining("no current, explicit organic route"),
+      p_retryable: false,
+    });
+  });
+
+  it("retries a route read outage without reaching the provider", async () => {
+    const { sb, rpc, signCalls } = database({ routeReadError: "unavailable" });
+    await runPublisherJob(sb, on, agent, job);
+    expect(publish).not.toHaveBeenCalled();
+    expect(signCalls).toEqual([]);
+    expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: true });
+  });
+
+  it("rechecks after preparation, before an ordinary provider write", async () => {
+    const { sb, rpc } = database({ routePostReads: [{}, { channel: "paid" }] });
+    await runPublisherJob(sb, on, agent, job);
+    expect(publish).not.toHaveBeenCalled();
+    expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: false });
+  });
+
   it("names a platform with no adapter", async () => {
     vi.spyOn(registry, "adapterFor").mockReturnValue(null);
     const { sb, rpc } = database();
@@ -418,6 +501,17 @@ describe("a story, which is not one publication", () => {
     // The post carries the first frame's id, which is the one a person
     // following the link would expect to land on.
     expect(argsOf(rpc, "record_post_published")).toMatchObject({ p_external_id: "ig_story_1" });
+  });
+
+  it("checks the route before each story frame and stops if it changes", async () => {
+    const { sb, rpc } = database({
+      claimed: [STORY],
+      routePostReads: [{}, {}, { channel: "paid" }],
+    });
+    await runPublisherJob(sb, on, agent, job);
+    expect(publishFrame).toHaveBeenCalledTimes(1);
+    expect(framesRecorded(rpc).map((f) => f.p_position)).toEqual([1]);
+    expect(failureFor(rpc, "post-1")).toMatchObject({ p_retryable: false });
   });
 
   it("sends only what has not gone out yet when it is tried again", async () => {
