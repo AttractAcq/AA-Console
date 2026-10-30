@@ -174,6 +174,7 @@ export function createIngressServer({ upstream, secret, publicLimits = DEFAULT_P
           else activeOrdinary -= 1;
         };
         body = await readBounded(req, bodyLimit(url));
+        if (res.destroyed) return;
         const timestamp = String(Date.now());
         const nonce = randomBytes(16).toString("base64url");
         const bodyHash = createHash("sha256").update(body).digest("hex");
@@ -194,10 +195,15 @@ export function createIngressServer({ upstream, secret, publicLimits = DEFAULT_P
         upstreamRes.pipe(res);
       });
       upstreamReq.on("timeout", () => upstreamReq.destroy(new Error("upstream_timeout")));
-      upstreamReq.on("error", () => { if (!res.headersSent) res.writeHead(502).end(); else res.destroy(); });
+      upstreamReq.on("error", () => {
+        if (res.destroyed) return;
+        if (!res.headersSent) res.writeHead(502).end();
+        else res.destroy();
+      });
       if (body) upstreamReq.end(body);
       else req.pipe(upstreamReq);
     })().catch((error) => {
+      if (res.destroyed) return;
       if (!res.headersSent) res.writeHead([408, 413].includes(error?.status) ? error.status : 503,
         { "connection": "close" }).end();
       else res.destroy();
