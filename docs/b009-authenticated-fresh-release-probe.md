@@ -9,9 +9,10 @@ on every authorized request. It never uses the public route's ten-second
 cache. The public route remains available to operators and retains its cache.
 
 This is a preparatory release slice. A missing `BROWSER_RELEASE_PROBE_TOKEN`
-returns HTTP 503 from the fresh route. No production token, GitHub Actions
-secret, workflow edit, or live probe is included in this PR. It does not mark
-B009 complete or authorize a customer-facing release.
+returns HTTP 503 from the fresh route, and the Pages identity step fails
+before publication. This PR updates that step and its script, but does not
+provision a production token, change a secret value, or claim a live probe.
+It does not mark B009 complete or authorize a customer-facing release.
 
 ## Credential and rollout contract
 
@@ -30,31 +31,33 @@ HTTP 401 without making a database or gateway request. Non-GET calls return
 HTTP 200; an unavailable dependency returns 503. All responses use
 `Cache-Control: no-store`. No credential or dependency error text is returned.
 
-Release this in order:
+Release this in order after independent review of the exact candidate:
 
-1. Merge and deploy this runtime code through four fresh protected checks.
-   With the token absent, verify the service stays healthy, the public probe
-   works, and the fresh route returns 503 without an internal read.
-2. Provision the dedicated token in Railway and in the GitHub Actions secret
-   store through the reviewed production configuration path. Verify the
-   Railway deployment is active. Send one authenticated read from a private
-   operator environment; compare its full runtime and gateway SHAs and live
-   migration head with independent deployment and database reads. Never print
-   the token or response headers that contain it.
-3. After the browser manifest/Pages gate PR has merged, update the Pages
-   identity step to pass `BROWSER_RELEASE_PROBE_TOKEN` only to that step and
-   use `/release/identities/fresh` with an Authorization header. The runtime's
-   sequential catalog, gateway fetch and gateway body deadlines can total
-   nine seconds, so give the Pages HTTP request a bounded deadline of at
-   least twelve seconds and test a healthy six-to-nine-second response.
-   Require a nonempty, exact-format token before calling `fetch`; require literal HTTP
-   200, fresh complete JSON, exact manifest identities, and a current-main
-   recheck immediately before Pages publication. Keep the token out of the
-   build, npm tests, artifacts, logs, and `VITE_*` environment variables.
+1. Provision one reviewed dedicated token in Railway and the GitHub Actions
+   secret store. Check the existing public probe and workers after the
+   config-only Railway redeploy of the older runtime; the new route is not
+   present yet. Do not disclose the token in a release packet.
+2. Merge this PR only after four fresh protected checks. Railway must deploy
+   the new runtime code and its token; verify health and send a private
+   authenticated fresh read. Compare its full runtime and gateway SHAs and
+   live migration head with independent deployment and database reads. The
+   Pages run for this merge is expected to withhold publication: its current
+   manifest pins the older runtime source, and the runtime source changed.
+   If configuration is absent or malformed, keep Pages blocked and repair the
+   configuration without bypassing the gate.
+3. Open a separate reviewed manifest update pinning the exact full runtime
+   SHA actually deployed from step 2. After its four protected checks and
+   merge, the Pages job receives the secret only in its live identity step,
+   calls `/release/identities/fresh`, requires literal HTTP 200 and complete
+   exact identities, and rechecks current main before publication. The
+   runtime's sequential catalog, gateway fetch and gateway body deadlines can
+   total nine seconds; the script uses one bounded twelve-second deadline
+   per attempt, with a healthy six-to-nine-second response test. Keep the
+   token out of the build, npm tests, artifacts, logs and `VITE_*` variables.
 4. Exercise invalid/missing token, 401/503, old runtime, old gateway, pending
-   migration, endpoint timeout, and a component that changes during the
-   bounded wait. Confirm each blocks Pages. Then observe a successful
-   CI-tested SHA on the deployed browser bundle.
+   migration, endpoint timeout and a component change during the bounded
+   wait. Confirm each blocks Pages. Then observe a successful CI-tested SHA
+   on the deployed browser bundle.
 
 The protected Pages job does not need a Supabase Management API token. Such a
 token would grant database management power to a privileged workflow merely

@@ -10,12 +10,14 @@ import {
   loadReleaseManifest,
   probeLiveIdentity,
   validateManifest,
+  validateProbeToken,
   waitForLiveIdentity,
 } from './assert-live-release-identities.mjs'
 
 const runtimeSha = 'a'.repeat(40)
 const gatewaySha = 'b'.repeat(40)
 const migrationHead = '20261030160000'
+const token = 'a1'.repeat(32)
 const manifest = { schemaVersion: 1, runtimeSha, gatewaySha, migrationHead }
 const live = () => ({
   ...manifest, observationsComplete: true, observedAt: new Date().toISOString(), reason: null,
@@ -38,13 +40,36 @@ test('exact, recent live identities pass; mismatches and partial observations fa
 
 test('bounded live probe refuses 503, malformed body and a transport that never resolves', async () => {
   const response = (body, status = 200) => new Response(JSON.stringify(body), { status })
-  await probeLiveIdentity(manifest, async () => response(live()))
-  await assert.rejects(() => probeLiveIdentity(manifest, async () => response(live(), 201)), /HTTP 201/)
-  await assert.rejects(() => probeLiveIdentity(manifest, async () => response(live(), 503)), /HTTP 503/)
-  await assert.rejects(() => probeLiveIdentity(manifest, async () => response({ ...live(), gatewaySha: null })))
-  await assert.rejects(() => probeLiveIdentity(manifest, async () => new Response('x'.repeat(4097))), /response limit/)
-  // The actual timeout is five seconds, even if a transport ignores AbortSignal.
-  await assert.rejects(() => probeLiveIdentity(manifest, () => new Promise(() => {})), /timed out/)
+  await probeLiveIdentity(manifest, async () => response(live()), { token })
+  await assert.rejects(() => probeLiveIdentity(manifest, async () => response(live(), 201), { token }), /HTTP 201/)
+  await assert.rejects(() => probeLiveIdentity(manifest, async () => response(live(), 503), { token }), /HTTP 503/)
+  await assert.rejects(() => probeLiveIdentity(manifest, async () => response({ ...live(), gatewaySha: null }), { token }))
+  await assert.rejects(() => probeLiveIdentity(manifest, async () => new Response('x'.repeat(4097)), { token }), /response limit/)
+  await assert.rejects(() => probeLiveIdentity(manifest, () => new Promise(() => {}), { token, deadlineMs: 25 }), /timed out/)
+})
+
+test('fresh probe rejects absent credentials before transport and scopes bearer header to the fixed route', async () => {
+  assert.equal(validateProbeToken(token), token)
+  assert.throws(() => validateProbeToken('short'), /missing or malformed/)
+  let calls = 0
+  await assert.rejects(() => probeLiveIdentity(manifest, async () => { calls++; return new Response('{}') }, { token: '' }), /missing or malformed/)
+  assert.equal(calls, 0)
+  await probeLiveIdentity(manifest, async (url, init) => {
+    calls++
+    assert.equal(url, 'https://runtime.attractacq.com/release/identities/fresh')
+    assert.deepEqual(init.headers, { Authorization: `Bearer ${token}` })
+    assert.equal(init.cache, 'no-store')
+    assert.equal(init.redirect, 'error')
+    return new Response(JSON.stringify(live()))
+  }, { token })
+  assert.equal(calls, 1)
+})
+
+test('healthy fresh collector can take more than five seconds within the bounded twelve-second deadline', { timeout: 15000 }, async () => {
+  await probeLiveIdentity(manifest, async () => {
+    await new Promise((resolve) => setTimeout(resolve, 6500))
+    return new Response(JSON.stringify(live()))
+  }, { token })
 })
 
 test('bounded retry waits for a compatible deployment and stops after repeated mismatch', async () => {
@@ -52,11 +77,11 @@ test('bounded retry waits for a compatible deployment and stops after repeated m
   await waitForLiveIdentity(manifest, async () => {
     calls++
     return new Response(JSON.stringify(calls === 1 ? { ...live(), gatewaySha: 'c'.repeat(40) } : live()))
-  }, { attempts: 2, delayMs: 0 })
+  }, { attempts: 2, delayMs: 0, token })
   assert.equal(calls, 2)
   await assert.rejects(() => waitForLiveIdentity(manifest,
     async () => new Response(JSON.stringify({ ...live(), runtimeSha: 'c'.repeat(40) })),
-    { attempts: 2, delayMs: 0 }), /runtime SHA/)
+    { attempts: 2, delayMs: 0, token }), /runtime SHA/)
 })
 
 test('component pins require main ancestry and unchanged runtime/gateway source', () => {

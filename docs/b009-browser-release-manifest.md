@@ -18,11 +18,17 @@ numbers. They can differ from the browser commit when Railway watched paths
 correctly skip an unchanged service. The Pages job verifies both pins are
 ancestors of its CI-tested main commit and that the tracked service source
 has not changed between each pin and that commit. It then requests
-`GET https://runtime.attractacq.com/release/identities` with a bounded wait,
+the dedicated authenticated
+`GET https://runtime.attractacq.com/release/identities/fresh` route with a
+bounded twelve-second deadline per attempt,
 requires a fresh complete observation, and compares the runtime SHA, gateway
 SHA and migration head with the manifest. A 503, timeout, changed source,
 stale response, or mismatch stops publication. The browser SHA is the exact
 successful main CI SHA passed by GitHub's `workflow_run` event.
+The dedicated 32-byte token is supplied only to the live identity step as a
+GitHub Actions secret; it is never present in PR CI, the browser build or
+the Pages artifact. The runtime bypasses its public ten-second cache for
+this authenticated route and rereads the database and gateway on each call.
 
 ## Updating a pin after a service change
 

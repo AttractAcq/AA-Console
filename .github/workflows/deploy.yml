@@ -132,6 +132,7 @@ jobs:
       - name: Require live runtime, gateway and schema identities
         env:
           TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          BROWSER_RELEASE_PROBE_TOKEN: ${{ secrets.BROWSER_RELEASE_PROBE_TOKEN }}
         run: node scripts/assert-live-release-identities.mjs
 
       # A newer main can arrive during the bounded live deployment wait.

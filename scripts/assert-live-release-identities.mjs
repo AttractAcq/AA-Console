@@ -11,7 +11,15 @@ import { pathToFileURL } from 'node:url'
 
 const sha = /^[0-9a-f]{40}$/
 const migration = /^\d{14}$/
-const endpoint = 'https://runtime.attractacq.com/release/identities'
+const probeToken = /^[0-9a-f]{64}$/
+const endpoint = 'https://runtime.attractacq.com/release/identities/fresh'
+const probeDeadlineMs = 12000
+
+export function validateProbeToken(value) {
+  if (typeof value !== 'string' || !probeToken.test(value))
+    throw new Error('Dedicated live release probe token is missing or malformed')
+  return value
+}
 
 export function validateManifest(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) ||
@@ -88,13 +96,19 @@ async function within(work, milliseconds) {
   }
 }
 
-export async function probeLiveIdentity(manifest, fetcher = fetch, url = endpoint) {
-  const response = await within(fetcher(url, {
-    method: 'GET', cache: 'no-store', redirect: 'error',
-    signal: AbortSignal.timeout(5000),
-  }), 5000)
-  if (response.status !== 200) throw new Error(`Live release probe returned HTTP ${response.status}`)
-  const raw = await within(response.text(), 5000)
+export async function probeLiveIdentity(manifest, fetcher = fetch, options = {}) {
+  const token = validateProbeToken(options.token ?? process.env.BROWSER_RELEASE_PROBE_TOKEN)
+  const url = options.url ?? endpoint
+  const deadlineMs = options.deadlineMs ?? probeDeadlineMs
+  const raw = await within((async () => {
+    const response = await fetcher(url, {
+      method: 'GET', cache: 'no-store', redirect: 'error',
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(deadlineMs),
+    })
+    if (response.status !== 200) throw new Error(`Live release probe returned HTTP ${response.status}`)
+    return response.text()
+  })(), deadlineMs)
   if (raw.length > 4096) throw new Error('Live release probe exceeded its response limit')
   const body = JSON.parse(raw)
   assertLiveIdentity(body, manifest)
@@ -103,11 +117,10 @@ export async function probeLiveIdentity(manifest, fetcher = fetch, url = endpoin
 export async function waitForLiveIdentity(manifest, fetcher = fetch, options = {}) {
   const attempts = options.attempts ?? 8
   const delayMs = options.delayMs ?? 15000
-  const url = options.url ?? endpoint
   let lastError
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      await probeLiveIdentity(manifest, fetcher, url)
+      await probeLiveIdentity(manifest, fetcher, options)
       return
     } catch (error) {
       lastError = error
