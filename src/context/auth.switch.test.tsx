@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FormModal } from "../components/forms/FormModal";
@@ -74,8 +75,8 @@ describe("authenticated route identity", () => {
     </MemoryRouter></AuthProvider>);
     const note = await screen.findByLabelText("Private note");
     expect(screen.getByTestId("profile-id")).toHaveTextContent("user-a");
-    fireEvent.change(note, { target: { value: "user-a private value" } });
-    expect(note).toHaveValue("user-a private value");
+    await userEvent.type(note, "user-a private value");
+    await waitFor(() => expect(note).toHaveValue("user-a private value"));
 
     mock.holdB = true;
     act(() => { mock.listener?.("SIGNED_IN", { user: { id: "user-b" } }); });
