@@ -38,6 +38,24 @@ import {
 
 const PREFIX = "/public/sales/v1/d/";
 const MAX_OUTPUT_TOKENS = 1024;
+const MAX_CONTEXT_BYTES = 128 * 1024;
+
+/** Reserve a conservative upper bound before the provider can bill us. */
+export function maxSalesTurnCostUsd(
+  model: string,
+  system: string,
+  messages: Anthropic.Messages.MessageParam[],
+): number | null {
+  const bytes = Buffer.byteLength(JSON.stringify({ system, messages, tools: [CONTACT_TOOL] }));
+  if (bytes > MAX_CONTEXT_BYTES) return null;
+  // Input tokens cannot normally exceed UTF-8 bytes. Double that count and
+  // the output cap, then add framing headroom for a conservative reserve.
+  const estimate = estimateCostUsd(model, {
+    inputTokens: bytes * 2 + 4096,
+    outputTokens: MAX_OUTPUT_TOKENS * 2,
+  });
+  return Math.max(0.01, Math.ceil(estimate * 1_000_000) / 1_000_000);
+}
 
 type Deployment = {
   deployment_id: string;
@@ -225,6 +243,7 @@ export async function handlePublicSales(
   }
 
   const ipHash = admission?.allowed ? admission.ipHash.slice(0, 32) : null;
+  let reservationId: string | null = null;
 
   const log = async (outcome: string, costUsd = 0, conversationId?: string): Promise<void> => {
     await sb.from("sales_runtime_requests").insert({
@@ -235,6 +254,7 @@ export async function handlePublicSales(
       origin: origin ?? null,
       outcome,
       cost_usd: costUsd,
+      reservation_id: reservationId,
     });
   };
 
@@ -249,20 +269,6 @@ export async function handlePublicSales(
   if ("reason" in checked) {
     await log("denied");
     deny(checked.reason, allow);
-    return;
-  }
-
-  // Limits are checked before any model work, because a ceiling has to cost
-  // less than the thing it caps.
-  const { data: verdictRows } = await sb.rpc("sales_runtime_allow", {
-    p_deployment_id: d.deployment_id,
-    p_ip_hash: ipHash,
-  });
-  const verdict = ((verdictRows as { allowed: boolean; reason: string }[] | null) ?? [])[0];
-  if (!verdict?.allowed) {
-    const reason = verdict?.reason ?? "deployment_unavailable";
-    await log(reason === "ip_rate_limit" ? "rate_limited" : "ceiling");
-    deny(reason === "ip_rate_limit" ? "rate_limited" : "ceiling", allow);
     return;
   }
 
@@ -286,6 +292,37 @@ export async function handlePublicSales(
     }
   }
 
+  const messages: Anthropic.Messages.MessageParam[] = [
+    ...history.map((t) => ({ role: t.role, content: t.content })),
+    { role: "user" as const, content: checked.message },
+  ];
+  const system = systemFor(d);
+  const reserveUsd = maxSalesTurnCostUsd(config.model, system, messages);
+  if (reserveUsd === null) {
+    await log("denied");
+    deny("too_large", allow);
+    return;
+  }
+
+  // A single SQL UPDATE reserves both daily message and dollar capacity.
+  // It serializes distinct callers before any model work or new conversation.
+  const { data: budgetRows, error: budgetError } = await sb.rpc("reserve_sales_runtime_v6", {
+    p_deployment_id: d.deployment_id,
+    p_reserved_usd: reserveUsd,
+  } as never);
+  if (budgetError) {
+    logger.error("public_sales_budget_failed", { deployment: d.deployment_id });
+    deny("error", allow);
+    return;
+  }
+  const budget = ((budgetRows as { allowed: boolean; reason: string; reservation_id: string | null }[] | null) ?? [])[0];
+  if (!budget?.allowed || !budget.reservation_id) {
+    await log("ceiling");
+    deny("ceiling", allow);
+    return;
+  }
+  reservationId = budget.reservation_id;
+
   if (!convId) {
     const { data: created, error: createError } = await sb
       .from("sales_agent_conversations")
@@ -299,7 +336,11 @@ export async function handlePublicSales(
       .select("id")
       .single();
     if (createError || !created) {
-      logger.error("public_sales_conversation_failed", { error: createError?.message });
+      logger.error("public_sales_conversation_failed", { deployment: d.deployment_id });
+      const { error: cancelError } = await sb.rpc("cancel_sales_runtime_reservation_v6", {
+        p_reservation_id: reservationId,
+      } as never);
+      if (cancelError) logger.error("public_sales_reservation_cancel_failed", { deployment: d.deployment_id });
       await log("error");
       deny("error", allow);
       return;
@@ -307,11 +348,9 @@ export async function handlePublicSales(
     convId = created.id as string;
   }
 
-  const anthropic = new Anthropic({ apiKey: config.anthropicApiKey });
-  const messages: Anthropic.Messages.MessageParam[] = [
-    ...history.map((t) => ({ role: t.role, content: t.content })),
-    { role: "user" as const, content: checked.message },
-  ];
+  // One reservation covers one provider attempt. The SDK otherwise retries
+  // ambiguous failures by default, which could incur multiple charges.
+  const anthropic = new Anthropic({ apiKey: config.anthropicApiKey, maxRetries: 0 });
 
   let reply = "";
   let contact: Record<string, unknown> | null = null;
@@ -323,7 +362,7 @@ export async function handlePublicSales(
       {
         model: config.model,
         max_tokens: MAX_OUTPUT_TOKENS,
-        system: systemFor(d),
+        system,
         messages,
         tools: [CONTACT_TOOL],
       },
@@ -342,17 +381,32 @@ export async function handlePublicSales(
     if (used && used.input && typeof used.input === "object") {
       contact = used.input as Record<string, unknown>;
     }
-  } catch (err) {
-    logger.error("public_sales_model_failed", {
-      error: err instanceof Error ? err.message : String(err),
-      deployment: d.deployment_id,
-    });
+  } catch {
+    logger.error("public_sales_model_failed", { deployment: d.deployment_id });
+    await sb.rpc("mark_sales_runtime_uncertain_v6", {
+      p_reservation_id: reservationId,
+    } as never);
     await log("error", 0, convId);
     deny("error", allow);
     return;
   }
 
   const costUsd = estimateCostUsd(config.model, { inputTokens, outputTokens });
+  const { data: overrun, error: settleError } = await sb.rpc("settle_sales_runtime_v6", {
+    p_reservation_id: reservationId,
+    p_actual_usd: costUsd,
+    p_conversation_id: convId,
+  } as never);
+  // A successful RPC must return the scalar boolean result. Treat an empty
+  // response as an ambiguous settlement and retain the reserve for review.
+  if (settleError || typeof overrun !== "boolean") {
+    logger.error("public_sales_settlement_failed", { deployment: d.deployment_id });
+    await sb.rpc("mark_sales_runtime_uncertain_v6", { p_reservation_id: reservationId } as never);
+    await log("error", 0, convId);
+    deny("error", allow);
+    return;
+  }
+  if (overrun === true) logger.error("public_sales_reserve_overrun", { deployment: d.deployment_id });
   if (!reply) reply = "Sorry — could you put that another way?";
 
   const nextTranscript = [
