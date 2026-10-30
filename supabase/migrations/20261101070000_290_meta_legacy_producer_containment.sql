@@ -31,6 +31,80 @@ revoke execute on function public.enqueue_agent_job(text,uuid,text,uuid)
 grant execute on function public.enqueue_agent_job(text,uuid,text,uuid)
   to authenticated;
 
+-- Supabase's table grants and the original admin-all RLS policy can also
+-- permit a direct insert, or an update of a benign queued job's agent_key.
+-- Console users use RPCs to queue work; the worker writes as service_role.
+revoke insert, update, delete on table public.agent_jobs
+  from public, anon, authenticated;
+
+-- The Master AI uses service-role wrappers rather than the browser RPC.
+-- They must not offer a second generic route to either held Meta worker.
+create or replace function public.enqueue_agent_job_as(
+  p_actor uuid, p_agent_key text, p_client_id uuid default null,
+  p_input_table text default null, p_input_id uuid default null
+)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare new_id uuid;
+begin
+  if not exists (select 1 from public.profiles where id = p_actor and role = 'admin') then
+    raise exception 'Only an admin can queue agent work.' using errcode = '42501';
+  end if;
+  if p_agent_key in ('meta_build', 'recruitment_meta_build') then
+    raise exception 'Meta object creation requires an exact AAL2 Approval Inbox decision and a bound prewrite executor.'
+      using errcode = '42501';
+  end if;
+  if not exists (select 1 from public.agents where agent_key = p_agent_key) then
+    raise exception 'Unknown agent: %', p_agent_key;
+  end if;
+  if (select paused from public.agents where agent_key = p_agent_key) then
+    raise exception 'Agent % is paused', p_agent_key;
+  end if;
+  if p_client_id is not null and not public.can_run_agent(p_agent_key, p_client_id) then
+    raise exception 'Agent % is missing required upstream intelligence', p_agent_key;
+  end if;
+  insert into public.agent_jobs (agent_key, client_id, input_table, input_id, created_by)
+  values (p_agent_key, p_client_id, p_input_table, p_input_id, p_actor)
+  returning id into new_id;
+  insert into public.agent_job_events (job_id, description)
+  values (new_id, 'Queued by the Master AI');
+  return new_id;
+end;
+$$;
+revoke execute on function public.enqueue_agent_job_as(uuid,text,uuid,text,uuid)
+  from public, anon, authenticated;
+grant execute on function public.enqueue_agent_job_as(uuid,text,uuid,text,uuid)
+  to service_role;
+
+create or replace function public.start_master_run_as(p_actor uuid, p_client_id uuid)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_run_id uuid := gen_random_uuid(); v_count integer;
+begin
+  if not exists (select 1 from public.profiles where id = p_actor and role = 'admin') then
+    raise exception 'Only an admin can start a master run.' using errcode = '42501';
+  end if;
+  insert into public.agent_jobs (agent_key, client_id, run_id, created_by)
+  select a.agent_key, p_client_id, v_run_id, p_actor
+  from public.agents a
+  where a.paused = false and a.archived_at is null
+    and a.scheduled_only = false and a.agent_key <> 'brief'
+    and a.agent_key not in ('meta_build', 'recruitment_meta_build')
+    and not exists (
+      select 1 from public.agent_jobs j
+      where j.agent_key = a.agent_key and j.client_id = p_client_id
+        and j.status in ('queued', 'claimed', 'running')
+    );
+  get diagnostics v_count = row_count;
+  if v_count = 0 then
+    raise exception 'Nothing to run - every agent is already queued or running for this client.';
+  end if;
+  return v_run_id;
+end;
+$$;
+revoke execute on function public.start_master_run_as(uuid,uuid)
+  from public, anon, authenticated;
+grant execute on function public.start_master_run_as(uuid,uuid)
+  to service_role;
+
 create or replace function public.request_meta_build(p_campaign_id uuid)
 returns uuid language plpgsql security definer set search_path = public as $$
 begin

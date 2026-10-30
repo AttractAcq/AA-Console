@@ -74,6 +74,8 @@ beforeAll(async () => {
       language sql stable security definer set search_path=public as $$
         select coalesce(public.is_admin(),false) and p_client_id = '${HOUSE}'::uuid
       $$;
+    create function public.can_run_agent(text, uuid) returns boolean
+      language sql stable as $$ select true $$;
     create function public.aa_house_client_id() returns uuid language sql stable
       as $$ select id from public.clients where is_internal
         and lower(name)='attract acquisition' order by id limit 1 $$;
@@ -103,11 +105,16 @@ beforeAll(async () => {
       credential_secret_id uuid);
     create table public.agents (
       agent_key text primary key, name text, initials text, domain text,
-      description text, requires_upstream text[], requires_input boolean);
+      description text, requires_upstream text[], requires_input boolean,
+      paused boolean not null default false, archived_at timestamptz,
+      scheduled_only boolean not null default false);
     create table public.agent_jobs (
       id uuid primary key default gen_random_uuid(), agent_key text,
       client_id uuid, input_table text, input_id uuid,
-      status text not null default 'queued');
+      status text not null default 'queued', run_id uuid, created_by uuid);
+    create table public.agent_job_events (
+      id uuid primary key default gen_random_uuid(), job_id uuid,
+      description text);
     create function public.enqueue_agent_job_internal(
       p_agent_key text, p_client_id uuid, p_input_table text,
       p_input_id uuid, p_actor uuid, p_params jsonb default '{}'::jsonb,
@@ -151,7 +158,10 @@ beforeAll(async () => {
     insert into public.client_integrations
       (client_id,provider,status,ad_account_id,meta_page_id,meta_pixel_id,credential_label)
       values ('${HOUSE}','meta','connected','act_123','page_1','pixel_1','house');
+    insert into public.agents(agent_key) values
+      ('icp'),('meta_build'),('recruitment_meta_build');
     grant usage on schema public,auth to authenticated,service_role,anon;
+    grant select,insert,update,delete on public.agent_jobs to authenticated;
     grant execute on function auth.uid(),auth.role(),auth.jwt(),
       public.current_role_of(),public.is_admin(),public.can_access_client(uuid),
       public.aa_house_client_id() to authenticated,service_role,anon;
@@ -183,6 +193,33 @@ describe("Meta legacy producer containment migration 290", () => {
       "select public.enqueue_agent_job('icp',$1,null,null)", [HOUSE]);
     expect((await db.query<{ agent_key: string }>(
       "select agent_key from public.agent_jobs")).rows).toEqual([{ agent_key: "icp" }]);
+  });
+
+  it("revokes direct authenticated job writes and holds service-role generic Meta producers", async () => {
+    await expect(asRole("authenticated", ADMIN,
+      "insert into public.agent_jobs(agent_key,client_id) values('meta_build',$1)", [HOUSE]))
+      .rejects.toThrow(/permission denied/i);
+    const benignId = (await db.query<{ id: string }>(
+      "insert into public.agent_jobs(agent_key,client_id) values('icp',$1) returning id",
+      [HOUSE])).rows[0]!.id;
+    await expect(asRole("authenticated", ADMIN,
+      "update public.agent_jobs set agent_key='meta_build' where id=$1", [benignId]))
+      .rejects.toThrow(/permission denied/i);
+    for (const key of ["meta_build", "recruitment_meta_build"]) {
+      await expect(asRole("service_role", null,
+        "select public.enqueue_agent_job_as($1,$2,$3,null,null)",
+        [ADMIN, key, HOUSE])).rejects.toThrow(/exact AAL2 Approval Inbox/);
+    }
+    await asRole("service_role", null,
+      "select public.enqueue_agent_job_as($1,'icp',$2,null,null)", [ADMIN, HOUSE]);
+    await asRole("service_role", null,
+      "select public.start_master_run_as($1,$2)", [ADMIN, OTHER]);
+    const masterKeys = (await db.query<{ agent_key: string }>(
+      "select agent_key from public.agent_jobs where client_id=$1", [OTHER]))
+      .rows.map((row) => row.agent_key);
+    expect(masterKeys).toEqual(["icp"]);
+    expect((await db.query("select id from public.agent_jobs where agent_key in ('meta_build','recruitment_meta_build')"))
+      .rows).toHaveLength(0);
   });
 
   it("creates a house recruitment source and one blocked, exact Inbox card without a job", async () => {
