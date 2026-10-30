@@ -19,6 +19,7 @@ type Asset = {
 type Campaign = {
   id: string; name: string; daily_budget: number;
   target_countries: string[]; meta_campaign_id: string | null;
+  meta_ad_set_id: string | null;
   meta_built_at: string | null; created_at: string;
 };
 type Integration = {
@@ -134,7 +135,7 @@ export function RecruitmentDistributionPanel() {
     if (requestError) setError(isMissingFunction(requestError)
       ? `Inbox requests are unavailable. ${MIGRATION_PENDING_NOTE}`
       : requestError.message);
-    else { setNotice("The held Approval Inbox request is current. No Meta objects were created."); void refresh(); }
+    else { setNotice("The held Approval Inbox request is current. No new Meta objects were created by this request."); void refresh(); }
   }
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading recruitment distribution…</p>;
@@ -186,7 +187,7 @@ export function RecruitmentDistributionPanel() {
           const job = lastJob(campaign.id);
           const running = job && ["queued", "claimed", "running"].includes(job.status);
           return <div key={campaign.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
-            <div><p className="font-medium">{campaign.name}</p><p className="text-xs text-muted-foreground">{campaign.target_countries.join(", ")} · {campaign.daily_budget} per day · {campaign.meta_built_at ? "Created in Ads Manager, paused" : running ? "Legacy build job held" : job?.status === "failed" ? "Legacy build held; inspect failure" : "Awaiting exact Inbox approval; no Meta objects created"}</p>
+            <div><p className="font-medium">{campaign.name}</p><p className="text-xs text-muted-foreground">{campaign.target_countries.join(", ")} · {campaign.daily_budget} per day · {campaign.meta_built_at ? "Created in Ads Manager, paused" : campaign.meta_campaign_id || campaign.meta_ad_set_id ? "Partial Meta objects may exist; reconcile in Ads Manager" : running ? "Legacy build job held; verify outcome" : job?.status === "failed" ? "Legacy build held; inspect failure and provider" : "Held Inbox request; no new Meta objects will be created"}</p>
               {job?.error && <p className="text-xs text-destructive">{job.error}</p>}</div>
             <div className="flex gap-2">
               {campaign.meta_campaign_id && integration?.ad_account_id && <a className="rounded border border-border px-3 py-2 text-sm" href={adsManagerUrl(integration.ad_account_id, campaign.meta_campaign_id)} target="_blank" rel="noopener noreferrer">Open in Ads Manager</a>}

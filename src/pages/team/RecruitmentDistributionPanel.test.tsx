@@ -62,6 +62,20 @@ it("allows a held request while the Meta account still needs connection", async 
     .toBeEnabled();
 });
 
+it("flags a historical partial provider write for assisted reconciliation", async () => {
+  const base = from.getMockImplementation()!;
+  from.mockImplementation((table: string) => table === "recruitment_meta_campaigns"
+    ? chain([{
+      id: "campaign-legacy", name: "Legacy hiring", daily_budget: 25,
+      target_countries: ["ZA"], meta_campaign_id: "provider-campaign-1",
+      meta_ad_set_id: null, meta_built_at: null, created_at: "2026-10-01T00:00:00Z",
+    }]) : base(table));
+  render(<RecruitmentDistributionPanel />);
+  expect(await screen.findByText(/Partial Meta objects may exist; reconcile in Ads Manager/))
+    .toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Open in Ads Manager" })).toBeInTheDocument();
+});
+
 // If migration 133 is missing during a rollout, the approved ads and Meta
 // account status remain useful even while campaign requests are unavailable.
 describe("when migration 133 has not been applied", () => {
