@@ -385,7 +385,7 @@ export function IntegrationsPanel() {
       {clientId && rows.some((r) => SYNCS[r.provider]) && <MetricsBackfill clientId={clientId} />}
 
       <FormModal
-        key={`meta-settings:${clientId}`}
+        key={`meta-settings:${clientId}:${adSettings?.token ?? "closed"}`}
         open={currentAdSettings !== null}
         onClose={() => {
           if (!metaSelectionIsCurrent(adSettings)) return;
@@ -414,7 +414,7 @@ export function IntegrationsPanel() {
       />
 
       <FormModal
-        key={`add-integration:${clientId}`}
+        key={`add-integration:${clientId}:${addOpenClient?.token ?? "closed"}`}
         open={addOpen}
         onClose={() => {
           if (!addSelectionIsCurrent(addOpenClient)) return;

@@ -164,3 +164,86 @@ it("does not carry A's in-flight secret or completion into B's real Add Integrat
     .getByLabelText(/Credential/)).toHaveValue("");
   expect(rpc).toHaveBeenCalledTimes(1);
 });
+
+it("keeps a same-client reopened Add form's new secret when its old save completes", async () => {
+  useParams.mockReturnValue({ clientId: "client-1" });
+  from.mockImplementation(() => {
+    const query = {
+      select: () => query,
+      eq: () => query,
+      order: async () => ({ data: [], error: null }),
+    };
+    return query;
+  });
+  let finishOld: ((value: { error: null }) => void) | undefined;
+  rpc.mockImplementation(() => new Promise<{ error: null }>((resolve) => { finishOld = resolve; }));
+
+  render(<IntegrationsPanel />);
+  fireEvent.click(await screen.findByRole("button", { name: "Add" }));
+  const oldDialog = screen.getByRole("dialog", { name: "Add Integration" });
+  fireEvent.change(within(oldDialog).getByLabelText(/Provider/), { target: { value: "meta" } });
+  fireEvent.change(within(oldDialog).getByLabelText(/Credential/), { target: { value: "old-secret" } });
+  fireEvent.click(within(oldDialog).getByRole("button", { name: "Connect" }));
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("admin_store_integration_credential",
+    expect.objectContaining({ p_client_id: "client-1", p_secret: "old-secret" })));
+
+  fireEvent.click(within(oldDialog).getByRole("button", { name: "Cancel" }));
+  fireEvent.click(within(oldDialog).getByRole("button", { name: "Leave form" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  const newDialog = screen.getByRole("dialog", { name: "Add Integration" });
+  fireEvent.change(within(newDialog).getByLabelText(/Provider/), { target: { value: "instagram" } });
+  fireEvent.change(within(newDialog).getByLabelText(/Credential/), { target: { value: "new-secret" } });
+
+  await act(async () => { finishOld?.({ error: null }); });
+  expect(rpc).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("dialog", { name: "Add Integration" })).toBeInTheDocument();
+  expect(within(screen.getByRole("dialog", { name: "Add Integration" }))
+    .getByLabelText(/Credential/)).toHaveValue("new-secret");
+});
+
+it("keeps a same-client reopened Meta form's new page ID when its old save completes", async () => {
+  useParams.mockReturnValue({ clientId: "client-1" });
+  let finishOld: ((value: { error: null }) => void) | undefined;
+  const writes: Array<Array<[string, string]>> = [];
+  from.mockImplementation(() => {
+    const query = {
+      select: () => query,
+      eq: () => query,
+      order: async () => ({ data: [{ ...base, id: "meta-a", client_id: "client-1",
+        meta_page_id: "111" }], error: null }),
+      update: () => {
+        const filters: Array<[string, string]> = [];
+        writes.push(filters);
+        const updateQuery = {
+          eq: (field: string, value: string) => {
+            filters.push([field, value]);
+            return filters.length === 2
+              ? new Promise<{ error: null }>((resolve) => { finishOld = resolve; })
+              : updateQuery;
+          },
+        };
+        return updateQuery;
+      },
+    };
+    return query;
+  });
+
+  render(<IntegrationsPanel />);
+  fireEvent.click(await screen.findByRole("button", { name: "Page 111" }));
+  const oldDialog = screen.getByRole("dialog", { name: "Meta ad settings" });
+  fireEvent.change(within(oldDialog).getByLabelText(/Facebook page ID/), { target: { value: "333" } });
+  fireEvent.click(within(oldDialog).getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(writes).toEqual([[["id", "meta-a"], ["client_id", "client-1"]]]));
+
+  fireEvent.click(within(oldDialog).getByRole("button", { name: "Cancel" }));
+  fireEvent.click(within(oldDialog).getByRole("button", { name: "Leave form" }));
+  fireEvent.click(screen.getByRole("button", { name: "Page 111" }));
+  const newDialog = screen.getByRole("dialog", { name: "Meta ad settings" });
+  fireEvent.change(within(newDialog).getByLabelText(/Facebook page ID/), { target: { value: "555" } });
+
+  await act(async () => { finishOld?.({ error: null }); });
+  expect(writes).toHaveLength(1);
+  expect(screen.getByRole("dialog", { name: "Meta ad settings" })).toBeInTheDocument();
+  expect(within(screen.getByRole("dialog", { name: "Meta ad settings" }))
+    .getByLabelText(/Facebook page ID/)).toHaveValue("555");
+});
