@@ -172,11 +172,19 @@ describe("the buffer", () => {
   it("keeps a gap on both sides of something booked", async () => {
     await bookable({ slot_minutes: 60, buffer_minutes: 30, max_per_day: 10 });
     const before = await slots();
-    const target = before[2]!;
-    await db.query(`select book_appointment_v6($1,$2,'person')`, [LEAD, target.starts_at]);
+    // The first day may already be partly elapsed when CI runs. Select a
+    // future slot whose neighbours all exist in the same booking window.
+    const target = before.find((slot) => {
+      const start = at(slot.starts_at);
+      return [-1, 1, 2].every((hours) => before.some((candidate) =>
+        dayOf(candidate.starts_at) === dayOf(slot.starts_at)
+        && at(candidate.starts_at) === start + hours * 3600_000));
+    });
+    expect(target, "expected a future slot with neighbours before and after it").toBeDefined();
+    await db.query(`select book_appointment_v6($1,$2,'person')`, [LEAD, target!.starts_at]);
 
     const after = await slots();
-    const taken = at(target.starts_at);
+    const taken = at(target!.starts_at);
     // The slot itself, the one before and the one after are all gone: a
     // thirty-minute buffer overlaps an hour slot on each side.
     for (const offset of [-3600_000, 0, 3600_000]) {
