@@ -15394,6 +15394,62 @@ export type Database = {
           },
         ]
       }
+      production_release_approval_bindings_v6: {
+        Row: {
+          attestation_id: string
+          bound_at: string
+          decision_id: string
+          packet_sha256: string
+          request_id: string
+          source_version: string
+        }
+        Insert: {
+          attestation_id: string
+          bound_at?: string
+          decision_id: string
+          packet_sha256: string
+          request_id: string
+          source_version: string
+        }
+        Update: {
+          attestation_id?: string
+          bound_at?: string
+          decision_id?: string
+          packet_sha256?: string
+          request_id?: string
+          source_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_release_approval_bindings_v6_attestation_id_fkey"
+            columns: ["attestation_id"]
+            isOneToOne: false
+            referencedRelation: "production_release_attestations_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_release_approval_bindings_v6_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: true
+            referencedRelation: "approval_decision_events_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_release_approval_bindings_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_release_approval_bindings_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_release_attestations_v6: {
         Row: {
           attested_at: string
@@ -27966,6 +28022,10 @@ export type Database = {
       }
       recruitment_meta_build_source_state_v6: {
         Args: { p_request_id: string }
+        Returns: string
+      }
+      refresh_approved_production_release_attestation_v6: {
+        Args: { p_packet: Json; p_request_id: string }
         Returns: string
       }
       regenerate_asset: {

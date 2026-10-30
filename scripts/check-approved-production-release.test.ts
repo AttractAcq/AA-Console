@@ -28,6 +28,10 @@ test('uses the PR marker only as a locator and requires an independently verifie
   const result = await checkApprovedProductionRelease({ event: event(), ...context,
     supabaseUrl: 'https://example.supabase.co',
     serviceRoleKey: 'server-credential-from-trusted-workflow', token: 'github-token',
+    refresher: async (args: unknown) => {
+      calls.push(args)
+      return { requestId: REQUEST, attestationId: REQUEST }
+    },
     verifier: async (args: unknown) => {
       calls.push(args)
       return { requestId: REQUEST, prNumber: 271, headSha: HEAD, baseSha: BASE,
@@ -35,9 +39,12 @@ test('uses the PR marker only as a locator and requires an independently verifie
     },
   })
   assert.equal(result.requestId, REQUEST)
-  assert.equal(calls.length, 1)
+  assert.equal(calls.length, 2)
+  assert.equal((calls[0] as { refreshApproved: boolean }).refreshApproved, true)
+  assert.equal((calls[0] as { expectedHeadSha: string }).expectedHeadSha, HEAD)
   assert.equal((calls[0] as { trustedBaseCheckout: boolean }).trustedBaseCheckout, true)
-  assert.equal((calls[0] as { token: string }).token, 'github-token')
+  assert.equal((calls[1] as { trustedBaseCheckout: boolean }).trustedBaseCheckout, true)
+  assert.equal((calls[1] as { token: string }).token, 'github-token')
 })
 
 test('fails closed on a missing, duplicate or malformed release marker', () => {
@@ -67,8 +74,22 @@ test('rejects a PR head or base change after the event even when the request ID 
     { headSha: 'e'.repeat(40) }, { baseSha: 'f'.repeat(40) }, { prNumber: 272 },
   ]) {
     await assert.rejects(checkApprovedProductionRelease({ event: event(), ...context,
+      refresher: async () => ({ requestId: REQUEST }),
       verifier: async () => ({ requestId: REQUEST, prNumber: 271,
         headSha: HEAD, baseSha: BASE, ...mismatch }),
     }), /latest approved release differs/)
   }
+})
+
+test('does not read a green decision after refresh fails or returns another request', async () => {
+  let checks = 0
+  await assert.rejects(checkApprovedProductionRelease({ event: event(), ...context,
+    refresher: async () => { throw new Error('latest approved proof changed') },
+    verifier: async () => { checks++; return {} },
+  }), /latest approved proof changed/)
+  await assert.rejects(checkApprovedProductionRelease({ event: event(), ...context,
+    refresher: async () => ({ requestId: '22222222-2222-4222-8222-222222222222' }),
+    verifier: async () => { checks++; return {} },
+  }), /returned another release request/)
+  assert.equal(checks, 0)
 })

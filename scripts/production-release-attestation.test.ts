@@ -7,6 +7,8 @@ import {
 
 const UUID = '11111111-1111-4111-8111-111111111111'
 const SOURCE = '22222222-2222-4222-8222-222222222222'
+const DECISION = '33333333-3333-4333-8333-333333333333'
+const ATTESTATION = '44444444-4444-4444-8444-444444444444'
 const HEAD = 'a'.repeat(40)
 const BASE = 'b'.repeat(40)
 const HASH = 'c'.repeat(64)
@@ -109,6 +111,34 @@ test('fails before proof write when GitHub returns an advanced head', async () =
   assert.equal(writes, 0)
 })
 
+test('approved proof refresh self-verifies exact event commits before its server RPC', async () => {
+  const requests = []
+  const fetcher = async (url, options) => {
+    requests.push({ url, options })
+    const body = url.includes('/approval_requests_v6?')
+      ? [{ id: UUID, source_id: SOURCE, source_kind: 'production_release',
+        source_system: 'aa_console', source_version: HASH }]
+      : url.includes('/production_release_candidates_v6?')
+        ? [{ id: SOURCE, version_hash: HASH, candidate }]
+        : ATTESTATION
+    return { ok: true, status: 200, text: async () => JSON.stringify(body) }
+  }
+  const parameters = { requestId: UUID, supabaseUrl: 'https://example.supabase.co',
+    serviceRoleKey: 'secret-only-on-release-server', token: 'github-token',
+    fetcher, refreshApproved: true, trustedBaseCheckout: true,
+    expectedPrNumber: 271, expectedHeadSha: HEAD, expectedBaseSha: BASE,
+    verifier: async ({ trustedBaseCheckout }) => {
+      assert.equal(trustedBaseCheckout, true)
+      return packet
+    } }
+  const result = await attestProductionRelease(parameters)
+  assert.equal(result.attestationId, ATTESTATION)
+  assert.match(requests[2].url, /refresh_approved_production_release_attestation_v6$/)
+  await assert.rejects(attestProductionRelease({ ...parameters,
+    expectedHeadSha: 'd'.repeat(40) }), /differs from the exact event/)
+  assert.equal(requests.length, 5)
+})
+
 test('premerge assertion requires the current exact human decision and GitHub packet', async () => {
   const releaseCard = {
     id: UUID, source_system: 'aa_console', source_kind: 'production_release',
@@ -119,6 +149,7 @@ test('premerge assertion requires the current exact human decision and GitHub pa
     expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
   }
   let cardReads = 0
+  let boundDecision = DECISION
   const fetcher = async (url) => {
     let body
     if (url.includes('/approval_inbox_v6?')) { body = [releaseCard]; cardReads++ }
@@ -129,7 +160,11 @@ test('premerge assertion requires the current exact human decision and GitHub pa
       request_id: UUID, source_version: HASH, packet, packet_sha256: HASH,
       attested_at: new Date().toISOString(),
     }]
-    else body = [{ request_id: UUID, decision: 'approved', actor_id: UUID,
+    else if (url.includes('/production_release_approval_bindings_v6?')) body = [{
+      request_id: UUID, decision_id: boundDecision, attestation_id: ATTESTATION,
+      source_version: HASH, packet_sha256: HASH,
+    }]
+    else body = [{ id: DECISION, request_id: UUID, decision: 'approved', actor_id: UUID,
       actor_aal: 'aal2', artifact_hash: HASH, event_order: 1 }]
     return { ok: true, status: 200, text: async () => JSON.stringify(body) }
   }
@@ -140,6 +175,10 @@ test('premerge assertion requires the current exact human decision and GitHub pa
   assert.equal(result.headSha, HEAD)
   assert.equal(result.baseSha, BASE)
   assert.equal(cardReads, 2)
+  boundDecision = '55555555-5555-4555-8555-555555555555'
+  await assert.rejects(verifyApprovedProductionRelease({ ...parameters,
+    verifier: async () => packet }), /human approval is not bound/)
+  boundDecision = DECISION
   await assert.rejects(verifyApprovedProductionRelease({ ...parameters,
     verifier: async () => ({ ...packet, pr: { ...packet.pr,
       base: { ...packet.pr.base, sha: HEAD } } }) }),
@@ -166,7 +205,11 @@ test('premerge assertion fails if the human revokes while GitHub is being rechec
       request_id: UUID, source_version: HASH, packet, packet_sha256: HASH,
       attested_at: new Date().toISOString(),
     }]
-    else body = [{ request_id: UUID, decision: 'approved', actor_id: UUID,
+    else if (url.includes('/production_release_approval_bindings_v6?')) body = [{
+      request_id: UUID, decision_id: DECISION, attestation_id: ATTESTATION,
+      source_version: HASH, packet_sha256: HASH,
+    }]
+    else body = [{ id: DECISION, request_id: UUID, decision: 'approved', actor_id: UUID,
       actor_aal: 'aal2', artifact_hash: HASH, event_order: 1 }]
     return { ok: true, status: 200, text: async () => JSON.stringify(body) }
   }
@@ -197,9 +240,13 @@ test('final decision re-read blocks a revocation even if the card projection rem
       request_id: UUID, source_version: HASH, packet, packet_sha256: HASH,
       attested_at: new Date().toISOString(),
     }]
+    else if (url.includes('/production_release_approval_bindings_v6?')) body = [{
+      request_id: UUID, decision_id: DECISION, attestation_id: ATTESTATION,
+      source_version: HASH, packet_sha256: HASH,
+    }]
     else {
       decisionReads++
-      body = [{ request_id: UUID,
+      body = [{ id: DECISION, request_id: UUID,
         decision: decisionReads === 1 ? 'approved' : 'revoked',
         actor_id: UUID, actor_aal: 'aal2', artifact_hash: HASH,
         event_order: decisionReads }]

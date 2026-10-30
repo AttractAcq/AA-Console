@@ -5,7 +5,9 @@
 import { readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { verifyApprovedProductionRelease } from './production-release-attestation.mjs'
+import {
+  attestProductionRelease, verifyApprovedProductionRelease,
+} from './production-release-attestation.mjs'
 
 const REPOSITORY = 'AttractAcq/AA-Console'
 const SHA = /^[0-9a-f]{40}$/
@@ -40,8 +42,16 @@ export function releaseRequestFromEvent(event, { eventName, repository, eventSha
 export async function checkApprovedProductionRelease({
   event, eventName, repository, eventSha, checkoutDir = process.cwd(),
   supabaseUrl, serviceRoleKey, token, verifier = verifyApprovedProductionRelease,
+  refresher = attestProductionRelease,
 }) {
   const expected = releaseRequestFromEvent(event, { eventName, repository, eventSha })
+  const refreshed = await refresher({ requestId: expected.requestId,
+    checkoutDir: resolve(checkoutDir), supabaseUrl, serviceRoleKey, token,
+    refreshApproved: true, trustedBaseCheckout: true,
+    expectedPrNumber: expected.prNumber,
+    expectedHeadSha: expected.headSha, expectedBaseSha: expected.baseSha })
+  if (refreshed.requestId !== expected.requestId)
+    fail('trusted proof refresh returned another release request')
   const result = await verifier({ requestId: expected.requestId,
     checkoutDir: resolve(checkoutDir), supabaseUrl, serviceRoleKey, token,
     trustedBaseCheckout: true })

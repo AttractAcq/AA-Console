@@ -1,7 +1,9 @@
 name: Production release approval
 
-# Held bootstrap: this check is read-only. Main protection must require its
-# exact job after the credential and no-bypass release policy are reviewed.
+# Held bootstrap: this check refreshes only an already human-approved exact
+# GitHub packet in the approval ledger. It performs no merge or deployment.
+# Main protection must require its exact job after credential custody and the
+# no-bypass release policy are reviewed.
 on:
   pull_request_target:
     branches: [main]
