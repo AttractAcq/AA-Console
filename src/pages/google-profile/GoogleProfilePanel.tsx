@@ -9,9 +9,12 @@ import { FormModal } from "../../components/forms/FormModal";
 import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
+import { PROFILE_FIELD_PATCH_HOLD } from "../../../agent-runtime/src/profiles/prewrite-gate.js";
 
 type Location = Database["public"]["Tables"]["client_google_locations"]["Row"];
 type ProfileDue = Database["public"]["Views"]["google_profile_due"]["Row"];
+type ProfileChange = Pick<Database["public"]["Tables"]["google_profile_changes"]["Row"],
+  "id" | "location_id" | "field" | "current_value" | "proposed_value" | "status">;
 type Review = Database["public"]["Tables"]["google_reviews"]["Row"];
 type Reply = Database["public"]["Tables"]["google_review_replies"]["Row"];
 type Placement = Database["public"]["Tables"]["proof_placements"]["Row"];
@@ -40,6 +43,7 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
   const [locations, setLocations] = useState<Location[]>([]);
   const [due, setDue] = useState<ReadonlyMap<string, ProfileDue>>(new Map());
+  const [changes, setChanges] = useState<ProfileChange[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
@@ -56,13 +60,16 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
       return;
     }
     try {
-      const [locs, board, revs, reps, place] = await Promise.all([
+      const [locs, board, proposed, revs, reps, place] = await Promise.all([
         supabase
           .from("client_google_locations")
           .select("*")
           .eq("client_id", clientId)
           .order("created_at", { ascending: false }),
         supabase.from("google_profile_due").select("*").eq("client_id", clientId),
+        supabase.from("google_profile_changes")
+          .select("id,location_id,field,current_value,proposed_value,status")
+          .eq("client_id", clientId).order("created_at", { ascending: false }).limit(100),
         supabase
           .from("google_reviews")
           .select("*")
@@ -77,11 +84,12 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
           .eq("destination_key", "google_business_profile")
           .order("created_at", { ascending: false }),
       ]);
-      for (const result of [locs, board, revs, reps, place]) {
+      for (const result of [locs, board, proposed, revs, reps, place]) {
         if (result.error) throw new Error(result.error.message);
       }
       setLocations(locs.data ?? []);
       setDue(new Map((board.data ?? []).map((r) => [String(r.location_id), r])));
+      setChanges(proposed.data ?? []);
       setReviews(revs.data ?? []);
       setReplies(reps.data ?? []);
       setPlacements(place.data ?? []);
@@ -123,6 +131,9 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
 
       {tab === "location" && (
         <div className="space-y-4">
+          <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+            {PROFILE_FIELD_PATCH_HOLD}
+          </p>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
             <div>
               <p className="text-sm font-medium">
@@ -131,8 +142,9 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
                   : `${locations.length} location${locations.length === 1 ? "" : "s"} connected`}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Reading a profile is not changing one. Every field change and every reply waits
-                for a person, and proof reaches the profile through Proof Distribution.
+                Reading a profile is not changing one. Profile field proposals stay recorded
+                under the hold above. Review replies require their own decision, and proof
+                reaches the profile through Proof Distribution.
               </p>
             </div>
             <Button onClick={() => setConnecting(true)}>Connect a location</Button>
@@ -170,7 +182,7 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
                         : "mt-3 text-sm text-brand-strong"
                     }
                   >
-                    {board?.blocker ?? "Readable, and nothing is blocking a change."}
+                    {board?.blocker ?? "No location-read blocker was reported."}
                   </p>
 
                   <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-4">
@@ -203,8 +215,8 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
 
                   {(location.missing_fields ?? []).length > 0 && (
                     <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
-                      Missing from the profile: {(location.missing_fields ?? []).join(", ")}. Each
-                      is an approved change, not an edit this page makes by itself.
+                      Missing from the profile: {(location.missing_fields ?? []).join(", ")}. A
+                      field proposal is recorded for review; automatic field PATCH is held.
                     </p>
                   )}
                   <p className="mt-2 text-xs text-muted-foreground">
@@ -214,6 +226,36 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
               );
             })
           )}
+          <section className="space-y-3 rounded-lg border border-border bg-card p-4">
+            <div>
+              <h3 className="font-semibold">Recent recorded field proposals</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Approval in the older profile-change table does not authorize a provider PATCH.
+                These records need an exact Approval Inbox decision and prewrite verification.
+              </p>
+            </div>
+            <DataTable
+              columns={["Location", "Field", "Current", "Proposed", "Record status", "Execution"]}
+              emptyLabel={loading ? "Loading…" : "No profile field proposal has been recorded"}
+              rows={changes.map((change) => [
+                <span key="location" className="text-xs">
+                  {locations.find((location) => location.id === change.location_id)?.title ?? "Unknown location"}
+                </span>,
+                <span key="field">{change.field.replace(/_/g, " ")}</span>,
+                <span key="current" className="text-xs">{change.current_value ?? "empty"}</span>,
+                <span key="proposed" className="text-xs">{change.proposed_value}</span>,
+                <span key="status">{change.status.replace(/_/g, " ")}</span>,
+                <span key="execution" className={change.status === "applied"
+                  ? "text-xs text-muted-foreground" : "text-xs text-destructive"}>
+                  {change.status === "applied"
+                    ? "Recorded as applied; external readback remains separate."
+                    : change.status === "rejected"
+                      ? "Rejected; no field PATCH."
+                      : "Held; no field PATCH will be claimed."}
+                </span>,
+              ])}
+            />
+          </section>
         </div>
       )}
 

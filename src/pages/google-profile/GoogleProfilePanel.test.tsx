@@ -47,15 +47,23 @@ const review = (over: Record<string, unknown> = {}) => ({
   created_at: "2026-10-24T09:00:00Z", ...over,
 });
 
+const change = (over: Record<string, unknown> = {}) => ({
+  id: "change-1", client_id: "client-1", location_id: "loc-1",
+  field: "description", current_value: "Old description", proposed_value: "New description",
+  status: "approved", attempts: 0, applied_at: null, last_error: null,
+  created_at: "2026-10-24T09:00:00Z", ...over,
+});
+
 function database(options: {
   locations?: unknown[]; due?: unknown[]; reviews?: unknown[];
-  replies?: unknown[]; placements?: unknown[];
+  replies?: unknown[]; placements?: unknown[]; changes?: unknown[];
 } = {}) {
   from.mockImplementation((table: string) => {
     const payload = () => {
       switch (table) {
         case "client_google_locations": return options.locations ?? [location()];
         case "google_profile_due": return options.due ?? [due()];
+        case "google_profile_changes": return options.changes ?? [];
         case "google_reviews": return options.reviews ?? [review()];
         case "google_review_replies": return options.replies ?? [];
         default: return options.placements ?? [];
@@ -82,10 +90,22 @@ beforeEach(() => {
 });
 
 describe("the location", () => {
-  it("shows what is missing as approved changes rather than edits", async () => {
+  it("shows missing fields without promising an approved provider PATCH", async () => {
     render(<GoogleProfilePanel tab="location" />);
     expect(await screen.findByText(/Missing from the profile: services, hours/)).toBeInTheDocument();
-    expect(screen.getByText(/not an edit this page makes by itself/)).toBeInTheDocument();
+    expect(screen.getByText(/automatic field PATCH is held/)).toBeInTheDocument();
+    expect(screen.getByText("No location-read blocker was reported.")).toBeInTheDocument();
+    expect(screen.queryByText(/nothing is blocking a change/)).not.toBeInTheDocument();
+  });
+
+  it("marks a formerly approved field proposal held even when the location read has no blocker", async () => {
+    database({ changes: [change()] });
+    render(<GoogleProfilePanel tab="location" />);
+    expect(await screen.findByText("New description")).toBeInTheDocument();
+    expect(screen.getByText("Old description")).toBeInTheDocument();
+    expect(screen.getByText("Held; no field PATCH will be claimed.")).toBeInTheDocument();
+    expect(screen.getByText(/exact-version AAL2 Approval Inbox decision/)).toBeInTheDocument();
+    expect(from).toHaveBeenCalledWith("google_profile_changes");
   });
 
   it("leads with the blocker when the credential cannot see the location", async () => {

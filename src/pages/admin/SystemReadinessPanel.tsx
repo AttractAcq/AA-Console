@@ -41,6 +41,7 @@ type Snapshot = {
   runtime: {
     sha: string | null;
     switches: Record<string, boolean>;
+    actionHolds?: { profileFieldPatch?: { state: "held"; reason: string } };
     credentialPresence: Record<string, boolean>;
     heartbeats: Observation<{
       workerId: string; sha: string | null; reportedVersion: string | null;
@@ -209,6 +210,16 @@ export function SystemReadinessPanel() {
             <dl className="mt-2 space-y-1 text-sm">{Object.entries(snapshot.runtime.credentialPresence).map(([key, value]) =>
               <div key={key} className="flex justify-between gap-3"><dt>{key}</dt><dd>{value ? "Present" : "Missing"}</dd></div>)}</dl>
           </div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4 text-sm">
+          <h3 className="font-medium">Profile field PATCH</h3>
+          <p className="mt-1 font-medium text-destructive">
+            {snapshot.runtime.actionHolds?.profileFieldPatch?.state === "held" ? "Held" : "Unknown"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {snapshot.runtime.actionHolds?.profileFieldPatch?.reason
+              ?? "This runtime has not reported whether profile field writes are held."}
+          </p>
         </div>
         <ObservationMessage observation={snapshot.global} />
         {snapshot.global.value && <div className="rounded-lg border border-border bg-card p-4 text-sm">

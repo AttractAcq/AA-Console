@@ -88,6 +88,10 @@ describe("B001 system inventory", () => {
     expect(snapshot.runtime.sha).toBe(SHA);
     expect(snapshot.runtime.heartbeats.value?.[0]).toMatchObject({ isLive: false, enabled: true, sha: SHA });
     expect(snapshot.runtime.credentialPresence).toMatchObject({ anthropic: true, openai: true });
+    expect(snapshot.runtime.actionHolds.profileFieldPatch).toMatchObject({
+      state: "held",
+      reason: expect.stringMatching(/exact-version AAL2 Approval Inbox decision/),
+    });
     expect(snapshot.gateway.state).toBe("unknown");
     expect(snapshot.global.value?.engineEnabled).toBe(false);
     expect(snapshot.global.value?.campaignActionExecutors).toContainEqual({

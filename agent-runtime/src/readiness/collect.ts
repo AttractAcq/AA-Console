@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
+import { PROFILE_FIELD_PATCH_HOLD } from "../profiles/prewrite-gate.js";
 import { deployedCommitSha } from "./version.js";
 import { HANDLERS } from "../campaigns/actions/executor.js";
 import { inspectCampaignActionRegistry } from "../campaigns/actions/support.js";
@@ -101,6 +102,7 @@ export type SystemReadinessSnapshot = {
   runtime: {
     sha: string | null;
     switches: Record<string, boolean>;
+    actionHolds: { profileFieldPatch: { state: "held"; reason: string } };
     credentialPresence: Record<string, boolean>;
     heartbeats: Observation<Heartbeat[]>;
   };
@@ -481,6 +483,9 @@ export async function collectSystemReadiness(
     },
     runtime: {
       sha: deployedCommitSha(env),
+      actionHolds: {
+        profileFieldPatch: { state: "held", reason: PROFILE_FIELD_PATCH_HOLD },
+      },
       switches: {
         workers: config.enabled,
         workflow: config.workflowEnabled,
