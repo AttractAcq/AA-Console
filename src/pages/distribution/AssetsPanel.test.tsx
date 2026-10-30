@@ -68,6 +68,8 @@ describe("what the tab is for", () => {
   it("counts what still has no date", async () => {
     render(<AssetsPanel />);
     expect(await screen.findByText(/1 still has no date/i)).toBeInTheDocument();
+    expect(screen.getByText(/A post created here has no approved Engine slot and stays blocked/i))
+      .toBeInTheDocument();
   });
 
   it("says so when everything is scheduled", async () => {
@@ -76,6 +78,7 @@ describe("what the tab is for", () => {
     );
     render(<AssetsPanel />);
     expect(await screen.findByText(/All of it is scheduled/i)).toBeInTheDocument();
+    expect(screen.queryByText(/ready to go out/i)).not.toBeInTheDocument();
   });
 });
 

@@ -91,6 +91,8 @@ describe("the board", () => {
     render(<DistributionBoard channel="organic" />);
     expect(await screen.findByText("Instagram")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Platform" })).toBeInTheDocument();
+    expect(screen.getByText(/A post without an approved Engine slot stays blocked/i))
+      .toBeInTheDocument();
   });
 
   // The month calendar also prints the asset code when the post falls in

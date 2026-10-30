@@ -53,6 +53,18 @@ type Snapshot = {
       accountIds: Record<string, string | null>;
     }[];
   }[]>;
+  publicPerimeter?: Observation<{
+    asOf: string; budgetDay: string;
+    quotaLastHour: { route: string; bucketKind: string; activeBuckets: number; countedAttempts: number }[];
+    budgetsToday: { deploymentId: string; messages: number; committedUsd: number;
+      heldUsd: number; uncertainCount: number }[];
+    unresolvedUncertain: number;
+  }>;
+  requestProxy?: {
+    directPeer: string | null; forwardedHops: string[];
+    chainStatus: "absent" | "invalid" | "ignored_untrusted_peer" | "trusted_peer";
+    trustedProxyCount: number; signedIngressRequired: boolean; callerIpUsedForQuota: string | null;
+  };
 };
 
 function stamp(value: string | null | undefined): string {
@@ -90,6 +102,7 @@ export function SystemReadinessPanel() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [budgetPage, setBudgetPage] = useState(0);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -97,6 +110,7 @@ export function SystemReadinessPanel() {
     try {
       const result = await readRuntime<Snapshot>("/admin/system-readiness");
       setSnapshot(result);
+      setBudgetPage(0);
     } catch (cause) {
       setSnapshot(null);
       setError(cause instanceof Error ? cause.message : "System readiness is unavailable.");
@@ -200,6 +214,70 @@ export function SystemReadinessPanel() {
             <ul className="mt-2 space-y-1">{snapshot.database.value.cronJobs.map((job) =>
               <li key={job.name} className="flex flex-wrap justify-between gap-2"><span>{job.name}</span><span>{job.active ? "Active" : "Inactive"} · {job.schedule}</span></li>)}</ul>}
         </div>}
+      </section>
+
+      <section aria-label="Public acquisition perimeter" className="space-y-3">
+        <h2 className="text-lg font-semibold">Public acquisition perimeter</h2>
+        {snapshot.requestProxy && <div className="rounded-lg border border-border bg-card p-4 text-sm">
+          <h3 className="font-medium">This admin request's proxy path</h3>
+          <p className="mt-2">Direct socket peer: <code>{snapshot.requestProxy.directPeer ?? "Invalid"}</code></p>
+          <p className="mt-1">Forwarded chain: {snapshot.requestProxy.chainStatus.replaceAll("_", " ")}; {snapshot.requestProxy.forwardedHops.length ?
+            snapshot.requestProxy.forwardedHops.map((hop, index) => <code key={`${index}-${hop}`} className="mr-2">{hop}</code>) : "no valid hops"}</p>
+          <p className="mt-1">Configured trusted proxy CIDRs: {snapshot.requestProxy.trustedProxyCount}. Signed public ingress: {snapshot.requestProxy.signedIngressRequired ? "required" : "off"}.</p>
+          <p className="mt-1">Public quota identity: {snapshot.requestProxy.signedIngressRequired ?
+            "verified signed client IP from the isolated ingress" :
+            <>direct socket peer fallback; this admin request resolves to <code>{snapshot.requestProxy.callerIpUsedForQuota ?? "Refused"}</code></>}.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Only this authenticated admin request is inspected. The raw forwarding header is never returned or logged. Railway does not publish stable ingress proxy CIDRs; this chain is diagnostic, not proof of trust.</p>
+        </div>}
+        {!snapshot.publicPerimeter && <p className="text-sm text-muted-foreground">This runtime build has no public perimeter inventory.</p>}
+        {snapshot.publicPerimeter && <ObservationMessage observation={snapshot.publicPerimeter} />}
+        {snapshot.publicPerimeter?.value && <>
+          <p className="text-xs text-muted-foreground">Checked {stamp(snapshot.publicPerimeter.value.asOf)}. Counted attempts are capped within each quota bucket; they are not a count of every refused request. These aggregate metrics contain no caller IP or token handles.</p>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <Fact label="Unresolved paid requests" observedAt={snapshot.publicPerimeter.checkedAt}>
+              {snapshot.publicPerimeter.value.unresolvedUncertain}
+            </Fact>
+            <Fact label={`Held paid budget · ${snapshot.publicPerimeter.value.budgetDay}`} observedAt={snapshot.publicPerimeter.checkedAt}>
+              ${snapshot.publicPerimeter.value.budgetsToday.reduce((sum, row) => sum + row.heldUsd, 0).toFixed(2)}
+            </Fact>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-border bg-card p-4">
+            <h3 className="font-medium">Quota buckets · last hour</h3>
+            {snapshot.publicPerimeter.value.quotaLastHour.length === 0 ?
+              <p className="mt-2 text-sm text-muted-foreground">No public POST attempts recorded.</p> :
+              <table className="mt-2 w-full text-left text-sm"><thead><tr>
+                <th className="p-2">Route</th><th className="p-2">Bucket</th>
+                <th className="p-2">Active buckets</th><th className="p-2">Counted attempts</th>
+              </tr></thead><tbody>{snapshot.publicPerimeter.value.quotaLastHour.map((row) =>
+                <tr key={`${row.route}-${row.bucketKind}`} className="border-t border-border">
+                  <td className="p-2 font-mono text-xs">{row.route}</td><td className="p-2">{row.bucketKind}</td>
+                  <td className="p-2">{row.activeBuckets}</td><td className="p-2">{row.countedAttempts}</td>
+                </tr>)}</tbody></table>}
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-border bg-card p-4">
+            <h3 className="font-medium">Paid widget budgets · {snapshot.publicPerimeter.value.budgetDay}</h3>
+            {snapshot.publicPerimeter.value.budgetsToday.length === 0 ?
+              <p className="mt-2 text-sm text-muted-foreground">No paid widget reservations today.</p> : <>
+              <table className="mt-2 w-full text-left text-sm"><thead><tr>
+                <th className="p-2">Deployment</th><th className="p-2">Messages</th>
+                <th className="p-2">Settled USD</th><th className="p-2">Held USD</th>
+                <th className="p-2">Uncertain today</th>
+              </tr></thead><tbody>{snapshot.publicPerimeter.value.budgetsToday.slice(budgetPage * 20, budgetPage * 20 + 20).map((row) =>
+                <tr key={row.deploymentId} className="border-t border-border">
+                  <td className="p-2 font-mono text-xs">{row.deploymentId}</td><td className="p-2">{row.messages}</td>
+                  <td className="p-2">${row.committedUsd.toFixed(4)}</td>
+                  <td className="p-2">${row.heldUsd.toFixed(4)}</td><td className="p-2">{row.uncertainCount}</td>
+                </tr>)}</tbody></table>
+              <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>Showing {budgetPage * 20 + 1}–{Math.min((budgetPage + 1) * 20, snapshot.publicPerimeter.value.budgetsToday.length)} of {snapshot.publicPerimeter.value.budgetsToday.length}</span>
+                <div className="flex gap-2">
+                  <Button disabled={budgetPage === 0} onClick={() => setBudgetPage((page) => page - 1)}>Previous</Button>
+                  <Button disabled={(budgetPage + 1) * 20 >= snapshot.publicPerimeter.value.budgetsToday.length} onClick={() => setBudgetPage((page) => page + 1)}>Next</Button>
+                </div>
+              </div></>}
+            <p className="mt-2 text-xs text-muted-foreground">These are runtime cost estimates, not provider billing receipts. An uncertain reserve stays held until verified against provider usage.</p>
+          </div>
+        </>}
       </section>
 
       <section aria-label="Client configuration" className="space-y-3">

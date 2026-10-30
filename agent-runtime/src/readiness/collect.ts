@@ -46,6 +46,19 @@ type ClientInventory = {
   }[];
 };
 
+type PublicPerimeter = {
+  asOf: string;
+  budgetDay: string;
+  quotaLastHour: {
+    route: string; bucketKind: string; activeBuckets: number; countedAttempts: number;
+  }[];
+  budgetsToday: {
+    deploymentId: string; messages: number; committedUsd: number;
+    heldUsd: number; uncertainCount: number;
+  }[];
+  unresolvedUncertain: number;
+};
+
 export type SystemReadinessSnapshot = {
   schemaVersion: 1;
   capturedAt: string;
@@ -74,6 +87,7 @@ export type SystemReadinessSnapshot = {
     messageChannels: { key: string; transport: string; supported: boolean; canInitiate: boolean }[];
   }>;
   clients: Observation<ClientInventory[]>;
+  publicPerimeter: Observation<PublicPerimeter>;
 };
 
 function observed<T>(value: T): Observation<T> {
@@ -309,6 +323,63 @@ async function clients(sb: SupabaseClient): Promise<Observation<ClientInventory[
   }
 }
 
+/** The SQL feed is bounded to 200 deployments per page and contains no IP or
+ * token handles. The admin route authenticates before calling this collector. */
+async function publicPerimeter(sb: SupabaseClient): Promise<Observation<PublicPerimeter>> {
+  try {
+    const budgetsToday: PublicPerimeter["budgetsToday"] = [];
+    let cursor: string | null = null;
+    let first: Record<string, unknown> | null = null;
+    const visited = new Set<string>();
+    for (let page = 0; page < 100; page += 1) {
+      const { data, error } = await sb.rpc("public_perimeter_status_v6", {
+        p_limit: 200, p_after_deployment_id: cursor,
+      });
+      if (error) throw new Error("public perimeter RPC unavailable");
+      const raw = record(data);
+      if (!Array.isArray(raw.quotaLastHour) || !Array.isArray(raw.budgetsToday)
+          || typeof raw.asOf !== "string" || typeof raw.budgetDay !== "string"
+          || asNumber(raw.unresolvedUncertain) === null)
+        throw new Error("public perimeter response invalid");
+      if (!first) first = raw;
+      budgetsToday.push(...raw.budgetsToday.map((value) => {
+        const row = record(value);
+        const messages = asNumber(row.messages);
+        const committedUsd = asNumber(row.committedUsd);
+        const heldUsd = asNumber(row.heldUsd);
+        const uncertainCount = asNumber(row.uncertainCount);
+        if (typeof row.deploymentId !== "string" || messages === null ||
+            committedUsd === null || heldUsd === null || uncertainCount === null)
+          throw new Error("public budget response invalid");
+        return { deploymentId: row.deploymentId, messages, committedUsd, heldUsd, uncertainCount };
+      }));
+      const next = raw.nextDeploymentCursor;
+      if (next === null) {
+        const quotaLastHour = (first.quotaLastHour as unknown[]).map((value) => {
+          const row = record(value);
+          const activeBuckets = asNumber(row.activeBuckets);
+          const countedAttempts = asNumber(row.countedAttempts);
+          if (typeof row.route !== "string" || typeof row.bucketKind !== "string"
+              || activeBuckets === null || countedAttempts === null)
+            throw new Error("public quota response invalid");
+          return { route: row.route, bucketKind: row.bucketKind, activeBuckets, countedAttempts };
+        });
+        return observed({
+          asOf: first.asOf as string, budgetDay: first.budgetDay as string,
+          quotaLastHour, budgetsToday,
+          unresolvedUncertain: first.unresolvedUncertain as number,
+        });
+      }
+      if (typeof next !== "string" || visited.has(next)) throw new Error("public perimeter cursor invalid");
+      visited.add(next);
+      cursor = next;
+    }
+    throw new Error("public perimeter inventory exceeds 20,000 deployments");
+  } catch {
+    return failed("Public route quotas or paid widget budgets could not be verified.");
+  }
+}
+
 async function gateway(config: RuntimeConfig, fetcher: typeof fetch): Promise<SystemReadinessSnapshot["gateway"]> {
   if (!config.gatewayUrl || !config.mcpServiceSecret)
     return unknown("Gateway URL or service credential is not configured for a probe.");
@@ -342,8 +413,9 @@ export async function collectSystemReadiness(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<SystemReadinessSnapshot> {
   const capturedAt = new Date().toISOString();
-  const [heartbeatResult, catalogResult, globalResult, clientResult, gatewayResult] = await Promise.all([
+  const [heartbeatResult, catalogResult, globalResult, clientResult, gatewayResult, perimeterResult] = await Promise.all([
     heartbeats(sb), catalog(sb), globalConfiguration(sb), clients(sb), gateway(config, fetcher),
+    publicPerimeter(sb),
   ]);
   return {
     schemaVersion: 1,
@@ -379,5 +451,6 @@ export async function collectSystemReadiness(
     database: catalogResult,
     global: globalResult,
     clients: clientResult,
+    publicPerimeter: perimeterResult,
   };
 }
