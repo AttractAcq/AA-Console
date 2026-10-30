@@ -215,6 +215,8 @@ beforeAll(async () => {
     "20261101100000_293_trusted_production_release_decision.sql"));
   await db.exec(await migration(
     "20261101120000_295_approved_release_proof_refresh.sql"));
+  await db.exec(await migration(
+    "20261101140000_297_production_release_merge_lease.sql"));
   await db.exec("set timezone='UTC'");
 }, 60_000);
 
@@ -304,7 +306,7 @@ describe("production release candidate Inbox migration 288", () => {
       executor_state: string; overall_status: string;
     }>("authenticated", ADMIN, "aal2",
       "select revision,source_state,decision_state,executor_state,overall_status from public.approval_class_coverage_v6 where class_id=32");
-    expect(coverage).toMatchObject({ revision: 4, source_state: "blocked",
+    expect(coverage).toMatchObject({ revision: 5, source_state: "blocked",
       decision_state: "blocked", executor_state: "missing", overall_status: "blocked" });
     await expect(db.query("update public.production_release_candidates_v6 set expires_at=now() where id=$1", [id]))
       .rejects.toThrow(/append-only/);
@@ -654,5 +656,115 @@ describe("trusted exact-version production release decision migration 293", () =
     await expect(asRole("service_role", null, "aal1", refresh,
       [card.id, JSON.stringify(proof)]))
       .rejects.toThrow(/approval is absent or revoked/);
+  });
+
+  it("leases only a current exact approved PR and serializes human revocation", async () => {
+    const { source, card } = await submitted("304");
+    const proof = packet(source);
+    await attest(card.id, proof);
+    const acquire = "select public.acquire_production_release_merge_lease_v6($1,$2,$3,$4,$5,$6,$7) as id";
+    const args = [card.id, card.source_version, proof.packetSha256, 304,
+      HEAD, BASE, "squash"];
+    await expect(asRole("service_role", null, "aal1", acquire, args))
+      .rejects.toThrow(/approval or proof is not current/);
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,$4,'approved','')",
+      [card.id, card.source_version, card.artifact_hash, proof.packetSha256]);
+    await expect(asRole("authenticated", ADMIN, "aal2", acquire, args))
+      .rejects.toThrow(/permission denied|Only the trusted release merger/);
+    for (const mismatched of [
+      [card.id, card.source_version, "f".repeat(64), 304, HEAD, BASE, "squash"],
+      [card.id, card.source_version, proof.packetSha256, 304, BASE, BASE, "squash"],
+      [card.id, card.source_version, proof.packetSha256, 304, HEAD, BASE, "merge"],
+    ]) await expect(asRole("service_role", null, "aal1", acquire, mismatched))
+      .rejects.toThrow(/source or expected GitHub plan changed|approval or proof is not current/);
+    const [lease] = await asRole<{ id: string }>("service_role", null,
+      "aal1", acquire, args);
+    expect(lease!.id).toMatch(/^[0-9a-f-]{36}$/);
+    await expect(asRole("service_role", null, "aal1", acquire, args))
+      .rejects.toThrow(/unresolved or completed merge attempt/);
+    const revoke = "select public.decide_production_release_candidate_v6($1,$2,$3,'','revoked',$4)";
+    const revokeArgs = [card.id, card.source_version, card.artifact_hash,
+      "Withdraw before merge"];
+    await expect(asRole("authenticated", ADMIN, "aal2", revoke, revokeArgs))
+      .rejects.toThrow(/Release merge is in progress/);
+    await asRole("service_role", null, "aal1",
+      "select public.abort_production_release_merge_lease_v6($1,$2)",
+      [lease!.id, "Protected check went red before dispatch"]);
+    const [retry] = await asRole<{ id: string }>("service_role", null,
+      "aal1", acquire, args);
+    expect(retry!.id).not.toBe(lease!.id);
+    await asRole("service_role", null, "aal1",
+      "select public.abort_production_release_merge_lease_v6($1,$2)",
+      [retry!.id, "Second pre-dispatch check changed"]);
+    await asRole("authenticated", ADMIN, "aal2", revoke, revokeArgs);
+    const [state] = await asRole<{ state: string; abort_reason: string }>(
+      "service_role", null, "aal1",
+      "select state,abort_reason from public.production_release_merge_leases_v6 where id=$1",
+      [lease!.id]);
+    expect(state).toMatchObject({ state: "aborted",
+      abort_reason: "Protected check went red before dispatch" });
+    const events = await asRole<{ state: string }>("service_role", null,
+      "aal1", "select state from public.production_release_merge_lease_events_v6 where lease_id=$1 order by event_order",
+      [lease!.id]);
+    expect(events.map((event) => event.state)).toEqual(["active", "aborted"]);
+    await expect(asRole("service_role", null, "aal1", acquire, args))
+      .rejects.toThrow(/approval or proof is not current/);
+  });
+
+  it("holds a dispatched merge until its exact GitHub outcome is reconciled", async () => {
+    const { source, card } = await submitted("305");
+    const proof = packet(source);
+    await attest(card.id, proof);
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,$4,'approved','')",
+      [card.id, card.source_version, card.artifact_hash, proof.packetSha256]);
+    const [lease] = await asRole<{ id: string }>("service_role", null, "aal1",
+      "select public.acquire_production_release_merge_lease_v6($1,$2,$3,$4,$5,$6,$7) as id",
+      [card.id, card.source_version, proof.packetSha256, 305, HEAD, BASE, "squash"]);
+    await asRole("service_role", null, "aal1",
+      "select public.dispatch_production_release_merge_lease_v6($1)", [lease!.id]);
+    await expect(asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,'','revoked',$4)",
+      [card.id, card.source_version, card.artifact_hash, "Stop release"]))
+      .rejects.toThrow(/Release merge is in progress/);
+    await expect(asRole("service_role", null, "aal1",
+      "select public.abort_production_release_merge_lease_v6($1,$2)",
+      [lease!.id, "Ambiguous GitHub response"]))
+      .rejects.toThrow(/cannot be aborted without GitHub reconciliation/);
+    await expect(asRole("service_role", null, "aal1",
+      "select public.complete_production_release_merge_lease_v6($1,$2)",
+      [lease!.id, "short-sha"]))
+      .rejects.toThrow(/commit SHA is invalid/);
+    await asRole("service_role", null, "aal1",
+      "select public.complete_production_release_merge_lease_v6($1,$2)",
+      [lease!.id, "d".repeat(40)]);
+    const [state] = await asRole<{ state: string; observed_merge_sha: string }>(
+      "service_role", null, "aal1",
+      "select state,observed_merge_sha from public.production_release_merge_leases_v6 where id=$1",
+      [lease!.id]);
+    expect(state).toMatchObject({ state: "completed",
+      observed_merge_sha: "d".repeat(40) });
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,'','revoked',$4)",
+      [card.id, card.source_version, card.artifact_hash, "No future use"]);
+  });
+
+  it("keeps lease mutation RPCs private to the trusted service identity", async () => {
+    const signatures = [
+      "public.acquire_production_release_merge_lease_v6(uuid,text,text,bigint,text,text,text)",
+      "public.dispatch_production_release_merge_lease_v6(uuid)",
+      "public.abort_production_release_merge_lease_v6(uuid,text)",
+      "public.complete_production_release_merge_lease_v6(uuid,text)",
+    ];
+    for (const signature of signatures) {
+      const [grants] = await asRole<{ anon: boolean; human: boolean; service: boolean }>(
+        "service_role", null, "aal1",
+        `select has_function_privilege('anon',$1,'execute') as anon,
+                has_function_privilege('authenticated',$1,'execute') as human,
+                has_function_privilege('service_role',$1,'execute') as service`,
+        [signature]);
+      expect(grants).toEqual({ anon: false, human: false, service: true });
+    }
   });
 });
