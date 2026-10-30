@@ -6,6 +6,7 @@ import { EmptyState } from "../../../components/EmptyState";
 import { Modal } from "../../../components/Modal";
 import { supabase } from "../../../lib/supabase";
 import { signPaths } from "../../../lib/media";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../../lib/signedUrlPolicy";
 
 type Job = {
   id: string;
@@ -210,7 +211,7 @@ export function ProductionWorkspace({
 
     const { error: uploadError } = await supabase.storage
       .from("client-media")
-      .upload(path, file, { upsert: false });
+      .upload(path, file, { upsert: false, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS });
     if (uploadError) {
       setUploading(false);
       setError(uploadError.message);

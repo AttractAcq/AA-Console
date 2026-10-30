@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Bot, ImagePlus, Users, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { BROWSER_PREVIEW_URL_TTL_SECONDS, PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../lib/signedUrlPolicy";
 import { cn } from "../../lib/cn";
 import { MAX_FRAMES, MIN_FRAMES, STORY_SIZE, formatLabel, sizeFitsFormat } from "../../lib/contentFormat";
 import { framePlanLines } from "../../lib/framePlan";
@@ -125,13 +126,14 @@ export function ApproveAndBuildModal({
     const path = `${clientId}/references/${crypto.randomUUID()}.${ext}`;
     const { error: uploadError } = await supabase.storage
       .from("client-media")
-      .upload(path, file, { upsert: false });
+      .upload(path, file, { upsert: false, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS });
     if (uploadError) {
       setError(uploadError.message);
       setUploading(false);
       return;
     }
-    const { data: signed } = await supabase.storage.from("client-media").createSignedUrl(path, 3600);
+    const { data: signed } = await supabase.storage.from("client-media")
+      .createSignedUrl(path, BROWSER_PREVIEW_URL_TTL_SECONDS);
     setReference({ path, name: file.name, preview: signed?.signedUrl ?? "" });
     setUploading(false);
   };

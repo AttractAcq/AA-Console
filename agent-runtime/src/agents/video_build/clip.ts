@@ -12,6 +12,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../storage/signed-url-policy.js";
 
 /** Same bucket creative_build writes stills to. */
 export const CLIENT_MEDIA_BUCKET = "client-media";
@@ -120,7 +121,9 @@ export async function persistCompletedClip(
   );
   const storagePath = clipStoragePath(input.clientId, input.frameId);
   const bucket = sb.storage.from(CLIENT_MEDIA_BUCKET);
-  const uploaded = await bucket.upload(storagePath, bytes, { contentType, upsert: false });
+  const uploaded = await bucket.upload(storagePath, bytes, {
+    contentType, upsert: false, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS,
+  });
   if (uploaded.error) {
     const uploadError = uploaded.error as { message: string; statusCode?: string | number };
     if (isDuplicate(uploadError)) {

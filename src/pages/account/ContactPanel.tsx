@@ -22,6 +22,7 @@ import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef, FormValues } from "../../components/forms/fields";
 import { signPaths } from "../../lib/media";
 import { supabase } from "../../lib/supabase";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../lib/signedUrlPolicy";
 import { OnboardingSource } from "../../components/OnboardingSource";
 import { cn } from "../../lib/cn";
 
@@ -374,7 +375,7 @@ export function ContactPanel() {
             const path = `${clientId}/identity/logo-${crypto.randomUUID()}.${ext}`;
             const { error: uploadError } = await supabase.storage
               .from("client-media")
-              .upload(path, logo, { upsert: false });
+              .upload(path, logo, { upsert: false, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS });
             if (uploadError) throw new Error(uploadError.message);
             payload.logo_path = path;
           }

@@ -176,6 +176,11 @@ describe("ApproveAndBuildModal — the AI route", () => {
     const file = new File(["x"], "product.png", { type: "image/png" });
     await user.upload(screen.getByLabelText(/Upload a product shot/i), file);
     await waitFor(() => expect(screen.getByText("product.png")).toBeInTheDocument());
+    expect(upload).toHaveBeenCalledWith(
+      expect.stringMatching(/^client-1\/references\/.+\.png$/), file,
+      { upsert: false, cacheControl: "60" },
+    );
+    expect(createSignedUrl).toHaveBeenCalledWith(expect.stringMatching(/^client-1\/references\/.+\.png$/), 900);
 
     await user.click(screen.getByRole("button", { name: /^Generate$/ }));
     await waitFor(() => expect(rpc).toHaveBeenCalledOnce());

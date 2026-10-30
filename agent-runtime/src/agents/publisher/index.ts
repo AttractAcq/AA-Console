@@ -37,6 +37,7 @@ import { isPlatform } from "../../content/platform-limits.js";
 import { MAX_FRAMES, MIN_FRAMES, isContentFormat } from "../../content/format.js";
 import { adapterFor } from "../../publishing/registry.js";
 import { compose } from "../../publishing/caption.js";
+import { PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS, safeProviderErrorMessage } from "../../storage/signed-url-policy.js";
 import {
   PublishError,
   type PublishAdapter,
@@ -46,8 +47,6 @@ import {
 } from "../../publishing/types.js";
 
 const MEDIA_BUCKET = "client-media";
-/** Long enough for Meta to fetch a reel, short enough not to be a public link. */
-const SIGNED_URL_SECONDS = 60 * 60;
 const DEFAULT_BATCH = 5;
 
 export interface ClaimedPost {
@@ -113,7 +112,7 @@ export async function prepare(
   if (!path) throw new PublishError("The asset has no file to post.", false);
   const { data: signed, error: signError } = await sb.storage
     .from(MEDIA_BUCKET)
-    .createSignedUrl(path, SIGNED_URL_SECONDS);
+    .createSignedUrl(path, PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS);
   const mediaUrl = signed?.signedUrl?.trim() ?? "";
   if (signError || !mediaUrl.startsWith("https://")) {
     // The platform fetches this URL itself, so anything it cannot reach is
@@ -150,7 +149,7 @@ export async function prepare(
     }
     const { data: signedFrames, error: frameError } = await sb.storage
       .from(MEDIA_BUCKET)
-      .createSignedUrls(paths, SIGNED_URL_SECONDS);
+      .createSignedUrls(paths, PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS);
     if (frameError || !signedFrames || signedFrames.length !== paths.length) {
       throw new PublishError(`Could not sign URLs for this ${format}'s ${paths.length} frames.`, true);
     }
@@ -352,7 +351,7 @@ export async function runPublisherJob(
     } catch (thrown) {
       failed += 1;
       const retryable = thrown instanceof PublishError ? thrown.retryable : false;
-      const reason = thrown instanceof Error ? thrown.message : String(thrown);
+      const reason = safeProviderErrorMessage(thrown instanceof Error ? thrown.message : String(thrown));
       const { error: failError } = await sb.rpc("record_post_publish_failure", {
         p_post_id: post.post_id,
         p_reason: reason,

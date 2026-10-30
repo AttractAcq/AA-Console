@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ContentJourney } from "../../components/ContentJourney";
 import { signPaths } from "../../lib/media";
 import { supabase } from "../../lib/supabase";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../lib/signedUrlPolicy";
 import { VideoRepurposePanel } from "./VideoRepurposePanel";
 
 type Source = {
@@ -213,7 +214,7 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false, sho
     setError(null);
     setNotice(null);
     const { error: uploadError } = await supabase.storage.from("client-media")
-      .upload(path, intakeFile, { upsert: false });
+      .upload(path, intakeFile, { upsert: false, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS });
     if (uploadError) {
       setUploading(false); setError(uploadError.message); return;
     }
