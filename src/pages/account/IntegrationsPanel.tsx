@@ -11,6 +11,7 @@ import { supabase } from "../../lib/supabase";
 import { SYNCING_PROVIDERS } from "../../lib/onboarding";
 import { cn } from "../../lib/cn";
 import { MetricsBackfill } from "../../components/MetricsBackfill";
+import { integrationCapabilitySummary } from "./integrationHealth";
 
 type Integration = {
   id: string;
@@ -20,6 +21,7 @@ type Integration = {
   status: string;
   ingest_enabled: boolean;
   last_checked_at: string | null;
+  token_expires_at: string | null;
   ad_account_id: string | null;
   meta_page_id: string | null;
   meta_pixel_id: string | null;
@@ -64,6 +66,12 @@ const SYNCS: Record<string, string> = {
   meta: "Paid campaign metrics, daily",
   instagram: "Organic post and account metrics, daily",
 };
+
+function dateLabel(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString();
+}
 
 const FIELDS: FieldDef[] = [
   {
@@ -115,7 +123,7 @@ export function IntegrationsPanel() {
     try {
       const { data, error } = await supabase
         .from("client_integrations")
-        .select("id, provider, credential_label, access_level, status, ingest_enabled, last_checked_at, ad_account_id, meta_page_id, meta_pixel_id")
+        .select("id, provider, credential_label, access_level, status, ingest_enabled, last_checked_at, token_expires_at, ad_account_id, meta_page_id, meta_pixel_id")
         .eq("client_id", clientId)
         .order("provider");
       if (error) throw error;
@@ -174,8 +182,8 @@ export function IntegrationsPanel() {
         <p className="text-xs text-muted-foreground">
           {outstanding.length === 0 ? (
             <>
-              Both credentials onboarding asks for are connected. Reporting and attribution have
-              numbers to pull.
+              Both provider entries onboarding asks for are listed. Account access and required scopes
+              still need verification before reporting or publishing is trusted.
             </>
           ) : (
             <>
@@ -199,22 +207,32 @@ export function IntegrationsPanel() {
       )}
 
       <DataTable
-        columns={["Integration", "Credential", "Access Level", "Status", "Daily sync", "Ads"]}
+        columns={["Integration", "Credential", "Declared access", "Status", "Provider capability", "Daily sync", "Ads"]}
         emptyLabel="No integrations connected yet"
         rows={rows.map((r) => [
           <span key="p" className="capitalize">{r.provider}</span>,
           r.credential_label ?? "—",
           r.access_level ?? "—",
-          <span
-            key="s"
-            className={cn(
-              "inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize",
-              r.status === "error"
-                ? "bg-destructive/10 text-destructive"
-                : "bg-primary/10 text-brand-strong",
-            )}
-          >
-            {r.status}
+          <div key="s" className="space-y-1">
+            <span
+              className={cn(
+                "inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+                ["error", "expired", "revoked"].includes(r.status)
+                  ? "bg-destructive/10 text-destructive"
+                  : r.status === "expiring"
+                    ? "bg-amber-100 text-amber-900"
+                    : "bg-muted text-foreground",
+              )}
+            >
+              {r.status}
+            </span>
+            {(["meta", "instagram"].includes(r.provider) && dateLabel(r.last_checked_at)) &&
+              <span className="block text-xs text-muted-foreground">Token checked {dateLabel(r.last_checked_at)}</span>}
+            {dateLabel(r.token_expires_at) &&
+              <span className="block text-xs text-muted-foreground">Recorded expiry {dateLabel(r.token_expires_at)}</span>}
+          </div>,
+          <span key="h" className="text-xs text-muted-foreground">
+            {integrationCapabilitySummary(r.provider, r.status, r.token_expires_at)}
           </span>,
           SYNCS[r.provider] ? (
             <div key="t" className="flex items-center gap-2">

@@ -8,6 +8,7 @@ import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
 import { CHANNEL_OPTIONS, loadApprovedAssets, useOptions } from "../../lib/options";
 import { supabase } from "../../lib/supabase";
+import { assertOrganicScheduleRoute, PAID_SCHEDULING_BLOCKER } from "../../lib/scheduleRoute";
 
 type Post = {
   id: string;
@@ -58,7 +59,8 @@ export function CalendarPanel() {
       options: assetOptions,
       hint: "Only approved assets can be scheduled. Reference, media type and client are copied from it.",
     },
-    { name: "channel", label: "Channel", kind: "select", options: CHANNEL_OPTIONS },
+    { name: "channel", label: "Channel", kind: "select", required: true, options: CHANNEL_OPTIONS,
+      hint: PAID_SCHEDULING_BLOCKER },
   ];
 
   // Only this month's posts land on the grid; the table below is the full list.
@@ -95,10 +97,12 @@ export function CalendarPanel() {
         fields={fields}
         submitLabel="Schedule"
         onSubmit={async (v) => {
+          const channel = v.channel as string;
+          await assertOrganicScheduleRoute(v.asset_id as string, channel);
           const { error } = await supabase.rpc("schedule_asset", {
             p_asset_id: v.asset_id as string,
             p_date: v.scheduled_for as string,
-            p_channel: ((v.channel as string) || "organic") as "organic" | "paid",
+            p_channel: channel as "organic" | "paid",
             ...(v.scheduled_time ? { p_time: v.scheduled_time as string } : {}),
           });
           if (error) throw new Error(error.message);

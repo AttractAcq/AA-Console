@@ -70,7 +70,7 @@ function fixture() {
     mcpServiceSecret: null, gatewayUrl: null, metaAppSecret: null, metaWebhookVerifyToken: null,
     resendApiKey: null,
   } as unknown as RuntimeConfig;
-  return { sb, config };
+  return { sb, config, rows };
 }
 
 describe("B001 system inventory", () => {
@@ -105,12 +105,54 @@ describe("B001 system inventory", () => {
     });
     expect(snapshot.clients.value?.[0]?.integrations[0]).toMatchObject({
       hasCredential: true, accountIds: { adAccountId: "act_123", metaPageId: "42" },
+      providerHealth: { state: "unknown", evidenceAt: null },
     });
+    expect(snapshot.clients.value?.[0]?.integrations[0]?.providerHealth.reason).toMatch(/exact account, required scopes/);
+    expect(snapshot.schemaVersion).toBe(2);
+    expect(snapshot.evidenceCoverage.runtimeDeployment.state).toBe("observed");
+    expect(snapshot.evidenceCoverage.runtimeWorkers.state).toBe("unknown");
+    expect(snapshot.evidenceCoverage.cronCatalog.state).toBe("observed");
+    expect(snapshot.evidenceCoverage.schemaParity.state).toBe("unknown");
+    expect(snapshot.evidenceCoverage.cronExecution.state).toBe("unknown");
+    expect(snapshot.evidenceCoverage.switchInventory.state).toBe("unknown");
+    expect(snapshot.evidenceCoverage.credentialValidity.state).toBe("unknown");
+    expect(snapshot.evidenceCoverage.providerAccountHealth.state).toBe("unknown");
+    expect(snapshot.evidenceCoverage.otherEnvironment.state).toBe("unknown");
+    expect(snapshot.evidenceCoverage.externalEffects.state).toBe("unknown");
     const exported = JSON.stringify(snapshot);
     for (const forbidden of ["private-service-key", "private-anthropic-key", "private-openai-key",
       "private-github-key", "vault-secret-123", "accidentally-a-secret",
       "possibly-private-account-ref", "private-token-hash"])
       expect(exported).not.toContain(forbidden);
+  });
+
+  it("names provider-specific gaps without treating metadata or a terminal status as live proof", async () => {
+    const { sb, config, rows } = fixture();
+    rows.client_integrations = [
+      { client_id: "client-1", provider: "meta", status: "revoked", credential_secret_id: "secret-1" },
+      { client_id: "client-1", provider: "google_business", status: "connected", credential_secret_id: "secret-2" },
+      { client_id: "client-1", provider: "google_ads", status: "connected", credential_secret_id: "secret-3" },
+      { client_id: "client-1", provider: "resend", status: "connected", credential_secret_id: "secret-4" },
+      { client_id: "client-1", provider: "instagram", status: "active", credential_secret_id: null },
+      { client_id: "client-1", provider: "meta", status: "expiring", credential_secret_id: "secret-5",
+        token_expires_at: null },
+    ];
+    const snapshot = await collectSystemReadiness(sb, config, fetch, {});
+    const integrations = snapshot.clients.value?.[0]?.integrations ?? [];
+    expect(integrations.map((row) => row.providerHealth.state)).toEqual(
+      ["unknown", "unknown", "unknown", "unknown", "unknown", "unknown"],
+    );
+    expect(integrations.map((row) => row.providerHealth.reason)).toEqual([
+      expect.stringMatching(/status blocks use/),
+      expect.stringMatching(/Business Profile location readback/),
+      expect.stringMatching(/developer token, exact customer access/),
+      expect.stringMatching(/runtime email key/),
+      expect.stringMatching(/No credential is configured/),
+      expect.stringMatching(/lacks a known future expiry/),
+    ]);
+    const exported = JSON.stringify(snapshot);
+    for (const secret of ["secret-1", "secret-2", "secret-3", "secret-4", "secret-5"])
+      expect(exported).not.toContain(secret);
   });
 
   it("does not turn a gateway timeout or missing catalog into a healthy assertion", async () => {
@@ -124,5 +166,40 @@ describe("B001 system inventory", () => {
     expect(snapshot.database.state).toBe("error");
     expect(snapshot.publicPerimeter.state).toBe("error");
     expect(snapshot.runtime.sha).toBeNull();
+    expect(snapshot.evidenceCoverage.gatewayDeployment.state).toBe("error");
+    expect(snapshot.evidenceCoverage.schemaCatalog.state).toBe("error");
+    expect(snapshot.evidenceCoverage.cronCatalog.state).toBe("error");
+  });
+
+  it("requires every fresh enabled worker to report the runtime commit before recording fleet evidence", async () => {
+    const { sb, config, rows } = fixture();
+    const reportedAt = new Date().toISOString();
+    rows.agent_runtime_status = [
+      { worker_id: "runtime-a", version: SHA, reported_at: reportedAt, is_live: true,
+        metadata: { enabled: true }, queue_depth: 0, active_jobs: 0 },
+      { worker_id: "runtime-b", version: "b".repeat(40), reported_at: reportedAt, is_live: true,
+        metadata: { enabled: true }, queue_depth: 0, active_jobs: 0 },
+    ];
+    const mismatch = await collectSystemReadiness(sb, config, fetch, { RAILWAY_GIT_COMMIT_SHA: SHA });
+    expect(mismatch.evidenceCoverage.runtimeWorkers.state).toBe("unknown");
+    rows.agent_runtime_status[1]!.version = SHA;
+    const matching = await collectSystemReadiness(sb, config, fetch, { RAILWAY_GIT_COMMIT_SHA: SHA });
+    expect(matching.evidenceCoverage.runtimeWorkers).toMatchObject({
+      state: "observed", evidenceAt: reportedAt, reason: null,
+    });
+  });
+
+  it("does not turn a successful gateway HTTP response with a short SHA into deployment evidence", async () => {
+    const { sb, config } = fixture();
+    config.gatewayUrl = "https://gateway.example";
+    config.mcpServiceSecret = "private-secret";
+    const snapshot = await collectSystemReadiness(sb, config,
+      async () => new Response(JSON.stringify({ ok: true, sha: "abc123", observedAt: new Date().toISOString(),
+        configured: { aaInternalApi: true, botAuthMode: "grants" } }), { status: 200 }),
+      { RAILWAY_GIT_COMMIT_SHA: SHA });
+    expect(snapshot.gateway.state).toBe("observed");
+    expect(snapshot.gateway.value?.sha).toBeNull();
+    expect(snapshot.evidenceCoverage.gatewayDeployment.state).toBe("unknown");
+    expect(JSON.stringify(snapshot)).not.toContain("private-secret");
   });
 });
