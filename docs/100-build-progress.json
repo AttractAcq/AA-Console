@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-10-30T03:30:00Z",
+  "updated_at": "2026-10-30T03:37:00Z",
   "objective": "AA-Console 100/100 autonomous service-business acquisition and content system, subject to exact-version human approval for every external publish, send, deployment, and spend action in one Approval Inbox.",
   "blueprint": {
     "artifact": "docs/AA_CONSOLE_100_BUILD_BLUEPRINT.md",
-    "sha256": "c4d61b5922a73b38c8bffc054c412447f3089c7488a8af5bfdf2fd27311ac134",
+    "sha256": "0aa9632ff93d56eac90361889e926fc5141cc42b9699ee41ed94cb429b5a6f59",
     "build_rows": 106
   },
   "baseline": {
     "github_main_sha": "7a3151ce13c77ef77878b34a053f527ec09ffaa8",
     "isolated_branch": "codex/progress-after-b009",
-    "source_checked_at": "2026-10-30T03:30:00Z",
+    "source_checked_at": "2026-10-30T03:37:00Z",
     "business_context_source": "2 - business/README.md in the local Attract Acquisition workspace",
     "confirmed_offer_ladder": [
       "Proof Sprint",
@@ -122,7 +122,7 @@
         "The SELECT-only P01–P20 staging reconciliation preflight returned successfully in staging and production: 40 of 40 read-only calls.",
         "Staging-only 260 correction plus canonical 261–272 passed full disposable Supabase CLI db push: 290 history rows, one client/five Auth ID digests preserved, generated schema body matched checked-in types; no live staging write.",
         "Draft #257 actual-staging private clone reached 297 history rows after correction 277→278, canonical 261–272 278→290 and 273–279 290→297; one client and five Auth UUID digests remained unchanged, generated types matched current main. No live staging write.",
-        "Fresh stage-linked private dump at 02:57–03:10 UTC was bracketed by matching 277-row history and one-client/five-Auth UUID digests. A new disposable local Supabase target restored roles/schema/data/history, all four Storage bucket configurations and all 17 source cron definitions inactive; original cron normalized SHA-256 24408ce345624b10fef7db94b8f85b1573aa1605b6b70c61e8f73215fbedbc98. Exact CLI dry-run/apply selected 1→12→7 through 297, preserved all original identities/history, disabled false Google support and matched main generated types SHA-256 b080885bac8902bf929816a2d3f0c59e020e8acc7c319c976739fcc23c12365e. Draft #257 head 9605c855df10050a6694f9da63403e6c8807a439 is in fresh protected CI; no live staging write."
+        "Fresh stage-linked private dump at 02:57–03:10 UTC was bracketed by matching 277-row history and one-client/five-Auth UUID digests. A new disposable local Supabase target restored roles/schema/data/history, all four Storage bucket configurations and all 17 source cron definitions inactive; original cron normalized SHA-256 24408ce345624b10fef7db94b8f85b1573aa1605b6b70c61e8f73215fbedbc98. Exact CLI dry-run/apply selected 1→12→7 through 297, preserved all original identities/history, disabled false Google support and matched main generated types SHA-256 b080885bac8902bf929816a2d3f0c59e020e8acc7c319c976739fcc23c12365e. Draft #257 head 9605c855df10050a6694f9da63403e6c8807a439 passed all four protected CI jobs in run 40997518512; no live staging write."
       ],
       "permission_and_negative_tests": [
         "Read-only Management API route uses a database-read token only and rejects wrong project identity, invalid origin/TLS and unverified provenance.",
@@ -135,9 +135,9 @@
       "real_account_or_client": "Production and staging Supabase projects were queried read-only; no connected client account behavior was exercised.",
       "external_proof": "Staging remains at 277 history rows with alternate 259/260 stamps and all historical SQL payloads NULL, one client and five Auth users. The 02:57 and 03:10 UTC SELECT-only captures matched identity/history digests around the private dump; that bundle was restored to a disposable clone and migrated through 297. Production is through 279 and Google support=false. This is source/catalog/restore rehearsal evidence, not a live staging correction or a connected-client pilot.",
       "observed_at": "2026-10-30T03:10:05Z",
-      "blocker": "Automatic production parity feed still needs a fine-grained Database Read PAT and isolated staging runtime. Staging correction is draft #257; live staging retains alternate 259/260 and lacks 261–279. No PITR or automated backup is available. Q012 requires a fresh durable pre-write checkpoint, another verified checkpoint after live correction at 278, independent acknowledgment of feasible in-place forward repair or proven hosted cutover, exact-head CI and live readbacks. Local restore does not prove hosted replacement. Historical SQL payloads remain unavailable.",
+      "blocker": "Automatic production parity feed still needs a fine-grained Database Read PAT and isolated staging runtime. Staging correction is draft #257; live staging retains alternate 259/260 and lacks 261–279. No PITR or automated backup is available. Q012 requires a fresh durable pre-write checkpoint, another verified checkpoint after live correction at 278, independent acknowledgment of feasible in-place forward repair or proven hosted cutover and live readbacks. Local restore does not prove hosted replacement. Historical SQL payloads remain unavailable.",
       "rollback": "Auditor is read-only; remove admin tab/tool without database mutation.",
-      "reviewer": "Independent #248 review found no blocker in scoped read-only feed; #249 SELECT-only packet passed protected checks. #257 builder/runbook code review found no blocker, and fresh local restore/full CLI rehearsal passed; Q012 recovery decision and exact-head four-check CI remain open.",
+      "reviewer": "Independent #248 review found no blocker in scoped read-only feed; #249 SELECT-only packet passed protected checks. #257 builder/runbook code review found no blocker, and fresh local restore/full CLI rehearsal passed; All four exact-head #257 protected CI jobs passed; Q012 recovery decision and live staging readback remain open.",
       "additional_prs": [
         "https://github.com/AttractAcq/AA-Console/pull/249",
         "https://github.com/AttractAcq/AA-Console/pull/257"
