@@ -21,6 +21,9 @@ type Integration = IntegrationEvidence & {
   meta_pixel_id: string | null;
 };
 
+type AddSelection = { clientId: string; routeVisit: number; token: number };
+type MetaSettingsSelection = { integration: Integration; routeVisit: number; token: number };
+
 /**
  * What building ads needs from the Meta account beyond the token. The page
  * every ad runs from, and the pixel conversion goals count against. The
@@ -103,8 +106,8 @@ const FIELDS: FieldDef[] = [
 ];
 
 export function IntegrationsPanel() {
-  const [addOpenClient, setAddOpenClient] = useState<{ clientId: string; routeVisit: number } | null>(null);
-  const [adSettings, setAdSettings] = useState<{ integration: Integration; routeVisit: number } | null>(null);
+  const [addOpenClient, setAddOpenClient] = useState<AddSelection | null>(null);
+  const [adSettings, setAdSettings] = useState<MetaSettingsSelection | null>(null);
   const { clientId } = useParams<{ clientId: string }>();
   const [snapshot, setSnapshot] = useState<{ clientId: string; rows: Integration[]; observedAtMs: number } | null>(null);
   const [saving, setSaving] = useState<{ clientId: string; integrationId: string } | null>(null);
@@ -112,6 +115,9 @@ export function IntegrationsPanel() {
   const [loadError, setLoadError] = useState<{ clientId: string; message: string } | null>(null);
   const activeClient = useRef<string | null>(null);
   const routeVisit = useRef(0);
+  const nextFormToken = useRef(0);
+  const activeAddSelection = useRef<AddSelection | null>(null);
+  const activeMetaSelection = useRef<MetaSettingsSelection | null>(null);
   const requestGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -146,6 +152,8 @@ export function IntegrationsPanel() {
     routeVisit.current += 1;
     // The render guard below closes a previous client's dialog immediately;
     // clearing the selection also keeps it closed if the route later returns.
+    activeMetaSelection.current = null;
+    activeAddSelection.current = null;
     setAdSettings(null);
     setAddOpenClient(null);
     void refresh();
@@ -167,6 +175,32 @@ export function IntegrationsPanel() {
     () => ({ meta_page_id: currentAdSettings?.meta_page_id ?? "", meta_pixel_id: currentAdSettings?.meta_pixel_id ?? "" }),
     [currentAdSettings],
   );
+
+  const openMetaSettings = (integration: Integration) => {
+    if (!clientId || activeClient.current !== clientId || integration.client_id !== clientId) return;
+    const selection = { integration, routeVisit: routeVisit.current, token: ++nextFormToken.current };
+    activeMetaSelection.current = selection;
+    setAdSettings(selection);
+  };
+
+  const openAddIntegration = () => {
+    if (!clientId || activeClient.current !== clientId) return;
+    const selection = { clientId, routeVisit: routeVisit.current, token: ++nextFormToken.current };
+    activeAddSelection.current = selection;
+    setAddOpenClient(selection);
+  };
+
+  const metaSelectionIsCurrent = (selection: MetaSettingsSelection | null) =>
+    !!selection && !!clientId && activeClient.current === clientId
+    && selection.integration.client_id === clientId
+    && selection.routeVisit === routeVisit.current
+    && activeMetaSelection.current === selection;
+
+  const addSelectionIsCurrent = (selection: AddSelection | null) =>
+    !!selection && !!clientId && activeClient.current === clientId
+    && selection.clientId === clientId
+    && selection.routeVisit === routeVisit.current
+    && activeAddSelection.current === selection;
 
   /**
    * Turns the scheduled pull on or off for one integration. This gates the
@@ -229,7 +263,7 @@ export function IntegrationsPanel() {
           Meta and Instagram activation evidence is shown below. A stored integration or account ID
           does not establish provider access, scopes, or permission to publish.
         </p>
-        <Button icon={Plus} onClick={() => setAddOpenClient({ clientId, routeVisit: routeVisit.current })}>
+        <Button icon={Plus} onClick={openAddIntegration}>
           Add
         </Button>
       </div>
@@ -329,7 +363,7 @@ export function IntegrationsPanel() {
             <button
               key="a"
               type="button"
-              onClick={() => setAdSettings({ integration: r, routeVisit: routeVisit.current })}
+              onClick={() => openMetaSettings(r)}
               className="text-xs text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {r.meta_page_id ? `Page ${r.meta_page_id}` : "Add page for ads"}
@@ -351,16 +385,20 @@ export function IntegrationsPanel() {
       {clientId && rows.some((r) => SYNCS[r.provider]) && <MetricsBackfill clientId={clientId} />}
 
       <FormModal
+        key={`meta-settings:${clientId}`}
         open={currentAdSettings !== null}
-        onClose={() => setAdSettings(null)}
+        onClose={() => {
+          if (!metaSelectionIsCurrent(adSettings)) return;
+          activeMetaSelection.current = null;
+          setAdSettings((prev) => prev === adSettings ? null : prev);
+        }}
         title="Meta ad settings"
         intro="What building ads in Meta needs beyond the credential. Ads are always built paused; launching happens in Ads Manager."
         fields={META_AD_FIELDS}
         initialValues={adSettingsValues}
         submitLabel="Save"
         onSubmit={async (v) => {
-          if (!clientId || activeClient.current !== clientId || !currentAdSettings
-            || adSettings?.routeVisit !== routeVisit.current) {
+          if (!clientId || !currentAdSettings || !metaSelectionIsCurrent(adSettings)) {
             throw new Error("No current-client integration selected.");
           }
           const pageId = numericId(v.meta_page_id, "The page ID");
@@ -372,19 +410,23 @@ export function IntegrationsPanel() {
             .eq("client_id", clientId);
           if (error) throw new Error(error.message);
         }}
-        onSaved={refresh}
+        onSaved={() => { if (metaSelectionIsCurrent(adSettings)) void refresh(); }}
       />
 
       <FormModal
+        key={`add-integration:${clientId}`}
         open={addOpen}
-        onClose={() => setAddOpenClient(null)}
+        onClose={() => {
+          if (!addSelectionIsCurrent(addOpenClient)) return;
+          activeAddSelection.current = null;
+          setAddOpenClient((prev) => prev === addOpenClient ? null : prev);
+        }}
         title="Add Integration"
         draftKey={clientId ? integrationDraftKey(clientId) : undefined}
         fields={FIELDS}
         submitLabel="Connect"
         onSubmit={async (v) => {
-          if (!clientId || activeClient.current !== clientId || !addOpen
-            || addOpenClient?.routeVisit !== routeVisit.current) {
+          if (!clientId || !addOpen || !addSelectionIsCurrent(addOpenClient)) {
             throw new Error("No current-client integration form selected.");
           }
           const { error } = await supabase.rpc("admin_store_integration_credential", {
@@ -396,7 +438,7 @@ export function IntegrationsPanel() {
           });
           if (error) throw new Error(error.message);
         }}
-        onSaved={refresh}
+        onSaved={() => { if (addSelectionIsCurrent(addOpenClient)) void refresh(); }}
       />
     </div>
   );
