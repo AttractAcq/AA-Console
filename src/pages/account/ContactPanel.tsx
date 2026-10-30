@@ -20,8 +20,9 @@ import { Button } from "../../components/Button";
 import { Panel } from "../../components/Panel";
 import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef, FormValues } from "../../components/forms/fields";
-import { signPaths } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { supabase } from "../../lib/supabase";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../lib/signedUrlPolicy";
 import { OnboardingSource } from "../../components/OnboardingSource";
 import { cn } from "../../lib/cn";
 
@@ -201,7 +202,8 @@ export function ContactPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [row, setRow] = useState<Row | null>(null);
   const [clientName, setClientName] = useState<string | null>(null);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const signedLogo = useSignedPreviewPaths("client-media", [row?.logo_path]);
+  const logoUrl = row?.logo_path ? signedLogo.get(row.logo_path) ?? null : null;
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -214,9 +216,6 @@ export function ContactPanel() {
     const next = (data as Row) ?? null;
     setRow(next);
     setClientName((client?.name as string | null) ?? null);
-    setLogoUrl(
-      next?.logo_path ? ((await signPaths("client-media", [next.logo_path])).get(next.logo_path) ?? null) : null,
-    );
     setLoading(false);
   }, [clientId]);
 
@@ -374,7 +373,7 @@ export function ContactPanel() {
             const path = `${clientId}/identity/logo-${crypto.randomUUID()}.${ext}`;
             const { error: uploadError } = await supabase.storage
               .from("client-media")
-              .upload(path, logo, { upsert: false });
+              .upload(path, logo, { upsert: false, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS });
             if (uploadError) throw new Error(uploadError.message);
             payload.logo_path = path;
           }

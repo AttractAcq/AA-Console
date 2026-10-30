@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from '../storage/signed-url-policy.js';
 import {
   BOT, ID, MCP_ERRORS, UUID, authenticated, fail, header, json, readJsonBody,
 } from './http.js';
@@ -407,7 +408,7 @@ export async function attachSignedUpload(
     content_type: contentType,
     headers: {
       'content-type': contentType,
-      'cache-control': 'max-age=3600',
+      'cache-control': `max-age=${PRIVATE_OBJECT_CACHE_CONTROL_SECONDS}`,
     },
     ...(typeof record.replayed === 'boolean' ? { replayed: record.replayed } : {}),
     ...(record.filename === undefined ? {} : { filename: record.filename }),

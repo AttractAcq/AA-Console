@@ -10,6 +10,7 @@ import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { estimateCostUsd } from "../../usage/cost.js";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../storage/signed-url-policy.js";
 import { applyPromptPalette, fitMotionPlan, motionCanvas, motionCapability, motionPalette, renderMotion, validateMotionPlan, type MotionAspect } from "./render.js";
 
 const BUCKET = "client-media";
@@ -149,10 +150,10 @@ export async function runMotionDesignJob(sb: SupabaseClient, config: RuntimeConf
     const renderPath = `${project.client_id}/motion-design/${project.id}/motion.mp4`;
     const posterPath = `${project.client_id}/motion-design/${project.id}/poster.jpg`;
     const { error: videoError } = await sb.storage.from(BUCKET).upload(renderPath,
-      await readFile(output), { upsert: true, contentType: "video/mp4" });
+      await readFile(output), { upsert: true, contentType: "video/mp4", cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS });
     if (videoError) throw new Error(`Could not store motion video: ${videoError.message}`);
     const { error: posterError } = await sb.storage.from(BUCKET).upload(posterPath,
-      await readFile(poster), { upsert: true, contentType: "image/jpeg" });
+      await readFile(poster), { upsert: true, contentType: "image/jpeg", cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS });
     if (posterError) throw new Error(`Could not store motion poster: ${posterError.message}`);
     const { error: completeError } = await sb.from("motion_design_projects")
       .update({ status: "completed", scene_plan: plan, render_path: renderPath,

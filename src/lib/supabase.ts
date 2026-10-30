@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../types/database";
+import { BROWSER_PREVIEW_URL_TTL_SECONDS } from "./signedUrlPolicy";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -56,8 +57,8 @@ export function watchAgentJob(
 }
 
 /** Signed URL for a private bucket object. Buckets are never public. */
-export async function signedUrl(bucket: string, path: string, expiresIn = 3600) {
-  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn);
+export async function signedUrl(bucket: string, path: string) {
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, BROWSER_PREVIEW_URL_TTL_SECONDS);
   if (error) throw error;
   return data.signedUrl;
 }

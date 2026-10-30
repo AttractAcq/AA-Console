@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ContentJourney } from "../../components/ContentJourney";
-import { signPaths } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { supabase } from "../../lib/supabase";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../lib/signedUrlPolicy";
 import { VideoRepurposePanel } from "./VideoRepurposePanel";
 
 type Source = {
@@ -53,11 +54,16 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false, sho
   const [assignments, setAssignments] = useState<ReadonlyMap<string, Assignment>>(new Map());
   const [aiRequests, setAiRequests] = useState<ReadonlyMap<string, AiRequest>>(new Map());
   const [restoredCuts, setRestoredCuts] = useState<ReadonlyMap<string, AiRequest>>(new Map());
-  const [outputs, setOutputs] = useState<ReadonlyMap<string, string>>(new Map());
+  const [outputPaths, setOutputPaths] = useState<ReadonlyMap<string, string>>(new Map());
+  const signedOutputs = useSignedPreviewPaths("client-media", [...outputPaths.values()]);
+  const outputs = new Map([...outputPaths].flatMap(([id, path]) => {
+    const url = signedOutputs.get(path);
+    return url ? [[id, url] as const] : [];
+  }));
   const [editingAi, setEditingAi] = useState<string | null>(null);
   const [controls, setControls] = useState<EditControls>(defaultControls);
   const [emailStatus, setEmailStatus] = useState<ReadonlyMap<string, string>>(new Map());
-  const [urls, setUrls] = useState<ReadonlyMap<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", sources.map((source) => source.storage_path));
   const [selected, setSelected] = useState<ReadonlyMap<string, string>>(new Map());
   const [dueDates, setDueDates] = useState<ReadonlyMap<string, string>>(new Map());
   const [busy, setBusy] = useState<string | null>(null);
@@ -126,15 +132,13 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false, sho
         }
       }
       setEmailStatus(byAssignmentEmail);
-      setUrls(await signPaths("client-media", rows.map((row) => row.storage_path)));
       const outputIds = [...latest.values(), ...restored.values()]
         .map((request) => request.output_asset_id).filter((id): id is string => !!id);
       if (outputIds.length) {
         const result = await supabase.from("client_media_assets").select("id, storage_path").in("id", outputIds);
         if (result.error) throw result.error;
-        const signed = await signPaths("client-media", (result.data ?? []).map((asset) => asset.storage_path));
-        setOutputs(new Map((result.data ?? []).map((asset) => [asset.id, signed.get(asset.storage_path) ?? ""])));
-      } else setOutputs(new Map());
+        setOutputPaths(new Map((result.data ?? []).map((asset) => [asset.id, asset.storage_path])));
+      } else setOutputPaths(new Map());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load video editing work.");
     } finally {
@@ -213,7 +217,7 @@ export function EditRepurposePanel({ clientIdOverride, employeeMode = false, sho
     setError(null);
     setNotice(null);
     const { error: uploadError } = await supabase.storage.from("client-media")
-      .upload(path, intakeFile, { upsert: false });
+      .upload(path, intakeFile, { upsert: false, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS });
     if (uploadError) {
       setUploading(false); setError(uploadError.message); return;
     }

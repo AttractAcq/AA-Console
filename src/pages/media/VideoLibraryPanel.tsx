@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { MediaLibrary } from "../../components/MediaLibrary";
 import { supabase } from "../../lib/supabase";
-import { signPaths } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { VideoCandidateReviewsPanel } from "./VideoCandidateReviewsPanel";
 
 type Reel = {
@@ -22,7 +22,7 @@ export function VideoLibraryPanel() {
   const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
   const [reels, setReels] = useState<Reel[]>([]);
-  const [cuts, setCuts] = useState<ReadonlyMap<string, string>>(new Map());
+  const cuts = useSignedPreviewPaths("client-media", reels.map((reel) => reel.render_path));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,10 +38,8 @@ export function VideoLibraryPanel() {
           .order("created_at", { ascending: false });
         if (queryError) throw queryError;
         const rows = (data ?? []) as Reel[];
-        const signed = await signPaths("client-media", rows.map((r) => r.render_path ?? "").filter(Boolean));
         if (!cancelled) {
           setReels(rows);
-          setCuts(signed);
         }
       } catch (caught) {
         if (!cancelled) setError(caught instanceof Error ? caught.message : "Could not load reels.");

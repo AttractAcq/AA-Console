@@ -16,6 +16,7 @@
 // not configured. Failing loudly with the reasons is the honest outcome.
 
 import { createHash } from "node:crypto";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../storage/signed-url-policy.js";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -364,7 +365,9 @@ async function cut(
   const storagePath = renderStoragePath(asset.client_id, asset.id, job.id, job.attempts, digest);
   const probe = await probeRenderedVideo(outputPath, soundTreatment !== "captions_only");
   await uploadRenderedCut(
-    () => sb.storage.from(BUCKET).upload(storagePath, bytes, { contentType: "video/mp4", upsert: true }),
+    () => sb.storage.from(BUCKET).upload(storagePath, bytes, {
+      contentType: "video/mp4", upsert: true, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS,
+    }),
     { onRetry: (attempt, reason) => void appendEvent(sb, job.id,
       `Storage returned a temporary error after rendering. Retrying this exact cut (${attempt}/3): ${reason}`, "warn") },
   );

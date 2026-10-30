@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
 import type { AgentRow } from "../orchestration/registry.js";
 import type { AgentJobRow } from "../queue.js";
-import { runProofPlacerJob, type ClaimedPlacement } from "./placer.js";
+import { resolvePayload, runProofPlacerJob, type ClaimedPlacement } from "./placer.js";
 
 /**
  * The sweep's own behaviour, with the database and Google faked.
@@ -110,6 +110,25 @@ describe("the runtime switch", () => {
 });
 
 describe("the exact version, re-checked at the write", () => {
+  it("uses the fixed provider fetch lifetime for a proof image", async () => {
+    const createSignedUrl = vi.fn(async () => ({
+      data: { signedUrl: "https://storage.example/a.png" }, error: null,
+    }));
+    const query: Record<string, unknown> = {};
+    Object.assign(query, {
+      select: () => query,
+      eq: () => query,
+      maybeSingle: async () => ({ data: { storage_path: "client-1/a.png", caption: "Proof" }, error: null }),
+    });
+    const sb = {
+      from: () => query,
+      storage: { from: () => ({ createSignedUrl }) },
+    } as unknown as SupabaseClient;
+    const result = await resolvePayload(sb, { ...PLACEMENT, artifact_version_id: null, asset_id: "asset-1" });
+    expect(result.mediaUrl).toBe("https://storage.example/a.png");
+    expect(createSignedUrl).toHaveBeenCalledWith("client-1/a.png", 3600);
+  });
+
   it("refuses to post when the payload would now hash differently", async () => {
     const { sb, calls, fetchImpl } = database({ currentHash: "d".repeat(64) });
     await runProofPlacerJob(sb, on, agent, job);
@@ -143,6 +162,16 @@ describe("the exact version, re-checked at the write", () => {
     expect(String(callsTo(calls, "record_proof_placement_failure")[0]!.p_reason)).toContain(
       "no way to tell",
     );
+  });
+
+  it("does not persist a Google error that echoes a signed Storage URL", async () => {
+    const { sb, calls, events } = database({
+      status: 400,
+      body: { error: "https://storage.example/storage/v1/object/sign/client-media/a.png?token=secret" },
+    });
+    await runProofPlacerJob(sb, on, agent, job);
+    expect(String(callsTo(calls, "record_proof_placement_failure")[0]!.p_reason)).toContain("details withheld");
+    expect(JSON.stringify({ calls, events })).not.toContain("token=secret");
   });
 });
 

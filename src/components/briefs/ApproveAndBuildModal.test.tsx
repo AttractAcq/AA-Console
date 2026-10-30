@@ -5,11 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // lib/supabase builds a real client at import time, so the fake has to be
 // hoisted above the component import — the same shape lib/media.test.ts uses.
-const { rpc, order, upload, createSignedUrl, useParams } = vi.hoisted(() => ({
+const { rpc, order, upload, createSignedUrls, useParams } = vi.hoisted(() => ({
   rpc: vi.fn(),
   order: vi.fn(),
   upload: vi.fn(),
-  createSignedUrl: vi.fn(),
+  createSignedUrls: vi.fn(),
   useParams: vi.fn(),
 }));
 
@@ -17,7 +17,7 @@ vi.mock("../../lib/supabase", () => ({
   supabase: {
     from: () => ({ select: () => ({ in: () => ({ eq: () => ({ order }) }) }) }),
     rpc,
-    storage: { from: () => ({ upload, createSignedUrl }) },
+    storage: { from: () => ({ upload, createSignedUrls }) },
   },
 }));
 
@@ -168,7 +168,10 @@ describe("ApproveAndBuildModal — the AI route", () => {
 
   it("passes the uploaded reference through to the build", async () => {
     upload.mockResolvedValue({ error: null });
-    createSignedUrl.mockResolvedValue({ data: { signedUrl: "https://signed/ref.png" } });
+    createSignedUrls.mockImplementation(async (paths: string[]) => ({
+      data: paths.map((path) => ({ path, signedUrl: "https://signed/ref.png", error: null })),
+      error: null,
+    }));
     const user = userEvent.setup();
     show();
     await user.click(screen.getByRole("button", { name: /AI/ }));
@@ -176,6 +179,14 @@ describe("ApproveAndBuildModal — the AI route", () => {
     const file = new File(["x"], "product.png", { type: "image/png" });
     await user.upload(screen.getByLabelText(/Upload a product shot/i), file);
     await waitFor(() => expect(screen.getByText("product.png")).toBeInTheDocument());
+    expect(upload).toHaveBeenCalledWith(
+      expect.stringMatching(/^client-1\/references\/.+\.png$/), file,
+      { upsert: false, cacheControl: "60" },
+    );
+    await waitFor(() => expect(createSignedUrls).toHaveBeenCalledWith(
+      [expect.stringMatching(/^client-1\/references\/.+\.png$/)], 900,
+    ));
+    await waitFor(() => expect(document.querySelector("img")).toHaveAttribute("src", "https://signed/ref.png"));
 
     await user.click(screen.getByRole("button", { name: /^Generate$/ }));
     await waitFor(() => expect(rpc).toHaveBeenCalledOnce());
@@ -201,7 +212,10 @@ describe("ApproveAndBuildModal — the AI route", () => {
 
   it("lets a reference be removed again", async () => {
     upload.mockResolvedValue({ error: null });
-    createSignedUrl.mockResolvedValue({ data: { signedUrl: "https://signed/ref.png" } });
+    createSignedUrls.mockImplementation(async (paths: string[]) => ({
+      data: paths.map((path) => ({ path, signedUrl: "https://signed/ref.png", error: null })),
+      error: null,
+    }));
     const user = userEvent.setup();
     show();
     await user.click(screen.getByRole("button", { name: /AI/ }));

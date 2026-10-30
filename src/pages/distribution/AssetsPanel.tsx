@@ -7,6 +7,7 @@ import { MediaDetailModal } from "../../components/MediaDetailModal";
 import { Modal } from "../../components/Modal";
 import { fetchClientAssets, fetchTextBodies, shortDate, signPaths } from "../../lib/media";
 import type { MediaAsset } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { POST_PLATFORMS, platformLabel } from "../../lib/postPlatform";
 import { DEFAULT_POST_TIME } from "../../lib/postTime";
 import { supabase } from "../../lib/supabase";
@@ -34,7 +35,7 @@ export function AssetsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [bookings, setBookings] = useState<Map<string, Booking>>(new Map());
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.storage_path));
   const [bodies, setBodies] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -79,9 +80,8 @@ export function AssetsPanel() {
       }
       setBookings(booked);
 
-      const signed = await signPaths("client-media", rows.map((r) => r.storage_path));
-      setUrls(signed);
-      setBodies(await fetchTextBodies(rows.filter((r) => r.media_type === "text"), signed));
+      const textRows = rows.filter((row) => row.media_type === "text");
+      setBodies(await fetchTextBodies(textRows, await signPaths("client-media", textRows.map((row) => row.storage_path))));
     } catch (err) {
       setLoadError(
         "Failed to load approved assets: " + (err instanceof Error ? err.message : "Unknown error"),
