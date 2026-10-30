@@ -1,5 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -188,38 +187,18 @@ describe("proposed changes", () => {
   it("does not claim an approved change was applied", async () => {
     database({ changes: [change({ status: "approved", approved_at: "2026-10-24T10:00:00Z" })] });
     render(<MetaProfilePanel tab="profile" />);
-    // There is no Meta profile-write adapter, and the page says so instead of
-    // implying the profile changed.
-    expect(await screen.findByText("waiting for an adapter")).toBeInTheDocument();
+    expect(await screen.findByText("held for Inbox binding and an adapter")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
 
-  it("approves a draft, and refuses to reject without a reason", async () => {
-    const prompt = vi.spyOn(window, "prompt").mockReturnValue("  ");
+  it("holds direct legacy decisions until exact AAL2 Inbox binding exists", async () => {
     database({ changes: [change()] });
     render(<MetaProfilePanel tab="profile" />);
-
-    await userEvent.click(await screen.findByRole("button", { name: "Reject" }));
+    expect(await screen.findByText("Garage conversions, dry in four days")).toBeInTheDocument();
+    expect(screen.getByText(/Direct decisions are/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
     expect(rpc).not.toHaveBeenCalled();
-    prompt.mockRestore();
-
-    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
-    await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("decide_meta_profile_change_v6", {
-        p_change_id: "chg-1",
-        p_approved: true,
-      }),
-    );
-  });
-
-  it("does not echo a provider marker from a failed profile decision", async () => {
-    const marker = "credential-marker-decision-error";
-    database({ changes: [change()] });
-    rpc.mockResolvedValue({ data: null, error: { message: `Failed for ${marker}` } });
-    render(<MetaProfilePanel tab="profile" />);
-    await userEvent.click(await screen.findByRole("button", { name: "Approve" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not record the profile decision.");
-    expect(document.body.textContent).not.toContain(marker);
   });
 });
 

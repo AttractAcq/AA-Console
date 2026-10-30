@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
 import { dayOrDash } from "../../lib/contentRecords";
@@ -64,8 +63,6 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
   const [presence, setPresence] = useState<Presence[]>([]);
   const [changes, setChanges] = useState<ProfileChange[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -108,38 +105,10 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
     void refresh();
   }, [refresh]);
 
-  async function decide(change: ProfileChange, approved: boolean) {
-    if (busy) return;
-    const reason = approved ? undefined : window.prompt("Why is this change not going ahead?");
-    if (!approved && !reason?.trim()) return;
-    setBusy(change.id);
-    setNotice(null);
-    setError(null);
-    try {
-      const { error: rpcError } = await supabase.rpc("decide_meta_profile_change_v6", {
-        p_change_id: change.id,
-        p_approved: approved,
-        ...(reason?.trim() ? { p_reason: reason.trim() } : {}),
-      });
-      if (rpcError) throw new Error("Profile decision failed.");
-      setNotice(
-        approved
-          ? "Approved. It waits for a Meta profile-write adapter, which does not exist yet."
-          : "Rejected.",
-      );
-      await refresh();
-    } catch {
-      setError("Could not record the profile decision.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   const broken = identities.filter((identity) => recordedIdentityAlert(identity)).length;
 
   return (
     <div className="space-y-5">
-      {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
       {tab === "identities" && (
@@ -219,17 +188,17 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-semibold">Proposed changes</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              What the profile says now, beside what we would make it say. An approved change
-              waits for a Meta profile-write adapter, which this runtime does not have — so
-              approval records the decision rather than applying it, and this page says so instead
-              of offering a button that would fail.
+              What the profile says now, beside what we would make it say. Direct decisions are
+              held until each exact proposal is bound to the unified Approval Inbox with AAL2
+              approval. This runtime also has no Meta profile-write adapter, so no field change
+              can be applied from this page.
             </p>
           </div>
           {changes.length === 0 && !loading ? (
             <EmptyState label="No profile change has been proposed" />
           ) : (
             <DataTable
-              columns={["Field", "Says now", "Would say", "State", "Actions"]}
+              columns={["Field", "Says now", "Would say", "State"]}
               emptyLabel={loading ? "Loading…" : "Nothing proposed"}
               rows={changes.map((change) => [
                 <span key="f">
@@ -260,20 +229,8 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                   {change.status}
                   {change.status === "approved" && (
                     <span className="block text-xs text-muted-foreground">
-                      waiting for an adapter
+                      held for Inbox binding and an adapter
                     </span>
-                  )}
-                </span>,
-                <span key="a" className="flex gap-2">
-                  {change.status === "drafted" && (
-                    <>
-                      <Button disabled={busy === change.id} onClick={() => void decide(change, true)}>
-                        Approve
-                      </Button>
-                      <Button disabled={busy === change.id} onClick={() => void decide(change, false)}>
-                        Reject
-                      </Button>
-                    </>
                   )}
                 </span>,
               ])}
