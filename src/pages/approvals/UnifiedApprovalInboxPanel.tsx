@@ -178,21 +178,63 @@ function isRecruitmentBriefApprovalReady(request: UnifiedApprovalRequest, client
     && scope.media_type === "image" && scope.apply_url === preview.apply_url;
 }
 
+function isSalesEntitlementRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "client_sales_entitlement"
+    || request.owner_role !== "admin" || request.client_id !== clientId
+    || !(["pending", "expired", "source_held"].includes(request.status))
+    || !(["pending", "source_held"].includes(request.source_state ?? ""))
+    || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const action = preview.action;
+  const hash = request.source_version;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(request.source_id)
+    && /^[0-9a-f]{64}$/.test(hash)
+    && request.artifact_hash === hash && scope.scope_hash === hash
+    && (action === "grant" || action === "revoke") && scope.action === action
+    && request.title === (action === "grant" ? "Grant sales access" : "Revoke sales access")
+    && typeof preview.client_name === "string" && !!preview.client_name.trim()
+    && typeof preview.member_name === "string" && !!preview.member_name.trim()
+    && preview.permission === "Read and manage this client's leads and conversations"
+    && preview.client_id === clientId && scope.client_id === clientId
+    && typeof preview.member_id === "string" && !!preview.member_id
+    && scope.member_id === preview.member_id
+    && typeof preview.bound_user_id === "string" && !!preview.bound_user_id
+    && scope.bound_user_id === preview.bound_user_id
+    && request.account_ref === preview.bound_user_id
+    && request.destination === `client_sales_os:${clientId}`
+    && request.requester_kind === "human" && !!request.requested_by;
+}
+
+function isSalesEntitlementApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  return isSalesEntitlementRejectionReady(request, clientId)
+    && request.status === "pending" && request.source_state === "pending" && !isExpired(request);
+}
+
 function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignRejectionReady(request, clientId)
-    || isGoogleReplyRejectionReady(request, clientId);
+    || isGoogleReplyRejectionReady(request, clientId)
+    || isSalesEntitlementRejectionReady(request, clientId);
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignApprovalReady(request, clientId)
     || isGoogleReplyApprovalReady(request, clientId)
-    || isRecruitmentBriefApprovalReady(request, clientId);
+    || isRecruitmentBriefApprovalReady(request, clientId)
+    || isSalesEntitlementApprovalReady(request, clientId);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
   return left.id === right.id && left.source_id === right.source_id
     && left.client_id === right.client_id && left.source_system === right.source_system
     && left.source_kind === right.source_kind && left.owner_role === right.owner_role
+    && left.title === right.title && left.requested_at === right.requested_at
+    && left.requested_by === right.requested_by
+    && left.requester_kind === right.requester_kind
+    && left.requester_ref === right.requester_ref
+    && left.owning_path === right.owning_path
     && left.source_version === right.source_version
     && left.status === right.status
     && left.source_state === right.source_state
@@ -235,11 +277,13 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
   const blocker = previewMissing(request);
   const sourcePath = manager ? null : sourcePathForRequest(request, clientId);
   const html = exactHtml(request.preview);
-  const canReject = isRejectionReady(request, clientId);
-  const canApprove = isApprovalReady(request, clientId);
+  const salesManagerCard = manager && request.source_kind === "client_sales_entitlement";
+  const canReject = !salesManagerCard && isRejectionReady(request, clientId);
+  const canApprove = !salesManagerCard && isApprovalReady(request, clientId);
   const decisionLabel = request.source_kind === "google_review_reply"
     ? "Google review reply" : request.source_kind === "recruitment_brief"
-      ? "Recruitment brief" : "Campaign action";
+      ? "Recruitment brief" : request.source_kind === "client_sales_entitlement"
+        ? "Sales access" : "Campaign action";
 
   return (
     <article className="rounded-xl border border-border bg-card p-5" aria-labelledby={`approval-${request.id}`}>
@@ -283,7 +327,9 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
       {request.source_state && request.source_state !== "pending"
         && request.status !== "approved" && request.status !== "rejected"
         && request.status !== "revoked" && <p role="alert" className="mt-3 text-sm text-destructive">
-          The owning source is {request.source_state.replaceAll("_", " ")}. This card cannot be decided.
+          The owning source is {request.source_state.replaceAll("_", " ")}. {canReject
+            ? "Approval is unavailable; this request can only be closed with a reasoned rejection."
+            : "This card cannot be decided."}
         </p>}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -333,8 +379,13 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
             This calls the source owner for the exact version above. AAL2 is required;
             the source and database recheck the request before recording a decision.
           </p>
+          {request.source_kind === "client_sales_entitlement"
+            && (request.preview as Record<string, unknown>).action === "grant"
+            && <p role="status" className="text-xs text-muted-foreground">
+              Approving this grant records an entitlement for the exact client, team member and employee account above. It becomes active when system-wide sales access is enabled. Before enabling access, audit every approved, unrevoked grant.
+          </p>}
           {!canApprove && canReject && <p className="text-xs text-muted-foreground">
-            This request has expired. It can only be closed with a reasoned rejection.
+            This request cannot be approved. It can only be closed with a reasoned rejection.
           </p>}
           {aal !== "aal2" && <p role="status" className="text-sm text-destructive">
             {aal === "aal1" ? "Complete MFA to reach AAL2 before deciding." : "MFA level could not be verified; decisions are unavailable."}{" "}
@@ -361,8 +412,14 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
 
       <div className="mt-4">
         {sourcePath ? (
-          <Link className="text-sm font-medium text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            to={sourcePath}>View owning source</Link>
+          <>
+            <Link className="text-sm font-medium text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              to={sourcePath}>{request.source_kind === "client_sales_entitlement"
+                ? "Open Sales OS workspace" : "View owning source"}</Link>
+            {request.source_kind === "client_sales_entitlement" && <p className="mt-1 text-xs text-muted-foreground">
+              Sales access request controls are not yet available in that workspace.
+            </p>}
+          </>
         ) : <span className="text-xs text-muted-foreground">
           {manager ? "Owning source is unavailable from the manager console." : "Owning source link unavailable."}
         </span>}
@@ -466,7 +523,8 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
 
   async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) {
     const targetClientId = multiClient ? request.client_id : clientId;
-    if (!targetClientId || request.client_id !== targetClientId || (decision === "approved"
+    if (!targetClientId || (manager && request.source_kind === "client_sales_entitlement")
+      || request.client_id !== targetClientId || (decision === "approved"
       ? !isApprovalReady(request, targetClientId)
       : !isRejectionReady(request, targetClientId))) return;
     setBusyId(request.id);
@@ -507,11 +565,20 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             p_expected_source_version: request.source_version,
             p_expected_artifact_hash: request.artifact_hash!,
           })
-        : await supabase.rpc("decide_campaign_action_approval_v6", {
+        : request.source_kind === "client_sales_entitlement"
+          ? await supabase.rpc("decide_client_sales_entitlement", {
+            p_request_id: request.source_id,
+            p_scope_hash: request.source_version,
+            p_approve: decision === "approved",
+            p_note: decision === "rejected" ? reason!.trim() : "Approved from unified Approval Inbox",
+          })
+        : request.source_kind === "campaign_action"
+          ? await supabase.rpc("decide_campaign_action_approval_v6", {
           p_request_id: request.source_id,
           p_decision: decision,
           ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
-        });
+        }) : null;
+      if (!outcome) throw new Error("This request has no supported source decision function.");
       if (outcome.error) throw outcome.error;
       setStatusFilter("all");
       await refresh();
@@ -562,7 +629,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
               : "Canonical requests and decision history appear here as source adapters are connected. "}
           {manager
             ? "Complete campaign action and Google review reply requests can be decided here through their owning functions."
-            : "Complete campaign action, Google review reply and recruitment brief requests can be decided here through their owning functions."}
+            : "Complete campaign action, Google review reply, recruitment brief and sales access requests can be decided here through their owning functions."}
           {manager ? " Other requests remain read-only. " : " Other requests link to their owning source. "}
           Coverage is incomplete: work not yet mirrored here remains in its owning queue.
           Pending here reflects the canonical ledger; each owning source is checked again before a decision.

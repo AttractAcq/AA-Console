@@ -91,6 +91,35 @@ const readyRecruitment = {
   owner_role: "admin", owning_path: "/team?tab=recruitment",
 };
 
+const salesRequestId = "11111111-1111-4111-8111-111111111111";
+const salesHash = "f".repeat(64);
+const readySales = {
+  ...request,
+  id: "sales-inbox-1", source_system: "aa_console", source_kind: "client_sales_entitlement",
+  source_id: salesRequestId, source_version: salesHash, artifact_hash: salesHash,
+  title: "Grant sales access", source_state: "pending",
+  requested_by: "admin-1", requester_kind: "human", requester_ref: null,
+  expires_at: "2030-01-01T00:00:00Z",
+  preview: {
+    action: "grant", client_name: "Service Client", member_name: "Employee One",
+    client_id: "client-1", member_id: "member-1", bound_user_id: "employee-1",
+    permission: "Read and manage this client's leads and conversations",
+  },
+  destination: "client_sales_os:client-1", account_ref: "employee-1", budget: null,
+  scope: {
+    client_id: "client-1", member_id: "member-1", bound_user_id: "employee-1",
+    action: "grant", scope_hash: salesHash,
+  },
+  owner_role: "admin", preview_blocker: null,
+  owning_path: "/clients/client-1/delivery/sales-os?tab=leads",
+};
+
+const readySalesRevoke = {
+  ...readySales, id: "sales-inbox-revoke", source_id: "22222222-2222-4222-8222-222222222222",
+  title: "Revoke sales access", preview: { ...readySales.preview, action: "revoke" },
+  scope: { ...readySales.scope, action: "revoke" },
+};
+
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
@@ -526,6 +555,156 @@ describe("unified approval inbox", () => {
     const card = await screen.findByRole("article", { name: "Google review reply: Harbour Home" });
     expect(await within(card).findByRole("button", { name: "Approve exact version" })).toBeDisabled();
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("shows exact sales scope and decides a staged grant through its AAL2 owning RPC", async () => {
+    const user = userEvent.setup();
+    requests = [readySales];
+    rpc.mockImplementation(async () => {
+      requests = [{ ...readySales, status: "approved", source_state: "source_decided" }];
+      decisions = [{ request_id: readySales.id, decision: "approved", actor_id: "admin-1",
+        actor_aal: "aal2", reason: "Approved from unified Approval Inbox",
+        decided_at: "2026-10-30T09:00:00Z" }];
+      return { data: null, error: null };
+    });
+    show("global");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    expect(within(card).getByText(/Employee One/)).toBeInTheDocument();
+    expect(within(card).getAllByText(/member-1/)).toHaveLength(2);
+    expect(within(card).getByText(/Before enabling access, audit every approved, unrevoked grant/)).toBeInTheDocument();
+    expect(within(card).getByText(/Sales access request controls are not yet available/)).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "Open Sales OS workspace" }))
+      .toHaveAttribute("href", "/clients/client-1/delivery/sales-os?tab=leads");
+    await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_sales_entitlement", {
+      p_request_id: salesRequestId, p_scope_hash: salesHash,
+      p_approve: true, p_note: "Approved from unified Approval Inbox",
+    }));
+    await waitFor(() => expect(screen.getByText("Decision history (1)")).toBeInTheDocument());
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("uses the exact sales revoke source and requires a reason for rejection", async () => {
+    const user = userEvent.setup();
+    requests = [readySalesRevoke];
+    show("global");
+    const card = await screen.findByRole("article", { name: "Revoke sales access" });
+    expect(within(card).getByText("Sales access decision")).toBeInTheDocument();
+    const reject = within(card).getByRole("button", { name: "Reject with reason" });
+    expect(reject).toBeDisabled();
+    await user.type(within(card).getByRole("textbox", { name: "Reason to reject" }), " Wrong account ");
+    await user.click(reject);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_sales_entitlement", {
+      p_request_id: readySalesRevoke.source_id, p_scope_hash: salesHash,
+      p_approve: false, p_note: "Wrong account",
+    }));
+  });
+
+  it("closes an expired sales request by rejection and never offers approval", async () => {
+    const user = userEvent.setup();
+    requests = [{ ...readySales, status: "expired", expires_at: "2020-01-01T00:00:00Z" }];
+    show("global");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "expired");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    await user.type(within(card).getByRole("textbox", { name: "Reason to reject" }), "Window closed");
+    await user.click(within(card).getByRole("button", { name: "Reject with reason" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_sales_entitlement", {
+      p_request_id: salesRequestId, p_scope_hash: salesHash,
+      p_approve: false, p_note: "Window closed",
+    }));
+  });
+
+  it("offers only reasoned rejection when the live sales target becomes held", async () => {
+    const user = userEvent.setup();
+    requests = [{ ...readySales, status: "source_held", source_state: "source_held" }];
+    show("global");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "source_held");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    expect(within(card).getAllByText(/only be closed with a reasoned rejection/)).toHaveLength(2);
+    await user.type(within(card).getByRole("textbox", { name: "Reason to reject" }), "Employee account relinked");
+    await user.click(within(card).getByRole("button", { name: "Reject with reason" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_sales_entitlement", {
+      p_request_id: salesRequestId, p_scope_hash: salesHash,
+      p_approve: false, p_note: "Employee account relinked",
+    }));
+  });
+
+  it("keeps sales grants read-only for managers and malformed or superseded scopes", async () => {
+    requests = [readySales];
+    show("manager", "/employee/approvals");
+    expect(await screen.findByRole("heading", { name: "Manager approval inbox" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Grant sales access" })).not.toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["wrong owner", { owner_role: "admin_or_active_client_manager" }],
+    ["changed artifact", { artifact_hash: "e".repeat(64) }],
+    ["changed scope", { scope: { ...readySales.scope, member_id: "member-2" } }],
+    ["changed destination", { destination: "client_sales_os:another-client" }],
+    ["changed account", { account_ref: "employee-2" }],
+    ["changed action", { preview: { ...readySales.preview, action: "revoke" } }],
+    ["missing frozen name", { preview: { ...readySales.preview, member_name: "" } }],
+    ["no human origin", { requester_kind: "service", requested_by: null }],
+    ["source decided", { status: "source_decided", source_state: "source_decided" }],
+  ])("keeps a sales card read-only with %s", async (_label, change) => {
+    requests = [{ ...readySales, ...change }];
+    show("global");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Status" }), "all");
+    const card = await screen.findByRole("article");
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Reject with reason" })).not.toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rechecks AAL2 and a fresh exact sales card before calling the source", async () => {
+    requests = [readySales];
+    getAAL.mockResolvedValueOnce({ data: { currentLevel: "aal2" }, error: null })
+      .mockResolvedValue({ data: { currentLevel: "aal1" }, error: null });
+    show("global");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Complete MFA to reach AAL2/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a sales scope change between render and click", async () => {
+    requests = [readySales];
+    freshRequest = { ...readySales, scope: { ...readySales.scope, member_id: "member-2" } };
+    show("global");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByText(/This exact request changed or is no longer pending/))
+      .toHaveAttribute("role", "alert");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["requester", { requested_by: "admin-2" }],
+    ["request timestamp", { requested_at: "2026-10-30T08:00:01Z" }],
+    ["title", { title: "Revoke sales access" }],
+  ])("rejects a %s change between render and click", async (_label, change) => {
+    requests = [readySales];
+    freshRequest = { ...readySales, ...change };
+    show("global");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByText(/This exact request changed or is no longer pending/))
+      .toHaveAttribute("role", "alert");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a rejected sales source RPC without claiming a decision", async () => {
+    requests = [readySales];
+    rpc.mockResolvedValue({ data: null, error: { message: "The team member identity changed." } });
+    show("global");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The team member identity changed.");
+    expect(await within(await screen.findByRole("article", { name: "Grant sales access" }))
+      .findByRole("button", { name: "Approve exact version" })).toBeInTheDocument();
   });
 
   it("shows every client and the house client in the admin global Inbox with safe source links", async () => {
