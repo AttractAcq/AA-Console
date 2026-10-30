@@ -57,8 +57,11 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<Review | null>(null);
+  const [connectOpening, setConnectOpening] = useState<number | null>(null);
+  const [replyOpening, setReplyOpening] = useState<{ id: number; review: Review } | null>(null);
+  const nextOpeningId = useRef(0);
+  const connectOpeningRef = useRef<number | null>(null);
+  const replyOpeningRef = useRef<number | null>(null);
   const requestGeneration = useRef(0);
   const activeVisit = useRef(true);
 
@@ -123,6 +126,32 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
     };
   }, [refresh]);
 
+  function openConnect() {
+    if (!activeVisit.current) return;
+    const opening = ++nextOpeningId.current;
+    connectOpeningRef.current = opening;
+    setConnectOpening(opening);
+  }
+
+  function closeConnect(opening: number | null) {
+    if (!activeVisit.current || opening === null || connectOpeningRef.current !== opening) return;
+    connectOpeningRef.current = null;
+    setConnectOpening(null);
+  }
+
+  function openReply(review: Review) {
+    if (!activeVisit.current || review.client_id !== clientId) return;
+    const opening = ++nextOpeningId.current;
+    replyOpeningRef.current = opening;
+    setReplyOpening({ id: opening, review });
+  }
+
+  function closeReply(opening: number | null) {
+    if (!activeVisit.current || opening === null || replyOpeningRef.current !== opening) return;
+    replyOpeningRef.current = null;
+    setReplyOpening(null);
+  }
+
   async function act(key: string, work: () => Promise<void>, said: string) {
     if (!activeVisit.current || busy) return;
     setBusy(key);
@@ -168,7 +197,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                 reaches the profile through Proof Distribution.
               </p>
             </div>
-            <Button onClick={() => { if (activeVisit.current) setConnecting(true); }}>
+            <Button onClick={openConnect}>
               Connect a location
             </Button>
           </div>
@@ -345,9 +374,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                         }]
                       : []),
                     ...(!reply && !r.gone_at
-                      ? [{ label: "Draft a reply", onSelect: () => {
-                          if (activeVisit.current && r.client_id === clientId) setReplyingTo(r);
-                        } }]
+                      ? [{ label: "Draft a reply", onSelect: () => openReply(r) }]
                       : []),
                   ]}
                 />,
@@ -399,8 +426,9 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
       )}
 
       <FormModal
-        open={connecting}
-        onClose={() => { if (activeVisit.current) setConnecting(false); }}
+        key={`connect-${connectOpening ?? "closed"}`}
+        open={connectOpening !== null}
+        onClose={() => closeConnect(connectOpening)}
         title="Connect a Business Profile location"
         submitLabel="Connect"
         intro="The location as Google addresses it. Connecting records it; it reads nothing until a google_business credential exists on the Integrations page."
@@ -417,6 +445,9 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           if (!activeVisit.current || !clientId) {
             throw new Error("Client selection changed. Reopen the form.");
           }
+          if (connectOpening === null || connectOpeningRef.current !== connectOpening) {
+            throw new Error("This form has been replaced. Reopen it.");
+          }
           const { error: insertError } = await supabase.from("client_google_locations").insert({
             client_id: clientId,
             location_ref: String(values.location_ref).trim(),
@@ -424,38 +455,46 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
             address: values.address ? String(values.address).trim() : null,
           });
           if (insertError) throw new Error(insertError.message);
-          if (activeVisit.current) setNotice("Connected. Nothing is read until a credential exists.");
+          if (activeVisit.current && connectOpeningRef.current === connectOpening) {
+            setNotice("Connected. Nothing is read until a credential exists.");
+          }
         }}
         onSaved={() => {
-          if (!activeVisit.current) return;
-          setConnecting(false);
+          if (!activeVisit.current || connectOpeningRef.current !== connectOpening) return;
+          closeConnect(connectOpening);
           void refresh();
         }}
       />
 
       <FormModal
-        open={replyingTo !== null}
-        onClose={() => { if (activeVisit.current) setReplyingTo(null); }}
-        title={replyingTo ? `Reply to ${replyingTo.author_name ?? "a review"}` : "Draft a reply"}
+        key={`reply-${replyOpening?.id ?? "closed"}`}
+        open={replyOpening !== null}
+        onClose={() => closeReply(replyOpening?.id ?? null)}
+        title={replyOpening ? `Reply to ${replyOpening.review.author_name ?? "a review"}` : "Draft a reply"}
         submitLabel="Save the draft"
         intro="A reply is an external effect on somebody else's profile, so it waits for approval. The exact words are hashed: editing them afterwards means asking again."
         fields={[
           { name: "body", label: "Reply", kind: "textarea", required: true, rows: 5 },
         ]}
         onSubmit={async (values) => {
-          if (!activeVisit.current || !clientId || !replyingTo || replyingTo.client_id !== clientId) {
+          if (!activeVisit.current || !clientId || !replyOpening || replyOpening.review.client_id !== clientId) {
             throw new Error("Client selection changed. Reopen the form.");
           }
+          if (replyOpeningRef.current !== replyOpening.id) {
+            throw new Error("This form has been replaced. Reopen it.");
+          }
           const { error: rpcError } = await supabase.rpc("draft_google_review_reply_v6", {
-            p_review_id: replyingTo.id,
+            p_review_id: replyOpening.review.id,
             p_body: String(values.body),
           });
           if (rpcError) throw new Error(rpcError.message);
-          if (activeVisit.current) setNotice("Drafted. It waits for a person.");
+          if (activeVisit.current && replyOpeningRef.current === replyOpening.id) {
+            setNotice("Drafted. It waits for a person.");
+          }
         }}
         onSaved={() => {
-          if (!activeVisit.current) return;
-          setReplyingTo(null);
+          if (!activeVisit.current || !replyOpening || replyOpeningRef.current !== replyOpening.id) return;
+          closeReply(replyOpening.id);
           void refresh();
         }}
       />
