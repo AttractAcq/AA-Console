@@ -29,7 +29,8 @@ function facts() {
       status: 'completed', conclusion: 'success',
       created_at: new Date(now - 60_000).toISOString(),
       updated_at: new Date(now - 10_000).toISOString(),
-      repository: { full_name: REPOSITORY }, pull_requests: [] },
+      repository: { full_name: REPOSITORY },
+      pull_requests: [{ number: 297, head: { sha: HEAD }, base: { sha: BASE } }] },
   }
 }
 
@@ -111,6 +112,7 @@ test('a wrong or absent protected-base workflow run cannot publish', async () =>
     (h: ReturnType<typeof harness>) => { h.state.run.conclusion = 'failure' },
     (h: ReturnType<typeof harness>) => { h.state.run.updated_at = new Date(Date.now() - 16 * 60_000).toISOString() },
     (h: ReturnType<typeof harness>) => { h.state.run.created_at = new Date(Date.now() - 31 * 60_000).toISOString() },
+    (h: ReturnType<typeof harness>) => { h.state.run.pull_requests = [] },
     (h: ReturnType<typeof harness>) => { h.state.run.pull_requests = [{ number: 298, head: { sha: HEAD }, base: { sha: BASE } }] },
     (h: ReturnType<typeof harness>) => { h.state.run.pull_requests = [
       { number: 297, head: { sha: HEAD }, base: { sha: BASE } },

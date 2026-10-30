@@ -100,10 +100,12 @@ from the pinned GitHub Actions app plus the distinct
 the exact PR head. It verifies the App check's deterministic `external_id`
 against the request, packet, PR/head/base, trusted workflow run ID and run
 attempt. The workflow run itself must be the completed successful
-`pull_request_target` workflow on the protected base. A nonempty workflow-run
-PR association must identify this exact PR/head/base; an empty association
-is accepted only because the dedicated App check binds those facts. The live
-pilot must establish GitHub's actual association and required-check behavior.
+`pull_request_target` workflow on the protected base. The workflow run must
+have exactly one GitHub-reported PR association for this PR/head/base. An
+empty or multiple association fails even with the App-owned binding. If
+GitHub omits the association for this event, a separately verified run-bound
+event artifact must be implemented before activation. The live pilot must
+establish GitHub's actual association and required-check behavior.
 The merger then acquires
 the lease, repeats the canonical/GitHub checks, and
 calls the dispatch RPC. The future merge call supplies the exact PR head SHA
@@ -282,10 +284,10 @@ approved packet SHA-256, workflow run ID and run attempt. Its `details_url`
 names that GitHub Actions run. The merger recomputes this reference, requires
 the configured App ID and slug to match both branch protection and the
 check, requires the App check to be successful on the exact PR head, and
-requires the linked protected-base workflow to finish successfully. A wrong
-nonempty workflow-run PR association is rejected. An empty association is
-allowed only with the App-owned exact binding; the App token is therefore a
-critical trust root. A stale green App check after revocation cannot authorize
+requires the linked protected-base workflow to finish successfully. The run
+must have exactly one GitHub association for the approved PR/head/base; an
+empty, wrong or multiple association is rejected. The App-owned digest alone
+cannot establish which PR caused a run. A stale green App check after revocation cannot authorize
 the effect because the merger's AAL2 re-read and database lease reject it.
 
 **Q020 choices and pilot evidence to collect before activation:**
@@ -301,7 +303,10 @@ the effect because the merger's AAL2 re-read and database lease reject it.
    cannot change its own verifier. Build a separate completed-run broker that
    recovers the original event's exact request/PR/head/base from a trusted
    run-bound artifact or equally strong first-party evidence, then repeats
-   all independent reads. The broker is **not** built here. It must never
+   all independent reads. The broker is **not** built here. The current
+   publisher and merger require the GitHub run API's exact single PR
+   association; if this API returns an empty array, build and independently
+   verify the run-bound artifact before changing that requirement. Never
    trust a client-supplied event or execute PR-head code with credentials.
 3. Use a same-repository trial PR to record the native job check SHA, the App
    check SHA, App ID/slug, `external_id`, linked workflow run path/event/base,

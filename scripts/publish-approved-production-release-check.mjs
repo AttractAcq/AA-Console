@@ -50,18 +50,19 @@ function assertTrustedRun(run, approved, workflowRunId, workflowRunAttempt, now)
       || now - startedAt > 30 * 60_000
       || run?.repository?.full_name !== REPOSITORY
       || !Array.isArray(run?.pull_requests)
-      || (run.pull_requests.length > 0 && (run.pull_requests.length !== 1
-        || run.pull_requests[0]?.number !== approved.prNumber
-        || run.pull_requests[0]?.head?.sha !== approved.headSha
-        || run.pull_requests[0]?.base?.sha !== approved.baseSha)))
+      || run.pull_requests.length !== 1
+      || run.pull_requests[0]?.number !== approved.prNumber
+      || run.pull_requests[0]?.head?.sha !== approved.headSha
+      || run.pull_requests[0]?.base?.sha !== approved.baseSha)
     fail('protected-base workflow run does not match the approved candidate')
 }
 
 // GitHub's pull_request_target job can attach to the base commit. This
 // dedicated App publishes a distinct check directly on the approved PR head.
-// An absent run pull_requests association is allowed only here because the
-// App-owned external_id binds the run and exact PR/base/head/packet. The
-// later trusted merger must independently re-read that binding and AAL2 state.
+// GitHub must independently associate the completed run to the one approved
+// PR/head/base. The App external_id is an additional binding, not a substitute
+// for that provenance. Empty associations fail until a separately verified
+// run-bound event artifact exists. The merger also re-reads AAL2 state.
 export async function publishApprovedProductionReleaseHeadCheck({
   event, eventName, repository, eventSha, workflowRunId, workflowRunAttempt,
   checkoutDir, supabaseUrl, serviceRoleKey, verificationToken, appToken,

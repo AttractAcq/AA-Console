@@ -128,11 +128,10 @@ export function assertProtectedReleaseBoundary({ plan, branch, pr, protection,
       || trustedRun?.status !== 'completed' || trustedRun?.conclusion !== 'success'
       || trustedRun?.repository?.full_name !== REPOSITORY
       || !Array.isArray(trustedRun?.pull_requests)
-      || (trustedRun.pull_requests.length > 0
-        && (trustedRun.pull_requests.length !== 1
-          || trustedRun.pull_requests[0]?.number !== plan.prNumber
-          || trustedRun.pull_requests[0]?.head?.sha !== plan.headSha
-          || trustedRun.pull_requests[0]?.base?.sha !== plan.baseSha))
+      || trustedRun.pull_requests.length !== 1
+      || trustedRun.pull_requests[0]?.number !== plan.prNumber
+      || trustedRun.pull_requests[0]?.head?.sha !== plan.headSha
+      || trustedRun.pull_requests[0]?.base?.sha !== plan.baseSha
       || trusted.external_id !== approvedReleaseCheckExternalId(plan,
         trustedRun.id, trustedRun.run_attempt))
     fail('App check does not bind the exact protected-base release workflow and plan')
