@@ -28059,6 +28059,49 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_client_engine_budget_v6: {
+        Args: {
+          p_cap_usd: number
+          p_client_id: string
+          p_month: string
+          p_note?: string
+        }
+        Returns: {
+          cap_usd: number
+          client_id: string
+          created_at: string
+          month: string
+          note: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_engine_budgets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_client_timezone_v6: {
+        Args: { p_client_id: string; p_timezone: string }
+        Returns: {
+          created_at: string
+          id: string
+          initials: string
+          is_internal: boolean
+          location: string | null
+          name: string
+          sector: string | null
+          tier: string | null
+          timezone: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "clients"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_content_approval_owner: {
         Args: { p_user_id: string }
         Returns: undefined
