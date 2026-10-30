@@ -4,23 +4,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../../config.js";
 import type { AgentRow } from "../../orchestration/registry.js";
 import type { AgentJobRow } from "../../queue.js";
-import { runCampaignActionJob, HANDLERS, type ClaimedAction } from "./executor.js";
+import {
+  ActionError, HANDLERS, enrolCampaignLeads, releaseProofPlacements,
+  runCampaignActionJob, type ClaimedAction,
+} from "./executor.js";
+import { GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD } from "./preclaim-hold.js";
 
-/**
- * The executor's own behaviour, with the database faked.
- *
- * What is worth asserting here is everything that decides whether an
- * external act happens and whether the record of it is true: the runtime
- * switch, an action with no handler, a failure's retryability, and the case
- * where the act succeeded but recording it did not. The SQL guarantees --
- * stale packages, switches, hashes -- are asserted against a real Postgres
- * in campaign-action-executor.pg.test.ts, because that is where they live.
- */
-
-const agent = { agent_key: "campaign_action_executor" } as unknown as AgentRow;
-const job = { id: "job-1", params: { limit: 3 } } as unknown as AgentJobRow;
+const agent = { agent_key: "campaign_action_executor" } as AgentRow;
 const on = { campaignActionsEnabled: true } as RuntimeConfig;
 const off = { campaignActionsEnabled: false } as RuntimeConfig;
+const job = (params: Record<string, unknown> = { limit: 3 }) =>
+  ({ id: "job-1", params }) as AgentJobRow;
 
 const ACTION: ClaimedAction = {
   execution_id: "exec-1",
@@ -35,299 +29,159 @@ const ACTION: ClaimedAction = {
   attempt: 1,
 };
 
-const REGISTRY = [
-  { action_key: "campaign_launch", executor_module: "campaign_factory", supported: false },
-  { action_key: "meta_ad_build", executor_module: "meta_ads_studio", supported: false },
-  { action_key: "google_ad_build", executor_module: "google_ads_studio", supported: false },
-  { action_key: "organic_publish", executor_module: "content_distribution", supported: false },
-  { action_key: "proof_publish", executor_module: "proof_distribution", supported: true },
-  { action_key: "page_deploy", executor_module: "website_studio", supported: true },
-  { action_key: "lead_message", executor_module: "sales_os", supported: true },
-  { action_key: "profile_update", executor_module: "google_profile", supported: false },
-  { action_key: "budget_change", executor_module: "meta_ads_studio", supported: true },
-];
-
-function database(
-  options: {
-    claimed?: ClaimedAction[];
-    release?: { released?: number; skipped?: unknown[] };
-    releaseError?: string;
-    recordError?: string;
-    enrol?: { enrolled?: number; skipped?: unknown[]; sequence_name?: string };
-    enrolError?: string;
-    registry?: unknown;
-    registryError?: string;
-  } = {},
-) {
+function database(options: {
+  registry?: { metaAdBuildSupported: boolean };
+  onInsert?: () => Promise<void>;
+} = {}) {
   const events: Record<string, unknown>[] = [];
-  const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
-  const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
-    calls.push({ name, args });
-    if (name === "claim_campaign_actions") {
-      return { data: options.claimed ?? [ACTION], error: null };
-    }
-    if (name === "release_campaign_proof_placements") {
-      if (options.releaseError) return { data: null, error: { message: options.releaseError } };
-      return { data: options.release ?? { released: 1, skipped: [] }, error: null };
-    }
-    if (name === "enrol_campaign_leads_in_sequence_v6") {
-      if (options.enrolError) return { data: null, error: { message: options.enrolError } };
-      return { data: options.enrol ?? { enrolled: 1, skipped: [] }, error: null };
-    }
-    if (name === "record_campaign_action_executed" && options.recordError) {
-      return { data: null, error: { message: options.recordError } };
+  const rpc = vi.fn(async (name: string, _args?: unknown) => {
+    if (name === "claim_campaign_actions" && options.registry?.metaAdBuildSupported) {
+      return { data: [{ ...ACTION, action_key: "meta_ad_build" }], error: null };
     }
     return { data: null, error: null };
   });
   const from = vi.fn((table: string) => {
-    if (table === "campaign_action_executors") {
-      return {
-        select: () => ({
-          order: async () => ({
-            data: options.registry === undefined ? REGISTRY : options.registry,
-            error: options.registryError ? { message: options.registryError } : null,
-          }),
-        }),
-      };
+    if (table !== "agent_job_events") {
+      throw new Error("The held sweep must not read " + table + ".");
     }
-    if (table === "agent_job_events") {
-      return {
-        insert: vi.fn(async (row: Record<string, unknown>) => {
-          events.push(row);
-          return { error: null };
-        }),
-      };
-    }
-    throw new Error(`The executor should not be reading ${table}.`);
+    return {
+      insert: vi.fn(async (row: Record<string, unknown>) => {
+        events.push(row);
+        await options.onInsert?.();
+        return { error: null };
+      }),
+    };
   });
-  return { sb: { rpc, from } as unknown as SupabaseClient, events, calls, rpc, from };
+  return { sb: { rpc, from } as unknown as SupabaseClient, rpc, from, events };
 }
 
-/** Every rpc call of one name, in order. */
-const callsTo = (calls: Array<{ name: string; args: Record<string, unknown> }>, name: string) =>
-  calls.filter((call) => call.name === name).map((call) => call.args);
-
-describe("the runtime switch", () => {
-  it("claims nothing at all when campaign actions are off", async () => {
-    const { sb, calls, events, from } = database();
-    const result = await runCampaignActionJob(sb, off, agent, job);
-
+describe("generic campaign action preclaim hold", () => {
+  it("treats the disabled runtime switch as an idle state without reading or claiming", async () => {
+    const { sb, rpc, from, events } = database();
+    const result = await runCampaignActionJob(sb, off, agent, job());
     expect(result).toEqual({ ok: true, retryable: false });
-    // Not a dry run: nothing is claimed, so nothing can be recorded as done.
-    expect(callsTo(calls, "claim_campaign_actions")).toHaveLength(0);
-    expect(from).not.toHaveBeenCalledWith("campaign_action_executors");
+    expect(rpc).not.toHaveBeenCalled();
+    expect(from).toHaveBeenCalledExactlyOnceWith("agent_job_events");
     expect(String(events[0]?.description)).toContain("CAMPAIGN_ACTIONS_ENABLED");
   });
 
-  it("says so plainly when nothing is approved and waiting", async () => {
-    const { sb, events } = database({ claimed: [] });
-    await runCampaignActionJob(sb, on, agent, job);
-    expect(String(events[0]?.description)).toContain("No approved action is waiting");
-  });
-});
+  it.each([
+    "proof_publish", "page_deploy", "lead_message", "budget_change",
+    "meta_ad_build", "google_ad_build", "profile_update", "unknown_action",
+  ])("does not claim or execute %s even with the broad switch on", async (actionKey) => {
+    const { sb, rpc, from, events } = database();
+    const result = await runCampaignActionJob(sb, on, agent, job({
+      limit: 20, action_key: actionKey, bypass_preclaim_hold: true,
+      approval_id: "forged-approved-version",
+    }));
 
-describe("performing an approved action", () => {
-  it("releases the placements and records the result against the execution", async () => {
-    const { sb, calls } = database({ release: { released: 2, skipped: [] } });
-    await runCampaignActionJob(sb, on, agent, job);
-
-    expect(callsTo(calls, "release_campaign_proof_placements")).toEqual([
-      { p_execution_id: "exec-1" },
-    ]);
-    expect(callsTo(calls, "record_campaign_action_executed")).toEqual([
-      {
-        p_execution_id: "exec-1",
-        p_external_id: null,
-        p_external_url: null,
-        p_result: { released: 2, skipped: [] },
-      },
-    ]);
-    expect(callsTo(calls, "record_campaign_action_failure")).toHaveLength(0);
-  });
-
-  it("keeps the skipped placements on the record rather than only the count", async () => {
-    const skipped = [{ placement_id: "pl-9", reason: "The payload changed after approval." }];
-    const { sb, calls } = database({ release: { released: 1, skipped } });
-    await runCampaignActionJob(sb, on, agent, job);
-
-    expect(callsTo(calls, "record_campaign_action_executed")[0]).toMatchObject({
-      p_result: { released: 1, skipped },
+    expect(result).toMatchObject({
+      ok: false,
+      retryable: false,
+      failureMessage: expect.stringContaining(GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD),
     });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(from).toHaveBeenCalledExactlyOnceWith("agent_job_events");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ level: "warn" });
+    expect(String(events[0]?.description)).toContain("No action was claimed.");
   });
 
-  it("fails, non-retryably, when the decision released nothing", async () => {
-    // Everything named in the approval has moved on. Trying again would ask
-    // the same question of the same unchanged rows.
-    const { sb, calls } = database({
-      release: { released: 0, skipped: [{ reason: "The placement is retracted." }] },
-    });
-    await runCampaignActionJob(sb, on, agent, job);
-
-    const failure = callsTo(calls, "record_campaign_action_failure")[0]!;
-    expect(failure.p_retryable).toBe(false);
-    expect(String(failure.p_reason)).toContain("retracted");
-    expect(callsTo(calls, "record_campaign_action_executed")).toHaveLength(0);
-  });
-
-  it("treats a database error on release as retryable", async () => {
-    const { sb, calls } = database({ releaseError: "could not serialize access" });
-    await runCampaignActionJob(sb, on, agent, job);
-
-    expect(callsTo(calls, "record_campaign_action_failure")[0]).toMatchObject({
-      p_retryable: true,
-    });
-  });
-});
-
-describe("an action with nothing to perform it", () => {
-  it("refuses all claims when SQL advertises a missing Meta or profile handler", async () => {
-    const { sb, calls, events } = database({ registry: REGISTRY.map((row) => ({
-      ...row,
-      supported: ["meta_ad_build", "profile_update"].includes(row.action_key) ? true : row.supported,
-    })) });
-    const result = await runCampaignActionJob(sb, on, agent, job);
-    expect(result).toMatchObject({ ok: false, retryable: false });
-    expect(result.failureMessage).toContain("meta_ad_build, profile_update");
-    expect(callsTo(calls, "claim_campaign_actions")).toHaveLength(0);
-    expect(callsTo(calls, "record_campaign_action_failure")).toHaveLength(0);
-    expect(callsTo(calls, "release_campaign_proof_placements")).toHaveLength(0);
-    expect(String(events[0]?.description)).toContain("No action was claimed");
-  });
-
-  it("refuses claims when Google is incorrectly promoted before its handler", async () => {
-    const { sb, calls } = database({ registry: REGISTRY.map((row) => ({
-      ...row, supported: row.action_key === "google_ad_build" ? true : row.supported,
-    })) });
-    const result = await runCampaignActionJob(sb, on, agent, job);
-    expect(result.failureMessage).toContain("google_ad_build");
-    expect(callsTo(calls, "claim_campaign_actions")).toHaveLength(0);
-  });
-
-  it.each([null, [], REGISTRY.slice(1),
-    REGISTRY.map((row) => row.action_key === "proof_publish" ? { ...row, supported: null } : row),
-    [...REGISTRY, REGISTRY[0]]])(
-    "refuses a missing or malformed registry before claiming", async (registry) => {
-      const { sb, calls } = database({ registry });
-      const result = await runCampaignActionJob(sb, on, agent, job);
-      expect(result.failureMessage).toContain("could not be verified");
-      expect(callsTo(calls, "claim_campaign_actions")).toHaveLength(0);
-    });
-
-  it("refuses claims when the registry read fails", async () => {
-    const { sb, calls } = database({ registryError: "database unavailable" });
-    const result = await runCampaignActionJob(sb, on, agent, job);
-    expect(result.failureMessage).toContain("could not be verified");
-    expect(callsTo(calls, "claim_campaign_actions")).toHaveLength(0);
-  });
-
-  it("fails loudly rather than leaving it claimed", async () => {
-    // Only reachable by marking an action supported without writing its
-    // executor, which is exactly the mistake worth a loud failure.
-    const { sb, calls } = database({
-      claimed: [{ ...ACTION, action_key: "google_ad_build" }],
-    });
-    await runCampaignActionJob(sb, on, agent, job);
-
-    const failure = callsTo(calls, "record_campaign_action_failure")[0]!;
-    expect(String(failure.p_reason)).toContain("no executor for google ad build");
-    expect(failure.p_retryable).toBe(false);
-  });
-
-  it("registers an executor only for the actions that have one", () => {
-    // The guard on the other direction: this list and
-    // campaign_action_executors.supported have to agree, and the failure
-    // mode of them disagreeing is an action claimed and then failed.
-    expect(Object.keys(HANDLERS)).toEqual(["proof_publish", "page_deploy", "lead_message", "budget_change"]);
-  });
-});
-
-describe("done but not recorded", () => {
-  it("records a failure that says the act happened", async () => {
-    const { sb, calls } = database({ recordError: "deadlock detected" });
-    await runCampaignActionJob(sb, on, agent, job);
-
-    const failure = callsTo(calls, "record_campaign_action_failure")[0]!;
-    // The wording matters: whoever reads this has to know the external side
-    // may already have changed, so a retry is not obviously safe.
-    expect(String(failure.p_reason)).toContain("Done, but could not be recorded");
-    expect(failure.p_retryable).toBe(false);
-  });
-});
-
-describe("one action's failure is its own", () => {
-  it("carries on to the next action and reports both", async () => {
-    const { sb, calls, events } = database({
-      claimed: [
-        // Still without an executor, so it is the one that fails loudly.
-        { ...ACTION, action_key: "google_ad_build", execution_id: "exec-bad" },
-        { ...ACTION, execution_id: "exec-good" },
-      ],
-    });
-    await runCampaignActionJob(sb, on, agent, job);
-
-    expect(callsTo(calls, "record_campaign_action_failure")[0]).toMatchObject({
-      p_execution_id: "exec-bad",
-    });
-    expect(callsTo(calls, "record_campaign_action_executed")[0]).toMatchObject({
-      p_execution_id: "exec-good",
-    });
-    expect(events.map((event) => String(event.description))).toContain("1 done, 1 not.");
-  });
-});
-
-/**
- * G11's handler: enrolling a campaign's leads.
- *
- * The thing worth pinning is the blast radius. Enrolling is not sending, so
- * a hundred enrolments is not a hundred emails — but enrolling nobody when
- * the approval said somebody was eligible means something changed, and that
- * should reach a person rather than be recorded as a success.
- */
-describe("enrolling a campaign's leads", () => {
-  const leadMessage: ClaimedAction = {
-    ...ACTION,
-    action_key: "lead_message",
-    destination: "nurture sequence: Objections",
-    scope: { sequence_id: "seq-1", steps: 3 },
-  };
-
-  it("records what it enrolled and names the sequence", async () => {
-    const { sb, calls, events } = database({
-      claimed: [leadMessage],
-      enrol: { enrolled: 4, skipped: [], sequence_name: "Objections" },
-    });
-    await runCampaignActionJob(sb, on, agent, job);
-
-    const executed = calls.find((c) => c.name === "record_campaign_action_executed");
-    expect(executed).toBeDefined();
-    // The count goes on the row; the sentence goes on the job's events, which
-    // is where a person reads it.
-    expect((executed!.args as { p_result?: { enrolled?: number } }).p_result)
-      .toMatchObject({ enrolled: 4 });
-    expect(events.some((e) => String(e.description).includes("Enrolled 4 leads into Objections.")))
-      .toBe(true);
-  });
-
-  it("fails without retrying when nobody turns out to be eligible", async () => {
-    const { sb, calls } = database({
-      claimed: [leadMessage],
-      enrol: {
-        enrolled: 0,
-        skipped: [{ lead_id: "l-1", reason: "They unsubscribed or complained." }],
+  it("cannot race a support-bit promotion between a registry read and claim", async () => {
+    // Pause one sweep after it has entered the hold path, then promote an
+    // unhandled key before a second sweep starts. The mock SQL claim would
+    // return that newly supported key if either worker called it.
+    const registry = { metaAdBuildSupported: false };
+    let entered!: () => void;
+    let resume!: () => void;
+    const firstEventEntered = new Promise<void>((resolve) => { entered = resolve; });
+    const resumeFirst = new Promise<void>((resolve) => { resume = resolve; });
+    let insertCount = 0;
+    const { sb, rpc, from, events } = database({
+      registry,
+      onInsert: async () => {
+        if (++insertCount === 1) {
+          entered();
+          await resumeFirst;
+        }
       },
     });
-    await runCampaignActionJob(sb, on, agent, job);
-    const failed = calls.find((c) => c.name === "record_campaign_action_failure");
-    expect(failed).toBeDefined();
-    const args = failed!.args as { p_retryable?: boolean; p_reason?: string };
-    expect(args.p_retryable).toBe(false);
-    expect(String(args.p_reason)).toContain("unsubscribed");
+    const first = runCampaignActionJob(sb, on, agent, job({ action_key: "proof_publish" }));
+    await firstEventEntered;
+    registry.metaAdBuildSupported = true;
+    const second = runCampaignActionJob(sb, on, agent, job({ action_key: "meta_ad_build" }));
+    resume();
+    const results = await Promise.all([first, second]);
+
+    expect(registry.metaAdBuildSupported).toBe(true);
+    expect(results.every((result) => result.ok === false)).toBe(true);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(from).toHaveBeenCalledTimes(2);
+    expect(from).toHaveBeenNthCalledWith(1, "agent_job_events");
+    expect(from).toHaveBeenNthCalledWith(2, "agent_job_events");
+    expect(events).toHaveLength(2);
+  });
+});
+
+describe("dormant handler bodies", () => {
+  it("has no fallback handler for unknown campaign actions", () => {
+    expect(Object.keys(HANDLERS)).toEqual([
+      "proof_publish", "page_deploy", "lead_message", "budget_change",
+    ]);
+    expect(HANDLERS.google_ad_build).toBeUndefined();
+    expect(HANDLERS.profile_update).toBeUndefined();
   });
 
-  it("retries when the enrolment call itself fails", async () => {
-    const { sb, calls } = database({ claimed: [leadMessage], enrolError: "deadlock detected" });
-    await runCampaignActionJob(sb, on, agent, job);
-    const failed = calls.find((c) => c.name === "record_campaign_action_failure");
-    expect((failed!.args as { p_retryable?: boolean }).p_retryable).toBe(true);
+  it("releases only the exact claimed proof execution and preserves skips", async () => {
+    const skipped = [{ placement_id: "pl-9", reason: "Payload changed after approval." }];
+    const rpc = vi.fn(async () => ({ data: { released: 2, skipped }, error: null }));
+    const outcome = await releaseProofPlacements({ rpc } as unknown as SupabaseClient, on, ACTION);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("release_campaign_proof_placements", {
+      p_execution_id: ACTION.execution_id,
+    });
+    expect(outcome.result).toEqual({ released: 2, skipped });
+  });
+
+  it("does not call an empty proof release a success", async () => {
+    const rpc = vi.fn(async () => ({
+      data: { released: 0, skipped: [{ reason: "The placement is retracted." }] },
+      error: null,
+    }));
+    await expect(releaseProofPlacements({ rpc } as unknown as SupabaseClient, on, ACTION))
+      .rejects.toMatchObject({
+        name: "ActionError", retryable: false,
+        message: expect.stringContaining("retracted"),
+      });
+  });
+
+  it("keeps a failed proof-release transaction retryable", async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: { message: "serialization failure" } }));
+    await expect(releaseProofPlacements({ rpc } as unknown as SupabaseClient, on, ACTION))
+      .rejects.toMatchObject({ retryable: true });
+  });
+
+  it("enrols only the exact claimed lead-message execution", async () => {
+    const rpc = vi.fn(async () => ({
+      data: { enrolled: 4, skipped: [], sequence_name: "Objections" }, error: null,
+    }));
+    const outcome = await enrolCampaignLeads({ rpc } as unknown as SupabaseClient, on, {
+      ...ACTION, action_key: "lead_message",
+    });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("enrol_campaign_leads_in_sequence_v6", {
+      p_execution_id: ACTION.execution_id,
+    });
+    expect(outcome.result).toMatchObject({ enrolled: 4, sequence: "Objections" });
+  });
+
+  it("treats a zero-recipient enrolment as a nonretryable failure", async () => {
+    const rpc = vi.fn(async () => ({
+      data: { enrolled: 0, skipped: [{ reason: "Unsubscribed." }] }, error: null,
+    }));
+    await expect(enrolCampaignLeads({ rpc } as unknown as SupabaseClient, on, {
+      ...ACTION, action_key: "lead_message",
+    })).rejects.toMatchObject({
+      name: ActionError.name, retryable: false,
+      message: expect.stringContaining("Unsubscribed"),
+    });
   });
 });

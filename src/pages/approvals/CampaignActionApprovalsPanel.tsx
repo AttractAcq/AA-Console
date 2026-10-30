@@ -113,11 +113,17 @@ export function CampaignActionApprovalsPanel() {
       <div>
         <h2 className="text-xl font-semibold">Campaign action requests</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Each decision covers one campaign package version, destination, action and scope. An
-          approved action is performed by its own executor, against the exact version approved
-          here, and what it did is recorded below rather than assumed.
+          Each decision covers one campaign package version, destination, action and scope.
+          Approval records the decision; it does not perform the action. Execution receipts
+          appear below only after an action actually runs.
         </p>
       </div>
+
+      <p role="status" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        Generic campaign action claims are held before the worker reads or claims an approval.
+        The current database claim cannot atomically limit work to actions this runtime handles.
+        A client switch or approval does not release this hold.
+      </p>
 
       {/* The client switch. Approving an action and switching the client on
           are two separate acts on purpose: a decision about one campaign is
@@ -129,13 +135,13 @@ export function CampaignActionApprovalsPanel() {
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {actionsOn
-              ? "Approved actions with an executor will be performed. Each one still needs its own approval."
-              : "Nothing approved here will be performed until this is on. Approvals are still recorded."}
+              ? "This client switch is on, but the generic worker is held before claim. Each action still needs its own exact-version approval."
+              : "The generic worker is held before claim. Approvals are still recorded."}
           </p>
         </div>
         <button
           type="button"
-          disabled={!clientId || busyId === "switch"}
+          disabled={!clientId || busyId === "switch" || !actionsOn}
           onClick={() => {
             if (!clientId) return;
             setBusyId("switch");
@@ -149,7 +155,7 @@ export function CampaignActionApprovalsPanel() {
           }}
           className="rounded-lg border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
-          {actionsOn ? "Turn off" : "Turn on"}
+          {actionsOn ? "Turn off" : "Turn on (held)"}
         </button>
       </div>
       {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
@@ -217,8 +223,8 @@ export function CampaignActionApprovalsPanel() {
         <div>
           <h2 className="text-lg font-semibold">After the decision</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Approved actions, and why each has or has not been performed. A blank reason means it
-            would be taken on the next sweep.
+            Approved actions, and why each has or has not been performed. The database due view
+            does not include this runtime's generic preclaim hold.
           </p>
         </div>
         {decided.length === 0 ? (
@@ -255,7 +261,7 @@ export function CampaignActionApprovalsPanel() {
                   <div>
                     <dt className="text-muted-foreground">Why not, if not</dt>
                     <dd className={action.blocker ? "text-destructive" : "text-brand-strong"}>
-                      {action.blocker ?? "Nothing is stopping it."}
+                      {action.blocker ?? "Database due; the generic runtime worker is held before claim."}
                     </dd>
                   </div>
                   {action.external_id && (

@@ -151,20 +151,25 @@ it("shows the reason an approved action has not happened, and does not call it d
   expect(screen.getByText(/Nothing has tried to perform it yet/)).toBeInTheDocument();
 });
 
-it("keeps the client switch separate from any one approval", async () => {
-  const user = userEvent.setup();
+it("shows the generic hold and does not offer a switch-on action", async () => {
   render(<CampaignActionApprovalsPanel />);
   expect(
     await screen.findByText("External campaign actions are off for this client"),
   ).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent(/held before the worker reads or claims/);
+  expect(screen.getByRole("button", { name: "Turn on (held)" })).toBeDisabled();
+  expect(rpc).not.toHaveBeenCalledWith("set_campaign_actions_enabled", expect.anything());
+});
 
-  await user.click(screen.getByRole("button", { name: "Turn on" }));
-  await waitFor(() =>
-    expect(rpc).toHaveBeenCalledWith("set_campaign_actions_enabled", {
-      p_client_id: "client-1",
-      p_enabled: true,
-    }),
-  );
+it("keeps the ability to turn an already-on client switch off", async () => {
+  const user = userEvent.setup();
+  database({ actionsOn: true });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByText("External campaign actions are on for this client")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Turn off" }));
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("set_campaign_actions_enabled", {
+    p_client_id: "client-1", p_enabled: false,
+  }));
 });
 
 it("reports a failed attempt's error rather than leaving it blank", async () => {

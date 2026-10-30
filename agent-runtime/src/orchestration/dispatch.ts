@@ -137,11 +137,9 @@ const RUNNERS: Record<string, JobRunner> = {
   // client: two switches, so turning it on for one account is not turning
   // it on for every account.
   publisher: runPublisherJob,
-  // The other thing that makes an external system say something, and the
-  // one gate every v6 module ends at. Does nothing unless
-  // CAMPAIGN_ACTIONS_ENABLED is on here AND campaign actions are on for that
-  // client AND the action has an executor AND a person approved that exact
-  // package and version.
+  // Held before any generic claim. The released SQL claim has no atomic
+  // handler-owned action-key filter; a separate registry read can race a
+  // support-bit change. CAMPAIGN_ACTIONS_ENABLED does not lift the hold.
   campaign_action_executor: runCampaignActionJob,
   // Cleared proof reaching a destination that has an API. Same discipline,
   // and its own switch: a client can agree to posting on their own feed
