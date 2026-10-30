@@ -389,9 +389,9 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const initialSource = new URLSearchParams(location.search).get("source");
   const [requests, setRequests] = useState<UnifiedApprovalRequest[]>([]);
   const [decisions, setDecisions] = useState<UnifiedApprovalDecision[]>([]);
-  // Agency-wide held requests must remain visible even before their source
-  // attestation is complete; a pending-only default would hide release cards.
-  const [statusFilter, setStatusFilter] = useState(initialSource || global ? "all" : "pending");
+  // Held exact-package requests must remain visible for clients as well as
+  // agency reviewers; a pending-only default hides them from the Inbox.
+  const [statusFilter, setStatusFilter] = useState("all");
   const [clientFilter, setClientFilter] = useState("all");
   const [kindFilter, setKindFilter] = useState("all");
   const [search, setSearch] = useState(initialSource ?? "");

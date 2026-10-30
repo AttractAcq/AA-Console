@@ -53,7 +53,7 @@ type Settings = {
   publishing_enabled: boolean;
 };
 
-/** One row of publish_due. `blocker` is null for anything that would go out. */
+/** One row of publish_due. A null blocker is never a substitute for the final Inbox gate. */
 type DueRow = {
   post_id: string;
   platform: string | null;
@@ -191,13 +191,13 @@ export function EnginePanel() {
           <div>
             <p className="text-sm font-medium text-card-foreground">
               {publishing
-                ? "Approved posts go out on this client's accounts"
+                ? "Client publishing switch is on"
                 : "Nothing is posted to this client's accounts"}
             </p>
             <p className="text-sm text-muted-foreground">
               {publishing
-                ? "An approved post is sent at its planned time. The runtime must also have publishing on."
-                : "Approved posts sit on the calendar and wait. Nothing reaches a real account."}
+                ? "Every post still needs an exact outgoing package, its Approval Inbox decision, and the runtime gate before it can reach an account."
+                : "Scheduled posts remain on the calendar. Asset approval alone does not authorize publication."}
             </p>
           </div>
           <button
@@ -209,7 +209,7 @@ export function EnginePanel() {
                 { p_client_id: clientId, p_enabled: !publishing },
                 publishing
                   ? "Publishing is off for this client."
-                  : "Publishing is on for this client. The runtime has to have it on too.",
+                  : "The client switch is on. Exact outgoing Approval Inbox authority and the runtime gate are still required.",
               )
             }
             className={`rounded-md px-3 py-2 text-sm disabled:opacity-50 ${
@@ -223,14 +223,13 @@ export function EnginePanel() {
         </div>
       </section>
 
-      {/* Why nothing went out, which is the question a board cannot answer.
-          publish_due gives one sentence per post; a null blocker means it
-          would go out on the next sweep. */}
+      {/* publish_due gives one blocker per post. A missing listed blocker
+          cannot override the independent exact-version runtime prewrite gate. */}
       {due.length > 0 && (
         <section className="space-y-2 rounded-lg border border-border p-4">
           <h3 className="text-sm font-medium text-card-foreground">
-            Waiting to go out ({due.filter((row) => row.blocker === null).length} of {due.length}{" "}
-            ready)
+            Publication queue ({due.filter((row) => row.blocker === null).length} of {due.length}{" "}
+            without a listed blocker)
           </h3>
           <ul className="space-y-1">
             {due.map((row) => (
@@ -241,7 +240,7 @@ export function EnginePanel() {
                 <span className="text-foreground">{row.asset_title ?? "Untitled"}</span>
                 {row.platform && <span className="text-muted-foreground">{row.platform}</span>}
                 {row.blocker === null ? (
-                  <span className="text-brand-strong">Ready to go out.</span>
+                  <span className="text-muted-foreground">No listed blocker; exact Inbox publication approval is still required.</span>
                 ) : (
                   <span className="text-destructive">{row.blocker}</span>
                 )}
