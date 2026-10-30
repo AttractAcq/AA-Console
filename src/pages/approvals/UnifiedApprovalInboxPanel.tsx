@@ -231,6 +231,7 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
   onDecide: (request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) => Promise<void>;
 }) {
   const [rejectionReason, setRejectionReason] = useState("");
+  const location = useLocation();
   const blocker = previewMissing(request);
   const sourcePath = manager ? null : sourcePathForRequest(request, clientId);
   const html = exactHtml(request.preview);
@@ -336,7 +337,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
             This request has expired. It can only be closed with a reasoned rejection.
           </p>}
           {aal !== "aal2" && <p role="status" className="text-sm text-destructive">
-            {aal === "aal1" ? "Complete MFA to reach AAL2 before deciding." : "MFA level could not be verified; decisions are unavailable."}
+            {aal === "aal1" ? "Complete MFA to reach AAL2 before deciding." : "MFA level could not be verified; decisions are unavailable."}{" "}
+            <Link to="/security/mfa" state={{ returnTo: `${location.pathname}${location.search}` }} className="underline">Open account security</Link>
           </p>}
           <div className="flex flex-wrap gap-2">
             {canApprove && <button type="button" disabled={busy || aal !== "aal2"}

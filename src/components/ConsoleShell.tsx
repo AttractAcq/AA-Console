@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { LogOut, Menu } from "lucide-react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useAuth } from "../context/auth";
 import { LOGIN_FOR_ROLE } from "../lib/identity";
@@ -140,6 +140,7 @@ export function ConsoleShell({
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
+            <Link to="/security/mfa" className="rounded-md px-2.5 py-1.5 text-sm text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Security</Link>
             <span className="hidden text-sm text-muted-foreground sm:inline">
               {profile?.full_name ?? profile?.email}
             </span>
