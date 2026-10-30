@@ -58,12 +58,12 @@ export async function collectReleaseProbe(
   if (!config.gatewayUrl || !config.mcpServiceSecret)
     return empty("gateway_unconfigured", migrationHead);
   try {
-    const response = await fetcher(`${config.gatewayUrl}/internal/readiness`, {
+    const response = await within(fetcher(`${config.gatewayUrl}/internal/readiness`, {
       method: "GET",
       headers: { Authorization: `Bearer ${config.mcpServiceSecret}` },
       signal: AbortSignal.timeout(3000),
       cache: "no-store",
-    });
+    }), 3000);
     if (!response.ok) return empty("gateway_unavailable", migrationHead);
     const body: unknown = await within(response.json(), 3000);
     if (!body || typeof body !== "object" || Array.isArray(body))

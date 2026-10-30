@@ -59,4 +59,11 @@ describe("public release identity probe", () => {
     expect(probe).toMatchObject({ ready: false, reason: "gateway_unavailable" });
     expect(JSON.stringify(probe)).not.toContain(secret);
   });
+
+  it("bounds a gateway transport that ignores the abort signal", async () => {
+    const { sb, config } = fixture();
+    const hanging = vi.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch;
+    const probe = await collectReleaseProbe(sb, config, hanging, { RAILWAY_GIT_COMMIT_SHA: runtimeSha });
+    expect(probe).toMatchObject({ ready: false, reason: "gateway_unavailable", gatewaySha: null });
+  }, 10_000);
 });
