@@ -35,6 +35,7 @@ import { uploadAdImage } from "../../meta/creative.js";
 import { buildPlan, buildProblem } from "../../meta/build.js";
 import { builtState, isAdCandidate, payloadsFor, preflight, type AssetRow, type CampaignRow } from "./plan.js";
 import { UnrecordedError, executeBuild, progressFrom, type BuildStore, type MetaWriter } from "./execute.js";
+import { v6MetaBuildClaimProblem } from "./claim.js";
 
 const BUCKET = "client-media";
 
@@ -215,15 +216,12 @@ export async function runMetaBuildJob(
   if (error) throw new Error(`Could not read the campaign: ${error.message}`);
   if (!campaign) return fail("That campaign no longer exists.");
   if (campaign.client_id !== job.client_id) return fail("That campaign belongs to a different client.");
-  // A v6 campaign is no longer refused outright: migration 239 decides, from
-  // the approval, the package version, the payload hash and whether objects
-  // already exist. Its refusal sentence is the one a person reads, so it is
-  // passed through rather than replaced with something generic.
+  // A v6 job must be bound to the exact claimed execution before credentials
+  // or Meta can be reached. Migration 239's live gate is checked as part of
+  // that validation. Legacy jobs retain their existing route.
   if (campaign.acquisition_mode !== "legacy") {
-    const { error: gateError } = await sb.rpc("assert_meta_build_allowed_v6", {
-      p_campaign_id: campaign.id,
-    } as never);
-    if (gateError) return fail(gateError.message);
+    const problem = await v6MetaBuildClaimProblem(sb, job, campaign);
+    if (problem) return fail(problem);
   }
   const row = campaign as unknown as CampaignRow;
 
