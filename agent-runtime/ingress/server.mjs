@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
 const PUBLIC_FAMILIES = ["/public/proof", "/public/lead", "/public/book/v1/", "/public/sales/v1/"];
+const DEFAULT_PUBLIC_LIMITS = Object.freeze({ proof: 1, ordinary: 64 });
 const HOP_HEADERS = new Set(["connection", "content-length", "transfer-encoding", "upgrade", "keep-alive",
   "proxy-authorization", "proxy-authenticate", "te", "trailer", "host", "forwarded",
   "x-real-ip", "x-forwarded-for", "x-forwarded-proto", "x-forwarded-host", "cf-connecting-ip",
@@ -123,9 +124,24 @@ export function validateConfig(env = process.env) {
   return { upstream, secret, port };
 }
 
-export function createIngressServer({ upstream, secret }) {
+export function createIngressServer({ upstream, secret, publicLimits = DEFAULT_PUBLIC_LIMITS }) {
   const transport = upstream.protocol === "https:" ? https : http;
+  if (![publicLimits.proof, publicLimits.ordinary].every((value) =>
+    Number.isInteger(value) && value > 0)) {
+    throw new Error("Public concurrency limits must be positive integers");
+  }
+  let activeProof = 0;
+  let activeOrdinary = 0;
   return http.createServer((req, res) => {
+    let releasePermit = () => {};
+    let upstreamReq;
+    res.once("finish", () => releasePermit());
+    res.once("close", () => {
+      // A disconnected caller must not retain its body slot or upstream work.
+      if (!req.complete) req.destroy();
+      upstreamReq?.destroy();
+      releasePermit();
+    });
     void (async () => {
       const url = req.url ?? "";
       const method = req.method ?? "";
@@ -144,6 +160,19 @@ export function createIngressServer({ upstream, secret }) {
         const rawIp = req.headers["x-real-ip"];
         const clientIp = typeof rawIp === "string" ? normalizeIp(rawIp) : null;
         if (!clientIp) { res.writeHead(503, { "connection": "close" }).end(); return; }
+        const proof = url === "/public/proof/submit";
+        if (proof ? activeProof >= publicLimits.proof : activeOrdinary >= publicLimits.ordinary) {
+          res.writeHead(503, { "connection": "close", "retry-after": "1" }).end(); return;
+        }
+        if (proof) activeProof += 1;
+        else activeOrdinary += 1;
+        let released = false;
+        releasePermit = () => {
+          if (released) return;
+          released = true;
+          if (proof) activeProof -= 1;
+          else activeOrdinary -= 1;
+        };
         body = await readBounded(req, bodyLimit(url));
         const timestamp = String(Date.now());
         const nonce = randomBytes(16).toString("base64url");
@@ -155,7 +184,7 @@ export function createIngressServer({ upstream, secret }) {
         headers["x-aa-ingress-signature"] = signIngress(secret, method, url, clientIp, timestamp, nonce, bodyHash);
         headers["content-length"] = String(body.length);
       }
-      const upstreamReq = transport.request({
+      upstreamReq = transport.request({
         protocol: upstream.protocol, hostname: upstream.hostname, port: upstream.port || undefined,
         path: url, method, headers, timeout: 120_000,
       }, (upstreamRes) => {

@@ -7,7 +7,7 @@ import { after, before, test } from "node:test";
 import { createIngressServer, isPublicPath, readBounded, signIngress, validateConfig } from "./server.mjs";
 
 const secret = randomBytes(32).toString("hex");
-let core, facade, corePort, facadePort;
+let core, facade, cappedFacade, corePort, facadePort, cappedPort;
 const received = [];
 
 before(async () => {
@@ -24,15 +24,20 @@ before(async () => {
     .listen(0, "127.0.0.1");
   await once(facade, "listening");
   facadePort = facade.address().port;
+  cappedFacade = createIngressServer({ upstream: new URL(`http://127.0.0.1:${corePort}`),
+    secret, publicLimits: { proof: 1, ordinary: 1 } }).listen(0, "127.0.0.1");
+  await once(cappedFacade, "listening");
+  cappedPort = cappedFacade.address().port;
 });
 
 after(async () => {
-  await Promise.all([new Promise((resolve) => facade.close(resolve)), new Promise((resolve) => core.close(resolve))]);
+  await Promise.all([new Promise((resolve) => facade.close(resolve)),
+    new Promise((resolve) => cappedFacade.close(resolve)), new Promise((resolve) => core.close(resolve))]);
 });
 
-function call(path, headers = {}, body = "", method = "POST") {
+function call(path, headers = {}, body = "", method = "POST", port = facadePort) {
   return new Promise((resolve, reject) => {
-    const req = http.request({ hostname: "127.0.0.1", port: facadePort, path, method, headers }, (res) => {
+    const req = http.request({ hostname: "127.0.0.1", port, path, method, headers }, (res) => {
       const chunks = [];
       res.on("data", (chunk) => chunks.push(chunk));
       res.on("end", () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString() }));
@@ -40,6 +45,21 @@ function call(path, headers = {}, body = "", method = "POST") {
     req.on("error", reject);
     req.end(body);
   });
+}
+
+function heldCall(path, port = facadePort) {
+  let req;
+  const response = new Promise((resolve, reject) => {
+    req = http.request({ hostname: "127.0.0.1", port, path, method: "POST",
+      headers: { "x-real-ip": "203.0.113.9" } }, (res) => {
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString() }));
+    });
+    req.on("error", reject);
+  });
+  req.flushHeaders();
+  return { req, response };
 }
 
 test("public route strips caller-supplied ingress fields and signs exact body/path/IP", async () => {
@@ -105,4 +125,31 @@ test("a slowly held public body has an absolute read deadline", async () => {
   const hanging = new PassThrough();
   hanging.headers = {};
   await assert.rejects(readBounded(hanging, 8192, 15), (error) => error.status === 408);
+});
+
+test("large proof admission caps memory and recovers after completion", async () => {
+  const observed = once(cappedFacade, "request");
+  const held = heldCall("/public/proof/submit", cappedPort);
+  await observed;
+  const overloaded = await call("/public/proof/submit", { "x-real-ip": "203.0.113.9" },
+    "{}", "POST", cappedPort);
+  assert.equal(overloaded.status, 503);
+  held.req.end("{}");
+  assert.equal((await held.response).status, 200);
+  assert.equal((await call("/public/proof/submit", { "x-real-ip": "203.0.113.9" },
+    "{}", "POST", cappedPort)).status, 200);
+});
+
+test("ordinary public admission releases a slot after caller abort", async () => {
+  const observed = once(cappedFacade, "request");
+  const held = heldCall("/public/lead/submit", cappedPort);
+  const [, response] = await observed;
+  const closed = once(response, "close");
+  assert.equal((await call("/public/lead/submit", { "x-real-ip": "203.0.113.9" },
+    "{}", "POST", cappedPort)).status, 503);
+  void held.response.catch(() => {});
+  held.req.destroy();
+  await closed;
+  assert.equal((await call("/public/lead/submit", { "x-real-ip": "203.0.113.9" },
+    "{}", "POST", cappedPort)).status, 200);
 });
