@@ -37,13 +37,6 @@ const FIELDS: FieldDef[] = [
     derivedFrom: { field: "name", transform: initialsFrom },
   },
   { name: "engagement", label: "Engagement", kind: "select", options: ENGAGEMENT_OPTIONS },
-  {
-    name: "username",
-    label: "Username",
-    kind: "text",
-    hint: "Creates their Employee console login. Without it they cannot sign in.",
-  },
-  { name: "password", label: "Password", kind: "password", hint: "Shown once — write it down." },
 ];
 
 const EDIT_FIELDS: FieldDef[] = [
@@ -187,6 +180,7 @@ export function TeamCategoryPanel({ category }: { category: TeamCategory }) {
         title={addButtonLabel}
         draftKey={teamMemberDraftKey(category)}
         fields={FIELDS}
+        intro="This adds a team roster entry without a login. Login access requires an approved invitation."
         submitLabel="Add"
         onSubmit={async (v) => {
           const { error } = await supabase.rpc("admin_create_team_member", {
@@ -194,8 +188,6 @@ export function TeamCategoryPanel({ category }: { category: TeamCategory }) {
             p_initials: ((v.initials as string) || initialsFrom(v.name as string)).trim().toUpperCase(),
             p_category: category,
             p_engagement: ((v.engagement as string) || "contractor") as "employee" | "contractor",
-            p_username: (v.username as string)?.trim() || undefined,
-            p_password: (v.password as string) || undefined,
           });
           if (error) throw new Error(error.message);
         }}

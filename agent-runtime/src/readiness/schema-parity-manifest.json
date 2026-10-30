@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "8fc435672c1d353f3e440f0d55f948205bc8015e6738e5bffa1c455bc829bde3",
+  "migrationSourceDigest": "8d608f59502f544f6035c49beb89f8cc977cfa08305b241f53fa39b26781bd0c",
   "generatedTypesSha256": "3ed851b82426f2c0fc4915cc0bd85568bd71921d6d472643cd92bfb4d8a52a4f",
   "generatedSchemaBodySha256": "1058d5469b4ff54d5ebd69606b0a56c50b761e9c35203a9a12d1516fdaee0ab9",
   "localMigrations": [
@@ -2096,6 +2096,13 @@
       "filename": "20261101020000_282_public_perimeter_admin_status.sql",
       "sha256": "11c4af5a9a43df974540a2e0724d6314254ba28f1bd3b37ad8b6f386d4fc6721",
       "trimmedMd5": "90bd4058fa24acaa7378e6a92ecd0ab8"
+    },
+    {
+      "version": "20261101030000",
+      "name": "283_retire_browser_password_creation",
+      "filename": "20261101030000_283_retire_browser_password_creation.sql",
+      "sha256": "d18474623337c48bf1312d7ed857fbb5d12ad5870b33ac4d1ead1e53be7e9361",
+      "trimmedMd5": "3ff9e74d18c57a11971af7749b6b1a6b"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
