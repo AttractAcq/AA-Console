@@ -105,9 +105,9 @@ change before that pin requires the final observed runtime SHA, not the first.
 
 ## Focused verification in this held patch
 
-- PGlite: eleven cases cover the held source, server-only proof, digest/PR/CI/SQL
-  drift, AAL1/member/service rejection, exact admin approval, revocation and
-  reasoned rejection.
+- PGlite: twelve cases cover the held source, server-only proof, digest/PR/CI/SQL
+  drift, AAL1/member/service rejection, direct canonical-RPC denial, exact
+  admin approval, stale-proof revocation and reasoned rejection.
 - Inbox UI: 33 cases cover global/card routing, AAL2 exact decision,
   changed-proof rejection on refresh and reasoned revocation after a proof
   becomes stale.

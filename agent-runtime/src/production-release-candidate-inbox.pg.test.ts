@@ -438,6 +438,10 @@ describe("trusted exact-version production release decision migration 293", () =
       .rejects.toThrow(/provisioned admin with AAL2/);
     await expect(asRole("service_role", ADMIN, "aal2", decision, approveArgs))
       .rejects.toThrow(/permission denied|provisioned admin with AAL2/);
+    await expect(asRole("authenticated", ADMIN, "aal2",
+      "select public.record_approval_decision_v6($1,'approved',$2,$3,null)",
+      [card.id, card.artifact_hash, `direct:${card.id}`]))
+      .rejects.toThrow(/permission denied/);
     await expect(asRole("authenticated", ADMIN, "aal2", decision,
       [card.id, "f".repeat(64), card.artifact_hash, "approved", null]))
       .rejects.toThrow(/version changed/);
@@ -492,5 +496,31 @@ describe("trusted exact-version production release decision migration 293", () =
       "authenticated", ADMIN, "aal2",
       "select status from public.approval_inbox_v6 where id=$1", [card.id]);
     expect(ready!.status).toBe("pending");
+  });
+
+  it("allows a reasoned human revocation after an approved proof becomes stale", async () => {
+    const { source, card } = await submitted("299");
+    await attest(card.id, packet(source));
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,'approved',null)",
+      [card.id, card.source_version, card.artifact_hash]);
+    await db.query(`
+      insert into public.production_release_attestations_v6 (
+        request_id,source_version,packet,packet_sha256,attested_at
+      ) select request_id,source_version,packet,packet_sha256,
+          now() - interval '1 hour'
+        from public.production_release_attestations_v6
+        where request_id=$1 order by event_order desc limit 1
+    `, [card.id]);
+    const [held] = await asRole<{ status: string; source_state: string }>(
+      "authenticated", ADMIN, "aal2",
+      "select status,source_state from public.approval_inbox_v6 where id=$1", [card.id]);
+    expect(held).toMatchObject({ status: "source_held", source_state: "source_held" });
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,'revoked',$4)",
+      [card.id, card.source_version, card.artifact_hash, "Plan withdrawn after proof expiry"]);
+    const [revoked] = await asRole<{ status: string }>("authenticated", ADMIN,
+      "aal2", "select status from public.approval_inbox_v6 where id=$1", [card.id]);
+    expect(revoked!.status).toBe("revoked");
   });
 });
