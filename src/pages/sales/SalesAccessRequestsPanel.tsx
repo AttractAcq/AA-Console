@@ -24,7 +24,50 @@ type AccessRequest = {
   member_name_snapshot: string | null;
 };
 
-const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const SCOPE_HASH = /^[0-9a-f]{64}$/;
+
+function objectRow(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : null;
+}
+
+function validatedMembers(value: unknown): Member[] {
+  if (!Array.isArray(value)) throw new Error("Team member list is incomplete. Retry before requesting access.");
+  return value.map((value) => {
+    const row = objectRow(value);
+    const profile = objectRow(row?.profiles);
+    if (!row || typeof row.id !== "string" || !UUID.test(row.id)
+      || typeof row.name !== "string" || !row.name.trim()
+      || typeof row.active !== "boolean"
+      || (row.user_id !== null && (typeof row.user_id !== "string" || !UUID.test(row.user_id)))
+      || (row.profiles !== null && (!profile || typeof profile.role !== "string"))
+      || (row.user_id !== null && !profile)) {
+      throw new Error("Team member list contains an invalid identity. Retry before requesting access.");
+    }
+    return row as Member;
+  });
+}
+
+function validatedRequests(value: unknown, clientId: string): AccessRequest[] {
+  if (!Array.isArray(value)) throw new Error("Sales access request history is incomplete. Retry before requesting access.");
+  return value.map((value) => {
+    const row = objectRow(value);
+    if (!row || typeof row.id !== "string" || !UUID.test(row.id)
+      || row.client_id !== clientId
+      || typeof row.member_id !== "string" || !UUID.test(row.member_id)
+      || typeof row.bound_user_id !== "string" || !UUID.test(row.bound_user_id)
+      || (row.action !== "grant" && row.action !== "revoke")
+      || typeof row.scope_hash !== "string" || !SCOPE_HASH.test(row.scope_hash)
+      || typeof row.status !== "string"
+      || !["pending", "approved", "rejected"].includes(row.status)
+      || typeof row.requested_at !== "string" || !Number.isFinite(Date.parse(row.requested_at))
+      || (row.member_name_snapshot !== null && typeof row.member_name_snapshot !== "string")) {
+      throw new Error("Sales access request history contains an invalid or cross-client scope. Retry before requesting access.");
+    }
+    return row as AccessRequest;
+  });
+}
 
 function errorMessage(cause: unknown, fallback: string): string {
   if (cause instanceof Error) return cause.message;
@@ -71,8 +114,10 @@ function SalesAccessRequestsPanelForScope({ clientId }: { clientId: string }) {
       if (memberResult.error || requestResult.error) {
         throw memberResult.error ?? requestResult.error;
       }
-      setMembers((memberResult.data ?? []) as Member[]);
-      setRequests((requestResult.data ?? []) as AccessRequest[]);
+      const validMembers = validatedMembers(memberResult.data);
+      const validRequests = validatedRequests(requestResult.data, clientId);
+      setMembers(validMembers);
+      setRequests(validRequests);
     } catch (cause) {
       if (sequence === refreshSequence.current) {
         setLoadError(errorMessage(cause, "Could not load sales access requests."));
@@ -107,7 +152,7 @@ function SalesAccessRequestsPanelForScope({ clientId }: { clientId: string }) {
         p_action: action,
       });
       if (result.error) throw result.error;
-      if (typeof result.data !== "string" || !REQUEST_ID.test(result.data)) {
+      if (typeof result.data !== "string" || !UUID.test(result.data)) {
         throw new Error("The request may have been created, but its source ID was not returned. Refresh the request history before trying again.");
       }
       setCreatedId(result.data);

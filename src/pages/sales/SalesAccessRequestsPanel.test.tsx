@@ -11,8 +11,8 @@ const REQUEST = "55555555-5555-4555-8555-555555555555";
 
 const state = vi.hoisted(() => ({
   profile: { id: "admin-1", role: "admin" },
-  members: [] as Array<Record<string, unknown>>,
-  requests: [] as Array<Record<string, unknown>>,
+  members: [] as unknown,
+  requests: [] as unknown,
   requestError: null as string | null,
 }));
 const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
@@ -126,6 +126,39 @@ describe("admin sales access source requests", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("History temporarily unavailable");
     expect(screen.getByRole("link", { name: /Review its exact version/ }))
       .toHaveAttribute("href", `/approvals?source=${REQUEST}`);
+  });
+
+  it.each([
+    ["null team result", null, []],
+    ["nonarray team result", { id: MEMBER }, []],
+    ["null request result", [], null],
+    ["nonarray request result", [], { id: REQUEST }],
+  ])("fails closed on a %s", async (_case, members, requests) => {
+    state.members = members;
+    state.requests = requests;
+    show();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/incomplete/);
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Request sales access grant/ })).not.toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a mis-scoped or malformed history row before showing action controls", async () => {
+    state.requests = [{ id: REQUEST, client_id: "99999999-9999-4999-8999-999999999999",
+      member_id: MEMBER, bound_user_id: ACCOUNT, action: "grant", scope_hash: "a".repeat(64),
+      status: "pending", requested_at: "2026-10-30T00:00:00Z", member_name_snapshot: "Pat Sales" }];
+    const view = show();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/cross-client scope/);
+    expect(screen.queryByRole("link", { name: /Open exact request/ })).not.toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalled();
+    view.unmount();
+
+    state.requests = [{ id: "not-a-uuid", client_id: CLIENT,
+      member_id: MEMBER, bound_user_id: ACCOUNT, action: "grant", scope_hash: "a".repeat(64),
+      status: "pending", requested_at: "2026-10-30T00:00:00Z", member_name_snapshot: "Pat Sales" }];
+    show();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/invalid or cross-client scope/);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("fails closed on source-read failure and on a non-admin profile", async () => {
