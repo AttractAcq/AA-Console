@@ -256,15 +256,21 @@ export async function runTrustedProductionReleaseMerger({ requestId, attester,
 
 // Explicit wiring for a later custody-reviewed runner; not invoked anywhere.
 export async function mergeApprovedProductionRelease({ requestId, supabaseUrl,
-  serviceRoleKey, token, checkoutDir, mergerLogin, fetcher = fetch }) {
-  const options = { requestId, supabaseUrl, serviceRoleKey, token,
+  serviceRoleKey, verificationToken, mergerToken, checkoutDir, mergerLogin,
+  fetcher = fetch }) {
+  if (verificationToken === mergerToken)
+    fail('GitHub verification and merge credentials must be distinct')
+  const options = { requestId, supabaseUrl, serviceRoleKey,
+    token: verificationToken,
     checkoutDir, trustedBaseCheckout: true, fetcher }
   return runTrustedProductionReleaseMerger({ requestId,
     attester: () => attestProductionRelease({ ...options, refreshApproved: true }),
     verifier: () => verifyApprovedProductionRelease(options),
-    boundary: (plan) => readProtectedReleaseBoundary({ plan, token, mergerLogin, fetcher }),
+    boundary: (plan) => readProtectedReleaseBoundary({ plan, token: mergerToken,
+      mergerLogin, fetcher }),
     lease: createProductionReleaseLeaseStore({ supabaseUrl, serviceRoleKey, fetcher }),
-    mergeEffect: createGithubMergeEffect({ token, fetcher }),
-    observeMerge: (plan, proposedSha) => readObservedGithubMerge({ plan, proposedSha, token, fetcher }),
+    mergeEffect: createGithubMergeEffect({ token: mergerToken, fetcher }),
+    observeMerge: (plan, proposedSha) => readObservedGithubMerge({ plan, proposedSha,
+      token: mergerToken, fetcher }),
   })
 }

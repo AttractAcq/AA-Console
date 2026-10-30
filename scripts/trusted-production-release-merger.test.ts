@@ -3,6 +3,7 @@ import { test } from 'vitest'
 import {
   assertProtectedReleaseBoundary, runTrustedProductionReleaseMerger,
   createGithubMergeEffect, readObservedGithubMerge, readProtectedReleaseBoundary,
+  mergeApprovedProductionRelease,
 } from './trusted-production-release-merger.mjs'
 
 const REPOSITORY = 'AttractAcq/AA-Console'
@@ -206,4 +207,15 @@ test('GitHub effect binds the exact PR head and independently confirms merged co
   }
   await assert.rejects(readObservedGithubMerge({ plan, proposedSha: sha, token,
     fetcher: forged }), /do not prove the expected commit/)
+})
+
+test('production wiring rejects a shared read/write GitHub credential before any I/O', async () => {
+  let fetched = false
+  await assert.rejects(mergeApprovedProductionRelease({ requestId: REQUEST,
+    supabaseUrl: 'https://project.supabase.co', serviceRoleKey: 'server-secret-value-12345',
+    verificationToken: 'same-github-credential', mergerToken: 'same-github-credential',
+    mergerLogin: 'aa-release-merger',
+    fetcher: async () => { fetched = true; throw new Error('I/O must not happen') },
+  }), /credentials must be distinct/)
+  assert.equal(fetched, false)
 })

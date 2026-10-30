@@ -114,8 +114,9 @@ the Approval Inbox must show that pending outcome before a live pilot. The
 credential must be held only by the reviewed merger process; a general
 service-role key shared with other runtimes is insufficient custody.
 
-**Q020 / activation blocker:** Alex must approve a dedicated merger identity
-and server-only Supabase credential custody, ensure GitHub protection allows
+**Q020 / activation blocker:** Alex must approve a dedicated merger identity,
+separate read-only GitHub verifier and write-capable merger tokens, and
+server-only Supabase credential custody; ensure GitHub protection allows
 only that identity to change `main` with no bypass, make the trusted check
 mandatory with an exact GitHub Actions app binding, and prove a
 `pull_request_target` job is attached to the *PR head* before this verifier can
