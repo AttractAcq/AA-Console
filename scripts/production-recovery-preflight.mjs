@@ -148,6 +148,20 @@ function same(a, b, label) {
   if (!isDeepStrictEqual(a, b)) fail(`${label} differs between source and disposable restore`)
 }
 
+function sameStorage(source, restore) {
+  // Separate the byte proof from database metadata. A Storage API re-upload
+  // can change physical row fields even when every restored byte is identical;
+  // neither difference is safe to waive from an aggregate-only snapshot.
+  same(source.objectCount, restore.objectCount, 'Storage object count')
+  same(source.byteCount, restore.byteCount, 'Storage byte count')
+  same(source.byteManifestSha256, restore.byteManifestSha256, 'Storage byte manifest')
+  same(source.bucketCount, restore.bucketCount, 'Storage bucket count')
+  same(source.bucketConfigSha256, restore.bucketConfigSha256, 'Storage bucket configuration')
+  if (source.objectMetadataSha256 !== restore.objectMetadataSha256) {
+    fail('Storage object metadata differs despite matching byte manifest; inspect physical row changes privately')
+  }
+}
+
 export function verifyRecoverySnapshots({ targetRef, source, restore, expected = trackedHistory(), now = Date.now() }) {
   if (targetRef !== PRODUCTION_REF) fail('Explicit target ref is not the reviewed production project')
   const sourceTime = validateSnapshot(source, 'Production', now, expected, false)
@@ -157,7 +171,7 @@ export function verifyRecoverySnapshots({ targetRef, source, restore, expected =
   if (restoreTime < sourceTime) fail('Disposable restore snapshot predates production source snapshot')
   same(source.migrations, restore.migrations, 'Full migration history and stored-SQL availability')
   same(source.identities, restore.identities, 'Client/Auth identity counts and UUID digests')
-  same(source.storage, restore.storage, 'Storage metadata, bucket configuration and byte manifest')
+  sameStorage(source.storage, restore.storage)
   same(source.vault, restore.vault, 'Vault secret counts, IDs and decryption counts')
   const sourceCron = new Map(source.cronJobs.map(({ name, definitionSha256 }) => [name, definitionSha256]))
   for (const job of restore.cronJobs) {
