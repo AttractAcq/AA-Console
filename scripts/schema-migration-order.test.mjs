@@ -20,6 +20,10 @@ const migration272 = '20261030100000_272_onboarding_step_integrity.sql'
 const migration273 = '20261030110000_273_canonical_approval_ledger.sql'
 const migration274 = '20261030120000_274_campaign_action_inbox_bridge.sql'
 const migration275 = '20261030130000_275_sales_entitlement_inbox_binding.sql'
+const migration276 = '20261030140000_276_recruitment_brief_inbox.sql'
+const migration277 = '20261030141000_277_engine_slot_preview_inbox.sql'
+const migration278 = '20261030150000_278_google_review_reply_inbox.sql'
+const migration279 = '20261030160000_279_approval_class_coverage.sql'
 const released263 = '20261029140000'
 
 test('the 261 and 262 history is blocked until 260 exists', () => {
@@ -145,4 +149,21 @@ test('sales entitlement Inbox binding follows the campaign action bridge', () =>
     () => assertSchemaMigrationOrder(files.filter((name) => name !== migration274), released263),
     /Expected migration 274 before .*_275_/,
   )
+})
+
+test('the four later Inbox slices preserve strict 276–279 dependency order', () => {
+  const files = [migration259, migration260, migration261, migration262, migration263,
+    migration264, migration265, migration266, migration267, migration268, migration269,
+    migration270, migration271, migration272, migration273, migration274, migration275,
+    migration276, migration277, migration278, migration279]
+  assert.deepEqual(assertSchemaMigrationOrder(files, released263), {
+    releasedVersion: released263, releasedNumber: 263,
+    headVersion: '20261030160000', nextNumber: 280, pendingCount: 16,
+  })
+  for (const missing of [migration276, migration277, migration278]) {
+    assert.throws(
+      () => assertSchemaMigrationOrder(files.filter((name) => name !== missing), released263),
+      /Expected migration \d+ before .*_/,
+    )
+  }
 })
