@@ -138,11 +138,26 @@ beforeAll(async () => {
     "select public.approve_recruitment_brief($1)", [oldApproved]);
   await db.exec(await migration("20261030110000_273_canonical_approval_ledger.sql"));
   await db.exec(await migration("20261030140000_276_recruitment_brief_inbox.sql"));
+  await db.exec(await migration("20261030160000_279_approval_class_coverage.sql"));
 }, 90_000);
 
 afterAll(async () => { await db?.close(); });
 
 describe("recruitment brief Inbox adapter 276", () => {
+  it("marks an edited or archived draft non-actionable in the live Inbox view", async () => {
+    const id = await createDraft();
+    const card = await requestFor(id);
+    const state = async () => (await asRole<{ status: string; source_state: string }>(
+      "authenticated", ADMIN, "aal2",
+      "select status,source_state from public.approval_inbox_v6 where id=$1", [card.id],
+    ))[0]!;
+    expect(await state()).toMatchObject({ status: "pending", source_state: "pending" });
+    await db.query("update public.client_briefs set hook='Edited hook' where id=$1", [id]);
+    expect(await state()).toMatchObject({ status: "superseded", source_state: "superseded" });
+    await db.query("update public.client_briefs set archived_at=now() where id=$1", [id]);
+    expect(await state()).toMatchObject({ status: "cancelled", source_state: "cancelled" });
+  });
+
   it("backfills only pending drafts and freezes the full brief content", async () => {
     const draft = await requestFor(oldDraft);
     expect(draft.owner_role).toBe("admin");

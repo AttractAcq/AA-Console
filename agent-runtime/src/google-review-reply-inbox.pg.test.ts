@@ -38,16 +38,17 @@ async function addReply(id: string, body: string) {
 }
 
 async function cards(replyId: string) {
-  return (await db.query<{
+  return asRole<{
     id: string; source_version: string; status: string;
     artifact_hash: string; preview_blocker: string | null;
     preview: { reply_body: string; location_ref: string };
     destination: string; account_ref: string;
-  }>(`select id,source_version,status,artifact_hash,preview_blocker,
+  }>("authenticated", ADMIN, "aal2",
+    `select id,source_version,status,artifact_hash,preview_blocker,
             preview,destination,account_ref
        from public.approval_inbox_v6
       where source_kind='google_review_reply' and source_id=$1
-      order by requested_at,id`, [replyId])).rows;
+      order by requested_at,id`, [replyId]);
 }
 
 beforeAll(async () => {
@@ -140,6 +141,7 @@ beforeAll(async () => {
   for (const filename of [
     "20261030110000_273_canonical_approval_ledger.sql",
     "20261030150000_278_google_review_reply_inbox.sql",
+    "20261030160000_279_approval_class_coverage.sql",
   ]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${filename}`, import.meta.url), "utf8"));
   }
@@ -148,6 +150,20 @@ beforeAll(async () => {
 afterAll(async () => { await db?.close(); });
 
 describe("Google review reply exact Inbox bridge migration 278", () => {
+  it("marks an edited reply version superseded while its new card is pending", async () => {
+    const id = "99999999-9999-4999-8999-999999999999";
+    await addReply(id, "First exact reply");
+    const first = (await cards(id))[0]!;
+    expect(first.status).toBe("pending");
+    await db.query(`update public.google_review_replies
+      set body='Changed exact reply',
+          body_hash=encode(sha256(convert_to('Changed exact reply','UTF8')),'hex')
+      where id=$1`, [id]);
+    const versions = await cards(id);
+    expect(versions.find((card) => card.id === first.id)?.status).toBe("superseded");
+    expect(versions.find((card) => card.id !== first.id)?.status).toBe("pending");
+  });
+
   it("backfills a full reply, review and account preview without inventing a decision", async () => {
     const card = (await cards(LEGACY))[0]!;
     expect(card).toMatchObject({

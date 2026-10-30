@@ -11,7 +11,7 @@
 -- fail closed until their own adapter extends this function.
 create function public.approval_source_state_v6(p_request_id uuid)
 returns text language plpgsql stable security definer
-set search_path = pg_catalog, public as $$
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
 declare
   v_request public.approval_requests_v6%rowtype;
   v_source_id uuid;
