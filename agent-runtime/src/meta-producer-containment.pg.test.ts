@@ -111,10 +111,19 @@ beforeAll(async () => {
     create table public.agent_jobs (
       id uuid primary key default gen_random_uuid(), agent_key text,
       client_id uuid, input_table text, input_id uuid,
-      status text not null default 'queued', run_id uuid, created_by uuid);
+      status text not null default 'queued', run_id uuid, created_by uuid,
+      terminal boolean not null default false,
+      params jsonb not null default '{}'::jsonb, run_after timestamptz,
+      created_at timestamptz not null default now());
     create table public.agent_job_events (
       id uuid primary key default gen_random_uuid(), job_id uuid,
-      description text);
+      description text, payload jsonb);
+    create table public.workflow_runs (
+      id uuid primary key, client_id uuid, kind text);
+    create table public.workflow_steps (
+      id uuid primary key, run_id uuid, step_key text, agent_key text,
+      input_table text, resolved_input_id uuid, job_id uuid,
+      status text, blocker text, updated_at timestamptz);
     create function public.enqueue_agent_job_internal(
       p_agent_key text, p_client_id uuid, p_input_table text,
       p_input_id uuid, p_actor uuid, p_params jsonb default '{}'::jsonb,
@@ -210,6 +219,12 @@ describe("Meta legacy producer containment migration 290", () => {
         "select public.enqueue_agent_job_as($1,$2,$3,null,null)",
         [ADMIN, key, HOUSE])).rejects.toThrow(/exact AAL2 Approval Inbox/);
     }
+    await db.query("delete from public.agent_jobs where agent_key='icp' and client_id=$1", [HOUSE]);
+    await asRole("authenticated", ADMIN,
+      "select public.start_master_run($1)", [HOUSE]);
+    expect((await db.query<{ agent_key: string }>(
+      "select agent_key from public.agent_jobs where client_id=$1", [HOUSE]))
+      .rows.map((row) => row.agent_key)).toEqual(["icp"]);
     await asRole("service_role", null,
       "select public.enqueue_agent_job_as($1,'icp',$2,null,null)", [ADMIN, HOUSE]);
     await asRole("service_role", null,
@@ -218,6 +233,23 @@ describe("Meta legacy producer containment migration 290", () => {
       "select agent_key from public.agent_jobs where client_id=$1", [OTHER]))
       .rows.map((row) => row.agent_key);
     expect(masterKeys).toEqual(["icp"]);
+    expect((await db.query("select id from public.agent_jobs where agent_key in ('meta_build','recruitment_meta_build')"))
+      .rows).toHaveLength(0);
+  });
+
+  it("holds scheduled Meta follow-ups while retaining benign continuations", async () => {
+    const inputId = "66666666-6666-4666-8666-666666666666";
+    for (const key of ["meta_build", "recruitment_meta_build"]) {
+      await expect(asRole("service_role", null,
+        "select public.schedule_agent_follow_up($1,$2,'campaigns',$3,60,'Follow-up','{}'::jsonb,null::uuid)",
+        [key, HOUSE, inputId])).rejects.toThrow(/exact AAL2 Approval Inbox/);
+    }
+    const benign = (await asRole<{ id: string }>("service_role", null,
+      "select public.schedule_agent_follow_up('icp',$1,'campaigns',$2,60,'Follow-up','{}'::jsonb,null::uuid) as id",
+      [HOUSE, inputId]))[0]!.id;
+    expect(benign).toBeTruthy();
+    expect((await db.query("select agent_key from public.agent_jobs where id=$1", [benign]))
+      .rows).toEqual([{ agent_key: "icp" }]);
     expect((await db.query("select id from public.agent_jobs where agent_key in ('meta_build','recruitment_meta_build')"))
       .rows).toHaveLength(0);
   });

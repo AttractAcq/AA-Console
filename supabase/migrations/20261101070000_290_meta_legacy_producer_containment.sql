@@ -105,6 +105,118 @@ revoke execute on function public.start_master_run_as(uuid,uuid)
 grant execute on function public.start_master_run_as(uuid,uuid)
   to service_role;
 
+-- The browser's Run All Agents RPC also sweeps enabled registry rows.
+create or replace function public.start_master_run(p_client_id uuid)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_run_id uuid := gen_random_uuid(); v_count integer;
+begin
+  if public.can_access_client(p_client_id) is not true then
+    raise exception 'Not permitted for this client' using errcode = '42501';
+  end if;
+  insert into public.agent_jobs (agent_key, client_id, run_id, created_by)
+  select a.agent_key, p_client_id, v_run_id, auth.uid()
+  from public.agents a
+  where a.paused = false and a.archived_at is null
+    and a.scheduled_only = false and a.agent_key <> 'brief'
+    and a.agent_key not in ('meta_build', 'recruitment_meta_build')
+    and not exists (
+      select 1 from public.agent_jobs j
+      where j.agent_key = a.agent_key and j.client_id = p_client_id
+        and j.status in ('queued', 'claimed', 'running')
+    );
+  get diagnostics v_count = row_count;
+  if v_count = 0 then
+    raise exception 'Nothing to run - every agent is already queued or running for this client.';
+  end if;
+  return v_run_id;
+end;
+$$;
+revoke execute on function public.start_master_run(uuid)
+  from public, anon;
+grant execute on function public.start_master_run(uuid)
+  to authenticated, service_role;
+
+-- The current service-role follow-up (8 arguments) accepts an agent key.
+-- Preserve non-Meta continuation behavior while holding Meta creation.
+
+create or replace function public.schedule_agent_follow_up(
+  p_agent_key text, p_client_id uuid, p_input_table text, p_input_id uuid,
+  p_after_seconds integer, p_description text default 'Scheduled follow-up',
+  p_params jsonb default '{}'::jsonb, p_current_job_id uuid default null
+)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare
+  v_delay integer := greatest(10, least(coalesce(p_after_seconds, 60), 3600));
+  v_due timestamptz := now() + make_interval(secs => v_delay);
+  v_job uuid;
+  v_run_id uuid;
+  v_step_key text;
+  v_step public.workflow_steps%rowtype;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'AUTH: service role required' using errcode = '42501';
+  end if;
+  if p_agent_key in ('meta_build', 'recruitment_meta_build') then
+    raise exception 'Meta object creation requires an exact AAL2 Approval Inbox decision and a bound prewrite executor.'
+      using errcode = '42501';
+  end if;
+  if p_agent_key is null or p_input_table is null or p_input_id is null then
+    raise exception 'VALIDATION: agent, input table and input id are required';
+  end if;
+  if not exists (select 1 from public.agents where agent_key = p_agent_key) then
+    raise exception 'Unknown agent: %', p_agent_key;
+  end if;
+  v_step_key := nullif(p_params->>'v5_step_key', '');
+  if p_params ? 'v5_workflow_run_id' or p_params ? 'v5_step_key' then
+    if p_agent_key <> 'video_build' or p_input_table <> 'client_briefs'
+      or p_current_job_id is null or v_step_key is null
+      or nullif(p_params->>'v5_workflow_run_id', '') is null then
+      raise exception 'Invalid v5 motion follow-up.';
+    end if;
+    v_run_id := (p_params->>'v5_workflow_run_id')::uuid;
+    select * into v_step from public.workflow_steps
+      where run_id = v_run_id and step_key = v_step_key for update;
+    if not found or v_step.agent_key <> 'video_build'
+      or v_step.input_table <> 'client_briefs'
+      or v_step.resolved_input_id is distinct from p_input_id
+      or v_step.job_id is distinct from p_current_job_id
+      or v_step.status not in ('queued', 'running', 'needs_internal_qa')
+      or not exists (select 1 from public.workflow_runs r
+        where r.id = v_run_id and r.client_id = p_client_id
+          and r.kind = 'daily_content_package') then
+      raise exception 'V5 motion step does not match current job.';
+    end if;
+  end if;
+  select j.id into v_job from public.agent_jobs j
+  where j.agent_key = p_agent_key and j.input_table = p_input_table
+    and j.input_id = p_input_id and j.id is distinct from p_current_job_id
+    and j.terminal = false and j.status in ('queued', 'claimed', 'running')
+    and (v_run_id is null or (j.params->>'v5_workflow_run_id' = v_run_id::text
+      and j.params->>'v5_step_key' = v_step_key))
+  order by j.created_at desc limit 1;
+  if not found then
+    insert into public.agent_jobs
+      (agent_key, client_id, input_table, input_id, params, run_after, run_id)
+    values (p_agent_key, p_client_id, p_input_table, p_input_id,
+      coalesce(p_params, '{}'::jsonb), v_due, v_run_id)
+    returning id into v_job;
+    insert into public.agent_job_events(job_id, description, payload)
+    values (v_job, p_description,
+      jsonb_build_object('run_after', v_due, 'after_seconds', v_delay));
+  end if;
+  if v_run_id is not null then
+    update public.workflow_steps set job_id = v_job, status = 'queued',
+      blocker = null, updated_at = now() where id = v_step.id;
+  end if;
+  return v_job;
+end;
+$$;
+revoke execute on function public.schedule_agent_follow_up(
+  text,uuid,text,uuid,integer,text,jsonb,uuid)
+  from public, anon, authenticated;
+grant execute on function public.schedule_agent_follow_up(
+  text,uuid,text,uuid,integer,text,jsonb,uuid) to service_role;
+
 create or replace function public.request_meta_build(p_campaign_id uuid)
 returns uuid language plpgsql security definer set search_path = public as $$
 begin
