@@ -2,7 +2,9 @@
 -- Migration 280 admits public requests by caller and deployment; this ledger
 -- separately protects each deployment's daily message and dollar ceilings.
 create table public.sales_runtime_daily_budgets (
-  deployment_id uuid not null references public.client_sales_agent_deployments(id) on delete cascade,
+  -- A deployment with paid-use evidence must be disabled, not deleted. A
+  -- cascade would erase unresolved provider spend and the audit trail.
+  deployment_id uuid not null references public.client_sales_agent_deployments(id) on delete restrict,
   budget_day date not null,
   messages integer not null default 0 check (messages >= 0),
   committed_usd numeric(12,6) not null default 0 check (committed_usd >= 0),
@@ -21,7 +23,7 @@ create table public.sales_runtime_reservations (
   reserved_at timestamptz not null default now(),
   settled_at timestamptz,
   foreign key (deployment_id, budget_day)
-    references public.sales_runtime_daily_budgets(deployment_id, budget_day) on delete cascade
+    references public.sales_runtime_daily_budgets(deployment_id, budget_day) on delete restrict
 );
 create index sales_runtime_reservations_pending_idx
   on public.sales_runtime_reservations (reserved_at)

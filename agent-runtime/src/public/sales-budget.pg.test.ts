@@ -156,6 +156,25 @@ describe("atomic paid widget reservations", () => {
     expect((await reserve(0.3)).allowed).toBe(true);
   });
 
+  it("preserves unresolved paid-use evidence by blocking deployment and budget deletion", async () => {
+    const first = await reserve(0.3);
+    expect(first.allowed).toBe(true);
+    await db.query("select public.mark_sales_runtime_uncertain_v6($1)", [first.reservation_id]);
+    await expect(db.query(
+      "delete from public.client_sales_agent_deployments where id=$1", [DEPLOYMENT],
+    )).rejects.toThrow(/foreign key constraint/);
+    await expect(db.query(
+      "delete from public.sales_runtime_daily_budgets where deployment_id=$1", [DEPLOYMENT],
+    )).rejects.toThrow(/foreign key constraint/);
+    const evidence = await db.query<{ state: string; held_usd: string }>(`
+      select r.state, b.held_usd::text
+        from public.sales_runtime_reservations r
+        join public.sales_runtime_daily_budgets b
+          on b.deployment_id=r.deployment_id and b.budget_day=r.budget_day
+       where r.id=$1`, [first.reservation_id]);
+    expect(evidence.rows[0]).toEqual({ state: "uncertain", held_usd: "0.300000" });
+  });
+
   it("cancels a pre-model failure without consuming a message", async () => {
     const first = await reserve(0.8);
     const cancelled = await db.query<{ cancelled: boolean }>(
