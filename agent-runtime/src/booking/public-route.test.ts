@@ -130,7 +130,7 @@ describe("taking a slot", () => {
     expect(rpc).not.toHaveBeenCalledWith("book_from_public_link_v6", expect.anything());
   });
 
-  it("passes the database's own refusal back word for word", async () => {
+  it("passes a fixed, caller-safe booking refusal back word for word", async () => {
     const { res, out } = response();
     const { sb } = db({
       book_from_public_link_v6: {
@@ -141,6 +141,27 @@ describe("taking a slot", () => {
     await handlePublicBooking(request(`/public/book/v1/${TOKEN}`, "POST", good), res, sb);
     expect(out.status).toBe(400);
     expect(JSON.parse(out.body).error).toContain("not available");
+  });
+
+  it("does not expose an unexpected database error or submitted contact in response or logs", async () => {
+    const privateContact = "contact@example.test";
+    const { res, out } = response();
+    const { sb } = db({
+      book_from_public_link_v6: {
+        data: null,
+        error: { message: `duplicate value ${privateContact}` },
+      },
+    });
+    const logs = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await handlePublicBooking(request(`/public/book/v1/${TOKEN}`, "POST", good), res, sb);
+      expect(out.status).toBe(503);
+      expect(out.body).not.toContain(privateContact);
+      expect(JSON.stringify(logs.mock.calls)).not.toContain(privateContact);
+      expect(JSON.stringify(logs.mock.calls)).toContain("database_error");
+    } finally {
+      logs.mockRestore();
+    }
   });
 
   it("says nothing was held when the call returns no appointment", async () => {

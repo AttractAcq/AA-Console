@@ -122,7 +122,7 @@ export async function handlePublicLead(
   if (error) {
     // An infrastructure failure is ours, and the caller is told nothing
     // about it beyond that it did not work.
-    logger.error("lead_capture_failed", { message: error.message });
+    logger.error("lead_capture_failed", { reason: "database_error" });
     json(503, { error: "That did not go through. Please try again shortly." });
     return;
   }

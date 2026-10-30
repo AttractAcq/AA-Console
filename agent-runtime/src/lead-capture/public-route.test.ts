@@ -179,10 +179,18 @@ describe("what a stranger can learn", () => {
   });
 
   it("hides an infrastructure failure behind a retry message", async () => {
-    const { sb } = database(null, "connection reset");
-    const { code, payload } = await call(sb);
-    expect(code).toBe(503);
-    expect(String(payload.error)).not.toContain("connection reset");
+    const privateContact = "contact@example.test";
+    const { sb } = database(null, `database rejected ${privateContact}`);
+    const logs = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { code, payload } = await call(sb);
+      expect(code).toBe(503);
+      expect(String(payload.error)).not.toContain(privateContact);
+      expect(JSON.stringify(logs.mock.calls)).not.toContain(privateContact);
+      expect(JSON.stringify(logs.mock.calls)).toContain("database_error");
+    } finally {
+      logs.mockRestore();
+    }
   });
 
   it("serves nothing but the one route and the one method", async () => {

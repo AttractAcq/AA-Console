@@ -206,7 +206,7 @@ export async function handlePublicSales(
 
   const { data, error } = await sb.rpc("resolve_sales_deployment", { p_public_id: route.publicId });
   if (error) {
-    logger.error("public_sales_resolve_failed", { error: error.message });
+    logger.error("public_sales_resolve_failed", { reason: "database_error" });
     deny("error");
     return;
   }
@@ -445,7 +445,7 @@ export async function handlePublicSales(
     if (leadError) {
       logger.error("public_sales_lead_capture_failed", {
         deployment: d.deployment_id,
-        error: leadError.message,
+        reason: "database_error",
       });
     }
   }

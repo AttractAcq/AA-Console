@@ -14,7 +14,7 @@
  * Availability, the notice period, the daily maximum, the buffer, the
  * find-or-create of the lead and the lock that stops two people taking one
  * slot all live in `book_from_public_link_v6`. This route reads a body,
- * calls it, and passes its sentence back. A route that checked availability
+ * calls it, and passes a fixed, caller-safe refusal back. A route that checked availability
  * and then booked would have a gap between the two, and that gap is the
  * double booking.
  *
@@ -36,6 +36,16 @@ import { admitPublicRequest } from "../public/quota.js";
 const PREFIX = "/public/book/v1/";
 /** 64 hex characters, like every other public token in this system. */
 const TOKEN = /^[0-9a-f]{64}$/;
+// Only fixed business refusals from the booking RPC are safe to show. Other
+// database errors can include a submitted contact, constraint value or SQL
+// detail, and are never a public response or log field.
+const PUBLIC_BOOKING_REFUSALS = new Set([
+  "This booking link is not accepting bookings.",
+  "An email address or a phone number is needed to hold the slot.",
+  "Record what they agreed to.",
+  "This client is not taking bookings.",
+  "That slot is not available. Read the free slots again and choose another.",
+]);
 
 export function isBookingRequest(url: string | undefined): boolean {
   return typeof url === "string" && url.startsWith(PREFIX);
@@ -99,7 +109,7 @@ export async function handlePublicBooking(
       p_days: 14,
     } as never);
     if (error) {
-      logger.warn("booking_slots_failed", { error: error.message });
+      logger.warn("booking_slots_failed", { reason: "database_error" });
       json(503, { error: "Could not read the available times." });
       return;
     }
@@ -146,11 +156,13 @@ export async function handlePublicBooking(
   } as never);
 
   if (error) {
-    // The database's own sentence, written to be read by the person who
-    // pressed the button: "That slot is not available", "An email address or
-    // a phone number is needed to hold the slot".
-    logger.info("booking_refused", { reason: error.message });
-    json(400, { error: error.message });
+    if (PUBLIC_BOOKING_REFUSALS.has(error.message)) {
+      logger.info("booking_refused", { reason: "booking_rule" });
+      json(400, { error: error.message });
+    } else {
+      logger.warn("booking_refused", { reason: "database_error" });
+      json(503, { error: "Could not hold the slot. Please try again." });
+    }
     return;
   }
 
