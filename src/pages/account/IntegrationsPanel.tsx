@@ -226,8 +226,9 @@ export function IntegrationsPanel() {
             >
               {r.status}
             </span>
-            {(["meta", "instagram"].includes(r.provider) && dateLabel(r.last_checked_at)) &&
-              <span className="block text-xs text-muted-foreground">Token checked {dateLabel(r.last_checked_at)}</span>}
+            {/* metrics_ingest and token_health both write this timestamp. */}
+            {dateLabel(r.last_checked_at) &&
+              <span className="block text-xs text-muted-foreground">Last recorded integration activity {dateLabel(r.last_checked_at)}</span>}
             {dateLabel(r.token_expires_at) &&
               <span className="block text-xs text-muted-foreground">Recorded expiry {dateLabel(r.token_expires_at)}</span>}
           </div>,
@@ -258,9 +259,6 @@ export function IntegrationsPanel() {
               </button>
               <span className="text-xs text-muted-foreground">
                 {r.ingest_enabled ? "On" : "Off"}
-                {r.last_checked_at && r.ingest_enabled
-                  ? ` · last ${new Date(r.last_checked_at).toLocaleDateString()}`
-                  : ""}
               </span>
             </div>
           ) : (
