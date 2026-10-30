@@ -15,6 +15,7 @@ import { startProofCoordinator } from "./proof-capture/coordinator.js";
 // loops run and the process is inert.
 
 import http from "node:http";
+import { timingSafeEqual } from "node:crypto";
 import { handleMcpBrief } from "./mcp/brief-route.js";
 import { handleMcpOrchestration } from "./mcp/orchestration-route.js";
 import { handleMcpCampaign } from "./mcp/campaign-route.js";
@@ -172,7 +173,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url?.startsWith("/public/proof")) {
-    void handlePublicProof(req, res, sb);
+    void handlePublicProof(req, res, sb, config);
     return;
   }
   // The only way into this system for somebody who is not signed in. Handled
@@ -191,7 +192,7 @@ const server = http.createServer((req, res) => {
   // A prospect taking a slot in a client's week. Public for the same reason
   // the lead form is: it lives on the client's own site.
   if (isBookingRequest(req.url)) {
-    void handlePublicBooking(req, res, sb);
+    void handlePublicBooking(req, res, sb, config);
     return;
   }
   if (req.url === "/internal/proof-capture/event") {
@@ -347,10 +348,12 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url === "/status") {
-    if (
-      config.sharedSecret &&
-      req.headers["x-runtime-secret"] !== config.sharedSecret
-    ) {
+    const supplied = req.headers["x-runtime-secret"];
+    const expected = config.sharedSecret;
+    const suppliedBytes = typeof supplied === "string" ? Buffer.from(supplied) : null;
+    const expectedBytes = expected ? Buffer.from(expected) : null;
+    if (!suppliedBytes || !expectedBytes || suppliedBytes.length !== expectedBytes.length
+      || !timingSafeEqual(suppliedBytes, expectedBytes)) {
       json(401, { ok: false, error: "unauthorized" });
       return;
     }

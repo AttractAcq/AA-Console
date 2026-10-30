@@ -12,7 +12,7 @@ let savedEnv: NodeJS.ProcessEnv;
 beforeEach(() => {
   savedEnv = { ...process.env };
   for (const key of Object.keys(process.env)) {
-    if (key.startsWith("AGENT_RUNTIME_") || key.startsWith("MASTER_AI_") || key === "CONSOLE_URL" || key.startsWith("ANTHROPIC_API_KEY") || key === "SUPABASE_URL" || key === "SUPABASE_SERVICE_ROLE_KEY" || key === "PORT" || key === "AA_MCP_SERVICE_SECRET") {
+    if (key.startsWith("AGENT_RUNTIME_") || key.startsWith("MASTER_AI_") || key === "CONSOLE_URL" || key.startsWith("ANTHROPIC_API_KEY") || key === "SUPABASE_URL" || key === "SUPABASE_SERVICE_ROLE_KEY" || key === "PORT" || key === "AA_MCP_SERVICE_SECRET" || key === "PUBLIC_SALES_IP_SALT" || key === "PUBLIC_TRUSTED_PROXY_CIDRS") {
       delete process.env[key];
     }
   }
@@ -24,6 +24,25 @@ afterEach(() => {
 });
 
 describe("loadConfig", () => {
+  it("requires distinct 32-byte random secrets in production", () => {
+    process.env.NODE_ENV = "production";
+    expect(() => loadConfig()).toThrow(/AGENT_RUNTIME_SHARED_SECRET/);
+    process.env.AGENT_RUNTIME_SHARED_SECRET = "a".repeat(64);
+    expect(() => loadConfig()).toThrow(/AGENT_RUNTIME_SHARED_SECRET/);
+    process.env.AGENT_RUNTIME_SHARED_SECRET = "0123456789abcdef".repeat(4);
+    expect(() => loadConfig()).toThrow(/PUBLIC_SALES_IP_SALT/);
+    process.env.PUBLIC_SALES_IP_SALT = process.env.AGENT_RUNTIME_SHARED_SECRET;
+    expect(() => loadConfig()).toThrow(/must be distinct/);
+    process.env.PUBLIC_SALES_IP_SALT = "fedcba9876543210".repeat(4);
+    expect(loadConfig().publicIpSalt).toBe(process.env.PUBLIC_SALES_IP_SALT);
+  });
+
+  it("uses a local-only salt and no trusted proxy unless configured", () => {
+    expect(loadConfig().publicIpSalt).toBe("local-development-only-ip-salt");
+    expect(loadConfig().trustedProxies.count).toBe(0);
+    process.env.PUBLIC_TRUSTED_PROXY_CIDRS = "10.0.0.0/8";
+    expect(loadConfig().trustedProxies.count).toBe(1);
+  });
   it("fails closed when a required variable is missing", () => {
     delete process.env.SUPABASE_URL;
     expect(() => loadConfig()).toThrow(/SUPABASE_URL/);

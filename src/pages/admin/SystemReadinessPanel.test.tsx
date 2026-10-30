@@ -47,6 +47,16 @@ it("exports the same captured facts shown in the admin view on repeated download
         messageChannels: [{ key: "email", transport: "resend", supported: true, canInitiate: true }],
       }, reason: null },
     clients: { state: "observed", checkedAt: "2026-10-29T12:00:00Z", value: [], reason: null },
+    publicPerimeter: { state: "observed", checkedAt: "2026-10-29T12:00:00Z", reason: null,
+      value: { asOf: "2026-10-29T12:00:00Z", budgetDay: "2026-10-29",
+        quotaLastHour: [{ route: "lead_submit", bucketKind: "ip", activeBuckets: 2, countedAttempts: 9 }],
+        budgetsToday: [{ deploymentId: "deployment-1", messages: 3,
+          committedUsd: 0.04, heldUsd: 0.02, uncertainCount: 1 }],
+        unresolvedUncertain: 1,
+      } },
+    requestProxy: { directPeer: "10.0.0.2", forwardedHops: ["203.0.113.9", "10.0.0.3"],
+      chainStatus: "ignored_untrusted_peer", trustedProxyCount: 0,
+      callerIpUsedForQuota: "10.0.0.2" },
   });
   const blobs: Blob[] = [];
   Object.defineProperty(URL, "createObjectURL", { configurable: true, value: (blob: Blob) => {
@@ -59,6 +69,11 @@ it("exports the same captured facts shown in the admin view on repeated download
   expect(screen.getByText(/Environment staging/)).toBeInTheDocument();
   expect(screen.getByText(/google_ad_build unsupported/)).toBeInTheDocument();
   expect(screen.getByText(/email supported, can initiate/)).toBeInTheDocument();
+  expect(screen.getByText("Public acquisition perimeter")).toBeInTheDocument();
+  expect(screen.getByText("lead_submit")).toBeInTheDocument();
+  expect(screen.getByText("deployment-1")).toBeInTheDocument();
+  expect(screen.getByText(/Direct socket peer:/)).toBeInTheDocument();
+  expect(screen.getByText(/ignored untrusted peer/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Export JSON" }));
   fireEvent.click(screen.getByRole("button", { name: "Export JSON" }));
   const [first, second] = await Promise.all(blobs.map((blob) => blob.text()));

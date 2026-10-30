@@ -1,6 +1,7 @@
 // Environment configuration. Fails closed: a missing required variable
 // throws at startup rather than surfacing as undefined behaviour later.
 // Never logs a secret value, only whether one is present.
+import { parseTrustedProxies, type TrustedProxies } from "./public/client-ip.js";
 
 export interface RuntimeConfig {
   supabaseUrl: string;
@@ -20,10 +21,11 @@ export interface RuntimeConfig {
   /** How long a job may hold its lease before renewal stops and it becomes reclaimable. */
   maxJobSeconds: number;
   healthPort: number;
-  /** Required in an X-Runtime-Secret header on /status when set. */
+  /** Required in an X-Runtime-Secret header on /status. */
   sharedSecret: string | null;
   /** Salt for hashing public-widget caller IPs. A leaked hash must be useless against an IP list. */
   publicIpSalt: string;
+  trustedProxies: TrustedProxies;
   /** GitHub App identity. The private key never leaves this process. */
   githubAppId: string | null;
   githubAppPrivateKey: string | null;
@@ -123,6 +125,20 @@ function optionalEnv(name: string): string | undefined {
   return value && value.trim().length > 0 ? value.trim() : undefined;
 }
 
+function productionSecret(name: string): string {
+  const value = requireEnv(name);
+  // The deployment contract is 32+ random bytes encoded as hex/base64url.
+  // This catches placeholders and short shared passwords before serving traffic.
+  const hex = /^[a-f0-9]{64,}$/i.test(value) && value.length % 2 === 0;
+  const b64 = /^[A-Za-z0-9_-]{43,}$/.test(value)
+    && Buffer.from(value, "base64url").length >= 32
+    && Buffer.from(value, "base64url").toString("base64url") === value;
+  if ((!hex && !b64) || new Set(value).size < 12) {
+    throw new Error(`${name} must be a distinct random 32-byte-or-longer hex/base64url secret`);
+  }
+  return value;
+}
+
 function gatewayOrigin(): string | null {
   const raw = optionalEnv("AA_MCP_GATEWAY_URL");
   if (!raw) return null;
@@ -199,6 +215,16 @@ export function loadConfig(): RuntimeConfig {
     // rather than on every claim attempt.
     throw new Error(`AGENT_RUNTIME_LEASE_SECONDS must be between 30 and 3600, got: ${leaseSeconds}`);
   }
+  const production = process.env.NODE_ENV === "production";
+  const sharedSecret = production
+    ? productionSecret("AGENT_RUNTIME_SHARED_SECRET")
+    : optionalEnv("AGENT_RUNTIME_SHARED_SECRET") ?? null;
+  const publicIpSalt = production
+    ? productionSecret("PUBLIC_SALES_IP_SALT")
+    : optionalEnv("PUBLIC_SALES_IP_SALT") ?? "local-development-only-ip-salt";
+  if (production && sharedSecret === publicIpSalt) {
+    throw new Error("PUBLIC_SALES_IP_SALT and AGENT_RUNTIME_SHARED_SECRET must be distinct");
+  }
 
   return {
     supabaseUrl: requireEnv("SUPABASE_URL"),
@@ -216,11 +242,9 @@ export function loadConfig(): RuntimeConfig {
     providerTimeoutMs: intEnv("AGENT_RUNTIME_PROVIDER_TIMEOUT_MS", 600_000),
     maxJobSeconds: intEnv("AGENT_RUNTIME_MAX_JOB_SECONDS", 1800),
     healthPort: serverPort(),
-    sharedSecret: optionalEnv("AGENT_RUNTIME_SHARED_SECRET") ?? null,
-    publicIpSalt:
-      optionalEnv("PUBLIC_SALES_IP_SALT") ??
-      optionalEnv("AGENT_RUNTIME_SHARED_SECRET") ??
-      "aa-public-sales-unsalted",
+    sharedSecret,
+    publicIpSalt,
+    trustedProxies: parseTrustedProxies(optionalEnv("PUBLIC_TRUSTED_PROXY_CIDRS")),
     githubAppId: optionalEnv("GITHUB_APP_ID") ?? null,
     githubAppPrivateKey: optionalEnv("GITHUB_APP_PRIVATE_KEY") ?? null,
     githubInstallationId: optionalEnv("GITHUB_APP_INSTALLATION_ID") ?? null,
