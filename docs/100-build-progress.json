@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-10-30T04:24:38Z",
+  "updated_at": "2026-10-30T04:36:01Z",
   "objective": "AA-Console 100/100 autonomous service-business acquisition and content system, subject to exact-version human approval for every external publish, send, deployment, and spend action in one Approval Inbox.",
   "blueprint": {
     "artifact": "docs/AA_CONSOLE_100_BUILD_BLUEPRINT.md",
-    "sha256": "71459521ed263cf5f019a65ad22f839bae4c4460c42812f797ad9cdbe6cd9446",
+    "sha256": "8b591b7749d28ca92f81eaa4c424d3b8a25127a297dd35d579521cac17187bc2",
     "build_rows": 106
   },
   "baseline": {
     "github_main_sha": "00f7dc4aff12397a10b32aada08470b24e8366f2",
     "isolated_branch": "codex/progress-after-b009",
-    "source_checked_at": "2026-10-30T04:24:38Z",
+    "source_checked_at": "2026-10-30T04:36:01Z",
     "business_context_source": "2 - business/README.md in the local Attract Acquisition workspace",
     "confirmed_offer_ladder": [
       "Proof Sprint",
@@ -25,7 +25,7 @@
     "verified": "Mark a build row verified only after its stated acceptance evidence is recorded; track prerequisite gaps separately and do not credit dependent end-to-end behavior until all prerequisite rows and real external observations are verified.",
     "release": "Alex directly authorized this active 100/100 build session to merge and release subsequent work to main when CI jobs pass. Main protection strictly requires four up-to-date GitHub Actions checks and enforces admins. Production SQL requires exact dry-run, reviewed migration order and receipt. Alex separately approved AA_MCP_GATEWAY_URL=https://mcp.attractacq.com and the runtime redeploy. Product external actions still need exact-version human Approval Inbox decisions.",
     "approvals": "Every external action requires approval of its exact inspectable version in the unified Approval Inbox.",
-    "migration_order": "Production migrations 260–279 were applied in order after reviewed linked dry-runs and readbacks; current main is 00f7dc4aff12397a10b32aada08470b24e8366f2, with no new migration since 279. The first CI-gated Pages main run at 12a7555 failed one async frontend test and correctly withheld publication; isolated #258 merged after four checks and its new main CI passed all four checks and the first eligible Pages run published the exact tested SHA; live bundle SHA was verified. Staging retains alternate 259/260 stamps and lacks 261–279; draft #257 has a data-preserving disposable rehearsal and recovery review, no live write. Isolated async Auth-switch test repair #259 merged at 6886bf5 after four protected checks. B006 280–282 is held draft #254 under Q009; B004 283–286 is unreleased; B011 code-only #260 merged at 7a3151c after four checks; B009 phase-1 read-only release probe #262 merged at b9b4a3b after four protected checks; live endpoint observed runtime b9b4a3b, gateway d5910b9 and migration head 20261030160000, separately confirmed as 296 production history rows. B009 phase-2 #266 passed four protected jobs and merged at 360692a55be18af5bb4a61dd0293f163fdc07b3c; main CI 41000965930 passed 4/4 and Pages 41002119621 published exact 360692a55be18af5bb4a61dd0293f163fdc07b3c at 04:20:03 UTC. Held draft #267 prepares a dedicated authenticated uncached release probe without configuring a production secret. B011 browser scheduling guard #268 passed four protected jobs and merged at 00f7dc4aff12397a10b32aada08470b24e8366f2; main CI was in progress at 04:24 UTC and browser publication was not yet verified. B011 SQL 287 and B008 source reconciliation 288 are planned. Never reapply production 244–279 or rewrite staging history without a reviewed data-preserving plan."
+    "migration_order": "Production migrations 260–279 were applied in order after reviewed linked dry-runs and readbacks; current main is 00f7dc4aff12397a10b32aada08470b24e8366f2, with no new migration since 279. The first CI-gated Pages main run at 12a7555 failed one async frontend test and correctly withheld publication; isolated #258 merged after four checks and its new main CI passed all four checks and the first eligible Pages run published the exact tested SHA; live bundle SHA was verified. Staging retains alternate 259/260 stamps and lacks 261–279; draft #257 has a data-preserving disposable rehearsal and recovery review, no live write. Isolated async Auth-switch test repair #259 merged at 6886bf5 after four protected checks. B006 280–282 is held draft #254 under Q009; B004 283–286 is unreleased; B011 code-only #260 merged at 7a3151c after four checks; B009 phase-1 read-only release probe #262 merged at b9b4a3b after four protected checks; live endpoint observed runtime b9b4a3b, gateway d5910b9 and migration head 20261030160000, separately confirmed as 296 production history rows. B009 phase-2 #266 passed four protected jobs and merged at 360692a55be18af5bb4a61dd0293f163fdc07b3c; main CI 41000965930 passed 4/4 and Pages 41002119621 published exact 360692a55be18af5bb4a61dd0293f163fdc07b3c at 04:20:03 UTC. Held draft #267 prepares a dedicated authenticated uncached release probe without configuring a production secret. B011 browser scheduling guard #268 passed four protected jobs and merged at 00f7dc4aff12397a10b32aada08470b24e8366f2; main CI 41002663609 passed 4/4 and eligible Pages 41003452031 published exact browser SHA 00f7dc4aff12397a10b32aada08470b24e8366f2 at 04:34:50 UTC, independently read back from the public asset. B011 SQL 287 and B008 source reconciliation 288 are planned. Never reapply production 244–279 or rewrite staging history without a reviewed data-preserving plan."
   },
   "r000": {
     "state": "verified",
@@ -404,21 +404,23 @@
         "Read-only phase-1 release identity PR #262 exact head c358d1e1c9ee865844a70d984aecf5ba2f952a2d passed all four protected jobs in CI run 40997812730 and merged at b9b4a3b3b02624218a834505ece2a4e412c36979; six focused route/probe tests, local typecheck and build passed.",
         "PR #266 exact head 13b284369444611d5e42ba673bde163bbb1f3d88 passed all four protected checks in CI run 40999839265 and merged at 360692a55be18af5bb4a61dd0293f163fdc07b3c at 04:05:45 UTC. Six local Node guard tests passed, including 201/503, mismatch, stale observation, pinned-source ancestry/tree and bounded transport negatives; main CI 41000965930 later passed all four jobs and eligible Pages 41002119621 published exact 360692a55be18af5bb4a61dd0293f163fdc07b3c.",
         "PR #262 main CI run 40998821624 passed all four jobs, and eligible Pages run 40999607194 succeeded at 03:52:58 UTC for exact b9b4a3b3b02624218a834505ece2a4e412c36979.",
-        "PR #266 main CI 41000965930 passed all four jobs; eligible Pages run 41002119621 completed SUCCESS at 04:20:03 UTC, including the live identity comparison and deployment steps."
+        "PR #266 main CI 41000965930 passed all four jobs; eligible Pages run 41002119621 completed SUCCESS at 04:20:03 UTC, including the live identity comparison and deployment steps.",
+        "At 04:29:52 UTC a read-only comparator check accepted the public live /release/identities response against the current reviewed manifest, then separately rejected wrong full runtime SHA, wrong full gateway SHA and wrong migration head with exact mismatch errors; this is not a staged Pages withheld-publication test."
       ],
       "permission_and_negative_tests": [
         "Privileged Pages workflow_run job runs only for successful same-repository CI push events on main; PR, fork, failed and manual events skip before checkout/secrets.",
         "The workflow checks out the CI-tested SHA, requires the checked-out commit and remote main to match before build and just before publication, and blocks tracked migrations beyond the reviewed source release marker.",
         "The phase-1 GET /release/identities endpoint observes full runtime/gateway SHAs and live migration head, caches for ten seconds, denies non-GET, exposes no credentials or client data, and returns a fixed 503 reason rather than claiming compatibility on missing evidence.",
-        "Phase-2 Pages source guard pins full runtime/gateway SHAs and released migration head, rejects component source changed since a pinned deployment, compares a bounded live response and rechecks current main immediately before publication; secret-bearing job skips PR/fork/failed CI. Eligible live Pages run 41002119621 completed the guard and deployment steps successfully; its public bundle SHA was independently verified."
+        "Phase-2 Pages source guard pins full runtime/gateway SHAs and released migration head, rejects component source changed since a pinned deployment, compares a bounded live response and rechecks current main immediately before publication; secret-bearing job skips PR/fork/failed CI. Eligible live Pages run 41002119621 completed the guard and deployment steps successfully; its public bundle SHA was independently verified.",
+        "Live-response negative comparator rejected three deliberately incompatible inputs without changing production; staged CI-gated Pages refusal for a real incompatible deployment remains open."
       ],
-      "deployed_sha": "360692a55be18af5bb4a61dd0293f163fdc07b3c",
+      "deployed_sha": "00f7dc4aff12397a10b32aada08470b24e8366f2",
       "real_account_or_client": null,
-      "external_proof": "The CI-gated Pages path previously withheld publication after failed main CI, then published exact tested browser SHA d00cff45658320489e8cce63228aff61a06cacbc after 4/4 replacement CI. After #262 merged, live GET https://runtime.attractacq.com/release/identities returned HTTP 200 at 2026-10-30T03:44:39.366Z with observationsComplete=true, runtime SHA b9b4a3b3b02624218a834505ece2a4e412c36979, gateway SHA d5910b9f610318276f1ae63d67ef607c00f96439 and migration head 20261030160000. Separate SELECT-only production query at 03:43:46 UTC confirmed 296 history rows and that head; heartbeat at 03:44:11 UTC confirmed runtime b9 live/enabled. This proves observations, not enforced compatibility or an Inbox release decision. PR #266 merged the live comparison source at 04:05:45 UTC after 4/4 exact-head checks; main CI 41000965930 later passed 4/4 and the eligible Pages run published the exact main SHA. Independent 03:54 UTC public bundle read found asset index-CNXjdDkO.js embedding full b9b4a3b3b02624218a834505ece2a4e412c36979 after the successful #262 Pages run. This was the previous verified browser publication before #266. Subsequent #266 main CI 41000965930 passed 4/4; eligible Pages run 41002119621 completed live identity comparison and deploy SUCCESS at 04:20:03 UTC. A fetched public `index-Hpy-r7tp.js` embeds exact tested SHA 360692a55be18af5bb4a61dd0293f163fdc07b3c. This is the latest verified browser publication, not an authenticated feature smoke or production-release Inbox decision.",
-      "observed_at": "2026-10-30T04:20:03Z",
+      "external_proof": "The CI-gated Pages path previously withheld publication after failed main CI, then published exact tested browser SHA d00cff45658320489e8cce63228aff61a06cacbc after 4/4 replacement CI. After #262 merged, live GET https://runtime.attractacq.com/release/identities returned HTTP 200 at 2026-10-30T03:44:39.366Z with observationsComplete=true, runtime SHA b9b4a3b3b02624218a834505ece2a4e412c36979, gateway SHA d5910b9f610318276f1ae63d67ef607c00f96439 and migration head 20261030160000. Separate SELECT-only production query at 03:43:46 UTC confirmed 296 history rows and that head; heartbeat at 03:44:11 UTC confirmed runtime b9 live/enabled. This proves observations, not enforced compatibility or an Inbox release decision. PR #266 merged the live comparison source at 04:05:45 UTC after 4/4 exact-head checks; main CI 41000965930 later passed 4/4 and the eligible Pages run published the exact main SHA. Independent 03:54 UTC public bundle read found asset index-CNXjdDkO.js embedding full b9b4a3b3b02624218a834505ece2a4e412c36979 after the successful #262 Pages run. This was the previous verified browser publication before #266. Subsequent #266 main CI 41000965930 passed 4/4; eligible Pages run 41002119621 completed live identity comparison and deploy SUCCESS at 04:20:03 UTC. A fetched public `index-Hpy-r7tp.js` embeds exact tested SHA 360692a55be18af5bb4a61dd0293f163fdc07b3c. This is the latest verified browser publication, not an authenticated feature smoke or production-release Inbox decision. At 04:29:52 UTC, a read-only comparator check on the public live response accepted the reviewed manifest and rejected deliberately wrong runtime, gateway and migration identities separately; no production change or staged blocked-publication run occurred. After B011 #268 merged, main CI 41002663609 passed 4/4 and eligible Pages run 41003452031 completed live-identity and deploy SUCCESS at 04:34:50 UTC. Public asset index-CWQdMehP.js was fetched by 04:35:49 UTC and embeds exact full browser SHA 00f7dc4aff12397a10b32aada08470b24e8366f2. This is the latest verified browser publication, with the B009 source guard in main ancestry.",
+      "observed_at": "2026-10-30T04:35:49Z",
       "blocker": "B009 remains in progress: held draft #267 has code and exact-head branch CI but requires Q014 reviewed secure Railway/GitHub token delivery, fresh live deployment and a later exact runtime-pin manifest update. Deliberately incompatible live configurations still need a staged blocked-publication test; feature-specific authenticated smoke and migration 279 class #32 exact-version production-release Approval Inbox bridge remain missing.",
       "rollback": "Keep the last known-good Pages artifact and all immutable approval/external-ID rows; halt a mismatched release rather than bypass CI or the source marker.",
-      "reviewer": "PR #266 exact-head four protected checks, main CI 41000965930 and eligible Pages 41002119621 all passed; public bundle independently embeds full 360692a55be18af5bb4a61dd0293f163fdc07b3c. Draft #267 is held for Q014 secret delivery and live proof; Approval Inbox release class #32 and authenticated feature smoke remain open.",
+      "reviewer": "PR #266 exact-head four protected checks, main CI 41000965930 and eligible Pages 41002119621 all passed; public bundle independently embeds full 360692a55be18af5bb4a61dd0293f163fdc07b3c. Draft #267 is held for Q014 secret delivery and live proof; Approval Inbox release class #32 and authenticated feature smoke remain open. The #268 main CI and eligible Pages run also succeeded, with public bundle read-back of full 00f7dc4aff12397a10b32aada08470b24e8366f2. The 04:29:52 negative comparator did not exercise a staged Pages denial.",
       "release_receipt": {
         "head_sha": "796463e090a9ba006c1960ab30a8ed9d611ee7b9",
         "merge_sha": "12a7555360f14055715b15120e08c0b3fb3b30e5",
@@ -454,7 +456,15 @@
         "manifest_pages_completed_at": "2026-10-30T04:20:03Z",
         "manifest_pages_live_identity_step": "success",
         "manifest_published_browser_sha": "360692a55be18af5bb4a61dd0293f163fdc07b3c",
-        "manifest_browser_asset": "index-Hpy-r7tp.js"
+        "manifest_browser_asset": "index-Hpy-r7tp.js",
+        "negative_comparator_observed_at": "2026-10-30T04:29:52Z",
+        "negative_comparator_scope": "read-only live-response runtime/gateway/migration mismatch rejection; no staged Pages denial",
+        "latest_browser_main_ci": "https://github.com/AttractAcq/AA-Console/actions/runs/41002663609",
+        "latest_browser_pages_run": "https://github.com/AttractAcq/AA-Console/actions/runs/41003452031",
+        "latest_browser_pages_completed_at": "2026-10-30T04:34:50Z",
+        "latest_browser_asset": "index-CWQdMehP.js",
+        "latest_browser_sha": "00f7dc4aff12397a10b32aada08470b24e8366f2",
+        "latest_browser_readback_by": "2026-10-30T04:35:49Z"
       },
       "additional_prs": [
         "https://github.com/AttractAcq/AA-Console/pull/256",
@@ -490,19 +500,21 @@
       "migration_ids": [],
       "tests": [
         "Local 40/40 publisher tests and runtime typecheck passed before integration; exact-head PR #260 at 8a15a90d85cbda5ed6a87300892c85742dd90454 passed all four protected CI jobs in run 40995466852 and merged at 7a3151ce13c77ef77878b34a053f527ec09ffaa8.",
-        "Browser scheduling guard PR #268 exact head 5be24faa27f2e3e7076ed38973fa40d262071ec9 passed all four protected CI jobs in run 41001597903 and merged at 00f7dc4aff12397a10b32aada08470b24e8366f2 on 2026-10-30 04:23:51 UTC; focused Vitest passed 67/67 across five files, with build and lint passing before integration."
+        "Browser scheduling guard PR #268 exact head 5be24faa27f2e3e7076ed38973fa40d262071ec9 passed all four protected CI jobs in run 41001597903 and merged at 00f7dc4aff12397a10b32aada08470b24e8366f2 on 2026-10-30 04:23:51 UTC; focused Vitest passed 67/67 across five files, with build and lint passing before integration.",
+        "The #268 main CI run 41002663609 passed all four jobs; eligible Pages run 41003452031 completed live identity and deploy steps SUCCESS at 04:34:50 UTC, and public index-CWQdMehP.js embeds the exact browser SHA 00f7dc4aff12397a10b32aada08470b24e8366f2."
       ],
       "permission_and_negative_tests": [
         "Runtime guard refuses paid channel/campaign, legacy or missing route lineage, mismatched asset, stale claim and transient read errors before credential/Storage/provider access; rechecks before ordinary write and each story frame.",
-        "Shared browser guard checks asset → brief → idea → campaign and same-client explicit organic mode immediately before schedule_asset in DistributionBoard, AssetsPanel, ConceptWorkspace and CalendarPanel; paid, unknown, legacy, missing, cross-client and unreadable lineage display a named blocker without invoking the RPC. CalendarPanel requires channel choice. Direct authenticated RPC calls and a read/write race remain open until SQL migration 287."
+        "Shared browser guard checks asset → brief → idea → campaign and same-client explicit organic mode immediately before schedule_asset in DistributionBoard, AssetsPanel, ConceptWorkspace and CalendarPanel; paid, unknown, legacy, missing, cross-client and unreadable lineage display a named blocker without invoking the RPC. CalendarPanel requires channel choice. Direct authenticated RPC calls and a read/write race remain open until SQL migration 287.",
+        "Source audit: public.schedule_asset in migration 144 inserts only scheduled_posts; it does not link content_slots. Runtime requireOrganicRoute queries content_slots by scheduled_post_id and blocks the resulting slotless post. Browser route guard tests do not prove end-to-end publishing."
       ],
       "deployed_sha": "b9b4a3b3b02624218a834505ece2a4e412c36979",
       "real_account_or_client": null,
-      "external_proof": "SELECT-only production heartbeat at 2026-10-30 03:22:32 UTC reported guard merge SHA 7a3151ce13c77ef77878b34a053f527ec09ffaa8 live/enabled. After read-only B009 #262 merged, another heartbeat at 03:44:11 UTC reported full runtime b9b4a3b3b02624218a834505ece2a4e412c36979 live/enabled; #260 guard remains in its main ancestry. This proves runtime source deployment, not SQL route isolation or a real organic provider write.",
-      "observed_at": "2026-10-30T03:44:11Z",
-      "blocker": "The runtime guard is deployed and the browser guard is merged after four protected checks, but the latter had no independent public Pages proof at the 04:24 UTC snapshot. Direct authenticated schedule_asset RPC calls can bypass the browser check and campaign lineage can change between the browser read and SQL write. Migration 287 must enforce organic-only same-client route at schedule_asset, publish_due and claim_posts_for_publishing; separate paid handling and a real organic-provider pilot remain. External publishing switches stay off.",
+      "external_proof": "SELECT-only production heartbeat at 2026-10-30 03:22:32 UTC reported guard merge SHA 7a3151ce13c77ef77878b34a053f527ec09ffaa8 live/enabled. After read-only B009 #262 merged, another heartbeat at 03:44:11 UTC reported full runtime b9b4a3b3b02624218a834505ece2a4e412c36979 live/enabled; #260 guard remains in its main ancestry. This proves runtime source deployment, not SQL route isolation or a real organic provider write. The #268 main CI 41002663609 passed 4/4, eligible Pages 41003452031 completed SUCCESS at 04:34:50 UTC and public index-CWQdMehP.js was fetched by 04:35:49 UTC with exact full browser SHA 00f7dc4aff12397a10b32aada08470b24e8366f2. This proves browser publication, not SQL route isolation or a live organic provider write.",
+      "observed_at": "2026-10-30T04:35:49Z",
+      "blocker": "The runtime guard is deployed and the browser guard is publicly published after 4/4 main CI. Direct authenticated schedule_asset RPC calls bypass the browser check, and lineage can change between browser read and SQL write. Latest manual schedule_asset inserts scheduled_posts without a content_slots link, while runtime requireOrganicRoute denies a post without its matching slot. Do not enable slotless publication while B008 exact-byte ordinary-media/Engine approvals remain blocked. Migration 287 must enforce same-client organic route at schedule_asset, publish_due and claim_posts_for_publishing and define safe slot binding; separate paid handling and a real organic-provider pilot remain. External publishing switches stay off.",
       "rollback": "Keep organic publishing switches off; do not claim paid or legacy rows while SQL and live route verification are incomplete.",
-      "reviewer": "Independent runtime guard diff review found no provider-write bypass and #260 passed four protected jobs. Browser guard #268 passed four protected jobs with 67 focused tests; its UI boundary does not replace the SQL route gate or a real provider pilot.",
+      "reviewer": "Independent runtime guard diff review found no provider-write bypass and #260 passed four protected jobs. Browser guard #268 passed four protected jobs with 67 focused tests; its UI boundary does not replace the SQL route gate or a real provider pilot. The #268 main CI and Pages gate succeeded and the public bundle embeds the full tested SHA; manual slotless posts remain unable to pass the runtime route guard.",
       "release_receipt": {
         "head_sha": "8a15a90d85cbda5ed6a87300892c85742dd90454",
         "merge_sha": "7a3151ce13c77ef77878b34a053f527ec09ffaa8",
@@ -512,8 +524,10 @@
         "head_sha": "5be24faa27f2e3e7076ed38973fa40d262071ec9",
         "merge_sha": "00f7dc4aff12397a10b32aada08470b24e8366f2",
         "ci_run": "https://github.com/AttractAcq/AA-Console/actions/runs/41001597903",
-        "main_ci_at_snapshot": "https://github.com/AttractAcq/AA-Console/actions/runs/41002663609 (in progress at 04:24 UTC)",
-        "browser_publication": "not independently observed at this snapshot"
+        "main_ci_at_snapshot": "https://github.com/AttractAcq/AA-Console/actions/runs/41002663609 (success, four jobs)",
+        "browser_publication": "public index-CWQdMehP.js embeds exact full 00f7dc4aff12397a10b32aada08470b24e8366f2, fetched by 04:35:49 UTC",
+        "pages_run": "https://github.com/AttractAcq/AA-Console/actions/runs/41003452031",
+        "pages_completed_at": "2026-10-30T04:34:50Z"
       }
     },
     "B012": {
