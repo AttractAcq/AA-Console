@@ -15,8 +15,17 @@ describe("admin-only proxy topology diagnostic", () => {
     expect(result).toEqual({
       directPeer: "10.0.0.2", forwardedHops: ["203.0.113.9", "10.0.0.3"],
       chainStatus: "trusted_peer", trustedProxyCount: 1,
+      signedIngressRequired: false,
       callerIpUsedForQuota: "203.0.113.9",
     });
+  });
+
+  it("marks the signed public identity without misreporting this admin peer as quota identity", () => {
+    const result = requestProxyDiagnostic(request("100.64.0.2", "203.0.113.9, 100.64.0.1"),
+      parseTrustedProxies(undefined), true);
+    expect(result.signedIngressRequired).toBe(true);
+    expect(result.callerIpUsedForQuota).toBeNull();
+    expect(result.forwardedHops).toEqual(["203.0.113.9", "100.64.0.1"]);
   });
 
   it("never promotes a spoofed forwarding header from an untrusted peer", () => {

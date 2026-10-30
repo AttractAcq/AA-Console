@@ -16478,6 +16478,24 @@ export type Database = {
           },
         ]
       }
+      public_ingress_nonces_v1: {
+        Row: {
+          expires_at: string
+          issued_at: string
+          nonce_hash: string
+        }
+        Insert: {
+          expires_at: string
+          issued_at: string
+          nonce_hash: string
+        }
+        Update: {
+          expires_at?: string
+          issued_at?: string
+          nonce_hash?: string
+        }
+        Relationships: []
+      }
       public_route_quota_buckets: {
         Row: {
           attempts: number
@@ -24622,6 +24640,10 @@ export type Database = {
           proof_id: string
           provider: string
         }[]
+      }
+      claim_public_ingress_nonce_v1: {
+        Args: { p_issued_at: string; p_nonce_hash: string }
+        Returns: boolean
       }
       client_budget_state: {
         Args: { p_client_id: string; p_month?: string }

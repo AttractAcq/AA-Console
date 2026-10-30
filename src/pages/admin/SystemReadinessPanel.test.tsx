@@ -55,6 +55,7 @@ it("exports the same captured facts shown in the admin view on repeated download
         unresolvedUncertain: 1,
       } },
     requestProxy: { directPeer: "10.0.0.2", forwardedHops: ["203.0.113.9", "10.0.0.3"],
+      signedIngressRequired: false,
       chainStatus: "ignored_untrusted_peer", trustedProxyCount: 0,
       callerIpUsedForQuota: "10.0.0.2" },
   });

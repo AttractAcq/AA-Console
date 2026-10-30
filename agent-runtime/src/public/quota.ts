@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
 import { logger } from "../logging/logger.js";
 import { resolveCallerIp } from "./client-ip.js";
+import { signedIngressClientIp } from "./ingress-auth.js";
 
 export type PublicRoute = "lead_submit" | "proof_config" | "proof_submit" |
   "sales_config" | "sales_message" | "booking_slots" | "booking_submit";
@@ -25,7 +26,9 @@ export async function admitPublicRequest(
   route: PublicRoute,
   subject: string,
 ): Promise<Admission> {
-  const ip = resolveCallerIp(req, config.trustedProxies);
+  const ip = config.publicIngressRequired
+    ? signedIngressClientIp(req)
+    : resolveCallerIp(req, config.trustedProxies);
   if (!ip) {
     logger.info("public_request_refused", { route, reason: "invalid_peer" });
     return { allowed: false, reason: "invalid_peer" };
