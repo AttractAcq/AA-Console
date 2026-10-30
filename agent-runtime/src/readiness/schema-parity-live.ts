@@ -252,7 +252,10 @@ export async function collectSchemaParity(config: RuntimeConfig, fetchImpl: type
     createdAt: new Date().toISOString(),
     gitSha,
     sourceProvenance: {
-      headSha: gitSha, workingTreeClean: gitSha ? true : null, migrationInputsClean: true,
+      // Railway's commit SHA identifies a revision, not the cleanliness of
+      // the deployed checkout. CI checks this generated manifest against the
+      // migration/type inputs, but runtime has no working-tree attestation.
+      headSha: gitSha, workingTreeClean: null, migrationInputsClean: null,
       migrationSourceDigest: manifest.migrationSourceDigest, generatedTypesSha256: manifest.generatedTypesSha256,
     },
     result: queryIncomplete ? "incomplete" : observedDrift ? "drift" : payloadUnavailable ? "incomplete" : "matching_snapshots",

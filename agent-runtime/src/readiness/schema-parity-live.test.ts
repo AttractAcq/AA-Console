@@ -51,6 +51,11 @@ describe("live schema parity", () => {
     expect(report.findings.shown.filter((finding) => finding.type === "recorded_sql_mismatch")).toHaveLength(0);
     expect(report.findings.shown.filter((finding) => finding.type === "history_sql_payload_unavailable")).toHaveLength(1);
     expect(report.access.projectRefs).toEqual(refs);
+    expect(report.sourceProvenance).toMatchObject({
+      headSha: process.env.RAILWAY_GIT_COMMIT_SHA,
+      workingTreeClean: null,
+      migrationInputsClean: null,
+    });
     expect(report.generatedTypes.schemaDerivedComparison).toBe("matching");
     expect(JSON.stringify(report)).not.toContain(token);
     expect(JSON.stringify(report)).not.toContain("ddl_command_end");

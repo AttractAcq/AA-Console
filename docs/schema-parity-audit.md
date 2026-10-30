@@ -113,6 +113,14 @@ credentials or malformed reports show **Unknown**. The viewer still supports
 operator-imported JSON when used independently, but the Admin route uses the
 trusted live feed.
 
+The live runtime reports the full Railway commit SHA when present. Its
+`workingTreeClean` and `migrationInputsClean` fields are `null`: a commit SHA
+does not attest the deployed checkout's status. CI verifies that the checked-in
+runtime manifest matches migration files, generated types and catalog queries
+at its checkout. A live `matching_snapshots` result means the two observed
+projects match on the measured surfaces; it does not claim that either project
+matches a clean source replay.
+
 Set `AA_SCHEMA_PARITY_READ_TOKEN`, `AA_SCHEMA_PARITY_PRODUCTION_REF` and
 `AA_SCHEMA_PARITY_STAGING_REF` on the **agent-runtime** Railway service. Use a
 fine-grained PAT that has only Database Read on the two named projects, then
