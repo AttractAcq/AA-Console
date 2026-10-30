@@ -419,6 +419,8 @@ export type Database = {
           preview_blocker: string | null
           requested_at: string
           requested_by: string | null
+          requester_kind: string
+          requester_ref: string | null
           scope: Json | null
           source_id: string
           source_kind: string
@@ -441,6 +443,8 @@ export type Database = {
           preview_blocker?: string | null
           requested_at?: string
           requested_by?: string | null
+          requester_kind: string
+          requester_ref?: string | null
           scope?: Json | null
           source_id: string
           source_kind: string
@@ -463,6 +467,8 @@ export type Database = {
           preview_blocker?: string | null
           requested_at?: string
           requested_by?: string | null
+          requester_kind?: string
+          requester_ref?: string | null
           scope?: Json | null
           source_id?: string
           source_kind?: string
@@ -19298,6 +19304,9 @@ export type Database = {
           preview: Json | null
           preview_blocker: string | null
           requested_at: string
+          requested_by: string | null
+          requester_kind: string
+          requester_ref: string | null
           scope: Json | null
           source_id: string
           source_kind: string

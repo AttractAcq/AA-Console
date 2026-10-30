@@ -68,6 +68,13 @@ begin
       'location_id', v_location.id, 'location_ref', v_location.location_ref,
       'body_hash', p_reply.body_hash),
     'owner_role', 'admin_or_active_client_manager',
+    'requested_by', p_reply.created_by,
+    'requester_kind', case when p_reply.created_by is not null then 'human'
+      when p_reply.drafted_by_job_id is not null then 'agent'
+      else 'unknown' end,
+    'requester_ref', case when p_reply.created_by is null
+      and p_reply.drafted_by_job_id is not null
+      then 'agent_jobs:' || p_reply.drafted_by_job_id::text else null end,
     'expires_at', p_reply.created_at + interval '7 days',
     'preview_blocker', v_blocker,
     'owning_path', '/clients/' || p_reply.client_id::text ||

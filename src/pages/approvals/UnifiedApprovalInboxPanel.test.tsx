@@ -24,6 +24,9 @@ const request = {
   title: "Build the Meta ad",
   status: "pending",
   requested_at: "2026-10-30T08:00:00Z",
+  requested_by: null,
+  requester_kind: "service",
+  requester_ref: "campaign_action_approvals:source-1",
   expires_at: "2026-10-31T08:00:00Z",
   artifact_hash: "a".repeat(64),
   preview: { headline: "Exact headline", body: "Exact offer body" },
@@ -42,6 +45,8 @@ let requestError: { message: string } | null;
 let decisionError: { message: string } | null;
 let freshRequest: unknown | undefined;
 let clientEqValues: string[];
+let requestRanges: Array<[number, number]>;
+let historyIds: string[][];
 
 const readyCampaign = {
   ...request, source_system: "aa_console", expires_at: "2030-01-01T00:00:00Z",
@@ -89,21 +94,29 @@ const readyRecruitment = {
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
+    const filters: Array<[string, string | null]> = [];
     const query = {
       select: () => query,
       eq: (column: string, value: string) => {
         if (column === "id") id = value;
         if (column === "client_id" && table === "approval_inbox_v6") clientEqValues.push(value);
+        filters.push([column, value]);
         return query;
       },
-      in: () => query,
+      is: (column: string, value: null) => { filters.push([column, value]); return query; },
+      in: (_column: string, ids: string[]) => { historyIds.push(ids); return query; },
       maybeSingle: async () => ({
         data: freshRequest === undefined ? requests.find((row) => (row as { id: string }).id === id) ?? null : freshRequest,
         error: requestError,
       }),
-      order: async () => table === "approval_inbox_v6"
-        ? { data: requests, error: requestError }
-        : { data: decisions, error: decisionError },
+      order: () => table === "approval_inbox_v6" ? query
+        : Promise.resolve({ data: decisions, error: decisionError }),
+      range: async (start: number, end: number) => {
+        requestRanges.push([start, end]);
+        const filtered = requests.filter((row) => filters.every(([column, value]) =>
+          (row as Record<string, unknown>)[column] === value));
+        return { data: filtered.slice(start, end + 1), error: requestError };
+      },
     };
     return query;
   });
@@ -121,6 +134,8 @@ beforeEach(() => {
   decisionError = null;
   freshRequest = undefined;
   clientEqValues = [];
+  requestRanges = [];
+  historyIds = [];
   getAAL.mockResolvedValue({ data: { currentLevel: "aal2" }, error: null });
   rpc.mockResolvedValue({ data: null, error: null });
   wireDatabase();
@@ -137,11 +152,44 @@ describe("unified approval inbox", () => {
     expect(within(card).getByText(/daily_spend_limit/)).toBeInTheDocument();
     expect(within(card).getByText(/placement/)).toBeInTheDocument();
     expect(within(card).getByText("admin")).toBeInTheDocument();
+    expect(within(card).getByText("service · campaign_action_approvals:source-1"))
+      .toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "View owning source" })).toHaveAttribute(
       "href", "/clients/client-1/delivery/approval-inbox?tab=campaign-actions",
     );
     expect(within(card).queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
     expect(from).toHaveBeenCalledWith("approval_inbox_v6");
+  });
+
+  it("pages all matching requests in bounded batches and bounds decision history IDs", async () => {
+    requests = Array.from({ length: 60 }, (_, index) => ({
+      ...request, id: `request-${index}`, source_id: `action-${index}`,
+      title: `Queued ${index}`,
+    }));
+    show("global");
+    expect(await screen.findByRole("article", { name: "Queued 0" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Queued 50" })).not.toBeInTheDocument();
+    expect(requestRanges).toContainEqual([0, 50]);
+    expect(historyIds.every((ids) => ids.length <= 50)).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(await screen.findByRole("article", { name: "Queued 50" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Queued 0" })).not.toBeInTheDocument();
+    expect(requestRanges).toContainEqual([50, 100]);
+    expect(historyIds.at(-1)).toHaveLength(10);
+    await userEvent.click(screen.getByRole("button", { name: "Previous page" }));
+    expect(await screen.findByRole("article", { name: "Queued 0" })).toBeInTheDocument();
+  });
+
+  it("finds a deep-linked source even when it would be beyond the first page", async () => {
+    requests = Array.from({ length: 60 }, (_, index) => ({
+      ...request, id: `request-${index}`, source_id: index === 59 ? "brief-59" : `action-${index}`,
+      title: index === 59 ? "Exact linked brief" : `Queued ${index}`,
+      status: index === 59 ? "approved" : "pending",
+    }));
+    show("global", "/approvals?source=brief-59");
+    expect(await screen.findByRole("article", { name: "Exact linked brief" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+    expect(historyIds.at(-1)).toHaveLength(1);
   });
 
   it("makes missing exact preview and hash explicit without offering approval", async () => {
@@ -179,7 +227,8 @@ describe("unified approval inbox", () => {
     const recruitment = await screen.findByRole("article", { name: "Editor brief" });
     expect(within(recruitment).getByRole("link", { name: "View owning source" }))
       .toHaveAttribute("href", "/team?tab=recruitment");
-    for (const title of ["Other team card", "Cross-client brief", "Other team tab"]) {
+    expect(screen.queryByRole("article", { name: "Cross-client brief" })).not.toBeInTheDocument();
+    for (const title of ["Other team card", "Other team tab"]) {
       expect(within(screen.getByRole("article", { name: title }))
         .queryByRole("link", { name: "View owning source" })).not.toBeInTheDocument();
     }
@@ -200,11 +249,11 @@ describe("unified approval inbox", () => {
     await user.click(screen.getByText("Decision history (1)"));
     expect(screen.getByText(/Human: human-1 · Assurance: aal2/)).toBeInTheDocument();
     expect(screen.getByText("Reason: Rights verified")).toBeInTheDocument();
-    await user.selectOptions(screen.getByRole("combobox", { name: "Source type" }), "campaign_action");
-    expect(screen.getByText("No requests match these filters.")).toBeInTheDocument();
     await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "all");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Source type" }), "campaign_action");
     expect(screen.getByText("Build the Meta ad")).toBeInTheDocument();
-    await user.type(screen.getByRole("searchbox", { name: "Search" }), "no match");
+    expect(screen.queryByText("Proof placement")).not.toBeInTheDocument();
+    await user.type(screen.getByRole("searchbox", { name: "Search current page" }), "no match");
     expect(screen.getByText("No requests match these filters.")).toBeInTheDocument();
   });
 
@@ -371,7 +420,7 @@ describe("unified approval inbox", () => {
     expect(within(card).getByText(/Join the editing team/)).toBeInTheDocument();
     expect(within(card).getByText("Recruitment brief decision")).toBeInTheDocument();
     expect(within(card).queryByRole("button", { name: "Reject with reason" })).not.toBeInTheDocument();
-    expect(screen.getByRole("searchbox", { name: "Search" })).toHaveValue("brief-1");
+    expect(screen.getByRole("searchbox", { name: "Search current page" })).toHaveValue("brief-1");
     await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_recruitment_brief_from_inbox_v6", {
       p_brief_id: "brief-1", p_request_id: "recruitment-request-1",
@@ -460,7 +509,7 @@ describe("unified approval inbox", () => {
     show("global");
     expect(await screen.findByRole("heading", { name: "Agency approval inbox" })).toBeInTheDocument();
     expect(clientEqValues).toHaveLength(0);
-    expect(screen.getByText("Showing 4 of 4 mirrored requests.")).toBeInTheDocument();
+    expect(screen.getByText("Page 1: showing 4 of 4 loaded requests.")).toBeInTheDocument();
     expect(within(screen.getByRole("article", { name: "Second client" }))
       .getByRole("link", { name: "View owning source" }))
       .toHaveAttribute("href", "/clients/client-2/google-profile?tab=reviews");

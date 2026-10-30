@@ -81,6 +81,15 @@ begin
       'purpose', 'recruitment', 'recruitment_role', p_brief.recruitment_role,
       'media_type', p_brief.media_type, 'apply_url', p_brief.apply_url),
     'owner_role', 'admin',
+    -- Older briefs have no creator column. Keep a backfill unknown rather
+    -- than inventing a person; new human requests retain their JWT actor.
+    'requested_by', case when auth.role() = 'authenticated' then auth.uid()
+      else null end,
+    'requester_kind', case when auth.role() = 'authenticated'
+      and auth.uid() is not null then 'human'
+      when auth.role() = 'service_role' then 'service' else 'unknown' end,
+    'requester_ref', case when auth.role() = 'service_role'
+      then 'client_briefs:' || p_brief.id::text else null end,
     'expires_at', now() + interval '7 days',
     'preview_blocker', v_blocker,
     'owning_path', '/team?tab=recruitment'

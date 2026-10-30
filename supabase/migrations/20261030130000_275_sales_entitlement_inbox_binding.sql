@@ -104,6 +104,8 @@ begin
       'action',p_request.action,
       'scope_hash',p_request.scope_hash),
     'owner_role','admin',
+    'requested_by',p_request.requested_by,
+    'requester_kind','human',
     'expires_at',p_request.requested_at + interval '7 days',
     'preview_blocker',case
       when p_request.scope_hash = public.sales_entitlement_scope_hash(

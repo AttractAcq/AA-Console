@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import { supabase } from "../../lib/supabase";
+
+const PAGE_SIZE = 50;
 
 /**
  * The read projection for B008. The owning source keeps its decision RPC;
@@ -17,6 +19,9 @@ export interface UnifiedApprovalRequest {
   title: string;
   status: string;
   requested_at: string;
+  requested_by: string | null;
+  requester_kind: string;
+  requester_ref: string | null;
   expires_at: string | null;
   artifact_hash: string | null;
   preview: unknown;
@@ -236,6 +241,11 @@ function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <div><dt className="text-xs text-muted-foreground">Client</dt><dd className="break-all">{request.client_id || "Agency-wide"}</dd></div>
         <div><dt className="text-xs text-muted-foreground">Requested</dt><dd>{dateLabel(request.requested_at)}</dd></div>
+        <div><dt className="text-xs text-muted-foreground">Request origin</dt><dd className="break-all">
+          {request.requester_kind === "human"
+            ? `Human ${request.requested_by || "unidentified"}`
+            : `${request.requester_kind}${request.requester_ref ? ` · ${request.requester_ref}` : ""}`}
+        </dd></div>
         <div><dt className="text-xs text-muted-foreground">Expires</dt><dd>{dateLabel(request.expires_at)}</dd></div>
         <div><dt className="text-xs text-muted-foreground">Decision owner</dt><dd>{request.owner_role || "Not assigned"}</dd></div>
         <div><dt className="text-xs text-muted-foreground">Destination</dt><dd className="break-all">{request.destination || "Not supplied"}</dd></div>
@@ -339,27 +349,45 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const location = useLocation();
   const global = scope === "global";
   const scopeKey = global ? "global" : clientId ?? null;
+  const initialSource = new URLSearchParams(location.search).get("source");
   const [requests, setRequests] = useState<UnifiedApprovalRequest[]>([]);
   const [decisions, setDecisions] = useState<UnifiedApprovalDecision[]>([]);
-  const [statusFilter, setStatusFilter] = useState("pending");
+  const [statusFilter, setStatusFilter] = useState(initialSource ? "all" : "pending");
   const [clientFilter, setClientFilter] = useState("all");
   const [kindFilter, setKindFilter] = useState("all");
-  const [search, setSearch] = useState(() => new URLSearchParams(location.search).get("source") ?? "");
+  const [search, setSearch] = useState(initialSource ?? "");
+  const [sourceDeepLink, setSourceDeepLink] = useState(initialSource);
+  const [pageState, setPageState] = useState({ scopeKey, page: 0 });
+  const page = pageState.scopeKey === scopeKey ? pageState.page : 0;
+  const [hasNextPage, setHasNextPage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadedClientId, setLoadedClientId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [aal, setAal] = useState<"aal2" | "aal1" | "unavailable">("unavailable");
+  const refreshSequence = useRef(0);
 
   const refresh = useCallback(async () => {
     if (!global && !clientId) return;
+    const sequence = ++refreshSequence.current;
+    setLoading(true);
     try {
-      const query = supabase.from("approval_inbox_v6").select("*");
-      const requestResult = await (global ? query : query.eq("client_id", clientId!))
-        .order("requested_at", { ascending: false });
+      let query = supabase.from("approval_inbox_v6").select("*");
+      if (!global) query = query.eq("client_id", clientId!);
+      else if (clientFilter === "agency-wide") query = query.is("client_id", null);
+      else if (clientFilter !== "all") query = query.eq("client_id", clientFilter);
+      if (statusFilter !== "all") query = query.eq("status", statusFilter);
+      if (kindFilter !== "all") query = query.eq("source_kind", kindFilter);
+      if (sourceDeepLink) query = query.eq("source_id", sourceDeepLink);
+      // Fetch one sentinel row so the next-page control is based on evidence.
+      // Each history query is then bounded to the 50 cards actually displayed.
+      const requestResult = await query.order("requested_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
       if (requestResult.error) throw requestResult.error;
-      const rows: UnifiedApprovalRequest[] = requestResult.data ?? [];
+      const pageRows: UnifiedApprovalRequest[] = requestResult.data ?? [];
+      const rows = pageRows.slice(0, PAGE_SIZE);
       const ids = rows.map((row) => row.id);
       let decisionRows: UnifiedApprovalDecision[] = [];
       if (ids.length > 0) {
@@ -369,8 +397,10 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         if (decisionResult.error) throw decisionResult.error;
         decisionRows = decisionResult.data ?? [];
       }
+      if (sequence !== refreshSequence.current) return;
       try {
         const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (sequence !== refreshSequence.current) return;
         setAal(assurance.error ? "unavailable"
           : assurance.data.currentLevel === "aal2" ? "aal2" : "aal1");
       } catch {
@@ -378,14 +408,19 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       }
       setRequests(rows);
       setDecisions(decisionRows);
+      setHasNextPage(pageRows.length > PAGE_SIZE);
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : (cause as { message?: string }).message ?? "Could not load the unified approval inbox.");
+      if (sequence === refreshSequence.current) {
+        setError(cause instanceof Error ? cause.message : (cause as { message?: string }).message ?? "Could not load the unified approval inbox.");
+      }
     } finally {
-      setLoadedClientId(scopeKey);
-      setLoading(false);
+      if (sequence === refreshSequence.current) {
+        setLoadedClientId(scopeKey);
+        setLoading(false);
+      }
     }
-  }, [clientId, global, scopeKey]);
+  }, [clientId, clientFilter, global, kindFilter, page, scopeKey, sourceDeepLink, statusFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -460,16 +495,19 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
 
   const waiting = loading || loadedClientId !== scopeKey;
 
-  const kinds = useMemo(() => [...new Set(requests.map((request) => request.source_kind))].sort(), [requests]);
-  const clients = useMemo(() => [...new Set(requests.map((request) => request.client_id ?? "agency-wide"))].sort(), [requests]);
+  const kinds = useMemo(() => [...new Set([
+    ...requests.map((request) => request.source_kind),
+    ...(kindFilter === "all" ? [] : [kindFilter]),
+  ])].sort(), [requests, kindFilter]);
+  const clients = useMemo(() => [...new Set([
+    ...requests.map((request) => request.client_id ?? "agency-wide"),
+    ...(clientFilter === "all" ? [] : [clientFilter]),
+  ])].sort(), [requests, clientFilter]);
   const visible = useMemo(() => requests.filter((request) => {
-    if (statusFilter !== "all" && request.status !== statusFilter) return false;
-    if (global && clientFilter !== "all" && (request.client_id ?? "agency-wide") !== clientFilter) return false;
-    if (kindFilter !== "all" && request.source_kind !== kindFilter) return false;
     const needle = search.trim().toLocaleLowerCase();
     return !needle || [request.title, request.source_id, request.source_system, request.source_kind,
       request.destination, request.account_ref].some((part) => part?.toLocaleLowerCase().includes(needle));
-  }), [requests, statusFilter, clientFilter, kindFilter, search, global]);
+  }), [requests, search]);
 
   const historyByRequest = useMemo(() => {
     const grouped = new Map<string, UnifiedApprovalDecision[]>();
@@ -493,12 +531,15 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
           Complete campaign action, Google review reply and recruitment brief requests can be decided here through their owning functions.
           Other requests link to their owning source. Coverage is incomplete: the Engine,
           Assets and Campaign actions tabs remain available for work not yet mirrored here.
+          Pending here reflects the canonical ledger; each owning source is checked again before a decision.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-3 rounded-xl border border-border bg-card p-4">
         <label className="min-w-40 flex-1 text-sm font-medium">Status
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}
+          <select value={statusFilter} onChange={(event) => {
+            setStatusFilter(event.target.value); setPageState({ scopeKey, page: 0 });
+          }}
             className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
             <option value="pending">Pending</option><option value="approved">Approved</option>
             <option value="rejected">Rejected</option><option value="expired">Expired</option>
@@ -506,21 +547,28 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
           </select>
         </label>
         {global && <label className="min-w-40 flex-1 text-sm font-medium">Client
-          <select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}
+          <select value={clientFilter} onChange={(event) => {
+            setClientFilter(event.target.value); setPageState({ scopeKey, page: 0 });
+          }}
             className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
             <option value="all">All clients</option>
             {clients.map((id) => <option key={id} value={id}>{id === "agency-wide" ? "Agency-wide" : id}</option>)}
           </select>
         </label>}
         <label className="min-w-40 flex-1 text-sm font-medium">Source type
-          <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}
+          <select value={kindFilter} onChange={(event) => {
+            setKindFilter(event.target.value); setPageState({ scopeKey, page: 0 });
+          }}
             className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
             <option value="all">All source types</option>
             {kinds.map((kind) => <option key={kind} value={kind}>{kind.replaceAll("_", " ")}</option>)}
           </select>
         </label>
-        <label className="min-w-48 flex-[2] text-sm font-medium">Search
-          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)}
+        <label className="min-w-48 flex-[2] text-sm font-medium">Search current page
+          <input type="search" value={search} onChange={(event) => {
+            setSearch(event.target.value); setSourceDeepLink(null);
+            setPageState({ scopeKey, page: 0 });
+          }}
             placeholder="Title, source, destination or account"
             className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
         </label>
@@ -534,15 +582,29 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       {scopeKey && waiting ? <p role="status" className="text-sm text-muted-foreground">Loading canonical requests…</p>
         : error ? null
           : scopeKey ? <>
-            <p className="text-sm text-muted-foreground">Showing {visible.length} of {requests.length} mirrored requests.</p>
+            <p className="text-sm text-muted-foreground">
+              Page {page + 1}: showing {visible.length} of {requests.length} loaded requests.
+              {search.trim() ? " Search applies to this page." : ""}
+            </p>
             {visible.length === 0 ? <p className="text-sm text-muted-foreground">
-              {requests.length === 0 ? "No requests have been mirrored yet. Check the existing queue tabs for outstanding work."
+              {requests.length === 0 ? page === 0
+                ? "No requests have been mirrored yet or match these filters. Check the existing queue tabs for outstanding work."
+                : "No requests on this page. Return to the previous page."
                 : "No requests match these filters."}
             </p> : <div className="space-y-4">{visible.map((request) => (
               <RequestCard key={request.id} request={request} history={historyByRequest.get(request.id) ?? []}
                 clientId={global ? request.client_id ?? "" : clientId ?? ""}
                 aal={aal} busy={busyId === request.id} onDecide={decide} />
             ))}</div>}
+            {(page > 0 || hasNextPage) && <nav aria-label="Approval pages" className="flex items-center gap-3">
+              <button type="button" disabled={page === 0 || waiting}
+                onClick={() => setPageState({ scopeKey, page: page - 1 })}
+                className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-50">Previous page</button>
+              <span className="text-sm text-muted-foreground">Page {page + 1}</span>
+              <button type="button" disabled={!hasNextPage || waiting}
+                onClick={() => setPageState({ scopeKey, page: page + 1 })}
+                className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-50">Next page</button>
+            </nav>}
           </> : null}
     </section>
   );

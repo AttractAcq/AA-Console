@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "6fc5d4124806d466c4422f73e61cfe2d2258cb64aba91d4dcd98d6865295e78f",
-  "generatedTypesSha256": "2d4f66a0788a0c3a07b88e76b424366ac6b5003e6ad5091340173397f138d2f6",
-  "generatedSchemaBodySha256": "c16cebe3e3a7bfabbfc269aba1e8c742a29df73732c9dc06958910f6c29df3b7",
+  "migrationSourceDigest": "fa244aa354d2f4c15054e769ea6d797c5c4bfa6bce03da2145f4d56f23904d67",
+  "generatedTypesSha256": "4e9c5b29204a66967040fbcce422379e5d90808f204f9382295536dd80c0a388",
+  "generatedSchemaBodySha256": "b8641d628c063ac43b321a63ca8a0c249f16b3aa24bd766ae699bccdecf264d4",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2031,43 +2031,43 @@
       "version": "20261030110000",
       "name": "273_canonical_approval_ledger",
       "filename": "20261030110000_273_canonical_approval_ledger.sql",
-      "sha256": "27c243faa5e87cac4fb9172e219245b9f602316429af3c9eb07be4ba9236934e",
-      "trimmedMd5": "c95bad652cad559cafa506afc2e83923"
+      "sha256": "f5c671850e3bcae6437c40c03fbfdffd992eff912f9dc86236a9befc621853af",
+      "trimmedMd5": "38ac65b451e40be293b157263e3efcce"
     },
     {
       "version": "20261030120000",
       "name": "274_campaign_action_inbox_bridge",
       "filename": "20261030120000_274_campaign_action_inbox_bridge.sql",
-      "sha256": "37e076454094c7a888231cd770998b05b52b443f5ee3c2370a48163a8683e678",
-      "trimmedMd5": "affa37ec7f974bb61465f9692a72aba1"
+      "sha256": "1a575ec3e1f5190d19dd8623fb066748f04a94f995de30f2bfb6fac7156b53a6",
+      "trimmedMd5": "66d5f750930bf9da7ae83ada78df3eb0"
     },
     {
       "version": "20261030130000",
       "name": "275_sales_entitlement_inbox_binding",
       "filename": "20261030130000_275_sales_entitlement_inbox_binding.sql",
-      "sha256": "13a946c3c477ab57646eacc6ef39800dead560ab8e9849bcfe611812d8e478d3",
-      "trimmedMd5": "9eefd7ed28a28b713aad654fcf05ac28"
+      "sha256": "d7b7d80ff0648901e106bdda26007be12a6dcff8b6a2e79766f633b40b493a96",
+      "trimmedMd5": "cc436082b95271a26722b5f34b147dcc"
     },
     {
       "version": "20261030140000",
       "name": "276_recruitment_brief_inbox",
       "filename": "20261030140000_276_recruitment_brief_inbox.sql",
-      "sha256": "7ee65e3786951fbede6a1364f782ca26ed1686e1b3d7cdbdec514da8155407f4",
-      "trimmedMd5": "537388edd7672574bc5f372f31124014"
+      "sha256": "1dea4e218295e4bda995e98550d1466547ba61a23b68d520c6fe5991a5e38016",
+      "trimmedMd5": "feca73655f887ed98942b82b5e212a39"
     },
     {
       "version": "20261030141000",
       "name": "277_engine_slot_preview_inbox",
       "filename": "20261030141000_277_engine_slot_preview_inbox.sql",
-      "sha256": "b9588e79a39a93337dc12d03027e85dd5158efe6e7910e3686e8f6e78953607c",
-      "trimmedMd5": "f67a127e18a39f1c7819e95c4b55242b"
+      "sha256": "92d5bdf872fb593172caf03912fc10c91411ee7094634ade73bf6cb9764a190e",
+      "trimmedMd5": "d5e77b0ed1c199b9d4035d4e17d45334"
     },
     {
       "version": "20261030150000",
       "name": "278_google_review_reply_inbox",
       "filename": "20261030150000_278_google_review_reply_inbox.sql",
-      "sha256": "a4739364668fbf7f83b9a850f132651c1ef0a9832a56ee040cf307abaf4a65f3",
-      "trimmedMd5": "184f33796065eb4e0af95ca666b77159"
+      "sha256": "2ce64ec31282b25893f3151e872993b5c7b5ca57186a3dbcc5057facea8159ac",
+      "trimmedMd5": "a2006444faf848c2347d73480caeeace"
     },
     {
       "version": "20261030160000",

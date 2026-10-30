@@ -101,7 +101,9 @@ beforeAll(async () => {
     );
     create table public.slot_events (
       id uuid primary key, slot_id uuid not null,
-      to_stage text not null, created_at timestamptz not null default now()
+      to_stage text not null, actor text not null default 'engine',
+      actor_id uuid, agent_key text, job_id uuid,
+      created_at timestamptz not null default now()
     );
     create table public.post_copy (
       id uuid primary key, asset_id uuid, platform text not null,
@@ -154,6 +156,12 @@ describe("Engine slot blocked Inbox preview migration 277", () => {
     expect(real[0]!.preview.database_snapshot_sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(real[0]!.artifact_hash).toBeNull();
     expect(real[0]!.preview_blocker).toMatch(/media byte SHA-256/i);
+    expect((await db.query<{ requested_by: string | null; requester_kind: string; requester_ref: string }>(
+      "select requested_by,requester_kind,requester_ref from public.approval_inbox_v6 where id=$1",
+      [real[0]!.id],
+    )).rows[0]).toEqual({
+      requested_by: null, requester_kind: "engine", requester_ref: `slot_events:${LEGACY_ENTRY}`,
+    });
     expect(await cards(MISSING_ENTRY_SLOT)).toMatchObject([
       { source_version: "legacy-missing-entry-event",
         status: "pending", artifact_hash: null },

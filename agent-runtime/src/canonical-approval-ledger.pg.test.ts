@@ -150,6 +150,32 @@ beforeEach(async () => {
 afterAll(async () => { await db?.close(); });
 
 describe("canonical approval ledger migration 273", () => {
+  it("freezes a trusted source requester, including service origin without a JWT user", async () => {
+    const human = candidate({ requested_by: ADMIN, requester_kind: "human" });
+    const humanId = await register(human);
+    const service = candidate({ requester_kind: "service", requester_ref: "campaign_action_approvals:action-1" });
+    const serviceId = await register(service);
+    const rows = (await db.query<{
+      id: string; requested_by: string | null; requester_kind: string; requester_ref: string | null;
+    }>("select id,requested_by,requester_kind,requester_ref from public.approval_inbox_v6 where id = any($1::uuid[])",
+      [[humanId, serviceId]])).rows;
+    expect(rows.find((row) => row.id === humanId)).toMatchObject({
+      requested_by: ADMIN, requester_kind: "human", requester_ref: null,
+    });
+    expect(rows.find((row) => row.id === serviceId)).toMatchObject({
+      requested_by: null, requester_kind: "service", requester_ref: "campaign_action_approvals:action-1",
+    });
+    await expect(register({ ...human, requested_by: OTHER_USER }))
+      .rejects.toThrow(/different frozen evidence/i);
+    await expect(register(candidate({ requester_kind: "human" })))
+      .rejects.toThrow(/requester provenance/i);
+    await expect(register(candidate({ requester_kind: "agent" })))
+      .rejects.toThrow(/requester provenance/i);
+    await expect(register(candidate({ requested_by: ADMIN, requester_kind: "service",
+      requester_ref: "campaign_action_approvals:action-2" })))
+      .rejects.toThrow(/requester provenance/i);
+  });
+
   it("registers one immutable source version and rejects a changed idempotent replay", async () => {
     const payload = candidate();
     const first = await register(payload);

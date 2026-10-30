@@ -138,6 +138,12 @@ describe("campaign action to canonical Inbox bridge migration 274", () => {
     const card = await inbox(LEGACY);
     expect(card.status).toBe("pending");
     expect(card.preview_blocker).toMatch(/exact reviewable action payload/i);
+    expect((await db.query<{ requested_by: string | null; requester_kind: string; requester_ref: string }>(
+      "select requested_by,requester_kind,requester_ref from public.approval_inbox_v6 where id=$1",
+      [card.id],
+    )).rows[0]).toEqual({
+      requested_by: null, requester_kind: "service", requester_ref: `campaign_action_approvals:${LEGACY}`,
+    });
     expect((await db.query(
       "select * from public.approval_decision_events_v6 where request_id=$1", [card.id],
     )).rows).toHaveLength(0);

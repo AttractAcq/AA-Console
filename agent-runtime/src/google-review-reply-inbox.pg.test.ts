@@ -103,6 +103,7 @@ beforeAll(async () => {
       body text not null, body_hash text not null,
       status text not null default 'drafted', approved_by uuid,
       approved_at timestamptz, rejection_reason text,
+      created_by uuid, drafted_by_job_id uuid,
       created_at timestamptz not null default now()
     );
     grant select,update on public.google_review_replies to service_role;
@@ -158,6 +159,10 @@ describe("Google review reply exact Inbox bridge migration 278", () => {
     expect(card.preview).toMatchObject({
       reply_body: "Thank you, Jay", location_ref: "accounts/123/locations/456",
     });
+    expect((await db.query<{ requested_by: string | null; requester_kind: string }>(
+      "select requested_by,requester_kind from public.approval_inbox_v6 where id=$1",
+      [card.id],
+    )).rows[0]).toEqual({ requested_by: null, requester_kind: "unknown" });
     expect((await db.query("select * from public.approval_decision_events_v6")).rows)
       .toHaveLength(0);
   });

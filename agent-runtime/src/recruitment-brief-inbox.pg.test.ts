@@ -163,6 +163,10 @@ describe("recruitment brief Inbox adapter 276", () => {
   it("registers new drafts and denies non-owner reads", async () => {
     const id = await createDraft();
     const card = await requestFor(id);
+    expect((await db.query<{ requested_by: string; requester_kind: string }>(
+      "select requested_by,requester_kind from public.approval_inbox_v6 where id=$1",
+      [card.id],
+    )).rows[0]).toEqual({ requested_by: ADMIN, requester_kind: "human" });
     const adminRows = await asRole<{ id: string }>("authenticated", ADMIN, "aal1",
       "select id from public.approval_inbox_v6 where id=$1", [card.id]);
     const employeeRows = await asRole<{ id: string }>("authenticated", EMPLOYEE, "aal2",

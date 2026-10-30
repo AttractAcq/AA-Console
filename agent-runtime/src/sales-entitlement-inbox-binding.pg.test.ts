@@ -130,6 +130,10 @@ describe("B005 sales entitlement exact Inbox binding migration 275", () => {
       client_name: "Service Client", member_name: "Legacy Owner",
       bound_user_id: LEGACY_EMPLOYEE, action: "grant",
     });
+    expect((await db.query<{ requested_by: string; requester_kind: string }>(
+      "select requested_by,requester_kind from public.approval_inbox_v6 where id=$1",
+      [rows[0]!.id],
+    )).rows[0]).toEqual({ requested_by: ADMIN, requester_kind: "human" });
     expect((await db.query("select * from public.approval_decision_events_v6 where request_id=$1",
       [rows[0]!.id])).rows).toHaveLength(0);
     await expect(db.query(

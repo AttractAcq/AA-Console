@@ -22,8 +22,15 @@ create table public.approval_requests_v6 (
   preview_blocker text,
   owning_path text,
   requested_by uuid,
+  requester_kind text not null check (requester_kind in
+    ('human', 'service', 'agent', 'engine', 'policy', 'unknown')),
+  requester_ref text check (requester_ref is null or
+    length(btrim(requester_ref)) between 1 and 300),
   requested_at timestamptz not null default now(),
   payload_hash text not null check (payload_hash ~ '^[0-9a-f]{64}$'),
+  check ((requester_kind = 'human' and requested_by is not null)
+    or (requester_kind <> 'human' and requested_by is null)),
+  check (requester_kind in ('human', 'unknown') or requester_ref is not null),
   unique (source_system, source_kind, source_id, source_version)
 );
 create index approval_requests_v6_client_time_idx
@@ -146,7 +153,8 @@ select
     when d.decision = 'approved' then 'approved'
     else 'pending'
   end as status,
-  r.requested_at, r.expires_at,
+  r.requested_at, r.requested_by, r.requester_kind, r.requester_ref,
+  r.expires_at,
   coalesce(e.artifact_hash, r.artifact_hash) as artifact_hash,
   coalesce(e.preview, r.preview) as preview,
   coalesce(e.destination, r.destination) as destination,
@@ -198,6 +206,9 @@ declare
   v_expires_at timestamptz;
   v_preview_blocker text;
   v_owning_path text;
+  v_requested_by uuid;
+  v_requester_kind text;
+  v_requester_ref text;
   v_payload_hash text;
   v_id uuid;
   v_existing_hash text;
@@ -208,7 +219,8 @@ begin
   if exists (select 1 from jsonb_object_keys(p_request) k where k not in (
     'client_id','source_system','source_kind','source_id','source_version',
     'title','artifact_hash','preview','destination','account_ref','budget',
-    'scope','owner_role','expires_at','preview_blocker','owning_path'
+    'scope','owner_role','expires_at','preview_blocker','owning_path',
+    'requested_by','requester_kind','requester_ref'
   )) then
     raise exception 'Approval request contains an unknown field.' using errcode = '22023';
   end if;
@@ -229,6 +241,27 @@ begin
   v_expires_at := nullif(p_request ->> 'expires_at', '')::timestamptz;
   v_preview_blocker := nullif(btrim(p_request ->> 'preview_blocker'), '');
   v_owning_path := nullif(btrim(p_request ->> 'owning_path'), '');
+  v_requested_by := nullif(p_request ->> 'requested_by', '')::uuid;
+  v_requester_kind := nullif(btrim(p_request ->> 'requester_kind'), '');
+  v_requester_ref := nullif(btrim(p_request ->> 'requester_ref'), '');
+  -- A SECURITY DEFINER trigger may run with service-role or migration JWT
+  -- context. Only the owning source adapter may supply the frozen human ID;
+  -- never infer it from the caller executing a later idempotent replay.
+  if v_requester_kind is null then
+    if v_requested_by is not null then
+      v_requester_kind := 'human';
+    else
+      v_requester_kind := 'unknown';
+    end if;
+  end if;
+  if v_requester_kind not in ('human','service','agent','engine','policy','unknown')
+    or (v_requester_kind = 'human' and v_requested_by is null)
+    or (v_requester_kind <> 'human' and v_requested_by is not null)
+    or (v_requester_kind not in ('human','unknown') and v_requester_ref is null)
+    or length(v_requester_ref) > 300 then
+    raise exception 'Approval requester provenance is inconsistent or incomplete.'
+      using errcode = '22023';
+  end if;
 
   if v_source_system is null or v_source_kind is null or v_source_id is null
     or v_source_version is null or v_title is null then
@@ -257,17 +290,20 @@ begin
     'destination',v_destination,'account_ref',v_account_ref,
     'budget',v_budget,'scope',v_scope,'owner_role',v_owner_role,
     'expires_at',v_expires_at,'preview_blocker',v_preview_blocker,
-    'owning_path',v_owning_path
+    'owning_path',v_owning_path,'requested_by',v_requested_by,
+    'requester_kind',v_requester_kind,'requester_ref',v_requester_ref
   )::text, 'UTF8')), 'hex');
 
   insert into public.approval_requests_v6 (
     client_id,source_system,source_kind,source_id,source_version,title,
     artifact_hash,preview,destination,account_ref,budget,scope,owner_role,
-    expires_at,preview_blocker,owning_path,requested_by,payload_hash
+    expires_at,preview_blocker,owning_path,requested_by,requester_kind,
+    requester_ref,payload_hash
   ) values (
     v_client_id,v_source_system,v_source_kind,v_source_id,v_source_version,v_title,
     v_artifact_hash,v_preview,v_destination,v_account_ref,v_budget,v_scope,v_owner_role,
-    v_expires_at,v_preview_blocker,v_owning_path,auth.uid(),v_payload_hash
+    v_expires_at,v_preview_blocker,v_owning_path,v_requested_by,
+    v_requester_kind,v_requester_ref,v_payload_hash
   ) on conflict (source_system,source_kind,source_id,source_version) do nothing
   returning id into v_id;
   if v_id is not null then return v_id; end if;

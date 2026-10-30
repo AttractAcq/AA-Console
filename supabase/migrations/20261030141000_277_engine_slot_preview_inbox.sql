@@ -88,6 +88,14 @@ begin
     'budget', null,
     'scope', v_scope,
     'owner_role', 'client_media_reviewer',
+    'requested_by', case when p_event.actor = 'human'
+      then p_event.actor_id else null end,
+    'requester_kind', case when p_event.actor = 'human'
+      and p_event.actor_id is not null then 'human'
+      when p_event.actor = 'human' then 'unknown'
+      else p_event.actor end,
+    'requester_ref', case when p_event.actor <> 'human'
+      then 'slot_events:' || p_event.id::text else null end,
     'expires_at', least(v_slot.scheduled_at, p_event.created_at + interval '7 days'),
     'preview_blocker', case when v_asset.id is null then
       'The slot has no client-matched asset. Media bytes, copy and destination cannot be approved.'

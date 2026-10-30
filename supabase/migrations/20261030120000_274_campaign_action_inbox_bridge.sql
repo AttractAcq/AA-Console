@@ -67,6 +67,10 @@ begin
     'budget', v_budget,
     'scope', p_action.scope,
     'owner_role', 'admin_or_active_client_manager',
+    -- The owning request RPC is service-only and has no human requester
+    -- column. Record that source origin honestly rather than auth.uid()=NULL.
+    'requester_kind', 'service',
+    'requester_ref', 'campaign_action_approvals:' || p_action.id::text,
     'expires_at', p_action.requested_at + interval '7 days',
     'preview_blocker', v_blocker,
     'owning_path', '/clients/' || p_action.client_id::text ||
