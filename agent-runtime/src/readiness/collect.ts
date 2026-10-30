@@ -55,6 +55,39 @@ type ClientInventory = {
   }[];
 };
 
+function providerHealthReason(row: Record<string, unknown>, now: number): string {
+  const status = asString(row.status);
+  if (["error", "expired", "revoked"].includes(status ?? "")) {
+    return "The stored integration status blocks use; no live account or scope check was performed.";
+  }
+  const expiresAt = asString(row.token_expires_at);
+  if (status === "expiring" && (!expiresAt || !Number.isFinite(Date.parse(expiresAt)))) {
+    return "An expiring integration lacks a known future expiry and is not usable; no live account or scope check was performed.";
+  }
+  if (expiresAt && Number.isFinite(Date.parse(expiresAt)) && Date.parse(expiresAt) <= now) {
+    return "The recorded token expiry is past; no live account or scope check was performed.";
+  }
+  if (!["connected", "active", "expiring"].includes(status ?? "")) {
+    return "The stored integration status is not recognized as usable; no live provider check was performed.";
+  }
+  if (typeof row.credential_secret_id !== "string") {
+    return "No credential is configured; no live provider check was performed.";
+  }
+  switch (asString(row.provider)) {
+    case "meta":
+    case "instagram":
+      return "The daily Meta token check does not verify the exact account, required scopes, or publish/ads rights.";
+    case "google_business":
+      return "Business Profile location readback, OAuth scope, and local-post permission are unverified.";
+    case "google_ads":
+      return "Google Ads OAuth, developer token, exact customer access, and build rights are unverified.";
+    case "resend":
+      return "A client integration row does not verify the runtime email key, sending domain, or send permission.";
+    default:
+      return "This provider has no live account, scope, or action-capability diagnostic.";
+  }
+}
+
 export type SystemReadinessSnapshot = {
   schemaVersion: 2;
   capturedAt: string;
@@ -325,8 +358,7 @@ async function clients(sb: SupabaseClient): Promise<Observation<ClientInventory[
           },
           providerHealth: evidenceCheck(
             "unknown", new Date().toISOString(), "client_integrations metadata",
-            "No live provider account probe or credential validation was performed by this inventory.",
-            null,
+            providerHealthReason(row, Date.now()), null,
           ),
         })),
       };
