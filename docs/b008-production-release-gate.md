@@ -1,6 +1,6 @@
 # B008 production release: exact-version authority and effect boundaries
 
-**Status:** Migration 293 and its UI/attester are a held preparatory slice. No
+**Status:** Migrations 293 and 295 and their UI/attester are held preparatory slices. No
 production SQL, merge gate, Railway deployment gate, Pages approval gate or
 external switch is enabled by this document or this patch. Class 32 stays
 blocked until those independent effect gates and a live release pilot pass.
@@ -32,7 +32,8 @@ change before that pin requires the final observed runtime SHA, not the first.
 | --- | --- | --- |
 | Browser to candidate source | A person or Bot supplies four green job names, migration hashes or deployment SHAs without independent proof. | Migration 288 keeps the source `source_held`; caller claims never clear the blocker. |
 | Trusted attester to Supabase | A browser tries the proof RPC, a service caller sends a packet for another PR, a changed commit, a different CI run or different SQL bytes. | 293 grants proof submission only to `service_role`, repeats the packet digest and exact candidate binding in SQL, and records append-only evidence. The server process invokes the read-only GitHub verifier itself; it never accepts browser proof JSON. Service-role key custody is a required infrastructure control. |
-| Human decision | A Bot/service account, AAL1 session, non-admin, stale displayed card or changed artifact tries to approve. | 293 demands authenticated provisioned admin AAL2, locks the request, compares both expected hashes, requires fresh trusted proof, and appends the decision. The global Inbox re-reads the whole card before calling the owning RPC. Rejection and revocation require reasons. |
+| Human decision | A Bot/service account, AAL1 session, non-admin, stale displayed card or changed artifact tries to approve. A new proof arrives after the browser's last read but before its decision RPC. | 293 demands authenticated provisioned admin AAL2, locks the request, compares both expected source hashes, requires fresh trusted proof, and appends the decision. The global Inbox re-reads the whole card before calling the owning RPC. 295 additionally requires the exact displayed GitHub packet SHA-256 under the same request lock, so the bound proof is the one the human saw. Rejection and revocation require reasons. |
+| Approved proof freshness | The 15-minute GitHub attestation expires while CI or review progresses; the approved card becomes held even when every approved byte is unchanged. A service caller tries to refresh with a different packet after the human decides. | 295 binds the original packet digest and proof ID to the AAL2 decision in an append-only table. Its server-only refresh RPC accepts only the identical JSON packet after fresh independent GitHub verification. It locks the request, requires the same latest decision, exact source, original proof and digest, and rejects revocation or expiry. The trusted check refreshes before its read-only assertion. |
 | Approval to merge | The PR head/base or GitHub checks advance after the person decides; an unrelated `gh pr merge` bypasses the Inbox; a previously green check remains green after the human revokes. | **Still open:** a trusted merger must re-run the verifier and latest decision immediately before the exact GitHub merge API call, compare head/base/plan, and fail on mismatch. Make its status mandatory in GitHub protection or merge queue **and** remove direct/bypass merge authority. A cached green status or CLI wrapper alone does not prevent a revoked-plan merge. |
 | Merge to Railway | Railway deploys watched `main` before main CI or the release card is checked. | **Still open:** turn on a verified CI wait for both services and add a deploy-start exact approved-release/manifest check, or hold automatic deployment until a reviewed orchestrator deploys exact SHAs. A premerge approval alone does not prove the squash merge SHA or live service identity. |
 | Main CI to Pages | A newer `main` arrives while an older successful `workflow_run` builds. | The existing `assert-current-deploy-sha.sh` checks tested SHA and current main before and after the live identity wait. Its test simulates `main` advancing and rejects the old run. A later Pages effect gate must also compare the exact approved release scope. |
@@ -67,6 +68,15 @@ change before that pin requires the final observed runtime SHA, not the first.
    the exact packet digest and re-reads the card for revocation. Until GitHub
    branch protection requires this result, running the script is advisory and
    does not close the merge effect gate.
+7. Migration 295 replaces the decision RPC with a version that accepts the
+   displayed GitHub packet SHA-256 and compares it under the request lock.
+   It binds approval to the precise attestation that existed when the human
+   decided. The trusted server may re-run GitHub verification and
+   append a fresh attestation for that **identical packet** while the source
+   remains unexpired and the bound AAL2 decision is latest. A changed PR, CI
+   run, workflow digest, SQL file, packet field, candidate, or decision fails
+   closed. No second human decision is needed for unchanged approved bytes;
+   any change requires a new candidate and Inbox decision.
 
 ## Required next effect gates, in order
 
@@ -104,18 +114,76 @@ change before that pin requires the final observed runtime SHA, not the first.
    rejection, revocation, stale head, failed CI, changed SQL, missed Railway
    health check and newer-main Pages race. Only then mark class 32 operational.
 
+## Held trusted default-branch check (next source slice)
+
+The held `Production release approval` workflow runs on `pull_request_target`
+for PRs into `main`. Its single job has no skip condition. It checks out the
+protected base commit named by the event, fetches the PR head as Git **object
+data**, and runs only base-branch JavaScript. The script accepts one
+`AA-Release-Request: UUID` line in the PR body as a locator. That line is
+untrusted: the server-side assertion independently reads the canonical Inbox
+card, its latest AAL2 human decision, its fresh trusted attestation, GitHub's
+current PR/base/head and four CI jobs, the committed SQL bytes, and a second
+card **and decision** observation. It compares the result to the event PR and
+base/head before returning green. Before that assertion, the trusted server
+re-verifies GitHub and invokes 295's refresh RPC for the same bound packet;
+the refresh appends only internal proof evidence and is idempotent for a recent
+identical proof. The trusted checkout mode requires checked out `HEAD` to equal
+the exact GitHub PR base commit. It never checks out or executes the PR head
+in the job with the server credential.
+
+The first installation of this workflow is a bootstrap exception: a base
+without the file cannot compare its bytes. Once the file exists on the base,
+the GitHub verifier rejects PRs that edit or remove it **or its trusted
+execution scripts**, just as it rejects changes to `ci.yml`. A later gate
+upgrade therefore needs a separately reviewed bootstrap procedure and new
+approval; it cannot ride inside an ordinary release candidate. The first
+bootstrap must receive ordinary protected CI and human code review. A PR body
+edit or an explicit rerun of the failed job can refresh the proof and check
+after the AAL2 Inbox decision. If the approved packet is unchanged, the
+15-minute attestation window is renewed without another human decision. A
+green result is still only a snapshot.
+
+**Activation remains held.** The current main protection requires the four
+CI jobs with `strict: true` and `enforce_admins: true`, but does not require
+`Approved production release (trusted)`. The repository's Actions secrets
+currently contain only the public browser build settings; there is no
+`AA_RELEASE_SUPABASE_SERVICE_ROLE_KEY`. Before making the check mandatory,
+review custody and scope for that server credential (prefer a dedicated
+release verifier identity limited to the proof-refresh RPC and reads), confirm GitHub's `pull_request_target`
+event policy permits this trusted workflow, install the credential, test a
+red stale/revoked candidate and a green exact candidate, then require the
+check from the GitHub Actions app without a bypass route. No environment
+secret, protection setting or production SQL is changed by this held source
+slice.
+
+**A required green status does not close the release effect gate.** The
+human can revoke after the workflow's last read. GitHub can then merge a
+cached green PR unless a trusted merger re-reads the latest decision
+immediately before the merge API call, binds the expected head SHA, and
+requires the approved base/plan. Even that read has a small distributed
+race until the release decision is leased or locked through the effect.
+Railway still watches `main` with Wait for CI off, so a merge can deploy
+before the new main CI or any Pages `workflow_run` gate. No class-32 pass is
+claimed until the trusted merger, production SQL gate, Railway deploy gate,
+Pages gate and live adverse-case pilot are complete.
+
 ## Focused verification in this held patch
 
-- PGlite: thirteen cases cover the held source, server-only proof, digest/PR/CI/SQL
-  drift, AAL1/member/service rejection, direct canonical-RPC denial, exact
-  admin approval, stale-proof revocation, reasoned rejection and preservation
-  of 292's held organic package Inbox branch.
+- PGlite: migration 293 cases cover the held source, server-only proof,
+  digest/PR/CI/SQL drift, AAL1/member/service rejection, exact admin approval,
+  stale-proof revocation, reasoned rejection and preservation of 292's held
+  organic package Inbox branch. Migration 295 cases cover an unchanged packet
+  refreshing after stale proof, idempotent repeat, changed packet rejection,
+  service-only execution, revocation rejection and a new proof arriving after
+  the Inbox read but before the human decision RPC.
 - Inbox UI: 34 cases cover global/card routing, AAL2 exact decision,
   changed-proof rejection on refresh, reasoned revocation after a proof
   becomes stale and the client Inbox's held-source default visibility.
-- Attester and read-only premerge assertion: five tests cover exact binding,
-  self-fetch/server-only submit, a GitHub head advance before any proof write,
-  a changed base and human revocation during recheck.
+- Attester and trusted premerge assertion: tests cover server-side GitHub
+  fetch and exact event binding before a proof write, the approved proof
+  refresh path, a changed base, a mismatched human decision binding, and
+  revocation during final recheck.
 - Existing Pages guard: `scripts/assert-current-deploy-sha.test.mjs`
   exercises a newer `main` arriving between tested SHA selection and the
   publication check. This is the same class of race observed in run 41014777972.

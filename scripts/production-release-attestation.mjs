@@ -93,6 +93,8 @@ function validatedSupabaseUrl(url) {
 export async function attestProductionRelease({
   requestId, supabaseUrl, serviceRoleKey, token,
   checkoutDir = process.cwd(), fetcher = fetch, verifier,
+  refreshApproved = false, trustedBaseCheckout = false,
+  expectedPrNumber, expectedHeadSha, expectedBaseSha,
 }) {
   if (!ID.test(requestId ?? '')) fail('request ID is invalid')
   if (typeof serviceRoleKey !== 'string' || serviceRoleKey.length < 20)
@@ -116,12 +118,21 @@ export async function attestProductionRelease({
       || sources[0]?.version_hash !== requests[0].source_version)
     fail('release source is missing or superseded')
   const candidate = sources[0].candidate
+  if (expectedPrNumber !== undefined &&
+      (Number(candidate?.pr?.number) !== expectedPrNumber
+        || candidate?.pr?.head_sha !== expectedHeadSha
+        || candidate?.pr?.base_sha !== expectedBaseSha))
+    fail('candidate differs from the exact event PR and commits')
   const verified = verifier ?? (await import('./verify-github-release-candidate.mjs')).verifyGithubReleaseCandidate
   const packet = await verified({
     prNumber: Number(candidate?.pr?.number), checkoutDir: resolve(checkoutDir), token,
+    trustedBaseCheckout,
   })
   assertPremergePacketMatchesCandidate(packet, candidate)
-  const attestationResponse = await fetcher(`${origin}/rest/v1/rpc/record_trusted_production_release_attestation_v6`, {
+  const rpc = refreshApproved
+    ? 'refresh_approved_production_release_attestation_v6'
+    : 'record_trusted_production_release_attestation_v6'
+  const attestationResponse = await fetcher(`${origin}/rest/v1/rpc/${rpc}`, {
     method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_request_id: requestId, p_packet: packet }),
     redirect: 'error', signal: AbortSignal.timeout(10000),
@@ -131,12 +142,13 @@ export async function attestProductionRelease({
   return { requestId, attestationId, packetSha256: packet.packetSha256 }
 }
 
-// Read-only premerge assertion for the future required GitHub release check.
+// Read-only premerge assertion, called after any server-only proof refresh.
 // It never merges. Calling it by hand is advisory until GitHub protection
 // makes the check mandatory and Railway/Pages have their own effect gates.
 export async function verifyApprovedProductionRelease({
   requestId, supabaseUrl, serviceRoleKey, token,
   checkoutDir = process.cwd(), fetcher = fetch, verifier,
+  trustedBaseCheckout = false,
 }) {
   if (!ID.test(requestId ?? '')) fail('request ID is invalid')
   if (typeof serviceRoleKey !== 'string' || serviceRoleKey.length < 20)
@@ -185,26 +197,55 @@ export async function verifyApprovedProductionRelease({
       || Date.now() - Date.parse(attestation.attested_at) > 15 * 60_000
       || Date.parse(attestation.attested_at) > Date.now() + 5000)
     fail('trusted GitHub attestation is stale or mismatched')
-  const decision = await read('approval_decision_events_v6',
-    `request_id=eq.${requestId}&select=request_id,decision,actor_id,actor_aal,artifact_hash,event_order&order=event_order.desc&limit=1`,
-    'human release decision')
-  if (decision.request_id !== requestId || decision.decision !== 'approved'
-      || decision.actor_aal !== 'aal2' || !ID.test(decision.actor_id ?? '')
-      || decision.artifact_hash !== before.source_version)
-    fail('latest exact AAL2 human release decision is absent')
+  async function latestApprovedDecision() {
+    const decision = await read('approval_decision_events_v6',
+      `request_id=eq.${requestId}&select=id,request_id,decision,actor_id,actor_aal,artifact_hash,event_order&order=event_order.desc&limit=1`,
+      'human release decision')
+    if (!ID.test(decision.id ?? '') || decision.request_id !== requestId
+        || decision.decision !== 'approved'
+        || decision.actor_aal !== 'aal2' || !ID.test(decision.actor_id ?? '')
+        || decision.artifact_hash !== before.source_version
+        || !Number.isSafeInteger(Number(decision.event_order))
+        || Number(decision.event_order) <= 0)
+      fail('latest exact AAL2 human release decision is absent')
+    return decision
+  }
+  const decision = await latestApprovedDecision()
+  const binding = await read('production_release_approval_bindings_v6',
+    `request_id=eq.${requestId}&select=request_id,decision_id,attestation_id,source_version,packet_sha256`,
+    'human-approved GitHub packet binding')
+  if (binding.request_id !== requestId || binding.decision_id !== decision.id
+      || !ID.test(binding.attestation_id ?? '')
+      || binding.source_version !== before.source_version
+      || binding.packet_sha256 !== attestation.packet_sha256)
+    fail('human approval is not bound to the current exact GitHub packet')
   assertPremergePacketMatchesCandidate(attestation.packet, source.candidate)
   const verified = verifier ?? (await import('./verify-github-release-candidate.mjs')).verifyGithubReleaseCandidate
   const currentPacket = await verified({
     prNumber: Number(source.candidate.pr.number),
-    checkoutDir: resolve(checkoutDir), token,
+    checkoutDir: resolve(checkoutDir), token, trustedBaseCheckout,
   })
   assertPremergePacketMatchesCandidate(currentPacket, source.candidate)
   if (currentPacket.packetSha256 !== attestation.packet_sha256)
     fail('GitHub PR, CI or committed SQL changed after human approval')
   const after = await card()
-  if (after.source_version !== before.source_version
+  const decisionAfter = await latestApprovedDecision()
+  if (after.source_system !== before.source_system
+      || after.source_kind !== before.source_kind
+      || after.source_id !== before.source_id
+      || after.source_version !== before.source_version
       || after.artifact_hash !== before.artifact_hash
-      || JSON.stringify(after.preview) !== JSON.stringify(before.preview))
+      || after.status !== before.status
+      || after.source_state !== before.source_state
+      || after.preview_blocker !== before.preview_blocker
+      || after.expires_at !== before.expires_at
+      || after.client_id !== before.client_id
+      || after.owner_role !== before.owner_role
+      || JSON.stringify(after.preview) !== JSON.stringify(before.preview)
+      || String(decisionAfter.event_order) !== String(decision.event_order)
+      || decisionAfter.id !== decision.id
+      || decisionAfter.actor_id !== decision.actor_id
+      || decisionAfter.artifact_hash !== decision.artifact_hash)
     fail('canonical release card changed during premerge verification')
   return {
     requestId, prNumber: Number(source.candidate.pr.number),

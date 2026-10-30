@@ -213,6 +213,8 @@ beforeAll(async () => {
     returns text language sql stable as $$ select 'source_held'::text $$`);
   await db.exec(await migration(
     "20261101100000_293_trusted_production_release_decision.sql"));
+  await db.exec(await migration(
+    "20261101120000_295_approved_release_proof_refresh.sql"));
   await db.exec("set timezone='UTC'");
 }, 60_000);
 
@@ -302,7 +304,7 @@ describe("production release candidate Inbox migration 288", () => {
       executor_state: string; overall_status: string;
     }>("authenticated", ADMIN, "aal2",
       "select revision,source_state,decision_state,executor_state,overall_status from public.approval_class_coverage_v6 where class_id=32");
-    expect(coverage).toMatchObject({ revision: 3, source_state: "blocked",
+    expect(coverage).toMatchObject({ revision: 4, source_state: "blocked",
       decision_state: "blocked", executor_state: "missing", overall_status: "blocked" });
     await expect(db.query("update public.production_release_candidates_v6 set expires_at=now() where id=$1", [id]))
       .rejects.toThrow(/append-only/);
@@ -459,9 +461,9 @@ describe("trusted exact-version production release decision migration 293", () =
     expect((ready!.preview.trusted_github_evidence as { packetSha256: string }).packetSha256)
       .toBe(proof.packetSha256);
 
-    const decision = "select public.decide_production_release_candidate_v6($1,$2,$3,$4,$5) as id";
+    const decision = "select public.decide_production_release_candidate_v6($1,$2,$3,$4,$5,$6) as id";
     const approveArgs = [card.id, card.source_version, card.artifact_hash,
-      "approved", null];
+      proof.packetSha256, "approved", null];
     await expect(asRole("authenticated", ADMIN, "aal1", decision, approveArgs))
       .rejects.toThrow(/provisioned admin with AAL2/);
     await expect(asRole("authenticated", MEMBER, "aal2", decision, approveArgs))
@@ -473,17 +475,27 @@ describe("trusted exact-version production release decision migration 293", () =
       [card.id, card.artifact_hash, `direct:${card.id}`]))
       .rejects.toThrow(/permission denied/);
     await expect(asRole("authenticated", ADMIN, "aal2", decision,
-      [card.id, "f".repeat(64), card.artifact_hash, "approved", null]))
+      [card.id, "f".repeat(64), card.artifact_hash, proof.packetSha256,
+        "approved", null]))
       .rejects.toThrow(/version changed/);
+    await expect(asRole("authenticated", ADMIN, "aal2", decision,
+      [card.id, card.source_version, card.artifact_hash, "f".repeat(64),
+        "approved", null])).rejects.toThrow(/exact GitHub proof changed/);
+    await expect(asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,'approved',null)",
+      [card.id, card.source_version, card.artifact_hash]))
+      .rejects.toThrow(/does not exist/);
     await asRole("authenticated", ADMIN, "aal2", decision, approveArgs);
     const [approved] = await asRole<{ status: string }>("authenticated", ADMIN,
       "aal2", "select status from public.approval_inbox_v6 where id=$1", [card.id]);
     expect(approved!.status).toBe("approved");
     await expect(asRole("authenticated", ADMIN, "aal2", decision,
-      [card.id, card.source_version, card.artifact_hash, "rejected", "Changed my mind"]))
+      [card.id, card.source_version, card.artifact_hash, "",
+        "rejected", "Changed my mind"]))
       .rejects.toThrow(/already been decided/);
     await asRole("authenticated", ADMIN, "aal2", decision,
-      [card.id, card.source_version, card.artifact_hash, "revoked", "Superseded plan"]);
+      [card.id, card.source_version, card.artifact_hash, "",
+        "revoked", "Superseded plan"]);
     const [revoked] = await asRole<{ status: string }>("authenticated", ADMIN,
       "aal2", "select status from public.approval_inbox_v6 where id=$1", [card.id]);
     expect(revoked!.status).toBe("revoked");
@@ -491,12 +503,13 @@ describe("trusted exact-version production release decision migration 293", () =
 
   it("preserves reasoned rejection of a held source and cannot approve it later", async () => {
     const { card } = await submitted("297");
-    const decision = "select public.decide_production_release_candidate_v6($1,$2,$3,$4,$5) as id";
+    const decision = "select public.decide_production_release_candidate_v6($1,$2,$3,$4,$5,$6) as id";
     await expect(asRole("authenticated", ADMIN, "aal2", decision,
-      [card.id, card.source_version, card.artifact_hash, "approved", null]))
+      [card.id, card.source_version, card.artifact_hash, "", "approved", null]))
       .rejects.toThrow(/stale, held or expired/);
     await asRole("authenticated", ADMIN, "aal2", decision,
-      [card.id, card.source_version, card.artifact_hash, "rejected", "No verified CI"]);
+      [card.id, card.source_version, card.artifact_hash, "",
+        "rejected", "No verified CI"]);
     const [rejected] = await asRole<{ status: string }>("authenticated", ADMIN,
       "aal2", "select status from public.approval_inbox_v6 where id=$1", [card.id]);
     expect(rejected!.status).toBe("rejected");
@@ -518,8 +531,8 @@ describe("trusted exact-version production release decision migration 293", () =
       "select status,source_state from public.approval_inbox_v6 where id=$1", [card.id]);
     expect(held).toMatchObject({ status: "source_held", source_state: "source_held" });
     await expect(asRole("authenticated", ADMIN, "aal2",
-      "select public.decide_production_release_candidate_v6($1,$2,$3,'approved',null)",
-      [card.id, card.source_version, card.artifact_hash]))
+      "select public.decide_production_release_candidate_v6($1,$2,$3,$4,'approved',null)",
+      [card.id, card.source_version, card.artifact_hash, ""]))
       .rejects.toThrow(/stale, held or expired/);
     await attest(card.id, packet(source));
     const [ready] = await asRole<{ status: string }>(
@@ -532,8 +545,8 @@ describe("trusted exact-version production release decision migration 293", () =
     const { source, card } = await submitted("299");
     await attest(card.id, packet(source));
     await asRole("authenticated", ADMIN, "aal2",
-      "select public.decide_production_release_candidate_v6($1,$2,$3,'approved',null)",
-      [card.id, card.source_version, card.artifact_hash]);
+      "select public.decide_production_release_candidate_v6($1,$2,$3,$4,'approved',null)",
+      [card.id, card.source_version, card.artifact_hash, packet(source).packetSha256]);
     await db.query(`
       insert into public.production_release_attestations_v6 (
         request_id,source_version,packet,packet_sha256,attested_at
@@ -547,10 +560,99 @@ describe("trusted exact-version production release decision migration 293", () =
       "select status,source_state from public.approval_inbox_v6 where id=$1", [card.id]);
     expect(held).toMatchObject({ status: "source_held", source_state: "source_held" });
     await asRole("authenticated", ADMIN, "aal2",
-      "select public.decide_production_release_candidate_v6($1,$2,$3,'revoked',$4)",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,'','revoked',$4)",
       [card.id, card.source_version, card.artifact_hash, "Plan withdrawn after proof expiry"]);
     const [revoked] = await asRole<{ status: string }>("authenticated", ADMIN,
       "aal2", "select status from public.approval_inbox_v6 where id=$1", [card.id]);
     expect(revoked!.status).toBe("revoked");
+  });
+
+  it("binds the exact approved packet and refreshes only identical server proof", async () => {
+    const { source, card } = await submitted("301");
+    const proof = packet(source);
+    const [original] = await attest(card.id, proof);
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,$4,'approved',null)",
+      [card.id, card.source_version, card.artifact_hash, proof.packetSha256]);
+    const [binding] = await asRole<{
+      attestation_id: string; packet_sha256: string; source_version: string;
+    }>("service_role", null, "aal1",
+      "select attestation_id,packet_sha256,source_version from public.production_release_approval_bindings_v6 where request_id=$1",
+      [card.id]);
+    expect(binding).toMatchObject({ attestation_id: original!.id,
+      packet_sha256: proof.packetSha256, source_version: card.source_version });
+    await db.query(`
+      insert into public.production_release_attestations_v6 (
+        request_id,source_version,packet,packet_sha256,attested_at
+      ) select request_id,source_version,packet,packet_sha256,
+          now() - interval '1 hour'
+        from public.production_release_attestations_v6
+        where request_id=$1 order by event_order desc limit 1
+    `, [card.id]);
+    const [held] = await asRole<{ status: string }>("authenticated", ADMIN,
+      "aal2", "select status from public.approval_inbox_v6 where id=$1", [card.id]);
+    expect(held!.status).toBe("source_held");
+    const refresh = "select public.refresh_approved_production_release_attestation_v6($1,$2::jsonb) as id";
+    await expect(asRole("authenticated", ADMIN, "aal2", refresh,
+      [card.id, JSON.stringify(proof)])).rejects.toThrow(/permission denied|Only the trusted/);
+    const [refreshed] = await asRole<{ id: string }>("service_role", null,
+      "aal1", refresh, [card.id, JSON.stringify(proof)]);
+    expect(refreshed!.id).not.toBe(original!.id);
+    const [ready] = await asRole<{ status: string; source_state: string }>(
+      "authenticated", ADMIN, "aal2",
+      "select status,source_state from public.approval_inbox_v6 where id=$1", [card.id]);
+    expect(ready).toMatchObject({ status: "approved", source_state: "pending" });
+    const [same] = await asRole<{ id: string }>("service_role", null,
+      "aal1", refresh, [card.id, JSON.stringify(proof)]);
+    expect(same!.id).toBe(refreshed!.id);
+  });
+
+  it("rejects a new proof between Inbox read and the human decision lock", async () => {
+    const { source, card } = await submitted("303");
+    const shown = packet(source);
+    await attest(card.id, shown);
+    const replacement = packet(source, { checks: {
+      ...(shown.checks as Record<string, unknown>),
+      required: (shown.checks as { required: Array<Record<string, unknown>> }).required
+        .map((value, index) => index === 0 ? { ...value, checkRunId: 777 } : value),
+    } });
+    await attest(card.id, replacement);
+    const decision = "select public.decide_production_release_candidate_v6($1,$2,$3,$4,'approved',null)";
+    await expect(asRole("authenticated", ADMIN, "aal2", decision,
+      [card.id, card.source_version, card.artifact_hash, shown.packetSha256]))
+      .rejects.toThrow(/exact GitHub proof changed after the Inbox review/);
+    const [stillPending] = await asRole<{ status: string }>("authenticated", ADMIN,
+      "aal2", "select status from public.approval_inbox_v6 where id=$1", [card.id]);
+    expect(stillPending!.status).toBe("pending");
+    await asRole("authenticated", ADMIN, "aal2", decision,
+      [card.id, card.source_version, card.artifact_hash, replacement.packetSha256]);
+    const [binding] = await asRole<{ packet_sha256: string }>("service_role", null,
+      "aal1", "select packet_sha256 from public.production_release_approval_bindings_v6 where request_id=$1",
+      [card.id]);
+    expect(binding!.packet_sha256).toBe(replacement.packetSha256);
+  });
+
+  it("rejects changed packet bytes and a later human revocation", async () => {
+    const { source, card } = await submitted("302");
+    const proof = packet(source);
+    await attest(card.id, proof);
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,$4,'approved',null)",
+      [card.id, card.source_version, card.artifact_hash, proof.packetSha256]);
+    const changed = packet(source, { checks: {
+      ...(proof.checks as Record<string, unknown>),
+      required: (proof.checks as { required: Array<Record<string, unknown>> }).required
+        .map((value, index) => index === 0 ? { ...value, checkRunId: 999 } : value),
+    } });
+    const refresh = "select public.refresh_approved_production_release_attestation_v6($1,$2::jsonb)";
+    await expect(asRole("service_role", null, "aal1", refresh,
+      [card.id, JSON.stringify(changed)]))
+      .rejects.toThrow(/differs from the human-approved packet/);
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,'','revoked',$4)",
+      [card.id, card.source_version, card.artifact_hash, "Release withdrawn"]);
+    await expect(asRole("service_role", null, "aal1", refresh,
+      [card.id, JSON.stringify(proof)]))
+      .rejects.toThrow(/approval is absent or revoked/);
   });
 });
