@@ -43,8 +43,11 @@ Release this in order:
    the token or response headers that contain it.
 3. After the browser manifest/Pages gate PR has merged, update the Pages
    identity step to pass `BROWSER_RELEASE_PROBE_TOKEN` only to that step and
-   use `/release/identities/fresh` with an Authorization header. Require a
-   nonempty, exact-format token before calling `fetch`; require literal HTTP
+   use `/release/identities/fresh` with an Authorization header. The runtime's
+   sequential catalog, gateway fetch and gateway body deadlines can total
+   nine seconds, so give the Pages HTTP request a bounded deadline of at
+   least twelve seconds and test a healthy six-to-nine-second response.
+   Require a nonempty, exact-format token before calling `fetch`; require literal HTTP
    200, fresh complete JSON, exact manifest identities, and a current-main
    recheck immediately before Pages publication. Keep the token out of the
    build, npm tests, artifacts, logs, and `VITE_*` environment variables.

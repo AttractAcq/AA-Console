@@ -56,6 +56,7 @@ describe("authenticated uncached release identity probe", () => {
       const r = response();
       handleFreshReleaseProbe(request("GET", header), r.res, sb, config());
       expect(r.writeHead).toHaveBeenCalledWith(401, { "Content-Type": "application/json" });
+      expect(r.setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
       expect(r.end.mock.calls[0]![0]).not.toContain(token);
     }
     expect(probes.fresh).not.toHaveBeenCalled();
@@ -65,6 +66,7 @@ describe("authenticated uncached release identity probe", () => {
     const r = response();
     handleFreshReleaseProbe(request("POST", `Bearer ${token}`), r.res, sb, config());
     expect(r.writeHead).toHaveBeenCalledWith(405, { "Content-Type": "application/json" });
+    expect(r.setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
     expect(probes.fresh).not.toHaveBeenCalled();
   });
 
@@ -78,7 +80,24 @@ describe("authenticated uncached release identity probe", () => {
     expect(probes.cached).not.toHaveBeenCalled();
     expect(first.writeHead).toHaveBeenCalledWith(200, { "Content-Type": "application/json" });
     expect(second.writeHead).toHaveBeenCalledWith(200, { "Content-Type": "application/json" });
+    expect(first.setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
+    expect(second.setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
     expect(JSON.parse(second.end.mock.calls[0]![0])).toEqual(complete);
+  });
+
+  it("allows a healthy collector that completes after the old five-second Pages deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      probes.fresh.mockImplementationOnce(() => new Promise((resolve) => setTimeout(() => resolve(complete), 9_000)));
+      const r = response();
+      handleFreshReleaseProbe(request("GET", `Bearer ${token}`), r.res, sb, config());
+      expect(r.end).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(9_000);
+      expect(r.writeHead).toHaveBeenCalledWith(200, { "Content-Type": "application/json" });
+      expect(r.setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("returns only a fixed failure when a dependency rejects", async () => {
