@@ -1,4 +1,4 @@
--- Rule 6 / 299: a `supported` flag is a promise that something can perform
+-- Rule 6 / 280: a `supported` flag is a promise that something can perform
 -- the action. Four of them are promises nothing keeps.
 --
 -- The build blueprint states the rule twice. §1.1 rule 6: "A database

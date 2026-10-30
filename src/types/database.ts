@@ -1433,18 +1433,24 @@ export type Database = {
         Row: {
           action_key: string
           executor_module: string
+          handler_attested_at: string | null
+          handler_attested_sha: string | null
           note: string
           supported: boolean
         }
         Insert: {
           action_key: string
           executor_module: string
+          handler_attested_at?: string | null
+          handler_attested_sha?: string | null
           note: string
           supported?: boolean
         }
         Update: {
           action_key?: string
           executor_module?: string
+          handler_attested_at?: string | null
+          handler_attested_sha?: string | null
           note?: string
           supported?: boolean
         }

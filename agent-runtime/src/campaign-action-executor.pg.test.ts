@@ -825,8 +825,8 @@ describe("rule 6: a supported flag no handler backs", () => {
   const REGISTERED = ["budget_change", "lead_message", "page_deploy", "proof_publish"];
   const ATTESTED = "92191b3e854abce86f9f5f8cd7810f86ba318b9d";
 
-  /** Production's flag state before 299, which 230's seed does not reproduce. */
-  async function asProductionBefore299(): Promise<void> {
+  /** Production's flag state before 280, which 230's seed does not reproduce. */
+  async function asProductionBefore280(): Promise<void> {
     await db.exec(`
  update campaign_action_executors set supported = true
   where action_key in ('proof_publish','page_deploy','lead_message','budget_change',
@@ -834,12 +834,12 @@ describe("rule 6: a supported flag no handler backs", () => {
  update proof_destinations set supported = true;`);
   }
 
-  const apply299 = async () =>
-    db.exec(await sql("20261030170000_299_rule_six_supported_flags.sql"));
+  const apply280 = async () =>
+    db.exec(await sql("20261030170000_280_rule_six_supported_flags.sql"));
 
   it("leaves exactly the actions a handler is registered for", async () => {
-    await asProductionBefore299();
-    await apply299();
+    await asProductionBefore280();
+    await apply280();
 
     const supported = await rows<{ action_key: string }>(
       "select action_key from campaign_action_executors where supported order by action_key",
@@ -848,8 +848,8 @@ describe("rule 6: a supported flag no handler backs", () => {
   });
 
   it("says what is missing rather than going quiet, for both corrected actions", async () => {
-    await asProductionBefore299();
-    await apply299();
+    await asProductionBefore280();
+    await apply280();
 
     // The sentence a person reads is the due view's, and it is built from
     // this flag. What matters here is that the note names the gap.
@@ -864,8 +864,8 @@ describe("rule 6: a supported flag no handler backs", () => {
   });
 
   it("stops claiming the two proof destinations the placer has no transport for", async () => {
-    await asProductionBefore299();
-    await apply299();
+    await asProductionBefore280();
+    await apply280();
 
     const claimable = await rows<{ destination_key: string }>(
       "select destination_key from proof_destinations where supported and mode = 'api' order by 1",
@@ -875,8 +875,8 @@ describe("rule 6: a supported flag no handler backs", () => {
   });
 
   it("attests every row it leaves supported to the deployed build", async () => {
-    await asProductionBefore299();
-    await apply299();
+    await asProductionBefore280();
+    await apply280();
 
     const unattested = await rows<{ action_key: string }>(
       `select action_key from campaign_action_executors
@@ -890,8 +890,8 @@ describe("rule 6: a supported flag no handler backs", () => {
   });
 
   it("refuses a later flag flip that names no build", async () => {
-    await asProductionBefore299();
-    await apply299();
+    await asProductionBefore280();
+    await apply280();
 
     // The next person to do what 239 and 254 did. The constraint is the
     // whole point: there is no way to advertise support quietly.
@@ -901,8 +901,8 @@ describe("rule 6: a supported flag no handler backs", () => {
   });
 
   it("refuses a build identity that is not a full commit", async () => {
-    await asProductionBefore299();
-    await apply299();
+    await asProductionBefore280();
+    await apply280();
 
     await expect(
       db.exec(`update campaign_action_executors
