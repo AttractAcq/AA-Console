@@ -10,8 +10,9 @@ const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 export const teamMemberDraftKey = (category: string) => `team-member-v2:${category}`;
 export const integrationDraftKey = (clientId: string) => `integration-v2:${clientId}`;
 
-type SafeRule = "select" | "toggle" | "hex";
+type SafeRule = { allowed: readonly string[] } | "toggle" | "hex";
 type DraftPolicy = { key: RegExp; fields: Record<string, SafeRule> };
+const select = (...allowed: string[]): SafeRule => ({ allowed });
 
 const colours: Record<string, SafeRule> = {
   colour_primary: "hex",
@@ -21,9 +22,9 @@ const colours: Record<string, SafeRule> = {
   colour_text: "hex",
 };
 const ideaShape: Record<string, SafeRule> = {
-  target_platform: "select",
-  media_type: "select",
-  content_format: "select",
+  target_platform: select("instagram", "facebook", "tiktok", "linkedin", "youtube"),
+  media_type: select("image", "text", "video"),
+  content_format: select("single", "carousel", "story", "reel"),
 };
 
 /**
@@ -31,6 +32,8 @@ const ideaShape: Record<string, SafeRule> = {
  * explicit decision to keep that form in memory only. Unknown future keys
  * also deny every field. Only fixed selections, booleans and complete hex
  * colours may be persisted; free text and identifiers are deliberately absent.
+ * Select values have a fixed second allowlist, so adding a dynamic option to
+ * a form cannot accidentally make account IDs or credentials persistent.
  */
 const POLICIES: readonly DraftPolicy[] = [
   { key: /^add-client$/, fields: { is_internal: "toggle" } },
@@ -46,7 +49,9 @@ const POLICIES: readonly DraftPolicy[] = [
   { key: /^billing:[^:]+$/, fields: {} },
   { key: /^contract:[^:]+$/, fields: {} },
   { key: /^audit:[^:]+$/, fields: {} },
-  { key: /^integration-v2:[^:]+$/, fields: { provider: "select" } },
+  { key: /^integration-v2:[^:]+$/, fields: {
+    provider: select("meta", "instagram", "facebook", "resend", "google", "google_business", "other"),
+  } },
   { key: /^site-repo:[^:]+$/, fields: {} },
   { key: /^finance-period$/, fields: {} },
   { key: /^finance-entry$/, fields: {} },
@@ -62,12 +67,17 @@ const POLICIES: readonly DraftPolicy[] = [
   { key: /^add-sop$/, fields: {} },
   { key: /^add-channel$/, fields: {} },
   { key: /^proof:[^:]+$/, fields: {
-    media_type: "select", source_format: "select", capture_method: "select", source_category: "select",
+    media_type: select("image", "text", "video"),
+    source_format: select("single", "carousel", "story", "reel"),
+    capture_method: select("automated_requests", "field_capture", "guided_interview", "integration",
+      "manual_import", "outcome_followup"),
+    source_category: select("customers", "business_operations", "independent_sources"),
   } },
   { key: /^idea-manual:[^:]+$/, fields: ideaShape },
   { key: /^idea-pillar:[^:]+$/, fields: ideaShape },
   { key: /^idea-proof:[^:]+$/, fields: ideaShape },
-  { key: /^ad-copy:[^:]+$/, fields: { ad_cta: "select" } },
+  { key: /^ad-copy:[^:]+$/, fields: { ad_cta: select("APPLY_NOW", "BOOK_NOW", "CONTACT_US", "DOWNLOAD",
+    "GET_OFFER", "GET_QUOTE", "LEARN_MORE", "SEND_MESSAGE", "SHOP_NOW", "SIGN_UP", "SUBSCRIBE") } },
   { key: /^schedule:[^:]+:[^:]+$/, fields: {} },
   { key: /^page:[^:]+:[^:]+$/, fields: {} },
   { key: /^sales-agent:[^:]+$/, fields: {} },
@@ -83,8 +93,8 @@ function safeValues(key: string, values: Record<string, unknown>, fields: FieldD
     const rule = policy[name];
     const field = available.get(name);
     if (!rule || !field || field.sensitive || field.kind === "password") continue;
-    if (rule === "select" && field.kind === "select" && typeof value === "string"
-      && field.options?.some((option) => option.value === value)) safe[name] = value;
+    if (typeof rule === "object" && field.kind === "select" && typeof value === "string"
+      && rule.allowed.includes(value) && field.options?.some((option) => option.value === value)) safe[name] = value;
     if (rule === "toggle" && field.kind === "toggle" && typeof value === "boolean") safe[name] = value;
     if (rule === "hex" && field.kind === "text" && typeof value === "string"
       && /^#[0-9a-fA-F]{6}$/.test(value)) safe[name] = value;
@@ -97,7 +107,7 @@ function currentKey(key: string): string | null {
   return userId ? `${SAFE_PREFIX}${userId}:${key}` : null;
 }
 
-/** Remove every pre-v3 local draft without retrieving or parsing its value. */
+/** Remove pre-v3 drafts from both stores without retrieving or parsing values. */
 export function purgeLegacySensitiveDrafts() {
   try {
     const keys: string[] = [];
@@ -110,6 +120,18 @@ export function purgeLegacySensitiveDrafts() {
     }
   } catch {
     // Storage may be unavailable in private browsing or during SSR.
+  }
+  try {
+    const keys: string[] = [];
+    for (let index = 0; index < sessionStorage.length; index += 1) {
+      const key = sessionStorage.key(index);
+      if (key?.startsWith(LEGACY_PREFIX) && key !== IDENTITY_KEY && !key.startsWith(SAFE_PREFIX)) keys.push(key);
+    }
+    for (const key of keys) {
+      try { sessionStorage.removeItem(key); } catch { /* continue with other keys */ }
+    }
+  } catch {
+    // A blocked store must not prevent the other store from being scrubbed.
   }
 }
 
@@ -133,6 +155,7 @@ export function clearAllSafeDrafts() {
 
 /** Keep a draft only while the same authenticated user owns this tab. */
 export function syncDraftIdentity(userId: string | null) {
+  purgeLegacySensitiveDrafts();
   try {
     const previous = sessionStorage.getItem(IDENTITY_KEY);
     if (previous !== userId) clearAllSafeDrafts();
@@ -145,6 +168,7 @@ export function syncDraftIdentity(userId: string | null) {
 
 export function clearDraft(key: string | undefined) {
   if (!key) return;
+  purgeLegacySensitiveDrafts();
   try {
     const scopedKey = currentKey(key);
     if (scopedKey) sessionStorage.removeItem(scopedKey);
@@ -155,6 +179,7 @@ export function clearDraft(key: string | undefined) {
 /** Restore only explicitly allowed, validated values from the current tab. */
 export function readDraft(key: string | undefined, fields: FieldDef[]): FormValues | undefined {
   if (!key) return undefined;
+  purgeLegacySensitiveDrafts();
   try {
     const scopedKey = currentKey(key);
     if (!scopedKey) return undefined;
@@ -193,6 +218,7 @@ export function readDraft(key: string | undefined, fields: FieldDef[]): FormValu
 /** Write only explicitly allowed, validated fields; never save free text. */
 export function writeDraft(key: string | undefined, values: FormValues, fields: FieldDef[]) {
   if (!key) return;
+  purgeLegacySensitiveDrafts();
   try {
     const scopedKey = currentKey(key);
     if (!scopedKey) return;

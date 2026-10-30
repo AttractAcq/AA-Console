@@ -75,21 +75,83 @@ describe("form draft isolation", () => {
       localStorage.setItem(oldKey(key), JSON.stringify({ secret: marker }));
     }
     localStorage.setItem("unrelated:keep", "value");
+    sessionStorage.setItem("aa-console:draft:v2:contact:c", JSON.stringify({ secret: marker }));
+    sessionStorage.setItem("aa-console:draft:lead:c", JSON.stringify({ name: marker }));
+    const retainedSafeDraft = envelope({ provider: "meta" });
+    sessionStorage.setItem(currentKey("integration-v2:c"), retainedSafeDraft);
     const read = vi.spyOn(localStorage, "getItem");
+    const sessionRead = vi.spyOn(sessionStorage, "getItem");
     const log = vi.spyOn(console, "log");
     const warn = vi.spyOn(console, "warn");
     purgeLegacySensitiveDrafts();
+    expect(read).not.toHaveBeenCalled();
+    expect(sessionRead).not.toHaveBeenCalled();
+    read.mockRestore();
+    sessionRead.mockRestore();
     for (let index = 0; index < localStorage.length; index += 1) {
       expect(localStorage.key(index)).not.toMatch(/^aa-console:draft:/);
     }
     expect(Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)))
       .toContain("unrelated:keep");
-    expect(read).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("aa-console:draft:v2:contact:c")).toBeNull();
+    expect(sessionStorage.getItem("aa-console:draft:lead:c")).toBeNull();
+    expect(sessionStorage.getItem(currentKey("integration-v2:c"))).toBe(retainedSafeDraft);
     expect(log).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
-    read.mockRestore();
     log.mockRestore();
     warn.mockRestore();
+  });
+
+  it("scrubs legacy drafts arriving after module load before writing a safe replacement", () => {
+    const key = integrationDraftKey("client-1");
+    const legacyLocal = oldKey("contact:client-1");
+    const legacySession = "aa-console:draft:v2:billing:client-1";
+    const calls: { action: "set" | "remove"; key: string }[] = [];
+    const storage = (entries: [string, string][]) => {
+      const store = new Map(entries);
+      return {
+        get length() { return store.size; },
+        key: (index: number) => [...store.keys()][index] ?? null,
+        getItem: (name: string) => store.get(name) ?? null,
+        setItem: (name: string, value: string) => {
+          calls.push({ action: "set" as const, key: name }); store.set(name, value);
+        },
+        removeItem: (name: string) => {
+          calls.push({ action: "remove" as const, key: name }); store.delete(name);
+        },
+        clear: () => store.clear(),
+      };
+    };
+    const local = storage([[legacyLocal, JSON.stringify({ email: marker })]]);
+    const session = storage([
+      ["aa-console:draft:session-user", "user-1"],
+      [legacySession, JSON.stringify({ tax_id: marker })],
+    ]);
+    vi.stubGlobal("localStorage", local);
+    vi.stubGlobal("sessionStorage", session);
+    try {
+      writeDraft(key, { provider: "meta", secret: marker }, integrationFields);
+      expect(local.getItem(legacyLocal)).toBeNull();
+      expect(session.getItem(legacySession)).toBeNull();
+      expect(readDraft(key, integrationFields)).toEqual({ provider: "meta" });
+      const safeWrite = calls.findIndex((call) => call.action === "set" && call.key === currentKey(key));
+      expect(safeWrite).toBeGreaterThanOrEqual(0);
+      for (const legacyKey of [legacyLocal, legacySession]) {
+        const removed = calls.findIndex((call) => call.action === "remove" && call.key === legacyKey);
+        expect(removed).toBeGreaterThanOrEqual(0);
+        expect(removed).toBeLessThan(safeWrite);
+      }
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("scrubs a newly arrived legacy draft on safe reload without dropping the safe selection", () => {
+    const key = integrationDraftKey("client-1");
+    writeDraft(key, { provider: "meta" }, integrationFields);
+    localStorage.setItem(oldKey("lead:client-1"), JSON.stringify({ phone: marker }));
+    expect(readDraft(key, integrationFields)).toEqual({ provider: "meta" });
+    expect(localStorage.getItem(oldKey("lead:client-1"))).toBeNull();
   });
 
   it("does not persist free text or seeded personal and financial values after a safe edit", () => {
@@ -133,6 +195,24 @@ describe("form draft isolation", () => {
     sessionStorage.setItem(currentKey("integration-v2:c"), envelope({ provider: marker, secret: marker }));
     expect(readDraft("integration-v2:c", integrationFields)).toBeUndefined();
     expect(sessionStorage.getItem(currentKey("integration-v2:c"))).toBeNull();
+  });
+
+  it.each([
+    ["integration-v2:c", "provider", "meta", marker],
+    ["idea-manual:c", "target_platform", "instagram", "act_123456789"],
+    ["proof:c", "source_category", "customers", "private-client-account"],
+    ["ad-copy:a", "ad_cta", "BOOK_NOW", "secret-as-option"],
+  ])("refuses dynamic private select options for %s / %s", (key, name, safeValue, privateValue) => {
+    const fields: FieldDef[] = [{ name, label: name, kind: "select", options: [
+      { value: safeValue, label: "Safe" }, { value: privateValue, label: "Private" },
+    ] }];
+    writeDraft(key, { [name]: privateValue }, fields);
+    expect(sessionStorage.getItem(currentKey(key))).toBeNull();
+    sessionStorage.setItem(currentKey(key), envelope({ [name]: privateValue }));
+    expect(readDraft(key, fields)).toBeUndefined();
+    expect(sessionStorage.getItem(currentKey(key))).toBeNull();
+    writeDraft(key, { [name]: safeValue }, fields);
+    expect(readDraft(key, fields)).toEqual({ [name]: safeValue });
   });
 
   it("deletes unsafe source first even if saving its safe subset fails", () => {
