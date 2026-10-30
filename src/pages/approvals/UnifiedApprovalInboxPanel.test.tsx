@@ -625,6 +625,22 @@ describe("unified approval inbox", () => {
     expect(screen.queryByText("House recruitment")).not.toBeInTheDocument();
   });
 
+  it("shows a held agency-wide release card by default without decision controls", async () => {
+    requests = [{ ...request, id: "release-1", client_id: null,
+      source_system: "aa_console", source_kind: "production_release", title: "Production release PR #271",
+      status: "source_held", source_state: "source_held",
+      preview_blocker: "Release checks and deployment are not independently attested." }];
+    show("global");
+    const card = await screen.findByRole("article", { name: "Production release PR #271" });
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue("all");
+    expect(within(card).getByText("Agency-wide")).toBeInTheDocument();
+    expect(within(card).getAllByRole("alert")[0]).toHaveTextContent("not independently attested");
+    expect(within(card).queryByRole("button", { name: "Approve exact version" }))
+      .not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Reject with reason" }))
+      .not.toBeInTheDocument();
+  });
+
   it("uses a global card's own client for a fresh exact-version decision read", async () => {
     requests = [{ ...readyGoogle, client_id: "client-2",
       scope: { ...readyGoogle.scope, client_id: "client-2" },

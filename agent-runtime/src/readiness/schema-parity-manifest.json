@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "bf472259b1d3132ccb2562db2e6b59b968e9376163f729579b6199cd7ecaf328",
-  "generatedTypesSha256": "2faea7a28caaecdce999c4abbbeee68e2a1752ddb1111a30dde3236c4885a6ed",
-  "generatedSchemaBodySha256": "7248fe6c90579f912fbfdcbfe0ab9ba5387148a278fd1f7c87d2cdd8f925e34c",
+  "migrationSourceDigest": "4bef517ff2b087c193bf0999822dd6c108108d87852801b92cdfa685a9dfdaaf",
+  "generatedTypesSha256": "b3bdac1ace9a83e21cc8cb8c02b3412abddac4ffb72790de21d43444ca9dbf0b",
+  "generatedSchemaBodySha256": "a85812d2669c2272eb27031348dc82986c64dbf258b29ed91e398bc6c2349504",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2131,6 +2131,13 @@
       "filename": "20261101040000_287_organic_schedule_route.sql",
       "sha256": "f1e734dc16ef04b72a1ab6921b2329a7d49272b99ced6fc8d2fed8b270e79dbd",
       "trimmedMd5": "61d04c2c6f5c5222b0be34411198ba69"
+    },
+    {
+      "version": "20261101050000",
+      "name": "288_production_release_candidate_inbox",
+      "filename": "20261101050000_288_production_release_candidate_inbox.sql",
+      "sha256": "59568099d26eecf09b0fdcdfc0d77ec2c40f721f05c83df6218363f7c0273566",
+      "trimmedMd5": "ff48771174b5570560c65055e0bd07f1"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
