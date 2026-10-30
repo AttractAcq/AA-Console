@@ -1,18 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { applyProfileChanges, type ClaimedProfileChange } from "./updater.js";
-import { locationPatchBody } from "../proof-distribution/google-business.js";
+import { applyProfileChanges, runProfileUpdaterJob, type ClaimedProfileChange } from "./updater.js";
+import {
+  locationPatchBody, patchLocationField, PlacementTransportError,
+} from "../proof-distribution/google-business.js";
 import type { RuntimeConfig } from "../config.js";
+import type { AgentRow } from "../orchestration/registry.js";
 import type { AgentJobRow } from "../queue.js";
 
 /**
- * Applying an approved profile change — G05.
- *
- * The behaviour worth pinning is what this refuses to do: write a field no
- * platform permits, write without a credential, and overwrite fields nobody
- * asked about. The last of those is the one that would quietly erase a
- * client's opening hours, and it is a property of the updateMask rather than
- * of this worker — so it is tested at the body it builds.
+ * The old profile approval can be approved without a source-owned AAL2 Inbox
+ * decision. The worker must refuse before claim or credential read, even
+ * when a caller turns on the broad campaign-action switch. Keep the adapter
+ * body tests so the held transport remains reviewable for its later release.
  */
 const job = { id: "job-1" } as AgentJobRow;
 const config = (over: Partial<RuntimeConfig> = {}) =>
@@ -30,15 +30,13 @@ const change = (over: Partial<ClaimedProfileChange> = {}): ClaimedProfileChange 
   ...over,
 });
 
-function database(claimed: ClaimedProfileChange[] = [change()], over: Record<string, unknown> = {}) {
+function database(claimed: ClaimedProfileChange[] = [change()]) {
   const events: Record<string, unknown>[] = [];
   const calls: Array<{ name: string; args: unknown }> = [];
   const rpc = vi.fn(async (name: string, args?: unknown) => {
     calls.push({ name, args });
     if (name === "claim_profile_changes") return { data: claimed, error: null };
-    if (name === "integration_secret") {
-      return { data: "token" in over ? over.token : "a-token", error: null };
-    }
+    if (name === "integration_secret") return { data: "a-token", error: null };
     return { data: null, error: null };
   });
   const from = vi.fn(() => ({
@@ -47,74 +45,58 @@ function database(claimed: ClaimedProfileChange[] = [change()], over: Record<str
       return { error: null };
     }),
   }));
-  return { sb: { rpc, from } as never, rpc, calls, events };
+  return { sb: { rpc, from } as never, rpc, from, calls, events };
 }
 
-const ok = () =>
-  vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
-    new Response(JSON.stringify({}), { status: 200 }));
-
-describe("the switch", () => {
+describe("the global profile-write hold", () => {
   it("claims nothing when external actions are off", async () => {
-    const { sb, rpc, events } = database();
-    const result = await applyProfileChanges(sb, config({ campaignActionsEnabled: false }), job);
+    const { sb, rpc, from, events } = database();
+    const transport = vi.fn();
+    const result = await applyProfileChanges(
+      sb, config({ campaignActionsEnabled: false }), job, transport as never,
+    );
     expect(result.ok).toBe(true);
     expect(rpc).not.toHaveBeenCalled();
+    expect(from).toHaveBeenCalledTimes(1);
+    expect(from).toHaveBeenCalledWith("agent_job_events");
+    expect(transport).not.toHaveBeenCalled();
     expect(String(events[0]!.description)).toMatch(/External campaign actions are off/);
   });
 
-  it("says so when nothing is waiting on a writable field", async () => {
-    const { sb, events } = database([]);
-    await applyProfileChanges(sb, config(), job);
-    expect(String(events[0]!.description))
-      .toMatch(/No approved profile change was waiting on a field an adapter may write/);
-  });
-});
+  it.each([
+    ["Google Business", [change()]],
+    ["Facebook", [change({ surface: "meta", platform: "facebook", field: "about" })]],
+  ])("blocks formerly approved %s changes before every claim and provider call", async (_surface, claimed) => {
+    const { sb, rpc, from, events } = database(claimed);
+    const transport = vi.fn();
+    const result = await applyProfileChanges(sb, config(), job, transport as never);
 
-describe("applying one", () => {
-  it("patches only the approved field, and records the reference", async () => {
-    const { sb, rpc } = database();
-    const fetchImpl = ok();
-    await applyProfileChanges(sb, config(), job, fetchImpl as never);
-
-    const url = String(fetchImpl.mock.calls[0]![0]);
-    // Only this field is in the mask, so nothing else is touched.
-    expect(url).toContain("updateMask=profile.description");
-    expect(rpc).toHaveBeenCalledWith("record_profile_change_applied",
-      expect.objectContaining({ p_external_ref: "accounts/123/locations/456#description" }));
-  });
-
-  it("refuses without a credential, and does not retry", async () => {
-    const { sb, calls } = database([change()], { token: null });
-    await applyProfileChanges(sb, config(), job, ok() as never);
-    const failure = calls.find((c) => c.name === "record_profile_change_failure");
-    const args = failure!.args as { p_retryable: boolean; p_reason: string };
-    expect(args.p_retryable).toBe(false);
-    expect(args.p_reason).toContain("no usable Google Business credential");
+    expect(result).toMatchObject({
+      ok: false,
+      retryable: false,
+      failureMessage: expect.stringMatching(/exact-version AAL2 Approval Inbox decision/),
+    });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(from).toHaveBeenCalledTimes(1);
+    expect(from).toHaveBeenCalledWith("agent_job_events");
+    expect(transport).not.toHaveBeenCalled();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ level: "warn" });
+    expect(String(events[0]!.description)).toMatch(/no profile change was claimed/i);
   });
 
-  it("fails loudly when a surface is writable with no adapter", async () => {
-    const { sb, calls } = database([change({ surface: "meta", platform: "facebook" })]);
-    await applyProfileChanges(sb, config(), job, ok() as never);
-    const failure = calls.find((c) => c.name === "record_profile_change_failure");
-    const args = failure!.args as { p_retryable: boolean; p_reason: string };
-    expect(args.p_retryable).toBe(false);
-    expect(args.p_reason).toContain("although the field is marked writable");
-  });
+  it("blocks the registered worker entry point despite forged job parameters", async () => {
+    const { sb, rpc, from, events } = database();
+    const result = await runProfileUpdaterJob(sb, config(), {} as AgentRow, {
+      ...job,
+      params: { approval_id: "forged", bypass_prewrite_hold: true },
+    });
 
-  it("treats an unreachable API as retryable and a refusal as not", async () => {
-    const unreachable = vi.fn(async (): Promise<Response> => { throw new Error("socket hang up"); });
-    const { sb, calls } = database();
-    await applyProfileChanges(sb, config(), job, unreachable as never);
-    expect((calls.find((c) => c.name === "record_profile_change_failure")!.args as
-      { p_retryable: boolean }).p_retryable).toBe(true);
-
-    const refused = vi.fn(async (_u: RequestInfo | URL, _i?: RequestInit) =>
-      new Response("bad field", { status: 400 }));
-    const second = database();
-    await applyProfileChanges(second.sb, config(), job, refused as never);
-    expect((second.calls.find((c) => c.name === "record_profile_change_failure")!.args as
-      { p_retryable: boolean }).p_retryable).toBe(false);
+    expect(result).toMatchObject({ ok: false, retryable: false });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(from).toHaveBeenCalledTimes(1);
+    expect(from).toHaveBeenCalledWith("agent_job_events");
+    expect(String(events[0]!.description)).toMatch(/last-moment prewrite verification/);
   });
 });
 
@@ -139,5 +121,42 @@ describe("the body it builds", () => {
 
   it("refuses a field no adapter writes", () => {
     expect(() => locationPatchBody("categories", "x")).toThrow(/No adapter writes the categories/);
+  });
+});
+
+describe("the held Google transport in isolation", () => {
+  const request = {
+    accessToken: "test-token",
+    accountRef: "accounts/123/locations/456",
+    field: "description",
+    value: "Approved exact description",
+  };
+
+  it("patches only one field and returns a stable external reference", async () => {
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+      new Response("{}", { status: 200 }));
+    const result = await patchLocationField({ ...request, fetchImpl: fetchImpl as never });
+    expect(result.externalRef).toBe("accounts/123/locations/456#description");
+    expect(String(fetchImpl.mock.calls[0]![0])).toContain("updateMask=profile.description");
+    expect(JSON.parse(String((fetchImpl.mock.calls[0]![1] as RequestInit).body)))
+      .toEqual({ profile: { description: request.value } });
+  });
+
+  it("rejects a field the adapter does not write before transport", async () => {
+    const fetchImpl = vi.fn();
+    await expect(patchLocationField({
+      ...request, field: "categories", fetchImpl: fetchImpl as never,
+    })).rejects.toThrow(/No adapter writes the categories/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("classifies a network fault as retryable and a deliberate 400 as permanent", async () => {
+    const unreachable = vi.fn(async (): Promise<Response> => { throw new Error("socket hang up"); });
+    await expect(patchLocationField({ ...request, fetchImpl: unreachable as never }))
+      .rejects.toMatchObject({ retryable: true } satisfies Partial<PlacementTransportError>);
+
+    const refused = vi.fn(async () => new Response("bad field", { status: 400 }));
+    await expect(patchLocationField({ ...request, fetchImpl: refused as never }))
+      .rejects.toMatchObject({ retryable: false } satisfies Partial<PlacementTransportError>);
   });
 });

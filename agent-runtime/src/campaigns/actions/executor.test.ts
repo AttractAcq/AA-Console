@@ -35,6 +35,18 @@ const ACTION: ClaimedAction = {
   attempt: 1,
 };
 
+const REGISTRY = [
+  { action_key: "campaign_launch", executor_module: "campaign_factory", supported: false },
+  { action_key: "meta_ad_build", executor_module: "meta_ads_studio", supported: false },
+  { action_key: "google_ad_build", executor_module: "google_ads_studio", supported: false },
+  { action_key: "organic_publish", executor_module: "content_distribution", supported: false },
+  { action_key: "proof_publish", executor_module: "proof_distribution", supported: true },
+  { action_key: "page_deploy", executor_module: "website_studio", supported: true },
+  { action_key: "lead_message", executor_module: "sales_os", supported: true },
+  { action_key: "profile_update", executor_module: "google_profile", supported: false },
+  { action_key: "budget_change", executor_module: "meta_ads_studio", supported: true },
+];
+
 function database(
   options: {
     claimed?: ClaimedAction[];
@@ -43,6 +55,8 @@ function database(
     recordError?: string;
     enrol?: { enrolled?: number; skipped?: unknown[]; sequence_name?: string };
     enrolError?: string;
+    registry?: unknown;
+    registryError?: string;
   } = {},
 ) {
   const events: Record<string, unknown>[] = [];
@@ -66,6 +80,16 @@ function database(
     return { data: null, error: null };
   });
   const from = vi.fn((table: string) => {
+    if (table === "campaign_action_executors") {
+      return {
+        select: () => ({
+          order: async () => ({
+            data: options.registry === undefined ? REGISTRY : options.registry,
+            error: options.registryError ? { message: options.registryError } : null,
+          }),
+        }),
+      };
+    }
     if (table === "agent_job_events") {
       return {
         insert: vi.fn(async (row: Record<string, unknown>) => {
@@ -76,7 +100,7 @@ function database(
     }
     throw new Error(`The executor should not be reading ${table}.`);
   });
-  return { sb: { rpc, from } as unknown as SupabaseClient, events, calls, rpc };
+  return { sb: { rpc, from } as unknown as SupabaseClient, events, calls, rpc, from };
 }
 
 /** Every rpc call of one name, in order. */
@@ -85,12 +109,13 @@ const callsTo = (calls: Array<{ name: string; args: Record<string, unknown> }>, 
 
 describe("the runtime switch", () => {
   it("claims nothing at all when campaign actions are off", async () => {
-    const { sb, calls, events } = database();
+    const { sb, calls, events, from } = database();
     const result = await runCampaignActionJob(sb, off, agent, job);
 
     expect(result).toEqual({ ok: true, retryable: false });
     // Not a dry run: nothing is claimed, so nothing can be recorded as done.
     expect(callsTo(calls, "claim_campaign_actions")).toHaveLength(0);
+    expect(from).not.toHaveBeenCalledWith("campaign_action_executors");
     expect(String(events[0]?.description)).toContain("CAMPAIGN_ACTIONS_ENABLED");
   });
 
@@ -155,6 +180,46 @@ describe("performing an approved action", () => {
 });
 
 describe("an action with nothing to perform it", () => {
+  it("refuses all claims when SQL advertises a missing Meta or profile handler", async () => {
+    const { sb, calls, events } = database({ registry: REGISTRY.map((row) => ({
+      ...row,
+      supported: ["meta_ad_build", "profile_update"].includes(row.action_key) ? true : row.supported,
+    })) });
+    const result = await runCampaignActionJob(sb, on, agent, job);
+    expect(result).toMatchObject({ ok: false, retryable: false });
+    expect(result.failureMessage).toContain("meta_ad_build, profile_update");
+    expect(callsTo(calls, "claim_campaign_actions")).toHaveLength(0);
+    expect(callsTo(calls, "record_campaign_action_failure")).toHaveLength(0);
+    expect(callsTo(calls, "release_campaign_proof_placements")).toHaveLength(0);
+    expect(String(events[0]?.description)).toContain("No action was claimed");
+  });
+
+  it("refuses claims when Google is incorrectly promoted before its handler", async () => {
+    const { sb, calls } = database({ registry: REGISTRY.map((row) => ({
+      ...row, supported: row.action_key === "google_ad_build" ? true : row.supported,
+    })) });
+    const result = await runCampaignActionJob(sb, on, agent, job);
+    expect(result.failureMessage).toContain("google_ad_build");
+    expect(callsTo(calls, "claim_campaign_actions")).toHaveLength(0);
+  });
+
+  it.each([null, [], REGISTRY.slice(1),
+    REGISTRY.map((row) => row.action_key === "proof_publish" ? { ...row, supported: null } : row),
+    [...REGISTRY, REGISTRY[0]]])(
+    "refuses a missing or malformed registry before claiming", async (registry) => {
+      const { sb, calls } = database({ registry });
+      const result = await runCampaignActionJob(sb, on, agent, job);
+      expect(result.failureMessage).toContain("could not be verified");
+      expect(callsTo(calls, "claim_campaign_actions")).toHaveLength(0);
+    });
+
+  it("refuses claims when the registry read fails", async () => {
+    const { sb, calls } = database({ registryError: "database unavailable" });
+    const result = await runCampaignActionJob(sb, on, agent, job);
+    expect(result.failureMessage).toContain("could not be verified");
+    expect(callsTo(calls, "claim_campaign_actions")).toHaveLength(0);
+  });
+
   it("fails loudly rather than leaving it claimed", async () => {
     // Only reachable by marking an action supported without writing its
     // executor, which is exactly the mistake worth a loud failure.
