@@ -37,6 +37,11 @@ begin
     when v_review.client_id <> p_reply.client_id
       or v_location.client_id <> p_reply.client_id
       then 'The reply, review and location do not belong to one client.'
+    when nullif(btrim(coalesce(v_review.review_ref, '')), '') is null
+      or nullif(btrim(coalesce(v_location.location_ref, '')), '') is null
+      then 'The Google review or location has no exact external destination.'
+    when nullif(btrim(coalesce(p_reply.body, '')), '') is null
+      then 'The reply body is empty.'
     when v_review.gone_at is not null
       then 'The source review is no longer present on Google.'
     when p_reply.body_hash <> encode(sha256(convert_to(p_reply.body, 'UTF8')), 'hex')
@@ -147,6 +152,65 @@ revoke all on function public.record_google_reply_inbox_decision_v6()
 create trigger google_reply_inbox_decision_v6
   after update of status on public.google_review_replies
   for each row execute function public.record_google_reply_inbox_decision_v6();
+
+-- The old owning RPC takes only a reply ID. A stale Inbox card must never
+-- approve newly edited words. The wrapper locks the source, checks the exact
+-- version selected by the human, then invokes that same owning RPC. Revoke
+-- direct browser execution so every page uses the version-bound path.
+create function public.decide_google_review_reply_from_inbox_v6(
+  p_reply_id uuid, p_expected_source_version text,
+  p_expected_artifact_hash text, p_approved boolean,
+  p_reason text default null
+) returns public.google_review_replies language plpgsql volatile security definer
+set search_path = pg_catalog, public as $$
+declare
+  v_reply public.google_review_replies%rowtype;
+  v_payload jsonb;
+  v_request public.approval_requests_v6%rowtype;
+begin
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or public.current_role_of() is null
+    or coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
+    raise exception 'A provisioned human with AAL2 must decide this reply.'
+      using errcode = '42501';
+  end if;
+  select * into v_reply from public.google_review_replies
+    where id = p_reply_id for update;
+  if not found or v_reply.status not in ('drafted', 'awaiting_approval') then
+    raise exception 'That reply is not waiting for a decision.' using errcode = '23514';
+  end if;
+  v_payload := public.google_reply_inbox_payload_v6(v_reply);
+  if p_expected_source_version is distinct from v_payload->>'source_version'
+    or p_expected_artifact_hash is distinct from v_payload->>'artifact_hash' then
+    raise exception 'The selected reply card is stale; review the new exact version.'
+      using errcode = '23514';
+  end if;
+  select * into v_request from public.approval_requests_v6
+    where source_system = 'aa_console'
+      and source_kind = 'google_review_reply'
+      and source_id = p_reply_id::text
+      and source_version = p_expected_source_version;
+  if not found or v_request.artifact_hash is distinct from p_expected_artifact_hash
+    or v_request.preview is distinct from v_payload->'preview'
+    or v_request.destination is distinct from v_payload->>'destination'
+    or v_request.account_ref is distinct from v_payload->>'account_ref'
+    or v_request.scope is distinct from v_payload->'scope' then
+    raise exception 'The selected reply card no longer matches the source.'
+      using errcode = '23514';
+  end if;
+  if p_approved and v_payload->>'preview_blocker' is not null then
+    raise exception 'The Google reply is not decision-ready: %',
+      v_payload->>'preview_blocker' using errcode = '23514';
+  end if;
+  return public.decide_google_review_reply_v6(p_reply_id, p_approved, p_reason);
+end;
+$$;
+revoke all on function public.decide_google_review_reply_v6(uuid,boolean,text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.decide_google_review_reply_from_inbox_v6(
+  uuid,text,text,boolean,text) from public, anon, authenticated, service_role;
+grant execute on function public.decide_google_review_reply_from_inbox_v6(
+  uuid,text,text,boolean,text) to authenticated;
 
 -- Historical approved rows are source facts, not fabricated AAL2 events.
 do $$

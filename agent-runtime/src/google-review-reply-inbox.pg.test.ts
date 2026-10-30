@@ -116,29 +116,32 @@ beforeAll(async () => {
       values ('${LEGACY}','${CLIENT}','${REVIEW}','Thank you, Jay',
         encode(sha256(convert_to('Thank you, Jay','UTF8')),'hex'));
   `);
+  const ownerMigration = await readFile(new URL(
+    "../../supabase/migrations/20261024140000_240_google_business_profile.sql",
+    import.meta.url,
+  ), "utf8");
+  const ownerStart = ownerMigration.indexOf(
+    "create function public.decide_google_review_reply_v6(",
+  );
+  const ownerEnd = ownerMigration.indexOf(
+    "revoke all on function public.decide_google_review_reply_v6", ownerStart,
+  );
+  if (ownerStart < 0 || ownerEnd < 0) {
+    throw new Error("Could not isolate the real Google reply decision function.");
+  }
+  await db.exec(ownerMigration.slice(ownerStart, ownerEnd));
+  await db.exec(`
+    revoke all on function public.decide_google_review_reply_v6(uuid,boolean,text)
+      from public,anon;
+    grant execute on function public.decide_google_review_reply_v6(uuid,boolean,text)
+      to authenticated;
+  `);
   for (const filename of [
     "20261030110000_273_canonical_approval_ledger.sql",
     "20261030150000_278_google_review_reply_inbox.sql",
   ]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${filename}`, import.meta.url), "utf8"));
   }
-  await db.exec(`
-    create function public.fixture_decide_google_reply(
-      p_id uuid,p_approved boolean,p_reason text default null
-    ) returns void language plpgsql security definer set search_path=public as $$
-    begin
-      if p_approved then
-        update public.google_review_replies set status='approved',
-          approved_by=auth.uid(),approved_at=now() where id=p_id;
-      else
-        update public.google_review_replies set status='rejected',
-          rejection_reason=p_reason where id=p_id;
-      end if;
-    end;
-    $$;
-    grant execute on function public.fixture_decide_google_reply(uuid,boolean,text)
-      to authenticated,service_role;
-  `);
 }, 60_000);
 
 afterAll(async () => { await db?.close(); });
@@ -163,20 +166,26 @@ describe("Google review reply exact Inbox bridge migration 278", () => {
     await addReply(FRESH, "Exact new reply");
     const card = (await cards(FRESH))[0]!;
     await expect(asRole("authenticated", ADMIN, "aal1",
-      "select public.fixture_decide_google_reply($1,true,null)", [FRESH]))
+      "select public.decide_google_review_reply_from_inbox_v6($1,$2,$3,true,null)",
+      [FRESH, card.source_version, card.artifact_hash]))
       .rejects.toThrow(/AAL2/i);
+    await expect(asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_google_review_reply_v6($1,true,null)", [FRESH]))
+      .rejects.toThrow(/permission denied/i);
     await expect(asRole("service_role", ADMIN, "aal2",
       "update public.google_review_replies set status='approved',approved_by=$1,approved_at=now() where id=$2",
       [ADMIN, FRESH]))
       .rejects.toThrow(/provisioned human with AAL2/i);
     await expect(asRole("authenticated", OTHER, "aal2",
-      "select public.fixture_decide_google_reply($1,true,null)", [FRESH]))
-      .rejects.toThrow(/decision owner/i);
+      "select public.decide_google_review_reply_from_inbox_v6($1,$2,$3,true,null)",
+      [FRESH, card.source_version, card.artifact_hash]))
+      .rejects.toThrow(/assigned client manager/i);
     expect((await db.query<{ status: string }>(
       "select status from public.google_review_replies where id=$1", [FRESH],
     )).rows[0]!.status).toBe("drafted");
     await asRole("authenticated", MANAGER, "aal2",
-      "select public.fixture_decide_google_reply($1,true,null)", [FRESH]);
+      "select public.decide_google_review_reply_from_inbox_v6($1,$2,$3,true,null)",
+      [FRESH, card.source_version, card.artifact_hash]);
     expect((await cards(FRESH))[0]!.status).toBe("approved");
     expect((await db.query<{ actor_id: string; actor_aal: string }>(
       "select actor_id,actor_aal from public.approval_decision_events_v6 where request_id=$1",
@@ -186,17 +195,58 @@ describe("Google review reply exact Inbox bridge migration 278", () => {
 
   it("blocks changed review context and disappeared reviews, and never sends a draft", async () => {
     await addReply(GONE, "Thank you for the review");
+    const card = (await cards(GONE))[0]!;
     await expect(db.query(
       "update public.google_review_replies set status='posting' where id=$1", [GONE],
     )).rejects.toThrow(/cannot be sent before/i);
     await db.query("update public.google_reviews set comment='Edited review' where id=$1", [REVIEW]);
     await expect(asRole("authenticated", ADMIN, "aal2",
-      "select public.fixture_decide_google_reply($1,true,null)", [GONE]))
-      .rejects.toThrow(/changed; draft a new approval/i);
+      "select public.decide_google_review_reply_from_inbox_v6($1,$2,$3,true,null)",
+      [GONE, card.source_version, card.artifact_hash]))
+      .rejects.toThrow(/stale/i);
     await db.query("update public.google_reviews set comment='Great service',gone_at=now() where id=$1",
       [REVIEW]);
     await expect(asRole("authenticated", ADMIN, "aal2",
-      "select public.fixture_decide_google_reply($1,true,null)", [GONE]))
-      .rejects.toThrow(/no longer decision-ready/i);
+      "select public.decide_google_review_reply_from_inbox_v6($1,$2,$3,true,null)",
+      [GONE, card.source_version, card.artifact_hash]))
+      .rejects.toThrow(/not decision-ready/i);
+  });
+
+  it("rejects an edit between card read and click, then accepts only the new card", async () => {
+    await db.query("update public.google_reviews set gone_at=null where id=$1", [REVIEW]);
+    const id = "77777777-7777-4777-8777-777777777777";
+    await addReply(id, "Old reply");
+    const old = (await cards(id))[0]!;
+    await db.query(`update public.google_review_replies
+      set body='New reply',body_hash=encode(sha256(convert_to('New reply','UTF8')),'hex')
+      where id=$1`, [id]);
+    const versions = await cards(id);
+    expect(versions).toHaveLength(2);
+    const fresh = versions.find((row) => row.source_version !== old.source_version)!;
+    await expect(asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_google_review_reply_from_inbox_v6($1,$2,$3,true,null)",
+      [id, old.source_version, old.artifact_hash]))
+      .rejects.toThrow(/selected reply card is stale/i);
+    expect((await db.query<{ status: string }>(
+      "select status from public.google_review_replies where id=$1", [id],
+    )).rows[0]!.status).toBe("drafted");
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_google_review_reply_from_inbox_v6($1,$2,$3,true,null)",
+      [id, fresh.source_version, fresh.artifact_hash]);
+    expect((await cards(id)).find((row) => row.id === fresh.id)!.status).toBe("approved");
+    expect((await db.query("select * from public.approval_decision_events_v6 where request_id=$1",
+      [old.id])).rows).toHaveLength(0);
+  });
+
+  it("leaves a blank external review reference visibly blocked", async () => {
+    const id = "88888888-8888-4888-8888-888888888888";
+    await db.query("update public.google_reviews set review_ref='' where id=$1", [REVIEW]);
+    await addReply(id, "A reply with no target");
+    const card = (await cards(id))[0]!;
+    expect(card.preview_blocker).toMatch(/no exact external destination/i);
+    await expect(asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_google_review_reply_from_inbox_v6($1,$2,$3,true,null)",
+      [id, card.source_version, card.artifact_hash]))
+      .rejects.toThrow(/not decision-ready/i);
   });
 });
