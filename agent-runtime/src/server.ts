@@ -54,6 +54,7 @@ import { handleSystemReadiness } from "./readiness/route.js";
 import { handleSchemaParity } from "./readiness/schema-parity-route.js";
 import { handleSitesRoute } from "./github/sites-route.js";
 import { logger } from "./logging/logger.js";
+import { handleInvitationRequest, handleInvitationSend, handleInvitationAccept, handleInvitationList, handleInvitationInspect } from "./invitations/routes.js";
 
 const config = loadConfig();
 const sb = serviceClient(config);
@@ -232,6 +233,27 @@ const server = http.createServer((req, res) => {
 
   if (req.url === "/admin/proof-capture") {
     void handleProofCaptureAdmin(req, res, sb, config);
+    return;
+  }
+
+  if (req.url === "/admin/invitations/request") {
+    void handleInvitationRequest(req, res, sb, config);
+    return;
+  }
+  if (req.url === "/admin/invitations/send") {
+    void handleInvitationSend(req, res, sb, config);
+    return;
+  }
+  if (req.url === "/admin/invitations/accept") {
+    void handleInvitationAccept(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/invitations/list") {
+    void handleInvitationList(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/invitations/inspect") {
+    void handleInvitationInspect(req, res, sb);
     return;
   }
 

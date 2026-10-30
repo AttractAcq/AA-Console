@@ -3,8 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, update } = vi.hoisted(() => ({ from: vi.fn(), update: vi.fn() }));
-vi.mock("../../lib/supabase", () => ({ supabase: { from } }));
+const { from, update, callRuntime, rpc, assurance } = vi.hoisted(() => ({
+  from: vi.fn(), update: vi.fn(), callRuntime: vi.fn(), rpc: vi.fn(), assurance: vi.fn(),
+}));
+vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc, auth: { mfa: { getAuthenticatorAssuranceLevel: assurance } } } }));
+vi.mock("../../lib/callRuntime", () => ({ callRuntime }));
 
 import { TeamCategoryPanel } from "./TeamCategoryPanel";
 
@@ -27,6 +30,9 @@ function query(data: unknown[]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  callRuntime.mockResolvedValue({ ok: true, invitations: [] });
+  rpc.mockResolvedValue({ error: null });
+  assurance.mockResolvedValue({ data: { currentLevel: "aal2" }, error: null });
   from.mockReturnValue({
     ...query([member]),
     update: (value: unknown) => {
@@ -39,6 +45,102 @@ beforeEach(() => {
 });
 
 const show = () => render(<MemoryRouter><TeamCategoryPanel category="editors" /></MemoryRouter>);
+
+describe("controlled team invitations", () => {
+  it("requests a one-recipient roster invitation and keeps the review in Inbox", async () => {
+    callRuntime.mockImplementation(async (path: string) => path.endsWith("/list")
+      ? { ok: true, invitations: [] }
+      : { ok: true, requestId: "request-1", status: "requested" });
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Invite Editor 1" }));
+    await userEvent.type(screen.getByLabelText("Recipient email"), "new@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Request invitation" }));
+    await waitFor(() => expect(callRuntime).toHaveBeenCalledWith("/admin/invitations/request",
+      expect.objectContaining({
+        email: "new@example.com", targetRole: "employee", memberId: "member-1",
+        idempotencyKey: expect.any(String),
+      })));
+    expect(await screen.findByText(/awaiting exact-version approval/i)).toBeInTheDocument();
+  });
+
+  it("shows a pending card and prevents a second request", async () => {
+    callRuntime.mockResolvedValue({ ok: true, invitations: [{
+      id: "request-1", target_member_id: "member-1", recipient_email: "new@example.com",
+      status: "requested", expires_at: "2035-01-01T00:00:00Z", payload_hash: "a".repeat(64),
+    }] });
+    show();
+    expect(await screen.findByText(/Awaiting exact-version approval/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Approval Inbox/ })).toHaveAttribute("href", "/approvals");
+    expect(screen.queryByRole("button", { name: "Invite Editor 1" })).not.toBeInTheDocument();
+  });
+
+  it("holds ambiguous provider outcomes without offering another invite", async () => {
+    callRuntime.mockResolvedValue({ ok: true, invitations: [{
+      id: "request-1", target_member_id: "member-1", recipient_email: "new@example.com",
+      status: "reconcile", expires_at: "2020-01-01T00:00:00Z", payload_hash: "a".repeat(64),
+    }] });
+    show();
+    expect(await screen.findByText(/manual review; do not resend/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Invite Editor 1" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Resolve uncertain send/ })).toBeInTheDocument();
+  });
+
+  it("shows every invitation for the member, including a held uncertain send", async () => {
+    callRuntime.mockResolvedValue({ ok: true, invitations: [
+      { id: "old", target_member_id: "member-1", recipient_email: "old-invite@example.com",
+        status: "cancelled", expires_at: "2020-01-01T00:00:00Z", payload_hash: "a".repeat(64) },
+      { id: "current", target_member_id: "member-1", recipient_email: "current@example.com",
+        status: "sending", expires_at: "2035-01-01T00:00:00Z", payload_hash: "b".repeat(64) },
+    ] });
+    show();
+    expect(await screen.findByText(/old-invite@example.com/)).toBeInTheDocument();
+    expect(screen.getByText(/current@example.com/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Invite Editor 1" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a retired member's stale invitation visible for cancellation", async () => {
+    from.mockReturnValue({ ...query([{ ...member, active: false }]) });
+    callRuntime.mockResolvedValue({ ok: true, invitations: [{
+      id: "request-1", target_member_id: "member-1", recipient_email: "new@example.com",
+      status: "requested", expires_at: "2035-01-01T00:00:00Z", payload_hash: "a".repeat(64),
+    }] });
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: /Show retired/ }));
+    expect(screen.getByText(/new@example.com/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel invitation" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Invite Editor 1" })).not.toBeInTheDocument();
+  });
+
+  it("requires retained evidence and AAL2 to resolve a crashed send", async () => {
+    callRuntime.mockResolvedValue({ ok: true, invitations: [{
+      id: "request-1", target_member_id: "member-1", recipient_email: "new@example.com",
+      status: "sending", expires_at: "2035-01-01T00:00:00Z", payload_hash: "a".repeat(64),
+    }] });
+    vi.spyOn(window, "prompt").mockReturnValueOnce("provider-audit/no-send")
+      .mockReturnValueOnce("c".repeat(64))
+      .mockReturnValueOnce("Provider audit proves no send");
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: /Resolve uncertain send/ }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith(
+      "resolve_console_invitation_uncertain_v6", {
+        p_request_id: "request-1", p_expected_hash: "a".repeat(64),
+        p_evidence_ref: "provider-audit/no-send", p_evidence_sha256: "c".repeat(64),
+        p_reason: "Provider audit proves no send",
+      }));
+  });
+
+  it("requires AAL2 and a reason to cancel through the owning RPC", async () => {
+    callRuntime.mockResolvedValue({ ok: true, invitations: [{
+      id: "request-1", target_member_id: "member-1", recipient_email: "new@example.com",
+      status: "requested", expires_at: "2035-01-01T00:00:00Z", payload_hash: "a".repeat(64),
+    }] });
+    vi.spyOn(window, "prompt").mockReturnValue("Wrong recipient");
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Cancel invitation" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("cancel_console_invitation_v6",
+      { p_request_id: "request-1", p_reason: "Wrong recipient" }));
+  });
+});
 
 describe("team profile management", () => {
   it("edits the real roster name and contact fields", async () => {

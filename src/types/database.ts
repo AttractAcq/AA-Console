@@ -8032,6 +8032,239 @@ export type Database = {
         }
         Relationships: []
       }
+      console_auth_sender_verifications_v6: {
+        Row: {
+          evidence_ref: string
+          evidence_sha256: string
+          expires_at: string
+          id: string
+          redirect_origin: string
+          sender_email: string
+          supabase_url_origin: string
+          template_body: string
+          template_sha256: string
+          template_subject: string
+          verified_at: string
+          verified_by: string
+        }
+        Insert: {
+          evidence_ref: string
+          evidence_sha256: string
+          expires_at: string
+          id?: string
+          redirect_origin: string
+          sender_email: string
+          supabase_url_origin: string
+          template_body: string
+          template_sha256: string
+          template_subject: string
+          verified_at?: string
+          verified_by: string
+        }
+        Update: {
+          evidence_ref?: string
+          evidence_sha256?: string
+          expires_at?: string
+          id?: string
+          redirect_origin?: string
+          sender_email?: string
+          supabase_url_origin?: string
+          template_body?: string
+          template_sha256?: string
+          template_subject?: string
+          verified_at?: string
+          verified_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "console_auth_sender_verifications_v6_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      console_invitation_events_v6: {
+        Row: {
+          actor_id: string | null
+          id: string
+          occurred_at: string
+          provider_user_id: string | null
+          reason: string | null
+          request_id: string
+          state: string
+        }
+        Insert: {
+          actor_id?: string | null
+          id?: string
+          occurred_at?: string
+          provider_user_id?: string | null
+          reason?: string | null
+          request_id: string
+          state: string
+        }
+        Update: {
+          actor_id?: string | null
+          id?: string
+          occurred_at?: string
+          provider_user_id?: string | null
+          reason?: string | null
+          request_id?: string
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "console_invitation_events_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "console_invitation_requests_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      console_invitation_requests_v6: {
+        Row: {
+          accepted_at: string | null
+          expires_at: string
+          full_name: string
+          id: string
+          idempotency_key: string
+          payload: Json
+          payload_hash: string
+          provider_user_id: string | null
+          recipient_email: string
+          redirect_origin: string
+          requested_at: string
+          requested_by: string
+          sender_account: string
+          sent_at: string | null
+          status: string
+          target_client_id: string | null
+          target_member_id: string | null
+          target_role: string
+          team_category: Database["public"]["Enums"]["team_category"] | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          expires_at: string
+          full_name: string
+          id?: string
+          idempotency_key: string
+          payload: Json
+          payload_hash: string
+          provider_user_id?: string | null
+          recipient_email: string
+          redirect_origin: string
+          requested_at?: string
+          requested_by: string
+          sender_account: string
+          sent_at?: string | null
+          status?: string
+          target_client_id?: string | null
+          target_member_id?: string | null
+          target_role: string
+          team_category?: Database["public"]["Enums"]["team_category"] | null
+        }
+        Update: {
+          accepted_at?: string | null
+          expires_at?: string
+          full_name?: string
+          id?: string
+          idempotency_key?: string
+          payload?: Json
+          payload_hash?: string
+          provider_user_id?: string | null
+          recipient_email?: string
+          redirect_origin?: string
+          requested_at?: string
+          requested_by?: string
+          sender_account?: string
+          sent_at?: string | null
+          status?: string
+          target_client_id?: string | null
+          target_member_id?: string | null
+          target_role?: string
+          team_category?: Database["public"]["Enums"]["team_category"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "console_invitation_requests_v6_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "console_invitation_requests_v6_target_client_id_fkey"
+            columns: ["target_client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "console_invitation_requests_v6_target_client_id_fkey"
+            columns: ["target_client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "console_invitation_requests_v6_target_client_id_fkey"
+            columns: ["target_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "console_invitation_requests_v6_target_client_id_fkey"
+            columns: ["target_client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "console_invitation_requests_v6_target_member_id_fkey"
+            columns: ["target_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      console_invitation_send_claims_v6: {
+        Row: {
+          claimed_at: string
+          claimed_by: string
+          request_id: string
+        }
+        Insert: {
+          claimed_at?: string
+          claimed_by: string
+          request_id: string
+        }
+        Update: {
+          claimed_at?: string
+          claimed_by?: string
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "console_invitation_send_claims_v6_claimed_by_fkey"
+            columns: ["claimed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "console_invitation_send_claims_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "console_invitation_requests_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_approval_settings: {
         Row: {
           owner_user_id: string
@@ -17594,6 +17827,7 @@ export type Database = {
           given_name: string | null
           id: string
           initials: string
+          invitation_generation_v6: number
           legal_name: string | null
           name: string
           personal_info: string | null
@@ -17622,6 +17856,7 @@ export type Database = {
           given_name?: string | null
           id?: string
           initials: string
+          invitation_generation_v6?: number
           legal_name?: string | null
           name: string
           personal_info?: string | null
@@ -17650,6 +17885,7 @@ export type Database = {
           given_name?: string | null
           id?: string
           initials?: string
+          invitation_generation_v6?: number
           legal_name?: string | null
           name?: string
           personal_info?: string | null
@@ -23626,6 +23862,40 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      accept_console_invitation_v6: {
+        Args: {
+          p_auth_email: string
+          p_auth_user_id: string
+          p_request_id: string
+        }
+        Returns: {
+          accepted_at: string | null
+          expires_at: string
+          full_name: string
+          id: string
+          idempotency_key: string
+          payload: Json
+          payload_hash: string
+          provider_user_id: string | null
+          recipient_email: string
+          redirect_origin: string
+          requested_at: string
+          requested_by: string
+          sender_account: string
+          sent_at: string | null
+          status: string
+          target_client_id: string | null
+          target_member_id: string | null
+          target_role: string
+          team_category: Database["public"]["Enums"]["team_category"] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "console_invitation_requests_v6"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       accept_motion_candidate_v6: {
         Args: { p_accepted: boolean; p_candidate_id: string; p_reason?: string }
         Returns: {
@@ -24372,6 +24642,36 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cancel_console_invitation_v6: {
+        Args: { p_reason: string; p_request_id: string }
+        Returns: {
+          accepted_at: string | null
+          expires_at: string
+          full_name: string
+          id: string
+          idempotency_key: string
+          payload: Json
+          payload_hash: string
+          provider_user_id: string | null
+          recipient_email: string
+          redirect_origin: string
+          requested_at: string
+          requested_by: string
+          sender_account: string
+          sent_at: string | null
+          status: string
+          target_client_id: string | null
+          target_member_id: string | null
+          target_role: string
+          team_category: Database["public"]["Enums"]["team_category"] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "console_invitation_requests_v6"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       cancel_sales_runtime_reservation_v6: {
         Args: { p_reservation_id: string }
         Returns: boolean
@@ -24497,6 +24797,40 @@ export type Database = {
           manifest_id: string
           scope: Json
         }[]
+      }
+      claim_console_invitation_send_v6: {
+        Args: {
+          p_actor_id: string
+          p_expected_hash: string
+          p_request_id: string
+        }
+        Returns: {
+          accepted_at: string | null
+          expires_at: string
+          full_name: string
+          id: string
+          idempotency_key: string
+          payload: Json
+          payload_hash: string
+          provider_user_id: string | null
+          recipient_email: string
+          redirect_origin: string
+          requested_at: string
+          requested_by: string
+          sender_account: string
+          sent_at: string | null
+          status: string
+          target_client_id: string | null
+          target_member_id: string | null
+          target_role: string
+          team_category: Database["public"]["Enums"]["team_category"] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "console_invitation_requests_v6"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       claim_daily_recovery_alert: {
         Args: { p_lease_seconds?: number; p_worker: string }
@@ -25255,6 +25589,42 @@ export type Database = {
         }
         Returns: undefined
       }
+      decide_console_invitation_v6: {
+        Args: {
+          p_approved: boolean
+          p_expected_artifact_hash: string
+          p_expected_source_version: string
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: {
+          accepted_at: string | null
+          expires_at: string
+          full_name: string
+          id: string
+          idempotency_key: string
+          payload: Json
+          payload_hash: string
+          provider_user_id: string | null
+          recipient_email: string
+          redirect_origin: string
+          requested_at: string
+          requested_by: string
+          sender_account: string
+          sent_at: string | null
+          status: string
+          target_client_id: string | null
+          target_member_id: string | null
+          target_role: string
+          team_category: Database["public"]["Enums"]["team_category"] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "console_invitation_requests_v6"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       decide_google_review_reply_from_inbox_v6: {
         Args: {
           p_approved: boolean
@@ -25709,6 +26079,41 @@ export type Database = {
         Args: { p_error: string; p_request_id: string }
         Returns: undefined
       }
+      finish_console_invitation_send_v6: {
+        Args: {
+          p_outcome: string
+          p_provider_user_id: string
+          p_reason_code?: string
+          p_request_id: string
+        }
+        Returns: {
+          accepted_at: string | null
+          expires_at: string
+          full_name: string
+          id: string
+          idempotency_key: string
+          payload: Json
+          payload_hash: string
+          provider_user_id: string | null
+          recipient_email: string
+          redirect_origin: string
+          requested_at: string
+          requested_by: string
+          sender_account: string
+          sent_at: string | null
+          status: string
+          target_client_id: string | null
+          target_member_id: string | null
+          target_role: string
+          team_category: Database["public"]["Enums"]["team_category"] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "console_invitation_requests_v6"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       format_fits_media: {
         Args: {
           p_format: Database["public"]["Enums"]["content_format"]
@@ -25794,6 +26199,36 @@ export type Database = {
         }[]
       }
       lock_down_definer_functions: { Args: never; Returns: number }
+      mark_console_invitation_conflict_v6: {
+        Args: { p_expected_hash: string; p_request_id: string }
+        Returns: {
+          accepted_at: string | null
+          expires_at: string
+          full_name: string
+          id: string
+          idempotency_key: string
+          payload: Json
+          payload_hash: string
+          provider_user_id: string | null
+          recipient_email: string
+          redirect_origin: string
+          requested_at: string
+          requested_by: string
+          sender_account: string
+          sent_at: string | null
+          status: string
+          target_client_id: string | null
+          target_member_id: string | null
+          target_role: string
+          team_category: Database["public"]["Enums"]["team_category"] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "console_invitation_requests_v6"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       mark_proof_placement_placed_v6: {
         Args: { p_external_url: string; p_placement_id: string }
         Returns: undefined
@@ -26910,6 +27345,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_console_auth_sender_verification_v6: {
+        Args: {
+          p_evidence_ref: string
+          p_evidence_sha256: string
+          p_redirect_origin: string
+          p_sender_email: string
+          p_supabase_url_origin: string
+          p_template_body: string
+          p_template_subject: string
+        }
+        Returns: string
+      }
       record_frame_published: {
         Args: {
           p_external_id: string
@@ -27462,6 +27909,21 @@ export type Database = {
         Args: { p_action: string; p_client_id: string; p_member_id: string }
         Returns: string
       }
+      request_console_invitation_v6: {
+        Args: {
+          p_actor_id: string
+          p_auth_project_origin: string
+          p_idempotency_key: string
+          p_recipient_email: string
+          p_redirect_origin: string
+          p_sender_account: string
+          p_target_client_id: string
+          p_target_member_id: string
+          p_target_role: string
+          p_verification_id: string
+        }
+        Returns: string
+      }
       request_human_video_edit: {
         Args: { p_asset_id: string; p_due_date?: string; p_member_id: string }
         Returns: string
@@ -27594,6 +28056,42 @@ export type Database = {
           link_id: string
           purpose: string
         }[]
+      }
+      resolve_console_invitation_uncertain_v6: {
+        Args: {
+          p_evidence_ref: string
+          p_evidence_sha256: string
+          p_expected_hash: string
+          p_reason: string
+          p_request_id: string
+        }
+        Returns: {
+          accepted_at: string | null
+          expires_at: string
+          full_name: string
+          id: string
+          idempotency_key: string
+          payload: Json
+          payload_hash: string
+          provider_user_id: string | null
+          recipient_email: string
+          redirect_origin: string
+          requested_at: string
+          requested_by: string
+          sender_account: string
+          sent_at: string | null
+          status: string
+          target_client_id: string | null
+          target_member_id: string | null
+          target_role: string
+          team_category: Database["public"]["Enums"]["team_category"] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "console_invitation_requests_v6"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       resolve_sales_deployment: {
         Args: { p_public_id: string }

@@ -9,6 +9,7 @@ import { ClientLoginPage } from "./pages/client/ClientLoginPage";
 import { ClientConsolePage } from "./pages/client/ClientConsolePage";
 import { EmployeeLoginPage } from "./pages/employee/EmployeeLoginPage";
 import { EmployeeConsolePage } from "./pages/employee/EmployeeConsolePage";
+import { InvitationAcceptPage } from "./pages/InvitationAcceptPage";
 import { MemberDetailPage } from "./pages/operations/MemberDetailPage";
 import { AgentDetailPage } from "./pages/team/AgentDetailPage";
 import { CampaignExecutionPanel } from "./pages/campaigns/CampaignExecutionPanel";
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/landing" element={<LandingPage />} />
 
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/invite/accept" element={<InvitationAcceptPage />} />
 
             <Route path="/client/login" element={<ClientLoginPage />} />
             <Route
