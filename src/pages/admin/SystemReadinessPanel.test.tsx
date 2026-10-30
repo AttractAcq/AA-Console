@@ -28,6 +28,7 @@ it("shows unknown deployment and external proof as unknown, even with a reachabl
   expect(screen.getByText(/No runtime heartbeat has been recorded/)).toBeInTheDocument();
   expect(screen.getByText(/Schema catalog could not be read/)).toBeInTheDocument();
   expect(screen.getByText(/Provider receipts, read-back, actual spend/)).toBeInTheDocument();
+  expect(screen.getByText(/has not supplied machine-readable evidence coverage/)).toBeInTheDocument();
   expect(screen.queryByText("Runtime healthy")).not.toBeInTheDocument();
   expect(readRuntime).toHaveBeenCalledWith("/admin/system-readiness");
 });
@@ -35,7 +36,7 @@ it("shows unknown deployment and external proof as unknown, even with a reachabl
 it("exports the same captured facts shown in the admin view on repeated downloads", async () => {
   const sha = "a".repeat(40);
   readRuntime.mockResolvedValue({
-    schemaVersion: 1, capturedAt: "2026-10-29T12:00:00Z",
+    schemaVersion: 2, capturedAt: "2026-10-29T12:00:00Z",
     environment: { name: "staging", railwayEnvironmentId: "railway-stage", supabaseProjectRef: "stage-project" },
     runtime: { sha, switches: { workers: true }, credentialPresence: { anthropic: true },
       heartbeats: { state: "observed", checkedAt: "2026-10-29T12:00:00Z", value: [], reason: null } },
@@ -48,7 +49,21 @@ it("exports the same captured facts shown in the admin view on repeated download
         campaignActionExecutors: [{ key: "google_ad_build", module: "google_ads_studio", supported: false }],
         messageChannels: [{ key: "email", transport: "resend", supported: true, canInitiate: true }],
       }, reason: null },
-    clients: { state: "observed", checkedAt: "2026-10-29T12:00:00Z", value: [], reason: null },
+    clients: { state: "observed", checkedAt: "2026-10-29T12:00:00Z", value: [{
+      id: "client-1", name: "Acme", switches: {}, platforms: [], leadCaptureEndpoints: [],
+      proofDestinations: [], salesAgentDeployments: [], integrations: [{
+        provider: "meta", status: "connected", ingestEnabled: false, hasCredential: true,
+        lastCheckedAt: null, tokenExpiresAt: null, accountIds: { adAccountId: "act_123" },
+        providerHealth: { state: "unknown", checkedAt: "2026-10-29T12:00:00Z",
+          evidenceAt: null, source: "client_integrations metadata", reason: "No live provider probe." },
+      }],
+    }], reason: null },
+    evidenceCoverage: {
+      runtimeWorkers: { state: "observed", checkedAt: "2026-10-29T12:00:00Z",
+        evidenceAt: "2026-10-29T11:59:59Z", source: "agent_runtime_status", reason: null },
+      providerAccountHealth: { state: "unknown", checkedAt: "2026-10-29T12:00:00Z",
+        evidenceAt: null, source: "client_integrations metadata", reason: "No live provider account check." },
+    },
   });
   const blobs: Blob[] = [];
   Object.defineProperty(URL, "createObjectURL", { configurable: true, value: (blob: Blob) => {
@@ -63,6 +78,8 @@ it("exports the same captured facts shown in the admin view on repeated download
   expect(screen.getByText(/email supported, can initiate/)).toBeInTheDocument();
   expect(screen.getByText(/Gateway Bot auth mode: dual/)).toBeInTheDocument();
   expect(screen.getByText(/Dual mode can still admit legacy environment identities/)).toBeInTheDocument();
+  expect(screen.getByText(/live provider health Unknown/)).toBeInTheDocument();
+  expect(screen.getByText(/No live provider account check/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Export JSON" }));
   fireEvent.click(screen.getByRole("button", { name: "Export JSON" }));
   const [first, second] = await Promise.all(blobs.map((blob) => blob.text()));
@@ -71,5 +88,6 @@ it("exports the same captured facts shown in the admin view on repeated download
     capturedAt: "2026-10-29T12:00:00Z", environment: { name: "staging" },
     runtime: { sha }, gateway: { value: { configured: { botAuthMode: "dual" } } },
     browser: { capturedAt: "2026-10-29T12:00:00Z" },
+    evidenceCoverage: { providerAccountHealth: { state: "unknown" } },
   });
 });
