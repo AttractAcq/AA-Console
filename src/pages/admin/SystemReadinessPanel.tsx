@@ -34,6 +34,14 @@ const EVIDENCE_LABELS: Record<string, string> = {
   externalEffects: "External action results",
 };
 
+const CRON_ISSUE_LABELS: Record<string, string> = {
+  missing: "Missing",
+  inactive: "Inactive",
+  schedule_mismatch: "Schedule differs",
+  duplicate: "Duplicate name",
+  unexpected: "Not in registry",
+};
+
 type Snapshot = {
   schemaVersion: number;
   capturedAt: string;
@@ -61,6 +69,20 @@ type Snapshot = {
     objects: Record<string, number>;
     cronJobs: { name: string; schedule: string; active: boolean }[] | null;
   }>;
+  cronScheduleAudit?: {
+    state: "matches" | "drift" | "unknown";
+    registryHead: string;
+    observedHead: string | null;
+    expectedCount: number;
+    observedCount: number | null;
+    reason: string | null;
+    rows: {
+      name: string;
+      expectedSchedule: string | null;
+      observed: { schedule: string; active: boolean }[];
+      issues: string[];
+    }[];
+  };
   global: Observation<{
     engineEnabled: boolean | null;
     publishingPlatforms: { platform: string; supported: boolean }[];
@@ -275,9 +297,46 @@ export function SystemReadinessPanel() {
           <p>Tracked migration entries: {snapshot.database.value.migrationCount ?? "Unknown"}. Catalog objects: {Object.entries(snapshot.database.value.objects).map(([name, count]) => `${name} ${count}`).join(" · ")}</p>
           <p className="mt-2 text-xs text-muted-foreground">Source: service-only system_readiness_catalog RPC. This counts objects; B002 checks their definitions and drift.</p>
           {snapshot.database.value.cronJobs === null ? <p className="mt-2">Cron catalog unavailable.</p> :
-            <ul className="mt-2 space-y-1">{snapshot.database.value.cronJobs.map((job) =>
-              <li key={job.name} className="flex flex-wrap justify-between gap-2"><span>{job.name}</span><span>{job.active ? "Active" : "Inactive"} · {job.schedule}</span></li>)}</ul>}
+            <ul className="mt-2 space-y-1">{snapshot.database.value.cronJobs.map((job, index) =>
+              <li key={`${job.name}-${index}`} className="flex flex-wrap justify-between gap-2"><span>{job.name}</span><span>{job.active ? "Active" : "Inactive"} · {job.schedule}</span></li>)}</ul>}
         </div>}
+      </section>
+
+      <section aria-label="Cron schedule configuration" className="space-y-3">
+        <h2 className="text-lg font-semibold">Cron schedule configuration</h2>
+        <p className="text-sm text-muted-foreground">This compares names, schedules and active flags with the released migration registry. A matching catalog does not prove that any job ran or succeeded; cron execution remains unverified.</p>
+        {!snapshot.cronScheduleAudit || snapshot.cronScheduleAudit.state === "unknown" ?
+          <p role="status" className="rounded-md border border-border p-3 text-sm text-muted-foreground">
+            Schedule comparison unknown: {snapshot.cronScheduleAudit?.reason ?? "This runtime has not supplied a versioned cron comparison."}
+          </p> : <>
+            <p role={snapshot.cronScheduleAudit.state === "drift" ? "alert" : "status"}
+              className="rounded-md border border-border p-3 text-sm">
+              {snapshot.cronScheduleAudit.state === "drift"
+                ? `Cron catalog drift: ${snapshot.cronScheduleAudit.reason ?? "Review the entries below."}`
+                : `Cron catalog matches ${snapshot.cronScheduleAudit.expectedCount} expected schedules.`}
+              {` Registry migration ${snapshot.cronScheduleAudit.registryHead}; observed ${snapshot.cronScheduleAudit.observedCount ?? "unknown"} rows.`}
+            </p>
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full text-left text-sm">
+                <caption className="sr-only">Expected and observed cron schedule entries</caption>
+                <thead className="border-b border-border text-xs text-muted-foreground">
+                  <tr><th scope="col" className="p-3">Job</th><th scope="col" className="p-3">Expected</th>
+                    <th scope="col" className="p-3">Observed</th><th scope="col" className="p-3">Catalog result</th></tr>
+                </thead>
+                <tbody>{snapshot.cronScheduleAudit.rows.map((row) =>
+                  <tr key={row.name} className="border-b border-border last:border-b-0">
+                    <th scope="row" className="p-3 font-mono font-normal">{row.name}</th>
+                    <td className="p-3 font-mono">{row.expectedSchedule ?? "Not registered"}</td>
+                    <td className="p-3 font-mono">{row.observed.length
+                      ? row.observed.map((item) => `${item.schedule} (${item.active ? "active" : "inactive"})`).join("; ")
+                      : "Missing"}</td>
+                    <td className="p-3">{row.issues.length
+                      ? row.issues.map((issue) => CRON_ISSUE_LABELS[issue] ?? "Unrecognized issue").join("; ")
+                      : "Matches registry"}</td>
+                  </tr>)}</tbody>
+              </table>
+            </div>
+          </>}
       </section>
 
       <section aria-label="Client configuration" className="space-y-3">

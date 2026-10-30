@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
+import { auditCronCatalog, type CronCatalogAudit } from "./cron-catalog.js";
 import { PROFILE_FIELD_PATCH_HOLD } from "../profiles/prewrite-gate.js";
 import { deployedCommitSha } from "./version.js";
 import { HANDLERS } from "../campaigns/actions/executor.js";
@@ -116,6 +117,7 @@ export type SystemReadinessSnapshot = {
     configured: { aaInternalApi: boolean; botAuthMode: string };
   }>;
   database: Observation<Catalog>;
+  cronScheduleAudit: CronCatalogAudit;
   global: Observation<{
     engineEnabled: boolean | null;
     publishingPlatforms: { platform: string; supported: boolean }[];
@@ -513,6 +515,10 @@ export async function collectSystemReadiness(
     },
     gateway: gatewayResult,
     database: catalogResult,
+    cronScheduleAudit: auditCronCatalog(
+      catalogResult.value?.migrationHead ?? null,
+      catalogResult.value?.cronJobs ?? null,
+    ),
     global: globalResult,
     clients: clientResult,
   };
