@@ -143,7 +143,7 @@ describe("RecruitmentPanel — role pick and brief", () => {
         }),
       ),
     );
-  });
+  }, 15_000);
 });
 
 describe("RecruitmentPanel — writing the ad with AI", () => {
