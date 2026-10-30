@@ -313,12 +313,12 @@ describe("RecruitmentPanel — deleting an ad", () => {
 });
 
 describe("RecruitmentPanel — approve, generate, review, export", () => {
-  it("approves a draft through the admin-only RPC", async () => {
+  it("routes a draft to its exact approval Inbox card instead of using the legacy ID-only RPC", async () => {
     briefs = [draft];
     render(<RecruitmentPanel />);
-    fireEvent.click(await screen.findByRole("button", { name: "Approve brief" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_recruitment_brief", { p_brief_id: "brief-1" }));
-    expect(await screen.findByRole("status")).toHaveTextContent(/approved/i);
+    expect(await screen.findByRole("link", { name: "Review exact brief in Inbox" }))
+      .toHaveAttribute("href", "/approvals?source=brief-1");
+    expect(rpc).not.toHaveBeenCalledWith("approve_recruitment_brief", expect.anything());
   });
 
   it("generates via generate_recruitment_ad, not a custom MCP tool", async () => {

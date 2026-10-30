@@ -119,6 +119,25 @@ begin
 end;
 $$;
 
+-- A direct UPDATE of client_briefs.status is still possible through legacy
+-- table grants. Only the version-bound wrapper may authorize the source
+-- transition. Its short-lived context is inserted and removed in one
+-- transaction; authenticated and service roles have no table privileges.
+create schema if not exists approval_private;
+revoke all on schema approval_private from public, anon, authenticated, service_role;
+create table approval_private.recruitment_brief_decision_context_v6 (
+  transaction_id bigint not null,
+  brief_id uuid not null,
+  request_id uuid not null references public.approval_requests_v6(id),
+  source_version text not null,
+  artifact_hash text not null,
+  actor_id uuid not null,
+  primary key (transaction_id, brief_id)
+);
+alter table approval_private.recruitment_brief_decision_context_v6 enable row level security;
+revoke all on approval_private.recruitment_brief_decision_context_v6
+  from public, anon, authenticated, service_role;
+
 -- A draft may be revised, but then its prior exact-version card cannot sign
 -- the new words. Once approved, the approved copy is immutable; status and
 -- operational generation fields may still advance normally.
@@ -160,6 +179,8 @@ set search_path = pg_catalog, public set timezone = 'UTC' as $$
 declare
   v_hash text;
   v_request_id uuid;
+  v_context approval_private.recruitment_brief_decision_context_v6%rowtype;
+  v_request public.approval_requests_v6%rowtype;
 begin
   if old.purpose = 'recruitment' and old.status = 'draft'
     and new.status = 'approved' then
@@ -177,13 +198,24 @@ begin
         using errcode = '23514';
     end if;
     v_hash := public.recruitment_brief_snapshot_hash_v6(old);
-    select r.id into v_request_id from public.approval_requests_v6 r
-      where r.source_system = 'aa_console' and r.source_kind = 'recruitment_brief'
-        and r.source_id = old.id::text and r.artifact_hash = v_hash
-        and r.expires_at > now()
-      order by r.requested_at desc, r.id desc limit 1;
-    if v_request_id is null then
-      raise exception 'Recruitment brief changed or its approval expired; request a new exact-version review.'
+    select * into v_context from approval_private.recruitment_brief_decision_context_v6 c
+      where c.transaction_id = txid_current() and c.brief_id = old.id;
+    if not found or v_context.actor_id is distinct from auth.uid()
+      or v_context.artifact_hash is distinct from v_hash then
+      raise exception 'Recruitment approval requires the selected exact-version Inbox card.'
+        using errcode = '23514';
+    end if;
+    v_request_id := v_context.request_id;
+    select * into v_request from public.approval_requests_v6
+      where id = v_request_id;
+    if not found or v_request.source_system <> 'aa_console'
+      or v_request.source_kind <> 'recruitment_brief'
+      or v_request.source_id <> old.id::text
+      or v_request.source_version <> v_context.source_version
+      or v_request.artifact_hash is distinct from v_hash
+      or v_request.preview is distinct from public.recruitment_brief_snapshot_v6(old)
+      or v_request.expires_at <= now() then
+      raise exception 'Recruitment brief changed or its selected approval expired.'
         using errcode = '23514';
     end if;
     perform public.record_approval_decision_v6(
@@ -224,6 +256,60 @@ begin
 end;
 $$;
 
+-- The user supplies the card they actually reviewed. Lock the brief, prove
+-- the card still describes its complete current bytes, then invoke the owning
+-- source approval in the same transaction. The trigger consumes this context
+-- and rejects any direct UPDATE or legacy ID-only call.
+create function public.approve_recruitment_brief_from_inbox_v6(
+  p_brief_id uuid, p_request_id uuid,
+  p_expected_source_version text, p_expected_artifact_hash text
+) returns void language plpgsql volatile security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_brief public.client_briefs%rowtype;
+  v_request public.approval_requests_v6%rowtype;
+  v_hash text;
+begin
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or public.current_role_of() is null or not coalesce(public.is_admin(), false)
+    or coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
+    raise exception 'A provisioned human admin with AAL2 must approve the recruitment brief.'
+      using errcode = '42501';
+  end if;
+  select * into v_brief from public.client_briefs
+    where id = p_brief_id for update;
+  if not found or v_brief.purpose <> 'recruitment'
+    or v_brief.status <> 'draft' or v_brief.archived_at is not null then
+    raise exception 'Only an active recruitment draft can be approved.'
+      using errcode = '23514';
+  end if;
+  v_hash := public.recruitment_brief_snapshot_hash_v6(v_brief);
+  select * into v_request from public.approval_requests_v6
+    where id = p_request_id;
+  if not found or v_request.source_system <> 'aa_console'
+    or v_request.source_kind <> 'recruitment_brief'
+    or v_request.source_id <> p_brief_id::text
+    or v_request.client_id is distinct from v_brief.client_id
+    or v_request.source_version is distinct from p_expected_source_version
+    or v_request.artifact_hash is distinct from p_expected_artifact_hash
+    or v_request.artifact_hash is distinct from v_hash
+    or v_request.preview is distinct from public.recruitment_brief_snapshot_v6(v_brief)
+    or v_request.preview_blocker is not null
+    or v_request.expires_at is null or v_request.expires_at <= now()
+    or exists (select 1 from public.approval_decision_events_v6 d
+      where d.request_id = p_request_id) then
+    raise exception 'The selected recruitment card is stale or incomplete; review the current exact version.'
+      using errcode = '23514';
+  end if;
+  insert into approval_private.recruitment_brief_decision_context_v6
+    (transaction_id,brief_id,request_id,source_version,artifact_hash,actor_id)
+    values (txid_current(),p_brief_id,p_request_id,p_expected_source_version,v_hash,auth.uid());
+  perform public.approve_recruitment_brief(p_brief_id);
+  delete from approval_private.recruitment_brief_decision_context_v6
+    where transaction_id=txid_current() and brief_id=p_brief_id;
+end;
+$$;
+
 -- Existing draft requests become visible without inventing historical human
 -- sign-offs for briefs already approved before this migration.
 do $$
@@ -257,7 +343,9 @@ grant execute on function public.request_recruitment_brief_approval_v6(uuid)
   to authenticated;
 revoke all on function public.approve_recruitment_brief(uuid)
   from public, anon, authenticated, service_role;
-grant execute on function public.approve_recruitment_brief(uuid)
+revoke all on function public.approve_recruitment_brief_from_inbox_v6(uuid,uuid,text,text)
+  from public, anon, authenticated, service_role;
+grant execute on function public.approve_recruitment_brief_from_inbox_v6(uuid,uuid,text,text)
   to authenticated;
 
 select public.lock_down_definer_functions();

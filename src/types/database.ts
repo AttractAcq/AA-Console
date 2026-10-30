@@ -23757,6 +23757,15 @@ export type Database = {
         Args: { p_brief_id: string }
         Returns: undefined
       }
+      approve_recruitment_brief_from_inbox_v6: {
+        Args: {
+          p_brief_id: string
+          p_request_id: string
+          p_expected_source_version: string
+          p_expected_artifact_hash: string
+        }
+        Returns: undefined
+      }
       approve_service_offer_version_v6: {
         Args: { p_version_id: string }
         Returns: {

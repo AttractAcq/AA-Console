@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const ADMIN = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const SECOND_ADMIN = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const EMPLOYEE = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const PROFILELESS = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const PAYING = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -68,6 +69,15 @@ async function requestFor(briefId: string) {
      order by requested_at desc,id desc limit 1`, [briefId])).rows[0]!;
 }
 
+type Card = Awaited<ReturnType<typeof requestFor>>;
+async function approveCard(briefId: string, card: Card,
+  role: "authenticated" | "service_role" = "authenticated",
+  actor = ADMIN, aal: "aal1" | "aal2" = "aal2") {
+  return asRole(role, actor, aal,
+    "select public.approve_recruitment_brief_from_inbox_v6($1,$2,$3,$4)",
+    [briefId, card.id, card.source_version, card.artifact_hash]);
+}
+
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(`
@@ -105,9 +115,11 @@ beforeAll(async () => {
     alter table client_briefs add column archived_at timestamptz;
     insert into auth.users (id,email) values
       ('${ADMIN}','alex@attractacq.com'),
+      ('${SECOND_ADMIN}','chief@attractacq.com'),
       ('${EMPLOYEE}','editor@attractacq.com'),
       ('${PROFILELESS}','no-profile@attractacq.com');
     update profiles set role='admin' where id='${ADMIN}';
+    update profiles set role='admin' where id='${SECOND_ADMIN}';
     update profiles set role='employee' where id='${EMPLOYEE}';
     delete from profiles where id='${PROFILELESS}';
     insert into clients (id,name,initials,is_internal)
@@ -162,16 +174,13 @@ describe("recruitment brief Inbox adapter 276", () => {
   it("requires provisioned AAL2 human admin and binds one decision to source approval", async () => {
     const id = await createDraft();
     const card = await requestFor(id);
-    await expect(asRole("authenticated", ADMIN, "aal1",
-      "select public.approve_recruitment_brief($1)", [id])).rejects.toThrow(/AAL2/i);
-    await expect(asRole("authenticated", EMPLOYEE, "aal2",
-      "select public.approve_recruitment_brief($1)", [id])).rejects.toThrow(/admin/i);
-    await expect(asRole("authenticated", PROFILELESS, "aal2",
-      "select public.approve_recruitment_brief($1)", [id])).rejects.toThrow(/provisioned/i);
-    await expect(asRole("service_role", ADMIN, "aal2",
-      "select public.approve_recruitment_brief($1)", [id])).rejects.toThrow(/permission denied|provisioned/i);
-    await asRole("authenticated", ADMIN, "aal2",
-      "select public.approve_recruitment_brief($1)", [id]);
+    await expect(approveCard(id, card, "authenticated", ADMIN, "aal1")).rejects.toThrow(/AAL2/i);
+    await expect(approveCard(id, card, "authenticated", EMPLOYEE)).rejects.toThrow(/admin/i);
+    await expect(approveCard(id, card, "authenticated", PROFILELESS)).rejects.toThrow(/provisioned/i);
+    await expect(approveCard(id, card, "service_role")).rejects.toThrow(/permission denied|provisioned/i);
+    await expect(asRole("authenticated", ADMIN, "aal2",
+      "select public.approve_recruitment_brief($1)", [id])).rejects.toThrow(/permission denied/i);
+    await approveCard(id, card);
     const result = (await db.query<{
       status: string; decision: string; actor_id: string; actor_aal: string;
     }>(`select b.status::text as status,d.decision,d.actor_id,d.actor_aal
@@ -188,9 +197,8 @@ describe("recruitment brief Inbox adapter 276", () => {
     const id = await createDraft();
     const old = await requestFor(id);
     await db.query("update public.client_briefs set script='Changed primary text' where id=$1", [id]);
-    await expect(asRole("authenticated", ADMIN, "aal2",
-      "select public.approve_recruitment_brief($1)", [id])).rejects.toThrow(/changed|expired/i);
-    const requested = await asRole<{ id: string }>("authenticated", ADMIN, "aal1",
+    await expect(approveCard(id, old)).rejects.toThrow(/stale|changed/i);
+    const requested = await asRole<{ id: string }>("authenticated", SECOND_ADMIN, "aal1",
       "select public.request_recruitment_brief_approval_v6($1) as id", [id]);
     const fresh = await requestFor(id);
     expect(fresh.id).toBe(requested[0]!.id);
@@ -199,8 +207,13 @@ describe("recruitment brief Inbox adapter 276", () => {
     const repeat = await asRole<{ id: string }>("authenticated", ADMIN, "aal1",
       "select public.request_recruitment_brief_approval_v6($1) as id", [id]);
     expect(repeat[0]!.id).toBe(fresh.id);
-    await asRole("authenticated", ADMIN, "aal2",
-      "select public.approve_recruitment_brief($1)", [id]);
+    // A second admin may have requested v2 while this reviewer still has v1
+    // on screen. The v1 click must not silently approve the new card.
+    await expect(approveCard(id, old)).rejects.toThrow(/stale|changed/i);
+    await approveCard(id, fresh);
+    expect((await db.query<{ n: number }>(
+      "select count(*)::int as n from approval_private.recruitment_brief_decision_context_v6"
+    )).rows[0]!.n).toBe(0);
   });
 
   it("marks incomplete draft requests blocked instead of presenting them as approvable", async () => {
@@ -213,23 +226,21 @@ describe("recruitment brief Inbox adapter 276", () => {
        where source_kind='recruitment_brief' and source_id=$1
        order by requested_at desc,id desc limit 1`, [id]);
     expect(rows.rows[0]!.preview_blocker).toMatch(/Complete Meta-static/i);
-    await expect(asRole("authenticated", ADMIN, "aal2",
-      "select public.approve_recruitment_brief($1)", [id])).rejects.toThrow(/complete/i);
+    await expect(approveCard(id, await requestFor(id))).rejects.toThrow(/stale|incomplete/i);
   });
 
   it("cannot request or approve an archived draft, while approved production may archive", async () => {
     const id = await createDraft();
+    const card = await requestFor(id);
     await db.query("update public.client_briefs set archived_at=now() where id=$1", [id]);
-    await expect(asRole("authenticated", ADMIN, "aal2",
-      "select public.approve_recruitment_brief($1)", [id])).rejects.toThrow(/archived/i);
+    await expect(approveCard(id, card)).rejects.toThrow(/active recruitment draft/i);
     await expect(asRole("authenticated", ADMIN, "aal1",
       "select public.request_recruitment_brief_approval_v6($1)", [id])).rejects.toThrow(/active draft/i);
     await expect(asPrivilegedWriter("authenticated", ADMIN, "aal2",
       "update public.client_briefs set status='approved' where id=$1", [id]))
       .rejects.toThrow(/archived/i);
     await db.query("update public.client_briefs set archived_at=null where id=$1", [id]);
-    await asRole("authenticated", ADMIN, "aal2",
-      "select public.approve_recruitment_brief($1)", [id]);
+    await approveCard(id, card);
     await db.query("update public.client_briefs set archived_at=now() where id=$1", [id]);
   });
 
@@ -237,10 +248,13 @@ describe("recruitment brief Inbox adapter 276", () => {
     const id = await createDraft();
     await expect(asPrivilegedWriter("service_role", ADMIN, "aal2",
       "update public.client_briefs set status='approved' where id=$1", [id]))
-      .rejects.toThrow(/AAL2|provisioned/i);
+      .rejects.toThrow(/selected exact-version/i);
     await expect(asPrivilegedWriter("authenticated", ADMIN, "aal1",
       "update public.client_briefs set status='approved' where id=$1", [id]))
-      .rejects.toThrow(/AAL2/i);
+      .rejects.toThrow(/selected exact-version/i);
+    await expect(asPrivilegedWriter("authenticated", ADMIN, "aal2",
+      "update public.client_briefs set status='approved' where id=$1", [id]))
+      .rejects.toThrow(/selected exact-version/i);
     await expect(asPrivilegedWriter("authenticated", ADMIN, "aal2",
       "update public.client_briefs set script='Changed',status='approved' where id=$1", [id]))
       .rejects.toThrow(/immutable/i);
@@ -252,23 +266,22 @@ describe("recruitment brief Inbox adapter 276", () => {
     expect(status).toBe("draft");
   });
 
-  it("binds a direct admin AAL2 status transition to the same canonical decision", async () => {
+  it("denies a direct admin AAL2 status transition even when a current card exists", async () => {
     const id = await createDraft();
     const card = await requestFor(id);
-    await asPrivilegedWriter("authenticated", ADMIN, "aal2",
-      "update public.client_briefs set status='approved' where id=$1", [id]);
-    const result = (await db.query<{ status: string; decision: string; actor_id: string }>(`
-      select b.status::text as status,d.decision,d.actor_id
-        from public.client_briefs b
-        join public.approval_decision_events_v6 d on d.request_id=$2
-       where b.id=$1`, [id, card.id])).rows[0];
-    expect(result).toMatchObject({ status: "approved", decision: "approved", actor_id: ADMIN });
+    await expect(asPrivilegedWriter("authenticated", ADMIN, "aal2",
+      "update public.client_briefs set status='approved' where id=$1", [id]))
+      .rejects.toThrow(/selected exact-version/i);
+    const result = (await db.query<{ status: string; decisions: number }>(`
+      select b.status::text as status,
+        (select count(*)::int from public.approval_decision_events_v6 d where d.request_id=$2) as decisions
+        from public.client_briefs b where b.id=$1`, [id, card.id])).rows[0];
+    expect(result).toMatchObject({ status: "draft", decisions: 0 });
   });
 
   it("keeps approved content immutable while generation lifecycle fields may advance", async () => {
     const id = await createDraft();
-    await asRole("authenticated", ADMIN, "aal2",
-      "select public.approve_recruitment_brief($1)", [id]);
+    await approveCard(id, await requestFor(id));
     await expect(db.query("update public.client_briefs set apply_url='https://other.example' where id=$1", [id]))
       .rejects.toThrow(/immutable/i);
     await expect(db.query("update public.client_briefs set status='draft' where id=$1", [id]))

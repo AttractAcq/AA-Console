@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { supabase } from "../../lib/supabase";
 
@@ -135,6 +135,30 @@ function isGoogleReplyApprovalReady(request: UnifiedApprovalRequest, clientId: s
     && request.status === "pending" && !isExpired(request);
 }
 
+function isRecruitmentBriefApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "recruitment_brief"
+    || request.client_id !== clientId || request.owner_role !== "admin"
+    || request.status !== "pending" || isExpired(request) || previewMissing(request)
+    || request.destination !== "internal:recruitment_ad_generation"
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  return typeof request.artifact_hash === "string" && /^[0-9a-f]{64}$/.test(request.artifact_hash)
+    && request.source_version.startsWith(`${request.artifact_hash}:v`)
+    && /^[1-9][0-9]*$/.test(request.source_version.slice(request.artifact_hash.length + 2))
+    && preview.id === request.source_id && preview.client_id === clientId
+    && preview.purpose === "recruitment" && preview.media_type === "image"
+    && typeof preview.title === "string" && !!preview.title.trim()
+    && typeof preview.hook === "string" && !!preview.hook.trim()
+    && typeof preview.script === "string" && !!preview.script.trim()
+    && typeof preview.call_to_action === "string" && !!preview.call_to_action.trim()
+    && typeof preview.apply_url === "string" && preview.apply_url.startsWith("https://")
+    && scope.purpose === "recruitment"
+    && scope.recruitment_role === preview.recruitment_role
+    && scope.media_type === "image" && scope.apply_url === preview.apply_url;
+}
+
 function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignRejectionReady(request, clientId)
     || isGoogleReplyRejectionReady(request, clientId);
@@ -142,7 +166,8 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignApprovalReady(request, clientId)
-    || isGoogleReplyApprovalReady(request, clientId);
+    || isGoogleReplyApprovalReady(request, clientId)
+    || isRecruitmentBriefApprovalReady(request, clientId);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
@@ -191,7 +216,8 @@ function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
   const canReject = isRejectionReady(request, clientId);
   const canApprove = isApprovalReady(request, clientId);
   const decisionLabel = request.source_kind === "google_review_reply"
-    ? "Google review reply" : "Campaign action";
+    ? "Google review reply" : request.source_kind === "recruitment_brief"
+      ? "Recruitment brief" : "Campaign action";
 
   return (
     <article className="rounded-xl border border-border bg-card p-5" aria-labelledby={`approval-${request.id}`}>
@@ -266,14 +292,14 @@ function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
         )}
       </details>
 
-      {canReject && (
+      {(canApprove || canReject) && (
         <div className="mt-4 space-y-3 rounded-lg border border-border p-3">
           <p className="text-sm font-medium">{decisionLabel} decision</p>
           <p className="text-xs text-muted-foreground">
             This calls the source owner for the exact version above. AAL2 is required;
             the source and database recheck the request before recording a decision.
           </p>
-          {!canApprove && <p className="text-xs text-muted-foreground">
+          {!canApprove && canReject && <p className="text-xs text-muted-foreground">
             This request has expired. It can only be closed with a reasoned rejection.
           </p>}
           {aal !== "aal2" && <p role="status" className="text-sm text-destructive">
@@ -285,15 +311,15 @@ function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
               Approve exact version
             </button>}
-            <label className="min-w-48 flex-1 text-sm">Reason to reject
+            {canReject && <label className="min-w-48 flex-1 text-sm">Reason to reject
               <input value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)}
                 disabled={busy || aal !== "aal2"} className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
-            </label>
-            <button type="button" disabled={busy || aal !== "aal2" || !rejectionReason.trim()}
+            </label>}
+            {canReject && <button type="button" disabled={busy || aal !== "aal2" || !rejectionReason.trim()}
               onClick={() => void onDecide(request, "rejected", rejectionReason.trim())}
               className="self-end rounded-lg border border-border px-4 py-2 text-sm font-medium disabled:opacity-50">
               Reject with reason
-            </button>
+            </button>}
           </div>
         </div>
       )}
@@ -310,6 +336,7 @@ function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
 
 export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "client" | "global" }) {
   const { clientId } = useParams<{ clientId: string }>();
+  const location = useLocation();
   const global = scope === "global";
   const scopeKey = global ? "global" : clientId ?? null;
   const [requests, setRequests] = useState<UnifiedApprovalRequest[]>([]);
@@ -317,7 +344,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const [statusFilter, setStatusFilter] = useState("pending");
   const [clientFilter, setClientFilter] = useState("all");
   const [kindFilter, setKindFilter] = useState("all");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => new URLSearchParams(location.search).get("source") ?? "");
   const [loading, setLoading] = useState(true);
   const [loadedClientId, setLoadedClientId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -407,6 +434,13 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
           p_approved: decision === "approved",
           ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
         })
+        : request.source_kind === "recruitment_brief"
+          ? await supabase.rpc("approve_recruitment_brief_from_inbox_v6", {
+            p_brief_id: request.source_id,
+            p_request_id: request.id,
+            p_expected_source_version: request.source_version,
+            p_expected_artifact_hash: request.artifact_hash!,
+          })
         : await supabase.rpc("decide_campaign_action_approval_v6", {
           p_request_id: request.source_id,
           p_decision: decision,
@@ -433,7 +467,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
     if (global && clientFilter !== "all" && (request.client_id ?? "agency-wide") !== clientFilter) return false;
     if (kindFilter !== "all" && request.source_kind !== kindFilter) return false;
     const needle = search.trim().toLocaleLowerCase();
-    return !needle || [request.title, request.source_system, request.source_kind,
+    return !needle || [request.title, request.source_id, request.source_system, request.source_kind,
       request.destination, request.account_ref].some((part) => part?.toLocaleLowerCase().includes(needle));
   }), [requests, statusFilter, clientFilter, kindFilter, search, global]);
 
@@ -456,7 +490,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         <p className="mt-1 text-sm text-muted-foreground">
           {global ? "Canonical requests across every client and the agency house client appear here. "
             : "Canonical requests and decision history appear here as source adapters are connected. "}
-          Complete campaign action and Google review reply requests can be decided here through their owning functions.
+          Complete campaign action, Google review reply and recruitment brief requests can be decided here through their owning functions.
           Other requests link to their owning source. Coverage is incomplete: the Engine,
           Assets and Campaign actions tabs remain available for work not yet mirrored here.
         </p>

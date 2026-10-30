@@ -68,6 +68,24 @@ const readyGoogle = {
   owning_path: "/clients/client-1/google-profile?tab=reviews",
 };
 
+const readyRecruitment = {
+  ...request,
+  id: "recruitment-request-1", client_id: "client-1", source_system: "aa_console",
+  source_kind: "recruitment_brief", source_id: "brief-1",
+  source_version: `${"d".repeat(64)}:v1`, artifact_hash: "d".repeat(64),
+  title: "Recruitment brief: Editor", expires_at: "2030-01-01T00:00:00Z",
+  preview: {
+    id: "brief-1", client_id: "client-1", purpose: "recruitment", media_type: "image",
+    title: "Editor", hook: "Cut work that ships", script: "Join the editing team",
+    call_to_action: "Apply now", apply_url: "https://attractacq.com/careers/editor",
+    recruitment_role: "editor", compensation_text: "£250/day",
+  },
+  destination: "internal:recruitment_ad_generation", account_ref: null, budget: null,
+  scope: { purpose: "recruitment", recruitment_role: "editor", media_type: "image",
+    apply_url: "https://attractacq.com/careers/editor" },
+  owner_role: "admin", owning_path: "/team?tab=recruitment",
+};
+
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
@@ -91,8 +109,8 @@ function wireDatabase() {
   });
 }
 
-function show(scope: "client" | "global" = "client") {
-  return render(<MemoryRouter><UnifiedApprovalInboxPanel scope={scope} /></MemoryRouter>);
+function show(scope: "client" | "global" = "client", path = "/approvals") {
+  return render(<MemoryRouter initialEntries={[path]}><UnifiedApprovalInboxPanel scope={scope} /></MemoryRouter>);
 }
 
 beforeEach(() => {
@@ -275,7 +293,8 @@ describe("unified approval inbox", () => {
     show();
     const card = await screen.findByRole("article", { name: "Build the Meta ad" });
     await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/exact request changed/);
+    expect(await screen.findByText(/This exact request changed or is no longer pending/))
+      .toHaveAttribute("role", "alert");
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -336,6 +355,48 @@ describe("unified approval inbox", () => {
     }));
     await waitFor(() => expect(screen.getByText("Decision history (1)")).toBeInTheDocument());
     expect(rpc).not.toHaveBeenCalledWith("decide_google_review_reply_v6", expect.anything());
+  });
+
+  it("decides a recruitment brief only with the selected full Inbox card", async () => {
+    const user = userEvent.setup();
+    requests = [readyRecruitment];
+    rpc.mockImplementation(async () => {
+      requests = [{ ...readyRecruitment, status: "approved" }];
+      decisions = [{ request_id: readyRecruitment.id, decision: "approved", actor_id: "human-1",
+        actor_aal: "aal2", reason: null, decided_at: "2026-10-30T09:00:00Z" }];
+      return { data: null, error: null };
+    });
+    show("global", "/approvals?source=brief-1");
+    const card = await screen.findByRole("article", { name: "Recruitment brief: Editor" });
+    expect(within(card).getByText(/Join the editing team/)).toBeInTheDocument();
+    expect(within(card).getByText("Recruitment brief decision")).toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Reject with reason" })).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search" })).toHaveValue("brief-1");
+    await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_recruitment_brief_from_inbox_v6", {
+      p_brief_id: "brief-1", p_request_id: "recruitment-request-1",
+      p_expected_source_version: `${"d".repeat(64)}:v1`,
+      p_expected_artifact_hash: "d".repeat(64),
+    }));
+    expect(rpc).not.toHaveBeenCalledWith("approve_recruitment_brief", expect.anything());
+  });
+
+  it("keeps blocked and changed recruitment cards read-only or rejects the click", async () => {
+    const user = userEvent.setup();
+    requests = [
+      { ...readyRecruitment, id: "blocked", preview_blocker: "Incomplete brief" },
+      { ...readyRecruitment, id: "stale", title: "Edited brief" },
+    ];
+    freshRequest = { ...readyRecruitment, id: "stale", source_version: `${"e".repeat(64)}:v2`,
+      artifact_hash: "e".repeat(64) };
+    show("global");
+    const stale = await screen.findByRole("article", { name: "Edited brief" });
+    expect(within(screen.getByRole("article", { name: "Recruitment brief: Editor" }))
+      .queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    await user.click(within(stale).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByText(/This exact request changed or is no longer pending/))
+      .toHaveAttribute("role", "alert");
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("requires a reason and passes the selected Google version on rejection", async () => {
