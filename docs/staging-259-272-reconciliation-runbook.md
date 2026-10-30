@@ -1,6 +1,6 @@
 # Staging migration 259–272: data-preserving reconciliation preflight
 
-**Status:** Review packet only. No staging or production write is authorized by this document. Run the companion [read-only SQL preflight](staging-259-272-reconciliation-preflight.sql) and capture its result before preparing corrective DDL or migration-history repair. Target staging ref: `vmmertwoboqiazcsougw`. Comparison production ref: `bancbdztffokwiifzoiv`. Source snapshot: `main` at `3b9f0e157f45ea61c6ff617c84e06f303877a212`, production through migration 272 at 30 October 2026, 00:22 UTC. Refresh the snapshot and rerun the read-only preflight if `main` advances before a staging correction.
+**Status:** Review packet only. No staging or production write is authorized by this document. Run the companion [read-only SQL preflight](staging-259-272-reconciliation-preflight.sql) and capture its result before preparing corrective DDL or migration-history repair. Target staging ref: `vmmertwoboqiazcsougw`. Comparison production ref: `bancbdztffokwiifzoiv`. Source snapshot: `main` at `8d122308510b4b597e4b747eb117ef3d7f81d000`, production through migration 272 at 30 October 2026, 00:34 UTC; PR #248 changed parity tooling, not the 259–272 migration bytes. Refresh the snapshot and rerun the read-only preflight if `main` advances before a staging correction.
 
 ## Why a separate staging plan is required
 
