@@ -145,7 +145,7 @@ it("does not let a late response from a previous client replace the current clie
 
 it("closes client A's Meta dialog on route change, rejects its stale submit, and scopes an in-flight B update", async () => {
   let selectedClient = "client-1";
-  let finishUpdate: ((value: { error: null }) => void) | undefined;
+  let finishUpdate: ((value: { data: Array<{ id: string; client_id: string; meta_page_id: string; meta_pixel_id: null }>; error: null }) => void) | undefined;
   const writes: Array<{ payload: Record<string, unknown>; filters: Array<[string, string]> }> = [];
   useParams.mockImplementation(() => ({ clientId: selectedClient }));
   from.mockImplementation(() => {
@@ -169,10 +169,9 @@ it("closes client A's Meta dialog on route change, rejects its stale submit, and
         const updateQuery = {
           eq: (field: string, value: string) => {
             write.filters.push([field, value]);
-            return write.filters.length === 2
-              ? new Promise<{ error: null }>((resolve) => { finishUpdate = resolve; })
-              : updateQuery;
+            return updateQuery;
           },
+          select: () => new Promise<{ data: Array<{ id: string; client_id: string; meta_page_id: string; meta_pixel_id: null }>; error: null }>((resolve) => { finishUpdate = resolve; }),
         };
         return updateQuery;
       },
@@ -209,7 +208,7 @@ it("closes client A's Meta dialog on route change, rejects its stale submit, and
   rendered.rerender(<IntegrationsPanel />);
   await screen.findByRole("button", { name: "Page 111" });
   expect(latestAdModal().open).toBe(false);
-  await act(async () => { finishUpdate?.({ error: null }); await save; });
+  await act(async () => { finishUpdate?.({ data: [{ id: "meta-b", client_id: "client-2", meta_page_id: "444", meta_pixel_id: null }], error: null }); await save; });
   await bModal.onSaved();
   expect(writes).toHaveLength(1);
   expect(screen.queryByRole("button", { name: "Page 222" })).not.toBeInTheDocument();
@@ -220,7 +219,7 @@ it("closes client A's Meta dialog on route change, rejects its stale submit, and
 
 it("keeps client B's pending sync control disabled when client A's older update finishes", async () => {
   let selectedClient = "client-1";
-  const finish = new Map<string, (value: { error: null }) => void>();
+  const finish = new Map<string, (value: { data: Array<{ id: string; client_id: string; ingest_enabled: boolean }>; error: null }) => void>();
   const writes: Array<Array<[string, string]>> = [];
   useParams.mockImplementation(() => ({ clientId: selectedClient }));
   from.mockImplementation(() => {
@@ -238,10 +237,11 @@ it("keeps client B's pending sync control disabled when client A's older update 
         const updateQuery = {
           eq: (field: string, value: string) => {
             filters.push([field, value]);
-            return filters.length === 2
-              ? new Promise<{ error: null }>((resolve) => { finish.set(value, resolve); })
-              : updateQuery;
+            return updateQuery;
           },
+          select: () => new Promise<{ data: Array<{ id: string; client_id: string; ingest_enabled: boolean }>; error: null }>((resolve) => {
+            finish.set(filters.find(([field]) => field === "client_id")![1], resolve);
+          }),
         };
         return updateQuery;
       },
@@ -264,16 +264,16 @@ it("keeps client B's pending sync control disabled when client A's older update 
     [["id", "meta-client-2"], ["client_id", "client-2"]],
   ]);
 
-  await act(async () => { finish.get("client-1")?.({ error: null }); });
+  await act(async () => { finish.get("client-1")?.({ data: [{ id: "meta-client-1", client_id: "client-1", ingest_enabled: true }], error: null }); });
   expect(bSwitch).toBeDisabled();
-  await act(async () => { finish.get("client-2")?.({ error: null }); });
+  await act(async () => { finish.get("client-2")?.({ data: [{ id: "meta-client-2", client_id: "client-2", ingest_enabled: true }], error: null }); });
   await waitFor(() => expect(bSwitch).not.toBeDisabled());
 });
 
 it("keeps a returned client's sync pending and ignores an old visit's failed rollback", async () => {
   let selectedClient = "client-1";
   let aServerEnabled = false;
-  const finish = new Map<string, (value: { error: { message: string } | null }) => void>();
+  const finish = new Map<string, (value: { data: Array<{ id: string; client_id: string; ingest_enabled: boolean }> | null; error: { message: string } | null }) => void>();
   useParams.mockImplementation(() => ({ clientId: selectedClient }));
   from.mockImplementation(() => {
     let readClient = "";
@@ -283,10 +283,13 @@ it("keeps a returned client's sync pending and ignores an old visit's failed rol
       order: async () => ({ data: [{ ...base, id: `meta-${readClient}`, client_id: readClient,
         provider: "meta", ingest_enabled: readClient === "client-1" ? aServerEnabled : false }], error: null }),
       update: () => {
+        let updateClient = "";
         const updateQuery = {
-          eq: (field: string, value: string) => field === "client_id"
-            ? new Promise<{ error: { message: string } | null }>((resolve) => { finish.set(value, resolve); })
-            : updateQuery,
+          eq: (field: string, value: string) => {
+            if (field === "client_id") updateClient = value;
+            return updateQuery;
+          },
+          select: () => new Promise<{ data: Array<{ id: string; client_id: string; ingest_enabled: boolean }> | null; error: { message: string } | null }>((resolve) => { finish.set(updateClient, resolve); }),
         };
         return updateQuery;
       },
@@ -313,7 +316,7 @@ it("keeps a returned client's sync pending and ignores an old visit's failed rol
   expect(aSwitch).toHaveAttribute("aria-checked", "true");
   expect(aSwitch).toBeDisabled();
 
-  await act(async () => { finish.get("client-1")?.({ error: { message: "Old visit denied" } }); });
+  await act(async () => { finish.get("client-1")?.({ data: null, error: { message: "Old visit denied" } }); });
   await waitFor(() => expect(aSwitch).not.toBeDisabled());
   expect(aSwitch).toHaveAttribute("aria-checked", "true");
   expect(screen.queryByText("Old visit denied")).not.toBeInTheDocument();
@@ -321,8 +324,61 @@ it("keeps a returned client's sync pending and ignores an old visit's failed rol
   selectedClient = "client-2";
   rendered.rerender(<IntegrationsPanel />);
   expect(await screen.findByRole("switch", { name: "Daily sync for meta" })).toBeDisabled();
-  await act(async () => { finish.get("client-2")?.({ error: null }); });
+  await act(async () => { finish.get("client-2")?.({ data: [{ id: "meta-client-2", client_id: "client-2", ingest_enabled: true }], error: null }); });
   await waitFor(() => expect(screen.getByRole("switch", { name: "Daily sync for meta" })).not.toBeDisabled());
+});
+
+it.each([
+  { label: "zero rows", returned: [] },
+  { label: "another client's row", returned: [{ id: "meta-1", client_id: "client-2", ingest_enabled: true }] },
+])("reconciles an unconfirmed same-visit sync update: $label", async ({ returned }) => {
+  const updateSelect = vi.fn(async () => ({ data: returned, error: null }));
+  from.mockImplementation(() => {
+    const query = {
+      select: () => query,
+      eq: () => query,
+      order: async () => ({ data: [{ ...base, id: "meta-1", provider: "meta" }], error: null }),
+      update: () => {
+        const updateQuery = { eq: () => updateQuery, select: updateSelect };
+        return updateQuery;
+      },
+    };
+    return query;
+  });
+
+  render(<IntegrationsPanel />);
+  const toggle = await screen.findByRole("switch", { name: "Daily sync for meta" });
+  fireEvent.click(toggle);
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("not confirmed for this client"));
+  expect(toggle).toHaveAttribute("aria-checked", "false");
+  expect(toggle).not.toBeDisabled();
+  expect(updateSelect).toHaveBeenCalledWith("id, client_id, ingest_enabled");
+});
+
+it("keeps a same-visit sync change only after one exact-client returned row", async () => {
+  const updateSelect = vi.fn(async () => ({
+    data: [{ id: "meta-1", client_id: "client-1", ingest_enabled: true }], error: null,
+  }));
+  from.mockImplementation(() => {
+    const query = {
+      select: () => query,
+      eq: () => query,
+      order: async () => ({ data: [{ ...base, id: "meta-1", provider: "meta" }], error: null }),
+      update: () => {
+        const updateQuery = { eq: () => updateQuery, select: updateSelect };
+        return updateQuery;
+      },
+    };
+    return query;
+  });
+
+  render(<IntegrationsPanel />);
+  const toggle = await screen.findByRole("switch", { name: "Daily sync for meta" });
+  fireEvent.click(toggle);
+  await waitFor(() => expect(toggle).not.toBeDisabled());
+  expect(toggle).toHaveAttribute("aria-checked", "true");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(updateSelect).toHaveBeenCalledWith("id, client_id, ingest_enabled");
 });
 
 it("closes the Add Integration form on route change and rejects an old client's stale submit", async () => {

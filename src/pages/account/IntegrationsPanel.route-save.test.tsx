@@ -26,6 +26,11 @@ const base = {
   meta_pixel_id: null,
 };
 
+type MetaWriteResult = {
+  data: Array<{ id: string; client_id: string; meta_page_id: string; meta_pixel_id: null }>;
+  error: null;
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
@@ -34,7 +39,7 @@ beforeEach(() => {
 
 it("keeps B's real Meta dialog open when A's earlier save completes", async () => {
   let selectedClient = "client-1";
-  let finishA: ((value: { error: null }) => void) | undefined;
+  let finishA: ((value: MetaWriteResult) => void) | undefined;
   const writes: Array<Array<[string, string]>> = [];
   useParams.mockImplementation(() => ({ clientId: selectedClient }));
   from.mockImplementation(() => {
@@ -53,10 +58,9 @@ it("keeps B's real Meta dialog open when A's earlier save completes", async () =
         const updateQuery = {
           eq: (field: string, value: string) => {
             filters.push([field, value]);
-            return filters.length === 2
-              ? new Promise<{ error: null }>((resolve) => { finishA = resolve; })
-              : updateQuery;
+            return updateQuery;
           },
+          select: () => new Promise<MetaWriteResult>((resolve) => { finishA = resolve; }),
         };
         return updateQuery;
       },
@@ -77,7 +81,7 @@ it("keeps B's real Meta dialog open when A's earlier save completes", async () =
   const bDialog = screen.getByRole("dialog", { name: "Meta ad settings" });
   expect(within(bDialog).getByLabelText(/Facebook page ID/)).toHaveValue("222");
 
-  await act(async () => { finishA?.({ error: null }); });
+  await act(async () => { finishA?.({ data: [{ id: "meta-a", client_id: "client-1", meta_page_id: "333", meta_pixel_id: null }], error: null }); });
   expect(screen.getByRole("dialog", { name: "Meta ad settings" })).toBeInTheDocument();
   expect(within(screen.getByRole("dialog", { name: "Meta ad settings" }))
     .getByLabelText(/Facebook page ID/)).toHaveValue("222");
@@ -86,7 +90,7 @@ it("keeps B's real Meta dialog open when A's earlier save completes", async () =
 
 it("keeps a new A Meta dialog open after A→B→A while A's old save finishes", async () => {
   let selectedClient = "client-1";
-  let finishOldA: ((value: { error: null }) => void) | undefined;
+  let finishOldA: ((value: MetaWriteResult) => void) | undefined;
   useParams.mockImplementation(() => ({ clientId: selectedClient }));
   from.mockImplementation(() => {
     let readClient = "";
@@ -96,11 +100,9 @@ it("keeps a new A Meta dialog open after A→B→A while A's old save finishes",
       order: async () => ({ data: [{ ...base, id: `meta-${readClient}`, client_id: readClient,
         meta_page_id: readClient === "client-1" ? "111" : "222" }], error: null }),
       update: () => {
-        let count = 0;
         const updateQuery = {
-          eq: () => ++count === 2
-            ? new Promise<{ error: null }>((resolve) => { finishOldA = resolve; })
-            : updateQuery,
+          eq: () => updateQuery,
+          select: () => new Promise<MetaWriteResult>((resolve) => { finishOldA = resolve; }),
         };
         return updateQuery;
       },
@@ -122,7 +124,7 @@ it("keeps a new A Meta dialog open after A→B→A while A's old save finishes",
   fireEvent.click(await screen.findByRole("button", { name: "Page 111" }));
   expect(screen.getByRole("dialog", { name: "Meta ad settings" })).toBeInTheDocument();
 
-  await act(async () => { finishOldA?.({ error: null }); });
+  await act(async () => { finishOldA?.({ data: [{ id: "meta-client-1", client_id: "client-1", meta_page_id: "111", meta_pixel_id: null }], error: null }); });
   expect(screen.getByRole("dialog", { name: "Meta ad settings" })).toBeInTheDocument();
 });
 
@@ -203,7 +205,7 @@ it("keeps a same-client reopened Add form's new secret when its old save complet
 
 it("keeps a same-client reopened Meta form's new page ID when its old save completes", async () => {
   useParams.mockReturnValue({ clientId: "client-1" });
-  let finishOld: ((value: { error: null }) => void) | undefined;
+  let finishOld: ((value: MetaWriteResult) => void) | undefined;
   const writes: Array<Array<[string, string]>> = [];
   from.mockImplementation(() => {
     const query = {
@@ -217,10 +219,9 @@ it("keeps a same-client reopened Meta form's new page ID when its old save compl
         const updateQuery = {
           eq: (field: string, value: string) => {
             filters.push([field, value]);
-            return filters.length === 2
-              ? new Promise<{ error: null }>((resolve) => { finishOld = resolve; })
-              : updateQuery;
+            return updateQuery;
           },
+          select: () => new Promise<MetaWriteResult>((resolve) => { finishOld = resolve; }),
         };
         return updateQuery;
       },
@@ -241,9 +242,69 @@ it("keeps a same-client reopened Meta form's new page ID when its old save compl
   const newDialog = screen.getByRole("dialog", { name: "Meta ad settings" });
   fireEvent.change(within(newDialog).getByLabelText(/Facebook page ID/), { target: { value: "555" } });
 
-  await act(async () => { finishOld?.({ error: null }); });
+  await act(async () => { finishOld?.({ data: [{ id: "meta-a", client_id: "client-1", meta_page_id: "333", meta_pixel_id: null }], error: null }); });
   expect(writes).toHaveLength(1);
   expect(screen.getByRole("dialog", { name: "Meta ad settings" })).toBeInTheDocument();
   expect(within(screen.getByRole("dialog", { name: "Meta ad settings" }))
     .getByLabelText(/Facebook page ID/)).toHaveValue("555");
+});
+
+it("keeps the Meta settings form open when RLS returns zero updated rows", async () => {
+  useParams.mockReturnValue({ clientId: "client-1" });
+  const updateSelect = vi.fn(async () => ({ data: [], error: null }));
+  from.mockImplementation(() => {
+    const query = {
+      select: () => query,
+      eq: () => query,
+      order: async () => ({ data: [{ ...base, id: "meta-a", client_id: "client-1",
+        meta_page_id: "111" }], error: null }),
+      update: () => {
+        const updateQuery = { eq: () => updateQuery, select: updateSelect };
+        return updateQuery;
+      },
+    };
+    return query;
+  });
+
+  render(<IntegrationsPanel />);
+  fireEvent.click(await screen.findByRole("button", { name: "Page 111" }));
+  const dialog = screen.getByRole("dialog", { name: "Meta ad settings" });
+  fireEvent.change(within(dialog).getByLabelText(/Facebook page ID/), { target: { value: "333" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent("Meta settings were not confirmed for this client");
+  expect(dialog).toBeInTheDocument();
+  expect(within(dialog).getByLabelText(/Facebook page ID/)).toHaveValue("333");
+  expect(updateSelect).toHaveBeenCalledWith("id, client_id, meta_page_id, meta_pixel_id");
+});
+
+it("closes and refreshes Meta settings only after an exact-client returned row", async () => {
+  useParams.mockReturnValue({ clientId: "client-1" });
+  let storedPage = "111";
+  const updateSelect = vi.fn(async () => {
+    storedPage = "333";
+    return { data: [{ id: "meta-a", client_id: "client-1", meta_page_id: storedPage,
+      meta_pixel_id: null }], error: null };
+  });
+  from.mockImplementation(() => {
+    const query = {
+      select: () => query,
+      eq: () => query,
+      order: async () => ({ data: [{ ...base, id: "meta-a", client_id: "client-1",
+        meta_page_id: storedPage }], error: null }),
+      update: () => {
+        const updateQuery = { eq: () => updateQuery, select: updateSelect };
+        return updateQuery;
+      },
+    };
+    return query;
+  });
+
+  render(<IntegrationsPanel />);
+  fireEvent.click(await screen.findByRole("button", { name: "Page 111" }));
+  const dialog = screen.getByRole("dialog", { name: "Meta ad settings" });
+  fireEvent.change(within(dialog).getByLabelText(/Facebook page ID/), { target: { value: "333" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+  expect(await screen.findByRole("button", { name: "Page 333" })).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Meta ad settings" })).not.toBeInTheDocument());
+  expect(updateSelect).toHaveBeenCalledWith("id, client_id, meta_page_id, meta_pixel_id");
 });

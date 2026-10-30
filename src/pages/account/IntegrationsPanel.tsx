@@ -220,8 +220,8 @@ export function IntegrationsPanel() {
     activeIngestWrites.current.set(key, token);
     setPendingIngest((prev) => ({ ...prev, [key]: token }));
     setError(null);
-    // Optimistic: the switch should move under the finger, not after a
-    // round trip. Rolled back below if the write is refused.
+    // Optimistic: the switch should move under the finger. It stays pending
+    // until the update returns one exact-client row with the requested value.
     setSnapshot((prev) => {
       if (!prev || prev.clientId !== clientId) return prev;
       return {
@@ -229,26 +229,24 @@ export function IntegrationsPanel() {
         rows: prev.rows.map((r) => r.id === integration.id ? { ...r, ingest_enabled: enabled } : r),
       };
     });
-    const { error: updateError } = await supabase
+    // PostgREST may report error: null for an UPDATE that touched zero rows.
+    const { data: updated, error: updateError } = await supabase
       .from("client_integrations")
       .update({ ingest_enabled: enabled })
       .eq("id", integration.id)
-      .eq("client_id", clientId);
+      .eq("client_id", clientId)
+      .select("id, client_id, ingest_enabled");
+    const confirmed = Array.isArray(updated) && updated.length === 1
+      && updated[0].id === integration.id && updated[0].client_id === clientId
+      && updated[0].ingest_enabled === enabled;
+    const writeError = updateError?.message
+      ?? (confirmed ? null : "Daily sync change was not confirmed for this client.");
     const sameEvidence = activeClient.current === clientId
       && routeVisit.current === visit && requestGeneration.current === evidenceGeneration;
-    if (updateError && sameEvidence) {
-      setSnapshot((prev) => {
-        if (!prev || prev.clientId !== clientId) return prev;
-        return {
-          ...prev,
-          rows: prev.rows.map((r) => r.id === integration.id ? { ...r, ingest_enabled: !enabled } : r),
-        };
-      });
-      setError({ clientId, message: updateError.message });
-    }
-    // A route revisit or another read has a different evidence snapshot. Read
-    // the server again instead of applying this older result to that snapshot.
-    if (!sameEvidence && activeClient.current === clientId) await refresh();
+    if (writeError && sameEvidence) setError({ clientId, message: writeError });
+    // A refused or unconfirmed write, route revisit, or newer read must use
+    // current server evidence. A blind inverse would corrupt a newer snapshot.
+    if ((writeError || !sameEvidence) && activeClient.current === clientId) await refresh();
     if (activeIngestWrites.current.get(key) === token) activeIngestWrites.current.delete(key);
     setPendingIngest((prev) => {
       if (prev[key] !== token) return prev;
@@ -423,12 +421,20 @@ export function IntegrationsPanel() {
           }
           const pageId = numericId(v.meta_page_id, "The page ID");
           if (!pageId) throw new Error("The page ID is required.");
-          const { error } = await supabase
+          const pixelId = numericId(v.meta_pixel_id, "The pixel ID");
+          // Require the returned row: error: null alone does not prove a write.
+          const { data: updated, error } = await supabase
             .from("client_integrations")
-            .update({ meta_page_id: pageId, meta_pixel_id: numericId(v.meta_pixel_id, "The pixel ID") })
+            .update({ meta_page_id: pageId, meta_pixel_id: pixelId })
             .eq("id", currentAdSettings.id)
-            .eq("client_id", clientId);
+            .eq("client_id", clientId)
+            .select("id, client_id, meta_page_id, meta_pixel_id");
           if (error) throw new Error(error.message);
+          if (!Array.isArray(updated) || updated.length !== 1
+            || updated[0].id !== currentAdSettings.id || updated[0].client_id !== clientId
+            || updated[0].meta_page_id !== pageId || updated[0].meta_pixel_id !== pixelId) {
+            throw new Error("Meta settings were not confirmed for this client.");
+          }
         }}
         onSaved={() => { if (metaSelectionIsCurrent(adSettings)) void refresh(); }}
       />
