@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "c05742dfc534d58784dc29fe229fcb7b54239bfed271b146201af50c5d8c8ddf",
-  "generatedTypesSha256": "8d826e75a111b572017a2681e4b3feb74cfded6f4568016b1a6c94367a1c3f65",
-  "generatedSchemaBodySha256": "3cc068867d4b2a8740215c86656d75c0d7ef83e5b9c562dd8e0754ea206c6962",
+  "migrationSourceDigest": "9260097ce9d78635d0fb70b370fe1c3c1213a13e187de28c803f1446149d753f",
+  "generatedTypesSha256": "53080a79d6f99b34288161c22ede1207e623d34ae45836de00efc2e4692f4c3a",
+  "generatedSchemaBodySha256": "992fe11cbc6465e3c28767ed1350bbbc13b17bfec8a864474f82b35542cb9861",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2145,6 +2145,13 @@
       "filename": "20261101060000_289_meta_v6_atomic_job_binding.sql",
       "sha256": "e64074e004ebc305cfd68d5055897d6cebe41895ea65b65bed35c3e774206c54",
       "trimmedMd5": "4649e8b23d6e8c94ae6aee0a8d61f39f"
+    },
+    {
+      "version": "20261101070000",
+      "name": "290_meta_legacy_producer_containment",
+      "filename": "20261101070000_290_meta_legacy_producer_containment.sql",
+      "sha256": "e81ed4dce71fcbe13efc99c0db4be96fb6bef1d20bbf6e19c7e098a98698c92c",
+      "trimmedMd5": "4c89e92c09b867a23bcb413f4bfae228"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
