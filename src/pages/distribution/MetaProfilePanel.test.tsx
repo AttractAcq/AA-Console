@@ -165,6 +165,18 @@ describe("identities", () => {
 });
 
 describe("proposed changes", () => {
+  it("does not fetch or render historical proposal failure diagnostics", async () => {
+    const marker = "credential-marker-historical-profile-error";
+    database({ changes: [change({ last_error: `Provider rejected ${marker}` })] });
+    render(<MetaProfilePanel tab="profile" />);
+    expect(await screen.findByText("Garage conversions, dry in four days")).toBeInTheDocument();
+    expect(select).toHaveBeenCalledWith(
+      "meta_profile_changes",
+      "id,platform,field,current_value,proposed_value,offer_version_id,status,created_at",
+    );
+    expect(document.body.textContent).not.toContain(marker);
+  });
+
   it("shows what the profile says beside what it would say", async () => {
     database({ changes: [change()] });
     render(<MetaProfilePanel tab="profile" />);

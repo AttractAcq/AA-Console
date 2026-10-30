@@ -16,7 +16,12 @@ type Identity = Pick<
   "client_id" | "provider" | "account_ref" | "status" | "token_expires_at" | "days_left" | "posts_waiting"
 >;
 type Presence = Database["public"]["Views"]["meta_profile_presence"]["Row"];
-type ProfileChange = Database["public"]["Tables"]["meta_profile_changes"]["Row"];
+// A historical failure reason may contain raw provider diagnostics. Fetch only
+// the proposal fields used by this screen until the database is scrubbed.
+type ProfileChange = Pick<
+  Database["public"]["Tables"]["meta_profile_changes"]["Row"],
+  "id" | "platform" | "field" | "current_value" | "proposed_value" | "offer_version_id" | "status" | "created_at"
+>;
 
 type Tab = "identities" | "profile" | "presence";
 
@@ -81,7 +86,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           .limit(100),
         supabase
           .from("meta_profile_changes")
-          .select("*")
+          .select("id,platform,field,current_value,proposed_value,offer_version_id,status,created_at")
           .eq("client_id", clientId)
           .order("created_at", { ascending: false }),
       ]);
