@@ -31,6 +31,8 @@ describe("trusted public caller address", () => {
       .toBe("2001:db8::1");
     expect(resolveCallerIp(request("::ffff:10.0.0.2", "203.0.113.4"), policy))
       .toBe("203.0.113.4");
+    expect(normalizeIp("::ffff:203.0.113.4")).toBe("203.0.113.4");
+    expect(normalizeIp("::ffff:cb00:7104")).toBe("203.0.113.4");
   });
 
   it("rejects malformed trusted chains and missing socket peers", () => {

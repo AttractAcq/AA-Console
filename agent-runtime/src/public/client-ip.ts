@@ -30,9 +30,14 @@ export function normalizeIp(raw: string | undefined): string | null {
   if (isIP(trimmed) !== 6) return null;
   // Node's URL parser serializes IPv6 in a stable, compressed form.
   const normalized = new URL(`http://[${trimmed}]/`).hostname.slice(1, -1).toLowerCase();
-  return normalized.startsWith("::ffff:") && isIP(normalized.slice(7)) === 4
-    ? normalized.slice(7)
-    : normalized;
+  // URL serializes mapped IPv4 as two hexadecimal hextets, not dotted
+  // decimal. Collapse it so the same caller cannot obtain two quota buckets
+  // merely by arriving through IPv4 versus an IPv4-mapped IPv6 socket.
+  const mapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(normalized);
+  if (!mapped) return normalized;
+  const high = Number.parseInt(mapped[1]!, 16);
+  const low = Number.parseInt(mapped[2]!, 16);
+  return `${high >>> 8}.${high & 255}.${low >>> 8}.${low & 255}`;
 }
 
 function trusted(ip: string, policy: TrustedProxies): boolean {

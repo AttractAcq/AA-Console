@@ -21,6 +21,8 @@ beforeAll(async () => {
     create schema auth; create schema cron;
     create function auth.role() returns text language sql stable as
       $$ select current_setting('test.role', true) $$;
+    create function public.is_admin() returns boolean language sql stable as
+      $$ select current_setting('test.admin', true) = 'on' $$;
     create function cron.schedule(text,text,text) returns bigint language sql as
       $$ select 1::bigint $$;
     create table public.client_sales_agents (
@@ -32,6 +34,9 @@ beforeAll(async () => {
     create table public.sales_runtime_requests (
       id uuid primary key default gen_random_uuid(), deployment_id uuid,
       outcome text, cost_usd numeric, occurred_at timestamptz default now());
+    create table public.public_route_quota_metrics_v6 (
+      route text, bucket_kind text, active_buckets integer, attempts bigint,
+      salted_ip_hash text);
     create function public.sales_runtime_allow(uuid,text,integer)
       returns boolean language sql as $$ select true $$;
     revoke execute on function public.sales_runtime_allow(uuid,text,integer)
@@ -45,6 +50,8 @@ beforeAll(async () => {
   `);
   await db.exec(await readFile(new URL(
     "../../../supabase/migrations/20261101010000_281_sales_runtime_budget_reservations.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL(
+    "../../../supabase/migrations/20261101020000_282_public_perimeter_admin_status.sql", import.meta.url), "utf8"));
 });
 
 beforeEach(async () => {
@@ -53,9 +60,67 @@ beforeEach(async () => {
     delete from public.sales_runtime_requests;
     delete from public.sales_runtime_reservations;
     delete from public.sales_runtime_daily_budgets;
+    delete from public.public_route_quota_metrics_v6;
+    select set_config('test.admin','off',false);
     update public.client_sales_agent_deployments
       set enabled=true,daily_message_limit=3,daily_cost_limit_usd=1.00,disabled_at=null;
   `);
+});
+
+describe("admin public perimeter status", () => {
+  it("returns bounded aggregate pages without caller hashes or other private fields", async () => {
+    await db.query(`insert into public.public_route_quota_metrics_v6
+      values ('sales_message','ip',2,4,'private-hash'),
+             ('sales_message','ip',1,3,'another-private-hash')`);
+    const first = await reserve(0.3);
+    expect(first.allowed).toBe(true);
+    const another = "44444444-4444-4444-8444-444444444444";
+    await db.query(`insert into public.client_sales_agent_deployments
+      values ($1,null,$2,true,3,1.00,null) on conflict (id) do nothing`, [another, AGENT]);
+    await db.query(`insert into public.sales_runtime_daily_budgets
+      (deployment_id,budget_day,messages,committed_usd,held_usd)
+      values ($1,(now() at time zone 'UTC')::date,1,0.1,0)`, [another]);
+    const result = await db.query<{ status: Record<string, unknown> }>(
+      "select public.public_perimeter_status_v6(1,null) as status");
+    const status = result.rows[0]!.status;
+    expect(status.quotaLastHour).toEqual([{
+      route: "sales_message", bucketKind: "ip", activeBuckets: 3, countedAttempts: 7,
+    }]);
+    expect(status.budgetsToday).toHaveLength(1);
+    expect(status.nextDeploymentCursor).toBe(DEPLOYMENT);
+    expect(status.unresolvedUncertain).toBe(0);
+    expect(JSON.stringify(status)).not.toContain("private-hash");
+    const second = await db.query<{ status: Record<string, unknown> }>(
+      "select public.public_perimeter_status_v6(1,$1) as status", [DEPLOYMENT]);
+    expect(second.rows[0]!.status.nextDeploymentCursor).toBeNull();
+    expect(second.rows[0]!.status.budgetsToday).toEqual([expect.objectContaining({
+      deploymentId: another, messages: 1,
+    })]);
+  });
+
+  it("permits a database admin and refuses a generic authenticated user", async () => {
+    await db.exec("select set_config('test.role','authenticated',false)");
+    await expect(db.query("select public.public_perimeter_status_v6(1,null)"))
+      .rejects.toThrow(/Admin only/);
+    await db.exec("select set_config('test.admin','on',false)");
+    const admin = await db.query<{ status: Record<string, unknown> }>(
+      "select public.public_perimeter_status_v6(1,null) as status");
+    expect(admin.rows[0]?.status.budgetsToday).toEqual([]);
+    await db.exec("select set_config('test.role','anon',false)");
+    await expect(db.query("select public.public_perimeter_status_v6(1,null)"))
+      .rejects.toThrow(/Admin only/);
+    await db.exec("select set_config('test.role','authenticated',false)");
+    await expect(db.query("select public.public_perimeter_status_v6(0,null)"))
+      .rejects.toThrow(/page size/);
+    await expect(db.query("select public.public_perimeter_status_v6(201,null)"))
+      .rejects.toThrow(/page size/);
+    const privileges = await db.query<{ anon: boolean; authenticated: boolean }>(`
+      select has_function_privilege('anon',
+        'public.public_perimeter_status_v6(integer,uuid)','EXECUTE') as anon,
+        has_function_privilege('authenticated',
+        'public.public_perimeter_status_v6(integer,uuid)','EXECUTE') as authenticated`);
+    expect(privileges.rows[0]).toEqual({ anon: false, authenticated: true });
+  });
 });
 
 describe("atomic paid widget reservations", () => {

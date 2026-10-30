@@ -47,7 +47,15 @@ function fixture() {
         async range() { return { data: rows[table] ?? [], error: null }; },
       };
     },
-    async rpc() {
+    async rpc(name: string) {
+      if (name === "public_perimeter_status_v6") return { data: {
+        asOf: "2026-10-29T12:00:00Z", budgetDay: "2026-10-29",
+        quotaLastHour: [{ route: "lead_submit", bucketKind: "ip",
+          activeBuckets: 3, countedAttempts: 8 }],
+        budgetsToday: [{ deploymentId: "deployment-1", messages: 2,
+          committedUsd: 0.1, heldUsd: 0.2, uncertainCount: 1 }],
+        unresolvedUncertain: 1, nextDeploymentCursor: null,
+      }, error: null };
       return { data: { migrationHead: "20261025233000", migrationCount: 259,
         objects: { tables: 10, views: 5, functions: 4, policies: 3 },
         cronJobs: [{ name: "engine-tick", schedule: "* * * * *", active: true }] }, error: null };
@@ -90,6 +98,11 @@ describe("B001 system inventory", () => {
       key: "google_business_profile", enabled: false, hasAccountRef: true,
     }]);
     expect(snapshot.database.value?.migrationHead).toBe("20261025233000");
+    expect(snapshot.publicPerimeter.value).toMatchObject({
+      unresolvedUncertain: 1,
+      quotaLastHour: [{ route: "lead_submit", countedAttempts: 8 }],
+      budgetsToday: [{ deploymentId: "deployment-1", heldUsd: 0.2 }],
+    });
     expect(snapshot.clients.value?.[0]?.integrations[0]).toMatchObject({
       hasCredential: true, accountIds: { adAccountId: "act_123", metaPageId: "42" },
     });
@@ -109,6 +122,7 @@ describe("B001 system inventory", () => {
       async () => { throw new Error("network unreachable"); }, {});
     expect(snapshot.gateway.state).toBe("error");
     expect(snapshot.database.state).toBe("error");
+    expect(snapshot.publicPerimeter.state).toBe("error");
     expect(snapshot.runtime.sha).toBeNull();
   });
 });
