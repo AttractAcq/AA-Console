@@ -7,7 +7,8 @@ import { BriefDetailModal } from "../../components/briefs/BriefDetailModal";
 import { MediaDetailModal } from "../../components/MediaDetailModal";
 import { AdCopyModal, type AdCopyAsset } from "../../components/AdCopyModal";
 import { allowedCtas } from "../../lib/campaignTemplates";
-import { signPaths, type MediaAsset } from "../../lib/media";
+import { type MediaAsset } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { formatLabel } from "../../lib/contentFormat";
 import { cn } from "../../lib/cn";
 import { RegenerateAction } from "../../components/RegenerateAction";
@@ -44,7 +45,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
   const [assets, setAssets] = useState<CampaignAsset[]>([]);
   const [copying, setCopying] = useState<CampaignAsset | null>(null);
   const [landingUrl, setLandingUrl] = useState<string | null>(null);
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.storage_path));
   const [artifactPackages, setArtifactPackages] = useState<{ briefs: Map<string, string>; assets: Map<string, string>; versions: Map<string, number> }>({ briefs: new Map(), assets: new Map(), versions: new Map() });
   const [building, setBuilding] = useState<Brief | null>(null);
   const [viewing, setViewing] = useState<Brief | null>(null);
@@ -97,7 +98,6 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
       setIdeas((ideaRows.data ?? []) as Idea[]);
       setBriefs(briefRows.data ?? []);
       setAssets(rows);
-      setUrls(await signPaths("client-media", rows.map((asset) => asset.storage_path)));
     } catch (error) {
       setError(error instanceof Error ? error.message : (error as { message?: string }).message ?? "Could not load campaign content.");
     } finally {

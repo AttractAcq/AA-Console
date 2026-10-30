@@ -69,7 +69,8 @@ function harness(
   const events: Array<Record<string, unknown>> = [];
   const frameUpdates: Array<Record<string, unknown>> = [];
   const briefUpdates: Array<Record<string, unknown>> = [];
-  const uploads: Array<{ bucket: string; path: string; upsert: boolean; contentType: string; bytes: Buffer }> = [];
+  const uploads: Array<{ bucket: string; path: string; upsert: boolean; contentType: string; cacheControl?: string; bytes: Buffer }> = [];
+  const signCalls: Array<{ path: string; ttl: number }> = [];
   const assets = options.assets ?? [];
   const frames = options.frames ?? [];
   const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
@@ -150,23 +151,26 @@ function harness(
         // A configured URL is returned verbatim, as the existing tests expect.
         // Without one, the path is echoed back, so a test can tell which
         // build's still was actually submitted rather than only how many.
-        createSignedUrl: async (path: string) => ({
-          data: options.signedUrl
-            ? { signedUrl: options.signedUrl }
-            : options.signedUrl === null
-              ? null
-              : { signedUrl: `https://cdn.example.test/${path}` },
-          error: options.signedUrl === null ? { message: "no url" } : null,
-        }),
-        upload: async (path: string, bytes: Buffer, init: { contentType: string; upsert: boolean }) => {
-          uploads.push({ bucket, path, bytes, upsert: init.upsert, contentType: init.contentType });
+        createSignedUrl: async (path: string, ttl: number) => {
+          signCalls.push({ path, ttl });
+          return {
+            data: options.signedUrl
+              ? { signedUrl: options.signedUrl }
+              : options.signedUrl === null
+                ? null
+                : { signedUrl: `https://cdn.example.test/${path}` },
+            error: options.signedUrl === null ? { message: "no url" } : null,
+          };
+        },
+        upload: async (path: string, bytes: Buffer, init: { contentType: string; upsert: boolean; cacheControl?: string }) => {
+          uploads.push({ bucket, path, bytes, upsert: init.upsert, contentType: init.contentType, cacheControl: init.cacheControl });
           return { error: null };
         },
         remove: async () => ({ error: null }),
       }),
     },
   };
-  return { sb: sb as unknown as SupabaseClient, events, frameUpdates, briefUpdates, uploads, rpcCalls };
+  return { sb: sb as unknown as SupabaseClient, events, frameUpdates, briefUpdates, uploads, rpcCalls, signCalls };
 }
 
 const job: AgentJobRow = {
@@ -377,7 +381,7 @@ describe("video_build", () => {
         status: 200,
       });
     });
-    const { sb, frameUpdates, uploads, rpcCalls } = harness(ready, {
+    const { sb, frameUpdates, uploads, rpcCalls, signCalls } = harness(ready, {
       assets: [{ id: "asset-1" }],
       frames: [
         { id: "frame-1", position: 1, storage_path: "client-1/generated/r/01.png", provider_job_id: null,
@@ -390,6 +394,10 @@ describe("video_build", () => {
     const result = await runVideoBuildJob(sb, runtime, agent, job);
 
     expect(result.ok).toBe(true);
+    expect(signCalls).toEqual([
+      { path: "client-1/generated/r/01.png", ttl: 3600 },
+      { path: "client-1/generated/r/02.png", ttl: 3600 },
+    ]);
     expect(rpcCalls).toContainEqual({ name: "request_video_edit", args: { p_asset_id: "asset-1" } });
     expect(fetchSpy).toHaveBeenCalled();
     const apiCalls = fetchSpy.mock.calls.filter((call) => String(call[0]) !== clipUrl);
@@ -413,9 +421,9 @@ describe("video_build", () => {
       "client-1/generated/clips/frame-1.mp4",
       "client-1/generated/clips/frame-2.mp4",
     ]);
-    expect(uploads.map((upload) => ({ path: upload.path, upsert: upload.upsert, contentType: upload.contentType }))).toEqual([
-      { path: "client-1/generated/clips/frame-1.mp4", upsert: false, contentType: "video/mp4" },
-      { path: "client-1/generated/clips/frame-2.mp4", upsert: false, contentType: "video/mp4" },
+    expect(uploads.map((upload) => ({ path: upload.path, upsert: upload.upsert, contentType: upload.contentType, cacheControl: upload.cacheControl }))).toEqual([
+      { path: "client-1/generated/clips/frame-1.mp4", upsert: false, contentType: "video/mp4", cacheControl: "60" },
+      { path: "client-1/generated/clips/frame-2.mp4", upsert: false, contentType: "video/mp4", cacheControl: "60" },
     ]);
     expect(JSON.stringify(result)).not.toContain("not-a-real-secret");
   });

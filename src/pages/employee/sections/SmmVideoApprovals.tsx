@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { VideoApprovalRoute } from "../../../components/VideoApprovalRoute";
-import { signPaths } from "../../../lib/media";
+import { useSignedPreviewPaths } from "../../../lib/useSignedPreviewPaths";
 import { supabase } from "../../../lib/supabase";
 
 type Video = { id: string; client_id: string; title: string | null; content_format: string | null;
@@ -11,7 +11,7 @@ type Slot = { id: string; asset_id: string | null };
 export function SmmVideoApprovals({ memberId }: { memberId: string }) {
   const [videos, setVideos] = useState<Video[]>([]);
   const [names, setNames] = useState<ReadonlyMap<string, string>>(new Map());
-  const [urls, setUrls] = useState<ReadonlyMap<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", videos.map((video) => video.render_path ?? video.storage_path));
   const [slots, setSlots] = useState<ReadonlyMap<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export function SmmVideoApprovals({ memberId }: { memberId: string }) {
       const ids = [...new Set(clients.map((row) => row.client_id))];
       setNames(new Map(clients.map((row) => [row.client_id, row.clients?.name ?? "Client"])));
       if (ids.length === 0) {
-        setVideos([]); setUrls(new Map()); setSlots(new Map()); return;
+        setVideos([]); setSlots(new Map()); return;
       }
       const { data: assets, error: assetError } = await supabase.from("client_media_assets")
         .select("id, client_id, title, content_format, storage_path, render_path, review_status, created_at")
@@ -44,7 +44,6 @@ export function SmmVideoApprovals({ memberId }: { memberId: string }) {
       setVideos(rows);
       setSlots(new Map(((engineSlots ?? []) as Slot[]).flatMap((slot) =>
         slot.asset_id ? [[slot.asset_id, slot.id] as const] : [])));
-      setUrls(await signPaths("client-media", rows.map((row) => row.render_path ?? row.storage_path)));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load video approvals.");
     } finally { setLoading(false); }

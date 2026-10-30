@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
 import type { Option } from "../components/forms/fields";
 import { CONTENT_FORMATS } from "./contentFormat";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "./signedUrlPolicy";
 
 /** Loads select options once, when the modal that needs them opens. */
 export function useOptions(
@@ -154,7 +155,8 @@ export async function uploadThen(
   file: File,
   then: (storagePath: string) => Promise<void>,
 ): Promise<void> {
-  const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file);
+  const { error: uploadError } = await supabase.storage.from(bucket)
+    .upload(path, file, { cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS });
   if (uploadError) throw uploadError;
   try {
     await then(path);

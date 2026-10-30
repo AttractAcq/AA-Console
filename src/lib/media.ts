@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { BROWSER_PREVIEW_URL_TTL_SECONDS } from "./signedUrlPolicy";
 
 /**
  * Signs a batch of storage paths in one round trip. Buckets are private,
@@ -7,12 +8,11 @@ import { supabase } from "./supabase";
 export async function signPaths(
   bucket: string,
   paths: string[],
-  expiresIn = 3600,
 ): Promise<Map<string, string>> {
   const unique = [...new Set(paths.filter(Boolean))];
   if (unique.length === 0) return new Map();
 
-  const { data, error } = await supabase.storage.from(bucket).createSignedUrls(unique, expiresIn);
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrls(unique, BROWSER_PREVIEW_URL_TTL_SECONDS);
   if (error || !data) return new Map();
 
   return new Map(

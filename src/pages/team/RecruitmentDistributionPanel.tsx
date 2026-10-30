@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "../../components/Button";
 import { supabase } from "../../lib/supabase";
 import { adsManagerUrl, parseCountries } from "../../lib/metaBuild";
-import { signPaths } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { isMissingFunction, isMissingTable, MIGRATION_PENDING_NOTE } from "../../lib/schemaGaps";
 
@@ -34,7 +34,7 @@ export function RecruitmentDistributionPanel() {
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.storage_path));
   const [selected, setSelected] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [budget, setBudget] = useState("");
@@ -83,7 +83,6 @@ export function RecruitmentDistributionPanel() {
       setBriefs((copy.data ?? []) as Brief[]);
       setCampaigns((rows.data ?? []) as Campaign[]);
       setJobs((jobRows.data ?? []) as Job[]);
-      setUrls(await signPaths("client-media", (images.data ?? []).map((a) => a.storage_path)));
       setError(null);
     } catch (cause) {
       setError((cause as { message?: string }).message ?? "Could not load recruitment distribution.");

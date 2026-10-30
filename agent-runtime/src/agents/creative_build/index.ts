@@ -28,6 +28,7 @@ import { appendEvent } from "../../queue.js";
 import { ProviderError, runAgentLoop } from "../../tools/anthropic.js";
 import { OpenAiError, runStructuredCompletion } from "../../tools/openai.js";
 import { estimateCostUsd } from "../../usage/cost.js";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../storage/signed-url-policy.js";
 import { renderContext, renderUpstream } from "../shared.js";
 import { loadConceptContext } from "./context.js";
 import { remakeBlock, conceptProblem, recruitmentConceptProblem, TREATMENTS } from "./concept.js";
@@ -813,7 +814,9 @@ Call ${submitTool.name} once when you are done.`;
     const document = [`# ${String(concept.headline ?? typed.title)}`, "", body, "", `**Call to action:** ${String(concept.call_to_action ?? "")}`].join("\n");
     const { error: uploadError } = await sb.storage
       .from(BUCKET)
-      .upload(path, Buffer.from(document, "utf8"), { contentType: "text/markdown", upsert: true });
+      .upload(path, Buffer.from(document, "utf8"), {
+        contentType: "text/markdown", upsert: true, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS,
+      });
     if (uploadError) throw new Error(`Could not store the copy: ${uploadError.message}`);
 
     const assetId = await insertAsset(sb, job, typed, path, "text");
@@ -887,7 +890,9 @@ Call ${submitTool.name} once when you are done.`;
       newPath = pathFor(replacement.position, out.extension);
       const { error: upErr } = await sb.storage
         .from(BUCKET)
-        .upload(newPath, out.bytes, { contentType: out.contentType, upsert: true });
+        .upload(newPath, out.bytes, {
+          contentType: out.contentType, upsert: true, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS,
+        });
       if (upErr) throw new Error(`Could not store frame ${replacement.position}: ${upErr.message}`);
       await appendEvent(sb, job.id, `Rebuilt frame ${replacement.position} of ${total}.`);
 
@@ -1045,7 +1050,9 @@ Call ${submitTool.name} once when you are done.`;
           const path = framePath(String(job.client_id), renderId, frame.position, out.extension);
           const { error: upErr } = await sb.storage
             .from(BUCKET)
-            .upload(path, out.bytes, { contentType: out.contentType, upsert: true });
+            .upload(path, out.bytes, {
+              contentType: out.contentType, upsert: true, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS,
+            });
           if (upErr) throw new Error(`Could not store frame ${frame.position}: ${upErr.message}`);
           return path;
         },
@@ -1188,7 +1195,9 @@ Call ${submitTool.name} once when you are done.`;
   const path = `${job.client_id}/generated/${renderId}.${final.extension}`;
   const { error: uploadError } = await sb.storage
     .from(BUCKET)
-    .upload(path, final.bytes, { contentType: final.contentType, upsert: true });
+    .upload(path, final.bytes, {
+      contentType: final.contentType, upsert: true, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS,
+    });
   if (uploadError) throw new Error(`Could not store the image: ${uploadError.message}`);
 
   const assetId = await insertAsset(sb, job, typed, path, "image");

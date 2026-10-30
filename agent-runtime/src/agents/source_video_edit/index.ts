@@ -8,6 +8,7 @@ import type { AgentRow } from "../../orchestration/registry.js";
 import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../storage/signed-url-policy.js";
 import { validateEdl, type Edl } from "../video_edit/edl.js";
 import { bannedPhrases } from "../video_edit/handoff.js";
 import { installFont } from "../video_edit/font.js";
@@ -157,7 +158,7 @@ export async function runSourceVideoEditJob(sb: SupabaseClient, config: RuntimeC
     await render(renderPlan);
     const storagePath = `${request.client_id}/edits/${request.id}/cut.mp4`;
     const { error: uploadError } = await sb.storage.from(BUCKET).upload(storagePath,
-      await readFile(output), { contentType: "video/mp4", upsert: true });
+      await readFile(output), { contentType: "video/mp4", upsert: true, cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS });
     if (uploadError) throw new Error(`Could not store the edited video: ${uploadError.message}`);
     const dimensions = DIMENSIONS[request.aspect];
     const { error: completeError } = await sb.rpc("complete_source_video_edit", {

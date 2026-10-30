@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../../config.js";
 import type { AgentRow } from "../../orchestration/registry.js";
 import type { AgentJobRow } from "../../queue.js";
-import { runPublisherJob, type ClaimedPost } from "./index.js";
+import { prepare, runPublisherJob, type ClaimedPost } from "./index.js";
 import * as registry from "../../publishing/registry.js";
 import { PublishError } from "../../publishing/types.js";
 
@@ -55,6 +55,7 @@ function database(
   } = {},
 ) {
   const events: Record<string, unknown>[] = [];
+  const signCalls: Array<{ paths: string[]; ttl: number }> = [];
   const rpc = vi.fn(async (name: string) => {
     if (name === "claim_posts_for_publishing") return { data: options.claimed ?? [POST], error: null };
     if (name === "integration_secret") {
@@ -105,20 +106,26 @@ function database(
   });
   const storage = {
     from: () => ({
-      createSignedUrl: async () => ({
-        data: { signedUrl: "signed" in options ? options.signed : "https://signed.example/a.png" },
-        error: null,
-      }),
-      createSignedUrls: async (paths: string[]) => ({
-        data:
-          options.signedFrames !== undefined
-            ? options.signedFrames
-            : paths.map((path) => ({ signedUrl: `https://signed.example/${path}` })),
-        error: options.frameError ? { message: options.frameError } : null,
-      }),
+      createSignedUrl: async (path: string, ttl: number) => {
+        signCalls.push({ paths: [path], ttl });
+        return {
+          data: { signedUrl: "signed" in options ? options.signed : "https://signed.example/a.png" },
+          error: null,
+        };
+      },
+      createSignedUrls: async (paths: string[], ttl: number) => {
+        signCalls.push({ paths, ttl });
+        return {
+          data:
+            options.signedFrames !== undefined
+              ? options.signedFrames
+              : paths.map((path) => ({ signedUrl: `https://signed.example/${path}` })),
+          error: options.frameError ? { message: options.frameError } : null,
+        };
+      },
     }),
   };
-  return { sb: { from, rpc, storage } as unknown as SupabaseClient, rpc, events };
+  return { sb: { from, rpc, storage } as unknown as SupabaseClient, rpc, events, signCalls };
 }
 
 const publish = vi.fn();
@@ -159,6 +166,15 @@ describe("the switch", () => {
 });
 
 describe("the sweep", () => {
+  it("uses the fixed provider fetch lifetime for a post and every carousel frame", async () => {
+    const { sb, signCalls } = database();
+    await prepare(sb, CAROUSEL);
+    expect(signCalls).toEqual([
+      { paths: ["assets/a.png"], ttl: 3600 },
+      { paths: ["assets/f1.png", "assets/f2.png", "assets/f3.png"], ttl: 3600 },
+    ]);
+  });
+
   it("publishes what it claimed and records it", async () => {
     const { sb, rpc } = database();
     const result = await runPublisherJob(sb, on, agent, job);
@@ -204,6 +220,16 @@ describe("the sweep", () => {
     const { sb, rpc } = database();
     await runPublisherJob(sb, on, agent, job);
     expect(failureFor(rpc, "post-1")!.p_retryable).toBe(false);
+  });
+
+  it("does not persist a provider error that echoes a signed Storage URL", async () => {
+    publish.mockRejectedValueOnce(new PublishError(
+      "Bad media https://storage.example/storage/v1/object/sign/client-media/a.png?token=secret", false,
+    ));
+    const { sb, rpc, events } = database();
+    await runPublisherJob(sb, on, agent, job);
+    expect(failureFor(rpc, "post-1")!.p_reason).toContain("details withheld");
+    expect(JSON.stringify({ calls: rpc.mock.calls, events })).not.toContain("token=secret");
   });
 
   it("treats anything it does not recognise as not worth retrying", async () => {
