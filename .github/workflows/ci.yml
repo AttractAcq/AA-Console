@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: 22
       - name: Check isolated replay preparation
-        run: node --test scripts/prepare-schema-replay.test.mjs scripts/schema-migration-order.test.mjs scripts/schema-replay-fingerprint.test.mjs scripts/assert-current-deploy-sha.test.mjs scripts/verify-github-release-candidate.test.mjs
+        run: node --test scripts/prepare-schema-replay.test.mjs scripts/schema-migration-order.test.mjs scripts/schema-replay-fingerprint.test.mjs scripts/assert-current-deploy-sha.test.mjs scripts/verify-github-release-candidate.check.mjs
       - name: Require sequential migration dependencies
         run: node scripts/schema-migration-order.mjs
       - uses: supabase/setup-cli@v3
