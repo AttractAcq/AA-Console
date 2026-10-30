@@ -11,6 +11,29 @@ type Observation<T> = {
   reason: string | null;
 };
 
+type EvidenceCheck = {
+  state: "observed" | "unknown" | "error";
+  checkedAt: string;
+  evidenceAt: string | null;
+  source: string;
+  reason: string | null;
+};
+
+const EVIDENCE_LABELS: Record<string, string> = {
+  runtimeDeployment: "Runtime deployed commit",
+  runtimeWorkers: "Runtime worker fleet",
+  gatewayDeployment: "Gateway deployed commit",
+  schemaCatalog: "Database schema catalog",
+  schemaParity: "Database schema parity",
+  cronCatalog: "Cron schedule catalog",
+  cronExecution: "Cron execution",
+  switchInventory: "Runtime and database switches",
+  credentialValidity: "Credential validity",
+  providerAccountHealth: "Provider account health",
+  otherEnvironment: "Other environment inventory",
+  externalEffects: "External action results",
+};
+
 type Snapshot = {
   schemaVersion: number;
   capturedAt: string;
@@ -51,8 +74,10 @@ type Snapshot = {
       provider: string; status: string; ingestEnabled: boolean; hasCredential: boolean;
       lastCheckedAt: string | null; tokenExpiresAt: string | null;
       accountIds: Record<string, string | null>;
+      providerHealth?: EvidenceCheck;
     }[];
   }[]>;
+  evidenceCoverage?: Record<string, EvidenceCheck>;
 };
 
 function stamp(value: string | null | undefined): string {
@@ -134,6 +159,23 @@ export function SystemReadinessPanel() {
     {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
     {loading && !snapshot && <p role="status" className="text-sm text-muted-foreground">Collecting system evidence…</p>}
     {snapshot && <>
+      <section aria-label="Evidence coverage" className="space-y-3">
+        <h2 className="text-lg font-semibold">Evidence coverage</h2>
+        <p className="text-sm text-muted-foreground">Recorded means the named source returned evidence at capture time. It does not certify the feature or an external provider action.</p>
+        {!snapshot.evidenceCoverage && <p role="status" className="text-sm text-muted-foreground">This runtime has not supplied machine-readable evidence coverage. Refresh after its deployment.</p>}
+        {snapshot.evidenceCoverage && <dl className="grid gap-3 lg:grid-cols-2">
+          {Object.entries(EVIDENCE_LABELS).map(([key, label]) => {
+            const check = snapshot.evidenceCoverage?.[key];
+            return <div key={key} className="rounded-lg border border-border bg-card p-4 text-sm">
+              <dt className="font-medium">{label}</dt>
+              <dd className="mt-1">{check?.state === "observed" ? "Recorded" : check?.state === "error" ? "Could not verify" : "Unknown"}</dd>
+              <dd className="mt-1 text-xs text-muted-foreground">Source: {check?.source ?? "Unknown"}; checked {stamp(check?.checkedAt)}; source evidence {stamp(check?.evidenceAt)}.</dd>
+              {check?.reason && <dd className="mt-1 text-xs text-muted-foreground">{check.reason}</dd>}
+            </div>;
+          })}
+        </dl>}
+      </section>
+
       <section aria-label="Code and deployment identity" className="space-y-3">
         <h2 className="text-lg font-semibold">Code and deployed services</h2>
         <div className="grid gap-3 lg:grid-cols-2">
@@ -176,7 +218,13 @@ export function SystemReadinessPanel() {
           <p className="mt-1">Message channels: {snapshot.global.value.messageChannels.map((channel) => `${channel.key} ${channel.supported ? "supported" : "unsupported"}, ${channel.canInitiate ? "can initiate" : "reply only"} (${channel.transport})`).join(" · ") || "None"}</p>
           <p className="mt-2 text-xs text-muted-foreground">Source: engine_controls, platform_publishing, proof_destinations, campaign_action_executors and message_channels; checked {stamp(snapshot.global.checkedAt)}.</p>
         </div>}
-        <p className="text-xs text-muted-foreground">Gateway internal API: {snapshot.gateway.value ? state(snapshot.gateway.value.configured.aaInternalApi) : "Unknown"}. Gateway probe checked {stamp(snapshot.gateway.checkedAt)}.</p>
+        <div className="rounded-lg border border-border bg-card p-4 text-sm">
+          <p>Gateway internal API: {snapshot.gateway.value ? state(snapshot.gateway.value.configured.aaInternalApi) : "Unknown"}.</p>
+          <p className="mt-1">Gateway Bot auth mode: {snapshot.gateway.value?.configured.botAuthMode ?? "Unknown"}.</p>
+          {snapshot.gateway.value?.configured.botAuthMode === "dual" &&
+            <p role="status" className="mt-2 text-muted-foreground">Dual mode can still admit legacy environment identities. Verify each Bot grant and revocation before enabling autonomous tool access.</p>}
+          <p className="mt-2 text-xs text-muted-foreground">Gateway probe checked {stamp(snapshot.gateway.checkedAt)}.</p>
+        </div>
       </section>
 
       <section aria-label="Observed dependency state" className="space-y-3">
@@ -214,7 +262,7 @@ export function SystemReadinessPanel() {
           <p className="mt-1 text-sm">Proof destinations: {client.proofDestinations.length ? client.proofDestinations.map((destination) => `${destination.key} ${state(destination.enabled)}${destination.hasAccountRef ? " (account linked)" : ""}`).join(" · ") : "None configured"}</p>
           <p className="mt-1 text-sm">Sales agent deployments: {client.salesAgentDeployments.length ? client.salesAgentDeployments.map((deployment) => `${deployment.pageId ?? deployment.id} ${state(deployment.enabled)}`).join(" · ") : "None configured"}</p>
           <ul className="mt-2 space-y-1 text-sm">{client.integrations.map((integration, index) =>
-            <li key={`${integration.provider}-${index}`}>{integration.provider}: {integration.status}; ingest {state(integration.ingestEnabled)}; credential {integration.hasCredential ? "present" : "missing"}; checked {stamp(integration.lastCheckedAt)}; token expiry {stamp(integration.tokenExpiresAt)}; account IDs {Object.entries(integration.accountIds).filter(([, value]) => value).map(([key, value]) => `${key} ${value}`).join(", ") || "Unknown"}</li>)}</ul>
+            <li key={`${integration.provider}-${index}`}>{integration.provider}: {integration.status}; ingest {state(integration.ingestEnabled)}; credential {integration.hasCredential ? "present" : "missing"}; checked {stamp(integration.lastCheckedAt)}; token expiry {stamp(integration.tokenExpiresAt)}; account IDs {Object.entries(integration.accountIds).filter(([, value]) => value).map(([key, value]) => `${key} ${value}`).join(", ") || "Unknown"}; live provider health {integration.providerHealth?.state === "observed" ? "Recorded" : integration.providerHealth?.state === "error" ? "Could not verify" : "Unknown"}</li>)}</ul>
         </div>)}
       </section>
 
