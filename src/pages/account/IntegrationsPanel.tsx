@@ -18,6 +18,10 @@ type Integration = {
   credential_label: string | null;
   access_level: string | null;
   status: string;
+  usable: boolean;
+  headline: string | null;
+  health_detail: string | null;
+  token_expires_at: string | null;
   ingest_enabled: boolean;
   last_checked_at: string | null;
   ad_account_id: string | null;
@@ -113,13 +117,30 @@ export function IntegrationsPanel() {
     if (!clientId) return;
     setLoadError(null);
     try {
-      const { data, error } = await supabase
-        .from("client_integrations")
-        .select("id, provider, credential_label, access_level, status, ingest_enabled, last_checked_at, ad_account_id, meta_page_id, meta_pixel_id")
-        .eq("client_id", clientId)
-        .order("provider");
-      if (error) throw error;
-      setRows((data ?? []) as Integration[]);
+      const [integrations, health] = await Promise.all([
+        supabase
+          .from("client_integrations")
+          .select("id, provider, credential_label, access_level, status, ingest_enabled, last_checked_at, ad_account_id, meta_page_id, meta_pixel_id")
+          .eq("client_id", clientId)
+          .order("provider"),
+        supabase
+          .from("integration_health")
+          .select("integration_id, usable, headline, health_detail, token_expires_at")
+          .eq("client_id", clientId),
+      ]);
+      if (integrations.error) throw integrations.error;
+      if (health.error) throw health.error;
+      const byId = new Map((health.data ?? []).map((row) => [row.integration_id, row]));
+      setRows((integrations.data ?? []).map((row) => {
+        const state = byId.get(row.id);
+        return {
+          ...row,
+          usable: state?.usable === true,
+          headline: state?.headline ?? "Health unavailable",
+          health_detail: state?.health_detail ?? null,
+          token_expires_at: state?.token_expires_at ?? null,
+        };
+      }));
     } catch (error) {
       setLoadError("Failed to load integrations: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
     }
@@ -165,7 +186,7 @@ export function IntegrationsPanel() {
   // The credentials onboarding asks for, and whether they have arrived. Read
   // from the same list onboarding scores itself against, so the two cannot
   // disagree about what "credentials collected" means.
-  const connected = new Set(rows.map((r) => r.provider));
+  const connected = new Set(rows.filter((r) => r.usable).map((r) => r.provider));
   const outstanding = SYNCING_PROVIDERS.filter((p) => !connected.has(p));
 
   return (
@@ -174,8 +195,8 @@ export function IntegrationsPanel() {
         <p className="text-xs text-muted-foreground">
           {outstanding.length === 0 ? (
             <>
-              Both credentials onboarding asks for are connected. Reporting and attribution have
-              numbers to pull.
+              Both reporting credentials are currently eligible to read. Provider account and
+              permission checks still apply when a pull runs.
             </>
           ) : (
             <>
@@ -183,7 +204,7 @@ export function IntegrationsPanel() {
               <span className="font-medium capitalize text-foreground">
                 {outstanding.join(", ")}
               </span>
-              . Until these are here, reporting and attribution have nothing to read.
+              . Connect or repair them before a scheduled pull can run.
             </>
           )}
         </p>
@@ -209,12 +230,18 @@ export function IntegrationsPanel() {
             key="s"
             className={cn(
               "inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize",
-              r.status === "error"
+              !r.usable
                 ? "bg-destructive/10 text-destructive"
-                : "bg-primary/10 text-brand-strong",
+                : r.headline === "Expiring soon"
+                  ? "bg-amber-100 text-amber-900"
+                  : "bg-primary/10 text-brand-strong",
             )}
           >
-            {r.status}
+            {r.status} · {r.headline}
+            {r.token_expires_at && (
+              <span className="block normal-case">Expires {new Date(r.token_expires_at).toLocaleDateString()}</span>
+            )}
+            {r.health_detail && <span className="block normal-case">{r.health_detail}</span>}
           </span>,
           SYNCS[r.provider] ? (
             <div key="t" className="flex items-center gap-2">
@@ -239,7 +266,7 @@ export function IntegrationsPanel() {
                 />
               </button>
               <span className="text-xs text-muted-foreground">
-                {r.ingest_enabled ? "On" : "Off"}
+                {r.ingest_enabled ? (r.usable ? "On" : "On · waiting for credential") : "Off"}
                 {r.last_checked_at && r.ingest_enabled
                   ? ` · last ${new Date(r.last_checked_at).toLocaleDateString()}`
                   : ""}

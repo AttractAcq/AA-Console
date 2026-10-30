@@ -192,6 +192,19 @@ beforeEach(() => {
 });
 
 describe("unified approval inbox", () => {
+  it("shows a held organic publication card on initial client load", async () => {
+    requests = [{ ...request, id: "organic-package-1",
+      source_system: "aa_console", source_kind: "organic_publication",
+      title: "Organic publication: instagram", status: "source_held",
+      source_state: "source_held", preview_blocker: "Exact outgoing AAL2 decision is not connected." }];
+    show();
+    const card = await screen.findByRole("article", { name: "Organic publication: instagram" });
+    expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue("all");
+    expect(within(card).getByText(/Exact outgoing AAL2 decision is not connected/))
+      .toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
+  });
+
   it("shows only manager-owned cards across assigned clients and no admin source links", async () => {
     requests = [
       { ...readyCampaign, id: "manager-client-1", title: "Client one action",
@@ -312,6 +325,8 @@ describe("unified approval inbox", () => {
       actor_aal: "aal2", reason: "Rights verified", decided_at: "2026-10-30T09:00:00Z" }];
     show();
     expect(await screen.findByText("Build the Meta ad")).toBeInTheDocument();
+    expect(screen.getByText("Proof placement")).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "pending");
     expect(screen.queryByText("Proof placement")).not.toBeInTheDocument();
     await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "approved");
     expect(screen.getByText("Proof placement")).toBeInTheDocument();

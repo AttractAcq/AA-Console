@@ -14716,6 +14716,131 @@ export type Database = {
         }
         Relationships: []
       }
+      organic_publication_packages_v6: {
+        Row: {
+          artifact_hash: string
+          client_id: string
+          id: string
+          manifest: Json
+          registered_at: string
+          scheduled_post_id: string
+          slot_id: string
+          source_snapshot_hash: string
+        }
+        Insert: {
+          artifact_hash: string
+          client_id: string
+          id?: string
+          manifest: Json
+          registered_at?: string
+          scheduled_post_id: string
+          slot_id: string
+          source_snapshot_hash: string
+        }
+        Update: {
+          artifact_hash?: string
+          client_id?: string
+          id?: string
+          manifest?: Json
+          registered_at?: string
+          scheduled_post_id?: string
+          slot_id?: string
+          source_snapshot_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organic_publication_packages_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "organic_publication_packages_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "organic_publication_packages_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organic_publication_packages_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "organic_publication_packages_v6_scheduled_post_id_fkey"
+            columns: ["scheduled_post_id"]
+            isOneToOne: false
+            referencedRelation: "distribution_due"
+            referencedColumns: ["schedule_id"]
+          },
+          {
+            foreignKeyName: "organic_publication_packages_v6_scheduled_post_id_fkey"
+            columns: ["scheduled_post_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["post_id"]
+          },
+          {
+            foreignKeyName: "organic_publication_packages_v6_scheduled_post_id_fkey"
+            columns: ["scheduled_post_id"]
+            isOneToOne: false
+            referencedRelation: "post_copy_effective"
+            referencedColumns: ["scheduled_post_id"]
+          },
+          {
+            foreignKeyName: "organic_publication_packages_v6_scheduled_post_id_fkey"
+            columns: ["scheduled_post_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["post_id"]
+          },
+          {
+            foreignKeyName: "organic_publication_packages_v6_scheduled_post_id_fkey"
+            columns: ["scheduled_post_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organic_publication_packages_v6_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["slot_id"]
+          },
+          {
+            foreignKeyName: "organic_publication_packages_v6_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["slot_id"]
+          },
+          {
+            foreignKeyName: "organic_publication_packages_v6_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "content_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organic_publication_packages_v6_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "slot_board"
+            referencedColumns: ["slot_id"]
+          },
+        ]
+      }
       outbound_messages: {
         Row: {
           address: string
@@ -21876,6 +22001,7 @@ export type Database = {
           headline: string | null
           health_detail: string | null
           ingest_enabled: boolean | null
+          integration_id: string | null
           last_checked_at: string | null
           provider: string | null
           status: string | null
@@ -26102,6 +26228,7 @@ export type Database = {
         Args: { p_days?: number }
         Returns: number
       }
+      enqueue_organic_package_sweep_v6: { Args: never; Returns: string }
       enqueue_outbound_sweep: { Args: never; Returns: string }
       enqueue_profile_update_sweep: { Args: never; Returns: string }
       enqueue_proof_placement_sweep: { Args: never; Returns: string }
@@ -26247,6 +26374,10 @@ export type Database = {
       integration_secret: {
         Args: { p_client_id: string; p_provider: string }
         Returns: string
+      }
+      integration_state_eligible: {
+        Args: { p_expires_at: string; p_status: string }
+        Returns: boolean
       }
       integration_usable: {
         Args: { p_client_id: string; p_provider: string }
@@ -27131,6 +27262,25 @@ export type Database = {
         Args: { p_opportunity_id: string }
         Returns: string
       }
+      organic_publication_package_candidates_v6: {
+        Args: { p_limit?: number }
+        Returns: {
+          client_id: string
+          copy: Json
+          platform: string
+          post_id: string
+          source_paths: Json
+          source_snapshot_hash: string
+        }[]
+      }
+      organic_publication_source_snapshot_v6: {
+        Args: { p_post_id: string }
+        Returns: Json
+      }
+      organic_publication_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       pause_agent_job: {
         Args: { p_job_id: string; p_reason: string }
         Returns: {
@@ -27815,6 +27965,15 @@ export type Database = {
         Args: { p_request: Json }
         Returns: string
       }
+      register_organic_publication_package_v6: {
+        Args: {
+          p_expected_source_hash: string
+          p_media: Json
+          p_post_id: string
+          p_provider_copy: Json
+        }
+        Returns: string
+      }
       register_recruitment_brief_inbox_v6: {
         Args: { p_brief: Database["public"]["Tables"]["client_briefs"]["Row"] }
         Returns: string
@@ -28134,6 +28293,10 @@ export type Database = {
       require_opportunity_proof_v6: {
         Args: { p_opportunity_id: string; p_requirement: string }
         Returns: string
+      }
+      require_organic_publication_prewrite_v6: {
+        Args: { p_post_id: string }
+        Returns: Json
       }
       rerender_generation: {
         Args: { p_generation_id: string; p_quality?: string; p_size?: string }
