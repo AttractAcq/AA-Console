@@ -260,14 +260,17 @@ effective required SHA can be the PR head or test merge commit. These facts
 require a live non-effect pilot; they do not prove the current repository's
 policy has been installed correctly.
 
-The source-only `publishApprovedProductionReleaseHeadCheck` function accepts
-an event from the protected-base runner, independently invokes the canonical
-AAL2 approval assertion, re-reads current PR/main and the workflow run with
-a read-only GitHub token, then asks a separate reviewed App installation
-credential to create **only** a `success` check named
+The source-only `publishApprovedProductionReleaseHeadCheck` function is for
+a later reviewed broker **after** the protected-base workflow has completed
+successfully. It independently invokes the canonical AAL2 approval assertion,
+re-reads current PR/main and the workflow run with a read-only GitHub token,
+requires the run's successful completion to be no more than 15 minutes old
+and its start to be no more than 30 minutes old,
+then asks a separate reviewed App installation credential to create **only**
+a `success` check named
 `Approved production release (AA App)` on the exact approved PR head. It has
 no CLI or workflow call site. It rejects a changed marker, PR/head/base,
-main, run path/base/attempt, decision or packet before the write and re-reads
+main, run path/base/attempt/completion, decision or packet before the write and re-reads
 PR/main afterward. If a write times out, it reports an ambiguous outcome and
 does not retry automatically. A PR or main change after publication cannot
 be made atomic with GitHub; the trusted merger must still re-read the latest
@@ -289,21 +292,24 @@ the effect because the merger's AAL2 re-read and database lease reject it.
 
 1. Choose the App's real installation, ID, slug and custody mechanism. A
    short-lived installation token needs a reviewed issuer, such as an OIDC
-   attested broker. Putting a private key in a `pull_request_target` secret
-   is an alternative that needs an explicit custody review. The App should
-   have only repository Metadata read and Checks write. Keep its credential
-   distinct from the read-only verifier and merge identity.
+   attested broker. The App should have only repository Metadata read and
+   Checks write. Keep its credential distinct from the read-only verifier
+   and merge identity. The publisher deliberately refuses an in-progress or
+   failed native run, even after its approval assertion returns green.
 2. Bootstrap the protected-base publisher/contract/merger files and verifier
    path lock under separate human review. An ordinary exact release candidate
-   cannot change its own verifier. Wire the publisher into the workflow only
-   after the App and server credential policy is approved; do not execute
-   PR-head code in that secret-bearing runner.
+   cannot change its own verifier. Build a separate completed-run broker that
+   recovers the original event's exact request/PR/head/base from a trusted
+   run-bound artifact or equally strong first-party evidence, then repeats
+   all independent reads. The broker is **not** built here. It must never
+   trust a client-supplied event or execute PR-head code with credentials.
 3. Use a same-repository trial PR to record the native job check SHA, the App
    check SHA, App ID/slug, `external_id`, linked workflow run path/event/base,
    its `pull_requests` array and run attempt, and the PR status box's effective
    head versus test-merge SHA. Verify a changed head, newer base, revoked
-   Inbox decision, missing App check, wrong App, failed CI and wrong packet
-   all block. Require the App check by exact source ID only after this trial.
+   Inbox decision, missing App check, wrong App, failed/in-progress/stale
+   approval run, failed CI and wrong packet all block. Require the App check
+   by exact source ID only after this trial.
 4. Prove only the reviewed merger identity can change `main`, with no direct
    push, alternate merge, administrator bypass or merge queue path that skips
    the lease. The App check is a snapshot and cannot replace this policy.

@@ -1,6 +1,6 @@
 // Held source only: no CLI, workflow step, installed App or credential.
-// A later custody-reviewed protected-base runner may call this after its
-// exact AAL2 Inbox assertion. It never checks out or executes PR-head code.
+// A later custody-reviewed broker may call this only after the protected-base
+// approval workflow has completed successfully. It never runs PR-head code.
 import { checkApprovedProductionRelease, releaseRequestFromEvent } from './check-approved-production-release.mjs'
 import {
   APPROVED_RELEASE_APP_CHECK, approvedReleaseCheckExternalId,
@@ -37,10 +37,17 @@ function assertCurrentCandidate(event, context, approved, pr, main) {
       || main?.name !== 'main' || main?.commit?.sha !== approved.baseSha)
     fail('current main, PR marker, head or base changed')
 }
-function assertTrustedRun(run, approved, workflowRunId, workflowRunAttempt) {
+function assertTrustedRun(run, approved, workflowRunId, workflowRunAttempt, now) {
+  const startedAt = Date.parse(run?.created_at)
+  const finishedAt = Date.parse(run?.updated_at)
   if (run?.id !== workflowRunId || run?.run_attempt !== workflowRunAttempt
       || run?.path !== TRUSTED_WORKFLOW || run?.event !== 'pull_request_target'
-      || run?.head_sha !== approved.baseSha || run?.status !== 'in_progress'
+      || run?.head_sha !== approved.baseSha || run?.status !== 'completed'
+      || run?.conclusion !== 'success'
+      || !Number.isFinite(startedAt) || !Number.isFinite(finishedAt)
+      || finishedAt < startedAt || finishedAt > now + 5000
+      || now - finishedAt > 15 * 60_000
+      || now - startedAt > 30 * 60_000
       || run?.repository?.full_name !== REPOSITORY
       || !Array.isArray(run?.pull_requests)
       || (run.pull_requests.length > 0 && (run.pull_requests.length !== 1
@@ -87,7 +94,7 @@ export async function publishApprovedProductionReleaseHeadCheck({
     githubJson(`/actions/runs/${workflowRunId}`, verificationToken, fetcher),
   ])
   assertCurrentCandidate(event, context, approved, pr, main)
-  assertTrustedRun(run, approved, workflowRunId, workflowRunAttempt)
+  assertTrustedRun(run, approved, workflowRunId, workflowRunAttempt, Date.now())
   // The candidate may move during the parallel reads. Check main once more
   // immediately before the App writes the head-attached result.
   const finalMain = await githubJson('/branches/main', verificationToken, fetcher)

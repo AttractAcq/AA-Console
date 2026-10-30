@@ -14,6 +14,7 @@ const approved = { requestId: REQUEST, prNumber: 297, headSha: HEAD,
   baseSha: BASE, sourceVersion: 'c'.repeat(64), packetSha256: 'd'.repeat(64) }
 
 function facts() {
+  const now = Date.now()
   const pr = { number: 297, state: 'open', draft: false,
     html_url: `https://github.com/${REPOSITORY}/pull/297`,
     body: `AA-Release-Request: ${REQUEST}`,
@@ -24,7 +25,10 @@ function facts() {
     pr, main: { name: 'main', commit: { sha: BASE } },
     run: { id: 123, run_attempt: 1,
       path: '.github/workflows/production-release-approval.yml',
-      event: 'pull_request_target', head_sha: BASE, status: 'in_progress',
+      event: 'pull_request_target', head_sha: BASE,
+      status: 'completed', conclusion: 'success',
+      created_at: new Date(now - 60_000).toISOString(),
+      updated_at: new Date(now - 10_000).toISOString(),
       repository: { full_name: REPOSITORY }, pull_requests: [] },
   }
 }
@@ -100,10 +104,18 @@ test('stale event, decision, PR marker, head or base cannot create a green check
 test('a wrong or absent protected-base workflow run cannot publish', async () => {
   for (const change of [
     (h: ReturnType<typeof harness>) => { h.state.run.path = '.github/workflows/ci.yml' },
+    (h: ReturnType<typeof harness>) => { h.state.run.event = 'workflow_dispatch' },
     (h: ReturnType<typeof harness>) => { h.state.run.head_sha = HEAD },
     (h: ReturnType<typeof harness>) => { h.state.run.run_attempt = 2 },
-    (h: ReturnType<typeof harness>) => { h.state.run.status = 'completed' },
+    (h: ReturnType<typeof harness>) => { h.state.run.status = 'in_progress' },
+    (h: ReturnType<typeof harness>) => { h.state.run.conclusion = 'failure' },
+    (h: ReturnType<typeof harness>) => { h.state.run.updated_at = new Date(Date.now() - 16 * 60_000).toISOString() },
+    (h: ReturnType<typeof harness>) => { h.state.run.created_at = new Date(Date.now() - 31 * 60_000).toISOString() },
     (h: ReturnType<typeof harness>) => { h.state.run.pull_requests = [{ number: 298, head: { sha: HEAD }, base: { sha: BASE } }] },
+    (h: ReturnType<typeof harness>) => { h.state.run.pull_requests = [
+      { number: 297, head: { sha: HEAD }, base: { sha: BASE } },
+      { number: 298, head: { sha: HEAD }, base: { sha: BASE } },
+    ] },
   ]) {
     const h = harness(); change(h)
     await assert.rejects(publishApprovedProductionReleaseHeadCheck(h.input), /protected-base workflow run/)
