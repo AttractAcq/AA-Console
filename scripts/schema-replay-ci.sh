@@ -94,6 +94,8 @@ snapshot_schema() {
   local stage="$1"
   psql_local -qAt -f supabase/verification/schema-replay-contract.sql \
     >"$evidence_dir/$stage.contract.txt"
+  psql_local -qAt -f supabase/verification/b005-definer-grant-contract.sql \
+    >"$evidence_dir/$stage.b005-definer-grants.txt"
   psql_local -qAt -f supabase/verification/schema-replay-fingerprint.sql \
     >"$evidence_dir/$stage.fingerprint.json"
 }
