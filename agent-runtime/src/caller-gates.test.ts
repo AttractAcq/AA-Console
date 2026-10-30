@@ -27,9 +27,9 @@ async function allMigrationSql(): Promise<string> {
   return bodies.join("\n");
 }
 
-/** The regex literal 168 builds, as the database would return it. */
+/** The last definition wins after subsequent migrations replace this function. */
 function gateMarkers(sql: string): string {
-  const fn = sql.slice(sql.indexOf("function public.caller_gate_markers()"));
+  const fn = sql.slice(sql.lastIndexOf("function public.caller_gate_markers()"));
   const body = fn.slice(0, fn.indexOf("$$;"));
   return body;
 }
@@ -46,6 +46,9 @@ describe("the gates the exposure view knows about", () => {
 
     const markers = gateMarkers(sql);
     for (const gate of defined) {
+      expect(markers, `${gate} is a gate the exposure view cannot see`).toContain(gate);
+    }
+    for (const gate of ["has_client_sales_entitlement", "can_read_client_sales_data", "can_read_workflow_lead_attribution"]) {
       expect(markers, `${gate} is a gate the exposure view cannot see`).toContain(gate);
     }
   });
