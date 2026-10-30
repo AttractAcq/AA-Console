@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
+import type { Session } from "@supabase/supabase-js";
 import { useAuth } from "../context/auth";
 import { HOME_FOR_ROLE } from "../lib/identity";
 import type { ConsoleRole } from "../lib/identity";
@@ -9,6 +10,17 @@ import { supabase } from "../lib/supabase";
 type Factor = { id: string; type: string; status: string; name: string };
 type SecurityState = { factors: Factor[]; aal: "aal1" | "aal2" };
 type Enrollment = { id: string; secret: string };
+
+const sessionKeys = new WeakMap<Session, { token: string; key: number }>();
+let nextSessionKey = 0;
+
+function opaqueSessionKey(session: Session): number {
+  const prior = sessionKeys.get(session);
+  if (prior?.token === session.access_token) return prior.key;
+  const key = ++nextSessionKey;
+  sessionKeys.set(session, { token: session.access_token, key });
+  return key;
+}
 
 function safeApprovalReturnPath(raw: unknown, role: ConsoleRole): string | null {
   if (typeof raw !== "string" || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return null;
@@ -32,7 +44,7 @@ export function MfaSecurityPage() {
 
   // An account switch remounts the whole security form before another user's
   // factor names or temporary enrollment secret can be rendered.
-  return <MfaSecuritySession key={`${profile.id}:${session.access_token}`} identity={profile.id} role={profile.role} />;
+  return <MfaSecuritySession key={`${profile.id}:${opaqueSessionKey(session)}`} identity={profile.id} role={profile.role} />;
 }
 
 function MfaSecuritySession({ identity, role }: { identity: string; role: ConsoleRole }) {
