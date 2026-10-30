@@ -102,6 +102,7 @@ beforeAll(async () => {
     "20260917000000_94_team_recruitment.sql",
   ]) await db.exec(await migration(file));
   await db.exec(`
+    alter table client_briefs add column archived_at timestamptz;
     insert into auth.users (id,email) values
       ('${ADMIN}','alex@attractacq.com'),
       ('${EMPLOYEE}','editor@attractacq.com'),
@@ -214,6 +215,22 @@ describe("recruitment brief Inbox adapter 276", () => {
     expect(rows.rows[0]!.preview_blocker).toMatch(/Complete Meta-static/i);
     await expect(asRole("authenticated", ADMIN, "aal2",
       "select public.approve_recruitment_brief($1)", [id])).rejects.toThrow(/complete/i);
+  });
+
+  it("cannot request or approve an archived draft, while approved production may archive", async () => {
+    const id = await createDraft();
+    await db.query("update public.client_briefs set archived_at=now() where id=$1", [id]);
+    await expect(asRole("authenticated", ADMIN, "aal2",
+      "select public.approve_recruitment_brief($1)", [id])).rejects.toThrow(/archived/i);
+    await expect(asRole("authenticated", ADMIN, "aal1",
+      "select public.request_recruitment_brief_approval_v6($1)", [id])).rejects.toThrow(/active draft/i);
+    await expect(asPrivilegedWriter("authenticated", ADMIN, "aal2",
+      "update public.client_briefs set status='approved' where id=$1", [id]))
+      .rejects.toThrow(/archived/i);
+    await db.query("update public.client_briefs set archived_at=null where id=$1", [id]);
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.approve_recruitment_brief($1)", [id]);
+    await db.query("update public.client_briefs set archived_at=now() where id=$1", [id]);
   });
 
   it("does not let direct status writes, mixed copy changes or draft builds bypass the gate", async () => {

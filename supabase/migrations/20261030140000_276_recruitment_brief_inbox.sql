@@ -38,9 +38,10 @@ declare
 begin
   if p_brief.id is null or p_brief.purpose is distinct from 'recruitment'
     or p_brief.status is distinct from 'draft'
+    or p_brief.archived_at is not null
     or not exists (select 1 from public.clients c where c.id = p_brief.client_id
       and c.is_internal and lower(c.name) = 'attract acquisition') then
-    raise exception 'Only a draft on the Attract Acquisition house client can request recruitment approval.'
+    raise exception 'Only an active draft on the Attract Acquisition house client can request recruitment approval.'
       using errcode = '23514';
   end if;
   v_hash := public.recruitment_brief_snapshot_hash_v6(p_brief);
@@ -162,6 +163,10 @@ declare
 begin
   if old.purpose = 'recruitment' and old.status = 'draft'
     and new.status = 'approved' then
+    if old.archived_at is not null or new.archived_at is not null then
+      raise exception 'An archived recruitment draft cannot be approved.'
+        using errcode = '23514';
+    end if;
     if new.media_type <> 'image' or new.recruitment_role is null
       or nullif(btrim(new.title), '') is null
       or nullif(btrim(coalesce(new.hook, '')), '') is null
@@ -212,6 +217,9 @@ begin
   if v_brief.status <> 'draft' then
     raise exception 'Only a draft recruitment brief can be approved.' using errcode = '23514';
   end if;
+  if v_brief.archived_at is not null then
+    raise exception 'An archived recruitment draft cannot be approved.' using errcode = '23514';
+  end if;
   update public.client_briefs set status = 'approved' where id = p_brief_id;
 end;
 $$;
@@ -223,6 +231,7 @@ declare v_brief public.client_briefs%rowtype;
 begin
   for v_brief in select b.* from public.client_briefs b
     where b.purpose = 'recruitment' and b.status = 'draft'
+      and b.archived_at is null
     order by b.created_at, b.id
   loop
     perform public.register_recruitment_brief_inbox_v6(v_brief);
