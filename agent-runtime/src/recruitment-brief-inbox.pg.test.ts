@@ -10,6 +10,7 @@ const PAYING = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 let db: PGlite;
 let oldDraft: string;
 let oldApproved: string;
+let oldRejected: string;
 
 const migration = async (file: string) => readFile(new URL(
   `../../supabase/migrations/${file}`, import.meta.url,
@@ -134,11 +135,16 @@ beforeAll(async () => {
   `);
   oldDraft = await createDraft();
   oldApproved = await createDraft();
+  oldRejected = await createDraft();
   await asRole("authenticated", ADMIN, "aal1",
     "select public.approve_recruitment_brief($1)", [oldApproved]);
+  await db.query("update public.client_briefs set status='rejected' where id=$1", [oldRejected]);
   await db.exec(await migration("20261030110000_273_canonical_approval_ledger.sql"));
   await db.exec(await migration("20261030140000_276_recruitment_brief_inbox.sql"));
   await db.exec(await migration("20261030160000_279_approval_class_coverage.sql"));
+  // The hosted Supabase project grants browser table privileges separately
+  // from this disposable fixture; exercise the admin policy and new guard.
+  await db.exec("grant select,insert on public.client_briefs to authenticated");
 }, 90_000);
 
 afterAll(async () => { await db?.close(); });
@@ -291,7 +297,7 @@ describe("recruitment brief Inbox adapter 276", () => {
       .rejects.toThrow(/immutable/i);
     await expect(asPrivilegedWriter("authenticated", ADMIN, "aal2",
       "update public.client_briefs set status='in_production' where id=$1", [id]))
-      .rejects.toThrow(/before production/i);
+      .rejects.toThrow(/advance only|before production/i);
     const status = (await db.query<{ status: string }>(
       "select status::text as status from public.client_briefs where id=$1", [id])).rows[0]!.status;
     expect(status).toBe("draft");
@@ -316,10 +322,36 @@ describe("recruitment brief Inbox adapter 276", () => {
     await expect(db.query("update public.client_briefs set apply_url='https://other.example' where id=$1", [id]))
       .rejects.toThrow(/immutable/i);
     await expect(db.query("update public.client_briefs set status='draft' where id=$1", [id]))
-      .rejects.toThrow(/cannot return/i);
+      .rejects.toThrow(/advance only|cannot return/i);
     await db.query("update public.client_briefs set status='in_production',production_method='ai' where id=$1", [id]);
     const status = (await db.query<{ status: string }>(
       "select status::text as status from public.client_briefs where id=$1", [id])).rows[0]!.status;
     expect(status).toBe("in_production");
+  });
+
+  it("denies an admin inserting an already-approved recruitment brief", async () => {
+    const source = await createDraft();
+    await expect(asRole("authenticated", ADMIN, "aal2", `
+      insert into public.client_briefs
+        (client_id,title,body,media_type,status,purpose,recruitment_role,
+         apply_url,compensation_text,hook,premise,script,call_to_action,
+         visual_direction,channel_intent)
+      select client_id,title,body,media_type,'approved',purpose,recruitment_role,
+         apply_url,compensation_text,hook,premise,script,call_to_action,
+         visual_direction,channel_intent
+        from public.client_briefs where id=$1`, [source]))
+      .rejects.toThrow(/start as a draft/i);
+  });
+
+  it("keeps a historical rejected recruitment brief terminal under admin writes", async () => {
+    await expect(asPrivilegedWriter("authenticated", ADMIN, "aal2",
+      "update public.client_briefs set status='approved' where id=$1", [oldRejected]))
+      .rejects.toThrow(/advance only/i);
+    await expect(asPrivilegedWriter("authenticated", ADMIN, "aal2",
+      "update public.client_briefs set status='in_production' where id=$1", [oldRejected]))
+      .rejects.toThrow(/advance only/i);
+    expect((await db.query<{ status: string }>(
+      "select status::text as status from public.client_briefs where id=$1", [oldRejected],
+    )).rows[0]!.status).toBe("rejected");
   });
 });

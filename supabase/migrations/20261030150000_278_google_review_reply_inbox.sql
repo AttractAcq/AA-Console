@@ -84,6 +84,61 @@ $$;
 revoke all on function public.google_reply_inbox_payload_v6(
   public.google_review_replies) from public, anon, authenticated, service_role;
 
+-- A privileged table writer must not create an already approved source row,
+-- step around the AAL2 transition through another status, or claim that a
+-- reply was sent while this class still has no bound external executor.
+create function public.guard_google_reply_inbox_status_v6()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.status not in ('drafted','awaiting_approval')
+      or new.approved_by is not null or new.approved_at is not null
+      or new.rejection_reason is not null then
+      raise exception 'A Google reply must start as an undecided draft.'
+        using errcode = '23514';
+    end if;
+    return new;
+  end if;
+  if old.status in ('approved','posting','posted')
+    and (new.client_id,new.review_id,new.body,new.body_hash,
+         new.approved_by,new.approved_at)
+      is distinct from
+        (old.client_id,old.review_id,old.body,old.body_hash,
+         old.approved_by,old.approved_at) then
+    raise exception 'The approved Google reply and target are immutable.'
+      using errcode = '23514';
+  end if;
+  if new.status in ('drafted','awaiting_approval')
+    and (new.approved_by is not null or new.approved_at is not null
+      or new.rejection_reason is not null) then
+    raise exception 'An undecided Google reply cannot carry decision metadata.'
+      using errcode = '23514';
+  end if;
+  if new.status = 'approved'
+    and old.status not in ('drafted','awaiting_approval','approved') then
+    raise exception 'Only an undecided Google reply can enter approved state.'
+      using errcode = '23514';
+  end if;
+  if old.status in ('approved','rejected','posting','posted','failed')
+    and new.status is distinct from old.status then
+    raise exception 'A decided Google reply cannot restart or change state.'
+      using errcode = '23514';
+  end if;
+  if new.status in ('posting','posted')
+    and new.status is distinct from old.status then
+    raise exception 'Google reply sending requires a bound exact-version executor.'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.guard_google_reply_inbox_status_v6()
+  from public, anon, authenticated, service_role;
+create trigger google_reply_inbox_status_guard_v6
+  before insert or update on public.google_review_replies
+  for each row execute function public.guard_google_reply_inbox_status_v6();
+
 create function public.register_google_reply_inbox_v6()
 returns trigger language plpgsql security definer
 set search_path = pg_catalog, public as $$

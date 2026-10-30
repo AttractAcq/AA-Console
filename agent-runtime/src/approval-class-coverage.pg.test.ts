@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const ADMIN = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const CLIENT_USER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const SOURCE = "11111111-1111-4111-8111-111111111111";
+const MANIFEST = "22222222-2222-4222-8222-222222222222";
 const HASH = "a".repeat(64);
 let db: PGlite;
 
@@ -35,20 +36,26 @@ beforeAll(async () => {
       $$ select '{}'::jsonb $$;
     create table public.clients (id uuid primary key);
     create table public.campaign_action_approvals
-      (id uuid primary key, status text, request_hash text);
+      (id uuid primary key, client_id uuid, campaign_id uuid,
+       manifest_id uuid, status text, request_hash text);
+    create table public.campaign_manifest_versions
+      (id uuid primary key, campaign_id uuid, version integer);
     create table public.client_sales_entitlement_requests
-      (id uuid primary key, status text, scope_hash text);
+      (id uuid primary key, client_id uuid, status text, scope_hash text);
     create table public.client_briefs
-      (id uuid primary key, status text, archived_at timestamptz, body_hash text);
+      (id uuid primary key, client_id uuid, status text,
+       archived_at timestamptz, body_hash text);
     create function public.recruitment_brief_snapshot_hash_v6(
       public.client_briefs) returns text language sql stable as
       $$ select $1.body_hash $$;
     create table public.google_review_replies
-      (id uuid primary key, status text, payload jsonb);
+      (id uuid primary key, client_id uuid, status text, payload jsonb);
     create function public.google_reply_inbox_payload_v6(
       public.google_review_replies) returns jsonb language sql stable as
       $$ select $1.payload $$;
-    create table public.content_slots (id uuid primary key, stage text);
+    create table public.content_slots (
+      id uuid primary key, client_id uuid, asset_id uuid,
+      platform text, scheduled_at timestamptz, format text, stage text);
     create table public.slot_events
       (id uuid primary key, slot_id uuid, to_stage text, created_at timestamptz);
     create table public.profiles (id uuid primary key, role text not null);
@@ -75,6 +82,7 @@ beforeAll(async () => {
   ]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${filename}`, import.meta.url), "utf8"));
   }
+  await db.exec("set timezone='UTC'");
 }, 60_000);
 
 afterAll(async () => { await db?.close(); });
@@ -162,7 +170,7 @@ describe("34-class Approval Inbox coverage feed migration 279", () => {
       status: string; source_state: string;
     }>(ADMIN, `select status,source_state from public.approval_inbox_v6 where id='${id}'`))[0]!;
 
-    await db.query("insert into public.client_briefs values ($1,'draft',null,$2)",
+    await db.query("insert into public.client_briefs values ($1,null,'draft',null,$2)",
       [SOURCE, HASH]);
     const brief = await register("recruitment_brief", HASH + ":v1");
     expect(await state(brief)).toMatchObject({ status: "pending", source_state: "pending" });
@@ -172,9 +180,13 @@ describe("34-class Approval Inbox coverage feed migration 279", () => {
     await db.query("update public.client_briefs set archived_at=now() where id=$1", [SOURCE]);
     expect(await state(brief)).toMatchObject({ status: "cancelled", source_state: "cancelled" });
 
-    await db.query("insert into public.campaign_action_approvals values ($1,'pending','version-1')",
-      [SOURCE]);
-    const action = await register("campaign_action", "version-1");
+    await db.query("insert into public.campaign_manifest_versions values ($1,$2,1)",
+      [MANIFEST, SOURCE]);
+    await db.query("insert into public.campaign_action_approvals values ($1,null,$1,$2,'pending','version-1')",
+      [SOURCE, MANIFEST]);
+    const action = await register("campaign_action", "version-1", "aa_console", {
+      preview: { campaign_id: SOURCE, manifest_id: MANIFEST },
+    });
     expect(await state(action)).toMatchObject({ status: "pending", source_state: "pending" });
     await db.query("update public.campaign_action_approvals set status='rejected' where id=$1",
       [SOURCE]);
@@ -182,7 +194,7 @@ describe("34-class Approval Inbox coverage feed migration 279", () => {
       status: "source_decided", source_state: "source_decided",
     });
 
-    await db.query("insert into public.google_review_replies values ($1,'drafted',$2::jsonb)",
+    await db.query("insert into public.google_review_replies values ($1,null,'drafted',$2::jsonb)",
       [SOURCE, JSON.stringify({
         source_version: HASH, artifact_hash: HASH, preview: { words: "exact" },
         destination: "internal:test", account_ref: null,
@@ -196,11 +208,18 @@ describe("34-class Approval Inbox coverage feed migration 279", () => {
 
     const firstEpoch = "33333333-3333-4333-8333-333333333333";
     const secondEpoch = "44444444-4444-4444-8444-444444444444";
-    await db.query("insert into public.content_slots values ($1,'awaiting_approval')", [SOURCE]);
+    await db.query("insert into public.content_slots values ($1,null,null,'instagram','2030-01-01','single','awaiting_approval')", [SOURCE]);
     await db.query("insert into public.slot_events values ($1,$2,'awaiting_approval','2030-01-01T00:00:00Z')",
       [firstEpoch, SOURCE]);
+    const slotScope = (await db.query<{ scope: Record<string, unknown> }>(
+      `select jsonb_build_object('client_id',client_id,'slot_id',id,
+          'asset_id',asset_id,'platform',platform,'scheduled_at',scheduled_at,
+          'format',format,'approval_entry_id',$2::text) as scope
+         from public.content_slots where id=$1`, [SOURCE, firstEpoch],
+    )).rows[0]!.scope;
     const slot = await register("engine_slot", firstEpoch, "aa_console",
-      { artifact_hash: null, preview_blocker: "Media bytes unverified" });
+      { artifact_hash: null, preview_blocker: "Media bytes unverified",
+        scope: slotScope });
     expect(await state(slot)).toMatchObject({ status: "pending", source_state: "pending" });
     await db.query("insert into public.slot_events values ($1,$2,'awaiting_approval','2029-01-01T00:00:00Z')",
       [secondEpoch, SOURCE]);
@@ -208,8 +227,8 @@ describe("34-class Approval Inbox coverage feed migration 279", () => {
       status: "unverified", source_state: "unverified",
     });
 
-    await db.query("create table public.console_invitation_requests_v6 (id uuid primary key, status text, payload_hash text)");
-    await db.query("insert into public.console_invitation_requests_v6 values ($1,'requested',$2)",
+    await db.query("create table public.console_invitation_requests_v6 (id uuid primary key, status text, payload_hash text, target_client_id uuid)");
+    await db.query("insert into public.console_invitation_requests_v6 values ($1,'requested',$2,null)",
       [SOURCE, HASH]);
     const invite = await register("console_invitation", HASH, "auth");
     expect(await state(invite)).toMatchObject({ status: "pending", source_state: "pending" });

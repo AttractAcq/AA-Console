@@ -107,7 +107,7 @@ beforeAll(async () => {
       created_by uuid, drafted_by_job_id uuid,
       created_at timestamptz not null default now()
     );
-    grant select,update on public.google_review_replies to service_role;
+    grant select,insert,update on public.google_review_replies to service_role;
     insert into public.client_google_locations values
       ('${LOCATION}','${CLIENT}','accounts/123/locations/456','Main Street');
     insert into public.google_reviews values
@@ -219,7 +219,7 @@ describe("Google review reply exact Inbox bridge migration 278", () => {
     const card = (await cards(GONE))[0]!;
     await expect(db.query(
       "update public.google_review_replies set status='posting' where id=$1", [GONE],
-    )).rejects.toThrow(/cannot be sent before/i);
+    )).rejects.toThrow(/bound exact-version executor/i);
     await db.query("update public.google_reviews set comment='Edited review' where id=$1", [REVIEW]);
     await expect(asRole("authenticated", ADMIN, "aal2",
       "select public.decide_google_review_reply_from_inbox_v6($1,$2,$3,true,null)",
@@ -269,5 +269,37 @@ describe("Google review reply exact Inbox bridge migration 278", () => {
       "select public.decide_google_review_reply_from_inbox_v6($1,$2,$3,true,null)",
       [id, card.source_version, card.artifact_hash]))
       .rejects.toThrow(/not decision-ready/i);
+  });
+
+  it("blocks privileged approved inserts and failed or rejected routes into approval", async () => {
+    const forged = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+    await expect(asRole("service_role", ADMIN, "aal2", `insert into public.google_review_replies
+      (id,client_id,review_id,body,body_hash,status,approved_by,approved_at)
+      values ($1,$2,$3,'Forged',encode(sha256(convert_to('Forged','UTF8')),'hex'),
+        'approved',$4,now())`, [forged, CLIENT, REVIEW, ADMIN]))
+      .rejects.toThrow(/start as an undecided draft/i);
+    expect((await db.query("select id from public.google_review_replies where id=$1", [forged])).rows)
+      .toHaveLength(0);
+
+    const failed = "bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb";
+    await addReply(failed, "Reply that failed");
+    await asRole("service_role", ADMIN, "aal2",
+      "update public.google_review_replies set status='failed' where id=$1", [failed]);
+    await expect(asRole("service_role", ADMIN, "aal2",
+      "update public.google_review_replies set status='approved',approved_by=$2,approved_at=now() where id=$1",
+      [failed, ADMIN])).rejects.toThrow(/only an undecided|cannot restart/i);
+
+    const rejected = "cccccccc-1111-4111-8111-cccccccccccc";
+    await addReply(rejected, "Reply for rejection");
+    const card = (await cards(rejected))[0]!;
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_google_review_reply_from_inbox_v6($1,$2,$3,false,$4)",
+      [rejected, card.source_version, card.artifact_hash, "Do not post this reply"]);
+    await expect(asRole("service_role", ADMIN, "aal2",
+      "update public.google_review_replies set status='approved',approved_by=$2,approved_at=now() where id=$1",
+      [rejected, ADMIN])).rejects.toThrow(/only an undecided|cannot restart/i);
+    await expect(asRole("service_role", ADMIN, "aal2",
+      "update public.google_review_replies set status='posting' where id=$1",
+      [FRESH])).rejects.toThrow(/cannot restart|bound exact-version executor/i);
   });
 });

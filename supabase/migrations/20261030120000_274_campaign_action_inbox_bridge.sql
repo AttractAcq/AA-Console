@@ -80,6 +80,23 @@ $$;
 revoke all on function public.campaign_action_inbox_payload_v6(
   public.campaign_action_approvals) from public, anon, authenticated, service_role;
 
+create function public.guard_campaign_action_inbox_insert_v6()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public as $$
+begin
+  if new.status <> 'pending' then
+    raise exception 'A campaign action must start pending for exact Inbox review.'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.guard_campaign_action_inbox_insert_v6()
+  from public, anon, authenticated, service_role;
+create trigger campaign_action_inbox_insert_guard_v6
+  before insert on public.campaign_action_approvals
+  for each row execute function public.guard_campaign_action_inbox_insert_v6();
+
 create or replace function public.register_campaign_action_inbox_v6()
 returns trigger language plpgsql security definer
 set search_path = pg_catalog, public

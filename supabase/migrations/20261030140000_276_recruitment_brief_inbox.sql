@@ -111,6 +111,26 @@ create trigger recruitment_brief_inbox_request_v6
   after insert on public.client_briefs
   for each row execute function public.register_new_recruitment_brief_inbox_v6();
 
+-- The legacy admin INSERT policy permits direct rows. A recruitment brief
+-- cannot enter as approved or in production without the exact AAL2 decision
+-- that is recorded only on the guarded draft-to-approved transition.
+create function public.guard_recruitment_brief_inbox_insert_v6()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public as $$
+begin
+  if new.purpose = 'recruitment' and new.status <> 'draft' then
+    raise exception 'A recruitment brief must start as a draft for exact Inbox review.'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.guard_recruitment_brief_inbox_insert_v6()
+  from public, anon, authenticated, service_role;
+create trigger recruitment_brief_inbox_insert_guard_v6
+  before insert on public.client_briefs
+  for each row execute function public.guard_recruitment_brief_inbox_insert_v6();
+
 create function public.request_recruitment_brief_approval_v6(p_brief_id uuid)
 returns uuid language plpgsql volatile security definer
 set search_path = pg_catalog, public set timezone = 'UTC' as $$
@@ -157,6 +177,15 @@ begin
   if old.purpose = 'recruitment' or new.purpose = 'recruitment' then
     if new.purpose is distinct from old.purpose then
       raise exception 'Create a new brief to change recruitment purpose.' using errcode = '23514';
+    end if;
+    if not (
+      new.status = old.status
+      or (old.status = 'draft' and new.status = 'approved')
+      or (old.status = 'approved' and new.status = 'in_production')
+      or (old.status = 'in_production' and new.status = 'complete')
+    ) then
+      raise exception 'Recruitment briefs advance only from draft approval through production and completion.'
+        using errcode = '23514';
     end if;
     if old.status = 'draft' and new.status not in ('draft', 'approved') then
       raise exception 'Approve the exact recruitment brief before production.' using errcode = '23514';

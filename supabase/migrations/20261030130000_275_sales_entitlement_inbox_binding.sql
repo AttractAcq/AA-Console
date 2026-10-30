@@ -21,6 +21,10 @@ set search_path = pg_catalog, public
 as $$
 begin
   if tg_op = 'INSERT' then
+    if new.status <> 'pending' then
+      raise exception 'Sales entitlement requests must start pending for exact Inbox review.'
+        using errcode = '23514';
+    end if;
     select c.name into new.client_name_snapshot from public.clients c
       where c.id = new.client_id;
     select tm.name into new.member_name_snapshot from public.team_members tm

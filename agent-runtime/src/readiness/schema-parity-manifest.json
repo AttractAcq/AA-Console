@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "77c517b5ff698ff704ca1da3ed14c2af083cf540fa11366f2d5d71712686a721",
+  "migrationSourceDigest": "4050ec5db95a7a76e4c279c6631ee0573c641fbea120fc98cdb585742bc9094a",
   "generatedTypesSha256": "b080885bac8902bf929816a2d3f0c59e020e8acc7c319c976739fcc23c12365e",
   "generatedSchemaBodySha256": "e61a007fe5ba70174deefa96aeb5cb28493d46d25c491f56148f8564f75ab37e",
   "localMigrations": [
@@ -2038,22 +2038,22 @@
       "version": "20261030120000",
       "name": "274_campaign_action_inbox_bridge",
       "filename": "20261030120000_274_campaign_action_inbox_bridge.sql",
-      "sha256": "1a575ec3e1f5190d19dd8623fb066748f04a94f995de30f2bfb6fac7156b53a6",
-      "trimmedMd5": "66d5f750930bf9da7ae83ada78df3eb0"
+      "sha256": "4757b616ce22067a428d00a4f6ec4f100f69d13e2943466be31093487429c908",
+      "trimmedMd5": "3e6720767776281e35b0ec3347da7e3f"
     },
     {
       "version": "20261030130000",
       "name": "275_sales_entitlement_inbox_binding",
       "filename": "20261030130000_275_sales_entitlement_inbox_binding.sql",
-      "sha256": "d7b7d80ff0648901e106bdda26007be12a6dcff8b6a2e79766f633b40b493a96",
-      "trimmedMd5": "cc436082b95271a26722b5f34b147dcc"
+      "sha256": "d795dd294271016b556320a233420473c7fc59fb355433abc99cd36d59e81578",
+      "trimmedMd5": "b2aca0fff2f26339406beffc403d0434"
     },
     {
       "version": "20261030140000",
       "name": "276_recruitment_brief_inbox",
       "filename": "20261030140000_276_recruitment_brief_inbox.sql",
-      "sha256": "1dea4e218295e4bda995e98550d1466547ba61a23b68d520c6fe5991a5e38016",
-      "trimmedMd5": "feca73655f887ed98942b82b5e212a39"
+      "sha256": "6d7d6d30f067e5ac3c247e408cc4292ab115e14334c12c6006d5f0b6bf1b19e1",
+      "trimmedMd5": "7be7d7bfd9d749674c0341248307548a"
     },
     {
       "version": "20261030141000",
@@ -2066,15 +2066,15 @@
       "version": "20261030150000",
       "name": "278_google_review_reply_inbox",
       "filename": "20261030150000_278_google_review_reply_inbox.sql",
-      "sha256": "2ce64ec31282b25893f3151e872993b5c7b5ca57186a3dbcc5057facea8159ac",
-      "trimmedMd5": "a2006444faf848c2347d73480caeeace"
+      "sha256": "1be9ddadfe8a4504a484049668977f381839194a8b87fba75a96e0957ef14ee0",
+      "trimmedMd5": "be66fbd2ab2a15ffcc8e0d1f1f40452a"
     },
     {
       "version": "20261030160000",
       "name": "279_approval_class_coverage",
       "filename": "20261030160000_279_approval_class_coverage.sql",
-      "sha256": "90ffd6ccfec630ed4fc1b2d4d38542d80c8d8636a0bc4f849cdb1a0175197197",
-      "trimmedMd5": "441ba475c67ba9c7379d882a68537c50"
+      "sha256": "735b1a8a405fc808c5a7361e93c6b7c1261ec6407aa3af7f7a60754a3ac8a2ac",
+      "trimmedMd5": "30d96c69111d847a5951dcaece88da9b"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

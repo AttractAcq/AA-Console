@@ -34,14 +34,14 @@ async function asRole<T extends Record<string, unknown>>(
 }
 
 async function cards(slot: string) {
-  return (await db.query<{
+  return await asRole<{
     id: string; source_version: string; preview_blocker: string;
     preview: { post_copy: { caption: string }[]; database_snapshot_sha256: string };
     artifact_hash: string | null; status: string;
-  }>(`select id,source_version,preview_blocker,preview,artifact_hash,status
+  }>("authenticated", ADMIN, "aal2", `select id,source_version,preview_blocker,preview,artifact_hash,status
         from public.approval_inbox_v6
        where source_kind='engine_slot' and source_id=$1
-       order by requested_at,id`, [slot])).rows;
+       order by requested_at,id`, [slot]);
 }
 
 beforeAll(async () => {
@@ -131,6 +131,7 @@ beforeAll(async () => {
   for (const filename of [
     "20261030110000_273_canonical_approval_ledger.sql",
     "20261030141000_277_engine_slot_preview_inbox.sql",
+    "20261030160000_279_approval_class_coverage.sql",
   ]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${filename}`, import.meta.url), "utf8"));
   }
@@ -156,15 +157,16 @@ describe("Engine slot blocked Inbox preview migration 277", () => {
     expect(real[0]!.preview.database_snapshot_sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(real[0]!.artifact_hash).toBeNull();
     expect(real[0]!.preview_blocker).toMatch(/media byte SHA-256/i);
-    expect((await db.query<{ requested_by: string | null; requester_kind: string; requester_ref: string }>(
+    expect((await asRole<{ requested_by: string | null; requester_kind: string; requester_ref: string }>(
+      "authenticated", ADMIN, "aal2",
       "select requested_by,requester_kind,requester_ref from public.approval_inbox_v6 where id=$1",
       [real[0]!.id],
-    )).rows[0]).toEqual({
+    ))[0]).toEqual({
       requested_by: null, requester_kind: "engine", requester_ref: `slot_events:${LEGACY_ENTRY}`,
     });
     expect(await cards(MISSING_ENTRY_SLOT)).toMatchObject([
       { source_version: "legacy-missing-entry-event",
-        status: "pending", artifact_hash: null },
+        status: "unverified", artifact_hash: null },
     ]);
     expect((await db.query("select * from public.approval_decision_events_v6")).rows)
       .toHaveLength(0);
@@ -204,5 +206,23 @@ describe("Engine slot blocked Inbox preview migration 277", () => {
     const admin = await asRole("authenticated", ADMIN, "aal2",
       "select source_id from public.approval_inbox_v6 where source_kind='engine_slot'");
     expect(admin.length).toBeGreaterThan(0);
+  });
+
+  it("supersedes a frozen Engine card after client reparenting or schedule change", async () => {
+    expect((await cards(LEGACY_SLOT))[0]!.status).toBe("pending");
+    await db.query("update public.content_slots set client_id=$2 where id=$1",
+      [LEGACY_SLOT, OTHER_CLIENT]);
+    expect((await cards(LEGACY_SLOT))[0]!.status).toBe("superseded");
+    const originalClient = await asRole<{ status: string }>(
+      "authenticated", REVIEWER, "aal1",
+      "select status from public.approval_inbox_v6 where source_kind='engine_slot' and source_id=$1",
+      [LEGACY_SLOT]);
+    expect(originalClient[0]!.status).toBe("superseded");
+    await db.query("update public.content_slots set client_id=$2 where id=$1",
+      [LEGACY_SLOT, CLIENT]);
+    expect((await cards(LEGACY_SLOT))[0]!.status).toBe("pending");
+    await db.query("update public.content_slots set scheduled_at='2030-01-04' where id=$1",
+      [LEGACY_SLOT]);
+    expect((await cards(LEGACY_SLOT))[0]!.status).toBe("superseded");
   });
 });

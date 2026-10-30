@@ -23,6 +23,14 @@ declare
   v_slot_stage text;
   v_epoch text;
   v_epoch_count integer;
+  v_campaign_id uuid;
+  v_manifest_id uuid;
+  v_manifest_version integer;
+  v_client_id uuid;
+  v_member_id uuid;
+  v_bound_user_id uuid;
+  v_action text;
+  v_scope jsonb;
 begin
   select * into v_request from public.approval_requests_v6 where id = p_request_id;
   if not found then return 'unverified'; end if;
@@ -38,27 +46,63 @@ begin
 
   if v_request.source_system = 'aa_console'
     and v_request.source_kind = 'campaign_action' then
-    select a.status, a.request_hash into v_status, v_version
+    select a.status, a.request_hash, a.client_id, a.campaign_id, a.manifest_id
+      into v_status, v_version, v_client_id, v_campaign_id, v_manifest_id
       from public.campaign_action_approvals a where a.id = v_source_id;
     if not found then return 'cancelled'; end if;
+    if v_client_id is distinct from v_request.client_id
+      or v_campaign_id::text is distinct from v_request.preview->>'campaign_id'
+      or v_manifest_id::text is distinct from v_request.preview->>'manifest_id'
+      then return 'superseded'; end if;
     if v_status <> 'pending' then return 'source_decided'; end if;
     if v_version is distinct from v_request.source_version then return 'superseded'; end if;
+    select m.version into v_manifest_version
+      from public.campaign_manifest_versions m
+     where m.id = v_manifest_id and m.campaign_id = v_campaign_id;
+    if not found then return 'unverified'; end if;
+    if exists (
+      select 1 from public.campaign_manifest_versions later
+       where later.campaign_id = v_campaign_id
+         and later.version > v_manifest_version
+    ) then return 'superseded'; end if;
     return 'pending';
   elsif v_request.source_system = 'aa_console'
     and v_request.source_kind = 'client_sales_entitlement' then
-    select s.status, s.scope_hash into v_status, v_version
+    select s.status, s.scope_hash, s.client_id, s.member_id,
+           s.bound_user_id, s.action
+      into v_status, v_version, v_client_id, v_member_id,
+           v_bound_user_id, v_action
       from public.client_sales_entitlement_requests s where s.id = v_source_id;
     if not found then return 'cancelled'; end if;
+    if v_client_id is distinct from v_request.client_id
+      then return 'superseded'; end if;
     if v_status <> 'pending' then return 'source_decided'; end if;
     if v_version is distinct from v_request.source_version then return 'superseded'; end if;
+    -- The owning grant RPC can approve only the still-active, still-bound
+    -- employee. A revoke can approve only the same live grant. Keep these
+    -- cards visible but held when the live entitlement target changes.
+    if v_action = 'grant' and not exists (
+      select 1 from public.team_members tm
+      join public.profiles p on p.id = tm.user_id
+       where tm.id = v_member_id and tm.user_id = v_bound_user_id
+         and tm.active and p.role = 'employee'
+    ) then return 'source_held'; end if;
+    if v_action = 'revoke' and not exists (
+      select 1 from public.client_sales_entitlements e
+       where e.client_id = v_client_id and e.member_id = v_member_id
+         and e.bound_user_id = v_bound_user_id and e.revoked_at is null
+    ) then return 'source_held'; end if;
+    if v_action not in ('grant','revoke') then return 'unverified'; end if;
     return 'pending';
   elsif v_request.source_system = 'aa_console'
     and v_request.source_kind = 'recruitment_brief' then
-    select b.status::text, b.archived_at,
+    select b.status::text, b.archived_at, b.client_id,
       public.recruitment_brief_snapshot_hash_v6(b)
-      into v_status, v_archived_at, v_hash
+      into v_status, v_archived_at, v_client_id, v_hash
       from public.client_briefs b where b.id = v_source_id;
     if not found or v_archived_at is not null then return 'cancelled'; end if;
+    if v_client_id is distinct from v_request.client_id
+      then return 'superseded'; end if;
     if v_status <> 'draft' then return 'source_decided'; end if;
     if v_request.artifact_hash is distinct from v_hash
       or v_request.source_version !~ ('^' || v_hash || ':v[1-9][0-9]*$')
@@ -66,10 +110,12 @@ begin
     return 'pending';
   elsif v_request.source_system = 'aa_console'
     and v_request.source_kind = 'google_review_reply' then
-    select g.status, public.google_reply_inbox_payload_v6(g)
-      into v_status, v_payload from public.google_review_replies g
+    select g.status, g.client_id, public.google_reply_inbox_payload_v6(g)
+      into v_status, v_client_id, v_payload from public.google_review_replies g
       where g.id = v_source_id;
     if not found then return 'cancelled'; end if;
+    if v_client_id is distinct from v_request.client_id
+      then return 'superseded'; end if;
     if v_status not in ('drafted','awaiting_approval') then return 'source_decided'; end if;
     if v_payload->>'source_version' is distinct from v_request.source_version
       or v_payload->>'artifact_hash' is distinct from v_request.artifact_hash
@@ -82,9 +128,16 @@ begin
     return 'pending';
   elsif v_request.source_system = 'aa_console'
     and v_request.source_kind = 'engine_slot' then
-    select s.stage::text into v_slot_stage from public.content_slots s
+    select s.stage::text, jsonb_build_object(
+      'client_id',s.client_id,'slot_id',s.id,'asset_id',s.asset_id,
+      'platform',s.platform,'scheduled_at',s.scheduled_at,
+      'format',s.format,'approval_entry_id',v_request.source_version)
+      into v_slot_stage,v_scope from public.content_slots s
       where s.id = v_source_id;
     if not found then return 'cancelled'; end if;
+    if v_request.source_version !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      then return 'unverified'; end if;
+    if v_scope is distinct from v_request.scope then return 'superseded'; end if;
     if v_slot_stage <> 'awaiting_approval' then return 'source_decided'; end if;
     -- Older slot events have transaction-start timestamps and random UUIDs,
     -- neither of which proves order after concurrent serialized transitions.
@@ -100,9 +153,11 @@ begin
     -- B004 creates this source in 284. Until then there are no valid cards.
     if to_regclass('public.console_invitation_requests_v6') is null
       then return 'unverified'; end if;
-    execute 'select status,payload_hash from public.console_invitation_requests_v6 where id=$1'
-      into v_status,v_version using v_source_id;
+    execute 'select status,payload_hash,target_client_id from public.console_invitation_requests_v6 where id=$1'
+      into v_status,v_version,v_client_id using v_source_id;
     if not found then return 'cancelled'; end if;
+    if v_client_id is distinct from v_request.client_id
+      then return 'superseded'; end if;
     if v_version is distinct from v_request.source_version then return 'superseded'; end if;
     if v_status = 'requested' then return 'pending'; end if;
     if v_status = 'cancelled' then return 'cancelled'; end if;

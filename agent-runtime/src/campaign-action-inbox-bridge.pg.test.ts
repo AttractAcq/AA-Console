@@ -12,6 +12,8 @@ const PAGE = "55555555-5555-4555-8555-555555555555";
 const GOOGLE = "66666666-6666-4666-8666-666666666666";
 const REJECT = "77777777-7777-4777-8777-777777777777";
 const BAD_PAGE = "88888888-8888-4888-8888-888888888888";
+const SUPERSEDED = "99999999-9999-4999-8999-999999999999";
+const NEW_MANIFEST = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
 
 let db: PGlite;
 
@@ -46,14 +48,14 @@ async function action(
 }
 
 async function inbox(id: string) {
-  return (await db.query<{
+  return (await asRole<{
     id: string; status: string; preview_blocker: string | null;
     preview: Record<string, unknown>; artifact_hash: string | null;
     owning_path: string | null;
-  }>(`select id,status,preview_blocker,preview,artifact_hash,owning_path
+  }>("authenticated", ADMIN, "aal2", `select id,status,preview_blocker,preview,artifact_hash,owning_path
        from public.approval_inbox_v6
       where source_system='aa_console' and source_kind='campaign_action'
-        and source_id=$1`, [id])).rows[0]!;
+        and source_id=$1`, [id]))[0]!;
 }
 
 async function sourceStatus(id: string) {
@@ -108,6 +110,11 @@ beforeAll(async () => {
       requested_at timestamptz not null default now(),
       decided_at timestamptz, decided_by uuid, rejection_reason text
     );
+    create table public.campaign_manifest_versions (
+      id uuid primary key, campaign_id uuid not null, version integer not null
+    );
+    insert into public.campaign_manifest_versions values
+      ('${MANIFEST}','${CAMPAIGN}',1);
     create table public.campaign_page_approval_snapshots (
       approval_id uuid primary key references public.campaign_action_approvals(id),
       client_id uuid not null, page_id uuid not null, revision_id uuid not null,
@@ -115,6 +122,7 @@ beforeAll(async () => {
       rendered_html text not null, rendered_sha256 text not null
     );
     grant select,update on public.campaign_action_approvals to authenticated,service_role;
+    grant insert on public.campaign_action_approvals to service_role;
     grant insert on public.campaign_page_approval_snapshots to service_role;
     insert into public.campaign_action_approvals
       (id,client_id,campaign_id,manifest_id,idempotency_key,action_key,
@@ -126,6 +134,7 @@ beforeAll(async () => {
   for (const migration of [
     "20261030110000_273_canonical_approval_ledger.sql",
     "20261030120000_274_campaign_action_inbox_bridge.sql",
+    "20261030160000_279_approval_class_coverage.sql",
   ]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${migration}`, import.meta.url), "utf8"));
   }
@@ -138,10 +147,11 @@ describe("campaign action to canonical Inbox bridge migration 274", () => {
     const card = await inbox(LEGACY);
     expect(card.status).toBe("pending");
     expect(card.preview_blocker).toMatch(/exact reviewable action payload/i);
-    expect((await db.query<{ requested_by: string | null; requester_kind: string; requester_ref: string }>(
+    expect((await asRole<{ requested_by: string | null; requester_kind: string; requester_ref: string }>(
+      "authenticated", ADMIN, "aal2",
       "select requested_by,requester_kind,requester_ref from public.approval_inbox_v6 where id=$1",
       [card.id],
-    )).rows[0]).toEqual({
+    ))[0]).toEqual({
       requested_by: null, requester_kind: "service", requester_ref: `campaign_action_approvals:${LEGACY}`,
     });
     expect((await db.query(
@@ -233,5 +243,29 @@ describe("campaign action to canonical Inbox bridge migration 274", () => {
       "update public.campaign_action_approvals set status='rejected',rejection_reason='Missing creative bytes',decided_at=now(),decided_by=$1 where id=$2",
       [ADMIN, REJECT]);
     expect((await inbox(REJECT)).status).toBe("rejected");
+  });
+
+  it("marks an exact pending action superseded when a newer campaign manifest appears", async () => {
+    await action(SUPERSEDED, "google_ad_build", "d".repeat(64),
+      { approved_spec: { headlines: ["First version"] } },
+      "google_ads:customers/1234567890");
+    expect((await inbox(SUPERSEDED)).status).toBe("pending");
+    await db.query(
+      "insert into public.campaign_manifest_versions values ($1,$2,2)",
+      [NEW_MANIFEST, CAMPAIGN],
+    );
+    expect((await inbox(SUPERSEDED)).status).toBe("superseded");
+  });
+
+  it("denies a service-created approved action with no human Inbox event", async () => {
+    const id = "bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb";
+    await expect(asRole("service_role", ADMIN, "aal2", `insert into public.campaign_action_approvals
+      (id,client_id,campaign_id,manifest_id,idempotency_key,action_key,
+       destination,artifact_version_hash,scope,request_hash,status,decided_at,decided_by)
+      values ($1,$2,$3,$4,'forged','google_ad_build','google_ads:customers/123',
+        repeat('a',64),'{}'::jsonb,repeat('b',32),'approved',now(),$5)`,
+    [id, CLIENT, CAMPAIGN, MANIFEST, ADMIN])).rejects.toThrow(/start pending/i);
+    expect((await db.query("select id from public.campaign_action_approvals where id=$1", [id])).rows)
+      .toHaveLength(0);
   });
 });

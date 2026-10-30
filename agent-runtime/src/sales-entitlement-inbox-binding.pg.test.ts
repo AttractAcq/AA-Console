@@ -43,6 +43,14 @@ async function scopeHash(id: string) {
   )).rows[0]!.scope_hash;
 }
 
+async function inboxState(id: string) {
+  return (await asRole<{ status: string; source_state: string }>(
+    "authenticated", ADMIN, "aal2",
+    "select status,source_state from public.approval_inbox_v6 where source_kind='client_sales_entitlement' and source_id=$1",
+    [id],
+  ))[0]!;
+}
+
 async function decide(id: string, hash: string, approved: boolean, note: string) {
   await asRole("authenticated", ADMIN, "aal2",
     "select public.decide_client_sales_entitlement($1,$2,$3,$4)",
@@ -104,11 +112,13 @@ beforeAll(async () => {
     throw new Error("Could not isolate the real migration-267 sales decision contract.");
   }
   await db.exec(salesPrefix);
+  await db.exec("grant insert on public.client_sales_entitlement_requests to service_role");
   legacyRequest = await request(LEGACY_MEMBER, "grant");
 
   for (const migration of [
     "20261030110000_273_canonical_approval_ledger.sql",
     "20261030130000_275_sales_entitlement_inbox_binding.sql",
+    "20261030160000_279_approval_class_coverage.sql",
   ]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${migration}`, import.meta.url), "utf8"));
   }
@@ -118,22 +128,23 @@ afterAll(async () => { await db?.close(); });
 
 describe("B005 sales entitlement exact Inbox binding migration 275", () => {
   it("backfills a pending source request with frozen person/client names and no fabricated decision", async () => {
-    const rows = (await db.query<{
+    const rows = await asRole<{
       id: string; preview_blocker: string | null; preview: Record<string, unknown>;
       status: string;
-    }>(`select id,preview_blocker,preview,status from public.approval_inbox_v6
+    }>("authenticated", ADMIN, "aal2", `select id,preview_blocker,preview,status from public.approval_inbox_v6
        where source_kind='client_sales_entitlement' and source_id=$1`,
-    [legacyRequest])).rows;
+    [legacyRequest]);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ preview_blocker: null, status: "pending" });
     expect(rows[0]!.preview).toMatchObject({
       client_name: "Service Client", member_name: "Legacy Owner",
       bound_user_id: LEGACY_EMPLOYEE, action: "grant",
     });
-    expect((await db.query<{ requested_by: string; requester_kind: string }>(
+    expect((await asRole<{ requested_by: string; requester_kind: string }>(
+      "authenticated", ADMIN, "aal2",
       "select requested_by,requester_kind from public.approval_inbox_v6 where id=$1",
       [rows[0]!.id],
-    )).rows[0]).toEqual({ requested_by: ADMIN, requester_kind: "human" });
+    ))[0]).toEqual({ requested_by: ADMIN, requester_kind: "human" });
     expect((await db.query("select * from public.approval_decision_events_v6 where request_id=$1",
       [rows[0]!.id])).rows).toHaveLength(0);
     await expect(db.query(
@@ -205,5 +216,50 @@ describe("B005 sales entitlement exact Inbox binding migration 275", () => {
     expect((await db.query<{ decision: string }>(`select d.decision from public.approval_decision_events_v6 d
       join public.approval_requests_v6 r on r.id=d.request_id
       where r.source_id=$1`, [revokeId])).rows[0]!.decision).toBe("approved");
+  });
+
+  it("holds a pending grant after retirement or account relinking, and a revoke after grant loss", async () => {
+    expect(await inboxState(legacyRequest)).toMatchObject({
+      status: "pending", source_state: "pending",
+    });
+    await db.query("update public.team_members set active=false where id=$1", [LEGACY_MEMBER]);
+    expect(await inboxState(legacyRequest)).toMatchObject({
+      status: "source_held", source_state: "source_held",
+    });
+    await expect(decide(legacyRequest, await scopeHash(legacyRequest), true,
+      "Stale retired member")).rejects.toThrow(/identity changed/i);
+    await db.query("update public.team_members set active=true,user_id=$2 where id=$1",
+      [LEGACY_MEMBER, SECOND_EMPLOYEE]);
+    expect(await inboxState(legacyRequest)).toMatchObject({
+      status: "source_held", source_state: "source_held",
+    });
+    await expect(decide(legacyRequest, await scopeHash(legacyRequest), true,
+      "Stale relinked member")).rejects.toThrow(/identity changed/i);
+    await db.query("update public.team_members set user_id=$2 where id=$1",
+      [LEGACY_MEMBER, LEGACY_EMPLOYEE]);
+    expect((await inboxState(legacyRequest)).status).toBe("pending");
+
+    const revokeId = await request(SECOND_MEMBER, "revoke");
+    expect((await inboxState(revokeId)).status).toBe("pending");
+    await db.query(`update public.client_sales_entitlements
+      set revoked_at=now(),revoked_by=$3,revoke_request_id=$4
+      where client_id=$1 and member_id=$2`,
+      [CLIENT, SECOND_MEMBER, ADMIN, revokeId]);
+    expect(await inboxState(revokeId)).toMatchObject({
+      status: "source_held", source_state: "source_held",
+    });
+    await expect(decide(revokeId, await scopeHash(revokeId), true,
+      "Stale revoked grant")).rejects.toThrow(/sales grant changed/i);
+  });
+
+  it("denies a privileged source-approved entitlement request inserted without Inbox review", async () => {
+    const hash = (await db.query<{ hash: string }>(
+      "select public.sales_entitlement_scope_hash($1,$2,$3,'grant') as hash",
+      [CLIENT, MEMBER, EMPLOYEE],
+    )).rows[0]!.hash;
+    await expect(asRole("service_role", ADMIN, "aal2", `insert into public.client_sales_entitlement_requests
+      (client_id,member_id,bound_user_id,action,scope_hash,status,requested_by,decided_by,decided_at)
+      values ($1,$2,$3,'grant',$5,'approved',$4,$4,now())`,
+    [CLIENT, MEMBER, EMPLOYEE, ADMIN, hash])).rejects.toThrow(/start pending/i);
   });
 });
