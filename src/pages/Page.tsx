@@ -49,6 +49,7 @@ import { EnginePanel } from "./distribution/EnginePanel";
 import { PaidPanel } from "./distribution/PaidPanel";
 import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "./sales/SalesOverviewPanel";
+import { SalesAccessRequestsPanel } from "./sales/SalesAccessRequestsPanel";
 import { CampaignExecutionPanel } from "./campaigns/CampaignExecutionPanel";
 import { SitesPanel } from "./sites/SitesPanel";
 import { GitHubSettingsPanel } from "./sites/GitHubSettingsPanel";
@@ -181,7 +182,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   // page could never answer.
   "sales-os": {
     capture: () => <LeadCapturePanel />,
-    leads: () => <ProspectsLeadsPanel />,
+    leads: () => <><SalesAccessRequestsPanel /><ProspectsLeadsPanel /></>,
     agents: () => <SalesOverviewPanel />,
   },
   "motion-design": {
