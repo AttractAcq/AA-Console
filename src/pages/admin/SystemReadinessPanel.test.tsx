@@ -33,6 +33,23 @@ it("shows unknown deployment and external proof as unknown, even with a reachabl
   expect(readRuntime).toHaveBeenCalledWith("/admin/system-readiness");
 });
 
+it("does not present configured signed ingress as proof of live facade topology", async () => {
+  const unknown = { state: "unknown", checkedAt: "2026-10-29T12:00:00Z",
+    value: null, reason: "No observation." };
+  readRuntime.mockResolvedValue({
+    schemaVersion: 2, capturedAt: "2026-10-29T12:00:00Z",
+    environment: { name: "staging", railwayEnvironmentId: null, supabaseProjectRef: null },
+    runtime: { sha: null, switches: {}, credentialPresence: {}, heartbeats: unknown },
+    gateway: unknown, database: unknown, global: unknown, clients: unknown,
+    requestProxy: { directPeer: "10.0.0.2", forwardedHops: [], chainStatus: "absent",
+      trustedProxyCount: 0, signedIngressRequired: true, callerIpUsedForQuota: null },
+  });
+  render(<SystemReadinessPanel />);
+  expect(await screen.findByText(/accepted public requests use the signed client IP/)).toBeInTheDocument();
+  expect(screen.getByText(/facade topology and live route probes require separate release evidence/)).toBeInTheDocument();
+  expect(screen.queryByText(/verified signed client IP from the isolated ingress/)).not.toBeInTheDocument();
+});
+
 it("exports the same captured facts shown in the admin view on repeated downloads", async () => {
   const sha = "a".repeat(40);
   readRuntime.mockResolvedValue({

@@ -273,7 +273,7 @@ export function SystemReadinessPanel() {
             snapshot.requestProxy.forwardedHops.map((hop, index) => <code key={`${index}-${hop}`} className="mr-2">{hop}</code>) : "no valid hops"}</p>
           <p className="mt-1">Configured trusted proxy CIDRs: {snapshot.requestProxy.trustedProxyCount}. Signed public ingress: {snapshot.requestProxy.signedIngressRequired ? "required" : "off"}.</p>
           <p className="mt-1">Public quota identity: {snapshot.requestProxy.signedIngressRequired ?
-            "verified signed client IP from the isolated ingress" :
+            "accepted public requests use the signed client IP; facade topology and live route probes require separate release evidence" :
             <>direct socket peer fallback; this admin request resolves to <code>{snapshot.requestProxy.callerIpUsedForQuota ?? "Refused"}</code></>}.</p>
           <p className="mt-2 text-xs text-muted-foreground">Only this authenticated admin request is inspected. The raw forwarding header is never returned or logged. Railway does not publish stable ingress proxy CIDRs; this chain is diagnostic, not proof of trust.</p>
         </div>}
