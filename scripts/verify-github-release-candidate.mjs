@@ -213,6 +213,16 @@ export async function verifyGithubReleaseCandidate({
     fail('required check run is not a successful exact-head CI run for this PR/base')
 
   const migrations = migrationEvidence(checkoutDir, headSha, baseSha)
+  // GitHub may receive a force push or base-branch advance while the checks
+  // and committed SQL are being read. Never return a packet for that stale PR.
+  const latestPr = await githubJson(`/repos/${REPOSITORY}/pulls/${prNumber}`,
+    fetcher, token, timeoutMs)
+  if (latestPr?.state !== 'open' || latestPr.merged_at != null
+      || latestPr.number !== prNumber || latestPr.html_url !== pr.html_url
+      || latestPr.head?.sha !== headSha || latestPr.base?.sha !== baseSha
+      || latestPr.head?.ref !== pr.head.ref || latestPr.base?.ref !== pr.base.ref
+      || latestPr.head?.repo?.id !== repoId || latestPr.base?.repo?.id !== repoId)
+    fail('PR head, base or identity changed during verification')
   const body = {
     schemaVersion: 1,
     kind: 'github_premerge_release_evidence',

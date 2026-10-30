@@ -191,6 +191,20 @@ test('rejects a forked or changed repository identity', async (t) => {
   await assert.rejects(verify(checkout, data), /head\/base repositories/)
 })
 
+test('rejects a force push or base advance during verification', async (t) => {
+  const checkout = checkoutFixture(t)
+  const data = apiFixture(checkout)
+  const initial = fetchFixture(data)
+  let prReads = 0
+  const fetcher = (url, request) => {
+    if (new URL(url).pathname === `/repos/${REPO}/pulls/7` && ++prReads === 2)
+      return Response.json({ ...data.pr, base: { ...data.pr.base, sha: 'f'.repeat(40) } })
+    return initial(url, request)
+  }
+  await assert.rejects(verify(checkout, data, fetcher), /changed during verification/)
+  assert.equal(prReads, 2)
+})
+
 test('rejects modification of released SQL even if later pending migrations are valid', async (t) => {
   const checkout = checkoutFixture(t)
   writeFileSync(join(checkout.directory, 'supabase', 'migrations', `${RELEASED}_279_approval.sql`), 'select 2;\n')
