@@ -76,6 +76,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: node --test ingress/server.test.mjs
       - run: npm run build
 
   aa-mcp-gateway:

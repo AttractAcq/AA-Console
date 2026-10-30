@@ -57,7 +57,7 @@ it("serves the exact inventory only to an active admin session", async () => {
   expect(JSON.parse(raw.end.mock.calls[0]![0] as string)).toEqual({
     ok: true, capturedAt: "2026-10-29T12:00:00Z", schemaVersion: 1,
     requestProxy: { directPeer: "10.0.0.2", forwardedHops: ["203.0.113.6", "10.0.0.1"],
-      chainStatus: "ignored_untrusted_peer", trustedProxyCount: 0,
+      chainStatus: "ignored_untrusted_peer", trustedProxyCount: 0, signedIngressRequired: false,
       callerIpUsedForQuota: "10.0.0.2" },
   });
   expect(collectSystemReadiness).toHaveBeenCalledTimes(1);

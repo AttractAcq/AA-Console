@@ -95,3 +95,52 @@ grant select on public.public_route_quota_metrics_v6 to service_role;
 -- liveness data; a rotating-invalid-token attack cannot grow this forever.
 select cron.schedule('prune-public-route-quota', '17 * * * *',
   $cron$ delete from public.public_route_quota_buckets where expires_at < now(); $cron$);
+
+-- A signed ingress envelope is one-use across all runtime replicas. The
+-- facade generates a random nonce; the runtime claims only its SHA-256 digest
+-- after checking the HMAC and exact body bytes. A storage failure denies the
+-- request before any public route or quota side effect.
+create table public.public_ingress_nonces_v1 (
+  nonce_hash text primary key check (nonce_hash ~ '^[a-f0-9]{64}$'),
+  issued_at timestamptz not null,
+  expires_at timestamptz not null
+);
+create index public_ingress_nonces_expiry_idx on public.public_ingress_nonces_v1 (expires_at);
+alter table public.public_ingress_nonces_v1 enable row level security;
+revoke all on public.public_ingress_nonces_v1 from public, anon, authenticated;
+
+create function public.claim_public_ingress_nonce_v1(
+  p_nonce_hash text,
+  p_issued_at timestamptz
+) returns boolean
+language plpgsql volatile security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_now timestamptz := clock_timestamp();
+  v_claimed integer;
+begin
+  if auth.role() <> 'service_role' then
+    raise exception 'service_role only';
+  end if;
+  if p_nonce_hash is null or p_nonce_hash !~ '^[a-f0-9]{64}$'
+     or p_issued_at is null then
+    raise exception 'Invalid public ingress nonce';
+  end if;
+  if p_issued_at < v_now - interval '30 seconds'
+     or p_issued_at > v_now + interval '30 seconds' then
+    return false;
+  end if;
+  insert into public.public_ingress_nonces_v1 (nonce_hash, issued_at, expires_at)
+  values (p_nonce_hash, p_issued_at, v_now + interval '2 minutes')
+  on conflict (nonce_hash) do nothing;
+  get diagnostics v_claimed = row_count;
+  return v_claimed = 1;
+end;
+$$;
+revoke all on function public.claim_public_ingress_nonce_v1(text,timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.claim_public_ingress_nonce_v1(text,timestamptz)
+  to service_role;
+select cron.schedule('prune-public-ingress-nonces', '* * * * *',
+  $cron$ delete from public.public_ingress_nonces_v1 where expires_at < now(); $cron$);

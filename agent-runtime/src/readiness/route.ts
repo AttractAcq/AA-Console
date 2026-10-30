@@ -31,7 +31,7 @@ export async function handleSystemReadiness(
   }
   try {
     json(200, { ok: true, ...await collectSystemReadiness(sb, config),
-      requestProxy: requestProxyDiagnostic(req, config.trustedProxies) });
+      requestProxy: requestProxyDiagnostic(req, config.trustedProxies, config.publicIngressRequired) });
   } catch (error) {
     logger.error("system_readiness_failed", { error: error instanceof Error ? error.name : "unknown" });
     json(503, { ok: false, error: "The system inventory could not be collected." });

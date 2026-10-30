@@ -12,7 +12,7 @@ let savedEnv: NodeJS.ProcessEnv;
 beforeEach(() => {
   savedEnv = { ...process.env };
   for (const key of Object.keys(process.env)) {
-    if (key.startsWith("AGENT_RUNTIME_") || key.startsWith("MASTER_AI_") || key === "CONSOLE_URL" || key.startsWith("ANTHROPIC_API_KEY") || key === "SUPABASE_URL" || key === "SUPABASE_SERVICE_ROLE_KEY" || key === "PORT" || key === "AA_MCP_SERVICE_SECRET" || key === "PUBLIC_SALES_IP_SALT" || key === "PUBLIC_TRUSTED_PROXY_CIDRS") {
+    if (key.startsWith("AGENT_RUNTIME_") || key.startsWith("MASTER_AI_") || key === "CONSOLE_URL" || key.startsWith("ANTHROPIC_API_KEY") || key === "SUPABASE_URL" || key === "SUPABASE_SERVICE_ROLE_KEY" || key === "PORT" || key === "AA_MCP_SERVICE_SECRET" || key === "PUBLIC_SALES_IP_SALT" || key === "PUBLIC_TRUSTED_PROXY_CIDRS" || key.startsWith("PUBLIC_INGRESS_")) {
       delete process.env[key];
     }
   }
@@ -42,6 +42,23 @@ describe("loadConfig", () => {
     expect(loadConfig().trustedProxies.count).toBe(0);
     process.env.PUBLIC_TRUSTED_PROXY_CIDRS = "10.0.0.0/8";
     expect(loadConfig().trustedProxies.count).toBe(1);
+  });
+  it("requires a distinct ingress key and rejects proxy CIDR trust in production", () => {
+    process.env.PUBLIC_INGRESS_HMAC_REQUIRED = "tru";
+    expect(() => loadConfig()).toThrow(/must be true or false/);
+    delete process.env.PUBLIC_INGRESS_HMAC_REQUIRED;
+    process.env.NODE_ENV = "production";
+    process.env.AGENT_RUNTIME_SHARED_SECRET = "0123456789abcdef".repeat(4);
+    process.env.PUBLIC_SALES_IP_SALT = "fedcba9876543210".repeat(4);
+    process.env.PUBLIC_TRUSTED_PROXY_CIDRS = "100.64.0.0/10";
+    expect(() => loadConfig()).toThrow(/cannot establish Railway public-edge trust/);
+    delete process.env.PUBLIC_TRUSTED_PROXY_CIDRS;
+    process.env.PUBLIC_INGRESS_HMAC_REQUIRED = "true";
+    expect(() => loadConfig()).toThrow(/PUBLIC_INGRESS_HMAC_KEY/);
+    process.env.PUBLIC_INGRESS_HMAC_KEY = process.env.AGENT_RUNTIME_SHARED_SECRET;
+    expect(() => loadConfig()).toThrow(/must be present and distinct/);
+    process.env.PUBLIC_INGRESS_HMAC_KEY = "1234567890abcdef".repeat(4);
+    expect(loadConfig().publicIngressRequired).toBe(true);
   });
   it("fails closed when a required variable is missing", () => {
     delete process.env.SUPABASE_URL;
