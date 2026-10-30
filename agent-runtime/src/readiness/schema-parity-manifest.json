@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "5615d832889551bb973e96da33a7858fdf604da6edace2f13afeb70a25c46932",
-  "generatedTypesSha256": "e1eb3621783b2bfa4bf4d7877bce81a7aceb3e74caee9d746a53432a0d2f22e4",
-  "generatedSchemaBodySha256": "779947d784cbe4b83384af48c8560d5fdb73d9f81f0a7396b167c91a980bdf0f",
+  "migrationSourceDigest": "b48b77392a33f28310ab90fc1d777dbd3ca86b492cecf638411e2fbf92628eda",
+  "generatedTypesSha256": "a59aa87dd0082cf38147f7cf4f68d160fb31320411479fb12f3cf6a424aa571a",
+  "generatedSchemaBodySha256": "2b32ade768f257f1e38e3874d5df9c7b20230386e9ee55672d72bbe6c5b48033",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2194,6 +2194,13 @@
       "filename": "20261101130000_296_current_client_role_entitlement.sql",
       "sha256": "6a35c77e2d2d9d831114d68820998a42635d59af7918fbbb2088fd275f244d08",
       "trimmedMd5": "b186165c42fb272031a06ddd9edb1c5b"
+    },
+    {
+      "version": "20261101140000",
+      "name": "297_production_release_merge_lease",
+      "filename": "20261101140000_297_production_release_merge_lease.sql",
+      "sha256": "7039e3abda15ef62dd9f958195733838f34432288b6bad2e50f2b1190653904d",
+      "trimmedMd5": "920eeda01472daf4fa9bec88bff7e1a0"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
