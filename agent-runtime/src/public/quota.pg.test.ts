@@ -121,10 +121,11 @@ describe("shared atomic public admission", () => {
     expect(metrics.rows.length).toBeGreaterThan(0);
     expect(JSON.stringify(metrics.rows)).not.toContain("a".repeat(64));
     expect(metrics.rows[0]).not.toHaveProperty("subject_hash");
-    const privileges = await db.query<{ anon_execute: boolean; authenticated_execute: boolean; service_execute: boolean }>(`
+    const privileges = await db.query<{ anon_execute: boolean; authenticated_execute: boolean; service_execute: boolean; service_read: boolean }>(`
       select has_function_privilege('anon','public.admit_public_route_v6(text,text,text)','EXECUTE') as anon_execute,
              has_function_privilege('authenticated','public.admit_public_route_v6(text,text,text)','EXECUTE') as authenticated_execute,
-             has_function_privilege('service_role','public.admit_public_route_v6(text,text,text)','EXECUTE') as service_execute`);
-    expect(privileges.rows[0]).toEqual({ anon_execute: false, authenticated_execute: false, service_execute: true });
+             has_function_privilege('service_role','public.admit_public_route_v6(text,text,text)','EXECUTE') as service_execute,
+             has_table_privilege('service_role','public.public_route_quota_buckets','SELECT') as service_read`);
+    expect(privileges.rows[0]).toEqual({ anon_execute: false, authenticated_execute: false, service_execute: true, service_read: true });
   });
 });

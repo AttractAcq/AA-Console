@@ -14,6 +14,7 @@ create table public.public_route_quota_buckets (
 create index public_route_quota_expiry_idx on public.public_route_quota_buckets (expires_at);
 alter table public.public_route_quota_buckets enable row level security;
 revoke all on public.public_route_quota_buckets from public, anon, authenticated;
+grant select on public.public_route_quota_buckets to service_role;
 
 create function public.admit_public_route_v6(
   p_route text,
@@ -80,7 +81,7 @@ revoke all on function public.admit_public_route_v6(text,text,text) from public,
 grant execute on function public.admit_public_route_v6(text,text,text) to service_role;
 
 -- Hash-free operator counters. The route labels are a closed SQL allowlist.
-create view public.public_route_quota_metrics_v6 as
+create view public.public_route_quota_metrics_v6 with (security_invoker = true) as
 select route, bucket_kind, window_start,
        count(*)::integer as active_buckets,
        sum(attempts)::bigint as attempts

@@ -212,7 +212,7 @@ grant execute on function public.mark_sales_runtime_uncertain_v6(uuid) to servic
 -- reserve remains charged to that UTC day until reconciled against provider
 -- usage; the next day starts a fresh daily budget. Operators can see the
 -- uncertain count without reading visitor data.
-create view public.sales_runtime_budget_status_v6 as
+create view public.sales_runtime_budget_status_v6 with (security_invoker = true) as
 select b.deployment_id, b.budget_day, b.messages, b.committed_usd, b.held_usd,
        count(r.id) filter (where r.state='uncertain')::integer as uncertain_count
 from public.sales_runtime_daily_budgets b

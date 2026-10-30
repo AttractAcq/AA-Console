@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "446bf0bcaa0d16f1ba6f14b83267df483a1b78ad410327874c140238e3e12c3d",
+  "migrationSourceDigest": "69e5688c97175da88479c698fe59da702857cdfd34ccc893f37f2d54d250724f",
   "generatedTypesSha256": "e34e75dd9329be87bf0175e8233a628068167a5ee8f1bd69c8d26a01199aa599",
   "generatedSchemaBodySha256": "622d4ae279b1772d796bbf2ee167c4ce0d8f211ff50565f845d47bdc90787ad9",
   "localMigrations": [
@@ -2080,15 +2080,15 @@
       "version": "20261101000000",
       "name": "280_public_route_quota",
       "filename": "20261101000000_280_public_route_quota.sql",
-      "sha256": "bbf3299ac0ea7bf1b7ee38200bbd5f34ed3c199551ba2bf06ba9b8bfd9e31b75",
-      "trimmedMd5": "bda8157c423743d1e22163b6ae43a369"
+      "sha256": "da186b1bbac32456452fcb173f5859d7749e727f76113fc8629ef52718cd3425",
+      "trimmedMd5": "21935815e85954b04966ec276a862c9d"
     },
     {
       "version": "20261101010000",
       "name": "281_sales_runtime_budget_reservations",
       "filename": "20261101010000_281_sales_runtime_budget_reservations.sql",
-      "sha256": "3600ff45da23e894ccac95a8683333a07cd9d737fac0282f9a3190b441adae53",
-      "trimmedMd5": "c15c412b4a766612479d6f371ca7ecb6"
+      "sha256": "53cffed5ee5f6e093e24010de00aace6662f3de5150f21d1d3ab395a266192ba",
+      "trimmedMd5": "2fb8a94b201526bb0825ed8f6c20394a"
     },
     {
       "version": "20261101020000",
