@@ -47,7 +47,7 @@ const execution = {
   manifest_id: MANIFEST,
   status: "executing",
   lease_until: "2099-01-01T00:00:00Z",
-  result: { meta_build_job_id: JOB },
+  meta_build_job_id: JOB,
 };
 const approval = {
   id: APPROVAL,
@@ -122,8 +122,8 @@ describe("v6 Meta build claim", () => {
     ["wrong action", { action_key: "page_deploy" }],
     ["already executed", { status: "executed" }],
     ["expired lease", { lease_until: "2000-01-01T00:00:00Z" }],
-    ["wrong job binding", { result: { meta_build_job_id: CAMPAIGN } }],
-    ["missing job binding", { result: null }],
+    ["wrong job binding", { meta_build_job_id: CAMPAIGN }],
+    ["missing job binding", { meta_build_job_id: null }],
   ])("refuses %s on the execution before reading credentials", async (_name, changed) => {
     const db = database({ execution: { ...execution, ...changed } });
     expect(await v6MetaBuildClaimProblem(db.sb, job, campaign))

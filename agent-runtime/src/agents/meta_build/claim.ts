@@ -33,7 +33,7 @@ export async function v6MetaBuildClaimProblem(
 
   const { data: execution, error: executionError } = await sb
     .from("campaign_action_executions")
-    .select("id, approval_id, client_id, campaign_id, action_key, artifact_version_hash, manifest_id, status, lease_until, result")
+    .select("id, approval_id, client_id, campaign_id, action_key, artifact_version_hash, manifest_id, status, lease_until, meta_build_job_id")
     .eq("id", executionId)
     .maybeSingle();
   if (executionError) return `Could not verify the Meta build execution: ${executionError.message}`;
@@ -44,9 +44,7 @@ export async function v6MetaBuildClaimProblem(
       || typeof execution.lease_until !== "string"
       || !Number.isFinite(Date.parse(execution.lease_until))
       || Date.parse(execution.lease_until) <= Date.now()
-      || !execution.result || typeof execution.result !== "object"
-      || Array.isArray(execution.result)
-      || execution.result.meta_build_job_id !== job.id) {
+      || execution.meta_build_job_id !== job.id) {
     return "The Meta build job is not bound to a current, claimed execution for this campaign.";
   }
 
