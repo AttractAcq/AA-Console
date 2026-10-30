@@ -4,10 +4,10 @@
 evidence packet. It does not submit a production release candidate to Supabase,
 approve an Inbox card, merge a PR, apply SQL, or deploy Railway or Pages.
 
-## Run against an exact checked-out PR head
+## Run trusted verifier code against an exact checked-out PR head
 
 ```sh
-node scripts/verify-github-release-candidate.mjs --pr 273 --checkout /path/to/exact-pr-head
+node /path/to/reviewed-verifier/scripts/verify-github-release-candidate.mjs --pr 273 --checkout /path/to/exact-pr-head
 ```
 
 For a private GitHub repository or a higher API rate limit, supply `GH_TOKEN` or
@@ -21,7 +21,14 @@ requires exactly one successful GitHub Actions check for each of the four
 protected CI jobs, all from one successful `CI` pull-request workflow run for
 that PR, head, and base. Missing, duplicated, pending, failed, mixed-run, wrong
 app, wrong SHA, or incomplete API evidence fails closed. The check names match
-`.github/workflows/ci.yml` and the current protected branch configuration.
+`.github/workflows/ci.yml` and the current protected branch configuration. It
+also requires byte-identical CI workflow content at the PR base and head,
+recording that workflow's SHA-256 in the packet. A workflow change requires a
+separate reviewed release of the verifier's trust policy before its new checks
+can count. Run the verifier executable from a separately reviewed, trusted
+checkout, not from the candidate PR tree; the candidate tree is only the
+`--checkout` evidence input. A PR can still change code and test scripts called
+by an unchanged workflow, so code review remains a separate release gate.
 
 The migration evidence comes from committed Git objects at that same PR head,
 never from caller-supplied hashes or dirty working files. It hashes **every**

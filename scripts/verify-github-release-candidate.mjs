@@ -14,6 +14,7 @@ const VERSION = /^\d{14}$/
 const MIGRATION = /^(\d{14})_([A-Za-z0-9_.-]+)\.sql$/
 const NUMBERED_MIGRATION = /^\d{14}_(\d+)_/
 const MAX_CHECK_RUNS = 1000
+const CI_WORKFLOW_PATH = '.github/workflows/ci.yml'
 
 export const REQUIRED_RELEASE_CHECKS = Object.freeze([
   'Agent runtime (typecheck, test, build)',
@@ -140,6 +141,15 @@ function migrationEvidence(checkoutDir, headSha, baseSha) {
   }
 }
 
+function trustedWorkflowEvidence(checkoutDir, headSha, baseSha) {
+  const baseBytes = git(checkoutDir, ['show', `${baseSha}:${CI_WORKFLOW_PATH}`], 'buffer')
+  const headBytes = git(checkoutDir, ['show', `${headSha}:${CI_WORKFLOW_PATH}`], 'buffer')
+  const digest = sha256(baseBytes)
+  if (sha256(headBytes) !== digest)
+    fail('PR changes the CI workflow that defines required release checks')
+  return digest
+}
+
 function checkedRunId(check, repository) {
   const escaped = repository.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const match = new RegExp(`^https://github\\.com/${escaped}/actions/runs/([1-9][0-9]*)/job/([1-9][0-9]*)$`)
@@ -215,6 +225,7 @@ export async function verifyGithubReleaseCandidate({
     fail('required check run is not a successful exact-head CI run for this PR/base')
 
   const migrations = migrationEvidence(checkoutDir, headSha, baseSha)
+  const workflowSha256 = trustedWorkflowEvidence(checkoutDir, headSha, baseSha)
   // GitHub may receive a force push or base-branch advance while the checks
   // and committed SQL are being read. Never return a packet for that stale PR.
   const latestPr = await githubJson(`/repos/${REPOSITORY}/pulls/${prNumber}`,
@@ -237,6 +248,7 @@ export async function verifyGithubReleaseCandidate({
     },
     checks: {
       workflowRunId,
+      workflowSha256,
       required: required.map((check) => ({
         name: check.name, headSha: check.headSha, runId: check.runId, checkRunId: check.checkRunId,
       })),

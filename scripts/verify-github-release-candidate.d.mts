@@ -23,7 +23,7 @@ export interface GithubPremergePacket {
     head: { sha: string; ref: string; repositoryId: number };
     base: { sha: string; ref: string; repositoryId: number };
   };
-  checks: { workflowRunId: string; required: RequiredReleaseCheck[] };
+  checks: { workflowRunId: string; workflowSha256: string; required: RequiredReleaseCheck[] };
   migrations: {
     sourceMarkerHead: string;
     targetHead: string;

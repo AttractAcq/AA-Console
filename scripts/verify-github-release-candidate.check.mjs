@@ -26,6 +26,8 @@ function checkoutFixture(t) {
   git(directory, 'config', 'user.email', 'fixture@example.invalid')
   mkdirSync(join(directory, 'supabase', 'migrations'), { recursive: true })
   mkdirSync(join(directory, 'supabase', 'verification'), { recursive: true })
+  mkdirSync(join(directory, '.github', 'workflows'), { recursive: true })
+  writeFileSync(join(directory, '.github', 'workflows', 'ci.yml'), 'name: CI\n')
   writeFileSync(join(directory, 'supabase', 'verification', 'released-migration-version.txt'), `${RELEASED}\n`)
   writeFileSync(join(directory, 'supabase', 'migrations', `${RELEASED}_279_approval.sql`), 'select 1;\n')
   // A stacked PR inherits 280 from its base and adds 281 itself. Both must
@@ -90,6 +92,7 @@ test('produces deterministic typed premerge evidence from GitHub and committed S
   assert.equal(packet.productionSchemaVerified, false)
   assert.equal(packet.releaseAuthorized, false)
   assert.equal(packet.checks.workflowRunId, '6001')
+  assert.equal(packet.checks.workflowSha256, hash('name: CI\n'))
   assert.deepEqual(packet.checks.required.map((item) => item.name), REQUIRED_RELEASE_CHECKS)
   assert.equal(packet.migrations.sourceMarkerHead, RELEASED)
   assert.equal(packet.migrations.targetHead, '20261101010000')
@@ -224,6 +227,16 @@ test('rejects a PR that advances the source release marker to hide pending SQL',
   const data = apiFixture({ ...checkout, headSha: git(checkout.directory, 'rev-parse', 'HEAD') })
   await assert.rejects(verifyGithubReleaseCandidate({ prNumber: 7, checkoutDir: checkout.directory,
     fetcher: fetchFixture(data) }), /changes the source released-schema marker/)
+})
+
+test('rejects a PR that changes the workflow defining the four required jobs', async (t) => {
+  const checkout = checkoutFixture(t)
+  writeFileSync(join(checkout.directory, '.github', 'workflows', 'ci.yml'), 'name: CI\n# weakened in PR\n')
+  git(checkout.directory, 'add', '.')
+  git(checkout.directory, 'commit', '-qm', 'change CI workflow')
+  const data = apiFixture({ ...checkout, headSha: git(checkout.directory, 'rev-parse', 'HEAD') })
+  await assert.rejects(verifyGithubReleaseCandidate({ prNumber: 7, checkoutDir: checkout.directory,
+    fetcher: fetchFixture(data) }), /changes the CI workflow/)
 })
 
 test('rejects a non-200 GitHub API response without trusting fixture claims', async (t) => {
