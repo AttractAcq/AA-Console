@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "4050ec5db95a7a76e4c279c6631ee0573c641fbea120fc98cdb585742bc9094a",
-  "generatedTypesSha256": "b080885bac8902bf929816a2d3f0c59e020e8acc7c319c976739fcc23c12365e",
-  "generatedSchemaBodySha256": "e61a007fe5ba70174deefa96aeb5cb28493d46d25c491f56148f8564f75ab37e",
+  "migrationSourceDigest": "8fc435672c1d353f3e440f0d55f948205bc8015e6738e5bffa1c455bc829bde3",
+  "generatedTypesSha256": "3ed851b82426f2c0fc4915cc0bd85568bd71921d6d472643cd92bfb4d8a52a4f",
+  "generatedSchemaBodySha256": "1058d5469b4ff54d5ebd69606b0a56c50b761e9c35203a9a12d1516fdaee0ab9",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2075,6 +2075,27 @@
       "filename": "20261030160000_279_approval_class_coverage.sql",
       "sha256": "735b1a8a405fc808c5a7361e93c6b7c1261ec6407aa3af7f7a60754a3ac8a2ac",
       "trimmedMd5": "30d96c69111d847a5951dcaece88da9b"
+    },
+    {
+      "version": "20261101000000",
+      "name": "280_public_route_quota",
+      "filename": "20261101000000_280_public_route_quota.sql",
+      "sha256": "e1bb71ef97e832621c5f7e26dc58b8e3188b94240553eb602d0efa4b1998f9c9",
+      "trimmedMd5": "40683ae384fcb5daddc752110695b205"
+    },
+    {
+      "version": "20261101010000",
+      "name": "281_sales_runtime_budget_reservations",
+      "filename": "20261101010000_281_sales_runtime_budget_reservations.sql",
+      "sha256": "53cffed5ee5f6e093e24010de00aace6662f3de5150f21d1d3ab395a266192ba",
+      "trimmedMd5": "2fb8a94b201526bb0825ed8f6c20394a"
+    },
+    {
+      "version": "20261101020000",
+      "name": "282_public_perimeter_admin_status",
+      "filename": "20261101020000_282_public_perimeter_admin_status.sql",
+      "sha256": "11c4af5a9a43df974540a2e0724d6314254ba28f1bd3b37ad8b6f386d4fc6721",
+      "trimmedMd5": "90bd4058fa24acaa7378e6a92ecd0ab8"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

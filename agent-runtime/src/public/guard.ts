@@ -10,8 +10,6 @@
 // The deployment id in the page is an IDENTIFIER, not a credential. Assume it
 // is copied. Nothing here treats possession of it as permission.
 
-import { createHash } from "node:crypto";
-
 /** A visitor's message. Long enough for a real question, short enough not to be a payload. */
 export const MAX_MESSAGE_CHARS = 2_000;
 
@@ -140,32 +138,6 @@ export function transcriptToTurns(raw: unknown): Turn[] {
     if ((role === "user" || role === "assistant") && content) out.push({ role, content });
   }
   return out;
-}
-
-/**
- * A stable, non-reversible handle for one caller.
- *
- * Rate limiting needs to recognise a repeat caller, not identify a person. A
- * raw visitor IP on a marketing page is personal data that nothing here needs,
- * so only a salted hash is stored. The salt means the stored value is useless
- * against an IP list if the table ever leaks.
- */
-export function hashIp(ip: string | undefined, salt: string): string | null {
-  if (!ip) return null;
-  return createHash("sha256").update(`${salt}:${ip}`).digest("hex").slice(0, 32);
-}
-
-/**
- * The caller's address, from the proxy header Railway sets.
- *
- * The leftmost entry is the original client; the rest are proxies. Taking the
- * last would rate-limit the proxy and throttle every visitor together.
- */
-export function callerIp(forwardedFor: string | string[] | undefined): string | undefined {
-  const raw = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-  if (!raw) return undefined;
-  const first = raw.split(",")[0]?.trim();
-  return first && first.length > 0 ? first : undefined;
 }
 
 /**

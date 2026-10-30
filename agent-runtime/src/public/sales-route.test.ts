@@ -1,6 +1,19 @@
-import { describe, expect, it } from "vitest";
-import { isPublicSalesRequest, parsePath } from "./sales-route.js";
+import { Readable } from "node:stream";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { RuntimeConfig } from "../config.js";
+import { parseTrustedProxies } from "./client-ip.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { handlePublicSales, isPublicSalesRequest, maxSalesTurnCostUsd, parsePath } from "./sales-route.js";
+import { estimateCostUsd } from "../usage/cost.js";
 import { WIDGET_SOURCE } from "./widget.js";
+
+const provider = vi.hoisted(() => ({ create: vi.fn(), init: vi.fn() }));
+vi.mock("@anthropic-ai/sdk", () => ({ default: class {
+  constructor(options: unknown) { provider.init(options); }
+  messages = { create: provider.create };
+} }));
+beforeEach(() => { provider.create.mockReset(); provider.init.mockReset(); });
 
 describe("parsePath", () => {
   const ID = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
@@ -51,6 +64,187 @@ describe("isPublicSalesRequest", () => {
     expect(isPublicSalesRequest("/health")).toBe(false);
     expect(isPublicSalesRequest(undefined)).toBe(false);
   });
+});
+
+it("bounds one paid turn before provider work", () => {
+  const reserve = maxSalesTurnCostUsd("claude-opus-5", "system", [
+    { role: "user", content: "a short question" },
+  ]);
+  expect(reserve).not.toBeNull();
+  expect(reserve!).toBeGreaterThan(estimateCostUsd("claude-opus-5", {
+    inputTokens: 1_000, outputTokens: 1_024,
+  }));
+  expect(maxSalesTurnCostUsd("claude-opus-5", "x".repeat(140_000), [])).toBeNull();
+});
+
+it("charges the public quota before resolving a deployment or reading its message", async () => {
+  const req = Readable.from([Buffer.from("{".repeat(20_000))]) as IncomingMessage;
+  req.url = `/public/sales/v1/d/${"a".repeat(32)}/message`;
+  req.method = "POST";
+  req.headers = { origin: "https://client.example" };
+  Object.defineProperty(req, "socket", { value: { remoteAddress: "203.0.113.4" } });
+  const rpc = vi.fn(async (_name: string, _args: Record<string, unknown>) => ({ data: false, error: null }));
+  const sb = { rpc } as unknown as SupabaseClient;
+  const config = { publicIpSalt: "test-salt", trustedProxies: parseTrustedProxies(undefined) } as RuntimeConfig;
+  const res = { writeHead: vi.fn(), end: vi.fn() } as unknown as ServerResponse;
+  await handlePublicSales(req, res, sb, config);
+  expect(rpc).toHaveBeenCalledTimes(1);
+  expect(rpc.mock.calls[0]?.[0]).toBe("admit_public_route_v6");
+  expect(res.writeHead).toHaveBeenCalledWith(429, expect.anything());
+});
+
+it("charges dynamic config reads and preflights before deployment lookup", async () => {
+  for (const [action, method] of [["config", "GET"], ["message", "OPTIONS"]] as const) {
+    const req = Readable.from([]) as IncomingMessage;
+    req.url = `/public/sales/v1/d/${"a".repeat(32)}/${action}`;
+    req.method = method;
+    req.headers = { origin: "https://client.example" };
+    Object.defineProperty(req, "socket", { value: { remoteAddress: "203.0.113.4" } });
+    const rpc = vi.fn(async () => ({ data: false, error: null }));
+    const res = { writeHead: vi.fn(), end: vi.fn() } as unknown as ServerResponse;
+    await handlePublicSales(req, res, { rpc } as unknown as SupabaseClient, {
+      publicIpSalt: "test-salt", trustedProxies: parseTrustedProxies(undefined),
+    } as RuntimeConfig);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0]).toEqual(["admit_public_route_v6", expect.objectContaining({
+      p_route: "sales_config",
+    })]);
+    expect(res.writeHead).toHaveBeenCalledWith(429, expect.anything());
+  }
+});
+
+it("still serves the public widget config after shared admission and origin validation", async () => {
+  const req = Readable.from([]) as IncomingMessage;
+  req.url = `/public/sales/v1/d/${"a".repeat(32)}/config`;
+  req.method = "GET";
+  req.headers = { origin: "https://client.example" };
+  Object.defineProperty(req, "socket", { value: { remoteAddress: "203.0.113.4" } });
+  const calls: string[] = [];
+  const sb = { rpc: vi.fn(async (name: string) => {
+    calls.push(name);
+    return name === "admit_public_route_v6" ? { data: true, error: null } : {
+      data: [{ allowed_origin: "https://client.example", greeting: "Welcome",
+        widget_config: { label: "Ask us" }, system_prompt: "private prompt" }], error: null,
+    };
+  }) } as unknown as SupabaseClient;
+  const res = { setHeader: vi.fn(), writeHead: vi.fn(), end: vi.fn() } as unknown as ServerResponse;
+  await handlePublicSales(req, res, sb, { publicIpSalt: "test-salt",
+    trustedProxies: parseTrustedProxies(undefined) } as RuntimeConfig);
+  expect(calls).toEqual(["admit_public_route_v6", "resolve_sales_deployment"]);
+  expect(res.writeHead).toHaveBeenCalledWith(200, expect.anything());
+  const body = JSON.parse((res.end as ReturnType<typeof vi.fn>).mock.calls[0]![0] as string);
+  expect(body).toMatchObject({ ok: true, greeting: "Welcome", widget: { label: "Ask us" } });
+  expect(JSON.stringify(body)).not.toContain("private prompt");
+});
+
+it("does not resolve invalid sales methods", async () => {
+  const req = Readable.from([]) as IncomingMessage;
+  req.url = `/public/sales/v1/d/${"a".repeat(32)}/config`;
+  req.method = "POST";
+  req.headers = {};
+  const rpc = vi.fn();
+  const res = { writeHead: vi.fn(), end: vi.fn() } as unknown as ServerResponse;
+  await handlePublicSales(req, res, { rpc } as unknown as SupabaseClient, {} as RuntimeConfig);
+  expect(rpc).not.toHaveBeenCalled();
+  expect(res.writeHead).toHaveBeenCalledWith(400, expect.anything());
+});
+
+async function runWidgetTurn(options: {
+  budget?: { allowed: boolean; reason: string; reservation_id: string | null };
+  settlement?: { data: boolean | null; error: Error | null };
+  providerFailure?: boolean;
+} = {}) {
+  if (options.providerFailure) provider.create.mockResolvedValue({ usage: null, content: [] });
+  else provider.create.mockResolvedValue({
+    usage: { input_tokens: 100, output_tokens: 50 },
+    content: [{ type: "text", text: "We can help. We will follow up." },
+      { type: "tool_use", name: "record_contact", input: {
+        name: "Sam", email: "sam@example.test", summary: "Asked for a quote", qualified: true,
+      } }],
+  });
+  const req = Readable.from([Buffer.from(JSON.stringify({
+    message: "I agree to be contacted at sam@example.test about a quote.",
+  }))]) as IncomingMessage;
+  req.url = `/public/sales/v1/d/${"a".repeat(32)}/message`;
+  req.method = "POST";
+  req.headers = { origin: "https://client.example" };
+  Object.defineProperty(req, "socket", { value: { remoteAddress: "203.0.113.4" } });
+  const deployment = {
+    deployment_id: "11111111-1111-4111-8111-111111111111",
+    client_id: "22222222-2222-4222-8222-222222222222",
+    sales_agent_id: "33333333-3333-4333-8333-333333333333",
+    page_id: "44444444-4444-4444-8444-444444444444",
+    allowed_origin: "https://client.example", greeting: "Hello",
+    system_prompt: "Help the visitor", guardrails: "Be accurate", widget_config: {},
+  };
+  const order: string[] = [];
+  const inserted: Record<string, unknown>[] = [];
+  const rpc = vi.fn(async (name: string) => {
+    order.push(name);
+    if (name === "admit_public_route_v6") return { data: true, error: null };
+    if (name === "resolve_sales_deployment") return { data: [deployment], error: null };
+    if (name === "reserve_sales_runtime_v6") return { data: [options.budget ?? { allowed: true, reason: "ok", reservation_id: "reserve-1" }], error: null };
+    if (name === "settle_sales_runtime_v6") return options.settlement ?? { data: false, error: null };
+    return { data: null, error: null };
+  });
+  const sb = {
+    rpc,
+    from: (table: string) => ({
+      insert: (row: Record<string, unknown>) => {
+        inserted.push({ table, ...row });
+        return { select: () => ({ single: async () => ({ data: { id: "conversation-1" }, error: null }) }) };
+      },
+      update: (_row: unknown) => ({ eq: async () => ({ error: null }) }),
+    }),
+  } as unknown as SupabaseClient;
+  const config = {
+    publicIpSalt: "test-salt", trustedProxies: parseTrustedProxies(undefined),
+    model: "claude-opus-5", anthropicApiKey: "test-key", providerTimeoutMs: 60_000,
+  } as RuntimeConfig;
+  const res = { setHeader: vi.fn(), writeHead: vi.fn(), end: vi.fn() } as unknown as ServerResponse;
+  await handlePublicSales(req, res, sb, config);
+  return { res, order, inserted, rpc };
+}
+
+it("reserves and settles a real widget turn before replying", async () => {
+  const { res, order, inserted } = await runWidgetTurn();
+  expect(res.writeHead).toHaveBeenCalledWith(200, expect.anything());
+  expect(provider.create).toHaveBeenCalledTimes(1);
+  expect(provider.init).toHaveBeenCalledWith(expect.objectContaining({ maxRetries: 0 }));
+  expect(order.indexOf("reserve_sales_runtime_v6")).toBeLessThan(order.indexOf("settle_sales_runtime_v6"));
+  expect(order.indexOf("settle_sales_runtime_v6")).toBeLessThan(order.indexOf("capture_sales_agent_lead"));
+  expect(inserted).toContainEqual(expect.objectContaining({
+    table: "sales_runtime_requests", outcome: "ok", reservation_id: "reserve-1",
+  }));
+});
+
+it("never calls the provider when the shared paid budget refuses a turn", async () => {
+  const { res, order } = await runWidgetTurn({ budget: {
+    allowed: false, reason: "daily_ceiling", reservation_id: null,
+  } });
+  expect(res.writeHead).toHaveBeenCalledWith(429, expect.anything());
+  expect(provider.create).not.toHaveBeenCalled();
+  expect(order).not.toContain("settle_sales_runtime_v6");
+});
+
+it("keeps the reserve held after an unusable provider response", async () => {
+  const { res, order, inserted } = await runWidgetTurn({ providerFailure: true });
+  expect(res.writeHead).toHaveBeenCalledWith(500, expect.anything());
+  expect(order).toContain("mark_sales_runtime_uncertain_v6");
+  expect(order).not.toContain("settle_sales_runtime_v6");
+  expect(inserted).toContainEqual(expect.objectContaining({
+    table: "sales_runtime_requests", outcome: "error", reservation_id: "reserve-1",
+  }));
+});
+
+it.each([
+  [{ data: null, error: null }, "empty response"],
+  [{ data: null, error: new Error("network outcome unknown") }, "RPC failure"],
+] as const)("keeps the reserve held after settlement %s (%s)", async (settlement, _label) => {
+  const { res, order } = await runWidgetTurn({ settlement });
+  expect(res.writeHead).toHaveBeenCalledWith(500, expect.anything());
+  expect(order).toContain("mark_sales_runtime_uncertain_v6");
+  expect(order).not.toContain("capture_sales_agent_lead");
 });
 
 describe("WIDGET_SOURCE", () => {

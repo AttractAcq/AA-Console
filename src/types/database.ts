@@ -16478,6 +16478,51 @@ export type Database = {
           },
         ]
       }
+      public_ingress_nonces_v1: {
+        Row: {
+          expires_at: string
+          issued_at: string
+          nonce_hash: string
+        }
+        Insert: {
+          expires_at: string
+          issued_at: string
+          nonce_hash: string
+        }
+        Update: {
+          expires_at?: string
+          issued_at?: string
+          nonce_hash?: string
+        }
+        Relationships: []
+      }
+      public_route_quota_buckets: {
+        Row: {
+          attempts: number
+          bucket_kind: string
+          expires_at: string
+          route: string
+          subject_hash: string
+          window_start: string
+        }
+        Insert: {
+          attempts: number
+          bucket_kind: string
+          expires_at: string
+          route: string
+          subject_hash: string
+          window_start: string
+        }
+        Update: {
+          attempts?: number
+          bucket_kind?: string
+          expires_at?: string
+          route?: string
+          subject_hash?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       record_templates: {
         Row: {
           description: string | null
@@ -16840,6 +16885,41 @@ export type Database = {
           },
         ]
       }
+      sales_runtime_daily_budgets: {
+        Row: {
+          budget_day: string
+          committed_usd: number
+          deployment_id: string
+          generation: number
+          held_usd: number
+          messages: number
+        }
+        Insert: {
+          budget_day: string
+          committed_usd?: number
+          deployment_id: string
+          generation?: number
+          held_usd?: number
+          messages?: number
+        }
+        Update: {
+          budget_day?: string
+          committed_usd?: number
+          deployment_id?: string
+          generation?: number
+          held_usd?: number
+          messages?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_runtime_daily_budgets_deployment_id_fkey"
+            columns: ["deployment_id"]
+            isOneToOne: false
+            referencedRelation: "client_sales_agent_deployments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_runtime_requests: {
         Row: {
           client_id: string
@@ -16851,6 +16931,7 @@ export type Database = {
           occurred_at: string
           origin: string | null
           outcome: string
+          reservation_id: string | null
         }
         Insert: {
           client_id: string
@@ -16862,6 +16943,7 @@ export type Database = {
           occurred_at?: string
           origin?: string | null
           outcome: string
+          reservation_id?: string | null
         }
         Update: {
           client_id?: string
@@ -16873,6 +16955,7 @@ export type Database = {
           occurred_at?: string
           origin?: string | null
           outcome?: string
+          reservation_id?: string | null
         }
         Relationships: [
           {
@@ -16916,6 +16999,64 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_sales_agent_deployments"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_runtime_requests_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: true
+            referencedRelation: "sales_runtime_reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_runtime_reservations: {
+        Row: {
+          actual_usd: number | null
+          budget_day: string
+          conversation_id: string | null
+          deployment_id: string
+          id: string
+          reserved_at: string
+          reserved_usd: number
+          settled_at: string | null
+          state: string
+        }
+        Insert: {
+          actual_usd?: number | null
+          budget_day: string
+          conversation_id?: string | null
+          deployment_id: string
+          id?: string
+          reserved_at?: string
+          reserved_usd: number
+          settled_at?: string | null
+          state: string
+        }
+        Update: {
+          actual_usd?: number | null
+          budget_day?: string
+          conversation_id?: string | null
+          deployment_id?: string
+          id?: string
+          reserved_at?: string
+          reserved_usd?: number
+          settled_at?: string | null
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_runtime_reservations_deployment_id_budget_day_fkey"
+            columns: ["deployment_id", "budget_day"]
+            isOneToOne: false
+            referencedRelation: "sales_runtime_budget_status_v6"
+            referencedColumns: ["deployment_id", "budget_day"]
+          },
+          {
+            foreignKeyName: "sales_runtime_reservations_deployment_id_budget_day_fkey"
+            columns: ["deployment_id", "budget_day"]
+            isOneToOne: false
+            referencedRelation: "sales_runtime_daily_budgets"
+            referencedColumns: ["deployment_id", "budget_day"]
           },
         ]
       }
@@ -23044,6 +23185,16 @@ export type Database = {
           },
         ]
       }
+      public_route_quota_metrics_v6: {
+        Row: {
+          active_buckets: number | null
+          attempts: number | null
+          bucket_kind: string | null
+          route: string | null
+          window_start: string | null
+        }
+        Relationships: []
+      }
       publish_due: {
         Row: {
           alt_text: string | null
@@ -23166,6 +23317,25 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      sales_runtime_budget_status_v6: {
+        Row: {
+          budget_day: string | null
+          committed_usd: number | null
+          deployment_id: string | null
+          held_usd: number | null
+          messages: number | null
+          uncertain_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_runtime_daily_budgets_deployment_id_fkey"
+            columns: ["deployment_id"]
+            isOneToOne: false
+            referencedRelation: "client_sales_agent_deployments"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -23686,6 +23856,10 @@ export type Database = {
           p_secret: string
         }
         Returns: string
+      }
+      admit_public_route_v6: {
+        Args: { p_ip_hash: string; p_route: string; p_subject_hash: string }
+        Returns: boolean
       }
       advance_assignment: {
         Args: {
@@ -24216,6 +24390,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cancel_sales_runtime_reservation_v6: {
+        Args: { p_reservation_id: string }
+        Returns: boolean
+      }
       capture_campaign_artifact_offer_v6: {
         Args: { p_artifact_kind: string; p_job_id: string }
         Returns: Json
@@ -24462,6 +24640,10 @@ export type Database = {
           proof_id: string
           provider: string
         }[]
+      }
+      claim_public_ingress_nonce_v1: {
+        Args: { p_issued_at: string; p_nonce_hash: string }
+        Returns: boolean
       }
       client_budget_state: {
         Args: { p_client_id: string; p_month?: string }
@@ -25638,6 +25820,10 @@ export type Database = {
         Args: { p_external_url: string; p_placement_id: string }
         Returns: undefined
       }
+      mark_sales_runtime_uncertain_v6: {
+        Args: { p_reservation_id: string }
+        Returns: boolean
+      }
       master_ai_describe_table: {
         Args: { p_table: string }
         Returns: {
@@ -26543,6 +26729,10 @@ export type Database = {
         }[]
       }
       prune_agent_runtime_heartbeats: { Args: never; Returns: number }
+      public_perimeter_status_v6: {
+        Args: { p_after_deployment_id?: string; p_limit?: number }
+        Returns: Json
+      }
       public_slots_for_link_v6: {
         Args: { p_days?: number; p_token: string }
         Returns: {
@@ -27409,6 +27599,14 @@ export type Database = {
       rerender_generation: {
         Args: { p_generation_id: string; p_quality?: string; p_size?: string }
         Returns: string
+      }
+      reserve_sales_runtime_v6: {
+        Args: { p_deployment_id: string; p_reserved_usd: number }
+        Returns: {
+          allowed: boolean
+          reason: string
+          reservation_id: string
+        }[]
       }
       resolve_booking_link_v6: {
         Args: { p_token: string }
@@ -28312,6 +28510,14 @@ export type Database = {
       settle_completed_blocked_daily_siblings: {
         Args: { p_limit?: number }
         Returns: number
+      }
+      settle_sales_runtime_v6: {
+        Args: {
+          p_actual_usd: number
+          p_conversation_id?: string
+          p_reservation_id: string
+        }
+        Returns: boolean
       }
       sign_video_approval: {
         Args: { p_asset_id: string; p_role: string }

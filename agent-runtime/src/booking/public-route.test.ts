@@ -1,8 +1,15 @@
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { RuntimeConfig } from "../config.js";
+import { parseTrustedProxies } from "../public/client-ip.js";
 
-import { handlePublicBooking, isBookingRequest } from "./public-route.js";
+import { handlePublicBooking as routeBooking, isBookingRequest } from "./public-route.js";
+
+const config = { publicIpSalt: "test-salt", trustedProxies: parseTrustedProxies(undefined) } as RuntimeConfig;
+const handlePublicBooking = (req: IncomingMessage, res: ServerResponse, sb: SupabaseClient) =>
+  routeBooking(req, res, sb, config);
 
 /**
  * The public booking surface — G04.
@@ -19,6 +26,7 @@ function request(url: string, method = "GET", body?: unknown): IncomingMessage {
   req.url = url;
   req.method = method;
   req.headers = { "content-type": "application/json" };
+  Object.defineProperty(req, "socket", { value: { remoteAddress: "203.0.113.9" } });
   return req;
 }
 
@@ -37,6 +45,7 @@ const TOKEN = "a".repeat(64);
 const db = (over: Record<string, unknown> = {}) => {
   const rpc = vi.fn(async (name: string, _args?: unknown) => {
     if (name in over) return over[name] as { data: unknown; error: unknown };
+    if (name === "admit_public_route_v6") return { data: true, error: null };
     if (name === "public_slots_for_link_v6") {
       return { data: [{ starts_at: "2026-11-02T10:00:00Z" }], error: null };
     }
@@ -71,9 +80,22 @@ describe("which requests are ours", () => {
 describe("reading the free times", () => {
   it("returns the slots the database computed", async () => {
     const { res, out } = response();
-    await handlePublicBooking(request(`/public/book/v1/${TOKEN}/slots`), res, db().sb);
+    const { sb, rpc } = db();
+    await handlePublicBooking(request(`/public/book/v1/${TOKEN}/slots`), res, sb);
     expect(out.status).toBe(200);
     expect(JSON.parse(out.body).slots).toHaveLength(1);
+    expect(rpc.mock.calls.map((call) => call[0])).toEqual([
+      "admit_public_route_v6", "public_slots_for_link_v6",
+    ]);
+  });
+
+  it("refuses a saturated caller before reading slots", async () => {
+    const { res, out } = response();
+    const { sb, rpc } = db({ admit_public_route_v6: { data: false, error: null } });
+    await handlePublicBooking(request(`/public/book/v1/${TOKEN}/slots`), res, sb);
+    expect(out.status).toBe(429);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).not.toHaveBeenCalledWith("public_slots_for_link_v6", expect.anything());
   });
 
   it("answers an empty list for a dead link, so a token cannot be probed", async () => {
@@ -99,16 +121,16 @@ describe("taking a slot", () => {
     expect(JSON.parse(out.body).booked).toBe(true);
   });
 
-  it("refuses a time it cannot parse before calling anything", async () => {
+  it("refuses a time it cannot parse before calling the booking RPC", async () => {
     const { res, out } = response();
     const { sb, rpc } = db();
     await handlePublicBooking(
       request(`/public/book/v1/${TOKEN}`, "POST", { ...good, startsAt: "soon" }), res, sb);
     expect(out.status).toBe(400);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalledWith("book_from_public_link_v6", expect.anything());
   });
 
-  it("passes the database's own refusal back word for word", async () => {
+  it("passes a fixed, caller-safe booking refusal back word for word", async () => {
     const { res, out } = response();
     const { sb } = db({
       book_from_public_link_v6: {
@@ -119,6 +141,27 @@ describe("taking a slot", () => {
     await handlePublicBooking(request(`/public/book/v1/${TOKEN}`, "POST", good), res, sb);
     expect(out.status).toBe(400);
     expect(JSON.parse(out.body).error).toContain("not available");
+  });
+
+  it("does not expose an unexpected database error or submitted contact in response or logs", async () => {
+    const privateContact = "contact@example.test";
+    const { res, out } = response();
+    const { sb } = db({
+      book_from_public_link_v6: {
+        data: null,
+        error: { message: `duplicate value ${privateContact}` },
+      },
+    });
+    const logs = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await handlePublicBooking(request(`/public/book/v1/${TOKEN}`, "POST", good), res, sb);
+      expect(out.status).toBe(503);
+      expect(out.body).not.toContain(privateContact);
+      expect(JSON.stringify(logs.mock.calls)).not.toContain(privateContact);
+      expect(JSON.stringify(logs.mock.calls)).toContain("database_error");
+    } finally {
+      logs.mockRestore();
+    }
   });
 
   it("says nothing was held when the call returns no appointment", async () => {

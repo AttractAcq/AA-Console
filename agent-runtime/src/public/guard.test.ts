@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   boundHistory,
-  callerIp,
   clientFacing,
-  hashIp,
   MAX_HISTORY_TURNS,
   MAX_MESSAGE_CHARS,
   normaliseOrigin,
@@ -165,40 +163,6 @@ describe("transcriptToTurns", () => {
   it("returns empty for anything that is not a list", () => {
     expect(transcriptToTurns(null)).toEqual([]);
     expect(transcriptToTurns({ role: "user" })).toEqual([]);
-  });
-});
-
-describe("hashIp", () => {
-  it("is stable for the same caller", () => {
-    expect(hashIp("203.0.113.7", "salt")).toBe(hashIp("203.0.113.7", "salt"));
-  });
-  it("separates different callers", () => {
-    expect(hashIp("203.0.113.7", "salt")).not.toBe(hashIp("203.0.113.8", "salt"));
-  });
-  it("never stores the address itself", () => {
-    const hashed = hashIp("203.0.113.7", "salt");
-    expect(hashed).not.toContain("203.0.113.7");
-  });
-  it("is useless against an IP list without the salt", () => {
-    expect(hashIp("203.0.113.7", "salt-a")).not.toBe(hashIp("203.0.113.7", "salt-b"));
-  });
-  it("returns null when there is no address", () => {
-    expect(hashIp(undefined, "salt")).toBeNull();
-  });
-});
-
-describe("callerIp", () => {
-  it("takes the original client, not the proxy", () => {
-    // Taking the last entry would throttle every visitor behind one proxy together.
-    expect(callerIp("203.0.113.7, 10.0.0.1, 10.0.0.2")).toBe("203.0.113.7");
-  });
-  it("handles a single value and an array header", () => {
-    expect(callerIp("203.0.113.7")).toBe("203.0.113.7");
-    expect(callerIp(["203.0.113.9, 10.0.0.1"])).toBe("203.0.113.9");
-  });
-  it("returns undefined when the header is absent or empty", () => {
-    expect(callerIp(undefined)).toBeUndefined();
-    expect(callerIp("")).toBeUndefined();
   });
 });
 
