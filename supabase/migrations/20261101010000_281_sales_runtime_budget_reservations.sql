@@ -109,6 +109,7 @@ language plpgsql volatile security definer
 set search_path = pg_catalog, public
 as $$
 declare
+  v_deployment_id uuid;
   v_row public.sales_runtime_reservations%rowtype;
   v_overrun boolean;
 begin
@@ -116,6 +117,17 @@ begin
   if p_actual_usd is null or p_actual_usd < 0 or p_actual_usd > 100 then
     raise exception 'Invalid sales runtime actual cost';
   end if;
+  -- Reserve takes deployment then budget. Settle can disable the deployment
+  -- on an overrun, so it must take that same deployment row before locking
+  -- the reservation and budget. Read the immutable FK first, lock its parent,
+  -- then re-read the reservation under lock; this avoids a reverse-order
+  -- deadlock with a concurrent reserve.
+  select deployment_id into v_deployment_id
+    from public.sales_runtime_reservations where id = p_reservation_id;
+  if not found then raise exception 'Unknown sales runtime reservation'; end if;
+  perform 1 from public.client_sales_agent_deployments
+   where id = v_deployment_id for update;
+  if not found then raise exception 'Sales runtime deployment no longer exists'; end if;
   select * into v_row from public.sales_runtime_reservations
    where id = p_reservation_id for update;
   if not found then raise exception 'Unknown sales runtime reservation'; end if;

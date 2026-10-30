@@ -40,6 +40,11 @@ describe("trusted public caller address", () => {
     expect(resolveCallerIp(request("10.0.0.2", "203.0.113.4, invalid"), policy)).toBeNull();
     expect(resolveCallerIp(request("10.0.0.2", "203.0.113.4,"), policy)).toBeNull();
     expect(resolveCallerIp(request("invalid", "203.0.113.4"), policy)).toBeNull();
+    // net.isIP accepts zone IDs, but URL parsing does not. Both socket and
+    // attacker-supplied forwarded cases must fail closed without throwing.
+    expect(normalizeIp("fe80::1%en0")).toBeNull();
+    expect(resolveCallerIp(request("fe80::1%en0", "203.0.113.4"), policy)).toBeNull();
+    expect(resolveCallerIp(request("10.0.0.2", "fe80::1%en0"), policy)).toBeNull();
     expect(() => parseTrustedProxies("10.0.0.0/99")).toThrow(/PUBLIC_TRUSTED_PROXY_CIDRS/);
     expect(() => parseTrustedProxies("10.0.0.0/8,")).toThrow(/PUBLIC_TRUSTED_PROXY_CIDRS/);
   });

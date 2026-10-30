@@ -26,7 +26,10 @@ const freshToken = () => (issued += 1).toString(16).padStart(64, "0");
 
 function call(
   sb: SupabaseClient,
-  options: { token?: string; body?: Record<string, unknown>; method?: string; url?: string } = {},
+  options: {
+    token?: string; body?: Record<string, unknown>; method?: string; url?: string;
+    peer?: string; forwarded?: string; trustedProxies?: RuntimeConfig["trustedProxies"];
+  } = {},
 ) {
   const req = Readable.from([
     Buffer.from(JSON.stringify(options.body ?? { email: "jay@example.test", consent: true })),
@@ -36,9 +39,9 @@ function call(
   req.headers = {
     authorization: `Bearer ${options.token ?? freshToken()}`,
     "user-agent": "Mozilla/5.0",
-    "x-forwarded-for": "203.0.113.9, 10.0.0.1",
+    "x-forwarded-for": options.forwarded ?? "203.0.113.9, 10.0.0.1",
   };
-  Object.defineProperty(req, "socket", { value: { remoteAddress: "10.0.0.1" } });
+  Object.defineProperty(req, "socket", { value: { remoteAddress: options.peer ?? "10.0.0.1" } });
 
   let code = 0;
   let payload: Record<string, unknown> = {};
@@ -51,7 +54,9 @@ function call(
     },
   } as unknown as ServerResponse;
 
-  return handlePublicLead(req, res, sb, config).then(() => ({ code, payload }));
+  return handlePublicLead(req, res, sb, {
+    ...config, trustedProxies: options.trustedProxies ?? config.trustedProxies,
+  }).then(() => ({ code, payload }));
 }
 
 function database(outcome: Record<string, unknown> | null, error?: string) {
@@ -200,6 +205,18 @@ describe("what a stranger can learn", () => {
 });
 
 describe("rate limiting", () => {
+  it("fails closed on zone-scoped socket and trusted forwarded IPs without a rejected handler", async () => {
+    const { sb, rpc } = database({ ok: true, lead_id: "lead-1" });
+    const policy = parseTrustedProxies("10.0.0.0/8");
+    const direct = await call(sb, { peer: "fe80::1%en0", trustedProxies: policy });
+    const forwarded = await call(sb, {
+      peer: "10.0.0.1", forwarded: "fe80::1%en0", trustedProxies: policy,
+    });
+    expect(direct.code).toBe(503);
+    expect(forwarded.code).toBe(503);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("refuses a quota-store failure before body processing or token lookup", async () => {
     const rpc = vi.fn(async (name: string) => name === "admit_public_route_v6"
       ? { data: null, error: { message: "database unavailable" } }

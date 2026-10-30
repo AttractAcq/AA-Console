@@ -28,8 +28,17 @@ export function normalizeIp(raw: string | undefined): string | null {
   const trimmed = raw.trim();
   if (isIP(trimmed) === 4) return trimmed;
   if (isIP(trimmed) !== 6) return null;
-  // Node's URL parser serializes IPv6 in a stable, compressed form.
-  const normalized = new URL(`http://[${trimmed}]/`).hostname.slice(1, -1).toLowerCase();
+  // Node accepts scoped IPv6 literals such as fe80::1%en0, but URL rejects
+  // them. They are not usable as public caller identities; never let a
+  // forwarded header throw through an asynchronous public route.
+  if (trimmed.includes("%")) return null;
+  let normalized: string;
+  try {
+    // Node's URL parser serializes IPv6 in a stable, compressed form.
+    normalized = new URL(`http://[${trimmed}]/`).hostname.slice(1, -1).toLowerCase();
+  } catch {
+    return null;
+  }
   // URL serializes mapped IPv4 as two hexadecimal hextets, not dotted
   // decimal. Collapse it so the same caller cannot obtain two quota buckets
   // merely by arriving through IPv4 versus an IPv4-mapped IPv6 socket.
