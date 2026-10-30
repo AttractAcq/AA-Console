@@ -333,11 +333,15 @@ it.each([
   { label: "another client's row", returned: [{ id: "meta-1", client_id: "client-2", ingest_enabled: true }] },
 ])("reconciles an unconfirmed same-visit sync update: $label", async ({ returned }) => {
   const updateSelect = vi.fn(async () => ({ data: returned, error: null }));
+  let reads = 0;
   from.mockImplementation(() => {
     const query = {
       select: () => query,
       eq: () => query,
-      order: async () => ({ data: [{ ...base, id: "meta-1", provider: "meta" }], error: null }),
+      order: async () => {
+        reads += 1;
+        return { data: [{ ...base, id: "meta-1", provider: "meta" }], error: null };
+      },
       update: () => {
         const updateQuery = { eq: () => updateQuery, select: updateSelect };
         return updateQuery;
@@ -350,20 +354,24 @@ it.each([
   const toggle = await screen.findByRole("switch", { name: "Daily sync for meta" });
   fireEvent.click(toggle);
   await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("not confirmed for this client"));
+  await waitFor(() => expect(toggle).not.toBeDisabled());
   expect(toggle).toHaveAttribute("aria-checked", "false");
-  expect(toggle).not.toBeDisabled();
+  expect(reads).toBe(2); // Initial evidence plus authoritative post-denial readback.
   expect(updateSelect).toHaveBeenCalledWith("id, client_id, ingest_enabled");
 });
 
 it("keeps a same-visit sync change only after one exact-client returned row", async () => {
-  const updateSelect = vi.fn(async () => ({
-    data: [{ id: "meta-1", client_id: "client-1", ingest_enabled: true }], error: null,
-  }));
+  let serverEnabled = false;
+  const updateSelect = vi.fn(async () => {
+    serverEnabled = true;
+    return { data: [{ id: "meta-1", client_id: "client-1", ingest_enabled: true }], error: null };
+  });
   from.mockImplementation(() => {
     const query = {
       select: () => query,
       eq: () => query,
-      order: async () => ({ data: [{ ...base, id: "meta-1", provider: "meta" }], error: null }),
+      order: async () => ({ data: [{ ...base, id: "meta-1", provider: "meta",
+        ingest_enabled: serverEnabled }], error: null }),
       update: () => {
         const updateQuery = { eq: () => updateQuery, select: updateSelect };
         return updateQuery;
@@ -379,6 +387,55 @@ it("keeps a same-visit sync change only after one exact-client returned row", as
   expect(toggle).toHaveAttribute("aria-checked", "true");
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(updateSelect).toHaveBeenCalledWith("id, client_id, ingest_enabled");
+});
+
+it("does not let a pre-toggle refresh overwrite a confirmed sync change", async () => {
+  let reads = 0;
+  let serverEnabled = false;
+  let finishStaleRead: ((value: { data: Array<typeof base & { id: string; provider: string }>; error: null }) => void) | undefined;
+  let finishUpdate: ((value: { data: Array<{ id: string; client_id: string; ingest_enabled: boolean }>; error: null }) => void) | undefined;
+  from.mockImplementation(() => {
+    const query = {
+      select: () => query,
+      eq: () => query,
+      order: () => {
+        reads += 1;
+        const result: { data: Array<typeof base & { id: string; provider: string }>; error: null } = {
+          data: [{ ...base, id: "meta-1", provider: "meta", ingest_enabled: serverEnabled }], error: null,
+        };
+        return reads === 2
+          ? new Promise<typeof result>((resolve) => { finishStaleRead = resolve; })
+          : Promise.resolve(result);
+      },
+      update: () => {
+        const updateQuery = {
+          eq: () => updateQuery,
+          select: () => new Promise<{ data: Array<{ id: string; client_id: string; ingest_enabled: boolean }>; error: null }>((resolve) => { finishUpdate = resolve; }),
+        };
+        return updateQuery;
+      },
+    };
+    return query;
+  });
+
+  render(<IntegrationsPanel />);
+  fireEvent.click(await screen.findByRole("button", { name: "Add page for ads" }));
+  latestAdModal().onSaved(); // Starts a refresh before the operator toggles sync.
+  await waitFor(() => expect(reads).toBe(2));
+
+  const toggle = screen.getByRole("switch", { name: "Daily sync for meta" });
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-checked", "true");
+  expect(toggle).toBeDisabled();
+  await act(async () => { finishStaleRead?.({ data: [{ ...base, id: "meta-1", provider: "meta" }], error: null }); });
+  expect(toggle).toHaveAttribute("aria-checked", "true");
+  await act(async () => {
+    serverEnabled = true;
+    finishUpdate?.({ data: [{ id: "meta-1", client_id: "client-1", ingest_enabled: true }], error: null });
+  });
+  expect(toggle).toHaveAttribute("aria-checked", "true");
+  expect(toggle).not.toBeDisabled();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 it("closes the Add Integration form on route change and rejects an old client's stale submit", async () => {

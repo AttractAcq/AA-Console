@@ -216,7 +216,9 @@ export function IntegrationsPanel() {
     if (activeIngestWrites.current.has(key)) return;
     const token = ++nextIngestToken.current;
     const visit = routeVisit.current;
-    const evidenceGeneration = requestGeneration.current;
+    // A read begun before this optimistic write cannot replace its pending
+    // value. The final read below reconciles all fields after confirmation.
+    const evidenceGeneration = ++requestGeneration.current;
     activeIngestWrites.current.set(key, token);
     setPendingIngest((prev) => ({ ...prev, [key]: token }));
     setError(null);
@@ -244,9 +246,9 @@ export function IntegrationsPanel() {
     const sameEvidence = activeClient.current === clientId
       && routeVisit.current === visit && requestGeneration.current === evidenceGeneration;
     if (writeError && sameEvidence) setError({ clientId, message: writeError });
-    // A refused or unconfirmed write, route revisit, or newer read must use
-    // current server evidence. A blind inverse would corrupt a newer snapshot.
-    if ((writeError || !sameEvidence) && activeClient.current === clientId) await refresh();
+    // Reconcile every outcome from the server. This also restores other
+    // integration fields from a refresh invalidated at toggle start.
+    if (activeClient.current === clientId) await refresh();
     if (activeIngestWrites.current.get(key) === token) activeIngestWrites.current.delete(key);
     setPendingIngest((prev) => {
       if (prev[key] !== token) return prev;
