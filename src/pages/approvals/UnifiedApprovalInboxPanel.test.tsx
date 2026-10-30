@@ -46,6 +46,27 @@ const readyCampaign = {
   ...request, source_system: "aa_console", expires_at: "2030-01-01T00:00:00Z",
 };
 
+const readyGoogle = {
+  ...request,
+  id: "google-request-1", source_system: "aa_console", source_kind: "google_review_reply",
+  source_id: "reply-1", source_version: "b".repeat(64), artifact_hash: "b".repeat(64),
+  title: "Google review reply: Harbour Home", expires_at: "2030-01-01T00:00:00Z",
+  preview: {
+    reply_body: "Thanks for sharing your experience.", reply_body_sha256: "c".repeat(64),
+    review_id: "review-1", review_ref: "review-remote-1",
+    location_ref: "accounts/1184/locations/7730", location_title: "Harbour Home",
+  },
+  destination: "google_business:accounts/1184/locations/7730/reviews/review-remote-1/reply",
+  account_ref: "accounts/1184/locations/7730", budget: null,
+  scope: {
+    client_id: "client-1", reply_id: "reply-1", review_id: "review-1",
+    review_ref: "review-remote-1", location_ref: "accounts/1184/locations/7730",
+    body_hash: "c".repeat(64),
+  },
+  owner_role: "admin_or_active_client_manager",
+  owning_path: "/clients/client-1/google-profile?tab=reviews",
+};
+
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
@@ -291,5 +312,72 @@ describe("unified approval inbox", () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_campaign_action_approval_v6", {
       p_request_id: "action-1", p_decision: "rejected", p_reason: "Approval window closed",
     }));
+  });
+
+  it("decides a complete Google reply through the version-bound owning wrapper", async () => {
+    const user = userEvent.setup();
+    requests = [readyGoogle];
+    rpc.mockImplementation(async () => {
+      requests = [{ ...readyGoogle, status: "approved" }];
+      decisions = [{ request_id: readyGoogle.id, decision: "approved", actor_id: "human-1",
+        actor_aal: "aal2", reason: null, decided_at: "2026-10-30T09:00:00Z" }];
+      return { data: null, error: null };
+    });
+    show();
+    const card = await screen.findByRole("article", { name: "Google review reply: Harbour Home" });
+    expect(within(card).getByText("Google review reply decision")).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_google_review_reply_from_inbox_v6", {
+      p_reply_id: "reply-1", p_expected_source_version: "b".repeat(64),
+      p_expected_artifact_hash: "b".repeat(64), p_approved: true,
+    }));
+    await waitFor(() => expect(screen.getByText("Decision history (1)")).toBeInTheDocument());
+    expect(rpc).not.toHaveBeenCalledWith("decide_google_review_reply_v6", expect.anything());
+  });
+
+  it("requires a reason and passes the selected Google version on rejection", async () => {
+    const user = userEvent.setup();
+    requests = [readyGoogle];
+    show();
+    const card = await screen.findByRole("article", { name: "Google review reply: Harbour Home" });
+    const reject = within(card).getByRole("button", { name: "Reject with reason" });
+    expect(reject).toBeDisabled();
+    await user.type(within(card).getByRole("textbox", { name: "Reason to reject" }), "Wrong response");
+    await user.click(reject);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_google_review_reply_from_inbox_v6", {
+      p_reply_id: "reply-1", p_expected_source_version: "b".repeat(64),
+      p_expected_artifact_hash: "b".repeat(64), p_approved: false,
+      p_reason: "Wrong response",
+    }));
+  });
+
+  it("keeps blocked, incomplete and stale Google cards read-only or rejects their click", async () => {
+    requests = [
+      { ...readyGoogle, id: "blocked", preview_blocker: "Google review is gone" },
+      { ...readyGoogle, id: "missing-target", title: "No Google destination", destination: null },
+      { ...readyGoogle, id: "stale", title: "Edited Google reply" },
+    ];
+    freshRequest = { ...readyGoogle, id: "stale", source_version: "d".repeat(64),
+      artifact_hash: "d".repeat(64) };
+    show();
+    const user = userEvent.setup();
+    const stale = await screen.findByRole("article", { name: "Edited Google reply" });
+    expect(within(screen.getByRole("article", { name: "Google review reply: Harbour Home" }))
+      .queryByRole("button", { name: /Approve/ })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "No Google destination" }))
+      .queryByRole("button", { name: /Approve/ })).not.toBeInTheDocument();
+    await user.click(within(stale).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByText(/This exact request changed or is no longer pending/))
+      .toHaveAttribute("role", "alert");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("disables Google reply decisions unless current assurance is AAL2", async () => {
+    requests = [readyGoogle];
+    getAAL.mockResolvedValue({ data: { currentLevel: "aal1" }, error: null });
+    show();
+    const card = await screen.findByRole("article", { name: "Google review reply: Harbour Home" });
+    expect(await within(card).findByRole("button", { name: "Approve exact version" })).toBeDisabled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

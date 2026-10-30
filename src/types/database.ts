@@ -24907,6 +24907,22 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_google_review_reply_from_inbox_v6: {
+        Args: {
+          p_reply_id: string
+          p_expected_source_version: string
+          p_expected_artifact_hash: string
+          p_approved: boolean
+          p_reason?: string
+        }
+        Returns: Database["public"]["Tables"]["google_review_replies"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "google_review_replies"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       decide_lead_magnet_approval_v6: {
         Args: { p_approval_id: string; p_approved: boolean; p_reason?: string }
         Returns: {

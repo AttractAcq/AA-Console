@@ -106,14 +106,56 @@ function isCampaignApprovalReady(request: UnifiedApprovalRequest, clientId: stri
     && request.status === "pending" && !isExpired(request);
 }
 
+function isGoogleReplyRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "google_review_reply"
+    || request.client_id !== clientId
+    || (request.status !== "pending" && request.status !== "expired")
+    || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const location = preview.location_ref;
+  const review = preview.review_ref;
+  const bodyHash = preview.reply_body_sha256;
+  return typeof location === "string" && !!location.trim()
+    && typeof review === "string" && !!review.trim()
+    && typeof preview.reply_body === "string" && !!preview.reply_body.trim()
+    && typeof bodyHash === "string" && /^[0-9a-f]{64}$/.test(bodyHash)
+    && request.source_version === request.artifact_hash
+    && request.account_ref === location
+    && request.destination === `google_business:${location}/reviews/${review}/reply`
+    && scope.client_id === clientId && scope.reply_id === request.source_id
+    && scope.review_id === preview.review_id && scope.review_ref === review
+    && scope.location_ref === location && scope.body_hash === bodyHash;
+}
+
+function isGoogleReplyApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  return isGoogleReplyRejectionReady(request, clientId)
+    && request.status === "pending" && !isExpired(request);
+}
+
+function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  return isCampaignRejectionReady(request, clientId)
+    || isGoogleReplyRejectionReady(request, clientId);
+}
+
+function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  return isCampaignApprovalReady(request, clientId)
+    || isGoogleReplyApprovalReady(request, clientId);
+}
+
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
   return left.id === right.id && left.source_id === right.source_id
+    && left.client_id === right.client_id && left.source_system === right.source_system
+    && left.source_kind === right.source_kind && left.owner_role === right.owner_role
     && left.source_version === right.source_version
     && left.status === right.status
     && left.expires_at === right.expires_at
     && left.artifact_hash === right.artifact_hash
     && left.destination === right.destination
     && left.account_ref === right.account_ref
+    && left.preview_blocker === right.preview_blocker
     && JSON.stringify(left.preview) === JSON.stringify(right.preview)
     && JSON.stringify(left.scope) === JSON.stringify(right.scope)
     && JSON.stringify(left.budget) === JSON.stringify(right.budget);
@@ -146,8 +188,10 @@ function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
   const blocker = previewMissing(request);
   const sourcePath = sourcePathForRequest(request, clientId);
   const html = exactHtml(request.preview);
-  const canRejectCampaign = isCampaignRejectionReady(request, clientId);
-  const canApproveCampaign = isCampaignApprovalReady(request, clientId);
+  const canReject = isRejectionReady(request, clientId);
+  const canApprove = isApprovalReady(request, clientId);
+  const decisionLabel = request.source_kind === "google_review_reply"
+    ? "Google review reply" : "Campaign action";
 
   return (
     <article className="rounded-xl border border-border bg-card p-5" aria-labelledby={`approval-${request.id}`}>
@@ -221,21 +265,21 @@ function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
         )}
       </details>
 
-      {canRejectCampaign && (
+      {canReject && (
         <div className="mt-4 space-y-3 rounded-lg border border-border p-3">
-          <p className="text-sm font-medium">Campaign action decision</p>
+          <p className="text-sm font-medium">{decisionLabel} decision</p>
           <p className="text-xs text-muted-foreground">
-            This calls the campaign action owner for the exact version above. AAL2 is required;
+            This calls the source owner for the exact version above. AAL2 is required;
             the source and database recheck the request before recording a decision.
           </p>
-          {!canApproveCampaign && <p className="text-xs text-muted-foreground">
+          {!canApprove && <p className="text-xs text-muted-foreground">
             This request has expired. It can only be closed with a reasoned rejection.
           </p>}
           {aal !== "aal2" && <p role="status" className="text-sm text-destructive">
             {aal === "aal1" ? "Complete MFA to reach AAL2 before deciding." : "MFA level could not be verified; decisions are unavailable."}
           </p>}
           <div className="flex flex-wrap gap-2">
-            {canApproveCampaign && <button type="button" disabled={busy || aal !== "aal2"}
+            {canApprove && <button type="button" disabled={busy || aal !== "aal2"}
               onClick={() => void onDecide(request, "approved")}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
               Approve exact version
@@ -325,8 +369,8 @@ export function UnifiedApprovalInboxPanel() {
 
   async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) {
     if (!clientId || (decision === "approved"
-      ? !isCampaignApprovalReady(request, clientId)
-      : !isCampaignRejectionReady(request, clientId))) return;
+      ? !isApprovalReady(request, clientId)
+      : !isRejectionReady(request, clientId))) return;
     setBusyId(request.id);
     setDecisionError(null);
     try {
@@ -341,19 +385,27 @@ export function UnifiedApprovalInboxPanel() {
         .eq("id", request.id).eq("client_id", clientId).maybeSingle();
       if (current.error) throw current.error;
       if (!current.data || (decision === "approved"
-        ? !isCampaignApprovalReady(current.data, clientId)
-        : !isCampaignRejectionReady(current.data, clientId))
+        ? !isApprovalReady(current.data, clientId)
+        : !isRejectionReady(current.data, clientId))
         || !sameVersion(request, current.data)) {
         throw new Error("This exact request changed or is no longer pending. Review the refreshed card before deciding.");
       }
       if (decision === "rejected" && !reason?.trim()) {
         throw new Error("Enter a reason before rejecting this request.");
       }
-      const outcome = await supabase.rpc("decide_campaign_action_approval_v6", {
-        p_request_id: request.source_id,
-        p_decision: decision,
-        ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
-      });
+      const outcome = request.source_kind === "google_review_reply"
+        ? await supabase.rpc("decide_google_review_reply_from_inbox_v6", {
+          p_reply_id: request.source_id,
+          p_expected_source_version: request.source_version,
+          p_expected_artifact_hash: request.artifact_hash!,
+          p_approved: decision === "approved",
+          ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+        })
+        : await supabase.rpc("decide_campaign_action_approval_v6", {
+          p_request_id: request.source_id,
+          p_decision: decision,
+          ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+        });
       if (outcome.error) throw outcome.error;
       setStatusFilter("all");
       await refresh();
@@ -393,7 +445,7 @@ export function UnifiedApprovalInboxPanel() {
         <h2 id="unified-approvals-title" className="text-xl font-semibold">Unified approval inbox</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Canonical requests and decision history appear here as source adapters are connected.
-          Complete campaign action requests can be decided here through their owning function.
+          Complete campaign action and Google review reply requests can be decided here through their owning functions.
           Other requests link to their owning source. Coverage is incomplete: the Engine,
           Assets and Campaign actions tabs remain available for work not yet mirrored here.
         </p>
