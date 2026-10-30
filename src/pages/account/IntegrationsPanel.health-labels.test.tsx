@@ -213,6 +213,9 @@ it("closes client A's Meta dialog on route change, rejects its stale submit, and
   await bModal.onSaved();
   expect(writes).toHaveLength(1);
   expect(screen.queryByRole("button", { name: "Page 222" })).not.toBeInTheDocument();
+  await expect(aModal.onSubmit({ meta_page_id: "555", meta_pixel_id: "" }))
+    .rejects.toThrow("No current-client integration selected");
+  expect(writes).toHaveLength(1);
 });
 
 it("keeps client B's pending sync control disabled when client A's older update finishes", async () => {
@@ -303,4 +306,7 @@ it("closes the Add Integration form on route change and rejects an old client's 
   rendered.rerender(<IntegrationsPanel />);
   await screen.findByRole("button", { name: "Add" });
   expect(latestAddModal().open).toBe(false);
+  await expect(aModal.onSubmit({ provider: "meta", credential_label: "act_123", secret: "secret-a", access_level: "admin" }))
+    .rejects.toThrow("No current-client integration form selected");
+  expect(rpc).toHaveBeenCalledTimes(1);
 });

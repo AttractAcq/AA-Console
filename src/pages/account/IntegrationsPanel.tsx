@@ -103,14 +103,15 @@ const FIELDS: FieldDef[] = [
 ];
 
 export function IntegrationsPanel() {
-  const [addOpenClient, setAddOpenClient] = useState<string | null>(null);
-  const [adSettings, setAdSettings] = useState<Integration | null>(null);
+  const [addOpenClient, setAddOpenClient] = useState<{ clientId: string; routeVisit: number } | null>(null);
+  const [adSettings, setAdSettings] = useState<{ integration: Integration; routeVisit: number } | null>(null);
   const { clientId } = useParams<{ clientId: string }>();
   const [snapshot, setSnapshot] = useState<{ clientId: string; rows: Integration[]; observedAtMs: number } | null>(null);
   const [saving, setSaving] = useState<{ clientId: string; integrationId: string } | null>(null);
   const [error, setError] = useState<{ clientId: string; message: string } | null>(null);
   const [loadError, setLoadError] = useState<{ clientId: string; message: string } | null>(null);
   const activeClient = useRef<string | null>(null);
+  const routeVisit = useRef(0);
   const requestGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -142,6 +143,7 @@ export function IntegrationsPanel() {
 
   useEffect(() => {
     activeClient.current = clientId ?? null;
+    routeVisit.current += 1;
     // The render guard below closes a previous client's dialog immediately;
     // clearing the selection also keeps it closed if the route later returns.
     setAdSettings(null);
@@ -154,9 +156,9 @@ export function IntegrationsPanel() {
   }, [clientId, refresh]);
 
   const rows = snapshot && snapshot.clientId === clientId ? snapshot.rows : [];
-  const addOpen = addOpenClient === clientId && snapshot?.clientId === clientId;
-  const selectedAdSettingsId = adSettings && clientId && adSettings.client_id === clientId
-    ? adSettings.id : null;
+  const addOpen = addOpenClient?.clientId === clientId && snapshot?.clientId === clientId;
+  const selectedAdSettingsId = adSettings && clientId && adSettings.integration.client_id === clientId
+    ? adSettings.integration.id : null;
   const currentAdSettings = selectedAdSettingsId && snapshot?.clientId === clientId
     ? rows.find((row) => row.id === selectedAdSettingsId && row.client_id === clientId) ?? null
     : null;
@@ -227,7 +229,7 @@ export function IntegrationsPanel() {
           Meta and Instagram activation evidence is shown below. A stored integration or account ID
           does not establish provider access, scopes, or permission to publish.
         </p>
-        <Button icon={Plus} onClick={() => setAddOpenClient(clientId)}>
+        <Button icon={Plus} onClick={() => setAddOpenClient({ clientId, routeVisit: routeVisit.current })}>
           Add
         </Button>
       </div>
@@ -327,7 +329,7 @@ export function IntegrationsPanel() {
             <button
               key="a"
               type="button"
-              onClick={() => setAdSettings(r)}
+              onClick={() => setAdSettings({ integration: r, routeVisit: routeVisit.current })}
               className="text-xs text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {r.meta_page_id ? `Page ${r.meta_page_id}` : "Add page for ads"}
@@ -357,7 +359,8 @@ export function IntegrationsPanel() {
         initialValues={adSettingsValues}
         submitLabel="Save"
         onSubmit={async (v) => {
-          if (!clientId || activeClient.current !== clientId || !currentAdSettings) {
+          if (!clientId || activeClient.current !== clientId || !currentAdSettings
+            || adSettings?.routeVisit !== routeVisit.current) {
             throw new Error("No current-client integration selected.");
           }
           const pageId = numericId(v.meta_page_id, "The page ID");
@@ -380,7 +383,8 @@ export function IntegrationsPanel() {
         fields={FIELDS}
         submitLabel="Connect"
         onSubmit={async (v) => {
-          if (!clientId || activeClient.current !== clientId || !addOpen) {
+          if (!clientId || activeClient.current !== clientId || !addOpen
+            || addOpenClient?.routeVisit !== routeVisit.current) {
             throw new Error("No current-client integration form selected.");
           }
           const { error } = await supabase.rpc("admin_store_integration_credential", {
