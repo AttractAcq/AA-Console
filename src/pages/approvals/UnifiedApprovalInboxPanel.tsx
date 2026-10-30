@@ -277,6 +277,10 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
   const blocker = previewMissing(request);
   const sourcePath = manager ? null : sourcePathForRequest(request, clientId);
   const html = exactHtml(request.preview);
+  const salesGrant = request.source_kind === "client_sales_entitlement"
+    && request.preview !== null && typeof request.preview === "object"
+    && !Array.isArray(request.preview)
+    && (request.preview as Record<string, unknown>).action === "grant";
   const salesManagerCard = manager && request.source_kind === "client_sales_entitlement";
   const canReject = !salesManagerCard && isRejectionReady(request, clientId);
   const canApprove = !salesManagerCard && isApprovalReady(request, clientId);
@@ -316,6 +320,10 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
           <dd>{request.source_state.replaceAll("_", " ")}</dd></div>}
         <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Exact artifact hash</dt><dd className="break-all font-mono text-xs">{request.artifact_hash || "Not supplied"}</dd></div>
       </dl>
+
+      {salesGrant && <p role="status" className="mt-4 text-xs text-muted-foreground">
+        Approving this grant records an entitlement for the exact client, team member and employee account above. It becomes active when system-wide sales access is enabled. Before enabling access, audit every approved, unrevoked grant.
+      </p>}
 
       {blocker ? (
         <p role="alert" className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -379,11 +387,6 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
             This calls the source owner for the exact version above. AAL2 is required;
             the source and database recheck the request before recording a decision.
           </p>
-          {request.source_kind === "client_sales_entitlement"
-            && (request.preview as Record<string, unknown>).action === "grant"
-            && <p role="status" className="text-xs text-muted-foreground">
-              Approving this grant records an entitlement for the exact client, team member and employee account above. It becomes active when system-wide sales access is enabled. Before enabling access, audit every approved, unrevoked grant.
-          </p>}
           {!canApprove && canReject && <p className="text-xs text-muted-foreground">
             This request cannot be approved. It can only be closed with a reasoned rejection.
           </p>}

@@ -639,6 +639,23 @@ describe("unified approval inbox", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it("renders an incomplete sales card without hiding another valid decision", async () => {
+    requests = [{ ...readySales, id: "sales-incomplete", preview: null }, readySales];
+    show("global");
+    expect(await screen.findAllByRole("article", { name: "Grant sales access" })).toHaveLength(2);
+    // Both rows share a title; locate the blocked row by its projection ID.
+    const blocked = document.getElementById("approval-sales-incomplete")?.closest("article");
+    expect(blocked).toBeInTheDocument();
+    expect(within(blocked as HTMLElement).getByText(/exact artifact preview is missing/i)).toBeInTheDocument();
+    expect(within(blocked as HTMLElement).queryByRole("button", { name: "Approve exact version" }))
+      .not.toBeInTheDocument();
+    const valid = document.getElementById("approval-sales-inbox-1")?.closest("article");
+    expect(valid).toBeInTheDocument();
+    expect(within(valid as HTMLElement).getByRole("button", { name: "Approve exact version" }))
+      .toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["wrong owner", { owner_role: "admin_or_active_client_manager" }],
     ["changed artifact", { artifact_hash: "e".repeat(64) }],
