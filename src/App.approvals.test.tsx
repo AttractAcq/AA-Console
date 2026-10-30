@@ -6,7 +6,8 @@ const auth = vi.hoisted(() => ({ role: "admin" as "admin" | "client" | "employee
 
 vi.mock("./context/auth", () => ({
   AuthProvider: ({ children }: { children: ReactNode }) => children,
-  useAuth: () => ({ loading: false, profile: { role: auth.role } }),
+  useAuth: () => ({ loading: false,
+    profile: { id: "test-user", role: auth.role }, session: { user: { id: "test-user" } } }),
 }));
 vi.mock("./context/theme", () => ({
   ThemeProvider: ({ children }: { children: ReactNode }) => children,
