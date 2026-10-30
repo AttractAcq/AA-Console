@@ -38,6 +38,7 @@ import { MAX_FRAMES, MIN_FRAMES, isContentFormat } from "../../content/format.js
 import { adapterFor } from "../../publishing/registry.js";
 import { compose } from "../../publishing/caption.js";
 import { PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS, safeProviderErrorMessage } from "../../storage/signed-url-policy.js";
+import { requireOrganicRoute } from "./organic-route.js";
 import {
   PublishError,
   type PublishAdapter,
@@ -74,6 +75,7 @@ export async function prepare(
   sb: SupabaseClient,
   post: ClaimedPost,
 ): Promise<PublishRequest> {
+  await requireOrganicRoute(sb, post);
   if (!isPlatform(post.platform)) {
     throw new PublishError(`This post is for "${post.platform}", which has no rules on file.`, false);
   }
@@ -206,6 +208,7 @@ async function publishStory(
   sb: SupabaseClient,
   adapter: PublishAdapter,
   request: PublishRequest,
+  post: ClaimedPost,
   jobId: string,
 ): Promise<PublishSuccess> {
   if (!adapter.publishFrame) {
@@ -235,6 +238,7 @@ async function publishStory(
   let sent = 0;
   for (const frame of frames) {
     if (already.has(frame.position)) continue;
+    await requireOrganicRoute(sb, post);
     const result = await adapter.publishFrame(request, frame);
     const { error: frameError } = await sb.rpc("record_frame_published", {
       p_post_id: request.postId,
@@ -305,10 +309,13 @@ export async function runPublisherJob(
     try {
       const request = await prepare(sb, post);
       const adapter = adapterFor(post.platform)!;
-      const result =
-        request.contentFormat === "story"
-          ? await publishStory(sb, adapter, request, job.id)
-          : await adapter.publish(request);
+      let result: PublishSuccess;
+      if (request.contentFormat === "story") {
+        result = await publishStory(sb, adapter, request, post, job.id);
+      } else {
+        await requireOrganicRoute(sb, post);
+        result = await adapter.publish(request);
+      }
 
       const { error: recordError } = await sb.rpc("record_post_published", {
         p_post_id: post.post_id,
