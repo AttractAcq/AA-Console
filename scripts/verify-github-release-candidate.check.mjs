@@ -18,7 +18,7 @@ function git(directory, ...args) {
   return execFileSync('git', ['-C', directory, ...args], { encoding: 'utf8' }).trim()
 }
 
-function checkoutFixture(t) {
+function checkoutFixture(t, { releaseWorkflow = false } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'aa-release-verifier-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   git(directory, 'init', '-q')
@@ -28,6 +28,17 @@ function checkoutFixture(t) {
   mkdirSync(join(directory, 'supabase', 'verification'), { recursive: true })
   mkdirSync(join(directory, '.github', 'workflows'), { recursive: true })
   writeFileSync(join(directory, '.github', 'workflows', 'ci.yml'), 'name: CI\n')
+  if (releaseWorkflow) {
+    writeFileSync(join(directory, '.github', 'workflows', 'production-release-approval.yml'),
+      'name: Production release approval\n')
+    mkdirSync(join(directory, 'scripts'), { recursive: true })
+    for (const path of [
+      'check-approved-production-release.mjs',
+      'verify-approved-production-release.mjs',
+      'production-release-attestation.mjs',
+      'verify-github-release-candidate.mjs',
+    ]) writeFileSync(join(directory, 'scripts', path), '// trusted release gate\n')
+  }
   writeFileSync(join(directory, 'supabase', 'verification', 'released-migration-version.txt'), `${RELEASED}\n`)
   writeFileSync(join(directory, 'supabase', 'migrations', `${RELEASED}_279_approval.sql`), 'select 1;\n')
   // A stacked PR inherits 280 from its base and adds 281 itself. Both must
@@ -107,6 +118,24 @@ test('hashes the committed PR tree even when a local SQL file was edited after c
   writeFileSync(join(checkout.directory, 'supabase', 'migrations', '20261101000000_280_first.sql'), 'uncommitted edit\n')
   const packet = await verify(checkout)
   assert.equal(packet.migrations.pending[0].sha256, hash(SQL_280))
+})
+
+test('trusted base mode reads the PR commit as data without checking it out', async (t) => {
+  const checkout = checkoutFixture(t)
+  git(checkout.directory, 'checkout', '--detach', checkout.baseSha)
+  const packet = await verifyGithubReleaseCandidate({ prNumber: 7,
+    checkoutDir: checkout.directory, fetcher: fetchFixture(apiFixture(checkout)),
+    trustedBaseCheckout: true })
+  assert.equal(packet.pr.head.sha, checkout.headSha)
+  assert.equal(git(checkout.directory, 'rev-parse', 'HEAD'), checkout.baseSha)
+  await assert.rejects(verify(checkout), /checked-out HEAD differs from the GitHub PR head/)
+})
+
+test('trusted base mode rejects a checkout that is not the exact GitHub PR base', async (t) => {
+  const checkout = checkoutFixture(t)
+  await assert.rejects(verifyGithubReleaseCandidate({ prNumber: 7,
+    checkoutDir: checkout.directory, fetcher: fetchFixture(apiFixture(checkout)),
+    trustedBaseCheckout: true }), /trusted checkout HEAD differs/)
 })
 
 test('fails closed on missing, duplicate, pending, failed, wrong-SHA and wrong-app required checks', async (t) => {
@@ -237,6 +266,39 @@ test('rejects a PR that changes the workflow defining the four required jobs', a
   const data = apiFixture({ ...checkout, headSha: git(checkout.directory, 'rev-parse', 'HEAD') })
   await assert.rejects(verifyGithubReleaseCandidate({ prNumber: 7, checkoutDir: checkout.directory,
     fetcher: fetchFixture(data) }), /changes the CI workflow/)
+})
+
+test('allows the reviewed gate bootstrap but rejects later release-check workflow edits', async (t) => {
+  const bootstrap = checkoutFixture(t)
+  writeFileSync(join(bootstrap.directory, '.github', 'workflows', 'production-release-approval.yml'),
+    'name: Production release approval\n')
+  git(bootstrap.directory, 'add', '.')
+  git(bootstrap.directory, 'commit', '-qm', 'install trusted release check')
+  const bootstrapHead = git(bootstrap.directory, 'rev-parse', 'HEAD')
+  const bootstrapData = apiFixture({ ...bootstrap, headSha: bootstrapHead })
+  const bootstrapPacket = await verifyGithubReleaseCandidate({ prNumber: 7,
+    checkoutDir: bootstrap.directory, fetcher: fetchFixture(bootstrapData) })
+  assert.equal(bootstrapPacket.pr.head.sha, bootstrapHead)
+
+  const installed = checkoutFixture(t, { releaseWorkflow: true })
+  writeFileSync(join(installed.directory, '.github', 'workflows', 'production-release-approval.yml'),
+    'name: Production release approval\n# weakened in PR\n')
+  git(installed.directory, 'add', '.')
+  git(installed.directory, 'commit', '-qm', 'weaken trusted release check')
+  const changed = apiFixture({ ...installed, headSha: git(installed.directory, 'rev-parse', 'HEAD') })
+  await assert.rejects(verifyGithubReleaseCandidate({ prNumber: 7,
+    checkoutDir: installed.directory, fetcher: fetchFixture(changed) }),
+  /changes trusted production release gate code/)
+
+  const code = checkoutFixture(t, { releaseWorkflow: true })
+  writeFileSync(join(code.directory, 'scripts', 'check-approved-production-release.mjs'),
+    '// weakened release check\n')
+  git(code.directory, 'add', '.')
+  git(code.directory, 'commit', '-qm', 'weaken trusted release script')
+  const changedCode = apiFixture({ ...code, headSha: git(code.directory, 'rev-parse', 'HEAD') })
+  await assert.rejects(verifyGithubReleaseCandidate({ prNumber: 7,
+    checkoutDir: code.directory, fetcher: fetchFixture(changedCode) }),
+  /changes trusted production release gate code: scripts\/check-approved-production-release.mjs/)
 })
 
 test('rejects a non-200 GitHub API response without trusting fixture claims', async (t) => {

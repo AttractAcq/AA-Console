@@ -177,3 +177,39 @@ test('premerge assertion fails if the human revokes while GitHub is being rechec
   }), /approval is absent, held, expired or revoked/)
   assert.equal(cardReads, 2)
 })
+
+test('final decision re-read blocks a revocation even if the card projection remains approved', async () => {
+  const expires = new Date(Date.now() + 30 * 60_000).toISOString()
+  let decisionReads = 0
+  const fetcher = async (url: string) => {
+    let body
+    if (url.includes('/approval_inbox_v6?')) body = [{
+      id: UUID, source_system: 'aa_console', source_kind: 'production_release',
+      source_id: SOURCE, source_version: HASH, artifact_hash: HASH,
+      client_id: null, owner_role: 'admin', status: 'approved',
+      source_state: 'pending', preview_blocker: null,
+      preview: { candidate, trusted_github_evidence: packet }, expires_at: expires,
+    }]
+    else if (url.includes('/production_release_candidates_v6?')) body = [{
+      id: SOURCE, candidate, version_hash: HASH, expires_at: expires,
+    }]
+    else if (url.includes('/production_release_attestations_v6?')) body = [{
+      request_id: UUID, source_version: HASH, packet, packet_sha256: HASH,
+      attested_at: new Date().toISOString(),
+    }]
+    else {
+      decisionReads++
+      body = [{ request_id: UUID,
+        decision: decisionReads === 1 ? 'approved' : 'revoked',
+        actor_id: UUID, actor_aal: 'aal2', artifact_hash: HASH,
+        event_order: decisionReads }]
+    }
+    return { ok: true, status: 200, text: async () => JSON.stringify(body) }
+  }
+  await assert.rejects(verifyApprovedProductionRelease({
+    requestId: UUID, supabaseUrl: 'https://example.supabase.co',
+    serviceRoleKey: 'secret-only-on-release-server', fetcher,
+    verifier: async () => packet,
+  }), /latest exact AAL2 human release decision is absent/)
+  assert.equal(decisionReads, 2)
+})

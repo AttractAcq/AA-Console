@@ -137,6 +137,7 @@ export async function attestProductionRelease({
 export async function verifyApprovedProductionRelease({
   requestId, supabaseUrl, serviceRoleKey, token,
   checkoutDir = process.cwd(), fetcher = fetch, verifier,
+  trustedBaseCheckout = false,
 }) {
   if (!ID.test(requestId ?? '')) fail('request ID is invalid')
   if (typeof serviceRoleKey !== 'string' || serviceRoleKey.length < 20)
@@ -185,26 +186,45 @@ export async function verifyApprovedProductionRelease({
       || Date.now() - Date.parse(attestation.attested_at) > 15 * 60_000
       || Date.parse(attestation.attested_at) > Date.now() + 5000)
     fail('trusted GitHub attestation is stale or mismatched')
-  const decision = await read('approval_decision_events_v6',
-    `request_id=eq.${requestId}&select=request_id,decision,actor_id,actor_aal,artifact_hash,event_order&order=event_order.desc&limit=1`,
-    'human release decision')
-  if (decision.request_id !== requestId || decision.decision !== 'approved'
-      || decision.actor_aal !== 'aal2' || !ID.test(decision.actor_id ?? '')
-      || decision.artifact_hash !== before.source_version)
-    fail('latest exact AAL2 human release decision is absent')
+  async function latestApprovedDecision() {
+    const decision = await read('approval_decision_events_v6',
+      `request_id=eq.${requestId}&select=request_id,decision,actor_id,actor_aal,artifact_hash,event_order&order=event_order.desc&limit=1`,
+      'human release decision')
+    if (decision.request_id !== requestId || decision.decision !== 'approved'
+        || decision.actor_aal !== 'aal2' || !ID.test(decision.actor_id ?? '')
+        || decision.artifact_hash !== before.source_version
+        || !Number.isSafeInteger(Number(decision.event_order))
+        || Number(decision.event_order) <= 0)
+      fail('latest exact AAL2 human release decision is absent')
+    return decision
+  }
+  const decision = await latestApprovedDecision()
   assertPremergePacketMatchesCandidate(attestation.packet, source.candidate)
   const verified = verifier ?? (await import('./verify-github-release-candidate.mjs')).verifyGithubReleaseCandidate
   const currentPacket = await verified({
     prNumber: Number(source.candidate.pr.number),
-    checkoutDir: resolve(checkoutDir), token,
+    checkoutDir: resolve(checkoutDir), token, trustedBaseCheckout,
   })
   assertPremergePacketMatchesCandidate(currentPacket, source.candidate)
   if (currentPacket.packetSha256 !== attestation.packet_sha256)
     fail('GitHub PR, CI or committed SQL changed after human approval')
   const after = await card()
-  if (after.source_version !== before.source_version
+  const decisionAfter = await latestApprovedDecision()
+  if (after.source_system !== before.source_system
+      || after.source_kind !== before.source_kind
+      || after.source_id !== before.source_id
+      || after.source_version !== before.source_version
       || after.artifact_hash !== before.artifact_hash
-      || JSON.stringify(after.preview) !== JSON.stringify(before.preview))
+      || after.status !== before.status
+      || after.source_state !== before.source_state
+      || after.preview_blocker !== before.preview_blocker
+      || after.expires_at !== before.expires_at
+      || after.client_id !== before.client_id
+      || after.owner_role !== before.owner_role
+      || JSON.stringify(after.preview) !== JSON.stringify(before.preview)
+      || String(decisionAfter.event_order) !== String(decision.event_order)
+      || decisionAfter.actor_id !== decision.actor_id
+      || decisionAfter.artifact_hash !== decision.artifact_hash)
     fail('canonical release card changed during premerge verification')
   return {
     requestId, prNumber: Number(source.candidate.pr.number),
