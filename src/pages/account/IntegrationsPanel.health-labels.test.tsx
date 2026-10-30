@@ -1,10 +1,10 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const { from, useParams, formModalProps } = vi.hoisted(() => ({
-  from: vi.fn(), useParams: vi.fn(), formModalProps: vi.fn(),
+const { from, rpc, useParams, formModalProps } = vi.hoisted(() => ({
+  from: vi.fn(), rpc: vi.fn(), useParams: vi.fn(), formModalProps: vi.fn(),
 }));
-vi.mock("../../lib/supabase", () => ({ supabase: { from } }));
+vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
 vi.mock("react-router-dom", () => ({ useParams }));
 vi.mock("../../components/MetricsBackfill", () => ({ MetricsBackfill: () => null }));
 vi.mock("../../components/forms/FormModal", () => ({
@@ -39,6 +39,16 @@ function latestAdModal(): CapturedModal {
   return formModalProps.mock.calls
     .map(([props]) => props as CapturedModal)
     .filter((props) => props.title === "Meta ad settings")
+    .at(-1)!;
+}
+
+function latestAddModal(): {
+  open: boolean;
+  onSubmit: (values: Record<string, string>) => Promise<void>;
+} {
+  return formModalProps.mock.calls
+    .map(([props]) => props as { title: string; open: boolean; onSubmit: (values: Record<string, string>) => Promise<void> })
+    .filter((props) => props.title === "Add Integration")
     .at(-1)!;
 }
 
@@ -255,4 +265,42 @@ it("keeps client B's pending sync control disabled when client A's older update 
   expect(bSwitch).toBeDisabled();
   await act(async () => { finish.get("client-2")?.({ error: null }); });
   await waitFor(() => expect(bSwitch).not.toBeDisabled());
+});
+
+it("closes the Add Integration form on route change and rejects an old client's stale submit", async () => {
+  let selectedClient = "client-1";
+  useParams.mockImplementation(() => ({ clientId: selectedClient }));
+  from.mockImplementation(() => {
+    let readClient = "";
+    const query = {
+      select: () => query,
+      eq: (_field: string, value: string) => { readClient = value; return query; },
+      order: async () => ({ data: [{ ...base, id: `meta-${readClient}`, client_id: readClient, provider: "meta" }], error: null }),
+    };
+    return query;
+  });
+  rpc.mockResolvedValue({ error: null });
+
+  const rendered = render(<IntegrationsPanel />);
+  fireEvent.click(await screen.findByRole("button", { name: "Add" }));
+  const aModal = latestAddModal();
+  expect(aModal.open).toBe(true);
+
+  selectedClient = "client-2";
+  rendered.rerender(<IntegrationsPanel />);
+  await screen.findByRole("button", { name: "Add" });
+  expect(latestAddModal().open).toBe(false);
+  await expect(aModal.onSubmit({ provider: "meta", credential_label: "act_123", secret: "secret-a", access_level: "admin" }))
+    .rejects.toThrow("No current-client integration form selected");
+  expect(rpc).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  expect(latestAddModal().open).toBe(true);
+  await latestAddModal().onSubmit({ provider: "instagram", credential_label: "123", secret: "secret-b", access_level: "admin" });
+  expect(rpc).toHaveBeenCalledWith("admin_store_integration_credential", expect.objectContaining({ p_client_id: "client-2", p_provider: "instagram" }));
+
+  selectedClient = "client-1";
+  rendered.rerender(<IntegrationsPanel />);
+  await screen.findByRole("button", { name: "Add" });
+  expect(latestAddModal().open).toBe(false);
 });

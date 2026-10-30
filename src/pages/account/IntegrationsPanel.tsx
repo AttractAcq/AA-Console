@@ -103,7 +103,7 @@ const FIELDS: FieldDef[] = [
 ];
 
 export function IntegrationsPanel() {
-  const [addOpen, setAddOpen] = useState(false);
+  const [addOpenClient, setAddOpenClient] = useState<string | null>(null);
   const [adSettings, setAdSettings] = useState<Integration | null>(null);
   const { clientId } = useParams<{ clientId: string }>();
   const [snapshot, setSnapshot] = useState<{ clientId: string; rows: Integration[]; observedAtMs: number } | null>(null);
@@ -145,6 +145,7 @@ export function IntegrationsPanel() {
     // The render guard below closes a previous client's dialog immediately;
     // clearing the selection also keeps it closed if the route later returns.
     setAdSettings(null);
+    setAddOpenClient(null);
     void refresh();
     return () => {
       activeClient.current = null;
@@ -153,6 +154,7 @@ export function IntegrationsPanel() {
   }, [clientId, refresh]);
 
   const rows = snapshot && snapshot.clientId === clientId ? snapshot.rows : [];
+  const addOpen = addOpenClient === clientId && snapshot?.clientId === clientId;
   const selectedAdSettingsId = adSettings && clientId && adSettings.client_id === clientId
     ? adSettings.id : null;
   const currentAdSettings = selectedAdSettingsId && snapshot?.clientId === clientId
@@ -225,7 +227,7 @@ export function IntegrationsPanel() {
           Meta and Instagram activation evidence is shown below. A stored integration or account ID
           does not establish provider access, scopes, or permission to publish.
         </p>
-        <Button icon={Plus} onClick={() => setAddOpen(true)}>
+        <Button icon={Plus} onClick={() => setAddOpenClient(clientId)}>
           Add
         </Button>
       </div>
@@ -372,13 +374,15 @@ export function IntegrationsPanel() {
 
       <FormModal
         open={addOpen}
-        onClose={() => setAddOpen(false)}
+        onClose={() => setAddOpenClient(null)}
         title="Add Integration"
         draftKey={clientId ? integrationDraftKey(clientId) : undefined}
         fields={FIELDS}
         submitLabel="Connect"
         onSubmit={async (v) => {
-          if (!clientId) throw new Error("No client selected.");
+          if (!clientId || activeClient.current !== clientId || !addOpen) {
+            throw new Error("No current-client integration form selected.");
+          }
           const { error } = await supabase.rpc("admin_store_integration_credential", {
             p_client_id: clientId,
             p_provider: v.provider as string,
