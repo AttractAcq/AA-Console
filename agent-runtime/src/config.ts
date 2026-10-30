@@ -41,6 +41,8 @@ export interface RuntimeConfig {
   mcpServiceSecret?: string | null;
   /** HTTPS origin of the gateway's service-authenticated readiness probe. */
   gatewayUrl: string | null;
+  /** Dedicated credential for the uncached Pages release probe. */
+  browserReleaseProbeToken: string | null;
   /** Fine-grained Supabase PAT: Database Read on the two parity project refs. */
   schemaParityReadToken: string | null;
   schemaParityProductionRef: string | null;
@@ -136,6 +138,15 @@ function gatewayOrigin(): string | null {
   return url.origin;
 }
 
+function browserReleaseProbeToken(): string | null {
+  const raw = process.env.BROWSER_RELEASE_PROBE_TOKEN;
+  if (raw === undefined || raw === "") return null;
+  if (!/^[0-9a-f]{64}$/.test(raw)) {
+    throw new Error("BROWSER_RELEASE_PROBE_TOKEN must be exactly 64 lowercase hexadecimal characters");
+  }
+  return raw;
+}
+
 function intEnv(name: string, fallback: number): number {
   const raw = optionalEnv(name);
   if (!raw) return fallback;
@@ -229,6 +240,7 @@ export function loadConfig(): RuntimeConfig {
       (optionalEnv("PUBLIC_RUNTIME_BASE") ?? "https://runtime.attractacq.com").replace(/\/+$/, ""),
     mcpServiceSecret: optionalEnv("AA_MCP_SERVICE_SECRET") ?? null,
     gatewayUrl: gatewayOrigin(),
+    browserReleaseProbeToken: browserReleaseProbeToken(),
     schemaParityReadToken: optionalEnv("AA_SCHEMA_PARITY_READ_TOKEN") ?? null,
     schemaParityProductionRef: optionalEnv("AA_SCHEMA_PARITY_PRODUCTION_REF") ?? null,
     schemaParityStagingRef: optionalEnv("AA_SCHEMA_PARITY_STAGING_REF") ?? null,

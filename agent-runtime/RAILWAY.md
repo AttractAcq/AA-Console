@@ -27,6 +27,7 @@ Production configuration:
 - `AGENT_RUNTIME_ENABLED=true` runs workers; use `false` for a deliberate liveness-only rollout.
 - `AA_MCP_SERVICE_SECRET`: required to enable gateway calls; use the same dedicated >=32-character secret in both services. Missing leaves the MCP endpoint denied.
 - `AGENT_RUNTIME_SHARED_SECRET`: set a separate secret to protect `/status`.
+- `BROWSER_RELEASE_PROBE_TOKEN`: optional dedicated 32-byte lowercase hex secret for `GET /release/identities/fresh`; absent returns 503 and leaves the public cached probe available. Give the same value only to the protected GitHub Pages workflow, never to browser build variables or the MCP gateway. A malformed nonempty value fails startup.
 - `MASTER_AI_ALLOWED_ORIGINS=https://console.attractacq.com` and `CONSOLE_URL=https://console.attractacq.com` already default to the hosted Console; override for staging.
 - Optional capabilities: `OPENAI_API_KEY` for creative rendering/concepts, `RESEND_API_KEY` and `RESEND_FROM` for email. Model, concurrency, timeout and spend overrides remain documented in `.env.example` and `src/config.ts`.
 

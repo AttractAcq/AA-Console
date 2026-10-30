@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ listen: vi.fn(), stop: vi.fn(), release: vi.fn(), handler: undefined as any }));
+const mocks = vi.hoisted(() => ({ listen: vi.fn(), stop: vi.fn(), release: vi.fn(), freshRelease: vi.fn(), handler: undefined as any }));
 vi.mock("node:http", () => ({ default: { createServer: (handler: any) => {
   mocks.handler = handler;
   return { listen: mocks.listen, close: vi.fn() };
@@ -9,6 +9,7 @@ vi.mock("./db.js", () => ({ serviceClient: () => ({}) }));
 vi.mock("./worker.js", () => ({ startWorker: vi.fn() }));
 vi.mock("./heartbeat.js", () => ({ startHeartbeat: () => ({ stop: mocks.stop }) }));
 vi.mock("./readiness/release-probe.js", () => ({ currentReleaseProbe: mocks.release }));
+vi.mock("./readiness/fresh-release-route.js", () => ({ handleFreshReleaseProbe: mocks.freshRelease }));
 vi.mock("./orchestration/dispatch.js", () => ({ registeredAgentKeys: () => [] }));
 vi.mock("./master/route.js", () => ({ handleMasterChat: vi.fn() }));
 vi.mock("./mcp/brief-route.js", () => ({ handleMcpBrief: vi.fn() }));
@@ -52,5 +53,18 @@ it("serves a minimal public release probe and fails closed on a dependency error
     mocks.handler({ url: "/release/identities", method: "POST", headers: {} }, wrongMethod);
     expect(wrongMethod.writeHead).toHaveBeenCalledWith(405, { "Content-Type": "application/json" });
     expect(mocks.release).toHaveBeenCalledTimes(2);
+  } finally { signals.mockRestore(); }
+});
+
+it("routes the private fresh release probe to its authentication boundary", async () => {
+  const signals = vi.spyOn(process, "on").mockReturnValue(process);
+  try {
+    await import("./server.js");
+    mocks.release.mockClear();
+    const req = { url: "/release/identities/fresh", method: "GET", headers: {} };
+    const res = { setHeader: vi.fn(), writeHead: vi.fn(), end: vi.fn() };
+    mocks.handler(req, res);
+    expect(mocks.freshRelease).toHaveBeenCalledWith(req, res, expect.anything(), expect.anything());
+    expect(mocks.release).not.toHaveBeenCalled();
   } finally { signals.mockRestore(); }
 });
