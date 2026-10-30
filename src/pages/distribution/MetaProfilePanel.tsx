@@ -6,6 +6,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
+import { PROFILE_FIELD_PATCH_HOLD } from "../../../agent-runtime/src/profiles/prewrite-gate.js";
 
 // The view's historical health_detail and derived blocker can include a raw
 // provider OAuth error. Keep both out of the browser response until a SQL
@@ -193,6 +194,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
               approval. This runtime also has no Meta profile-write adapter, so no field change
               can be applied from this page.
             </p>
+            <p role="status" className="mt-2 text-sm text-destructive">{PROFILE_FIELD_PATCH_HOLD}</p>
           </div>
           {changes.length === 0 && !loading ? (
             <EmptyState label="No profile change has been proposed" />
@@ -229,7 +231,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                   {change.status}
                   {change.status === "approved" && (
                     <span className="block text-xs text-muted-foreground">
-                      held for Inbox binding and an adapter
+                      held for Inbox binding and an adapter; no field PATCH
                     </span>
                   )}
                 </span>,
