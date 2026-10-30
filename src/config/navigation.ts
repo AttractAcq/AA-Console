@@ -61,6 +61,12 @@ export const agencyNav: NavNode[] = [
     icon: Users,
   },
   {
+    id: "agency-approval-inbox",
+    label: "Approval Inbox",
+    path: "/approvals",
+    icon: CheckSquare,
+  },
+  {
     id: "operations",
     label: "Operations",
     path: "/operations",

@@ -41,6 +41,7 @@ let decisions: unknown[];
 let requestError: { message: string } | null;
 let decisionError: { message: string } | null;
 let freshRequest: unknown | undefined;
+let clientEqValues: string[];
 
 const readyCampaign = {
   ...request, source_system: "aa_console", expires_at: "2030-01-01T00:00:00Z",
@@ -74,6 +75,7 @@ function wireDatabase() {
       select: () => query,
       eq: (column: string, value: string) => {
         if (column === "id") id = value;
+        if (column === "client_id" && table === "approval_inbox_v6") clientEqValues.push(value);
         return query;
       },
       in: () => query,
@@ -89,8 +91,8 @@ function wireDatabase() {
   });
 }
 
-function show() {
-  return render(<MemoryRouter><UnifiedApprovalInboxPanel /></MemoryRouter>);
+function show(scope: "client" | "global" = "client") {
+  return render(<MemoryRouter><UnifiedApprovalInboxPanel scope={scope} /></MemoryRouter>);
 }
 
 beforeEach(() => {
@@ -100,6 +102,7 @@ beforeEach(() => {
   requestError = null;
   decisionError = null;
   freshRequest = undefined;
+  clientEqValues = [];
   getAAL.mockResolvedValue({ data: { currentLevel: "aal2" }, error: null });
   rpc.mockResolvedValue({ data: null, error: null });
   wireDatabase();
@@ -379,5 +382,45 @@ describe("unified approval inbox", () => {
     const card = await screen.findByRole("article", { name: "Google review reply: Harbour Home" });
     expect(await within(card).findByRole("button", { name: "Approve exact version" })).toBeDisabled();
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("shows every client and the house client in the admin global Inbox with safe source links", async () => {
+    requests = [
+      { ...request, id: "first", title: "First client", client_id: "client-1",
+        owning_path: "/clients/client-1/delivery/approval-inbox?tab=assets" },
+      { ...request, id: "second", title: "Second client", client_id: "client-2",
+        owning_path: "/clients/client-2/google-profile?tab=reviews" },
+      { ...request, id: "wrong-link", title: "Wrong client route", client_id: "client-2",
+        owning_path: "/clients/client-1/google-profile?tab=reviews" },
+      { ...request, id: "house", title: "House recruitment", client_id: "house-client",
+        source_system: "aa_console", source_kind: "recruitment_brief",
+        owning_path: "/team?tab=recruitment" },
+    ];
+    show("global");
+    expect(await screen.findByRole("heading", { name: "Agency approval inbox" })).toBeInTheDocument();
+    expect(clientEqValues).toHaveLength(0);
+    expect(screen.getByText("Showing 4 of 4 mirrored requests.")).toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Second client" }))
+      .getByRole("link", { name: "View owning source" }))
+      .toHaveAttribute("href", "/clients/client-2/google-profile?tab=reviews");
+    expect(within(screen.getByRole("article", { name: "Wrong client route" }))
+      .queryByRole("link", { name: "View owning source" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "House recruitment" }))
+      .getByRole("link", { name: "View owning source" }))
+      .toHaveAttribute("href", "/team?tab=recruitment");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Client" }), "client-2");
+    expect(screen.getByText("Second client")).toBeInTheDocument();
+    expect(screen.queryByText("House recruitment")).not.toBeInTheDocument();
+  });
+
+  it("uses a global card's own client for a fresh exact-version decision read", async () => {
+    requests = [{ ...readyGoogle, client_id: "client-2",
+      scope: { ...readyGoogle.scope, client_id: "client-2" },
+      owning_path: "/clients/client-2/google-profile?tab=reviews" }];
+    show("global");
+    const card = await screen.findByRole("article", { name: "Google review reply: Harbour Home" });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(clientEqValues).toContain("client-2"));
+    expect(rpc).toHaveBeenCalledWith("decide_google_review_reply_from_inbox_v6", expect.anything());
   });
 });

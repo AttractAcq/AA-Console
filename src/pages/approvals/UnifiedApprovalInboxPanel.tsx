@@ -208,6 +208,7 @@ function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
       </div>
 
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+        <div><dt className="text-xs text-muted-foreground">Client</dt><dd className="break-all">{request.client_id || "Agency-wide"}</dd></div>
         <div><dt className="text-xs text-muted-foreground">Requested</dt><dd>{dateLabel(request.requested_at)}</dd></div>
         <div><dt className="text-xs text-muted-foreground">Expires</dt><dd>{dateLabel(request.expires_at)}</dd></div>
         <div><dt className="text-xs text-muted-foreground">Decision owner</dt><dd>{request.owner_role || "Not assigned"}</dd></div>
@@ -307,11 +308,14 @@ function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
   );
 }
 
-export function UnifiedApprovalInboxPanel() {
+export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "client" | "global" }) {
   const { clientId } = useParams<{ clientId: string }>();
+  const global = scope === "global";
+  const scopeKey = global ? "global" : clientId ?? null;
   const [requests, setRequests] = useState<UnifiedApprovalRequest[]>([]);
   const [decisions, setDecisions] = useState<UnifiedApprovalDecision[]>([]);
   const [statusFilter, setStatusFilter] = useState("pending");
+  const [clientFilter, setClientFilter] = useState("all");
   const [kindFilter, setKindFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -322,10 +326,11 @@ export function UnifiedApprovalInboxPanel() {
   const [aal, setAal] = useState<"aal2" | "aal1" | "unavailable">("unavailable");
 
   const refresh = useCallback(async () => {
-    if (!clientId) return;
+    if (!global && !clientId) return;
     try {
-      const requestResult = await supabase.from("approval_inbox_v6")
-        .select("*").eq("client_id", clientId).order("requested_at", { ascending: false });
+      const query = supabase.from("approval_inbox_v6").select("*");
+      const requestResult = await (global ? query : query.eq("client_id", clientId!))
+        .order("requested_at", { ascending: false });
       if (requestResult.error) throw requestResult.error;
       const rows: UnifiedApprovalRequest[] = requestResult.data ?? [];
       const ids = rows.map((row) => row.id);
@@ -350,10 +355,10 @@ export function UnifiedApprovalInboxPanel() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : (cause as { message?: string }).message ?? "Could not load the unified approval inbox.");
     } finally {
-      setLoadedClientId(clientId);
+      setLoadedClientId(scopeKey);
       setLoading(false);
     }
-  }, [clientId]);
+  }, [clientId, global, scopeKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -368,9 +373,10 @@ export function UnifiedApprovalInboxPanel() {
   }
 
   async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) {
-    if (!clientId || (decision === "approved"
-      ? !isApprovalReady(request, clientId)
-      : !isRejectionReady(request, clientId))) return;
+    const targetClientId = global ? request.client_id : clientId;
+    if (!targetClientId || request.client_id !== targetClientId || (decision === "approved"
+      ? !isApprovalReady(request, targetClientId)
+      : !isRejectionReady(request, targetClientId))) return;
     setBusyId(request.id);
     setDecisionError(null);
     try {
@@ -382,11 +388,11 @@ export function UnifiedApprovalInboxPanel() {
       setAal("aal2");
 
       const current = await supabase.from("approval_inbox_v6").select("*")
-        .eq("id", request.id).eq("client_id", clientId).maybeSingle();
+        .eq("id", request.id).eq("client_id", targetClientId).maybeSingle();
       if (current.error) throw current.error;
       if (!current.data || (decision === "approved"
-        ? !isApprovalReady(current.data, clientId)
-        : !isRejectionReady(current.data, clientId))
+        ? !isApprovalReady(current.data, targetClientId)
+        : !isRejectionReady(current.data, targetClientId))
         || !sameVersion(request, current.data)) {
         throw new Error("This exact request changed or is no longer pending. Review the refreshed card before deciding.");
       }
@@ -418,16 +424,18 @@ export function UnifiedApprovalInboxPanel() {
     }
   }
 
-  const waiting = loading || loadedClientId !== clientId;
+  const waiting = loading || loadedClientId !== scopeKey;
 
   const kinds = useMemo(() => [...new Set(requests.map((request) => request.source_kind))].sort(), [requests]);
+  const clients = useMemo(() => [...new Set(requests.map((request) => request.client_id ?? "agency-wide"))].sort(), [requests]);
   const visible = useMemo(() => requests.filter((request) => {
     if (statusFilter !== "all" && request.status !== statusFilter) return false;
+    if (global && clientFilter !== "all" && (request.client_id ?? "agency-wide") !== clientFilter) return false;
     if (kindFilter !== "all" && request.source_kind !== kindFilter) return false;
     const needle = search.trim().toLocaleLowerCase();
     return !needle || [request.title, request.source_system, request.source_kind,
       request.destination, request.account_ref].some((part) => part?.toLocaleLowerCase().includes(needle));
-  }), [requests, statusFilter, kindFilter, search]);
+  }), [requests, statusFilter, clientFilter, kindFilter, search, global]);
 
   const historyByRequest = useMemo(() => {
     const grouped = new Map<string, UnifiedApprovalDecision[]>();
@@ -442,9 +450,12 @@ export function UnifiedApprovalInboxPanel() {
   return (
     <section className="space-y-5" aria-labelledby="unified-approvals-title">
       <div>
-        <h2 id="unified-approvals-title" className="text-xl font-semibold">Unified approval inbox</h2>
+        <h2 id="unified-approvals-title" className="text-xl font-semibold">
+          {global ? "Agency approval inbox" : "Unified approval inbox"}
+        </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Canonical requests and decision history appear here as source adapters are connected.
+          {global ? "Canonical requests across every client and the agency house client appear here. "
+            : "Canonical requests and decision history appear here as source adapters are connected. "}
           Complete campaign action and Google review reply requests can be decided here through their owning functions.
           Other requests link to their owning source. Coverage is incomplete: the Engine,
           Assets and Campaign actions tabs remain available for work not yet mirrored here.
@@ -460,6 +471,13 @@ export function UnifiedApprovalInboxPanel() {
             <option value="all">All statuses</option>
           </select>
         </label>
+        {global && <label className="min-w-40 flex-1 text-sm font-medium">Client
+          <select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}
+            className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+            <option value="all">All clients</option>
+            {clients.map((id) => <option key={id} value={id}>{id === "agency-wide" ? "Agency-wide" : id}</option>)}
+          </select>
+        </label>}
         <label className="min-w-40 flex-1 text-sm font-medium">Source type
           <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}
             className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
@@ -474,21 +492,22 @@ export function UnifiedApprovalInboxPanel() {
         </label>
       </div>
 
-      {!clientId && <p role="alert" className="text-sm text-destructive">Select a client to view approvals.</p>}
+      {!global && !clientId && <p role="alert" className="text-sm text-destructive">Select a client to view approvals.</p>}
       {error && !waiting && <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
         <p>{error}</p><button type="button" onClick={retry} className="mt-2 underline">Retry</button>
       </div>}
       {decisionError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{decisionError}</p>}
-      {clientId && waiting ? <p role="status" className="text-sm text-muted-foreground">Loading canonical requests…</p>
+      {scopeKey && waiting ? <p role="status" className="text-sm text-muted-foreground">Loading canonical requests…</p>
         : error ? null
-          : clientId ? <>
+          : scopeKey ? <>
             <p className="text-sm text-muted-foreground">Showing {visible.length} of {requests.length} mirrored requests.</p>
             {visible.length === 0 ? <p className="text-sm text-muted-foreground">
               {requests.length === 0 ? "No requests have been mirrored yet. Check the existing queue tabs for outstanding work."
                 : "No requests match these filters."}
             </p> : <div className="space-y-4">{visible.map((request) => (
               <RequestCard key={request.id} request={request} history={historyByRequest.get(request.id) ?? []}
-                clientId={clientId ?? ""} aal={aal} busy={busyId === request.id} onDecide={decide} />
+                clientId={global ? request.client_id ?? "" : clientId ?? ""}
+                aal={aal} busy={busyId === request.id} onDecide={decide} />
             ))}</div>}
           </> : null}
     </section>
