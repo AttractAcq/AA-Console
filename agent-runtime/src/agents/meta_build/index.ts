@@ -32,6 +32,7 @@ import {
   type AdAccount,
 } from "../../meta/ads.js";
 import { uploadAdImage } from "../../meta/creative.js";
+import { metaCreationPrewriteProblem } from "../../meta/creation-gate.js";
 import { buildPlan, buildProblem } from "../../meta/build.js";
 import { builtState, isAdCandidate, payloadsFor, preflight, type AssetRow, type CampaignRow } from "./plan.js";
 import { UnrecordedError, executeBuild, progressFrom, type BuildStore, type MetaWriter } from "./execute.js";
@@ -207,6 +208,13 @@ export async function runMetaBuildJob(
   if (job.input_table !== "client_campaigns" || !job.input_id) {
     return fail("A Meta build needs the campaign to build. Start it from the campaign.");
   }
+
+  // request_meta_build and the authenticated generic enqueue RPC can both
+  // queue legacy jobs without an AAL2 Inbox decision. The v6 producer and
+  // universal prewrite verifier are also held. Refuse every build before
+  // loading a credential, including jobs already in the queue.
+  const prewriteProblem = metaCreationPrewriteProblem();
+  if (prewriteProblem) return fail(prewriteProblem);
 
   const { data: campaign, error } = await sb
     .from("client_campaigns")

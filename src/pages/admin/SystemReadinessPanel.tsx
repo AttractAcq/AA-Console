@@ -190,7 +190,13 @@ export function SystemReadinessPanel() {
           <p className="mt-1">Message channels: {snapshot.global.value.messageChannels.map((channel) => `${channel.key} ${channel.supported ? "supported" : "unsupported"}, ${channel.canInitiate ? "can initiate" : "reply only"} (${channel.transport})`).join(" · ") || "None"}</p>
           <p className="mt-2 text-xs text-muted-foreground">Source: engine_controls, platform_publishing, proof_destinations, campaign_action_executors and message_channels; checked {stamp(snapshot.global.checkedAt)}.</p>
         </div>}
-        <p className="text-xs text-muted-foreground">Gateway internal API: {snapshot.gateway.value ? state(snapshot.gateway.value.configured.aaInternalApi) : "Unknown"}. Gateway probe checked {stamp(snapshot.gateway.checkedAt)}.</p>
+        <div className="rounded-lg border border-border bg-card p-4 text-sm">
+          <p>Gateway internal API: {snapshot.gateway.value ? state(snapshot.gateway.value.configured.aaInternalApi) : "Unknown"}.</p>
+          <p className="mt-1">Gateway Bot auth mode: {snapshot.gateway.value?.configured.botAuthMode ?? "Unknown"}.</p>
+          {snapshot.gateway.value?.configured.botAuthMode === "dual" &&
+            <p role="status" className="mt-2 text-muted-foreground">Dual mode can still admit legacy environment identities. Verify each Bot grant and revocation before enabling autonomous tool access.</p>}
+          <p className="mt-2 text-xs text-muted-foreground">Gateway probe checked {stamp(snapshot.gateway.checkedAt)}.</p>
+        </div>
       </section>
 
       <section aria-label="Observed dependency state" className="space-y-3">
