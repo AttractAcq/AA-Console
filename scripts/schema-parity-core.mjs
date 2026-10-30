@@ -93,16 +93,23 @@ export function compareHistory(local, left, right, leftName, rightName) {
   for (const version of new Set([...leftByVersion.keys(), ...rightByVersion.keys()])) {
     const a = leftByVersion.get(version);
     const b = rightByVersion.get(version);
-    if (a && b && a.storedSqlMd5 !== b.storedSqlMd5) {
+    // A NULL statements array is common in Supabase migration history. Its
+    // hash is unavailable, not evidence that the two SQL bodies differ.
+    if (a && b && a.storedSqlMd5 !== null && b.storedSqlMd5 !== null && a.storedSqlMd5 !== b.storedSqlMd5) {
       findings.push({ type: "recorded_sql_mismatch", version, environments: [leftName, rightName], recordedHashes: [a.storedSqlMd5, b.storedSqlMd5], nextAction: "Compare object definitions and the reviewed migration sources; do not replay by version alone." });
     }
   }
 
   const singleStatementVerified = {};
   const contentUnverified = {};
+  const storedSqlPayloadUnavailable = {};
   for (const [environment, history] of [[leftName, left], [rightName, right]]) {
     singleStatementVerified[environment] = 0;
     contentUnverified[environment] = 0;
+    storedSqlPayloadUnavailable[environment] = history.filter((remote) => remote.storedSqlMd5 === null).length;
+    if (storedSqlPayloadUnavailable[environment] > 0) {
+      findings.push({ type: "history_sql_payload_unavailable", environment, count: storedSqlPayloadUnavailable[environment], nextAction: "Stored migration SQL is NULL; compare live catalog objects and source lineage. Do not treat an unavailable hash as an SQL mismatch or repair history solely to fill it." });
+    }
     for (const remote of history) {
       const source = localByVersion.get(remote.version);
       if (!source) continue;
@@ -110,7 +117,7 @@ export function compareHistory(local, left, right, leftName, rightName) {
       else contentUnverified[environment]++;
     }
   }
-  return { findings, singleStatementVerified, contentUnverified };
+  return { findings, singleStatementVerified, contentUnverified, storedSqlPayloadUnavailable };
 }
 
 export function compareCatalogs(left, right, leftName, rightName) {
@@ -144,6 +151,8 @@ export function historySummary(rows) {
     count: ordered.length,
     head: ordered.at(-1)?.version ?? null,
     digest: sha256(stableJson(ordered.map(({ version, name, storedSqlMd5 }) => [version, name, storedSqlMd5]))),
+    storedSqlPayloadAvailable: ordered.filter((row) => row.storedSqlMd5 !== null).length,
+    storedSqlPayloadUnavailable: ordered.filter((row) => row.storedSqlMd5 === null).length,
   };
 }
 

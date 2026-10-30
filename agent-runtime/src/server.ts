@@ -50,6 +50,7 @@ import { handleContextDraft } from "./context/draft-route.js";
 import { handleRecruitmentDraft } from "./recruitment/draft-route.js";
 import { handleGitHubStatus } from "./github/status-route.js";
 import { handleSystemReadiness } from "./readiness/route.js";
+import { handleSchemaParity } from "./readiness/schema-parity-route.js";
 import { handleSitesRoute } from "./github/sites-route.js";
 import { logger } from "./logging/logger.js";
 
@@ -240,6 +241,11 @@ const server = http.createServer((req, res) => {
 
   if (req.url === "/admin/system-readiness") {
     void handleSystemReadiness(req, res, sb, config);
+    return;
+  }
+
+  if (req.url === "/admin/schema-parity") {
+    void handleSchemaParity(req, res, sb, config);
     return;
   }
 

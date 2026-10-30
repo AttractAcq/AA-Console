@@ -48,6 +48,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Verify runtime parity source manifest
+        run: node scripts/schema-parity-runtime-manifest.mjs --check
       - run: npm run lint
       - run: npx tsc -b
       - run: npm test
