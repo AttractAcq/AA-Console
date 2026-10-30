@@ -9,6 +9,9 @@
  */
 
 import { readTokenHealth } from "./health.js";
+import { evaluateProviderCapability, type ProviderCapabilityDecision,
+  type ProviderCapabilityKey, type ProviderCapabilityEvidence,
+  type CapabilityEvidenceSource, type LocalCredentialState } from "./provider-capability.js";
 
 export type DiagnosticState = "verified" | "blocked" | "unknown";
 export type DiagnosticCheck = { state: DiagnosticState; reason: string };
@@ -22,10 +25,16 @@ export interface ProviderDiagnostic {
   account: DiagnosticCheck;
   action: DiagnosticCheck;
   expiresAt: string | null;
+  /** Scoped verdict for the requested action; only an exact read can verify. */
+  capability: ProviderCapabilityDecision;
 }
 
 type BaseRequest = {
   accessToken: string;
+  /** Supplied from the exact authorized integration/credential row by a caller. */
+  capabilityKey: ProviderCapabilityKey;
+  /** Unknown and revoked local rows are never probed or verified. */
+  credentialState: LocalCredentialState;
   /** Required, so this code has no ambient network path. */
   fetchImpl: typeof fetch;
   now?: () => number;
@@ -48,7 +57,7 @@ const ok = (reason: string): DiagnosticCheck => ({ state: "verified", reason });
 const blocked = (reason: string): DiagnosticCheck => ({ state: "blocked", reason });
 const unknown = (reason: string): DiagnosticCheck => ({ state: "unknown", reason });
 
-function blank(provider: string, now: number): ProviderDiagnostic {
+function blank(provider: string, now: number, key: ProviderCapabilityKey): ProviderDiagnostic {
   return {
     provider,
     checkedAt: new Date(now).toISOString(),
@@ -58,7 +67,37 @@ function blank(provider: string, now: number): ProviderDiagnostic {
     account: unknown("The exact destination account was not verified."),
     action: unknown("A read-only probe cannot establish publish, send, or spend permission."),
     expiresAt: null,
+    capability: evaluateProviderCapability(key, null, now),
   };
+}
+
+function withCapability(
+  request: ProviderProbeRequest,
+  result: ProviderDiagnostic,
+  now: number,
+  probedAccountRef: string | null,
+  source: CapabilityEvidenceSource = "provider_read_probe",
+): ProviderDiagnostic {
+  if (probedAccountRef === null) return result;
+  // This exact binding is local caller context, not a provider assertion of
+  // client or credential identity. A future production caller must obtain it
+  // from the authorized integration row and the same credential generation.
+  const evidence: ProviderCapabilityEvidence = {
+    key: { ...request.capabilityKey, provider: request.provider, accountRef: probedAccountRef },
+    source,
+    observedAt: result.checkedAt,
+    ttlMs: 60_000,
+    credentialState: request.credentialState,
+    tokenExpiresAt: result.expiresAt,
+    checks: {
+      token: result.token.state,
+      app: result.app.state,
+      scopes: result.scopes.state,
+      account: result.account.state,
+    },
+  };
+  result.capability = evaluateProviderCapability(request.capabilityKey, evidence, now);
+  return result;
 }
 
 function object(value: unknown): Record<string, unknown> | null {
@@ -229,14 +268,22 @@ async function probeGoogleBusiness(
  */
 export async function probeProvider(request: ProviderProbeRequest): Promise<ProviderDiagnostic> {
   const now = request.now?.() ?? Date.now();
-  const result = blank(request.provider, now);
+  const result = blank(request.provider, now, request.capabilityKey);
+  if (request.credentialState !== "eligible") {
+    return withCapability(request, result, now, request.capabilityKey.accountRef, "configured_metadata");
+  }
   if (request.provider === "meta" || request.provider === "instagram") {
     const meta = request as BaseRequest & { provider: "meta" | "instagram";
       expectedAccountId: string | null; requiredScopes: readonly string[]; expectedAppId: string | null };
-    return probeMeta(meta, result, now);
+    const diagnostic = await probeMeta(meta, result, now);
+    return withCapability(request, diagnostic, request.now?.() ?? Date.now(),
+      meta.expectedAccountId?.trim() ?? "");
   }
   if (request.provider === "google_business") {
-    return probeGoogleBusiness(request as BaseRequest & { expectedLocationRef: string | null }, result);
+    const google = request as BaseRequest & { expectedLocationRef: string | null };
+    const diagnostic = await probeGoogleBusiness(google, result);
+    return withCapability(request, diagnostic, request.now?.() ?? Date.now(),
+      google.expectedLocationRef?.trim() ?? "");
   }
   result.token = unknown(
     request.provider === "resend"
