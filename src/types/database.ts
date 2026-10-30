@@ -24144,6 +24144,10 @@ export type Database = {
           starts_at: string
         }[]
       }
+      booking_enabled_for_client_v6: {
+        Args: { p_client_id: string }
+        Returns: boolean
+      }
       brief_video_repurpose_candidate: {
         Args: {
           p_candidate_index: number
@@ -24888,6 +24892,41 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "message_templates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_nurture_sequence_v6: {
+        Args: {
+          p_campaign_id: string
+          p_client_id: string
+          p_enrolled_automatically: boolean
+          p_exit_stages: Database["public"]["Enums"]["lead_stage"][]
+          p_name: string
+          p_purpose: string
+          p_trigger_after_hours: number
+          p_trigger_stage: Database["public"]["Enums"]["lead_stage"]
+        }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          archived_at: string | null
+          campaign_id: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          enrolled_automatically: boolean
+          exit_stages: Database["public"]["Enums"]["lead_stage"][]
+          id: string
+          name: string
+          purpose: string
+          trigger_after_hours: number
+          trigger_stage: Database["public"]["Enums"]["lead_stage"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "nurture_sequences"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -27203,6 +27242,23 @@ export type Database = {
         }
         Returns: boolean
       }
+      replace_client_booking_windows_v6: {
+        Args: { p_client_id: string; p_windows: Json }
+        Returns: {
+          client_id: string
+          created_at: string
+          day_of_week: number
+          ends_at_minute: number
+          id: string
+          starts_at_minute: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "client_booking_windows"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       repurpose_asset: {
         Args: { p_asset_id: string; p_formats: string[] }
         Returns: string
@@ -27951,6 +28007,56 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_client_booking_enabled_v6: {
+        Args: { p_client_id: string; p_enabled: boolean }
+        Returns: {
+          buffer_minutes: number
+          client_id: string
+          created_at: string
+          enabled: boolean
+          max_days_ahead: number
+          max_per_day: number
+          min_notice_hours: number
+          slot_minutes: number
+          timezone: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_booking_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_client_booking_settings_v6: {
+        Args: {
+          p_buffer_minutes: number
+          p_client_id: string
+          p_max_days_ahead: number
+          p_max_per_day: number
+          p_min_notice_hours: number
+          p_slot_minutes: number
+          p_timezone: string
+        }
+        Returns: {
+          buffer_minutes: number
+          client_id: string
+          created_at: string
+          enabled: boolean
+          max_days_ahead: number
+          max_per_day: number
+          min_notice_hours: number
+          slot_minutes: number
+          timezone: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_booking_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_content_approval_owner: {
         Args: { p_user_id: string }
         Returns: undefined
@@ -28142,6 +28248,24 @@ export type Database = {
           to: "client_engine_settings"
           isOneToOne: true
           isSetofReturn: false
+        }
+      }
+      set_nurture_sequence_steps_v6: {
+        Args: { p_sequence_id: string; p_steps: Json }
+        Returns: {
+          client_id: string
+          created_at: string
+          delay_hours: number
+          id: string
+          position: number
+          sequence_id: string
+          template_version_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "nurture_sequence_steps"
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
       set_opportunity_attributes_v6: {
