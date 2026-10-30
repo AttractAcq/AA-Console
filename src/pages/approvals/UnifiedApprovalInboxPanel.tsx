@@ -220,6 +220,12 @@ function releaseCanReject(request: UnifiedApprovalRequest): boolean {
       || request.status === "expired");
 }
 
+function releaseCanRevoke(request: UnifiedApprovalRequest, latestDecision?: string): boolean {
+  return isProductionRelease(request) && latestDecision === "approved"
+    && (request.status === "approved" || request.status === "source_held"
+      || request.status === "expired");
+}
+
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignApprovalReady(request, clientId)
     || isGoogleReplyApprovalReady(request, clientId)
@@ -266,19 +272,21 @@ function RequestCard({ request, history, clientId, manager, global, aal, busy, o
   global: boolean;
   aal: "aal2" | "aal1" | "unavailable";
   busy: boolean;
-  onDecide: (request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) => Promise<void>;
+  onDecide: (request: UnifiedApprovalRequest, decision: "approved" | "rejected" | "revoked", reason?: string) => Promise<void>;
 }) {
   const [rejectionReason, setRejectionReason] = useState("");
+  const latestDecision = history[0]?.decision;
   const blocker = isInvitation(request)
     ? invitationApprovalBlocker(request) : previewMissing(request);
   const sourcePath = manager ? null : sourcePathForRequest(request, clientId);
   const html = exactHtml(request.preview);
   const canReject = (global && !manager && isInvitation(request) && invitationCanReject(request))
-    || (global && !manager && releaseCanReject(request))
+    || (global && !manager && latestDecision !== "approved" && releaseCanReject(request))
     || isRejectionReady(request, clientId);
   const canApprove = (global && !manager && isInvitation(request) && invitationCanApprove(request))
     || (global && !manager && releaseCanApprove(request))
     || isApprovalReady(request, clientId);
+  const canRevoke = global && !manager && releaseCanRevoke(request, latestDecision);
   const decisionLabel = isInvitation(request) ? "Auth invitation"
     : isProductionRelease(request) ? "Production release plan"
     : request.source_kind === "google_review_reply"
@@ -370,7 +378,7 @@ function RequestCard({ request, history, clientId, manager, global, aal, busy, o
         )}
       </details>
 
-      {(canApprove || canReject) && (
+      {(canApprove || canReject || canRevoke) && (
         <div className="mt-4 space-y-3 rounded-lg border border-border p-3">
           <p className="text-sm font-medium">{decisionLabel} decision</p>
           <p className="text-xs text-muted-foreground">
@@ -392,7 +400,8 @@ function RequestCard({ request, history, clientId, manager, global, aal, busy, o
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
               Approve exact version
             </button>}
-            {canReject && <label className="min-w-48 flex-1 text-sm">Reason to reject
+            {(canReject || canRevoke) && <label className="min-w-48 flex-1 text-sm">
+              {canRevoke ? "Reason to revoke" : "Reason to reject"}
               <input value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)}
                 disabled={busy || aal !== "aal2"} className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
             </label>}
@@ -400,6 +409,11 @@ function RequestCard({ request, history, clientId, manager, global, aal, busy, o
               onClick={() => void onDecide(request, "rejected", rejectionReason.trim())}
               className="self-end rounded-lg border border-border px-4 py-2 text-sm font-medium disabled:opacity-50">
               Reject with reason
+            </button>}
+            {canRevoke && <button type="button" disabled={busy || aal !== "aal2" || !rejectionReason.trim()}
+              onClick={() => void onDecide(request, "revoked", rejectionReason.trim())}
+              className="self-end rounded-lg border border-destructive/40 px-4 py-2 text-sm font-medium text-destructive disabled:opacity-50">
+              Revoke with reason
             </button>}
           </div>
         </div>
@@ -512,14 +526,18 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
     void refresh();
   }
 
-  async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) {
+  async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected" | "revoked", reason?: string) {
     const agencyInvitation = global && isInvitation(request);
     const agencyRelease = global && isProductionRelease(request);
+    if (decision === "revoked" && !agencyRelease) return;
     const targetClientId = multiClient ? request.client_id : clientId;
+    const latestDecision = decisions.find((event) => event.request_id === request.id)?.decision;
     const ready = agencyInvitation
       ? (decision === "approved" ? invitationCanApprove(request) : invitationCanReject(request))
       : agencyRelease
-        ? (decision === "approved" ? releaseCanApprove(request) : releaseCanReject(request))
+        ? (decision === "approved" ? releaseCanApprove(request)
+          : decision === "revoked" ? releaseCanRevoke(request, latestDecision)
+          : latestDecision !== "approved" && releaseCanReject(request))
       : !!targetClientId && request.client_id === targetClientId
         && (decision === "approved" ? isApprovalReady(request, targetClientId)
           : isRejectionReady(request, targetClientId));
@@ -545,7 +563,8 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
           : invitationCanReject(currentRequest))
         : agencyRelease
           ? (decision === "approved" ? releaseCanApprove(currentRequest)
-            : releaseCanReject(currentRequest))
+            : decision === "revoked" ? releaseCanRevoke(currentRequest, latestDecision)
+            : latestDecision !== "approved" && releaseCanReject(currentRequest))
         : !!targetClientId && (decision === "approved"
           ? isApprovalReady(currentRequest, targetClientId)
           : isRejectionReady(currentRequest, targetClientId)));
@@ -553,8 +572,8 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         || !sameVersion(request, currentRequest)) {
         throw new Error("This exact request changed or is no longer pending. Review the refreshed card before deciding.");
       }
-      if (decision === "rejected" && !reason?.trim()) {
-        throw new Error("Enter a reason before rejecting this request.");
+      if (decision !== "approved" && !reason?.trim()) {
+        throw new Error("Enter a reason before rejecting or revoking this request.");
       }
       const outcome = agencyInvitation
         ? await supabase.rpc("decide_console_invitation_v6", {
@@ -570,7 +589,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             p_expected_source_version: request.source_version,
             p_expected_artifact_hash: request.artifact_hash!,
             p_decision: decision,
-            ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+            ...(decision !== "approved" ? { p_reason: reason!.trim() } : {}),
           })
         : request.source_kind === "google_review_reply"
         ? await supabase.rpc("decide_google_review_reply_from_inbox_v6", {

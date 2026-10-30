@@ -707,6 +707,36 @@ describe("unified approval inbox", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it("allows an AAL2 admin to revoke an approved release plan after proof ages out", async () => {
+    requests = [{ ...readyRelease, status: "source_held", source_state: "source_held",
+      preview_blocker: "Refresh trusted GitHub evidence" }];
+    decisions = [{ request_id: readyRelease.id, decision: "approved", actor_id: "human-1",
+      actor_aal: "aal2", reason: null, decided_at: "2026-10-30T09:00:00Z",
+      event_order: 3 }];
+    rpc.mockImplementation(async () => {
+      requests = [{ ...readyRelease, status: "revoked" }];
+      decisions = [{ request_id: readyRelease.id, decision: "revoked", actor_id: "human-1",
+        actor_aal: "aal2", reason: "Plan changed", decided_at: "2026-10-30T09:15:00Z",
+        event_order: 4 }];
+      return { data: null, error: null };
+    });
+    show("global");
+    const card = await screen.findByRole("article", { name: "Production release PR #301" });
+    expect(within(card).queryByRole("button", { name: "Reject with reason" })).not.toBeInTheDocument();
+    await userEvent.type(within(card).getByRole("textbox", { name: "Reason to revoke" }),
+      "Plan changed");
+    await userEvent.click(within(card).getByRole("button", { name: "Revoke with reason" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith(
+      "decide_production_release_candidate_v6", {
+        p_request_id: readyRelease.id,
+        p_expected_source_version: releaseHash,
+        p_expected_artifact_hash: releaseHash,
+        p_decision: "revoked",
+        p_reason: "Plan changed",
+      },
+    ));
+  });
+
   it("uses a global card's own client for a fresh exact-version decision read", async () => {
     requests = [{ ...readyGoogle, client_id: "client-2",
       scope: { ...readyGoogle.scope, client_id: "client-2" },
