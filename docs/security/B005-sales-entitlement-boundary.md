@@ -217,9 +217,11 @@ This is a source audit, not evidence of a production deployment.
 - B005: treat 268 as a **partial dormant slice** unless 269 is applied and
   reviewed with it. Do not enable employee Sales access from the 268 table
   policies alone. `lead_pipeline_counts` is `security_invoker` from 267.
-- B004/privacy: `proof_capture_submissions` holds submitted names and consent
-  but still has broad assignment SELECT in migration 216. Review that
-  adjacent proof workflow separately from lead/contact entitlements.
+- B004/privacy: `proof_capture_submissions` holds submitted names and consent.
+  Held migration 294 narrows the migration-216 broad assignment SELECT to
+  current admin, same-client client profile, and active SMM seat. It remains
+  unapplied with the 280–294 stack; see
+  `docs/security/B005-proof-submission-read-boundary.md`.
 - R000/B003: run full clean and upgrade schema replay in CI, generate database
   types from the resulting schema, and verify production SQL/version evidence
   through the release gate before applying any migration.
