@@ -31,28 +31,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
 import { readJsonBody } from "../mcp/http.js";
 import { logger } from "../logging/logger.js";
+import { admitPublicRequest, saltedPublicHash } from "../public/quota.js";
 
 /** Same construction as the proof portal's, so one salt covers both. */
 export const hashCaptureToken = (token: string) =>
   createHash("sha256").update(token).digest("hex");
 
-const saltedHash = (value: string, salt: string) =>
-  createHash("sha256").update(`${salt}:${value}`).digest("hex").slice(0, 32);
-
-/** Per-token attempt counter, in memory. Enough to blunt a script. */
-const attempts = new Map<string, { count: number; until: number }>();
-const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 10;
-const MAX_TRACKED = 5000;
-
 /** The one thing every refusal says. */
 const REFUSAL = "This form is not accepting submissions.";
-
-function callerIp(req: IncomingMessage): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  const first = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  return (first?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown").trim();
-}
 
 export async function handlePublicLead(
   req: IncomingMessage,
@@ -75,30 +61,20 @@ export async function handlePublicLead(
     return;
   }
 
-  const token = (req.headers.authorization ?? "").replace(/^Bearer /, "");
+  const rawAuthorization = req.headers.authorization ?? "";
+  const admitted = await admitPublicRequest(req, sb, config, "lead_submit", rawAuthorization);
+  if (!admitted.allowed) {
+    json(admitted.reason === "quota" ? 429 : 503, {
+      error: admitted.reason === "quota" ? "Please try again shortly." : "That did not go through. Please try again shortly.",
+    });
+    return;
+  }
+  const token = rawAuthorization.replace(/^Bearer /, "");
   if (!/^[a-f0-9]{64}$/.test(token)) {
     json(404, { error: REFUSAL });
     return;
   }
   const hash = hashCaptureToken(token);
-
-  const now = Date.now();
-  if (attempts.size > MAX_TRACKED) {
-    for (const [key, value] of attempts) if (value.until < now) attempts.delete(key);
-  }
-  if (attempts.size >= MAX_TRACKED && !attempts.has(hash)) {
-    json(429, { error: "Please try again shortly." });
-    return;
-  }
-  const seen = attempts.get(hash);
-  if (seen && seen.until > now && seen.count >= MAX_PER_WINDOW) {
-    json(429, { error: "Too many attempts. Please wait a minute." });
-    return;
-  }
-  attempts.set(hash, {
-    count: seen && seen.until > now ? seen.count + 1 : 1,
-    until: seen && seen.until > now ? seen.until : now + WINDOW_MS,
-  });
 
   let body: Record<string, unknown>;
   try {
@@ -135,8 +111,8 @@ export async function handlePublicLead(
     p_message: text("message", 4000),
     p_consented: body.consent === true,
     p_evidence: {
-      ip_hash: saltedHash(callerIp(req), config.publicIpSalt),
-      ua_hash: saltedHash(String(req.headers["user-agent"] ?? ""), config.publicIpSalt),
+      ip_hash: admitted.ipHash.slice(0, 32),
+      ua_hash: saltedPublicHash(String(req.headers["user-agent"] ?? ""), config.publicIpSalt).slice(0, 32),
       received_at: new Date().toISOString(),
     },
     p_click_id: text("gclid", 200) ?? text("fbclid", 200) ?? text("click_id", 200),

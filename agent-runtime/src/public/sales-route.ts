@@ -22,11 +22,10 @@ import type { RuntimeConfig } from "../config.js";
 import { estimateCostUsd } from "../usage/cost.js";
 import { logger } from "../logging/logger.js";
 import { WIDGET_SOURCE } from "./widget.js";
+import { admitPublicRequest } from "./quota.js";
 import {
   boundHistory,
-  callerIp,
   clientFacing,
-  hashIp,
   MAX_BODY_BYTES,
   originAllowed,
   publicConfig,
@@ -172,6 +171,16 @@ export async function handlePublicSales(
     return;
   }
 
+  // Count even unknown deployment IDs before resolver work. Otherwise a
+  // caller can rotate public IDs and escape the shared caller limit.
+  const admission = req.method === "POST" && route.action === "message"
+    ? await admitPublicRequest(req, sb, config, "sales_message", route.publicId)
+    : null;
+  if (admission && !admission.allowed) {
+    deny(admission.reason === "quota" ? "rate_limited" : "error");
+    return;
+  }
+
   const { data, error } = await sb.rpc("resolve_sales_deployment", { p_public_id: route.publicId });
   if (error) {
     logger.error("public_sales_resolve_failed", { error: error.message });
@@ -215,8 +224,7 @@ export async function handlePublicSales(
     return;
   }
 
-  const ip = callerIp(req.headers["x-forwarded-for"]) ?? req.socket.remoteAddress;
-  const ipHash = hashIp(ip, config.publicIpSalt);
+  const ipHash = admission?.allowed ? admission.ipHash.slice(0, 32) : null;
 
   const log = async (outcome: string, costUsd = 0, conversationId?: string): Promise<void> => {
     await sb.from("sales_runtime_requests").insert({

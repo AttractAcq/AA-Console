@@ -1,8 +1,15 @@
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { RuntimeConfig } from "../config.js";
+import { parseTrustedProxies } from "../public/client-ip.js";
 
-import { handlePublicBooking, isBookingRequest } from "./public-route.js";
+import { handlePublicBooking as routeBooking, isBookingRequest } from "./public-route.js";
+
+const config = { publicIpSalt: "test-salt", trustedProxies: parseTrustedProxies(undefined) } as RuntimeConfig;
+const handlePublicBooking = (req: IncomingMessage, res: ServerResponse, sb: SupabaseClient) =>
+  routeBooking(req, res, sb, config);
 
 /**
  * The public booking surface — G04.
@@ -19,6 +26,7 @@ function request(url: string, method = "GET", body?: unknown): IncomingMessage {
   req.url = url;
   req.method = method;
   req.headers = { "content-type": "application/json" };
+  Object.defineProperty(req, "socket", { value: { remoteAddress: "203.0.113.9" } });
   return req;
 }
 
@@ -36,6 +44,7 @@ function response() {
 const TOKEN = "a".repeat(64);
 const db = (over: Record<string, unknown> = {}) => {
   const rpc = vi.fn(async (name: string, _args?: unknown) => {
+    if (name === "admit_public_route_v6") return { data: true, error: null };
     if (name in over) return over[name] as { data: unknown; error: unknown };
     if (name === "public_slots_for_link_v6") {
       return { data: [{ starts_at: "2026-11-02T10:00:00Z" }], error: null };
@@ -99,13 +108,13 @@ describe("taking a slot", () => {
     expect(JSON.parse(out.body).booked).toBe(true);
   });
 
-  it("refuses a time it cannot parse before calling anything", async () => {
+  it("refuses a time it cannot parse before calling the booking RPC", async () => {
     const { res, out } = response();
     const { sb, rpc } = db();
     await handlePublicBooking(
       request(`/public/book/v1/${TOKEN}`, "POST", { ...good, startsAt: "soon" }), res, sb);
     expect(out.status).toBe(400);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalledWith("book_from_public_link_v6", expect.anything());
   });
 
   it("passes the database's own refusal back word for word", async () => {

@@ -27,9 +27,11 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { RuntimeConfig } from "../config.js";
 
 import { readJsonBody } from "../mcp/http.js";
 import { logger } from "../logging/logger.js";
+import { admitPublicRequest } from "../public/quota.js";
 
 const PREFIX = "/public/book/v1/";
 /** 64 hex characters, like every other public token in this system. */
@@ -54,6 +56,7 @@ export async function handlePublicBooking(
   req: IncomingMessage,
   res: ServerResponse,
   sb: SupabaseClient,
+  config: RuntimeConfig,
 ): Promise<void> {
   const json = (status: number, body: unknown): void => {
     res.writeHead(status, {
@@ -101,6 +104,14 @@ export async function handlePublicBooking(
 
   if (req.method !== "POST") {
     json(405, { error: "POST only" });
+    return;
+  }
+
+  const admitted = await admitPublicRequest(req, sb, config, "booking_submit", parsed.token);
+  if (!admitted.allowed) {
+    json(admitted.reason === "quota" ? 429 : 503, {
+      error: admitted.reason === "quota" ? "Please try again shortly." : "Could not accept the booking right now.",
+    });
     return;
   }
 

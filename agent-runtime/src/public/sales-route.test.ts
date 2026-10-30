@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { isPublicSalesRequest, parsePath } from "./sales-route.js";
+import { Readable } from "node:stream";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { RuntimeConfig } from "../config.js";
+import { parseTrustedProxies } from "./client-ip.js";
+import { describe, expect, it, vi } from "vitest";
+import { handlePublicSales, isPublicSalesRequest, parsePath } from "./sales-route.js";
 import { WIDGET_SOURCE } from "./widget.js";
 
 describe("parsePath", () => {
@@ -51,6 +56,22 @@ describe("isPublicSalesRequest", () => {
     expect(isPublicSalesRequest("/health")).toBe(false);
     expect(isPublicSalesRequest(undefined)).toBe(false);
   });
+});
+
+it("charges the public quota before resolving a deployment or reading its message", async () => {
+  const req = Readable.from([Buffer.from("{".repeat(20_000))]) as IncomingMessage;
+  req.url = `/public/sales/v1/d/${"a".repeat(32)}/message`;
+  req.method = "POST";
+  req.headers = { origin: "https://client.example" };
+  Object.defineProperty(req, "socket", { value: { remoteAddress: "203.0.113.4" } });
+  const rpc = vi.fn(async (_name: string, _args: Record<string, unknown>) => ({ data: false, error: null }));
+  const sb = { rpc } as unknown as SupabaseClient;
+  const config = { publicIpSalt: "test-salt", trustedProxies: parseTrustedProxies(undefined) } as RuntimeConfig;
+  const res = { writeHead: vi.fn(), end: vi.fn() } as unknown as ServerResponse;
+  await handlePublicSales(req, res, sb, config);
+  expect(rpc).toHaveBeenCalledTimes(1);
+  expect(rpc.mock.calls[0]?.[0]).toBe("admit_public_route_v6");
+  expect(res.writeHead).toHaveBeenCalledWith(429, expect.anything());
 });
 
 describe("WIDGET_SOURCE", () => {

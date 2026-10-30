@@ -26,11 +26,15 @@ Production configuration:
 - `PORT` is supplied by Railway.
 - `AGENT_RUNTIME_ENABLED=true` runs workers; use `false` for a deliberate liveness-only rollout.
 - `AA_MCP_SERVICE_SECRET`: required to enable gateway calls; use the same dedicated >=32-character secret in both services. Missing leaves the MCP endpoint denied.
-- `AGENT_RUNTIME_SHARED_SECRET`: set a separate secret to protect `/status`.
+- `AGENT_RUNTIME_SHARED_SECRET`: required at production startup. Generate 32 or more random bytes as hex or base64url; `/status` refuses access without its exact value.
+- `PUBLIC_SALES_IP_SALT`: required at production startup, generated independently from the runtime secret. Public IP evidence and quota handles are salted; neither value is logged.
+- `PUBLIC_TRUSTED_PROXY_CIDRS`: optional, comma-separated direct proxy CIDRs. Leave unset until the production socket peer and X-Forwarded-For chain have been observed and verified. With no trusted proxy, public routes ignore forwarding headers and use the direct socket address. Malformed trusted chains are refused.
 - `MASTER_AI_ALLOWED_ORIGINS=https://console.attractacq.com` and `CONSOLE_URL=https://console.attractacq.com` already default to the hosted Console; override for staging.
 - Optional capabilities: `OPENAI_API_KEY` for creative rendering/concepts, `RESEND_API_KEY` and `RESEND_FROM` for email. Model, concurrency, timeout and spend overrides remain documented in `.env.example` and `src/config.ts`.
 
 No `.env`, `.env.local`, localhost server, ngrok tunnel or developer filesystem is loaded by the production command. Inject variables in Railway. State/assets live in hosted Supabase; no runtime persistent volume is needed. Provider and Supabase network availability are required for actual jobs, not liveness.
+
+Public POST traffic also requires migration 280's shared quota RPC. Deploy migration 280 before this runtime code; a missing or failing quota store causes public POST routes to refuse requests. Keep public lead capture, proof capture and paid widget switches off until the quota migration, secret presence, proxy chain and endpoint acceptance probes are verified. The runtime's existing `/health` remains public for Railway. Inspect only variable names/presence when checking Railway; never print their values.
 
 ## Before deployment
 

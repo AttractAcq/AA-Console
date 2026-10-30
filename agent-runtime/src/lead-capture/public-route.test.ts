@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RuntimeConfig } from "../config.js";
+import { parseTrustedProxies } from "../public/client-ip.js";
 import { handlePublicLead, hashCaptureToken } from "./public-route.js";
 
 /**
@@ -17,17 +18,9 @@ import { handlePublicLead, hashCaptureToken } from "./public-route.js";
  */
 
 const TOKEN = "a".repeat(64);
-const config = { publicIpSalt: "a-salt" } as RuntimeConfig;
+const config = { publicIpSalt: "a-salt", trustedProxies: parseTrustedProxies(undefined) } as RuntimeConfig;
 
-/**
- * A different token per call unless a test pins one.
- *
- * The rate limiter is module state by design — one counter per token, shared
- * across requests, which is the point of it. That makes it shared across
- * tests too, so a test that reuses one token inherits the attempts of every
- * test before it. Distinct tokens are both isolated and more faithful: two
- * forms on two sites are two tokens.
- */
+/** A different token per call unless a test pins one. */
 let issued = 0;
 const freshToken = () => (issued += 1).toString(16).padStart(64, "0");
 
@@ -63,9 +56,16 @@ function call(
 
 function database(outcome: Record<string, unknown> | null, error?: string) {
   // Typed with its arguments so the assertions below can read them.
-  const rpc = vi.fn(async (_name: string, _args: Record<string, unknown>) =>
-    error ? { data: null, error: { message: error } } : { data: outcome, error: null },
-  );
+  const counts = new Map<string, number>();
+  const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
+    if (name === "admit_public_route_v6") {
+      const key = String(args.p_subject_hash);
+      const count = (counts.get(key) ?? 0) + 1;
+      counts.set(key, count);
+      return { data: count <= 10, error: null };
+    }
+    return error ? { data: null, error: { message: error } } : { data: outcome, error: null };
+  });
   return { sb: { rpc } as unknown as SupabaseClient, rpc };
 }
 
@@ -73,7 +73,7 @@ function database(outcome: Record<string, unknown> | null, error?: string) {
 const argsOf = (
   rpc: ReturnType<typeof database>["rpc"],
   index = 0,
-): Record<string, unknown> => rpc.mock.calls[index]![1];
+): Record<string, unknown> => rpc.mock.calls.filter(([name]) => name === "capture_lead_v6")[index]![1];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -148,10 +148,11 @@ describe("what a stranger can learn", () => {
     expect(dead.code).toBe(404);
   });
 
-  it("does not call the database at all for a malformed token", async () => {
+  it("charges quota but does not look up a malformed token", async () => {
     const { sb, rpc } = database(null);
     await call(sb, { token: "nope" });
-    expect(rpc).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith("admit_public_route_v6", expect.anything());
+    expect(rpc).not.toHaveBeenCalledWith("capture_lead_v6", expect.anything());
   });
 
   it("answers identically whether a lead was created or merged", async () => {
@@ -191,6 +192,19 @@ describe("what a stranger can learn", () => {
 });
 
 describe("rate limiting", () => {
+  it("refuses a quota-store failure before body processing or token lookup", async () => {
+    const rpc = vi.fn(async (name: string) => name === "admit_public_route_v6"
+      ? { data: null, error: { message: "database unavailable" } }
+      : { data: { ok: true }, error: null });
+    const { code, payload } = await call({ rpc } as unknown as SupabaseClient, {
+      token: "d".repeat(64), body: { message: "x".repeat(20_000) },
+    });
+    expect(code).toBe(503);
+    expect(String(payload.error)).not.toContain("database unavailable");
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0]?.[0]).toBe("admit_public_route_v6");
+  });
+
   it("stops a script on one token without blocking everyone", async () => {
     const { sb } = database({ ok: true, lead_id: "lead-1" });
     const token = "b".repeat(64);
