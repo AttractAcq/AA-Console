@@ -394,6 +394,34 @@ describe("trusted exact-version production release decision migration 293", () =
     expect(after!.preview_blocker).toMatch(/Refresh trusted GitHub evidence/);
   });
 
+  it("preserves the 292 organic package branch when replacing the Inbox view", async () => {
+    const sourceId = await submit(candidate({ pr: {
+      ...candidate().pr, number: "300",
+      url: "https://github.com/AttractAcq/AA-Console/pull/300",
+    } }));
+    const { rows } = await db.query<{ id: string }>(`
+      insert into public.approval_requests_v6 (
+        client_id,source_system,source_kind,source_id,source_version,title,
+        artifact_hash,preview,destination,account_ref,budget,scope,owner_role,
+        expires_at,preview_blocker,owning_path,requested_by,requester_kind,
+        requester_ref,requested_at,payload_hash
+      ) select client_id,source_system,'organic_publication',source_id,
+          source_version,'Frozen organic package',artifact_hash,preview,
+          destination,account_ref,budget,scope,'client_media_reviewer',
+          expires_at,'Exact outgoing package remains held',owning_path,
+          null,'service','organic_publication_packages_v6:test',requested_at,payload_hash
+        from public.approval_requests_v6 where source_id=$1
+        returning id
+    `, [sourceId]);
+    const [organic] = await asRole<{
+      status: string; source_state: string; preview_blocker: string;
+    }>("service_role", null, "aal1",
+      "select status,source_state,preview_blocker from public.approval_inbox_v6 where id=$1",
+      [rows[0]!.id]);
+    expect(organic).toMatchObject({ status: "source_held", source_state: "source_held",
+      preview_blocker: "Exact outgoing package remains held" });
+  });
+
   it("rejects forged CI claims, SQL bytes, PR head and packet digest", async () => {
     const { source, card } = await submitted("295");
     const good = packet(source);
