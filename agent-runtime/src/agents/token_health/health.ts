@@ -64,10 +64,10 @@ export function readTokenHealth(payload: unknown, now: number = Date.now()): Tok
     throw new Error("Meta debug_token returned a non-auth error; token validity is unknown.");
   }
   if (authError || data?.is_valid === false) {
-    const message = typeof authError?.message === "string" ? authError.message : null;
     return {
       status: "error",
-      detail: message ?? "Meta says this token is no longer valid. Reconnect the integration to replace it.",
+      // Provider error strings are untrusted and may echo credential bytes.
+      detail: "Meta says this token is no longer valid. Reconnect the integration to replace it.",
       expiresAt: null,
       usable: false,
     };

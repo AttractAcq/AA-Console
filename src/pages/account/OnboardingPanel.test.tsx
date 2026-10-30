@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,19 +16,38 @@ vi.mock("react-router-dom", () => ({
 }));
 
 import { OnboardingPanel } from "./OnboardingPanel";
+import type { IntegrationEvidence } from "../../lib/integrationReadiness";
+
+const filters: [string, string, unknown][] = [];
+
+const integration = (provider: "meta" | "instagram", client_id = "client-1"): IntegrationEvidence => ({
+  client_id,
+  provider,
+  credential_secret_id: `${provider}-vault-id`,
+  credential_label: provider === "meta" ? "act_123" : "17841400000000000",
+  ad_account_id: provider === "meta" ? "act_123" : null,
+  status: "connected",
+  token_expires_at: null,
+  last_checked_at: null,
+  ingest_enabled: true,
+});
 
 type Tables = {
   client_contact_details?: Record<string, unknown> | null;
   client_business_context?: Record<string, unknown> | null;
   client_brand_profiles?: Record<string, unknown> | null;
-  client_integrations?: { provider: string }[];
+  client_integrations?: IntegrationEvidence[];
   client_onboarding_steps?: { step_key: string }[];
 };
 
 function show(tables: Tables = {}) {
   from.mockImplementation((table: string) => {
     const chain: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "order", "update"]) chain[m] = () => chain;
+    for (const m of ["select", "order", "update"]) chain[m] = () => chain;
+    chain.eq = (column: string, value: unknown) => {
+      filters.push([table, column, value]);
+      return chain;
+    };
     chain.upsert = () => Promise.resolve({ error: null });
     chain.maybeSingle = () =>
       Promise.resolve({ data: (tables as Record<string, unknown>)[table] ?? null, error: null });
@@ -48,12 +67,13 @@ const COMPLETE: Tables = {
     competitors: "d",
   },
   client_brand_profiles: { colour_primary: "#142B23", imagery_style: "Documentary" },
-  client_integrations: [{ provider: "meta" }, { provider: "instagram" }],
+  client_integrations: [integration("meta"), integration("instagram")],
   client_onboarding_steps: [{ step_key: "onboarding_call" }],
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  filters.length = 0;
   useParams.mockReturnValue({ clientId: "client-1" });
   rpc.mockResolvedValue({ data: null, error: null });
 });
@@ -68,9 +88,22 @@ describe("progress is derived from the data, never stored", () => {
     expect(await screen.findByText("0 of 5 complete")).toBeInTheDocument();
   });
 
-  it("shows everything done when the app has what it needs", async () => {
+  it("does not call provider access done from two stored rows", async () => {
     show(COMPLETE);
-    expect(await screen.findByText("5 of 5 complete")).toBeInTheDocument();
+    expect(await screen.findByText("4 of 5 complete")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Provider activation dry run" })).toHaveTextContent("Current result: Unknown");
+    expect(screen.queryByText("5 of 5 complete")).not.toBeInTheDocument();
+    expect(filters).toContainEqual(["client_integrations", "client_id", "client-1"]);
+  });
+
+  it("refreshes the dry run with reads only", async () => {
+    show(COMPLETE);
+    await screen.findByRole("region", { name: "Provider activation dry run" });
+    const before = from.mock.calls.length;
+    await userEvent.click(screen.getByRole("button", { name: "Refresh readiness" }));
+    await waitFor(() => expect(from.mock.calls.length).toBeGreaterThan(before));
+    expect(rpc).not.toHaveBeenCalled();
+    expect(screen.getByRole("region", { name: "Provider activation dry run" })).toHaveTextContent("Current result: Unknown");
   });
 
   it("counts a step somebody filled in from its own panel", async () => {
@@ -143,5 +176,69 @@ describe("when the database cannot answer", () => {
     render(<OnboardingPanel />);
     expect(await screen.findByRole("alert")).toHaveTextContent(/column missing/);
     expect(screen.queryByText(/0 of 5 complete/)).not.toBeInTheDocument();
+  });
+
+  it("refuses a cross-client integration response instead of displaying its metadata", async () => {
+    show({ client_integrations: [integration("meta", "client-2")] });
+    expect(await screen.findByRole("alert")).toHaveTextContent(/another client's data/);
+    expect(screen.queryByRole("region", { name: "Provider activation dry run" })).not.toBeInTheDocument();
+  });
+
+  it("does not render the previous client's readiness while the next client loads", async () => {
+    const view = show(COMPLETE);
+    expect(await screen.findByText("4 of 5 complete")).toBeInTheDocument();
+    useParams.mockReturnValue({ clientId: "client-2" });
+    view.rerender(<OnboardingPanel />);
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Provider activation dry run" })).not.toBeInTheDocument();
+  });
+
+  it("keeps client B's result when client A's slower query completes last", async () => {
+    type Result = { data: IntegrationEvidence[]; error: null };
+    let resolveA!: (result: Result) => void;
+    let resolveB!: (result: Result) => void;
+    const slowA = new Promise<Result>((resolve) => { resolveA = resolve; });
+    const fastB = new Promise<Result>((resolve) => { resolveB = resolve; });
+
+    from.mockImplementation((table: string) => {
+      const chain: Record<string, unknown> = {};
+      let scopedClient = "";
+      chain.select = () => chain;
+      chain.eq = (field: string, value: string) => {
+        if (field === "client_id") scopedClient = value;
+        return chain;
+      };
+      chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
+      chain.then = (done: (result: unknown) => unknown) =>
+        (table === "client_integrations"
+          ? scopedClient === "client-1" ? slowA : fastB
+          : Promise.resolve({ data: [], error: null }))
+          .then(done);
+      return chain;
+    });
+
+    const view = render(<OnboardingPanel />);
+    useParams.mockReturnValue({ clientId: "client-2" });
+    view.rerender(<OnboardingPanel />);
+    await act(async () => resolveB({ data: [integration("meta", "client-2")], error: null }));
+    expect(await screen.findByRole("region", { name: "Provider activation dry run" })).toHaveTextContent("Current result: Blocked");
+    expect(screen.getByRole("link", { name: "Review integrations" })).toHaveAttribute(
+      "href", "/clients/client-2/account/integrations",
+    );
+
+    await act(async () => resolveA({ data: [integration("meta", "client-1")], error: null }));
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review integrations" })).toHaveAttribute(
+      "href", "/clients/client-2/account/integrations",
+    );
+  });
+
+  it("shows an unhealthy integration as blocked and never starts an external action", async () => {
+    show({ client_integrations: [integration("meta"), { ...integration("instagram"), status: "revoked" }] });
+    const region = await screen.findByRole("region", { name: "Provider activation dry run" });
+    expect(region).toHaveTextContent("Current result: Blocked");
+    expect(region).toHaveTextContent("instagram status is revoked");
+    expect(region).toHaveTextContent("Required scopes: Unknown");
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

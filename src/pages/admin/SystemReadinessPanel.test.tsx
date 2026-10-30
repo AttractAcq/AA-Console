@@ -84,6 +84,7 @@ it("exports the same captured facts shown in the admin view on repeated download
   expect(screen.getByText(/Gateway Bot auth mode: dual/)).toBeInTheDocument();
   expect(screen.getByText(/Dual mode can still admit legacy environment identities/)).toBeInTheDocument();
   expect(screen.getByText(/live provider health Unknown/)).toBeInTheDocument();
+  expect(screen.getByText(/last recorded integration check Unknown/)).toBeInTheDocument();
   expect(screen.getByText("No live provider probe.")).toBeInTheDocument();
   expect(screen.getByText(/No live provider account check/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Export JSON" }));

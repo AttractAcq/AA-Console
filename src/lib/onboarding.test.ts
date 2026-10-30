@@ -8,8 +8,23 @@ import {
   stepState,
   type OnboardingData,
 } from "./onboarding";
+import type { IntegrationEvidence } from "./integrationReadiness";
+
+const integration = (provider: "meta" | "instagram", client_id = "client-1"): IntegrationEvidence => ({
+  client_id,
+  provider,
+  credential_secret_id: `${provider}-vault-id`,
+  credential_label: provider === "meta" ? "act_123" : "17841400000000000",
+  ad_account_id: provider === "meta" ? "act_123" : null,
+  status: "connected",
+  token_expires_at: null,
+  last_checked_at: null,
+  ingest_enabled: true,
+});
 
 const empty: OnboardingData = {
+  clientId: "client-1",
+  observedAtMs: Date.parse("2026-10-30T12:00:00Z"),
   contact: null,
   business: null,
   brand: null,
@@ -18,6 +33,8 @@ const empty: OnboardingData = {
 };
 
 const full: OnboardingData = {
+  clientId: "client-1",
+  observedAtMs: Date.parse("2026-10-30T12:00:00Z"),
   contact: { primary_contact: "Kyle", website: "https://example.co.za" },
   business: {
     business_overview: "Implant dentistry",
@@ -26,16 +43,17 @@ const full: OnboardingData = {
     competitors: "Named",
   },
   brand: { colour_primary: "#142B23", imagery_style: "Documentary" },
-  integrations: [{ provider: "meta" }, { provider: "instagram" }],
+  integrations: [integration("meta"), integration("instagram")],
   manualComplete: ["call"],
 };
 
 describe("a step's status is derived, never stored", () => {
-  it("is done when the data the app needs is there", () => {
-    for (const step of ONBOARDING_STEPS) {
+  it("derives completed information without calling unverified provider access done", () => {
+    for (const step of ONBOARDING_STEPS.filter((step) => step.key !== "credentials")) {
       expect(stepState(step.key, full), step.key).toBe("done");
     }
-    expect(progress(full)).toEqual({ done: 5, total: 5 });
+    expect(stepState("credentials", full)).toBe("partial");
+    expect(progress(full)).toEqual({ done: 4, total: 5 });
   });
 
   it("is empty on a client nobody has touched", () => {
@@ -77,19 +95,34 @@ describe("half-filled is its own state", () => {
 describe("credentials", () => {
   it("wants both providers that actually sync", () => {
     expect([...SYNCING_PROVIDERS]).toEqual(["meta", "instagram"]);
-    expect(missingFor("credentials", empty).sort()).toEqual(["instagram", "meta"]);
+    expect(missingFor("credentials", empty).join(" ")).toMatch(/meta integration/);
+    expect(missingFor("credentials", empty).join(" ")).toMatch(/instagram integration/);
   });
 
   it("is partial with one of the two", () => {
-    const one = { ...empty, integrations: [{ provider: "meta" }] };
+    const one = { ...empty, integrations: [integration("meta")] };
     expect(stepState("credentials", one)).toBe("partial");
-    expect(missingFor("credentials", one)).toEqual(["instagram"]);
+    expect(missingFor("credentials", one).join(" ")).toMatch(/instagram integration/);
   });
 
   it("is not satisfied by a credential that does not sync", () => {
     // Storing a Resend key is a useful thing to do and is not onboarding.
-    const resend = { ...empty, integrations: [{ provider: "resend" }] };
+    const resend = { ...empty, integrations: [{ ...integration("meta"), provider: "resend" }] };
     expect(stepState("credentials", resend)).toBe("empty");
+  });
+
+  it("does not mark a pair of connected rows ready without provider readback and scopes", () => {
+    expect(missingFor("credentials", full).join(" ")).toMatch(/meta account access, scopes and action rights verification/);
+    expect(missingFor("credentials", full).join(" ")).toMatch(/instagram account access, scopes and action rights verification/);
+  });
+
+  it("keeps an unhealthy integration blocked even when the other client's row is healthy", () => {
+    const unhealthy = { ...full, integrations: [integration("meta"), { ...integration("instagram"), status: "revoked" }] };
+    expect(stepState("credentials", unhealthy)).toBe("partial");
+    expect(missingFor("credentials", unhealthy).join(" ")).toMatch(/instagram status is revoked/);
+    const otherClient = { ...full, integrations: [integration("meta", "client-2"), integration("instagram", "client-2")] };
+    expect(stepState("credentials", otherClient)).toBe("empty");
+    expect(missingFor("credentials", otherClient).join(" ")).toMatch(/meta integration/);
   });
 });
 
@@ -112,8 +145,8 @@ describe("where to send somebody next", () => {
     expect(nextStep(empty)?.key).toBe("contact");
   });
 
-  it("returns nothing when there is nothing left", () => {
-    expect(nextStep(full)).toBeNull();
+  it("keeps provider verification as the next step when other information is complete", () => {
+    expect(nextStep(full)?.key).toBe("credentials");
   });
 });
 

@@ -28,6 +28,17 @@ const META_PROVIDERS = new Set(["meta", "instagram"]);
 const TERMINAL_STATUSES = new Set(["error", "expired", "revoked"]);
 const CHECKABLE_STATUSES = new Set(["connected", "active", "expiring"]);
 
+class TokenProbeError extends Error {}
+
+function safeFailureDetail(caught: unknown): string {
+  if (caught instanceof TokenProbeError) return caught.message;
+  if (caught instanceof Error && caught.message === "Meta debug_token returned a non-auth error; token validity is unknown.")
+    return caught.message;
+  if (caught instanceof Error && caught.message === "Meta debug_token did not establish token validity.")
+    return caught.message;
+  return "Integration check failed; result was not confirmed.";
+}
+
 export interface IntegrationRow {
   id: string;
   client_id: string;
@@ -50,7 +61,13 @@ export async function debugToken(token: string): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: controller.signal });
+    } catch {
+      // Fetch errors can carry the request URL, which contains the token.
+      throw new TokenProbeError("Meta debug_token transport failed.");
+    }
     const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
     if (!response.ok) {
       // Only Meta's explicit OAuth-token error is evidence of revocation.
@@ -60,7 +77,11 @@ export async function debugToken(token: string): Promise<unknown> {
       if (response.status === 400 && Number((error as { code?: unknown } | undefined)?.code) === 190) {
         return { data: { is_valid: false, error } };
       }
-      throw new Error(`Meta debug_token returned HTTP ${response.status}.`);
+      throw new TokenProbeError(
+        Number.isInteger(response.status) && response.status >= 100 && response.status <= 599
+          ? `Meta debug_token returned HTTP ${response.status}.`
+          : "Meta debug_token returned an unknown HTTP status.",
+      );
     }
     return body ?? {};
   } finally {
@@ -198,7 +219,7 @@ export async function runTokenHealthJob(
     } catch (caught) {
       // One client's trouble is not the others'.
       skipped += 1;
-      const message = caught instanceof Error ? caught.message : String(caught);
+      const message = safeFailureDetail(caught);
       trouble.push(`${integration.provider}: could not be checked (${message})`);
       logger.warn("token_health_check_failed", { jobId: job.id, provider: integration.provider, message });
     }

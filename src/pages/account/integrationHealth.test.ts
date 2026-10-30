@@ -29,5 +29,9 @@ describe("Account integration capability labels", () => {
     ["other", /No provider-specific/],
   ])("keeps %s action capability unverified", (provider, pattern) => {
     expect(integrationCapabilitySummary(provider, "connected", null, NOW)).toMatch(pattern);
+    if (provider !== "meta" && provider !== "instagram") {
+      expect(integrationCapabilitySummary(provider, "connected", null, NOW))
+        .toMatch(/^Provider health unknown/);
+    }
   });
 });
