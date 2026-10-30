@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { rpc, tables, signPaths, reads } = vi.hoisted(() => ({
+const { rpc, tables, signPaths, reads, assertOrganicScheduleRoute } = vi.hoisted(() => ({
   rpc: vi.fn(),
   tables: new Map<string, unknown>(),
   signPaths: vi.fn(),
@@ -10,6 +10,11 @@ const { rpc, tables, signPaths, reads } = vi.hoisted(() => ({
   // query for renders and two more only if a render produced an asset, so
   // a fixed wait on the asset path hangs forever for a failed render.
   reads: { done: 0 },
+  assertOrganicScheduleRoute: vi.fn(),
+}));
+vi.mock("../../lib/scheduleRoute", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/scheduleRoute")>()),
+  assertOrganicScheduleRoute,
 }));
 
 // One fake standing in for three different query shapes: renders are read
@@ -120,6 +125,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   tables.clear();
   rpc.mockResolvedValue({ error: null });
+  assertOrganicScheduleRoute.mockResolvedValue(undefined);
   signPaths.mockResolvedValue(new Map([["client-1/media/a.png", "https://signed/a.png"]]));
   setData({ renders: [renderRow()] });
 });
@@ -285,22 +291,46 @@ describe("ConceptWorkspace — approve and schedule", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("books the approved asset on the date and channel given", async () => {
+  it("books the approved asset on an explicitly organic route", async () => {
     const user = userEvent.setup();
     setData({ renders: [renderRow({ selected: true })], review: "approved" });
     const { onChanged } = await show();
     await user.type(screen.getByDisplayValue(""), "2026-10-01");
-    await user.selectOptions(screen.getByDisplayValue("Organic"), "paid");
     await user.click(screen.getByRole("button", { name: /^Schedule$/ }));
 
     await waitFor(() =>
       expect(rpc).toHaveBeenCalledWith("schedule_asset", {
         p_asset_id: "asset-1",
         p_date: "2026-10-01",
-        p_channel: "paid",
+        p_channel: "organic",
       }),
     );
+    expect(assertOrganicScheduleRoute).toHaveBeenCalledWith("asset-1", "organic");
     expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("shows the paid blocker and disables scheduling when paid is selected", async () => {
+    const user = userEvent.setup();
+    setData({ renders: [renderRow({ selected: true })], review: "approved" });
+    await show();
+    await user.type(screen.getByDisplayValue(""), "2026-10-01");
+    await user.selectOptions(screen.getByLabelText("Channel"), "paid");
+
+    expect(screen.getByRole("status")).toHaveTextContent(/Paid scheduling is unavailable/i);
+    expect(screen.getByRole("button", { name: /^Schedule$/ })).toBeDisabled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("shows the unknown-lineage blocker without calling the schedule RPC", async () => {
+    const user = userEvent.setup();
+    assertOrganicScheduleRoute.mockRejectedValueOnce(new Error("Scheduling blocked: no verified organic campaign route"));
+    setData({ renders: [renderRow({ selected: true })], review: "approved" });
+    await show();
+    await user.type(screen.getByDisplayValue(""), "2026-10-01");
+    await user.click(screen.getByRole("button", { name: /^Schedule$/ }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no verified organic campaign route/i);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   // The action bar offers the next step, not one already taken.
