@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { signPaths } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 
@@ -25,7 +25,7 @@ export function VideoRepurposePanel({ clientId, employeeMode = false }: {
   const [derivatives, setDerivatives] = useState<Derivative[]>([]);
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [clipRequests, setClipRequests] = useState<ClipRequest[]>([]);
-  const [urls, setUrls] = useState<ReadonlyMap<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", videos.map((video) => video.render_path || video.storage_path));
   const [sourceId, setSourceId] = useState("");
   const [direction, setDirection] = useState("");
   const [platforms, setPlatforms] = useState<Record<string, Platform>>({});
@@ -72,7 +72,6 @@ export function VideoRepurposePanel({ clientId, employeeMode = false }: {
       setDerivatives(derivativeRows);
       setBriefs((briefResult.data ?? []) as Brief[]);
       setClipRequests((clips.data ?? []) as ClipRequest[]);
-      setUrls(await signPaths("client-media", eligible.map((video) => video.render_path || video.storage_path)));
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load video repurposing.");

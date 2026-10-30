@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { signPaths } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { supabase } from "../../lib/supabase";
 import type { Database, Json } from "../../types/database";
 
@@ -23,7 +23,7 @@ export function VideoCandidateReviewsPanel({ clientId, titles }: {
   titles: ReadonlyMap<string, string>;
 }) {
   const [rows, setRows] = useState<Candidate[]>([]);
-  const [urls, setUrls] = useState<ReadonlyMap<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", rows.map((row) => row.render_path));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -37,10 +37,8 @@ export function VideoCandidateReviewsPanel({ clientId, titles }: {
           .order("created_at", { ascending: false }).limit(50);
         if (queryError) throw queryError;
         const candidates = data ?? [];
-        const signed = await signPaths("client-media", candidates.map((row) => row.render_path));
         if (!active) return;
         setRows(candidates);
-        setUrls(signed);
         setError(null);
       } catch (cause) {
         if (active) setError(cause instanceof Error ? cause.message : String(cause));

@@ -9,6 +9,7 @@ import { mediaFilters } from "../../data/mediaFilters";
 import type { MediaFilterId } from "../../data/mediaFilters";
 import { REVIEW_TONE, fetchClientAssets, fetchTextBodies, shortDate, signPaths } from "../../lib/media";
 import type { MediaAsset } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { supabase } from "../../lib/supabase";
 import { ContentJourney } from "../../components/ContentJourney";
 import { CreativeAuthorityStrip } from "./CreativeAuthorityStrip";
@@ -22,8 +23,14 @@ export function ApprovalsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
-  const [sourceUrls, setSourceUrls] = useState<Map<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) =>
+    asset.content_format === "reel" ? asset.render_path : asset.storage_path));
+  const [sourcePaths, setSourcePaths] = useState<Map<string, string>>(new Map());
+  const signedSourcePaths = useSignedPreviewPaths("client-media", [...sourcePaths.values()]);
+  const sourceUrls = new Map([...sourcePaths].flatMap(([id, path]) => {
+    const url = signedSourcePaths.get(path);
+    return url ? [[id, url] as const] : [];
+  }));
   const [bodies, setBodies] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -85,23 +92,17 @@ export function ApprovalsPanel() {
     setUncutReels(all.filter((asset) => !heldByEngine.has(asset.id)
       && asset.content_format === "reel" && !asset.render_path).length);
     setAssets(rows);
-    const signed = await signPaths("client-media", rows.map((r) =>
-      r.content_format === "reel" ? r.render_path ?? "" : r.storage_path));
-    setUrls(signed);
     const sourceIds = [...new Set(rows.map((row) => row.source_asset_id).filter((id): id is string => Boolean(id)))];
     if (sourceIds.length) {
       const { data: sources, error: sourceError } = await supabase.from("client_media_assets")
         .select("id, storage_path").in("id", sourceIds);
       if (sourceError) throw sourceError;
-      const signedSources = await signPaths("client-media", (sources ?? []).map((source) => source.storage_path));
-      setSourceUrls(new Map((sources ?? []).flatMap((source) => {
-        const url = signedSources.get(source.storage_path);
-        return url ? [[source.id, url] as const] : [];
-      })));
-    } else setSourceUrls(new Map());
+      setSourcePaths(new Map((sources ?? []).map((source) => [source.id, source.storage_path])));
+    } else setSourcePaths(new Map());
     // Same as Copy library: a text asset's file IS the content. Without this
     // the preview modal only has a signed URL and shows "could not be loaded".
-    setBodies(await fetchTextBodies(rows.filter((r) => r.media_type === "text"), signed));
+    const textRows = rows.filter((row) => row.media_type === "text");
+    setBodies(await fetchTextBodies(textRows, await signPaths("client-media", textRows.map((row) => row.storage_path))));
     setLoading(false);
     } catch (error) {
       setLoadError("Failed to load approvals: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));

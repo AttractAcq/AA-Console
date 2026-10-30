@@ -5,7 +5,7 @@ import { DataTable } from "../../../components/DataTable";
 import { EmptyState } from "../../../components/EmptyState";
 import { Modal } from "../../../components/Modal";
 import { supabase } from "../../../lib/supabase";
-import { signPaths } from "../../../lib/media";
+import { useSignedPreviewPaths } from "../../../lib/useSignedPreviewPaths";
 import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../../lib/signedUrlPolicy";
 
 type Job = {
@@ -108,7 +108,12 @@ export function ProductionWorkspace({
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [sourceUrls, setSourceUrls] = useState<ReadonlyMap<string, string>>(new Map());
+  const [sourcePaths, setSourcePaths] = useState<ReadonlyMap<string, string>>(new Map());
+  const signedSources = useSignedPreviewPaths("client-media", [...sourcePaths.values()]);
+  const sourceUrls = new Map([...sourcePaths].flatMap(([id, path]) => {
+    const url = signedSources.get(path);
+    return url ? [[id, url] as const] : [];
+  }));
   const [sourceNotes, setSourceNotes] = useState<ReadonlyMap<string, string>>(new Map());
   const [rejectionReasons, setRejectionReasons] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -145,14 +150,10 @@ export function ProductionWorkspace({
     if (sourceIds.length) {
       const { data: sources } = await supabase.from("client_media_assets")
         .select("id, storage_path, intake_notes").in("id", sourceIds);
-      const signed = await signPaths("client-media", (sources ?? []).map((source) => source.storage_path));
-      setSourceUrls(new Map((sources ?? []).flatMap((source) => {
-        const url = signed.get(source.storage_path);
-        return url ? [[source.id, url] as const] : [];
-      })));
+      setSourcePaths(new Map((sources ?? []).map((source) => [source.id, source.storage_path])));
       setSourceNotes(new Map((sources ?? []).flatMap((source) =>
         source.intake_notes ? [[source.id, source.intake_notes] as const] : [])));
-    } else { setSourceUrls(new Map()); setSourceNotes(new Map()); }
+    } else { setSourcePaths(new Map()); setSourceNotes(new Map()); }
     const rows = (delivered.data ?? []) as Submission[];
     setSubmissions(rows);
 

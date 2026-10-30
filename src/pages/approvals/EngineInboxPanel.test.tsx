@@ -178,7 +178,7 @@ describe("what is waiting on a person", () => {
     signPaths.mockResolvedValue(new Map([["client-1/cut.mp4", "https://signed/cut.mp4"]]));
     render(<EngineInboxPanel />);
     await screen.findByText("The Chain");
-    expect(document.querySelector("video")!.getAttribute("src")).toBe("https://signed/cut.mp4");
+    await waitFor(() => expect(document.querySelector("video")?.getAttribute("src")).toBe("https://signed/cut.mp4"));
   });
 });
 

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Bot, ImagePlus, Users, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { BROWSER_PREVIEW_URL_TTL_SECONDS, PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../lib/signedUrlPolicy";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../lib/signedUrlPolicy";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { cn } from "../../lib/cn";
 import { MAX_FRAMES, MIN_FRAMES, STORY_SIZE, formatLabel, sizeFitsFormat } from "../../lib/contentFormat";
 import { framePlanLines } from "../../lib/framePlan";
@@ -67,7 +68,9 @@ export function ApproveAndBuildModal({
   const [compensation, setCompensation] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reference, setReference] = useState<{ path: string; name: string; preview: string } | null>(null);
+  const [reference, setReference] = useState<{ path: string; name: string } | null>(null);
+  const referenceUrls = useSignedPreviewPaths("client-media", [reference?.path], open);
+  const referencePreview = reference?.path ? referenceUrls.get(reference.path) : undefined;
   const [uploading, setUploading] = useState(false);
   const [frameCount, setFrameCount] = useState("");
   const [framePlan, setFramePlan] = useState("");
@@ -132,9 +135,7 @@ export function ApproveAndBuildModal({
       setUploading(false);
       return;
     }
-    const { data: signed } = await supabase.storage.from("client-media")
-      .createSignedUrl(path, BROWSER_PREVIEW_URL_TTL_SECONDS);
-    setReference({ path, name: file.name, preview: signed?.signedUrl ?? "" });
+    setReference({ path, name: file.name });
     setUploading(false);
   };
 
@@ -359,9 +360,9 @@ export function ApproveAndBuildModal({
                   </h3>
                   {reference ? (
                     <div className="flex items-center gap-3 rounded-md border border-border p-2">
-                      {reference.preview && (
+                      {referencePreview && (
                         <img
-                          src={reference.preview}
+                          src={referencePreview}
                           alt=""
                           className="h-16 w-16 shrink-0 rounded object-cover"
                         />
