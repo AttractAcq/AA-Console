@@ -117,9 +117,9 @@ export function readTokenHealth(payload: unknown, now: number = Date.now()): Tok
  *
  * A valid Meta token does not prove the expected account or permission set.
  * Therefore this worker can only preserve a usable state or demote one on a
- * definitive invalid response. Reconnection is the only path out of a
- * terminal state. In particular, do not write `expiring` from a usable state:
- * released SQL still rejects it until migration 291 is applied.
+ * definitive invalid response. A terminal state needs a new credential or
+ * guarded operator review. In particular, do not write `expiring` from a
+ * usable state: released SQL still rejects it until migration 291 is applied.
  */
 export function statusToWrite(current: string, verdict: TokenVerdict): IntegrationStatus {
   if (current === "error" || current === "expired" || current === "revoked") return current;

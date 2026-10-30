@@ -33,7 +33,7 @@ export interface IntegrationRow {
   client_id: string;
   provider: string;
   status: string;
-  credential_secret_id: string;
+  credential_secret_id: string | null;
   token_expires_at: string | null;
 }
 
@@ -79,12 +79,11 @@ export async function runTokenHealthJob(
   const check = deps.check ?? debugToken;
   const now = deps.now ?? Date.now;
 
-  // Include terminal rows in the inventory so the event can explain why they
-  // were skipped. The guarded RPC will correctly refuse their credentials.
+  // Include rows without credentials when checking client/provider ambiguity:
+  // integration_secret sees all rows, not just credentialed ones.
   let query = sb
     .from("client_integrations")
-    .select("id, client_id, provider, status, credential_secret_id, token_expires_at")
-    .not("credential_secret_id", "is", null);
+    .select("id, client_id, provider, status, credential_secret_id, token_expires_at");
   if (job.client_id) query = query.eq("client_id", job.client_id);
 
   const { data, error } = await query;
@@ -94,7 +93,7 @@ export async function runTokenHealthJob(
 
   const integrations = (data ?? []) as IntegrationRow[];
   if (integrations.length === 0) {
-    await appendEvent(sb, job.id, "No integrations have a credential to check.");
+    await appendEvent(sb, job.id, "No integrations are configured to check.");
     return { ok: true, retryable: false };
   }
 
@@ -118,6 +117,10 @@ export async function runTokenHealthJob(
       if ((rowCountByKey.get(keyOf(integration)) ?? 0) !== 1) {
         skipped += 1;
         trouble.push(`${integration.provider}: duplicate integration rows require review`);
+        continue;
+      }
+      if (integration.credential_secret_id === null) {
+        skipped += 1;
         continue;
       }
       if (!META_PROVIDERS.has(integration.provider)) {

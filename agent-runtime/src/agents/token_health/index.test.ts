@@ -18,7 +18,7 @@ type Row = {
   client_id: string;
   provider: string;
   status: string;
-  credential_secret_id: string;
+  credential_secret_id: string | null;
   token_expires_at: string | null;
 };
 type Options = {
@@ -210,6 +210,17 @@ describe("the daily check", () => {
     expect(check).not.toHaveBeenCalled();
     expect(updates).toEqual([]);
     expect(events[0]!.description).toMatch(/2 skipped/);
+  });
+
+  it("counts a credentialless duplicate as ambiguous too", async () => {
+    const check = vi.fn(healthy);
+    const { sb, rpc, updates } = database([
+      row(), row({ id: "i2", credential_secret_id: null }),
+    ]);
+    await runTokenHealthJob(sb, config, agent, job, 0, { check, now: () => NOW });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(check).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
   });
 });
 
