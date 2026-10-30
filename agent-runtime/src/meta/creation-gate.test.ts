@@ -41,7 +41,8 @@ describe("Meta object creation containment before the AAL2 prewrite gate", () =>
     }],
   ])("blocks the client Meta runner for %s before credentials or provider calls", async (_route, params) => {
     const sb = database();
-    const provider = vi.spyOn(globalThis, "fetch");
+    const provider = vi.spyOn(globalThis, "fetch")
+      .mockRejectedValue(new Error("Unexpected Meta transport call"));
     const writer = vi.fn();
     const currency = vi.fn();
     const result = await runMetaBuildJob(sb, CONFIG, AGENT,
@@ -62,7 +63,8 @@ describe("Meta object creation containment before the AAL2 prewrite gate", () =>
 
   it("blocks recruitment Meta jobs from generic enqueue and auto-enqueue before provider calls", async () => {
     const sb = database();
-    const provider = vi.spyOn(globalThis, "fetch");
+    const provider = vi.spyOn(globalThis, "fetch")
+      .mockRejectedValue(new Error("Unexpected Meta transport call"));
     const writer = vi.fn();
     const currency = vi.fn();
     const result = await runRecruitmentMetaBuildJob(sb, CONFIG, AGENT,
