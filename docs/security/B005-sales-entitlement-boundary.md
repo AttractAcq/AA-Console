@@ -226,3 +226,14 @@ This is a source audit, not evidence of a production deployment.
 - B005: inspect and repair historical campaign/client mismatches, then run
   `VALIDATE CONSTRAINT` for the six new composite foreign keys. Until then,
   new writes are guarded but historical attribution is a data-quality gate.
+- B005 identity decision (held SQL follow-up): `is_client_user(target)` from
+  migration 19 checks only `client_users` membership. It does not require the
+  current `profiles.role` to be `client`. An `employee` profile with a surviving
+  `client_users` row for client B therefore passes the client-user branch of
+  `may_manage_client_leads(B)` and `can_read_client_sales_data(B)` without a
+  B005 sales grant, even if the employee's job or client assignment ended.
+  Decide whether such a dual employee/client identity is valid. If it is,
+  provision and audit it as explicit client authority; otherwise require a
+  current client profile role for this branch in every affected table, RPC,
+  and Storage policy. Do not enable the employee Sales route on an implicit
+  membership interpretation.
