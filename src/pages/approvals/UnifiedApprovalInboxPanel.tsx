@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
+import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 
 const PAGE_SIZE = 50;
+const RELEASED_SOURCE_KINDS = [
+  "campaign_action", "client_sales_entitlement", "engine_slot",
+  "google_review_reply", "recruitment_brief",
+] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
 /**
@@ -441,6 +446,8 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const [statusFilter, setStatusFilter] = useState(initialSource ? "all" : "pending");
   const [clientFilter, setClientFilter] = useState("all");
   const [kindFilter, setKindFilter] = useState("all");
+  const [clientFilterDraft, setClientFilterDraft] = useState("");
+  const [kindFilterDraft, setKindFilterDraft] = useState("");
   const [search, setSearch] = useState(initialSource ?? "");
   const [sourceDeepLink, setSourceDeepLink] = useState(initialSource);
   const [pageState, setPageState] = useState({ scopeKey, page: 0 });
@@ -594,6 +601,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const waiting = loading || loadedClientId !== scopeKey;
 
   const kinds = useMemo(() => [...new Set([
+    ...RELEASED_SOURCE_KINDS,
     ...requests.map((request) => request.source_kind),
     ...(kindFilter === "all" ? [] : [kindFilter]),
   ])].sort(), [requests, kindFilter]);
@@ -601,6 +609,15 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
     ...requests.map((request) => request.client_id ?? "agency-wide"),
     ...(clientFilter === "all" ? [] : [clientFilter]),
   ])].sort(), [requests, clientFilter]);
+
+  function applyExactFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setClientFilter(clientFilterDraft.trim() || "all");
+    setKindFilter(kindFilterDraft.trim() || "all");
+    setSourceDeepLink(null);
+    setSearch("");
+    setPageState({ scopeKey, page: 0 });
+  }
   const visible = useMemo(() => requests.filter((request) => {
     const needle = search.trim().toLocaleLowerCase();
     return !needle || [request.title, request.source_id, request.source_system, request.source_kind,
@@ -636,6 +653,8 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         </p>
       </div>
 
+      {global && <ApprovalCoveragePanel />}
+
       <div className="flex flex-wrap gap-3 rounded-xl border border-border bg-card p-4">
         <label className="min-w-40 flex-1 text-sm font-medium">Status
           <select value={statusFilter} onChange={(event) => {
@@ -651,24 +670,34 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             <option value="all">All statuses</option>
           </select>
         </label>
-        {global && <label className="min-w-40 flex-1 text-sm font-medium">Client
-          <select value={clientFilter} onChange={(event) => {
-            setClientFilter(event.target.value); setPageState({ scopeKey, page: 0 });
-          }}
-            className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
-            <option value="all">All clients</option>
-            {clients.map((id) => <option key={id} value={id}>{id === "agency-wide" ? "Agency-wide" : id}</option>)}
-          </select>
-        </label>}
-        <label className="min-w-40 flex-1 text-sm font-medium">Source type
-          <select value={kindFilter} onChange={(event) => {
-            setKindFilter(event.target.value); setPageState({ scopeKey, page: 0 });
-          }}
-            className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
-            <option value="all">All source types</option>
-            {kinds.map((kind) => <option key={kind} value={kind}>{kind.replaceAll("_", " ")}</option>)}
-          </select>
-        </label>
+        <form onSubmit={applyExactFilters} aria-label="Exact approval filters"
+          className="flex min-w-full flex-wrap items-end gap-3">
+          {global && <label className="min-w-48 flex-1 text-sm font-medium">Client ID
+            <input value={clientFilterDraft} onChange={(event) => setClientFilterDraft(event.target.value)}
+              list="approval-client-suggestions" placeholder="Any client ID, or agency-wide"
+              className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            <datalist id="approval-client-suggestions">
+              {clients.map((id) => <option key={id} value={id} />)}
+            </datalist>
+          </label>}
+          <label className="min-w-48 flex-1 text-sm font-medium">Source type
+            <input value={kindFilterDraft} onChange={(event) => setKindFilterDraft(event.target.value)}
+              list="approval-kind-suggestions" placeholder="Any exact source kind"
+              className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            <datalist id="approval-kind-suggestions">
+              {kinds.map((kind) => <option key={kind} value={kind} />)}
+            </datalist>
+          </label>
+          <button type="submit" className="rounded-lg border border-border px-3 py-2 text-sm font-medium">
+            Apply filters
+          </button>
+          <p className="min-w-full text-xs text-muted-foreground">
+            Exact filters search every request page. Suggestions are shortcuts; enter any client ID or source kind. Leave a field blank for all. Use agency-wide for requests without a client.
+          </p>
+          {(clientFilter !== "all" || kindFilter !== "all") && <p role="status" className="min-w-full text-xs text-muted-foreground">
+            Applied: client {clientFilter === "all" ? "all" : clientFilter}; source {kindFilter === "all" ? "all" : kindFilter}.
+          </p>}
+        </form>
         <label className="min-w-48 flex-[2] text-sm font-medium">Search current page
           <input type="search" value={search} onChange={(event) => {
             setSearch(event.target.value); setSourceDeepLink(null);
