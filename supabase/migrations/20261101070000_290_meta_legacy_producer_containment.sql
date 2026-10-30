@@ -264,7 +264,8 @@ begin
   v_snapshot := public.recruitment_meta_build_snapshot_v6(v_request.source_id::uuid);
   if v_snapshot is null then return 'cancelled'; end if;
   v_hash := encode(sha256(convert_to(v_snapshot::text, 'UTF8')), 'hex');
-  if v_request.client_id::text is distinct from v_snapshot->'campaign'->>'client_id'
+  if v_request.client_id is distinct from public.aa_house_client_id()
+    or v_request.client_id::text is distinct from v_snapshot->'campaign'->>'client_id'
     or v_request.owner_role is distinct from 'admin'
     or v_request.requester_kind is distinct from 'human'
     or v_request.artifact_hash is distinct from v_hash

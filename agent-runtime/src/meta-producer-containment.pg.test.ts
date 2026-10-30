@@ -75,7 +75,8 @@ beforeAll(async () => {
         select coalesce(public.is_admin(),false) and p_client_id = '${HOUSE}'::uuid
       $$;
     create function public.aa_house_client_id() returns uuid language sql stable
-      as $$ select '${HOUSE}'::uuid $$;
+      as $$ select id from public.clients where is_internal
+        and lower(name)='attract acquisition' order by id limit 1 $$;
     create function public.active_video_approval_manager(uuid) returns uuid
       language sql stable as $$ select null::uuid $$;
     create function public.lock_down_definer_functions() returns integer
@@ -255,5 +256,15 @@ describe("Meta legacy producer containment migration 290", () => {
     await expect(asRole("authenticated", ADMIN,
       "select public.recruitment_meta_build_snapshot_v6($1)", [HOUSE]))
       .rejects.toThrow(/permission denied/i);
+  });
+
+  it("supersedes a held card if its client stops being the AA house account", async () => {
+    const campaignId = (await asRole<{ id: string }>("authenticated", ADMIN,
+      "select public.create_recruitment_meta_campaign($1,$2,$3,$4) as id",
+      ["House lineage", 25, ["ZA"], [ASSET]]))[0]!.id;
+    expect(await card(campaignId)).toMatchObject({ status: "source_held" });
+    await db.query("update public.clients set is_internal=false where id=$1", [HOUSE]);
+    expect(await card(campaignId)).toMatchObject({ status: "superseded" });
+    await db.query("update public.clients set is_internal=true where id=$1", [HOUSE]);
   });
 });
