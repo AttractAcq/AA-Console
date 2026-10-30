@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "3ee98ea35577b4d5cde737bef0cc40cfc886a8b8eee697237320b1b462d051c3",
+  "migrationSourceDigest": "095d01a58292d781c4d770b9a6c91c03beb22e923c8c8634cb93642777fdf5a0",
   "generatedTypesSha256": "53080a79d6f99b34288161c22ede1207e623d34ae45836de00efc2e4692f4c3a",
   "generatedSchemaBodySha256": "992fe11cbc6465e3c28767ed1350bbbc13b17bfec8a864474f82b35542cb9861",
   "localMigrations": [
@@ -2143,8 +2143,8 @@
       "version": "20261101060000",
       "name": "289_meta_v6_atomic_job_binding",
       "filename": "20261101060000_289_meta_v6_atomic_job_binding.sql",
-      "sha256": "5d5a62efc1d71b164fc05f0cbfb1feea4fb7fb2a433afca0397b2f3ab4d51119",
-      "trimmedMd5": "094c5e4aa9190bb5281e617e4e6736d0"
+      "sha256": "e64074e004ebc305cfd68d5055897d6cebe41895ea65b65bed35c3e774206c54",
+      "trimmedMd5": "4649e8b23d6e8c94ae6aee0a8d61f39f"
     },
     {
       "version": "20261101070000",

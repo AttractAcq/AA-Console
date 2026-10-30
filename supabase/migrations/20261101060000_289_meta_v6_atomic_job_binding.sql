@@ -114,7 +114,7 @@ declare
   v_allowed_approval uuid;
   v_job uuid;
 begin
-  if auth.role() <> 'service_role' then
+  if auth.role() is distinct from 'service_role' then
     raise exception 'Only the internal service may queue an approved Meta build.';
   end if;
   select * into v_execution from public.campaign_action_executions
@@ -127,7 +127,8 @@ begin
    where id = v_execution.approval_id;
   if not found then raise exception 'Meta build approval not found.'; end if;
 
-  if v_campaign.acquisition_mode <> 'paid' or v_campaign.paid_platform <> 'meta'
+  if v_campaign.acquisition_mode is distinct from 'paid'
+     or v_campaign.paid_platform is distinct from 'meta'
      or v_campaign.client_id is distinct from v_execution.client_id
      or v_execution.action_key <> 'meta_ad_build'
      or v_execution.status <> 'executing'
