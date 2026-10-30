@@ -54,6 +54,12 @@ jobs:
       - name: Require sequential migration dependencies
         run: node scripts/schema-migration-order.mjs
 
+      # A PR can introduce a migration before it is applied to production.
+      # Wait for the reviewed marker update instead of publishing a browser
+      # that expects a schema which has not been released yet.
+      - name: Require released schema marker at tracked head
+        run: node scripts/require-released-schema.mjs
+
       - run: npm ci
 
       - name: Verify runtime parity source manifest
