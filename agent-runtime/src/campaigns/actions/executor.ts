@@ -20,11 +20,11 @@
  *
  * ONE HANDLER PER ACTION, AND NO DEFAULT
  *
- * There is no fallback handler. An action with no entry in HANDLERS fails
- * non-retryably and says so, which can only happen if somebody marks an
- * action supported in `campaign_action_executors` without writing its
- * executor -- exactly the mistake worth a loud failure rather than a silent
- * queue.
+ * There is no fallback handler. Before any claim, the runtime compares all
+ * database support claims with HANDLERS and refuses the sweep if one has no
+ * handler. The post-claim check remains as a last guard if the registry
+ * changes after that read; it records a non-retryable failure rather than
+ * attempting an external action.
  *
  * WHAT THIS DOES NOT DECIDE
  *
@@ -46,6 +46,7 @@ import { appendEvent } from "../../queue.js";
 import { logger } from "../../logging/logger.js";
 import { deployCampaignPage } from "./page-deploy.js";
 import { changeAdSetBudget } from "./budget-change.js";
+import { inspectCampaignActionRegistry } from "./support.js";
 
 const DEFAULT_BATCH = 3;
 
@@ -209,6 +210,31 @@ export async function runCampaignActionJob(
       "info",
     );
     return { ok: true, retryable: false };
+  }
+
+  // `claim_campaign_actions` has no action-key filter. A SQL support flag
+  // without a handler could therefore consume an exact human approval and
+  // abandon it before any provider write. Check every supported key before
+  // claiming anything; a partial/failed read blocks the whole sweep.
+  let unhandledSupportedKeys: string[];
+  try {
+    const { data, error } = await sb.from("campaign_action_executors")
+      .select("action_key,executor_module,supported")
+      .order("action_key");
+    if (error) throw new Error("Campaign action registry read failed.");
+    ({ unhandledSupportedKeys } = inspectCampaignActionRegistry(
+      data, new Set(Object.keys(HANDLERS)),
+    ));
+  } catch {
+    const failureMessage = "Campaign action support could not be verified against this runtime. No action was claimed.";
+    await appendEvent(sb, job.id, failureMessage, "warn");
+    return { ok: false, retryable: false, failureMessage };
+  }
+  if (unhandledSupportedKeys.length > 0) {
+    const failureMessage =
+      `Database marks ${unhandledSupportedKeys.join(", ")} supported, but this runtime has no campaign action handler. No action was claimed.`;
+    await appendEvent(sb, job.id, failureMessage, "warn");
+    return { ok: false, retryable: false, failureMessage };
   }
 
   const asked = Number((job.params as Record<string, unknown> | null)?.limit ?? DEFAULT_BATCH);

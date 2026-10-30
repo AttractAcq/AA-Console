@@ -39,6 +39,7 @@ it("exports the same captured facts shown in the admin view on repeated download
     schemaVersion: 2, capturedAt: "2026-10-29T12:00:00Z",
     environment: { name: "staging", railwayEnvironmentId: "railway-stage", supabaseProjectRef: "stage-project" },
     runtime: { sha, switches: { workers: true }, credentialPresence: { anthropic: true },
+      actionHolds: { profileFieldPatch: { state: "held", reason: "Exact Inbox gate is not connected." } },
       heartbeats: { state: "observed", checkedAt: "2026-10-29T12:00:00Z", value: [], reason: null } },
     gateway: { state: "observed", checkedAt: "2026-10-29T12:00:00Z",
       value: { sha, observedAt: "2026-10-29T12:00:00Z",
@@ -46,7 +47,11 @@ it("exports the same captured facts shown in the admin view on repeated download
     database: { state: "error", checkedAt: "2026-10-29T12:00:00Z", value: null, reason: "No catalog." },
     global: { state: "observed", checkedAt: "2026-10-29T12:00:00Z",
       value: { engineEnabled: false, publishingPlatforms: [], proofDestinations: [],
-        campaignActionExecutors: [{ key: "google_ad_build", module: "google_ads_studio", supported: false }],
+        campaignActionExecutors: [
+          { key: "google_ad_build", module: "google_ads_studio", supported: false, handlerRegistered: false },
+          { key: "meta_ad_build", module: "meta_ads_studio", supported: true, handlerRegistered: false },
+        ],
+        campaignActionHandlerParity: { state: "blocked", unhandledSupportedKeys: ["meta_ad_build"] },
         messageChannels: [{ key: "email", transport: "resend", supported: true, canInitiate: true }],
       }, reason: null },
     clients: { state: "observed", checkedAt: "2026-10-29T12:00:00Z", value: [{
@@ -74,11 +79,15 @@ it("exports the same captured facts shown in the admin view on repeated download
   render(<SystemReadinessPanel />);
   expect(await screen.findAllByRole("link", { name: sha })).toHaveLength(2);
   expect(screen.getByText(/Environment staging/)).toBeInTheDocument();
-  expect(screen.getByText(/google_ad_build unsupported/)).toBeInTheDocument();
+  expect(screen.getByText(/google_ad_build database unsupported, no runtime handler/)).toBeInTheDocument();
+  expect(screen.getByRole("alert", { name: "" }).textContent).toContain("meta_ad_build");
   expect(screen.getByText(/email supported, can initiate/)).toBeInTheDocument();
   expect(screen.getByText(/Gateway Bot auth mode: dual/)).toBeInTheDocument();
   expect(screen.getByText(/Dual mode can still admit legacy environment identities/)).toBeInTheDocument();
   expect(screen.getByText(/live provider health Unknown/)).toBeInTheDocument();
+  expect(screen.getByText("Profile field PATCH")).toBeInTheDocument();
+  expect(screen.getByText("Held")).toBeInTheDocument();
+  expect(screen.getByText("Exact Inbox gate is not connected.")).toBeInTheDocument();
   expect(screen.getByText(/last recorded integration check Unknown/)).toBeInTheDocument();
   expect(screen.getByText("No live provider probe.")).toBeInTheDocument();
   expect(screen.getByText(/No live provider account check/)).toBeInTheDocument();
@@ -88,7 +97,8 @@ it("exports the same captured facts shown in the admin view on repeated download
   expect(first).toBe(second);
   expect(JSON.parse(first)).toMatchObject({
     capturedAt: "2026-10-29T12:00:00Z", environment: { name: "staging" },
-    runtime: { sha }, gateway: { value: { configured: { botAuthMode: "dual" } } },
+    runtime: { sha, actionHolds: { profileFieldPatch: { state: "held" } } },
+    gateway: { value: { configured: { botAuthMode: "dual" } } },
     browser: { capturedAt: "2026-10-29T12:00:00Z" },
     evidenceCoverage: { providerAccountHealth: { state: "unknown" } },
   });
