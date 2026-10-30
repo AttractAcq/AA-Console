@@ -15245,6 +15245,33 @@ export type Database = {
           },
         ]
       }
+      production_release_candidates_v6: {
+        Row: {
+          candidate: Json
+          expires_at: string
+          id: string
+          submitted_at: string
+          submitted_by: string
+          version_hash: string
+        }
+        Insert: {
+          candidate: Json
+          expires_at: string
+          id?: string
+          submitted_at?: string
+          submitted_by: string
+          version_hash: string
+        }
+        Update: {
+          candidate?: Json
+          expires_at?: string
+          id?: string
+          submitted_at?: string
+          submitted_by?: string
+          version_hash?: string
+        }
+        Relationships: []
+      }
       profile_field_support: {
         Row: {
           field: string
@@ -27135,6 +27162,10 @@ export type Database = {
           taken: boolean
         }[]
       }
+      production_release_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       proof_placement_payload_hash_v6: {
         Args: {
           p_artifact_version_id: string
@@ -29104,6 +29135,10 @@ export type Database = {
         Returns: string
       }
       start_onboarding: { Args: { p_client_id: string }; Returns: undefined }
+      submit_production_release_candidate_v6: {
+        Args: { p_candidate: Json; p_expires_at: string }
+        Returns: string
+      }
       suppress_lead_v6: {
         Args: {
           p_client_id: string
