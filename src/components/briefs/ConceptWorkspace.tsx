@@ -3,6 +3,7 @@ import { CalendarPlus, Check, Pencil, RefreshCw, ThumbsUp } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { cn } from "../../lib/cn";
+import { assertOrganicScheduleRoute, PAID_SCHEDULING_BLOCKER } from "../../lib/scheduleRoute";
 
 export type Generation = {
   id: string;
@@ -219,16 +220,19 @@ export function ConceptWorkspace({
     }
     setBusy("schedule");
     setError(null);
-    const { error: rpcError } = await supabase.rpc("schedule_asset", {
-      p_asset_id: assetId,
-      p_date: scheduleDate,
-      p_channel: channel,
-    });
-    if (rpcError) setError(rpcError.message);
-    else {
+    try {
+      await assertOrganicScheduleRoute(assetId, channel);
+      const { error: rpcError } = await supabase.rpc("schedule_asset", {
+        p_asset_id: assetId,
+        p_date: scheduleDate,
+        p_channel: channel,
+      });
+      if (rpcError) throw new Error(rpcError.message);
       setScheduleDate("");
       await load();
       onChanged();
+    } catch (scheduleError) {
+      setError(scheduleError instanceof Error ? scheduleError.message : "Could not schedule this asset.");
     }
     setBusy(null);
   };
@@ -492,6 +496,7 @@ export function ConceptWorkspace({
                   className="rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <select
+                  aria-label="Channel"
                   value={channel}
                   onChange={(e) => setChannel(e.target.value as "organic" | "paid")}
                   className="rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -499,9 +504,12 @@ export function ConceptWorkspace({
                   <option value="organic">Organic</option>
                   <option value="paid">Paid</option>
                 </select>
+                {channel === "paid" && (
+                  <span role="status" className="text-xs text-destructive">{PAID_SCHEDULING_BLOCKER}</span>
+                )}
                 <button
                   type="button"
-                  disabled={busy === "schedule"}
+                  disabled={busy === "schedule" || channel !== "organic"}
                   onClick={() => void schedule(chosen.asset_id as string)}
                   className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                 >

@@ -15,6 +15,7 @@ import { mediaFilters } from "../data/mediaFilters";
 import type { MediaFilterId } from "../data/mediaFilters";
 import { fetchClientAssets } from "../lib/media";
 import { supabase } from "../lib/supabase";
+import { assertOrganicScheduleRoute, PAID_SCHEDULING_BLOCKER } from "../lib/scheduleRoute";
 import { POST_PLATFORMS, platformLabel } from "../lib/postPlatform";
 import type { Database } from "../types/database";
 
@@ -28,9 +29,9 @@ type Post = {
 };
 
 /**
- * Organic and Paid are the same board on a different channel. Only
- * approved assets appear in the picker — schedule_asset() enforces it
- * server-side too.
+ * Organic and Paid are the same board on a different channel. The current
+ * schedule_asset RPC does not enforce route lineage, so this board checks it
+ * before scheduling. Paid scheduling remains blocked pending its own route.
  */
 export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) {
   const { clientId } = useParams<{ clientId: string }>();
@@ -136,13 +137,18 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
 
   return (
     <div className="space-y-4">
+      {channel === "paid" && (
+        <p role="status" className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {PAID_SCHEDULING_BLOCKER}
+        </p>
+      )}
       <p className="text-sm text-muted-foreground">
         Scheduling creates a calendar entry, not a publishable route. A post without an approved
         Engine slot stays blocked; publication also requires its exact-version Approval Inbox decision.
         See Engine for the current route blocker.
       </p>
       <div className="flex justify-end">
-        <Button icon={CalendarPlus} onClick={() => setScheduleOpen(true)}>
+        <Button icon={CalendarPlus} disabled={channel === "paid"} onClick={() => setScheduleOpen(true)}>
           Schedule {channel === "paid" ? "Paid" : "Organic"}
         </Button>
       </div>
@@ -197,6 +203,7 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
         fields={fields}
         submitLabel="Schedule"
         onSubmit={async (v) => {
+          await assertOrganicScheduleRoute(v.asset_id as string, channel, clientId);
           const { error } = await supabase.rpc("schedule_asset", {
             p_asset_id: v.asset_id as string,
             p_date: v.scheduled_for as string,

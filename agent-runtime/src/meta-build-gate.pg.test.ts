@@ -51,6 +51,28 @@ async function approve(approvalId: string) {
   await db.query("select decide_campaign_action_approval_v6($1,'approved')", [approvalId]);
 }
 
+async function claimedMeta(): Promise<{ execution_id: string; approval_id: string }> {
+  await asService();
+  const claimed = await rows<{ execution_id: string; approval_id: string }>(
+    "select * from claim_campaign_actions(1)",
+  );
+  await asHuman();
+  const row = claimed[0];
+  if (!row) throw new Error("Expected the approved Meta build to be claimable");
+  return row;
+}
+
+async function queueExactMeta(executionId: string): Promise<string> {
+  await asService();
+  try {
+    return (await one<{ job_id: string }>(
+      "select enqueue_approved_meta_build_v6($1) as job_id", [executionId],
+    )).job_id;
+  } finally {
+    await asHuman();
+  }
+}
+
 /** The gate the builder consults. Returns its refusal, or null. */
 async function gate(): Promise<string | null> {
   await asService();
@@ -114,7 +136,24 @@ beforeEach(async () => {
    updated_at timestamptz not null default now());
  create table agent_jobs(id uuid primary key default gen_random_uuid(),
    agent_key text not null references agents(agent_key), client_id uuid,
+   input_table text, input_id uuid, created_by uuid,
    status text not null default 'queued', params jsonb);
+ create table agent_job_events(job_id uuid references agent_jobs(id), description text, payload jsonb);
+ create function enqueue_agent_job_internal(
+   p_agent_key text, p_client_id uuid, p_input_table text, p_input_id uuid,
+   p_actor uuid, p_params jsonb default '{}'::jsonb, p_description text default 'Queued'
+ ) returns uuid language plpgsql security definer as $$
+ declare v_job uuid;
+ begin
+   if exists (select 1 from agents where agent_key = p_agent_key and paused) then
+     raise exception 'Agent % is paused', p_agent_key;
+   end if;
+   insert into agent_jobs(agent_key, client_id, input_table, input_id, created_by, params)
+   values (p_agent_key, p_client_id, p_input_table, p_input_id, p_actor, p_params)
+   returning id into v_job;
+   insert into agent_job_events values (v_job, p_description, p_params);
+   return v_job;
+ end $$;
  create table client_engine_settings(client_id uuid primary key references clients(id) on delete cascade,
    enabled boolean not null default false);
  create table campaign_manifest_versions(
@@ -135,11 +174,13 @@ beforeEach(async () => {
  insert into campaign_artifacts values('${CAMPAIGN}','${CLIENT}','content','${ASSET}',null);
  insert into campaign_manifest_versions values
    ('${MANIFEST}','${CAMPAIGN}','${CLIENT}',1,'paid','meta',repeat('f',32));
- insert into client_engine_settings(client_id) values('${CLIENT}');`);
+ insert into client_engine_settings(client_id) values('${CLIENT}');
+ insert into agents(agent_key, name, initials) values('meta_build', 'Meta Builder', 'MB');`);
 
   await db.exec(await sql("20261015230000_206_v6_action_approvals.sql"));
   await db.exec(await sql("20261022090000_230_campaign_action_executor.sql"));
   await db.exec(await sql("20261024130000_239_a_meta_build_runs_on_an_approval.sql"));
+  await db.exec(await sql("20261101060000_289_meta_v6_atomic_job_binding.sql"));
   await db.exec("update client_engine_settings set campaign_actions_enabled = true;");
   await asHuman();
 }, 60000);
@@ -285,5 +326,189 @@ describe("activation stays its own decision", () => {
     expect(await sql("20261024130000_239_a_meta_build_runs_on_an_approval.sql")).toContain(
       "select lock_down_definer_functions();",
     );
+  });
+});
+
+describe("migration 289 exact Meta job binding", () => {
+  it("refuses a hash semantic change when any Meta build decision already exists", async () => {
+    const isolated = new PGlite();
+    try {
+      await isolated.exec(`
+        create table public.campaign_action_approvals (action_key text);
+        insert into public.campaign_action_approvals values ('meta_ad_build');`);
+      await expect(isolated.exec(await sql("20261101060000_289_meta_v6_atomic_job_binding.sql")))
+        .rejects.toThrow(/Review existing Meta build approvals/);
+    } finally {
+      await isolated.close();
+    }
+  });
+
+  it("atomically binds one job to the claimed execution and returns it on repeat", async () => {
+    const approvalId = await ask();
+    await approve(approvalId);
+    const claim = await claimedMeta();
+    expect(claim.approval_id).toBe(approvalId);
+
+    const hashState = await one<{ live_hash: string; approved_hash: string }>(
+      `select meta_build_payload_hash_v6($1) as live_hash,
+              artifact_version_hash as approved_hash
+         from campaign_action_approvals where id = $2`, [CAMPAIGN, approvalId],
+    );
+    expect(hashState.live_hash).toBe(hashState.approved_hash);
+    await db.exec("set timezone = 'UTC'");
+    expect((await one<{ live_hash: string }>(
+      "select meta_build_payload_hash_v6($1) as live_hash", [CAMPAIGN],
+    )).live_hash).toBe(hashState.approved_hash);
+
+    const jobId = await queueExactMeta(claim.execution_id);
+    expect(await queueExactMeta(claim.execution_id)).toBe(jobId);
+    const execution = await one<{ meta_build_job_id: string; result: Record<string, unknown> }>(
+      "select meta_build_job_id, result from campaign_action_executions where id = $1",
+      [claim.execution_id],
+    );
+    expect(execution.meta_build_job_id).toBe(jobId);
+    expect(execution.result.meta_build_job_id).toBe(jobId);
+    const jobs = await rows<{ id: string; client_id: string; input_table: string; input_id: string;
+      status: string; params: Record<string, unknown> }>("select * from agent_jobs where agent_key = 'meta_build'");
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]).toMatchObject({
+      id: jobId, client_id: CLIENT, input_table: "client_campaigns", input_id: CAMPAIGN,
+      status: "queued",
+      params: {
+        campaign_action_execution_id: claim.execution_id,
+        campaign_action_approval_id: approvalId,
+      },
+    });
+  });
+
+  it("requires service role and a claimed execution before enqueue", async () => {
+    const approvalId = await ask();
+    await approve(approvalId);
+    await expect(db.query("select enqueue_approved_meta_build_v6($1)", [approvalId]))
+      .rejects.toThrow(/Only the internal service/);
+    await asService();
+    await expect(db.query("select enqueue_approved_meta_build_v6($1)", [approvalId]))
+      .rejects.toThrow(/execution not found/);
+    await asHuman();
+    expect(await rows("select id from agent_jobs where agent_key = 'meta_build'")).toHaveLength(0);
+  });
+
+  it("refuses a missing caller role even if an exact execution was claimed", async () => {
+    await approve(await ask());
+    const claim = await claimedMeta();
+    await db.exec("create or replace function auth.role() returns text language sql as $$select null::text$$");
+    await expect(db.query("select enqueue_approved_meta_build_v6($1)", [claim.execution_id]))
+      .rejects.toThrow(/Only the internal service/);
+    expect(await rows("select id from agent_jobs where agent_key = 'meta_build'"))
+      .toHaveLength(0);
+  });
+
+  it.each([
+    ["changed budget", "update client_campaigns set daily_budget = 400"],
+    ["campaign no longer uses Meta", "update client_campaigns set paid_platform = null"],
+    ["disabled client switch", "update client_engine_settings set campaign_actions_enabled = false"],
+    ["changed account", "update client_integrations set ad_account_id = 'act_9999999'"],
+    ["expired execution lease", "update campaign_action_executions set lease_until = now() - interval '1 minute'"],
+    ["superseded manifest", `insert into campaign_manifest_versions values
+      (gen_random_uuid(),'${CAMPAIGN}','${CLIENT}',2,'paid','meta',repeat('e',32))`],
+  ])("refuses %s without leaving an orphan job", async (_name, mutation) => {
+    await approve(await ask());
+    const claim = await claimedMeta();
+    await db.exec(mutation);
+    await expect(queueExactMeta(claim.execution_id)).rejects.toThrow();
+    expect(await rows("select id from agent_jobs where agent_key = 'meta_build'")).toHaveLength(0);
+    const row = await one<{ meta_build_job_id: string | null }>(
+      "select meta_build_job_id from campaign_action_executions where id = $1",
+      [claim.execution_id],
+    );
+    expect(row.meta_build_job_id).toBeNull();
+  });
+
+  it("rolls back both sides when queue insertion fails", async () => {
+    await approve(await ask());
+    const claim = await claimedMeta();
+    await db.exec("update agents set paused = true where agent_key = 'meta_build'");
+    await expect(queueExactMeta(claim.execution_id)).rejects.toThrow(/paused/);
+    expect(await rows("select id from agent_jobs where agent_key = 'meta_build'")).toHaveLength(0);
+    expect((await one<{ meta_build_job_id: string | null }>(
+      "select meta_build_job_id from campaign_action_executions where id = $1", [claim.execution_id],
+    )).meta_build_job_id).toBeNull();
+  });
+
+  it("freezes the job and execution binding while permitting job status updates", async () => {
+    await approve(await ask());
+    const claim = await claimedMeta();
+    const jobId = await queueExactMeta(claim.execution_id);
+    await db.query("update agent_jobs set status = 'running' where id = $1", [jobId]);
+    await expect(db.query("update agent_jobs set params = '{}'::jsonb where id = $1", [jobId]))
+      .rejects.toThrow(/cannot change its action identity/);
+    await expect(db.query("update campaign_action_executions set meta_build_job_id = null where id = $1",
+      [claim.execution_id])).rejects.toThrow(/cannot change or release/);
+    await expect(db.query("update campaign_action_executions set result = '{}'::jsonb where id = $1",
+      [claim.execution_id])).rejects.toThrow(/must retain its exact job binding/);
+    expect((await one<{ status: string }>("select status from agent_jobs where id = $1", [jobId])).status)
+      .toBe("running");
+  });
+
+  it("rejects a direct binding to a job with the wrong action parameters", async () => {
+    await approve(await ask());
+    const claim = await claimedMeta();
+    const unrelated = (await one<{ id: string }>(
+      "insert into agent_jobs(agent_key, client_id, input_table, input_id, params) " +
+      "values ('meta_build', $1, 'client_campaigns', $2, '{}'::jsonb) returning id",
+      [CLIENT, CAMPAIGN],
+    )).id;
+    await expect(db.query(
+      "update campaign_action_executions set meta_build_job_id = $1::uuid, " +
+      "result = jsonb_build_object('meta_build_job_id', ($1::uuid)::text) where id = $2",
+      [unrelated, claim.execution_id],
+    )).rejects.toThrow(/does not match this exact execution/);
+    expect((await one<{ meta_build_job_id: string | null }>(
+      "select meta_build_job_id from campaign_action_executions where id = $1", [claim.execution_id],
+    )).meta_build_job_id).toBeNull();
+  });
+
+  it("rejects a forged binding on execution insert as well as update", async () => {
+    const approvalId = await ask();
+    const unrelated = (await one<{ id: string }>(
+      "insert into agent_jobs(agent_key, client_id, input_table, input_id, params) " +
+      "values ('meta_build', $1, 'client_campaigns', $2, '{}'::jsonb) returning id",
+      [CLIENT, CAMPAIGN],
+    )).id;
+    await expect(db.query(
+      `insert into campaign_action_executions
+         (approval_id, client_id, campaign_id, action_key, artifact_version_hash,
+          manifest_id, meta_build_job_id, result)
+       select id, client_id, campaign_id, action_key, artifact_version_hash,
+              manifest_id, $1::uuid,
+              jsonb_build_object('meta_build_job_id', ($1::uuid)::text)
+         from campaign_action_approvals where id = $2`,
+      [unrelated, approvalId],
+    )).rejects.toThrow(/does not match this exact execution/);
+    expect(await rows("select id from campaign_action_executions where approval_id = $1", [approvalId]))
+      .toHaveLength(0);
+  });
+
+  it("blocks a distinct approved action from making a second job for this campaign", async () => {
+    const firstApproval = await ask();
+    await approve(firstApproval);
+    const first = await claimedMeta();
+    const firstJob = await queueExactMeta(first.execution_id);
+
+    await asService();
+    const secondApproval = (await one<{ id: string }>(
+      `select (request_campaign_action_approval_v6($1, 'second-meta-build',
+         'meta_ad_build', 'meta:act_1184772', meta_build_payload_hash_v6($2),
+         '{"ad_account":"act_1184772"}'::jsonb)).id as id`,
+      [MANIFEST, CAMPAIGN],
+    )).id;
+    await asHuman();
+    expect(secondApproval).not.toBe(firstApproval);
+    await approve(secondApproval);
+    const second = await claimedMeta();
+    expect(second.approval_id).toBe(secondApproval);
+    await expect(queueExactMeta(second.execution_id)).rejects.toThrow(/already has a bound Meta build job/);
+    const jobs = await rows<{ id: string }>("select id from agent_jobs where agent_key = 'meta_build'");
+    expect(jobs.map((row) => row.id)).toEqual([firstJob]);
   });
 });
