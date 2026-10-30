@@ -26,10 +26,20 @@ describe("exact provider capability evidence", () => {
       evidenceFreshUntil: new Date(NOW + 60_000).toISOString() });
     expect(result.key).not.toBe(key);
     expect(result.key).not.toBe(evidence.key);
-    const withSecret = { ...evidence, accessToken: "private-token-value",
+    const secretKey = { ...key, accessToken: "private-token-value",
+      providerResponse: { authorization: "Bearer private-token-value" } };
+    const withSecret = { ...evidence, key: secretKey, accessToken: "private-token-value",
       providerBody: { authorization: "Bearer private-token-value" } };
-    expect(JSON.stringify(evaluateProviderCapability(key, withSecret, NOW)))
-      .not.toContain("private-token-value");
+    for (const result of [
+      evaluateProviderCapability(secretKey, withSecret, NOW),
+      evaluateProviderCapability(secretKey, null, NOW),
+      evaluateProviderCapability({ ...secretKey, clientId: "" }, withSecret, NOW),
+    ]) {
+      expect(JSON.stringify(result)).not.toContain("private-token-value");
+      expect(Object.keys(result.key).sort()).toEqual([
+        "accountRef", "actionKey", "clientId", "credentialVersion", "integrationId", "provider",
+      ]);
+    }
   });
 
   it.each([

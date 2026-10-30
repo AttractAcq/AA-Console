@@ -99,9 +99,20 @@ function decision(
   observedAt: string | null = null,
   evidenceFreshUntil: string | null = null,
 ): ProviderCapabilityDecision {
-  // Copy the exact key so a caller cannot mutate the input and later reuse a
-  // positive decision for a different client, row, credential or action.
-  return { key: { ...key }, state, reason, observedAt, evidenceFreshUntil };
+  // Pick only the declared nonsecret fields. A caller may pass an object with
+  // extra properties at runtime; spreading it would echo a credential through
+  // both positive and fail-closed diagnostic responses.
+  const candidate = key && typeof key === "object"
+    ? key as unknown as Record<string, unknown> : {};
+  const publicKey: ProviderCapabilityKey = {
+    clientId: typeof candidate.clientId === "string" ? candidate.clientId : "",
+    integrationId: typeof candidate.integrationId === "string" ? candidate.integrationId : "",
+    credentialVersion: typeof candidate.credentialVersion === "string" ? candidate.credentialVersion : "",
+    provider: typeof candidate.provider === "string" ? candidate.provider : "",
+    accountRef: typeof candidate.accountRef === "string" ? candidate.accountRef : "",
+    actionKey: typeof candidate.actionKey === "string" ? candidate.actionKey : "",
+  };
+  return { key: publicKey, state, reason, observedAt, evidenceFreshUntil };
 }
 
 /**

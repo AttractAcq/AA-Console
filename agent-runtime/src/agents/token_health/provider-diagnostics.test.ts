@@ -154,6 +154,28 @@ describe("controlled provider diagnostics", () => {
     expect(result.capability).toMatchObject({ state: "blocked", reason: "scope_mismatch" });
   });
 
+  it("never echoes incidental secret fields on the capability key", async () => {
+    const secretKey = { ...key, accessToken: TOKEN,
+      providerBody: { authorization: `Bearer ${TOKEN}` } };
+    const verifiedFetch = vi.fn().mockResolvedValueOnce(reply(valid))
+      .mockResolvedValueOnce(reply({ id: "act_123" }));
+    const verified = await probeProvider({ ...meta, capabilityKey: secretKey,
+      fetchImpl: verifiedFetch });
+    expect(verified.capability.state).toBe("verified");
+    const unknown = await probeProvider({ ...meta, capabilityKey: secretKey,
+      credentialState: "unknown", fetchImpl: vi.fn() });
+    expect(unknown.capability.state).toBe("unknown");
+    const invalid = await probeProvider({ ...meta, capabilityKey: secretKey,
+      expectedAccountId: "invalid-account", fetchImpl: vi.fn() });
+    expect(invalid.capability.state).toBe("blocked");
+    for (const result of [verified, unknown, invalid]) {
+      expect(JSON.stringify(result)).not.toContain(TOKEN);
+      expect(Object.keys(result.capability.key).sort()).toEqual([
+        "accountRef", "actionKey", "clientId", "credentialVersion", "integrationId", "provider",
+      ]);
+    }
+  });
+
   it("blocks an exact account mismatch and invalid IDs without leaking credentials", async () => {
     const mismatch = vi.fn().mockResolvedValueOnce(reply(valid))
       .mockResolvedValueOnce(reply({ id: "act_999" }));
