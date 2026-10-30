@@ -21201,10 +21201,12 @@ export type Database = {
         Row: {
           active_pillars: number | null
           active_platforms: number | null
+          advances_without_a_person: boolean | null
           approval_mode: string | null
           client_id: string | null
           client_name: string | null
           enabled: boolean | null
+          engine_running: boolean | null
           month_cap_usd: number | null
           plan_horizon_days: number | null
           posting_windows: number | null

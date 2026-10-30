@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "32f58629e33b73c9716cbfb217ef0e34a702561095adff3ca8df75d4aa8e532f",
-  "generatedTypesSha256": "835c0576bbee7b76d3ee9ad47473dc1b1e387f36054c30f34d6e3a01f8728aaf",
-  "generatedSchemaBodySha256": "c8c47168ca245c8cf477cf6980631cb7f7eab3366aedfd60e6b3e44ad338bc0b",
+  "migrationSourceDigest": "5ad8784848c329a62050675c459df93374b3132efc0dcbe3f8f199309b5ec06b",
+  "generatedTypesSha256": "727ead87c18fa763f00734d15b281568dfe90a9ed356ae8eb14ea0048927b0a5",
+  "generatedSchemaBodySha256": "09de9d9c0db751dee931bdf76c272014c6d69377b52f998b0d4384dae6836281",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2089,6 +2089,13 @@
       "filename": "20261030180000_281_the_configuration_nobody_can_enter.sql",
       "sha256": "3d82c86d9f1334aa9c50c325a2122e396fcbd582668ab946557308c9ad94e642",
       "trimmedMd5": "eda4a0222c026fbab3c577c54732fd2a"
+    },
+    {
+      "version": "20261030190000",
+      "name": "282_the_engines_own_configuration",
+      "filename": "20261030190000_282_the_engines_own_configuration.sql",
+      "sha256": "4f9838d4bc757cf4818a204044530639b4fb51086fa3bffe307cfb7631522af3",
+      "trimmedMd5": "97977e4fb72c65a1121621ab734f2a05"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
