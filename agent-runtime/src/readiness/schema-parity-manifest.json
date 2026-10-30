@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "21d266f1dcb70fe5f00d4087d82f9e0579231526afff4275f4c26c7af9daa99c",
-  "generatedTypesSha256": "f3b751e74675ef3af0770f4182f528e297d588b84c5b247a6e940ad1045309e5",
-  "generatedSchemaBodySha256": "825414bc1db0a62191fa7f62c58b1ce0994f9af41035244d9591b0655da88dcd",
+  "migrationSourceDigest": "ab12d4594094751b6900e1130397ba58221e27ba52dbc2781546b27e25f3a938",
+  "generatedTypesSha256": "6bd0f93a75d55d176138458ab2c40c97067c7f762673d2dcbed01993d7d11c48",
+  "generatedSchemaBodySha256": "1715d6830af11c0551abd324fb6eff15add170e173e01dae6ca5d7f0d3c8ce39",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2159,6 +2159,13 @@
       "filename": "20261101080000_291_integration_credential_eligibility.sql",
       "sha256": "832693904f2ef224628f941f5b725db06d63400ddf506a3265ffd6ecf0f49fc8",
       "trimmedMd5": "22d5b38321a448f088127dc9266927b3"
+    },
+    {
+      "version": "20261101090000",
+      "name": "292_organic_publication_package_boundary",
+      "filename": "20261101090000_292_organic_publication_package_boundary.sql",
+      "sha256": "1252a74d1818b90c47d3906bd921553ead19e3a0c84ae3f7c144bac182c8adeb",
+      "trimmedMd5": "e37064763da43de9fe9f59b0c51d695c"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -36,6 +36,7 @@ import { runCopywriterJob } from "../agents/copywriter/index.js";
 import { runTokenHealthJob } from "../agents/token_health/index.js";
 import { runQaJob } from "../agents/qa/index.js";
 import { runPublisherJob } from "../agents/publisher/index.js";
+import { runOrganicPackageBuilderJob } from "../agents/organic_package_builder/index.js";
 import { runCampaignActionJob } from "../campaigns/actions/executor.js";
 import { runProofPlacerJob } from "../proof-distribution/placer.js";
 import { runLeadMagnetCourierJob } from "../lead-magnets/courier.js";
@@ -137,6 +138,9 @@ const RUNNERS: Record<string, JobRunner> = {
   // client: two switches, so turning it on for one account is not turning
   // it on for every account.
   publisher: runPublisherJob,
+  // Internal byte freezing only. A held Inbox package is not authority to
+  // publish, and this runner has no provider adapter or credential path.
+  organic_package_builder: runOrganicPackageBuilderJob,
   // The other thing that makes an external system say something, and the
   // one gate every v6 module ends at. Does nothing unless
   // CAMPAIGN_ACTIONS_ENABLED is on here AND campaign actions are on for that
