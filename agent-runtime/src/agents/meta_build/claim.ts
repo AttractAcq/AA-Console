@@ -12,8 +12,9 @@ interface MetaCampaignIdentity {
 
 /**
  * A v6 build must belong to the one execution that queued this exact job.
- * The producer for this contract does not exist yet. Until its atomic SQL
- * binding is released, an approved v6 request still cannot reach Meta.
+ * Migration 289 defines the producer for this contract, but it remains held.
+ * Until its atomic SQL binding is released, an approved v6 request still
+ * cannot reach Meta.
  */
 export async function v6MetaBuildClaimProblem(
   sb: SupabaseClient,

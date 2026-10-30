@@ -45,12 +45,12 @@ returns trigger language plpgsql
 set search_path = pg_catalog, public as $$
 declare v_job public.agent_jobs%rowtype;
 begin
-  if old.meta_build_job_id is not null
+  if tg_op = 'UPDATE' and old.meta_build_job_id is not null
      and new.meta_build_job_id is distinct from old.meta_build_job_id then
     raise exception 'A Meta execution cannot change or release its bound job.';
   end if;
   if new.meta_build_job_id is null then
-    if old.meta_build_job_id is not null then
+    if tg_op = 'UPDATE' and old.meta_build_job_id is not null then
       raise exception 'A Meta execution cannot lose its bound job.';
     end if;
     return new;
@@ -75,7 +75,7 @@ begin
 end $$;
 
 create trigger guard_meta_build_execution_binding
-  before update on public.campaign_action_executions
+  before insert or update on public.campaign_action_executions
   for each row execute function public.guard_meta_build_execution_binding();
 
 create function public.guard_bound_meta_build_job_identity()

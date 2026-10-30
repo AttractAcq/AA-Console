@@ -457,6 +457,27 @@ describe("migration 289 exact Meta job binding", () => {
     )).meta_build_job_id).toBeNull();
   });
 
+  it("rejects a forged binding on execution insert as well as update", async () => {
+    const approvalId = await ask();
+    const unrelated = (await one<{ id: string }>(
+      "insert into agent_jobs(agent_key, client_id, input_table, input_id, params) " +
+      "values ('meta_build', $1, 'client_campaigns', $2, '{}'::jsonb) returning id",
+      [CLIENT, CAMPAIGN],
+    )).id;
+    await expect(db.query(
+      `insert into campaign_action_executions
+         (approval_id, client_id, campaign_id, action_key, artifact_version_hash,
+          manifest_id, meta_build_job_id, result)
+       select id, client_id, campaign_id, action_key, artifact_version_hash,
+              manifest_id, $1::uuid,
+              jsonb_build_object('meta_build_job_id', ($1::uuid)::text)
+         from campaign_action_approvals where id = $2`,
+      [unrelated, approvalId],
+    )).rejects.toThrow(/does not match this exact execution/);
+    expect(await rows("select id from campaign_action_executions where approval_id = $1", [approvalId]))
+      .toHaveLength(0);
+  });
+
   it("blocks a distinct approved action from making a second job for this campaign", async () => {
     const firstApproval = await ask();
     await approve(firstApproval);

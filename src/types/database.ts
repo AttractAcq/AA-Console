@@ -1263,6 +1263,7 @@ export type Database = {
           last_error: string | null
           lease_until: string | null
           manifest_id: string
+          meta_build_job_id: string | null
           result: Json | null
           status: string
           updated_at: string
@@ -1283,6 +1284,7 @@ export type Database = {
           last_error?: string | null
           lease_until?: string | null
           manifest_id: string
+          meta_build_job_id?: string | null
           result?: Json | null
           status?: string
           updated_at?: string
@@ -1303,6 +1305,7 @@ export type Database = {
           last_error?: string | null
           lease_until?: string | null
           manifest_id?: string
+          meta_build_job_id?: string | null
           result?: Json | null
           status?: string
           updated_at?: string
@@ -1426,6 +1429,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_meta_build_job_id_fkey"
+            columns: ["meta_build_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_meta_build_job_id_fkey"
+            columns: ["meta_build_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_executions_meta_build_job_id_fkey"
+            columns: ["meta_build_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -26037,6 +26061,10 @@ export type Database = {
           p_input_table: string
           p_params?: Json
         }
+        Returns: string
+      }
+      enqueue_approved_meta_build_v6: {
+        Args: { p_execution_id: string }
         Returns: string
       }
       enqueue_campaign_action_sweep: { Args: never; Returns: string }
