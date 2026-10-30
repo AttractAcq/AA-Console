@@ -393,8 +393,19 @@ describe("migration 289 exact Meta job binding", () => {
     expect(await rows("select id from agent_jobs where agent_key = 'meta_build'")).toHaveLength(0);
   });
 
+  it("refuses a missing caller role even if an exact execution was claimed", async () => {
+    await approve(await ask());
+    const claim = await claimedMeta();
+    await db.exec("create or replace function auth.role() returns text language sql as $$select null::text$$");
+    await expect(db.query("select enqueue_approved_meta_build_v6($1)", [claim.execution_id]))
+      .rejects.toThrow(/Only the internal service/);
+    expect(await rows("select id from agent_jobs where agent_key = 'meta_build'"))
+      .toHaveLength(0);
+  });
+
   it.each([
     ["changed budget", "update client_campaigns set daily_budget = 400"],
+    ["campaign no longer uses Meta", "update client_campaigns set paid_platform = null"],
     ["disabled client switch", "update client_engine_settings set campaign_actions_enabled = false"],
     ["changed account", "update client_integrations set ad_account_id = 'act_9999999'"],
     ["expired execution lease", "update campaign_action_executions set lease_until = now() - interval '1 minute'"],
