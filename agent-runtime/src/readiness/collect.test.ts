@@ -94,6 +94,7 @@ describe("B001 system inventory", () => {
       hasCredential: true, accountIds: { adAccountId: "act_123", metaPageId: "42" },
       providerHealth: { state: "unknown", evidenceAt: null },
     });
+    expect(snapshot.clients.value?.[0]?.integrations[0]?.providerHealth.reason).toMatch(/exact account, required scopes/);
     expect(snapshot.schemaVersion).toBe(2);
     expect(snapshot.evidenceCoverage.runtimeDeployment.state).toBe("observed");
     expect(snapshot.evidenceCoverage.runtimeWorkers.state).toBe("unknown");
@@ -110,6 +111,35 @@ describe("B001 system inventory", () => {
       "private-github-key", "vault-secret-123", "accidentally-a-secret",
       "possibly-private-account-ref", "private-token-hash"])
       expect(exported).not.toContain(forbidden);
+  });
+
+  it("names provider-specific gaps without treating metadata or a terminal status as live proof", async () => {
+    const { sb, config, rows } = fixture();
+    rows.client_integrations = [
+      { client_id: "client-1", provider: "meta", status: "revoked", credential_secret_id: "secret-1" },
+      { client_id: "client-1", provider: "google_business", status: "connected", credential_secret_id: "secret-2" },
+      { client_id: "client-1", provider: "google_ads", status: "connected", credential_secret_id: "secret-3" },
+      { client_id: "client-1", provider: "resend", status: "connected", credential_secret_id: "secret-4" },
+      { client_id: "client-1", provider: "instagram", status: "active", credential_secret_id: null },
+      { client_id: "client-1", provider: "meta", status: "expiring", credential_secret_id: "secret-5",
+        token_expires_at: null },
+    ];
+    const snapshot = await collectSystemReadiness(sb, config, fetch, {});
+    const integrations = snapshot.clients.value?.[0]?.integrations ?? [];
+    expect(integrations.map((row) => row.providerHealth.state)).toEqual(
+      ["unknown", "unknown", "unknown", "unknown", "unknown", "unknown"],
+    );
+    expect(integrations.map((row) => row.providerHealth.reason)).toEqual([
+      expect.stringMatching(/status blocks use/),
+      expect.stringMatching(/Business Profile location readback/),
+      expect.stringMatching(/developer token, exact customer access/),
+      expect.stringMatching(/runtime email key/),
+      expect.stringMatching(/No credential is configured/),
+      expect.stringMatching(/lacks a known future expiry/),
+    ]);
+    const exported = JSON.stringify(snapshot);
+    for (const secret of ["secret-1", "secret-2", "secret-3", "secret-4", "secret-5"])
+      expect(exported).not.toContain(secret);
   });
 
   it("does not turn a gateway timeout or missing catalog into a healthy assertion", async () => {
