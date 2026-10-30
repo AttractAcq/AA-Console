@@ -39,7 +39,9 @@ it("exports the same captured facts shown in the admin view on repeated download
     environment: { name: "staging", railwayEnvironmentId: "railway-stage", supabaseProjectRef: "stage-project" },
     runtime: { sha, switches: { workers: true }, credentialPresence: { anthropic: true },
       heartbeats: { state: "observed", checkedAt: "2026-10-29T12:00:00Z", value: [], reason: null } },
-    gateway: { state: "unknown", checkedAt: "2026-10-29T12:00:00Z", value: null, reason: "No probe." },
+    gateway: { state: "observed", checkedAt: "2026-10-29T12:00:00Z",
+      value: { sha, observedAt: "2026-10-29T12:00:00Z",
+        configured: { aaInternalApi: true, botAuthMode: "dual" } }, reason: null },
     database: { state: "error", checkedAt: "2026-10-29T12:00:00Z", value: null, reason: "No catalog." },
     global: { state: "observed", checkedAt: "2026-10-29T12:00:00Z",
       value: { engineEnabled: false, publishingPlatforms: [], proofDestinations: [],
@@ -55,16 +57,19 @@ it("exports the same captured facts shown in the admin view on repeated download
   Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: () => {} });
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   render(<SystemReadinessPanel />);
-  expect(await screen.findByRole("link", { name: sha })).toBeInTheDocument();
+  expect(await screen.findAllByRole("link", { name: sha })).toHaveLength(2);
   expect(screen.getByText(/Environment staging/)).toBeInTheDocument();
   expect(screen.getByText(/google_ad_build unsupported/)).toBeInTheDocument();
   expect(screen.getByText(/email supported, can initiate/)).toBeInTheDocument();
+  expect(screen.getByText(/Gateway Bot auth mode: dual/)).toBeInTheDocument();
+  expect(screen.getByText(/Dual mode can still admit legacy environment identities/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Export JSON" }));
   fireEvent.click(screen.getByRole("button", { name: "Export JSON" }));
   const [first, second] = await Promise.all(blobs.map((blob) => blob.text()));
   expect(first).toBe(second);
   expect(JSON.parse(first)).toMatchObject({
     capturedAt: "2026-10-29T12:00:00Z", environment: { name: "staging" },
-    runtime: { sha }, browser: { capturedAt: "2026-10-29T12:00:00Z" },
+    runtime: { sha }, gateway: { value: { configured: { botAuthMode: "dual" } } },
+    browser: { capturedAt: "2026-10-29T12:00:00Z" },
   });
 });
