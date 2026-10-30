@@ -26050,8 +26050,9 @@ export type Database = {
         Args: {
           p_decision: string
           p_expected_artifact_hash: string
+          p_expected_packet_sha256: string
           p_expected_source_version: string
-          p_reason?: string
+          p_reason: string
           p_request_id: string
         }
         Returns: string

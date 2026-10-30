@@ -698,7 +698,9 @@ describe("unified approval inbox", () => {
         p_request_id: readyRelease.id,
         p_expected_source_version: releaseHash,
         p_expected_artifact_hash: releaseHash,
+        p_expected_packet_sha256: "b".repeat(64),
         p_decision: "approved",
+        p_reason: "",
       },
     ));
     expect(await screen.findByText("Decision history (1)")).toBeInTheDocument();
@@ -746,6 +748,7 @@ describe("unified approval inbox", () => {
         p_request_id: readyRelease.id,
         p_expected_source_version: releaseHash,
         p_expected_artifact_hash: releaseHash,
+        p_expected_packet_sha256: "b".repeat(64),
         p_decision: "revoked",
         p_reason: "Plan changed",
       },

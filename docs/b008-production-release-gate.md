@@ -32,7 +32,7 @@ change before that pin requires the final observed runtime SHA, not the first.
 | --- | --- | --- |
 | Browser to candidate source | A person or Bot supplies four green job names, migration hashes or deployment SHAs without independent proof. | Migration 288 keeps the source `source_held`; caller claims never clear the blocker. |
 | Trusted attester to Supabase | A browser tries the proof RPC, a service caller sends a packet for another PR, a changed commit, a different CI run or different SQL bytes. | 293 grants proof submission only to `service_role`, repeats the packet digest and exact candidate binding in SQL, and records append-only evidence. The server process invokes the read-only GitHub verifier itself; it never accepts browser proof JSON. Service-role key custody is a required infrastructure control. |
-| Human decision | A Bot/service account, AAL1 session, non-admin, stale displayed card or changed artifact tries to approve. | 293 demands authenticated provisioned admin AAL2, locks the request, compares both expected hashes, requires fresh trusted proof, and appends the decision. The global Inbox re-reads the whole card before calling the owning RPC. Rejection and revocation require reasons. |
+| Human decision | A Bot/service account, AAL1 session, non-admin, stale displayed card or changed artifact tries to approve. A new proof arrives after the browser's last read but before its decision RPC. | 293 demands authenticated provisioned admin AAL2, locks the request, compares both expected source hashes, requires fresh trusted proof, and appends the decision. The global Inbox re-reads the whole card before calling the owning RPC. 295 additionally requires the exact displayed GitHub packet SHA-256 under the same request lock, so the bound proof is the one the human saw. Rejection and revocation require reasons. |
 | Approved proof freshness | The 15-minute GitHub attestation expires while CI or review progresses; the approved card becomes held even when every approved byte is unchanged. A service caller tries to refresh with a different packet after the human decides. | 295 binds the original packet digest and proof ID to the AAL2 decision in an append-only table. Its server-only refresh RPC accepts only the identical JSON packet after fresh independent GitHub verification. It locks the request, requires the same latest decision, exact source, original proof and digest, and rejects revocation or expiry. The trusted check refreshes before its read-only assertion. |
 | Approval to merge | The PR head/base or GitHub checks advance after the person decides; an unrelated `gh pr merge` bypasses the Inbox; a previously green check remains green after the human revokes. | **Still open:** a trusted merger must re-run the verifier and latest decision immediately before the exact GitHub merge API call, compare head/base/plan, and fail on mismatch. Make its status mandatory in GitHub protection or merge queue **and** remove direct/bypass merge authority. A cached green status or CLI wrapper alone does not prevent a revoked-plan merge. |
 | Merge to Railway | Railway deploys watched `main` before main CI or the release card is checked. | **Still open:** turn on a verified CI wait for both services and add a deploy-start exact approved-release/manifest check, or hold automatic deployment until a reviewed orchestrator deploys exact SHAs. A premerge approval alone does not prove the squash merge SHA or live service identity. |
@@ -68,8 +68,10 @@ change before that pin requires the final observed runtime SHA, not the first.
    the exact packet digest and re-reads the card for revocation. Until GitHub
    branch protection requires this result, running the script is advisory and
    does not close the merge effect gate.
-7. Migration 295 binds approval to the precise attestation that existed when
-   the human decided. The trusted server may re-run GitHub verification and
+7. Migration 295 replaces the decision RPC with a version that accepts the
+   displayed GitHub packet SHA-256 and compares it under the request lock.
+   It binds approval to the precise attestation that existed when the human
+   decided. The trusted server may re-run GitHub verification and
    append a fresh attestation for that **identical packet** while the source
    remains unexpired and the bound AAL2 decision is latest. A changed PR, CI
    run, workflow digest, SQL file, packet field, candidate, or decision fails
@@ -173,7 +175,8 @@ Pages gate and live adverse-case pilot are complete.
   stale-proof revocation, reasoned rejection and preservation of 292's held
   organic package Inbox branch. Migration 295 cases cover an unchanged packet
   refreshing after stale proof, idempotent repeat, changed packet rejection,
-  service-only execution and revocation rejection.
+  service-only execution, revocation rejection and a new proof arriving after
+  the Inbox read but before the human decision RPC.
 - Inbox UI: 34 cases cover global/card routing, AAL2 exact decision,
   changed-proof rejection on refresh, reasoned revocation after a proof
   becomes stale and the client Inbox's held-source default visibility.

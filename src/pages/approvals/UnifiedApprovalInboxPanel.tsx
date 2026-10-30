@@ -197,6 +197,14 @@ function isProductionRelease(request: UnifiedApprovalRequest): boolean {
     && typeof request.source_id === "string" && /^[0-9a-f-]{36}$/i.test(request.source_id);
 }
 
+function releaseProofHash(request: UnifiedApprovalRequest): string | null {
+  const preview = request.preview as Record<string, unknown> | null;
+  const proof = preview?.trusted_github_evidence as Record<string, unknown> | undefined;
+  return typeof proof?.packetSha256 === "string"
+    && /^[0-9a-f]{64}$/.test(proof.packetSha256)
+    ? proof.packetSha256 : null;
+}
+
 function releaseCanApprove(request: UnifiedApprovalRequest): boolean {
   if (!isProductionRelease(request) || request.status !== "pending"
     || request.source_state !== "pending" || isExpired(request)
@@ -210,8 +218,7 @@ function releaseCanApprove(request: UnifiedApprovalRequest): boolean {
   return candidate?.repository === "AttractAcq/AA-Console"
     && pr?.head_sha === head?.sha
     && proof?.premergePrHeadSha === head?.sha
-    && typeof proof?.packetSha256 === "string"
-    && /^[0-9a-f]{64}$/.test(proof.packetSha256);
+    && releaseProofHash(request) !== null;
 }
 
 function releaseCanReject(request: UnifiedApprovalRequest): boolean {
@@ -592,8 +599,9 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             p_request_id: request.id,
             p_expected_source_version: request.source_version,
             p_expected_artifact_hash: request.artifact_hash!,
+            p_expected_packet_sha256: releaseProofHash(request) ?? "",
             p_decision: decision,
-            ...(decision !== "approved" ? { p_reason: reason!.trim() } : {}),
+            p_reason: decision === "approved" ? "" : reason!.trim(),
           })
         : request.source_kind === "google_review_reply"
         ? await supabase.rpc("decide_google_review_reply_from_inbox_v6", {

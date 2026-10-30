@@ -75,6 +75,80 @@ create trigger approval_decision_events_v6_bind_production_release
   after insert on public.approval_decision_events_v6
   for each row execute function public.bind_approved_production_release_packet_v6();
 
+-- The 293 decision RPC compared only the immutable source hash. A new proof
+-- could arrive after the browser's last Inbox read but before its decision
+-- lock. Replace it with a packet-hash argument so the AAL2 decision binds
+-- precisely the GitHub packet shown to that human. The request lock also
+-- serializes this comparison with both trusted attestation writers.
+drop function public.decide_production_release_candidate_v6(uuid,text,text,text,text);
+create function public.decide_production_release_candidate_v6(
+  p_request_id uuid, p_expected_source_version text,
+  p_expected_artifact_hash text, p_expected_packet_sha256 text,
+  p_decision text, p_reason text
+) returns uuid language plpgsql volatile security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_request public.approval_requests_v6%rowtype;
+  v_source public.production_release_candidates_v6%rowtype;
+  v_proof public.production_release_attestations_v6%rowtype;
+begin
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or not coalesce(public.is_admin(),false)
+    or coalesce(auth.jwt()->>'aal','') <> 'aal2' then
+    raise exception 'Only a provisioned admin with AAL2 can decide a release.'
+      using errcode = '42501';
+  end if;
+  if p_decision not in ('approved','rejected','revoked') or p_decision is null
+    or (p_decision <> 'approved' and nullif(btrim(coalesce(p_reason,'')),'') is null) then
+    raise exception 'A valid release decision and reason are required.'
+      using errcode = '22023';
+  end if;
+  select * into v_request from public.approval_requests_v6
+    where id = p_request_id for update;
+  if not found or v_request.source_system is distinct from 'aa_console'
+    or v_request.source_kind is distinct from 'production_release'
+    or v_request.client_id is not null or v_request.owner_role is distinct from 'admin'
+    or v_request.source_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    raise exception 'Production release request is invalid.' using errcode = '23514';
+  end if;
+  select * into v_source from public.production_release_candidates_v6
+    where id = v_request.source_id::uuid;
+  if not found or v_request.source_version is distinct from v_source.version_hash
+    or v_request.artifact_hash is distinct from v_source.version_hash
+    or v_request.preview is distinct from v_source.candidate
+    or v_request.expires_at is distinct from v_source.expires_at
+    or p_expected_source_version is distinct from v_source.version_hash
+    or p_expected_artifact_hash is distinct from v_source.version_hash then
+    raise exception 'Production release candidate version changed.' using errcode = '23514';
+  end if;
+  if p_decision = 'approved' then
+    if v_source.expires_at <= clock_timestamp()
+      or public.production_release_source_state_v6(p_request_id) <> 'pending' then
+      raise exception 'Release evidence is stale, held or expired.'
+        using errcode = '23514';
+    end if;
+    select * into v_proof from public.production_release_attestations_v6
+      where request_id = p_request_id order by event_order desc limit 1;
+    if not found or not coalesce(p_expected_packet_sha256 ~ '^[0-9a-f]{64}$',false)
+      or p_expected_packet_sha256 is distinct from v_proof.packet_sha256
+      or v_proof.source_version is distinct from v_source.version_hash
+      or v_proof.packet->>'packetSha256' is distinct from v_proof.packet_sha256 then
+      raise exception 'The exact GitHub proof changed after the Inbox review.'
+        using errcode = '23514';
+    end if;
+  end if;
+  return public.record_approval_decision_v6(
+    p_request_id,p_decision,v_source.version_hash,
+    'production_release:' || p_request_id::text || ':' || p_decision,
+    p_reason
+  );
+end;
+$$;
+revoke execute on function public.decide_production_release_candidate_v6(uuid,text,text,text,text,text)
+  from public, anon, authenticated, service_role;
+grant execute on function public.decide_production_release_candidate_v6(uuid,text,text,text,text,text)
+  to authenticated;
+
 -- Any approval created in a hypothetical gap between 293 and 295 must be
 -- reviewed rather than guessed into a proof binding by timestamp. In normal
 -- ordered rollout these migrations are held and no such decision exists.
