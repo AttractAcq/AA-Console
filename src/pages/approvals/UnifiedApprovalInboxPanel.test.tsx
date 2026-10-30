@@ -7,6 +7,7 @@ const { from, rpc, getAAL } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), g
 vi.mock("../../lib/supabase", () => ({ supabase: {
   from, rpc, auth: { mfa: { getAuthenticatorAssuranceLevel: getAAL } },
 } }));
+vi.mock("./ApprovalCoveragePanel", () => ({ ApprovalCoveragePanel: () => null }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
   useParams: () => ({ clientId: "client-1" }),
@@ -241,6 +242,68 @@ describe("unified approval inbox", () => {
     expect(historyIds.at(-1)).toHaveLength(1);
   });
 
+  it("applies exact source and client filters to requests beyond the first page", async () => {
+    requests = Array.from({ length: 60 }, (_, index) => ({
+      ...request, id: `request-${index}`, source_id: `action-${index}`,
+      title: index === 59 ? "Off-page source" : `Queued ${index}`,
+      client_id: index === 59 ? "client-59" : "client-1",
+      source_kind: index === 59 ? "future_source_kind" : "campaign_action",
+    }));
+    show("global");
+    expect(await screen.findByRole("article", { name: "Queued 0" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Off-page source" })).not.toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText("Client ID"), "client-59");
+    await userEvent.type(screen.getByLabelText("Source type"), "future_source_kind");
+    await userEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(await screen.findByRole("article", { name: "Off-page source" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Queued 0" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+    expect(clientEqValues).toContain("client-59");
+    expect(historyIds.at(-1)).toEqual(["request-59"]);
+  });
+
+  it("treats a literal all source kind as an exact filter, then clears it to any source", async () => {
+    const user = userEvent.setup();
+    requests = [
+      { ...request, id: "request-all", title: "Literal all source", source_kind: "all" },
+      { ...request, id: "request-campaign", title: "Campaign action source" },
+    ];
+    show("global");
+    expect(await screen.findByRole("article", { name: "Literal all source" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Campaign action source" })).toBeInTheDocument();
+
+    const sourceInput = screen.getByLabelText("Source type");
+    await user.type(sourceInput, "all");
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => expect(screen.queryByRole("article", { name: "Campaign action source" }))
+      .not.toBeInTheDocument());
+    expect(screen.getByRole("article", { name: "Literal all source" })).toBeInTheDocument();
+    expect(historyIds.at(-1)).toEqual(["request-all"]);
+    expect(screen.getByRole("status", { name: "", hidden: false })).toHaveTextContent("source all");
+
+    await user.clear(sourceInput);
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(await screen.findByRole("article", { name: "Campaign action source" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Literal all source" })).toBeInTheDocument();
+    expect(historyIds.at(-1)).toEqual(["request-all", "request-campaign"]);
+  });
+
+  it("filters agency-wide requests by a null client without inventing a client ID", async () => {
+    requests = [request, { ...request, id: "agency-1", client_id: null,
+      title: "Agency release decision" }];
+    show("global");
+    expect(await screen.findByRole("article", { name: "Build the Meta ad" }))
+      .toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Client ID"), "agency-wide");
+    await userEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(await screen.findByRole("article", { name: "Agency release decision" }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Build the Meta ad" }))
+      .not.toBeInTheDocument();
+    expect(clientEqValues).toEqual([]);
+  });
+
   it("makes missing exact preview and hash explicit without offering approval", async () => {
     requests = [{ ...request, preview: null, artifact_hash: null,
       preview_blocker: "Legacy request has no frozen words." }];
@@ -299,7 +362,8 @@ describe("unified approval inbox", () => {
     expect(screen.getByText(/Human: human-1 · Assurance: aal2/)).toBeInTheDocument();
     expect(screen.getByText("Reason: Rights verified")).toBeInTheDocument();
     await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "all");
-    await user.selectOptions(screen.getByRole("combobox", { name: "Source type" }), "campaign_action");
+    await user.type(screen.getByLabelText("Source type"), "campaign_action");
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
     expect(screen.getByText("Build the Meta ad")).toBeInTheDocument();
     expect(screen.queryByText("Proof placement")).not.toBeInTheDocument();
     await user.type(screen.getByRole("searchbox", { name: "Search current page" }), "no match");
@@ -747,8 +811,9 @@ describe("unified approval inbox", () => {
     expect(within(screen.getByRole("article", { name: "House recruitment" }))
       .getByRole("link", { name: "View owning source" }))
       .toHaveAttribute("href", "/team?tab=recruitment");
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Client" }), "client-2");
-    expect(screen.getByText("Second client")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Client ID"), "client-2");
+    await userEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(await screen.findByText("Second client")).toBeInTheDocument();
     expect(screen.queryByText("House recruitment")).not.toBeInTheDocument();
   });
 
