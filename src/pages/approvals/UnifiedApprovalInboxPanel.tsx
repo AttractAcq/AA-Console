@@ -335,9 +335,11 @@ function RequestCard({ request, history, clientId, manager, global, aal, busy, o
       {request.source_state && request.source_state !== "pending"
         && request.status !== "approved" && request.status !== "rejected"
         && request.status !== "revoked" && <p role="alert" className="mt-3 text-sm text-destructive">
-          The owning source is {request.source_state.replaceAll("_", " ")}. {isProductionRelease(request) && releaseCanReject(request)
-            ? "This release plan cannot be approved in this state; you may close it with a reasoned rejection."
-            : "This card cannot be decided."}
+          The owning source is {request.source_state.replaceAll("_", " ")}. {releaseCanRevoke(request, latestDecision)
+            ? "This approved release plan is held; you may revoke it with a reason."
+            : isProductionRelease(request) && releaseCanReject(request)
+              ? "This release plan cannot be approved in this state; you may close it with a reasoned rejection."
+              : "This card cannot be decided."}
         </p>}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
