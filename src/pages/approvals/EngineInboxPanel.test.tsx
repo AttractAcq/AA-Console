@@ -135,8 +135,8 @@ describe("what is waiting on a person", () => {
     // card is the one place the decision is made.
     render(<EngineInboxPanel />);
     await screen.findByText("The Chain");
+    await waitFor(() => expect(document.querySelector("video")).not.toBeNull());
     const player = document.querySelector("video");
-    expect(player).not.toBeNull();
     expect(player!.getAttribute("src")).toBe("https://signed/a.mp4");
     // Not autoplay: a queue of reels all talking at once is worse than a
     // queue of still frames.
