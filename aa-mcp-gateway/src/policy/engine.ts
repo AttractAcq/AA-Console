@@ -381,11 +381,15 @@ export class ActionEngine {
   async executeApproval(id: string, identities: Identity[]) {
     const a = this.store.getApproval(id);
     const identity = identities.find((i) => i.bot === a?.requested_by_bot);
+    const tool = this.tools.find((t) => t.name === a?.tool);
     if (
       !a ||
       a.status !== "approved" ||
       a.execution_status !== "not_started" ||
-      !identity
+      !identity ||
+      !tool ||
+      !allowed(identity, tool) ||
+      !identity.clients.includes(String(a.client_id))
     )
       throw new Error("invalid_transition");
     // Synchronous reservation prevents concurrent reviewers from executing the same action.

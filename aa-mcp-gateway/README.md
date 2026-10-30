@@ -34,6 +34,12 @@ Environment variables:
 
 `npm run dev` uses already exported environment variables. `npm run build`, `npm run check`, and `npm test` build, typecheck, and run security/domain/HTTP tests. `npm start` runs compiled code with injected environment variables.
 
+### Gateway-local revocation boundary
+
+`workflow.get_activity`, `workflow.get_pending_approvals`, and the informational `workflow.create_approval` use the gateway's own SQLite store. In `dual` and `db` modes, their discovery and calls require a fresh AA token resolution that bypasses the 30-second positive cache. A missing token, revoked/suspended Bot, removed client grant, permission mismatch, or AA resolver outage hides or rejects these tools. Hosted `env` mode cannot prove current AA rights and therefore does not expose these local controls; loopback `env` fixtures remain available for development.
+
+The separate human reviewer endpoint also re-resolves the requesting Bot immediately before executing an approved action. It checks the current tool permission and client grant before reserving execution. Token hashes remain only in process memory and never enter SQLite, audit rows, or responses. After a gateway restart in `db` mode, a Bot must authenticate again before a reviewer can execute one of its pending approvals; the card remains unconsumed in the meantime. This gate does not replace the AA-side authorization on business RPCs. Other dual-mode AA-backed tools retain their existing fallback and cache behavior until the controlled Bot-auth cutover. Full B007 still requires live mode/grant evidence, a safe status and rotation UI, and end-to-end revocation proof.
+
 ## Connecting a Grok Bot
 
 Configure the Bot's MCP client for Streamable HTTP at `https://<gateway>/mcp`, with `Authorization: Bearer <that Bot's token>`. Use an MCP client supporting custom authentication headers; OAuth enrollment is not provided in v1. The official [MCP TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/server) supplies the transport. Discovery reveals only permitted, implemented tools. Stub names are rejected on `call` unless `MCP_DISCOVER_STUBS=true`. Do not put reviewer or AA service credentials in Bot configuration.

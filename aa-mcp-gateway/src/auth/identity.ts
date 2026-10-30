@@ -61,13 +61,16 @@ export type AaResolveResult = {
 };
 
 export type BotAuthAlert = (event: Record<string, unknown>) => void;
+export type FreshIdentity = { identity: Identity; aaPermissions: string[] };
 
 type CacheEntry = { expires: number; value: AaResolveResult | null };
 
 export class BotAuthenticator {
   private readonly cache = new Map<string, CacheEntry>();
   private allowLocalPrivilegedEnv = false;
-  private readonly byBot = new Map<Bot, Identity>();
+  // Memory only: reviewer execution can re-resolve the last authenticated
+  // Bot token without storing a bearer or token hash in SQLite/audit.
+  private readonly lastTokenHashByBot = new Map<Bot, string>();
   constructor(
     private readonly mode: BotAuthMode,
     private readonly credentials: Credential[],
@@ -113,12 +116,77 @@ export class BotAuthenticator {
     return auth;
   }
 
-  identities(): Identity[] {
-    if (this.mode === "db") return [...this.byBot.values()];
-    return this.credentials.map((c) => ({
-      bot: c.bot,
-      clients: [...c.clients],
-    }));
+  /**
+   * Recheck AA without the 30s positive cache or dual-mode env fallback.
+   * Gateway-local data has no AA business RPC to enforce current grants.
+   * Reviewer execution must also check before it reserves an action.
+   */
+  async authenticateFresh(header: string | undefined): Promise<FreshIdentity> {
+    // Hosted env mode has no AA authority to consult. Keep the legacy local
+    // fixture path, but deny gateway-local sensitive access on a hosted env.
+    if (this.mode === "env") {
+      if (!this.allowLocalPrivilegedEnv) throw unauthorized();
+      const identity = await this.authenticate(header);
+      return { identity, aaPermissions: [...grants[identity.bot]] };
+    }
+    const token = /^Bearer ([^\s]+)$/.exec(header ?? "")?.[1];
+    if (!token) throw unauthorized();
+    return this.freshAaIdentity(
+      tokenHashHex(token),
+      envIdentity(token, this.credentials),
+    );
+  }
+
+  /** Recheck the Bot behind a human-approved action before reserving it. */
+  async freshIdentityForBot(bot: unknown): Promise<FreshIdentity> {
+    if (typeof bot !== "string" || !bots.includes(bot as Bot))
+      throw unauthorized();
+    const botId = bot as Bot;
+    if (this.mode === "env") {
+      if (!this.allowLocalPrivilegedEnv) throw unauthorized();
+      const credential = this.credentials.find((c) => c.bot === botId);
+      if (!credential) throw unauthorized();
+      return {
+        identity: { bot: credential.bot, clients: [...credential.clients] },
+        aaPermissions: [...grants[credential.bot]],
+      };
+    }
+    const credential = this.credentials.find((c) => c.bot === botId);
+    const rememberedHash = this.lastTokenHashByBot.get(botId);
+    const hashHex =
+      rememberedHash ??
+      (credential ? tokenHashHex(credential.token) : undefined);
+    if (!hashHex) throw unauthorized();
+    const env =
+      credential && tokenHashHex(credential.token) === hashHex
+        ? { bot: credential.bot, clients: [...credential.clients] }
+        : undefined;
+    const current = await this.freshAaIdentity(hashHex, env);
+    if (current.identity.bot !== botId) throw unauthorized();
+    return current;
+  }
+
+  private async freshAaIdentity(
+    hashHex: string,
+    env?: Identity,
+  ): Promise<FreshIdentity> {
+    let aa: AaResolveResult | null;
+    try {
+      aa = await this.lookupAa(hashHex, true);
+    } catch {
+      this.alert({ event: "bot_auth_aa_unavailable" });
+      throw unauthorized();
+    }
+    const identity = this.fromAa(aa, this.mode === "db");
+    if (!identity || (env && this.mismatch(aa, env))) throw unauthorized();
+    const current = this.mode === "dual" && env ? env : identity;
+    this.remember(current, hashHex);
+    return { identity: current, aaPermissions: [...(aa?.permissions ?? [])] };
+  }
+
+  private remember(identity: Identity, hashHex: string): Identity {
+    this.lastTokenHashByBot.set(identity.bot, hashHex);
+    return identity;
   }
 
   async authenticate(header: string | undefined): Promise<Identity> {
@@ -145,8 +213,7 @@ export class BotAuthenticator {
     if (this.mode === "db") {
       const identity = this.fromAa(aa, true);
       if (!identity) throw unauthorized();
-      this.byBot.set(identity.bot, identity);
-      return identity;
+      return this.remember(identity, hashHex);
     }
     if (aa !== "unavailable" && aa?.found && aa.status !== "active")
       throw unauthorized();
@@ -167,8 +234,7 @@ export class BotAuthenticator {
         (env && this.mismatch(aa, env))
       )
         throw unauthorized();
-      this.byBot.set(current.bot, current);
-      return current;
+      return this.remember(current, hashHex);
     }
     // Security matches Admin: never fall back to env or stale permissions.
     // Prod db mode alone is not this posture — dual must refuse env too.
@@ -183,8 +249,7 @@ export class BotAuthenticator {
         (env && this.mismatch(aa, env))
       )
         throw unauthorized();
-      this.byBot.set(current.bot, current);
-      return current;
+      return this.remember(current, hashHex);
     }
     if (aaIdentity && env) {
       if (this.mismatch(aa, env)) {
@@ -200,11 +265,10 @@ export class BotAuthenticator {
         });
         throw unauthorized();
       }
-      return env;
+      return this.remember(env, hashHex);
     }
     if (aaIdentity) {
-      this.byBot.set(aaIdentity.bot, aaIdentity);
-      return aaIdentity;
+      return this.remember(aaIdentity, hashHex);
     }
     if (env) return env;
     throw unauthorized();
@@ -239,12 +303,16 @@ export class BotAuthenticator {
     return identity;
   }
 
-  private async lookupAa(hashHex: string): Promise<AaResolveResult | null> {
+  private async lookupAa(
+    hashHex: string,
+    fresh = false,
+  ): Promise<AaResolveResult | null> {
     const hit = this.cache.get(hashHex);
     // Admin, Engineering and Security must re-resolve every request so
     // revoked tokens and removed client grants take effect immediately
     // (no cached success). Security is the highest-risk Bot identity.
     if (
+      !fresh &&
       hit &&
       hit.value?.bot_id !== "bot_admin" &&
       hit.value?.bot_id !== "bot_engineering" &&
