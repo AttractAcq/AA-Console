@@ -27,7 +27,7 @@ describe("public release identity probe", () => {
     const probe = await collectReleaseProbe(sb, config, fetcher, { RAILWAY_GIT_COMMIT_SHA: runtimeSha });
     expect(rpc).toHaveBeenCalledWith("system_readiness_catalog");
     expect(fetcher).toHaveBeenCalledWith("https://gateway.example/internal/readiness", expect.objectContaining({ method: "GET", cache: "no-store" }));
-    expect(probe).toMatchObject({ ready: true, runtimeSha, gatewaySha, migrationHead, reason: null });
+    expect(probe).toMatchObject({ observationsComplete: true, runtimeSha, gatewaySha, migrationHead, reason: null });
     const exported = JSON.stringify(probe);
     expect(exported).not.toContain(secret);
     expect(exported).not.toContain("botAuthMode");
@@ -37,7 +37,7 @@ describe("public release identity probe", () => {
   it("fails closed before calling dependencies when runtime identity is short", async () => {
     const { rpc, sb, config, fetcher } = fixture();
     const probe = await collectReleaseProbe(sb, config, fetcher, { RAILWAY_GIT_COMMIT_SHA: runtimeSha.slice(0, 12) });
-    expect(probe).toMatchObject({ ready: false, reason: "runtime_sha_unknown", runtimeSha: null });
+    expect(probe).toMatchObject({ observationsComplete: false, reason: "runtime_sha_unknown", runtimeSha: null });
     expect(rpc).not.toHaveBeenCalled();
     expect(fetcher).not.toHaveBeenCalled();
   });
@@ -46,17 +46,17 @@ describe("public release identity probe", () => {
     const { sb, config, fetcher } = fixture();
     const badDb = { rpc: async () => ({ data: { migrationHead: "invalid" }, error: null }) } as unknown as SupabaseClient;
     expect(await collectReleaseProbe(badDb, config, fetcher, { RAILWAY_GIT_COMMIT_SHA: runtimeSha }))
-      .toMatchObject({ ready: false, reason: "schema_unavailable" });
+      .toMatchObject({ observationsComplete: false, reason: "schema_unavailable" });
     expect(fetcher).not.toHaveBeenCalled();
 
     expect(await collectReleaseProbe(sb, { ...config, mcpServiceSecret: null }, fetcher, { RAILWAY_GIT_COMMIT_SHA: runtimeSha }))
-      .toMatchObject({ ready: false, reason: "gateway_unconfigured", migrationHead });
+      .toMatchObject({ observationsComplete: false, reason: "gateway_unconfigured", migrationHead });
     const stale = vi.fn(async () => ({ ok: true, json: async () => ({ ok: true, sha: gatewaySha, observedAt: "2020-01-01T00:00:00Z" }) } as Response)) as unknown as typeof fetch;
     expect(await collectReleaseProbe(sb, config, stale, { RAILWAY_GIT_COMMIT_SHA: runtimeSha }))
-      .toMatchObject({ ready: false, reason: "gateway_unavailable", gatewaySha: null });
+      .toMatchObject({ observationsComplete: false, reason: "gateway_unavailable", gatewaySha: null });
     const down = vi.fn(async () => { throw new Error(`failed with ${secret}`); }) as unknown as typeof fetch;
     const probe = await collectReleaseProbe(sb, config, down, { RAILWAY_GIT_COMMIT_SHA: runtimeSha });
-    expect(probe).toMatchObject({ ready: false, reason: "gateway_unavailable" });
+    expect(probe).toMatchObject({ observationsComplete: false, reason: "gateway_unavailable" });
     expect(JSON.stringify(probe)).not.toContain(secret);
   });
 
@@ -64,6 +64,6 @@ describe("public release identity probe", () => {
     const { sb, config } = fixture();
     const hanging = vi.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch;
     const probe = await collectReleaseProbe(sb, config, hanging, { RAILWAY_GIT_COMMIT_SHA: runtimeSha });
-    expect(probe).toMatchObject({ ready: false, reason: "gateway_unavailable", gatewaySha: null });
+    expect(probe).toMatchObject({ observationsComplete: false, reason: "gateway_unavailable", gatewaySha: null });
   }, 10_000);
 });

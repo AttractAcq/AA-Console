@@ -347,15 +347,15 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.url === "/release/readiness") {
+  if (req.url === "/release/identities") {
     res.setHeader("Cache-Control", "no-store");
     if (req.method !== "GET") {
-      json(405, { ready: false, reason: "method_not_allowed" });
+      json(405, { observationsComplete: false, reason: "method_not_allowed" });
       return;
     }
     void currentReleaseProbe(sb, config).then(
-      (probe) => json(probe.ready ? 200 : 503, probe),
-      () => json(503, { ready: false, reason: "release_probe_unavailable" }),
+      (probe) => json(probe.observationsComplete ? 200 : 503, probe),
+      () => json(503, { observationsComplete: false, reason: "release_probe_unavailable" }),
     );
     return;
   }

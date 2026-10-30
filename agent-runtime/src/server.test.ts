@@ -34,22 +34,22 @@ it("serves a minimal public release probe and fails closed on a dependency error
   try {
     await import("./server.js");
     const res = { setHeader: vi.fn(), writeHead: vi.fn(), end: vi.fn() };
-    mocks.release.mockResolvedValueOnce({ ready: true, runtimeSha: "a".repeat(40), gatewaySha: "b".repeat(40), migrationHead: "20261030160000" });
-    mocks.handler({ url: "/release/readiness", method: "GET", headers: {} }, res);
+    mocks.release.mockResolvedValueOnce({ observationsComplete: true, runtimeSha: "a".repeat(40), gatewaySha: "b".repeat(40), migrationHead: "20261030160000" });
+    mocks.handler({ url: "/release/identities", method: "GET", headers: {} }, res);
     await vi.waitFor(() => expect(res.end).toHaveBeenCalled());
     expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
     expect(res.writeHead).toHaveBeenCalledWith(200, { "Content-Type": "application/json" });
-    expect(JSON.parse(res.end.mock.calls[0]![0])).toMatchObject({ ready: true, migrationHead: "20261030160000" });
+    expect(JSON.parse(res.end.mock.calls[0]![0])).toMatchObject({ observationsComplete: true, migrationHead: "20261030160000" });
 
     const failed = { setHeader: vi.fn(), writeHead: vi.fn(), end: vi.fn() };
     mocks.release.mockRejectedValueOnce(new Error("private detail"));
-    mocks.handler({ url: "/release/readiness", method: "GET", headers: {} }, failed);
+    mocks.handler({ url: "/release/identities", method: "GET", headers: {} }, failed);
     await vi.waitFor(() => expect(failed.end).toHaveBeenCalled());
     expect(failed.writeHead).toHaveBeenCalledWith(503, { "Content-Type": "application/json" });
     expect(failed.end.mock.calls[0]![0]).not.toContain("private detail");
 
     const wrongMethod = { setHeader: vi.fn(), writeHead: vi.fn(), end: vi.fn() };
-    mocks.handler({ url: "/release/readiness", method: "POST", headers: {} }, wrongMethod);
+    mocks.handler({ url: "/release/identities", method: "POST", headers: {} }, wrongMethod);
     expect(wrongMethod.writeHead).toHaveBeenCalledWith(405, { "Content-Type": "application/json" });
     expect(mocks.release).toHaveBeenCalledTimes(2);
   } finally { signals.mockRestore(); }

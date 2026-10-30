@@ -5,7 +5,7 @@ import { deployedCommitSha } from "./version.js";
 type ReleaseProbe = {
   schemaVersion: 1;
   observedAt: string;
-  ready: boolean;
+  observationsComplete: boolean;
   runtimeSha: string | null;
   gatewaySha: string | null;
   migrationHead: string | null;
@@ -41,7 +41,7 @@ export async function collectReleaseProbe(
   const observedAt = new Date().toISOString();
   const runtimeSha = deployedCommitSha(env);
   const empty = (reason: Exclude<ReleaseProbe["reason"], null>, migrationHead: string | null = null): ReleaseProbe => ({
-    schemaVersion: 1, observedAt, ready: false, runtimeSha, gatewaySha: null, migrationHead, reason,
+    schemaVersion: 1, observedAt, observationsComplete: false, runtimeSha, gatewaySha: null, migrationHead, reason,
   });
   if (!runtimeSha) return empty("runtime_sha_unknown");
 
@@ -73,7 +73,7 @@ export async function collectReleaseProbe(
     const age = Date.now() - Date.parse(String(record.observedAt ?? ""));
     if (record.ok !== true || !gatewaySha || !Number.isFinite(age) || age < -5000 || age > 30_000)
       return empty("gateway_unavailable", migrationHead);
-    return { schemaVersion: 1, observedAt, ready: true, runtimeSha, gatewaySha, migrationHead, reason: null };
+    return { schemaVersion: 1, observedAt, observationsComplete: true, runtimeSha, gatewaySha, migrationHead, reason: null };
   } catch { return empty("gateway_unavailable", migrationHead); }
 }
 
