@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
@@ -249,6 +249,13 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
                 </span>,
                 <span key="y" className="text-xs">
                   {reply ? reply.status.replace(/_/g, " ") : "none"}
+                  {reply && (reply.status === "drafted" || reply.status === "awaiting_approval")
+                    && clientId && (
+                      <Link className="mt-1 block text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        to={`/clients/${encodeURIComponent(clientId)}/delivery/approval-inbox?tab=unified`}>
+                        Review in Approval Inbox
+                      </Link>
+                    )}
                 </span>,
                 <ActionMenu
                   key="a"
@@ -274,44 +281,6 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
                       : []),
                     ...(!reply && !r.gone_at
                       ? [{ label: "Draft a reply", onSelect: () => setReplyingTo(r) }]
-                      : []),
-                    ...(reply && (reply.status === "drafted" || reply.status === "awaiting_approval")
-                      ? [
-                          {
-                            label: "Approve this reply",
-                            onSelect: () =>
-                              void act(
-                                r.id,
-                                async () => {
-                                  const { error: rpcError } = await supabase.rpc(
-                                    "decide_google_review_reply_v6",
-                                    { p_reply_id: reply.id, p_approved: true },
-                                  );
-                                  if (rpcError) throw new Error(rpcError.message);
-                                },
-                                "Approved. It posts when the adapter runs.",
-                              ),
-                          },
-                          {
-                            label: "Reject it",
-                            onSelect: () => {
-                              const why = window.prompt("Why is this reply not going out?");
-                              if (why?.trim()) {
-                                void act(
-                                  r.id,
-                                  async () => {
-                                    const { error: rpcError } = await supabase.rpc(
-                                      "decide_google_review_reply_v6",
-                                      { p_reply_id: reply.id, p_approved: false, p_reason: why.trim() },
-                                    );
-                                    if (rpcError) throw new Error(rpcError.message);
-                                  },
-                                  "Rejected.",
-                                );
-                              }
-                            },
-                          },
-                        ]
                       : []),
                   ]}
                 />,
