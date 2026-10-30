@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "5ba90cf386e2fe9eeda7d3017d147dbe290990330c5533d83c5b340c763772f4",
-  "generatedTypesSha256": "6d352eeab50241bfe3385302388d7e22ab2726127f1bd58c36ebf295d804334c",
-  "generatedSchemaBodySha256": "ffa219214b84dd782c5dc3b17fae20f41cd75ad1ea8ccdd0190c3993620ef2b6",
+  "migrationSourceDigest": "fd2abc9179e22820c45ff7663e34fdd34b2bf12fe5ae416740e3669fdb1fe8ff",
+  "generatedTypesSha256": "e2a4ad57e2233b382872d0f4a38fa0ce9e5d32195b42048ccafa8dd1a9a568f4",
+  "generatedSchemaBodySha256": "55b0b603864c48415e2c4bbe8ba0bed04e348ba773db468872904748ccde7270",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -1963,6 +1963,69 @@
       "filename": "20261029140000_263_auth_signup_role_hardening.sql",
       "sha256": "a4eaadaf5a09c3649fc6ee0c948c37f986ba5fdd02c883978a4ca99c6cefad62",
       "trimmedMd5": "b9c34610a93211c5f226e25f9cdb1446"
+    },
+    {
+      "version": "20261029150000",
+      "name": "264_low_level_transition_isolation",
+      "filename": "20261029150000_264_low_level_transition_isolation.sql",
+      "sha256": "f4c5e23fac1ba49cf1a97763366d8ad75945d484798a86a8ae1dedd827132b39",
+      "trimmedMd5": "e447198bd2b97318bb5a17cda002a4bd"
+    },
+    {
+      "version": "20261029160000",
+      "name": "265_lead_and_media_entitlements",
+      "filename": "20261029160000_265_lead_and_media_entitlements.sql",
+      "sha256": "b9c7b21ec2bdecd00b8984f82f242248a53272041e02dbdada6689bbfc74f305",
+      "trimmedMd5": "13c7157adc82d1fa513487da66ea938a"
+    },
+    {
+      "version": "20261029170000",
+      "name": "266_commercial_reporting_and_storage_scope",
+      "filename": "20261029170000_266_commercial_reporting_and_storage_scope.sql",
+      "sha256": "9f0d96ee3d8708846fbd0838ec9ed72f70fbf571ac26d8b2af6db0d6943922d2",
+      "trimmedMd5": "9d05c9df6ca33c017ccf81c2cdedc8a3"
+    },
+    {
+      "version": "20261029180000",
+      "name": "267_sales_entitlement_boundary",
+      "filename": "20261029180000_267_sales_entitlement_boundary.sql",
+      "sha256": "1b42a2536b212e50e68fb948e1fb15feeb4de1026cdc52638659fd5d7c59cf3a",
+      "trimmedMd5": "07f5f64b3588df09de7b9d34f8cb1ad2"
+    },
+    {
+      "version": "20261029190000",
+      "name": "268_contact_and_conversation_scope",
+      "filename": "20261029190000_268_contact_and_conversation_scope.sql",
+      "sha256": "05ca4d1cbb269617b3760e52426519f7590d5a2ee1559b561535f0423c0fd28d",
+      "trimmedMd5": "6b0b56ed551cb54cba563c58edba18db"
+    },
+    {
+      "version": "20261029200000",
+      "name": "269_authenticated_sales_rpc_scope",
+      "filename": "20261029200000_269_authenticated_sales_rpc_scope.sql",
+      "sha256": "ea60bb774a7e8b6c2d6613558eeecdf418031e0cded66f7073c5a09e8845a299",
+      "trimmedMd5": "c023c705c58a9d7091f43f43a80a6138"
+    },
+    {
+      "version": "20261029210000",
+      "name": "270_default_deny_auth_and_active_staff",
+      "filename": "20261029210000_270_default_deny_auth_and_active_staff.sql",
+      "sha256": "30302170417e9a4915d4d3594844bbf75c53c26bc4dd65becb8cab706d7925d0",
+      "trimmedMd5": "271e65ed322eb60c82ded54bb29446b4"
+    },
+    {
+      "version": "20261029220000",
+      "name": "271_profileless_authenticated_scope",
+      "filename": "20261029220000_271_profileless_authenticated_scope.sql",
+      "sha256": "b55c3229fb3a9a14cbaf454c35e1107c98426961b487325fac93e6b71404140c",
+      "trimmedMd5": "77d97667b667ec259da4efde44675e0e"
+    },
+    {
+      "version": "20261030100000",
+      "name": "272_onboarding_step_integrity",
+      "filename": "20261030100000_272_onboarding_step_integrity.sql",
+      "sha256": "c7abc702f5c05de152d4d0c9c4e23373db8261d01b22d5aef9203e7640964eb4",
+      "trimmedMd5": "487206ae074d6c8dd6d7a70001a1d116"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
