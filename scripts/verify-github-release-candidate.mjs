@@ -22,6 +22,9 @@ const RELEASE_GATE_PATHS = Object.freeze([
   'scripts/verify-approved-production-release.mjs',
   'scripts/production-release-attestation.mjs',
   'scripts/verify-github-release-candidate.mjs',
+  'scripts/production-release-head-check-contract.mjs',
+  'scripts/publish-approved-production-release-check.mjs',
+  'scripts/trusted-production-release-merger.mjs',
 ])
 
 export const REQUIRED_RELEASE_CHECKS = Object.freeze([
@@ -167,6 +170,13 @@ function trustedWorkflowEvidence(checkoutDir, headSha, baseSha) {
     .split('\0').includes(RELEASE_CHECK_WORKFLOW_PATH)
   if (baseReleaseCheckExists) {
     for (const path of RELEASE_GATE_PATHS) {
+      // The head-check App and merger are a separately reviewed trust-root
+      // bootstrap. Before their first base installation there are no base
+      // bytes to compare; after installation all candidate edits are blocked.
+      const basePathExists = git(checkoutDir,
+        ['ls-tree', '--name-only', '-z', baseSha, '--', path])
+        .split('\0').includes(path)
+      if (!basePathExists) continue
       const baseBytes = git(checkoutDir, ['show', `${baseSha}:${path}`], 'buffer')
       const headBytes = git(checkoutDir, ['show', `${headSha}:${path}`], 'buffer')
       if (sha256(baseBytes) !== sha256(headBytes))

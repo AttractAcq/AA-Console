@@ -5,6 +5,9 @@ import {
   createGithubMergeEffect, readObservedGithubMerge, readProtectedReleaseBoundary,
   mergeApprovedProductionRelease,
 } from './trusted-production-release-merger.mjs'
+import {
+  APPROVED_RELEASE_APP_CHECK, approvedReleaseCheckExternalId,
+} from './production-release-head-check-contract.mjs'
 
 const REPOSITORY = 'AttractAcq/AA-Console'
 const REQUEST = '11111111-1111-4111-8111-111111111111'
@@ -12,12 +15,13 @@ const LEASE = '22222222-2222-4222-8222-222222222222'
 const HEAD = 'a'.repeat(40)
 const BASE = 'b'.repeat(40)
 const MERGED = 'c'.repeat(40)
+const TRUSTED_APP = { id: 424242, slug: 'aa-release-gate' }
 const CHECKS = [
   'Agent runtime (typecheck, test, build)',
   'Frontend (lint, typecheck, test, build)',
   'MCP gateway (typecheck, test, build)',
   'Schema replay (clean, upgrade, catalog, types)',
-  'Approved production release (trusted)',
+  APPROVED_RELEASE_APP_CHECK,
 ]
 const plan = Object.freeze({ requestId: REQUEST, prNumber: 297,
   headSha: HEAD, baseSha: BASE, sourceVersion: 'd'.repeat(64),
@@ -25,27 +29,34 @@ const plan = Object.freeze({ requestId: REQUEST, prNumber: 297,
 
 function protectedFacts() {
   return {
-    plan, mergerLogin: 'aa-release-merger',
+    plan, mergerLogin: 'aa-release-merger', trustedApp: TRUSTED_APP,
     actor: { login: 'aa-release-merger', type: 'User' },
     branch: { name: 'main', commit: { sha: BASE } },
     pr: { number: 297, state: 'open', draft: false, merged_at: null,
+      body: `AA-Release-Request: ${REQUEST}`,
       mergeable: true, mergeable_state: 'clean',
       head: { sha: HEAD, repo: { full_name: REPOSITORY } },
       base: { sha: BASE, ref: 'main', repo: { full_name: REPOSITORY } } },
     protection: {
       required_status_checks: { strict: true,
-        checks: CHECKS.map((context) => ({ context, app_id: 15368 })) },
+        checks: CHECKS.map((context) => ({ context,
+          app_id: context === APPROVED_RELEASE_APP_CHECK ? TRUSTED_APP.id : 15368 })) },
       enforce_admins: { enabled: true },
       allow_force_pushes: { enabled: false }, allow_deletions: { enabled: false },
       restrictions: { users: [{ login: 'aa-release-merger' }], teams: [], apps: [] },
     },
     checks: { total_count: 5, check_runs: CHECKS.map((name, index) => ({
       name, id: index + 1, head_sha: HEAD, status: 'completed',
-      conclusion: 'success', app: { id: 15368, slug: 'github-actions' },
-      details_url: `https://github.com/${REPOSITORY}/actions/runs/123/job/${index + 1}`,
+      conclusion: 'success', app: name === APPROVED_RELEASE_APP_CHECK
+        ? TRUSTED_APP : { id: 15368, slug: 'github-actions' },
+      details_url: name === APPROVED_RELEASE_APP_CHECK
+        ? `https://github.com/${REPOSITORY}/actions/runs/123`
+        : `https://github.com/${REPOSITORY}/actions/runs/123/job/${index + 1}`,
+      external_id: name === APPROVED_RELEASE_APP_CHECK
+        ? approvedReleaseCheckExternalId(plan, 123, 1) : undefined,
     })) },
     trustedRun: { id: 123, path: '.github/workflows/production-release-approval.yml',
-      event: 'pull_request_target', head_sha: BASE,
+      event: 'pull_request_target', head_sha: BASE, run_attempt: 1,
       status: 'completed', conclusion: 'success',
       repository: { full_name: REPOSITORY },
       pull_requests: [{ number: 297, head: { sha: HEAD }, base: { sha: BASE } }] },
@@ -66,9 +77,13 @@ test('requires strict protected CI, the trusted exact-head job, sole merger iden
     (f: ReturnType<typeof protectedFacts>) => { f.checks.check_runs[4].head_sha = BASE },
     (f: ReturnType<typeof protectedFacts>) => { f.checks.check_runs[4].app.id = 999 },
     (f: ReturnType<typeof protectedFacts>) => { f.trustedRun.path = '.github/workflows/ci.yml' },
-    (f: ReturnType<typeof protectedFacts>) => { f.trustedRun.pull_requests = [] },
+    (f: ReturnType<typeof protectedFacts>) => { f.trustedRun.pull_requests = [{ number: 298, head: { sha: HEAD }, base: { sha: BASE } }] },
     (f: ReturnType<typeof protectedFacts>) => { f.trustedRun.pull_requests[0].head.sha = MERGED },
     (f: ReturnType<typeof protectedFacts>) => { f.trustedRun.head_sha = HEAD },
+    (f: ReturnType<typeof protectedFacts>) => { f.checks.check_runs[4].external_id = 'forged' },
+    (f: ReturnType<typeof protectedFacts>) => { f.checks.check_runs[4].app.id = 15368 },
+    (f: ReturnType<typeof protectedFacts>) => { f.trustedRun.run_attempt = 2 },
+    (f: ReturnType<typeof protectedFacts>) => { f.pr.body = `AA-Release-Request: ${LEASE}` },
     (f: ReturnType<typeof protectedFacts>) => { f.actor.login = 'alex' },
   ]
   for (const attack of attacks) {
@@ -76,6 +91,15 @@ test('requires strict protected CI, the trusted exact-head job, sole merger iden
     attack(facts)
     assert.throws(() => assertProtectedReleaseBoundary(facts), /blocked:/)
   }
+})
+
+test('an empty pull_request_target run association still needs the App-owned exact binding', () => {
+  const facts = protectedFacts()
+  facts.trustedRun.pull_requests = []
+  assert.equal(assertProtectedReleaseBoundary(facts), true)
+  facts.checks.check_runs[4].external_id = approvedReleaseCheckExternalId(
+    { ...plan, packetSha256: 'f'.repeat(64) }, 123, 1)
+  assert.throws(() => assertProtectedReleaseBoundary(facts), /exact protected-base release workflow/)
 })
 
 test('rejects main moving between parallel boundary reads and the final branch read', async () => {
@@ -96,7 +120,7 @@ test('rejects main moving between parallel boundary reads and the final branch r
   }
   await assert.rejects(readProtectedReleaseBoundary({ plan,
     token: 'reviewed-merger-token-value', mergerLogin: 'aa-release-merger',
-    fetcher }), /main advanced during protected release boundary read/)
+    trustedApp: TRUSTED_APP, fetcher }), /main advanced during protected release boundary read/)
   assert.equal(branchReads, 2)
 })
 

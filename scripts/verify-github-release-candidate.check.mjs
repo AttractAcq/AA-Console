@@ -18,7 +18,7 @@ function git(directory, ...args) {
   return execFileSync('git', ['-C', directory, ...args], { encoding: 'utf8' }).trim()
 }
 
-function checkoutFixture(t, { releaseWorkflow = false } = {}) {
+function checkoutFixture(t, { releaseWorkflow = false, appGateFiles = false } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'aa-release-verifier-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   git(directory, 'init', '-q')
@@ -37,6 +37,11 @@ function checkoutFixture(t, { releaseWorkflow = false } = {}) {
       'verify-approved-production-release.mjs',
       'production-release-attestation.mjs',
       'verify-github-release-candidate.mjs',
+      ...(appGateFiles ? [
+        'production-release-head-check-contract.mjs',
+        'publish-approved-production-release-check.mjs',
+        'trusted-production-release-merger.mjs',
+      ] : []),
     ]) writeFileSync(join(directory, 'scripts', path), '// trusted release gate\n')
   }
   writeFileSync(join(directory, 'supabase', 'verification', 'released-migration-version.txt'), `${RELEASED}\n`)
@@ -299,6 +304,23 @@ test('allows the reviewed gate bootstrap but rejects later release-check workflo
   await assert.rejects(verifyGithubReleaseCandidate({ prNumber: 7,
     checkoutDir: code.directory, fetcher: fetchFixture(changedCode) }),
   /changes trusted production release gate code: scripts\/check-approved-production-release.mjs/)
+})
+
+test('locks App check contract, publisher and merger after reviewed base installation', async (t) => {
+  for (const name of [
+    'production-release-head-check-contract.mjs',
+    'publish-approved-production-release-check.mjs',
+    'trusted-production-release-merger.mjs',
+  ]) {
+    const checkout = checkoutFixture(t, { releaseWorkflow: true, appGateFiles: true })
+    writeFileSync(join(checkout.directory, 'scripts', name), '// weakened App gate\n')
+    git(checkout.directory, 'add', '.')
+    git(checkout.directory, 'commit', '-qm', 'weaken app gate')
+    const changed = apiFixture({ ...checkout, headSha: git(checkout.directory, 'rev-parse', 'HEAD') })
+    await assert.rejects(verifyGithubReleaseCandidate({ prNumber: 7,
+      checkoutDir: checkout.directory, fetcher: fetchFixture(changed) }),
+    new RegExp(`changes trusted production release gate code: scripts/${name.replace(/\./g, '\\.')}`))
+  }
 })
 
 test('rejects a non-200 GitHub API response without trusting fixture claims', async (t) => {

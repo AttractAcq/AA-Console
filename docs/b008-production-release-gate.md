@@ -95,12 +95,16 @@ workflow caller or installed credential**. It refreshes only the identical
 human-bound GitHub packet, reads the latest canonical card/decision and exact
 plan, checks current GitHub main and the open PR, requires strict branch
 protection and a sole reviewed merger restriction, verifies all four CI jobs
-plus `Approved production release (trusted)` as successful exact-head checks
-from their pinned GitHub Actions app, and verifies the trusted check's workflow
-run path, protected base SHA and single exact PR/head/base association. A
-missing workflow-run PR association fails closed; GitHub may leave this array
-empty for some event topologies, so the live `pull_request_target` pilot must
-establish that these facts are available before activation. It then acquires
+from the pinned GitHub Actions app plus the distinct
+`Approved production release (AA App)` check from a separately pinned App on
+the exact PR head. It verifies the App check's deterministic `external_id`
+against the request, packet, PR/head/base, trusted workflow run ID and run
+attempt. The workflow run itself must be the completed successful
+`pull_request_target` workflow on the protected base. A nonempty workflow-run
+PR association must identify this exact PR/head/base; an empty association
+is accepted only because the dedicated App check binds those facts. The live
+pilot must establish GitHub's actual association and required-check behavior.
+The merger then acquires
 the lease, repeats the canonical/GitHub checks, and
 calls the dispatch RPC. The future merge call supplies the exact PR head SHA
 and approved merge method. It accepts a completed receipt only after a fresh
@@ -145,15 +149,16 @@ service-role key shared with other runtimes is insufficient custody.
    provisioned human AAL2 admin may revoke the approved plan if needed.
 
 **Q020 / activation blocker:** Alex must approve a dedicated merger identity,
-separate read-only GitHub verifier and write-capable merger tokens, and
-server-only Supabase credential custody; ensure GitHub protection allows
-only that identity to change `main` with no bypass, make the trusted check
-mandatory with an exact GitHub Actions app binding, and prove a
-`pull_request_target` job is attached to the *PR head* before this verifier can
-accept it. A base-commit-only check is rejected. The new merger file is not
-yet part of the 293 verifier's protected gate-code path list; adding it there
-needs a separately reviewed trust-root bootstrap because ordinary candidates
-cannot change the verifier itself. None of these settings are changed by 297.
+separate read-only GitHub verifier, App check publisher and write-capable
+merger credentials, plus server-only Supabase custody. GitHub protection must
+allow only the reviewed merger identity to change `main`, with no bypass, and
+must require the dedicated App check on the exact PR head with its real App ID
+as expected source. The App's installation/custody method, ID and slug, and
+the live required-check topology are unverified. The new publisher, shared
+binding contract and merger are added to the verifier's protected gate-code
+path list in the held follow-up, but that change itself needs a separately
+reviewed trust-root bootstrap because ordinary release candidates cannot
+modify the verifier. None of those settings are changed by this source work.
 
 The final distributed window remains between the last GitHub read, the
 database dispatch and GitHub's merge API. The exact-head `sha` precondition
@@ -231,16 +236,81 @@ green result is still only a snapshot.
 
 **Activation remains held.** The current main protection requires the four
 CI jobs with `strict: true` and `enforce_admins: true`, but does not require
-`Approved production release (trusted)`. The repository's Actions secrets
+either the native workflow job or the dedicated App check. The repository's Actions secrets
 currently contain only the public browser build settings; there is no
 `AA_RELEASE_SUPABASE_SERVICE_ROLE_KEY`. Before making the check mandatory,
 review custody and scope for that server credential (prefer a dedicated
 release verifier identity limited to the proof-refresh RPC and reads), confirm GitHub's `pull_request_target`
 event policy permits this trusted workflow, install the credential, test a
 red stale/revoked candidate and a green exact candidate, then require the
-check from the GitHub Actions app without a bypass route. No environment
+separate App's exact-head check by its pinned App ID without a bypass route. No environment
 secret, protection setting or production SQL is changed by this held source
 slice.
+
+### Held dedicated App check on the exact PR head
+
+[GitHub documents](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request_target)
+that `pull_request_target` runs on the protected base commit. Its native job
+check can therefore be base-attached and cannot be presumed to satisfy a
+head-required branch rule. [The Checks API](https://docs.github.com/en/rest/checks/runs?apiVersion=2022-11-28#create-a-check-run)
+permits a GitHub App with `Checks: write` to create a check on an explicit
+`head_sha`. [GitHub's required-check guidance](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)
+also distinguishes App-created checks from workflow job checks and says the
+effective required SHA can be the PR head or test merge commit. These facts
+require a live non-effect pilot; they do not prove the current repository's
+policy has been installed correctly.
+
+The source-only `publishApprovedProductionReleaseHeadCheck` function accepts
+an event from the protected-base runner, independently invokes the canonical
+AAL2 approval assertion, re-reads current PR/main and the workflow run with
+a read-only GitHub token, then asks a separate reviewed App installation
+credential to create **only** a `success` check named
+`Approved production release (AA App)` on the exact approved PR head. It has
+no CLI or workflow call site. It rejects a changed marker, PR/head/base,
+main, run path/base/attempt, decision or packet before the write and re-reads
+PR/main afterward. If a write times out, it reports an ambiguous outcome and
+does not retry automatically. A PR or main change after publication cannot
+be made atomic with GitHub; the trusted merger must still re-read the latest
+AAL2 decision, strict protection and exact GitHub state under the 297 lease.
+
+The App check's `external_id` is a SHA-256 reference over an ordered version,
+repository, request UUID, PR number, exact head/base SHA, source version,
+approved packet SHA-256, workflow run ID and run attempt. Its `details_url`
+names that GitHub Actions run. The merger recomputes this reference, requires
+the configured App ID and slug to match both branch protection and the
+check, requires the App check to be successful on the exact PR head, and
+requires the linked protected-base workflow to finish successfully. A wrong
+nonempty workflow-run PR association is rejected. An empty association is
+allowed only with the App-owned exact binding; the App token is therefore a
+critical trust root. A stale green App check after revocation cannot authorize
+the effect because the merger's AAL2 re-read and database lease reject it.
+
+**Q020 choices and pilot evidence to collect before activation:**
+
+1. Choose the App's real installation, ID, slug and custody mechanism. A
+   short-lived installation token needs a reviewed issuer, such as an OIDC
+   attested broker. Putting a private key in a `pull_request_target` secret
+   is an alternative that needs an explicit custody review. The App should
+   have only repository Metadata read and Checks write. Keep its credential
+   distinct from the read-only verifier and merge identity.
+2. Bootstrap the protected-base publisher/contract/merger files and verifier
+   path lock under separate human review. An ordinary exact release candidate
+   cannot change its own verifier. Wire the publisher into the workflow only
+   after the App and server credential policy is approved; do not execute
+   PR-head code in that secret-bearing runner.
+3. Use a same-repository trial PR to record the native job check SHA, the App
+   check SHA, App ID/slug, `external_id`, linked workflow run path/event/base,
+   its `pull_requests` array and run attempt, and the PR status box's effective
+   head versus test-merge SHA. Verify a changed head, newer base, revoked
+   Inbox decision, missing App check, wrong App, failed CI and wrong packet
+   all block. Require the App check by exact source ID only after this trial.
+4. Prove only the reviewed merger identity can change `main`, with no direct
+   push, alternate merge, administrator bypass or merge queue path that skips
+   the lease. The App check is a snapshot and cannot replace this policy.
+
+This source-only follow-up does not install an App, token, workflow step,
+required check or merger runner. The 291–297 SQL stack remains held and
+class 32 remains blocked.
 
 **A required green status does not close the release effect gate.** The
 human can revoke after the workflow's last read. GitHub can then merge a
