@@ -572,8 +572,7 @@ describe("unified approval inbox", () => {
     expect(within(card).getByText(/Employee One/)).toBeInTheDocument();
     expect(within(card).getAllByText(/member-1/)).toHaveLength(2);
     expect(within(card).getByText(/Before enabling access, audit every approved, unrevoked grant/)).toBeInTheDocument();
-    expect(within(card).getByText(/Sales access request controls are not yet available/)).toBeInTheDocument();
-    expect(within(card).getByRole("link", { name: "Open Sales OS workspace" }))
+    expect(within(card).getByRole("link", { name: "Open sales access requests" }))
       .toHaveAttribute("href", "/clients/client-1/delivery/sales-os?tab=leads");
     await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_sales_entitlement", {

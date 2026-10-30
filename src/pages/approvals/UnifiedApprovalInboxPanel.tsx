@@ -418,10 +418,7 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
           <>
             <Link className="text-sm font-medium text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               to={sourcePath}>{request.source_kind === "client_sales_entitlement"
-                ? "Open Sales OS workspace" : "View owning source"}</Link>
-            {request.source_kind === "client_sales_entitlement" && <p className="mt-1 text-xs text-muted-foreground">
-              Sales access request controls are not yet available in that workspace.
-            </p>}
+                ? "Open sales access requests" : "View owning source"}</Link>
           </>
         ) : <span className="text-xs text-muted-foreground">
           {manager ? "Owning source is unavailable from the manager console." : "Owning source link unavailable."}
