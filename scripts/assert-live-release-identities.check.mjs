@@ -39,6 +39,7 @@ test('exact, recent live identities pass; mismatches and partial observations fa
 test('bounded live probe refuses 503, malformed body and a transport that never resolves', async () => {
   const response = (body, status = 200) => new Response(JSON.stringify(body), { status })
   await probeLiveIdentity(manifest, async () => response(live()))
+  await assert.rejects(() => probeLiveIdentity(manifest, async () => response(live(), 201)), /HTTP 201/)
   await assert.rejects(() => probeLiveIdentity(manifest, async () => response(live(), 503)), /HTTP 503/)
   await assert.rejects(() => probeLiveIdentity(manifest, async () => response({ ...live(), gatewaySha: null })))
   await assert.rejects(() => probeLiveIdentity(manifest, async () => new Response('x'.repeat(4097))), /response limit/)

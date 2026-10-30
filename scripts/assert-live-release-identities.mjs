@@ -93,7 +93,7 @@ export async function probeLiveIdentity(manifest, fetcher = fetch, url = endpoin
     method: 'GET', cache: 'no-store', redirect: 'error',
     signal: AbortSignal.timeout(5000),
   }), 5000)
-  if (!response.ok) throw new Error(`Live release probe returned HTTP ${response.status}`)
+  if (response.status !== 200) throw new Error(`Live release probe returned HTTP ${response.status}`)
   const raw = await within(response.text(), 5000)
   if (raw.length > 4096) throw new Error('Live release probe exceeded its response limit')
   const body = JSON.parse(raw)

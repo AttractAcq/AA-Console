@@ -49,3 +49,12 @@ human approval requirements remain separate B008/B009 work. A failed Pages
 gate leaves the previous site available; do not alter the marker solely to
 make a red gate green. Preserve action ledger and external IDs during any
 runtime rollback.
+
+The runtime currently caches its gateway and schema observation for up to ten
+seconds. A gateway rollback or schema change immediately after that cache fill
+can make a recent `/release/identities` response briefly reflect the previous
+state. This guard therefore does not establish an atomic deployment snapshot.
+B009 remains open until the pre-publication observation can be forced fresh or
+corroborated independently and an authenticated compatibility smoke test is
+recorded. A later live change can also occur after any pre-publication check;
+rollback monitoring must detect and reconcile that state.
