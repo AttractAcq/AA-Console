@@ -36,6 +36,8 @@ describe("SchemaParityPanel", () => {
     expect(screen.getByText("Observed snapshots match")).toBeInTheDocument();
     expect(screen.getByText(/tracked-source equivalence is unproven/)).toBeInTheDocument();
     expect(screen.getByText(/Generated types: unverified/)).toBeInTheDocument();
+    expect(screen.getByText("Source manifest")).toBeInTheDocument();
+    expect(screen.queryByText("Local working tree")).not.toBeInTheDocument();
     expect(screen.getAllByText("20261025233000")).toHaveLength(3);
     expect(screen.getAllByText("Unknown").length).toBeGreaterThan(0);
   });

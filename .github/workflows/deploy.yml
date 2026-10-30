@@ -41,6 +41,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Verify runtime parity source manifest
+        run: node scripts/schema-parity-runtime-manifest.mjs --check
+
       # A missing key does not fail the build — Vite substitutes undefined
       # and the app ships, rendering a login page that cannot reach anything.
       # Checking here turns a confusing runtime failure into an obvious
