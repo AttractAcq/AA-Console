@@ -1,4 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -50,6 +51,46 @@ function candidate(overrides: Record<string, unknown> = {}) {
     rollback: { strategy: "forward_fix" },
     ...overrides,
   };
+}
+
+function canonical(value: unknown): string {
+  if (value === null || typeof value === "string" || typeof value === "boolean"
+    || typeof value === "number") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  const object = value as Record<string, unknown>;
+  return `{${Object.keys(object).sort().map((key) =>
+    `${JSON.stringify(key)}:${canonical(object[key])}`).join(",")}}`;
+}
+
+function packet(source = candidate(), overrides: Record<string, unknown> = {}) {
+  const body = {
+    schemaVersion: 1,
+    kind: "github_premerge_release_evidence",
+    repository: { id: 12345, fullName: source.repository },
+    pr: {
+      number: Number((source.pr as { number: string }).number),
+      url: (source.pr as { url: string }).url,
+      head: { sha: HEAD, ref: "codex/release", repositoryId: 12345 },
+      base: { sha: BASE, ref: "main", repositoryId: 12345 },
+    },
+    checks: {
+      workflowRunId: "41005193831", workflowSha256: HASH,
+      required: CHECK_NAMES.map((name, index) => ({
+        name, headSha: HEAD, runId: "41005193831", checkRunId: 100 + index,
+      })),
+    },
+    migrations: {
+      sourceMarkerHead: (source.schema as { current_head: string }).current_head,
+      targetHead: (source.schema as { target_head: string }).target_head,
+      pending: source.migrations,
+    },
+    premergePrHeadSha: HEAD,
+    futureDeploymentSha: null,
+    productionSchemaVerified: false,
+    releaseAuthorized: false,
+    ...overrides,
+  };
+  return { ...body, packetSha256: createHash("sha256").update(canonical(body)).digest("hex") };
 }
 
 async function asRole<T extends Record<string, unknown>>(
@@ -164,6 +205,12 @@ beforeAll(async () => {
     "20261030160000_279_approval_class_coverage.sql",
     "20261101050000_288_production_release_candidate_inbox.sql",
   ]) await db.exec(await migration(name));
+  // Migration 290 defines this adapter. The focused PGlite fixture does not
+  // replay Meta tables, so provide the unrelated branch of the 293 view.
+  await db.exec(`create function public.recruitment_meta_build_source_state_v6(uuid)
+    returns text language sql stable as $$ select 'unverified'::text $$`);
+  await db.exec(await migration(
+    "20261101100000_293_trusted_production_release_decision.sql"));
   await db.exec("set timezone='UTC'");
 }, 60_000);
 
@@ -253,8 +300,8 @@ describe("production release candidate Inbox migration 288", () => {
       executor_state: string; overall_status: string;
     }>("authenticated", ADMIN, "aal2",
       "select revision,source_state,decision_state,executor_state,overall_status from public.approval_class_coverage_v6 where class_id=32");
-    expect(coverage).toMatchObject({ revision: 2, source_state: "blocked",
-      decision_state: "missing", executor_state: "missing", overall_status: "blocked" });
+    expect(coverage).toMatchObject({ revision: 3, source_state: "blocked",
+      decision_state: "blocked", executor_state: "missing", overall_status: "blocked" });
     await expect(db.query("update public.production_release_candidates_v6 set expires_at=now() where id=$1", [id]))
       .rejects.toThrow(/append-only/);
     await expect(db.query("delete from public.production_release_candidates_v6 where id=$1", [id]))
@@ -306,5 +353,144 @@ describe("production release candidate Inbox migration 288", () => {
       [requestId]);
     expect(row).toMatchObject({ status: "expired", source_state: "source_held" });
     expect(row!.preview_blocker).toMatch(/not independently attested/);
+  });
+});
+
+describe("trusted exact-version production release decision migration 293", () => {
+  async function submitted(number: string) {
+    const source = candidate({ pr: {
+      ...candidate().pr, number,
+      url: `https://github.com/AttractAcq/AA-Console/pull/${number}`,
+    } });
+    const sourceId = await submit(source);
+    const [card] = await asRole<{ id: string; status: string; source_state: string;
+      source_version: string; artifact_hash: string }>(
+      "authenticated", ADMIN, "aal2",
+      "select id,status,source_state,source_version,artifact_hash from public.approval_inbox_v6 where source_id=$1",
+      [sourceId],
+    );
+    return { source, card: card! };
+  }
+
+  async function attest(requestId: string, proof: Record<string, unknown>,
+    role: "authenticated" | "service_role" = "service_role") {
+    return asRole<{ id: string }>(role, ADMIN, "aal2",
+      "select public.record_trusted_production_release_attestation_v6($1,$2::jsonb) as id",
+      [requestId, JSON.stringify(proof)]);
+  }
+
+  it("keeps an unverified card held and denies browser and Bot proof submission", async () => {
+    const { source, card } = await submitted("294");
+    expect(card).toMatchObject({ status: "source_held", source_state: "source_held" });
+    await expect(attest(card.id, packet(source), "authenticated"))
+      .rejects.toThrow(/permission denied|Only the release attester service/);
+    const [after] = await asRole<{ status: string; preview_blocker: string }>(
+      "authenticated", ADMIN, "aal2",
+      "select status,preview_blocker from public.approval_inbox_v6 where id=$1",
+      [card.id]);
+    expect(after!.status).toBe("source_held");
+    expect(after!.preview_blocker).toMatch(/Refresh trusted GitHub evidence/);
+  });
+
+  it("rejects forged CI claims, SQL bytes, PR head and packet digest", async () => {
+    const { source, card } = await submitted("295");
+    const good = packet(source);
+    await expect(attest(card.id, { ...good, packetSha256: HASH }))
+      .rejects.toThrow(/digest does not match/);
+    await expect(attest(card.id, packet(source, { premergePrHeadSha: BASE })))
+      .rejects.toThrow(/malformed or overclaims/);
+    await expect(attest(card.id, packet(source, { checks: {
+      ...(good.checks as Record<string, unknown>), workflowRunId: "41005193832",
+    } }))).rejects.toThrow(/CI job differs/);
+    await expect(attest(card.id, packet(source, { migrations: {
+      ...(good.migrations as Record<string, unknown>), pending: [{
+        ...(source.migrations as Array<Record<string, unknown>>)[0], sha256: "d".repeat(64),
+      }],
+    } }))).rejects.toThrow(/committed SQL differs/);
+    await expect(attest(card.id, packet(source, { pr: {
+      ...(good.pr as Record<string, unknown>), head: {
+        sha: BASE, ref: "codex/release", repositoryId: 12345,
+      },
+    } }))).rejects.toThrow(/repository or PR/);
+  });
+
+  it("binds trusted proof to one exact AAL2 human decision and supports revocation", async () => {
+    const { source, card } = await submitted("296");
+    const proof = packet(source);
+    const [written] = await attest(card.id, proof);
+    expect(written!.id).toMatch(/^[0-9a-f-]{36}$/);
+    const [ready] = await asRole<{ status: string; source_state: string;
+      preview_blocker: string | null; preview: Record<string, unknown> }>(
+      "authenticated", ADMIN, "aal2",
+      "select status,source_state,preview_blocker,preview from public.approval_inbox_v6 where id=$1",
+      [card.id]);
+    expect(ready).toMatchObject({ status: "pending", source_state: "pending",
+      preview_blocker: null });
+    expect((ready!.preview.trusted_github_evidence as { packetSha256: string }).packetSha256)
+      .toBe(proof.packetSha256);
+
+    const decision = "select public.decide_production_release_candidate_v6($1,$2,$3,$4,$5) as id";
+    const approveArgs = [card.id, card.source_version, card.artifact_hash,
+      "approved", null];
+    await expect(asRole("authenticated", ADMIN, "aal1", decision, approveArgs))
+      .rejects.toThrow(/provisioned admin with AAL2/);
+    await expect(asRole("authenticated", MEMBER, "aal2", decision, approveArgs))
+      .rejects.toThrow(/provisioned admin with AAL2/);
+    await expect(asRole("service_role", ADMIN, "aal2", decision, approveArgs))
+      .rejects.toThrow(/permission denied|provisioned admin with AAL2/);
+    await expect(asRole("authenticated", ADMIN, "aal2", decision,
+      [card.id, "f".repeat(64), card.artifact_hash, "approved", null]))
+      .rejects.toThrow(/version changed/);
+    await asRole("authenticated", ADMIN, "aal2", decision, approveArgs);
+    const [approved] = await asRole<{ status: string }>("authenticated", ADMIN,
+      "aal2", "select status from public.approval_inbox_v6 where id=$1", [card.id]);
+    expect(approved!.status).toBe("approved");
+    await expect(asRole("authenticated", ADMIN, "aal2", decision,
+      [card.id, card.source_version, card.artifact_hash, "rejected", "Changed my mind"]))
+      .rejects.toThrow(/already been decided/);
+    await asRole("authenticated", ADMIN, "aal2", decision,
+      [card.id, card.source_version, card.artifact_hash, "revoked", "Superseded plan"]);
+    const [revoked] = await asRole<{ status: string }>("authenticated", ADMIN,
+      "aal2", "select status from public.approval_inbox_v6 where id=$1", [card.id]);
+    expect(revoked!.status).toBe("revoked");
+  });
+
+  it("preserves reasoned rejection of a held source and cannot approve it later", async () => {
+    const { card } = await submitted("297");
+    const decision = "select public.decide_production_release_candidate_v6($1,$2,$3,$4,$5) as id";
+    await expect(asRole("authenticated", ADMIN, "aal2", decision,
+      [card.id, card.source_version, card.artifact_hash, "approved", null]))
+      .rejects.toThrow(/stale, held or expired/);
+    await asRole("authenticated", ADMIN, "aal2", decision,
+      [card.id, card.source_version, card.artifact_hash, "rejected", "No verified CI"]);
+    const [rejected] = await asRole<{ status: string }>("authenticated", ADMIN,
+      "aal2", "select status from public.approval_inbox_v6 where id=$1", [card.id]);
+    expect(rejected!.status).toBe("rejected");
+  });
+
+  it("holds a stale verifier observation until the server refreshes that exact packet", async () => {
+    const { source, card } = await submitted("298");
+    await attest(card.id, packet(source));
+    await db.query(`
+      insert into public.production_release_attestations_v6 (
+        request_id,source_version,packet,packet_sha256,attested_at
+      ) select request_id,source_version,packet,packet_sha256,
+          now() - interval '1 hour'
+        from public.production_release_attestations_v6
+        where request_id=$1 order by event_order desc limit 1
+    `, [card.id]);
+    const [held] = await asRole<{ status: string; source_state: string }>(
+      "authenticated", ADMIN, "aal2",
+      "select status,source_state from public.approval_inbox_v6 where id=$1", [card.id]);
+    expect(held).toMatchObject({ status: "source_held", source_state: "source_held" });
+    await expect(asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,'approved',null)",
+      [card.id, card.source_version, card.artifact_hash]))
+      .rejects.toThrow(/stale, held or expired/);
+    await attest(card.id, packet(source));
+    const [ready] = await asRole<{ status: string }>(
+      "authenticated", ADMIN, "aal2",
+      "select status from public.approval_inbox_v6 where id=$1", [card.id]);
+    expect(ready!.status).toBe("pending");
   });
 });

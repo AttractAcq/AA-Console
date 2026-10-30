@@ -25818,6 +25818,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_production_release_candidate_v6: {
+        Args: {
+          p_decision: string
+          p_expected_artifact_hash: string
+          p_expected_source_version: string
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: string
+      }
       decide_proof_delivery: {
         Args: { p_approve: boolean; p_delivery_id: string }
         Returns: undefined

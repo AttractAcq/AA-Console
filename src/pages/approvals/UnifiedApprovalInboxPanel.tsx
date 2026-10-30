@@ -188,6 +188,38 @@ function isInvitation(request: UnifiedApprovalRequest): boolean {
   return request.source_system === "auth" && request.source_kind === "console_invitation";
 }
 
+function isProductionRelease(request: UnifiedApprovalRequest): boolean {
+  return request.source_system === "aa_console"
+    && request.source_kind === "production_release"
+    && request.client_id === null && request.owner_role === "admin"
+    && request.source_version === request.artifact_hash
+    && /^[0-9a-f]{64}$/.test(request.source_version)
+    && typeof request.source_id === "string" && /^[0-9a-f-]{36}$/i.test(request.source_id);
+}
+
+function releaseCanApprove(request: UnifiedApprovalRequest): boolean {
+  if (!isProductionRelease(request) || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request)
+    || previewMissing(request)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const candidate = preview?.candidate as Record<string, unknown> | undefined;
+  const proof = preview?.trusted_github_evidence as Record<string, unknown> | undefined;
+  const pr = candidate?.pr as Record<string, unknown> | undefined;
+  const verifiedPr = proof?.pr as Record<string, unknown> | undefined;
+  const head = verifiedPr?.head as Record<string, unknown> | undefined;
+  return candidate?.repository === "AttractAcq/AA-Console"
+    && pr?.head_sha === head?.sha
+    && proof?.premergePrHeadSha === head?.sha
+    && typeof proof?.packetSha256 === "string"
+    && /^[0-9a-f]{64}$/.test(proof.packetSha256);
+}
+
+function releaseCanReject(request: UnifiedApprovalRequest): boolean {
+  return isProductionRelease(request)
+    && (request.status === "pending" || request.status === "source_held"
+      || request.status === "expired");
+}
+
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignApprovalReady(request, clientId)
     || isGoogleReplyApprovalReady(request, clientId)
@@ -242,10 +274,13 @@ function RequestCard({ request, history, clientId, manager, global, aal, busy, o
   const sourcePath = manager ? null : sourcePathForRequest(request, clientId);
   const html = exactHtml(request.preview);
   const canReject = (global && !manager && isInvitation(request) && invitationCanReject(request))
+    || (global && !manager && releaseCanReject(request))
     || isRejectionReady(request, clientId);
   const canApprove = (global && !manager && isInvitation(request) && invitationCanApprove(request))
+    || (global && !manager && releaseCanApprove(request))
     || isApprovalReady(request, clientId);
   const decisionLabel = isInvitation(request) ? "Auth invitation"
+    : isProductionRelease(request) ? "Production release plan"
     : request.source_kind === "google_review_reply"
     ? "Google review reply" : request.source_kind === "recruitment_brief"
       ? "Recruitment brief" : "Campaign action";
@@ -342,6 +377,9 @@ function RequestCard({ request, history, clientId, manager, global, aal, busy, o
             This calls the source owner for the exact version above. AAL2 is required;
             the source and database recheck the request before recording a decision.
           </p>
+          {isProductionRelease(request) && <p className="text-xs text-muted-foreground">
+            This decision records a release plan. Merge, migration, Railway and Pages each require their own exact-version effect gate and observed receipt.
+          </p>}
           {!canApprove && canReject && <p className="text-xs text-muted-foreground">
             This request has expired. It can only be closed with a reasoned rejection.
           </p>}
@@ -476,9 +514,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
 
   async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) {
     const agencyInvitation = global && isInvitation(request);
+    const agencyRelease = global && isProductionRelease(request);
     const targetClientId = multiClient ? request.client_id : clientId;
     const ready = agencyInvitation
       ? (decision === "approved" ? invitationCanApprove(request) : invitationCanReject(request))
+      : agencyRelease
+        ? (decision === "approved" ? releaseCanApprove(request) : releaseCanReject(request))
       : !!targetClientId && request.client_id === targetClientId
         && (decision === "approved" ? isApprovalReady(request, targetClientId)
           : isRejectionReady(request, targetClientId));
@@ -502,6 +543,9 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       const currentReady = currentRequest && (agencyInvitation
         ? (decision === "approved" ? invitationCanApprove(currentRequest)
           : invitationCanReject(currentRequest))
+        : agencyRelease
+          ? (decision === "approved" ? releaseCanApprove(currentRequest)
+            : releaseCanReject(currentRequest))
         : !!targetClientId && (decision === "approved"
           ? isApprovalReady(currentRequest, targetClientId)
           : isRejectionReady(currentRequest, targetClientId)));
@@ -520,6 +564,14 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
           p_approved: decision === "approved",
           ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
         })
+        : agencyRelease
+          ? await supabase.rpc("decide_production_release_candidate_v6", {
+            p_request_id: request.id,
+            p_expected_source_version: request.source_version,
+            p_expected_artifact_hash: request.artifact_hash!,
+            p_decision: decision,
+            ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+          })
         : request.source_kind === "google_review_reply"
         ? await supabase.rpc("decide_google_review_reply_from_inbox_v6", {
           p_reply_id: request.source_id,
