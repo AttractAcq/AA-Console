@@ -36,25 +36,34 @@ beforeEach(() => {
   });
 });
 
-it("selects approved AA ads and queues a paused house-account campaign", async () => {
+it("selects approved AA ads and records a held Inbox request without promising a Meta build", async () => {
   render(<RecruitmentDistributionPanel />);
   expect(await screen.findByText(/Connected: act_123/)).toBeInTheDocument();
   fireEvent.change(screen.getByRole("textbox", { name: "Campaign name" }), { target: { value: "Editor hiring" } });
   fireEvent.change(screen.getByRole("spinbutton", { name: "Daily budget" }), { target: { value: "25" } });
   fireEvent.change(screen.getByRole("textbox", { name: "Countries" }), { target: { value: "za, gb" } });
   fireEvent.click(screen.getByRole("checkbox", { name: /Editor image/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Push selected ads to Ads Manager" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save campaign and request Inbox review" }));
   await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_recruitment_meta_campaign", {
     p_name: "Editor hiring", p_daily_budget: 25,
     p_target_countries: ["ZA", "GB"], p_asset_ids: ["asset-1"],
   }));
-  expect(await screen.findByRole("status")).toHaveTextContent(/paused campaign/i);
+  expect(await screen.findByRole("status")).toHaveTextContent(/No Meta objects were created/i);
+  expect(screen.getByRole("link", { name: "Open Approval Inbox" })).toHaveAttribute("href", "/approvals");
 });
 
-// This panel shipped in #113 and reads recruitment_meta_campaigns plus two
-// RPCs, all of which migration 133 creates and production does not have. Every
-// other query here reads a table that does exist, so the approved ads and the
-// Meta account status are still worth showing.
+it("allows a held request while the Meta account still needs connection", async () => {
+  const base = from.getMockImplementation()!;
+  from.mockImplementation((table: string) => table === "client_integrations"
+    ? chain(null, null) : base(table));
+  render(<RecruitmentDistributionPanel />);
+  expect(await screen.findByText(/You can still prepare a held request/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Save campaign and request Inbox review" }))
+    .toBeEnabled();
+});
+
+// If migration 133 is missing during a rollout, the approved ads and Meta
+// account status remain useful even while campaign requests are unavailable.
 describe("when migration 133 has not been applied", () => {
   const MISSING_TABLE = {
     code: "PGRST205",
@@ -80,21 +89,21 @@ describe("when migration 133 has not been applied", () => {
     withCampaignsError(MISSING_TABLE);
     render(<RecruitmentDistributionPanel />);
 
-    expect(await screen.findByText(/Building recruitment ads is unavailable/)).toBeInTheDocument();
+    expect(await screen.findByText(/Recruitment campaign requests are unavailable/)).toBeInTheDocument();
     // The ad list reads client_media_assets, which exists. Before the guard the
     // whole panel collapsed into one error and showed none of this.
     expect(screen.getByText("Editor image")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("disables the build and does not claim nothing has been built", async () => {
+  it("disables a request when its source table is unavailable", async () => {
     withCampaignsError(MISSING_TABLE);
     render(<RecruitmentDistributionPanel />);
-    await screen.findByText(/Building recruitment ads is unavailable/);
+    await screen.findByText(/Recruitment campaign requests are unavailable/);
 
-    expect(screen.getByRole("button", { name: /Push selected ads to Ads Manager/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Save campaign and request Inbox review/ })).toBeDisabled();
     expect(screen.getByText(/cannot be listed yet/)).toBeInTheDocument();
-    expect(screen.queryByText("No recruitment campaigns built yet.")).toBeNull();
+    expect(screen.queryByText("No recruitment campaigns prepared yet.")).toBeNull();
   });
 
   it("still reports a real failure on that table as an error", async () => {
@@ -102,6 +111,6 @@ describe("when migration 133 has not been applied", () => {
     render(<RecruitmentDistributionPanel />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/permission denied/);
-    expect(screen.queryByText(/Building recruitment ads is unavailable/)).toBeNull();
+    expect(screen.queryByText(/Recruitment campaign requests are unavailable/)).toBeNull();
   });
 });

@@ -27750,6 +27750,14 @@ export type Database = {
         Args: { p_brief: Database["public"]["Tables"]["client_briefs"]["Row"] }
         Returns: Json
       }
+      recruitment_meta_build_snapshot_v6: {
+        Args: { p_campaign_id: string }
+        Returns: Json
+      }
+      recruitment_meta_build_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       regenerate_asset: {
         Args: {
           p_asset_id: string
