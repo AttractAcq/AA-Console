@@ -198,6 +198,136 @@ for (const mode of ["dual", "db"] as const) {
   });
 }
 
+for (const mode of ["dual", "db"] as const) {
+  for (const [reason, lost] of [
+    ["client grant removed", active("bot_production", { clients: [] })],
+    ["token revoked", { found: false }],
+    ["AA unavailable", "outage"],
+    ["Bot suspended", active("bot_production", { status: "suspended" })],
+    [
+      "write permission removed",
+      active("bot_production", {
+        permissions: grants.bot_production.filter(
+          (grant) => grant !== "content.*" && grant !== "workflow.create_approval",
+        ),
+      }),
+    ],
+  ] as const) {
+    test(`${mode} ${reason} blocks all writes before a SQLite receipt or approval card`, async (t) => {
+      const f = fixture(mode, "bot_production");
+      const store = new Store(":memory:");
+      t.after(() => store.close());
+      let adapterCalls = 0;
+      const engine = new ActionEngine(store, registry, {
+        async execute(tool) {
+          adapterCalls++;
+          return { status: "accepted", capability: tool.name };
+        },
+      });
+      const app = await start(f.c, engine, f.auth);
+      t.after(app.close);
+      const warm = await app.mcp("tools/list");
+      assert.equal(warm.status, 200);
+      assert.ok(
+        warm.body.result.tools.some(
+          (tool: { name: string }) => tool.name === "content.generate_brief",
+        ),
+      );
+
+      f.setResponse(lost);
+      const before = f.resolves();
+      for (const [name, args] of [
+        [
+          "content.generate_brief",
+          {
+            client_id: client,
+            idea_id: "22222222-2222-4222-8222-222222222222",
+            idempotency_key: `blocked-brief-${mode}`,
+          },
+        ],
+        [
+          "workflow.create_approval",
+          {
+            client_id: client,
+            summary: "Blocked action must not create a card",
+            idempotency_key: `blocked-approval-${mode}`,
+          },
+        ],
+      ] as const) {
+        const denied = await app.mcp("tools/call", {
+          name,
+          arguments: args,
+        });
+        assert.ok(
+          denied.status === 401 ||
+            denied.body.result?.structuredContent?.status === "rejected",
+        );
+      }
+      assert.ok(f.resolves() > before, "write gate must bypass auth cache");
+      assert.equal(adapterCalls, 0);
+      assert.equal(
+        (store.db.prepare("SELECT count(*) AS count FROM receipts").get() as {
+          count: number;
+        }).count,
+        0,
+      );
+      assert.equal(store.approvals().length, 0);
+
+      const hidden = await app.mcp("tools/list");
+      if (hidden.status === 200)
+        for (const name of ["content.generate_brief", "workflow.create_approval"])
+          assert.ok(
+            !hidden.body.result.tools.some(
+              (tool: { name: string }) => tool.name === name,
+            ),
+          );
+      else assert.equal(hidden.status, 401);
+    });
+  }
+}
+
+test("healthy AA grant allows a write receipt and an approval card", async (t) => {
+  const f = fixture("dual", "bot_production");
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  let adapterCalls = 0;
+  const engine = new ActionEngine(store, registry, {
+    async execute(tool) {
+      adapterCalls++;
+      return { status: "accepted", capability: tool.name };
+    },
+  });
+  const app = await start(f.c, engine, f.auth);
+  t.after(app.close);
+
+  const write = await app.mcp("tools/call", {
+    name: "content.generate_brief",
+    arguments: {
+      client_id: client,
+      idea_id: "22222222-2222-4222-8222-222222222222",
+      idempotency_key: "healthy-brief",
+    },
+  });
+  assert.equal(write.body.result.structuredContent.status, "accepted");
+  assert.equal(adapterCalls, 1);
+  const approval = await app.mcp("tools/call", {
+    name: "workflow.create_approval",
+    arguments: {
+      client_id: client,
+      summary: "Review healthy plan",
+      idempotency_key: "healthy-approval",
+    },
+  });
+  assert.equal(approval.body.result.structuredContent.status, "approval_required");
+  assert.equal(store.approvals().length, 1);
+  assert.equal(
+    (store.db.prepare("SELECT count(*) AS count FROM receipts").get() as {
+      count: number;
+    }).count,
+    2,
+  );
+});
+
 test("dual AA-only token needs the exact current AA permission for each local tool", async (t) => {
   const c = config({
     BOT_AUTH_MODE: "dual",
@@ -385,5 +515,58 @@ test("hosted env mode fails closed for gateway-local sensitive access; loopback 
   assert.equal(
     (await local.authenticateFresh(`Bearer ${botToken}`)).identity.bot,
     "bot_production",
+  );
+});
+
+test("hosted env MCP hides writes and cannot create local receipts or cards", async (t) => {
+  const c = config({
+    BOT_AUTH_MODE: "env",
+    PUBLIC_ORIGIN: "https://gateway.example.test",
+    BOT_CREDENTIALS_JSON: JSON.stringify([
+      { bot: "bot_production", clients: [client], token: botToken },
+    ]),
+    REVIEWER_CREDENTIALS_JSON: JSON.stringify([
+      { id: "human", token: reviewerToken },
+    ]),
+  });
+  const auth = BotAuthenticator.fromConfig(c);
+  const store = new Store(":memory:");
+  t.after(() => store.close());
+  const engine = new ActionEngine(store, registry, {
+    async execute(tool) {
+      return { status: "accepted", capability: tool.name };
+    },
+  });
+  const app = await start(c, engine, auth);
+  t.after(app.close);
+
+  const listed = await app.mcp("tools/list");
+  assert.equal(listed.status, 200);
+  assert.ok(
+    listed.body.result.tools.some(
+      (tool: { name: string }) => tool.name === "content.get_brief",
+    ),
+  );
+  for (const name of ["content.generate_brief", "workflow.create_approval"])
+    assert.ok(
+      !listed.body.result.tools.some(
+        (tool: { name: string }) => tool.name === name,
+      ),
+    );
+  const denied = await app.mcp("tools/call", {
+    name: "workflow.create_approval",
+    arguments: {
+      client_id: client,
+      summary: "Hosted env must not create a card",
+      idempotency_key: "hosted-env-blocked",
+    },
+  });
+  assert.equal(denied.body.result.structuredContent.status, "rejected");
+  assert.equal(store.approvals().length, 0);
+  assert.equal(
+    (store.db.prepare("SELECT count(*) AS count FROM receipts").get() as {
+      count: number;
+    }).count,
+    0,
   );
 });

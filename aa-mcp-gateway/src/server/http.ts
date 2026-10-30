@@ -20,6 +20,10 @@ const GATEWAY_LOCAL_TOOLS = new Set([
   "workflow.get_activity",
   "workflow.create_approval",
 ]);
+// Every write reserves a local idempotency receipt before its AA adapter runs,
+// and high-risk writes can create a local approval card. Recheck AA first.
+const needsFreshAa = (tool: Tool) =>
+  tool.action === "write" || GATEWAY_LOCAL_TOOLS.has(tool.name);
 const hasFreshAaPermission = (fresh: FreshIdentity, tool: Tool) =>
   tool.permissions.every((permission) =>
     fresh.aaPermissions.some((grant) => permissionMatches(grant, permission)),
@@ -164,7 +168,7 @@ export function createServer(
         if (req.url !== "/mcp")
           return json(404, { error: "not_found", request_id });
         const caller = identity!;
-        const freshLocalIdentity = async (): Promise<FreshIdentity> => {
+        const freshSensitiveIdentity = async (): Promise<FreshIdentity> => {
           const current = await authenticator.authenticateFresh(
             req.headers.authorization,
           );
@@ -181,26 +185,26 @@ export function createServer(
         );
         server.setRequestHandler(ListToolsRequestSchema, async () => {
           const visible = engine.discover(caller);
-          let local: FreshIdentity | undefined;
-          if (visible.some((t) => GATEWAY_LOCAL_TOOLS.has(t.name))) {
+          let fresh: FreshIdentity | undefined;
+          if (visible.some(needsFreshAa)) {
             try {
-              local = await freshLocalIdentity();
+              fresh = await freshSensitiveIdentity();
             } catch {
-              local = undefined;
+              fresh = undefined;
               engine.store.audit({
                 request_id,
                 bot: caller.bot,
                 authorization: "denied",
                 execution_result: "rejected",
-                error: "gateway_local_aa_auth_required",
+                error: "gateway_sensitive_aa_auth_required",
               });
             }
           }
-          const freshNames = local
+          const freshNames = fresh
             ? new Set(
                 engine
-                  .discover(local.identity)
-                  .filter((t) => hasFreshAaPermission(local, t))
+                  .discover(fresh.identity)
+                  .filter((t) => hasFreshAaPermission(fresh, t))
                   .map((t) => t.name),
               )
             : new Set<string>();
@@ -208,7 +212,7 @@ export function createServer(
             tools: visible
               .filter(
                 (t) =>
-                  !GATEWAY_LOCAL_TOOLS.has(t.name) || freshNames.has(t.name),
+                  !needsFreshAa(t) || freshNames.has(t.name),
               )
               .map((t) => ({
                 name: t.name,
@@ -231,14 +235,14 @@ export function createServer(
             request_id,
             message: "Tool unavailable or unauthorized.",
           };
-          if (GATEWAY_LOCAL_TOOLS.has(request.params.name)) {
+          const tool = engine.tools.find(
+            (t) => t.name === request.params.name,
+          );
+          if (tool && needsFreshAa(tool)) {
             let current: FreshIdentity | undefined;
             try {
-              current = await freshLocalIdentity();
-              const tool = engine.tools.find(
-                (t) => t.name === request.params.name,
-              );
-              if (!tool || !hasFreshAaPermission(current, tool))
+              current = await freshSensitiveIdentity();
+              if (!hasFreshAaPermission(current, tool))
                 throw new Error("unauthorized");
             } catch {
               current = undefined;
@@ -248,7 +252,7 @@ export function createServer(
                 tool: request.params.name,
                 authorization: "denied",
                 execution_result: "rejected",
-                error: "gateway_local_aa_auth_required",
+                error: "gateway_sensitive_aa_auth_required",
               });
             }
             if (current)
