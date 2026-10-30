@@ -106,7 +106,7 @@ export function readTokenHealth(payload: unknown, now: number = Date.now()): Tok
     status: "connected",
     detail: expiresAt
       ? "Meta reports this token valid; account and required permissions are not verified."
-      : "Meta reports this token valid with no expiry; account and required permissions are not verified.",
+      : "Meta reports this token valid; no expiry date was established, and account and required permissions are not verified.",
     expiresAt,
     usable: true,
   };
