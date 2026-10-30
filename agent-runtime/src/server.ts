@@ -52,6 +52,7 @@ import { handleGitHubStatus } from "./github/status-route.js";
 import { handleSystemReadiness } from "./readiness/route.js";
 import { handleSchemaParity } from "./readiness/schema-parity-route.js";
 import { currentReleaseProbe } from "./readiness/release-probe.js";
+import { handleFreshReleaseProbe } from "./readiness/fresh-release-route.js";
 import { handleSitesRoute } from "./github/sites-route.js";
 import { logger } from "./logging/logger.js";
 
@@ -357,6 +358,11 @@ const server = http.createServer((req, res) => {
       (probe) => json(probe.observationsComplete ? 200 : 503, probe),
       () => json(503, { observationsComplete: false, reason: "release_probe_unavailable" }),
     );
+    return;
+  }
+
+  if (req.url === "/release/identities/fresh") {
+    handleFreshReleaseProbe(req, res, sb, config);
     return;
   }
 

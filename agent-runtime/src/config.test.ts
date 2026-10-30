@@ -12,7 +12,7 @@ let savedEnv: NodeJS.ProcessEnv;
 beforeEach(() => {
   savedEnv = { ...process.env };
   for (const key of Object.keys(process.env)) {
-    if (key.startsWith("AGENT_RUNTIME_") || key.startsWith("MASTER_AI_") || key === "CONSOLE_URL" || key.startsWith("ANTHROPIC_API_KEY") || key === "SUPABASE_URL" || key === "SUPABASE_SERVICE_ROLE_KEY" || key === "PORT" || key === "AA_MCP_SERVICE_SECRET") {
+    if (key.startsWith("AGENT_RUNTIME_") || key.startsWith("MASTER_AI_") || key === "CONSOLE_URL" || key.startsWith("ANTHROPIC_API_KEY") || key === "SUPABASE_URL" || key === "SUPABASE_SERVICE_ROLE_KEY" || key === "PORT" || key === "AA_MCP_SERVICE_SECRET" || key === "BROWSER_RELEASE_PROBE_TOKEN") {
       delete process.env[key];
     }
   }
@@ -44,6 +44,16 @@ describe("loadConfig", () => {
     expect(loadConfig().mcpServiceSecret).toBe("test-service-secret");
     process.env.AA_MCP_SERVICE_SECRET = "   ";
     expect(loadConfig().mcpServiceSecret).toBeNull();
+  });
+
+  it("keeps the uncached release route disabled until a dedicated 32-byte token is configured", () => {
+    expect(loadConfig().browserReleaseProbeToken).toBeNull();
+    process.env.BROWSER_RELEASE_PROBE_TOKEN = "a1".repeat(32);
+    expect(loadConfig().browserReleaseProbeToken).toBe("a1".repeat(32));
+    for (const malformed of ["short", "A".repeat(64), "a1".repeat(32) + " "]) {
+      process.env.BROWSER_RELEASE_PROBE_TOKEN = malformed;
+      expect(() => loadConfig()).toThrow(/BROWSER_RELEASE_PROBE_TOKEN/);
+    }
   });
 
   it("rejects a lease outside the 30-3600s range claim_agent_job accepts", () => {
