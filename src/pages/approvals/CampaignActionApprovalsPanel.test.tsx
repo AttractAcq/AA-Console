@@ -124,11 +124,11 @@ it("refuses a page approval with no reviewable snapshot", async () => {
 
 it("says what became of an action after it was approved", async () => {
   render(<CampaignActionApprovalsPanel />);
-  // The state, who performs it, and the external record. An approval whose
+  // The state, assigned module, and external record. An approval whose
   // outcome nobody can see is the same problem as no approval at all.
   expect(await screen.findByText("After the decision")).toBeInTheDocument();
   expect(screen.getByText("proof publish")).toBeInTheDocument();
-  expect(screen.getByText(/performed by proof distribution/)).toBeInTheDocument();
+  expect(screen.getByText(/Executor module: proof distribution/)).toBeInTheDocument();
   expect(screen.getByText("Already done.")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "ext-99" })).toHaveAttribute(
     "href",
@@ -149,6 +149,8 @@ it("shows the reason an approved action has not happened, and does not call it d
     await screen.findByText("External campaign actions are off for this client."),
   ).toBeInTheDocument();
   expect(screen.getByText(/Nothing has tried to perform it yet/)).toBeInTheDocument();
+  expect(screen.getByText(/Executor module: proof distribution/)).toBeInTheDocument();
+  expect(screen.queryByText(/performed by/i)).not.toBeInTheDocument();
 });
 
 it("shows the generic hold and does not offer a switch-on action", async () => {

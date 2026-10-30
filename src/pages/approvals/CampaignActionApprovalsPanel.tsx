@@ -237,7 +237,7 @@ export function CampaignActionApprovalsPanel() {
                   <div>
                     <h3 className="text-sm font-semibold">{action.action_key.replaceAll("_", " ")}</h3>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {action.destination} · performed by {action.executor_module.replaceAll("_", " ")}
+                      {action.destination} · Executor module: {action.executor_module.replaceAll("_", " ")}
                     </p>
                   </div>
                   <Link
