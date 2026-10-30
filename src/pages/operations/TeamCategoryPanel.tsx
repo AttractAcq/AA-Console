@@ -246,7 +246,7 @@ export function TeamCategoryPanel({ category }: { category: TeamCategory }) {
                 Resolve uncertain send after provider check
               </button>}
           </div>)}
-          {!retired && !member.user_id && !held && <button type="button" className="text-brand-strong underline"
+          {!retired && !member.user_id && !held && !inviteLoadError && <button type="button" className="text-brand-strong underline"
             onClick={() => { setInviting(member); setInviteEmail(""); setInviteKey(crypto.randomUUID()); setActionError(null); }}>
             Invite {member.name}
           </button>}
@@ -267,7 +267,8 @@ export function TeamCategoryPanel({ category }: { category: TeamCategory }) {
 
       {actionError && <p role="alert" className="mb-4 text-sm text-destructive">{actionError}</p>}
       {notice && <p role="status" className="mb-4 text-sm text-brand-strong">{notice}</p>}
-      {inviteLoadError && <p role="alert" className="mb-4 text-sm text-destructive">{inviteLoadError}</p>}
+      {inviteLoadError && members.some((member) => member.active && !member.user_id)
+        && <p role="alert" className="mb-4 text-sm text-destructive">{inviteLoadError}</p>}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading team…</p>

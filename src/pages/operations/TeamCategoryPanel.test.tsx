@@ -47,6 +47,13 @@ beforeEach(() => {
 const show = () => render(<MemoryRouter><TeamCategoryPanel category="editors" /></MemoryRouter>);
 
 describe("controlled team invitations", () => {
+  it("blocks requests when invitation state cannot be loaded", async () => {
+    callRuntime.mockRejectedValue(new Error("Runtime unavailable"));
+    show();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Invitation states are unavailable");
+    expect(screen.queryByRole("button", { name: "Invite Editor 1" })).not.toBeInTheDocument();
+  });
+
   it("requests a one-recipient roster invitation and keeps the review in Inbox", async () => {
     callRuntime.mockImplementation(async (path: string) => path.endsWith("/list")
       ? { ok: true, invitations: [] }
