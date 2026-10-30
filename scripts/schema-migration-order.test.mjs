@@ -14,6 +14,9 @@ const migration266 = '20261029170000_266_commercial_reporting_and_storage_scope.
 const migration267 = '20261029180000_267_sales_entitlement_boundary.sql'
 const migration268 = '20261029190000_268_contact_and_conversation_scope.sql'
 const migration269 = '20261029200000_269_authenticated_sales_rpc_scope.sql'
+const migration270 = '20261029210000_270_default_deny_auth_and_active_staff.sql'
+const migration271 = '20261029220000_271_profileless_authenticated_scope.sql'
+const migration272 = '20261030100000_272_onboarding_step_integrity.sql'
 const released263 = '20261029140000'
 
 test('the 261 and 262 history is blocked until 260 exists', () => {
@@ -82,5 +85,19 @@ test('the released 263 marker leaves exactly the B005 264–269 sequence pending
   assert.throws(
     () => assertSchemaMigrationOrder(files.filter((name) => name !== migration266), released263),
     /Expected migration 266 before .*_267_/,
+  )
+})
+
+test('onboarding integrity follows profileless Auth hardening with no skipped migration', () => {
+  const files = [migration259, migration260, migration261, migration262, migration263,
+    migration264, migration265, migration266, migration267, migration268, migration269,
+    migration270, migration271, migration272]
+  assert.deepEqual(assertSchemaMigrationOrder(files, released263), {
+    releasedVersion: released263, releasedNumber: 263,
+    headVersion: '20261030100000', nextNumber: 273, pendingCount: 9,
+  })
+  assert.throws(
+    () => assertSchemaMigrationOrder(files.filter((name) => name !== migration271), released263),
+    /Expected migration 271 before .*_272_/,
   )
 })
