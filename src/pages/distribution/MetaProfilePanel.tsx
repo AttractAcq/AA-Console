@@ -8,11 +8,38 @@ import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 
-type Identity = Database["public"]["Views"]["meta_identity_health"]["Row"];
+// The view's historical health_detail and derived blocker can include a raw
+// provider OAuth error. Keep both out of the browser response until a SQL
+// migration can scrub the stored data and fix the view itself.
+type Identity = Pick<
+  Database["public"]["Views"]["meta_identity_health"]["Row"],
+  "client_id" | "provider" | "account_ref" | "status" | "token_expires_at" | "days_left" | "posts_waiting"
+>;
 type Presence = Database["public"]["Views"]["meta_profile_presence"]["Row"];
 type ProfileChange = Database["public"]["Tables"]["meta_profile_changes"]["Row"];
 
 type Tab = "identities" | "profile" | "presence";
+
+function recordedIdentityAlert(identity: Identity, now = Date.now()): string | null {
+  const status = identity.status ?? "";
+  if (["error", "expired", "revoked"].includes(status)) {
+    return "Recorded integration status blocks this account. Reconnect or review its credential.";
+  }
+  if (!["connected", "active", "expiring"].includes(status)) {
+    return "Integration status needs review before this account is used.";
+  }
+  const expiry = identity.token_expires_at ? Date.parse(identity.token_expires_at) : Number.NaN;
+  if (Number.isFinite(expiry) && expiry <= now) {
+    return "The recorded token expiry has passed. Reconnect before use.";
+  }
+  if (status === "expiring" && !Number.isFinite(expiry)) {
+    return "The integration is marked expiring without a known expiry. Review its credential.";
+  }
+  if (Number.isFinite(expiry) && expiry < now + 7 * 24 * 60 * 60 * 1000) {
+    return "The recorded token expiry is near. Reconnect before it expires.";
+  }
+  return null;
+}
 
 /**
  * Meta Profile v2 — Identities, Profile and Presence.
@@ -43,7 +70,9 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
     }
     try {
       const [health, posts, proposed] = await Promise.all([
-        supabase.from("meta_identity_health").select("*").eq("client_id", clientId),
+        supabase.from("meta_identity_health")
+          .select("client_id,provider,account_ref,status,token_expires_at,days_left,posts_waiting")
+          .eq("client_id", clientId),
         supabase
           .from("meta_profile_presence")
           .select("*")
@@ -57,14 +86,14 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           .order("created_at", { ascending: false }),
       ]);
       for (const result of [health, posts, proposed]) {
-        if (result.error) throw new Error(result.error.message);
+        if (result.error) throw new Error("Profile read failed.");
       }
       setIdentities(health.data ?? []);
       setPresence(posts.data ?? []);
       setChanges(proposed.data ?? []);
       setError(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load the profiles.");
+    } catch {
+      setError("Could not load the profiles.");
     } finally {
       setLoading(false);
     }
@@ -87,21 +116,21 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
         p_approved: approved,
         ...(reason?.trim() ? { p_reason: reason.trim() } : {}),
       });
-      if (rpcError) throw new Error(rpcError.message);
+      if (rpcError) throw new Error("Profile decision failed.");
       setNotice(
         approved
           ? "Approved. It waits for a Meta profile-write adapter, which does not exist yet."
           : "Rejected.",
       );
       await refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Something went wrong.");
+    } catch {
+      setError("Could not record the profile decision.");
     } finally {
       setBusy(null);
     }
   }
 
-  const broken = identities.filter((i) => i.blocker).length;
+  const broken = identities.filter((identity) => recordedIdentityAlert(identity)).length;
 
   return (
     <div className="space-y-5">
@@ -116,11 +145,11 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                 ? "No Meta identity recorded"
                 : broken > 0
                   ? `${broken} of ${identities.length} identities need attention`
-                  : `No recorded blockers for ${identities.length} Meta identit${identities.length === 1 ? "y" : "ies"}; provider access unverified`}
+                  : `No status or expiry alerts for ${identities.length} Meta identit${identities.length === 1 ? "y" : "ies"}; credential and provider access unverified`}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               This shows recorded status, expiry and queued posts. It does not verify the current
-              account, token permissions or publishing rights.
+              credential, account, token permissions or publishing rights.
             </p>
           </div>
 
@@ -130,48 +159,51 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
             <DataTable
               columns={["Account", "Status", "Token", "Waiting on it", "What is stopping it"]}
               emptyLabel={loading ? "Loading…" : "No identities"}
-              rows={identities.map((identity) => [
-                <span key="a">
-                  {identity.account_ref ?? "no account id"}
-                  <span className="block text-xs capitalize text-muted-foreground">
-                    {identity.provider}
-                  </span>
-                </span>,
-                <span
-                  key="s"
-                  className={identity.status === "error" ? "text-destructive" : undefined}
-                >
-                  {identity.status}
-                </span>,
-                <span key="t" className="text-xs">
-                  {identity.token_expires_at ? (
-                    <>
-                      {dayOrDash(identity.token_expires_at)}
-                      <span
-                        className={
-                          Number(identity.days_left ?? 0) <= 7
-                            ? "block text-destructive"
-                            : "block text-muted-foreground"
-                        }
-                      >
-                        {identity.days_left} days left
-                      </span>
-                    </>
-                  ) : (
-                    "no expiry recorded"
-                  )}
-                </span>,
-                <span
-                  key="w"
-                  className={Number(identity.posts_waiting ?? 0) > 0 && identity.blocker ? "text-destructive" : undefined}
-                >
-                  {identity.posts_waiting ?? 0} post
-                  {Number(identity.posts_waiting ?? 0) === 1 ? "" : "s"}
-                </span>,
-                <span key="b" className={identity.blocker ? "text-destructive" : "text-muted-foreground"}>
-                  {identity.blocker ?? "No recorded blocker; provider rights unverified"}
-                </span>,
-              ])}
+              rows={identities.map((identity) => {
+                const alert = recordedIdentityAlert(identity);
+                return [
+                  <span key="a">
+                    {identity.account_ref ?? "no account id"}
+                    <span className="block text-xs capitalize text-muted-foreground">
+                      {identity.provider}
+                    </span>
+                  </span>,
+                  <span
+                    key="s"
+                    className={identity.status === "error" ? "text-destructive" : undefined}
+                  >
+                    {identity.status}
+                  </span>,
+                  <span key="t" className="text-xs">
+                    {identity.token_expires_at ? (
+                      <>
+                        {dayOrDash(identity.token_expires_at)}
+                        <span
+                          className={
+                            Number(identity.days_left ?? 0) <= 7
+                              ? "block text-destructive"
+                              : "block text-muted-foreground"
+                          }
+                        >
+                          {identity.days_left} days left
+                        </span>
+                      </>
+                    ) : (
+                      "no expiry recorded"
+                    )}
+                  </span>,
+                  <span
+                    key="w"
+                    className={Number(identity.posts_waiting ?? 0) > 0 && alert ? "text-destructive" : undefined}
+                  >
+                    {identity.posts_waiting ?? 0} post
+                    {Number(identity.posts_waiting ?? 0) === 1 ? "" : "s"}
+                  </span>,
+                  <span key="b" className={alert ? "text-destructive" : "text-muted-foreground"}>
+                    {alert ?? "No status or expiry alert; credential and provider rights unverified"}
+                  </span>,
+                ];
+              })}
             />
           )}
         </div>

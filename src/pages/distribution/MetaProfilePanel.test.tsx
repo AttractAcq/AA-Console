@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * applied, because this runtime has no Meta profile-write adapter.
  */
 
-const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
+const { from, rpc, select } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), select: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
 vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: "client-1" }) }));
 
@@ -43,21 +43,27 @@ const post = (over: Record<string, unknown> = {}) => ({
   carries_placed_proof: true, ...over,
 });
 
-function database(options: { identities?: unknown[]; changes?: unknown[]; presence?: unknown[] } = {}) {
+function database(options: { identities?: unknown[]; changes?: unknown[]; presence?: unknown[]; healthError?: string } = {}) {
   from.mockImplementation((table: string) => {
     const payload = () => {
       if (table === "meta_identity_health") return options.identities ?? [identity()];
       if (table === "meta_profile_changes") return options.changes ?? [];
       return options.presence ?? [];
     };
+    const response = () => ({
+      data: payload(),
+      error: table === "meta_identity_health" && options.healthError
+        ? { message: options.healthError }
+        : null,
+    });
     const chain: Record<string, unknown> = {};
     Object.assign(chain, {
-      select: () => chain,
+      select: (columns: string) => { select(table, columns); return chain; },
       eq: () => chain,
       order: () => chain,
-      limit: async () => ({ data: payload(), error: null }),
+      limit: async () => response(),
       then: (...a: Parameters<Promise<unknown>["then"]>) =>
-        Promise.resolve({ data: payload(), error: null }).then(...a),
+        Promise.resolve(response()).then(...a),
     });
     return chain;
   });
@@ -73,9 +79,9 @@ describe("identities", () => {
   it("does not call a status-and-expiry-only identity healthy", async () => {
     database({ identities: [identity({ blocker: null })] });
     render(<MetaProfilePanel tab="identities" />);
-    expect(await screen.findByText("No recorded blockers for 1 Meta identity; provider access unverified"))
+    expect(await screen.findByText("No status or expiry alerts for 1 Meta identity; credential and provider access unverified"))
       .toBeInTheDocument();
-    expect(screen.getByText("No recorded blocker; provider rights unverified")).toBeInTheDocument();
+    expect(screen.getByText("No status or expiry alert; credential and provider rights unverified")).toBeInTheDocument();
     expect(screen.getByText(/It does not verify the current/)).toBeInTheDocument();
     expect(screen.queryByText(/healthy/i)).not.toBeInTheDocument();
   });
@@ -93,7 +99,7 @@ describe("identities", () => {
     });
     render(<MetaProfilePanel tab="identities" />);
     expect(await screen.findByText("1 of 2 identities need attention")).toBeInTheDocument();
-    expect(screen.getByText("This account is in error: token expired.")).toBeInTheDocument();
+    expect(screen.getByText("Recorded integration status blocks this account. Reconnect or review its credential.")).toBeInTheDocument();
     // The cost of not reconnecting, attached to the reconnect.
     expect(screen.getByText("2 posts")).toBeInTheDocument();
   });
@@ -101,12 +107,51 @@ describe("identities", () => {
   it("warns before a token expires rather than after", async () => {
     database({
       identities: [
-        identity({ days_left: 3, blocker: "The token expires on 2026-10-27. Reconnect before it does." }),
+        identity({
+          token_expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          days_left: 3,
+        }),
       ],
     });
     render(<MetaProfilePanel tab="identities" />);
-    expect(await screen.findByText(/Reconnect before it does/)).toBeInTheDocument();
+    expect(await screen.findByText("The recorded token expiry is near. Reconnect before it expires.")).toBeInTheDocument();
     expect(screen.getByText("3 days left")).toBeInTheDocument();
+  });
+
+  it("never fetches or renders historical provider error text from identity health", async () => {
+    const marker = "credential-marker-historical-provider-error";
+    database({
+      identities: [identity({
+        status: "error",
+        health_detail: `OAuth failed for ${marker}`,
+        blocker: `This account is in error: OAuth failed for ${marker}.`,
+      })],
+    });
+    render(<MetaProfilePanel tab="identities" />);
+    expect(await screen.findByText("Recorded integration status blocks this account. Reconnect or review its credential."))
+      .toBeInTheDocument();
+    expect(select).toHaveBeenCalledWith(
+      "meta_identity_health",
+      "client_id,provider,account_ref,status,token_expires_at,days_left,posts_waiting",
+    );
+    expect(document.body.textContent).not.toContain(marker);
+  });
+
+  it("keeps a raw view blocker out of the UI even when status has no alert", async () => {
+    const marker = "credential-marker-hidden-view-blocker";
+    database({ identities: [identity({ health_detail: marker, blocker: `OAuth error ${marker}` })] });
+    render(<MetaProfilePanel tab="identities" />);
+    expect(await screen.findByText("No status or expiry alert; credential and provider rights unverified"))
+      .toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(marker);
+  });
+
+  it("does not echo a provider marker from a failed identity read", async () => {
+    const marker = "credential-marker-query-error";
+    database({ healthError: `Read failed for ${marker}` });
+    render(<MetaProfilePanel tab="identities" />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load the profiles.");
+    expect(document.body.textContent).not.toContain(marker);
   });
 
   it("says plainly when no Meta identity is recorded", async () => {
@@ -153,6 +198,16 @@ describe("proposed changes", () => {
         p_approved: true,
       }),
     );
+  });
+
+  it("does not echo a provider marker from a failed profile decision", async () => {
+    const marker = "credential-marker-decision-error";
+    database({ changes: [change()] });
+    rpc.mockResolvedValue({ data: null, error: { message: `Failed for ${marker}` } });
+    render(<MetaProfilePanel tab="profile" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not record the profile decision.");
+    expect(document.body.textContent).not.toContain(marker);
   });
 });
 

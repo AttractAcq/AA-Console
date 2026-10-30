@@ -38,7 +38,7 @@ it("does not present the shared check timestamp as token proof or a completed sy
   render(<IntegrationsPanel />);
   // Both metrics_ingest and token_health update last_checked_at. A row with
   // that value cannot identify which check ran, including for Meta.
-  expect(await screen.findAllByText(/Last recorded integration check/)).toHaveLength(3);
+  expect(await screen.findAllByText(/Last recorded integration activity/)).toHaveLength(3);
   expect(screen.queryByText(/Token checked/)).not.toBeInTheDocument();
   expect(screen.queryByText(/On · last/)).not.toBeInTheDocument();
   expect(screen.getByText(/Provider health unknown. Exact location access/)).toBeInTheDocument();

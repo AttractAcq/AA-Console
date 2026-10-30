@@ -228,7 +228,7 @@ export function IntegrationsPanel() {
             </span>
             {/* metrics_ingest and token_health both write this timestamp. */}
             {dateLabel(r.last_checked_at) &&
-              <span className="block text-xs text-muted-foreground">Last recorded integration check {dateLabel(r.last_checked_at)}</span>}
+              <span className="block text-xs text-muted-foreground">Last recorded integration activity {dateLabel(r.last_checked_at)}</span>}
             {dateLabel(r.token_expires_at) &&
               <span className="block text-xs text-muted-foreground">Recorded expiry {dateLabel(r.token_expires_at)}</span>}
           </div>,
