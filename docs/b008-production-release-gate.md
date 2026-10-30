@@ -33,7 +33,7 @@ change before that pin requires the final observed runtime SHA, not the first.
 | Browser to candidate source | A person or Bot supplies four green job names, migration hashes or deployment SHAs without independent proof. | Migration 288 keeps the source `source_held`; caller claims never clear the blocker. |
 | Trusted attester to Supabase | A browser tries the proof RPC, a service caller sends a packet for another PR, a changed commit, a different CI run or different SQL bytes. | 293 grants proof submission only to `service_role`, repeats the packet digest and exact candidate binding in SQL, and records append-only evidence. The server process invokes the read-only GitHub verifier itself; it never accepts browser proof JSON. Service-role key custody is a required infrastructure control. |
 | Human decision | A Bot/service account, AAL1 session, non-admin, stale displayed card or changed artifact tries to approve. | 293 demands authenticated provisioned admin AAL2, locks the request, compares both expected hashes, requires fresh trusted proof, and appends the decision. The global Inbox re-reads the whole card before calling the owning RPC. Rejection and revocation require reasons. |
-| Approval to merge | The PR head/base or GitHub checks advance after the person decides; an unrelated `gh pr merge` bypasses the Inbox. | **Still open:** a trusted premerge gate must re-run the verifier, compare the current approved card and exact head/base/plan, and fail on any mismatch. Make that status mandatory in GitHub protection or merge queue; a CLI wrapper alone does not prevent direct merges. |
+| Approval to merge | The PR head/base or GitHub checks advance after the person decides; an unrelated `gh pr merge` bypasses the Inbox; a previously green check remains green after the human revokes. | **Still open:** a trusted merger must re-run the verifier and latest decision immediately before the exact GitHub merge API call, compare head/base/plan, and fail on mismatch. Make its status mandatory in GitHub protection or merge queue **and** remove direct/bypass merge authority. A cached green status or CLI wrapper alone does not prevent a revoked-plan merge. |
 | Merge to Railway | Railway deploys watched `main` before main CI or the release card is checked. | **Still open:** turn on a verified CI wait for both services and add a deploy-start exact approved-release/manifest check, or hold automatic deployment until a reviewed orchestrator deploys exact SHAs. A premerge approval alone does not prove the squash merge SHA or live service identity. |
 | Main CI to Pages | A newer `main` arrives while an older successful `workflow_run` builds. | The existing `assert-current-deploy-sha.sh` checks tested SHA and current main before and after the live identity wait. Its test simulates `main` advancing and rejects the old run. A later Pages effect gate must also compare the exact approved release scope. |
 | Runtime to browser pin | Railway deploys watched runtime source while the browser manifest pins an older runtime commit. | The existing live identity/source-tree gate rejects the browser build, as observed in Pages run 41015609250. After the final runtime merge is deployed and read back, a separate reviewed manifest-pin commit must name that exact full SHA; its own main CI and Pages gate then publish the browser. |
@@ -74,13 +74,14 @@ change before that pin requires the final observed runtime SHA, not the first.
    292 before 293; replay the complete schema and regenerate types/manifest
    from that ancestry. #279's failed Pages run is an expected held release
    receipt, so browser publication requires the later observed runtime pin.
-2. Build the trusted premerge decision check without executing PR code in a
+2. Build the trusted premerge decision check and merger without executing PR code in a
    secret-bearing context. It must read the latest canonical decision, fresh
    attestation and candidate, re-run GitHub verification at the moment of
    merge, and reject head/base, CI, workflow bytes, migration and plan drift.
-   Configure this check as mandatory in GitHub branch protection or the merge
-   queue; verify no admin bypass. A changed head/base creates a new candidate
-   and human decision.
+   Configure its check as mandatory in GitHub branch protection or the merge
+   queue; verify no admin bypass or independent direct merge route. A green
+   status obtained before a revocation must not be usable for the merge. A
+   changed head/base creates a new candidate and human decision.
 3. Resolve Railway's early deploy window: verify `Wait for CI` semantics and
    turn it on for both watched services, or disable watched-main deployment
    and let a gated orchestrator deploy the approved exact merge SHA. Prove a
