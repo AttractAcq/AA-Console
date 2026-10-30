@@ -6,7 +6,7 @@ This page maps the code at this revision. It describes boundaries visible in the
 
 | Component | Entry points | Responsibility | Deployment boundary |
 | --- | --- | --- | --- |
-| Browser console | [`src/App.tsx`](../src/App.tsx), [`src/context/auth.tsx`](../src/context/auth.tsx), [`src/lib/supabase.ts`](../src/lib/supabase.ts) | Role-specific UI, Supabase session and profile loading, job enqueueing, and result subscriptions | Vite build published by the [Pages workflow](../.github/workflows/deploy.yml) on `main` |
+| Browser console | [`src/App.tsx`](../src/App.tsx), [`src/context/auth.tsx`](../src/context/auth.tsx), [`src/lib/supabase.ts`](../src/lib/supabase.ts) | Role-specific UI, Supabase session and profile loading, job enqueueing, and result subscriptions | Vite build published by the [Pages workflow](../.github/workflows/deploy.yml) after the exact `main` commit passes CI |
 | Supabase | [`supabase/migrations/`](../supabase/migrations/), [database notes](../supabase/README.md) | Authentication, data, row-level access, RPCs, and the agent job queue | Managed separately from the frontend build |
 | Agent runtime | [`agent-runtime/src/server.ts`](../agent-runtime/src/server.ts), [`worker.ts`](../agent-runtime/src/worker.ts), [`dispatch.ts`](../agent-runtime/src/orchestration/dispatch.ts) | HTTP APIs and leased background workers; dispatches only registered agent runners | Separate Node service; see [runtime deployment notes](../agent-runtime/RAILWAY.md) |
 | MCP gateway | [`aa-mcp-gateway/src/server/main.ts`](../aa-mcp-gateway/src/server/main.ts), [`http.ts`](../aa-mcp-gateway/src/server/http.ts), [`policy/engine.ts`](../aa-mcp-gateway/src/policy/engine.ts) | Bot authentication, scoped tool discovery, action policy, approvals, idempotency, and audit | Separate service; see [gateway deployment notes](../aa-mcp-gateway/docs/railway.md) |
@@ -40,7 +40,7 @@ The examples in [`.env.example`](../.env.example), [`agent-runtime/.env.example`
 
 ## Verification and release
 
-The [CI workflow](../.github/workflows/ci.yml) independently checks frontend lint, typecheck, tests and build; runtime typecheck, tests and build; and gateway check, tests and build. CI installs FFmpeg for runtime render tests. The [Pages workflow](../.github/workflows/deploy.yml) checks and publishes the frontend after a push to `main`. Runtime and gateway deployment are separate.
+The [CI workflow](../.github/workflows/ci.yml) independently checks schema replay, frontend lint/typecheck/tests/build, runtime typecheck/tests/build, and gateway check/tests/build. CI installs FFmpeg for runtime render tests. The [Pages workflow](../.github/workflows/deploy.yml) runs only after all CI jobs succeed for a `push` to `main`, checks out that tested SHA, and rejects an older result if `main` has moved. It requires the reviewed released-migration marker to equal the tracked migration head, then checks current `main` again immediately before publication. Runtime and gateway deployment are separate. The marker is source-side evidence, not an independent live production query. B009 remains open for that live migration check, the runtime/gateway compatibility matrix and the unified release approval card.
 
 For a source-only change, review the diff and run the affected package's CI commands in an isolated checkout. For database, authentication, or integration changes, add the relevant focused tests and verify the target environment before release. [`AGENTS.md`](../AGENTS.md) defines the PR and production release boundary.
 
