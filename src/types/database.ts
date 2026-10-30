@@ -15394,6 +15394,51 @@ export type Database = {
           },
         ]
       }
+      production_release_attestations_v6: {
+        Row: {
+          attested_at: string
+          event_order: number
+          id: string
+          packet: Json
+          packet_sha256: string
+          request_id: string
+          source_version: string
+        }
+        Insert: {
+          attested_at?: string
+          event_order?: never
+          id?: string
+          packet: Json
+          packet_sha256: string
+          request_id: string
+          source_version: string
+        }
+        Update: {
+          attested_at?: string
+          event_order?: never
+          id?: string
+          packet?: Json
+          packet_sha256?: string
+          request_id?: string
+          source_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_release_attestations_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_release_attestations_v6_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_release_candidates_v6: {
         Row: {
           candidate: Json
@@ -24871,6 +24916,7 @@ export type Database = {
         Args: { p_reservation_id: string }
         Returns: boolean
       }
+      canonical_release_json_v6: { Args: { p_value: Json }; Returns: string }
       capture_campaign_artifact_offer_v6: {
         Args: { p_artifact_kind: string; p_job_id: string }
         Returns: Json
@@ -27833,6 +27879,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      record_trusted_production_release_attestation_v6: {
+        Args: { p_packet: Json; p_request_id: string }
+        Returns: string
       }
       record_video_render_candidate: {
         Args: {
