@@ -215,6 +215,17 @@ test('rejects modification of released SQL even if later pending migrations are 
     fetcher: fetchFixture(data) }), /rewrites or removes released migration SQL/)
 })
 
+test('rejects a PR that advances the source release marker to hide pending SQL', async (t) => {
+  const checkout = checkoutFixture(t)
+  writeFileSync(join(checkout.directory, 'supabase', 'verification', 'released-migration-version.txt'),
+    '20261101010000\n')
+  git(checkout.directory, 'add', '.')
+  git(checkout.directory, 'commit', '-qm', 'advance marker without production evidence')
+  const data = apiFixture({ ...checkout, headSha: git(checkout.directory, 'rev-parse', 'HEAD') })
+  await assert.rejects(verifyGithubReleaseCandidate({ prNumber: 7, checkoutDir: checkout.directory,
+    fetcher: fetchFixture(data) }), /changes the source released-schema marker/)
+})
+
 test('rejects a non-200 GitHub API response without trusting fixture claims', async (t) => {
   const checkout = checkoutFixture(t)
   const data = apiFixture(checkout)

@@ -28,8 +28,9 @@ never from caller-supplied hashes or dirty working files. It hashes **every**
 pending SQL migration after `supabase/verification/released-migration-version.txt`,
 including migrations inherited from a stacked PR base, and requires a
 contiguous migration sequence. It rejects a PR that edits or removes SQL at or
-before the released source marker. The marker is source evidence only; it does
-not prove the live production migration head.
+before the released source marker, or that changes the marker within the PR.
+The marker is source evidence only; it does not prove the live production
+migration head.
 
 The typed packet is declared in
 `scripts/verify-github-release-candidate.d.mts`. Its deterministic

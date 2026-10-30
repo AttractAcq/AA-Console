@@ -95,6 +95,8 @@ function migrationEvidence(checkoutDir, headSha, baseSha) {
 
   const marker = git(checkoutDir, ['show', `${headSha}:supabase/verification/released-migration-version.txt`]).trim()
   if (!VERSION.test(marker)) fail('committed released-schema marker is invalid')
+  const baseMarker = git(checkoutDir, ['show', `${baseSha}:supabase/verification/released-migration-version.txt`]).trim()
+  if (baseMarker !== marker) fail('PR changes the source released-schema marker without production evidence')
   const paths = git(checkoutDir, ['ls-tree', '-r', '--name-only', '-z', headSha, '--', 'supabase/migrations'])
     .split('\0').filter(Boolean).filter((path) => path.endsWith('.sql'))
   const files = paths.map((path) => {
