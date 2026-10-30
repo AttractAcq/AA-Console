@@ -61,6 +61,12 @@ export const agencyNav: NavNode[] = [
     icon: Users,
   },
   {
+    id: "agency-approval-inbox",
+    label: "Approval Inbox",
+    path: "/approvals",
+    icon: CheckSquare,
+  },
+  {
     id: "operations",
     label: "Operations",
     path: "/operations",
@@ -501,6 +507,7 @@ export const clientNavGroups: NavNode[] = [
       capability: "expanding", tabs: [
         { id: "engine-inbox", label: "Engine" }, { id: "assets", label: "Assets" },
         { id: "campaign-actions", label: "Campaign actions" },
+        { id: "unified", label: "Unified" },
       ] },
     ...v6ModuleNodes,
     { ...legacyUtility("motion-design"), tabs: [

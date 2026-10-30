@@ -13,6 +13,7 @@ import { ClientsTable } from "./sections/ClientsTable";
 import { SmmVideoApprovals } from "./sections/SmmVideoApprovals";
 import { SmmVideoEditing } from "./sections/SmmVideoEditing";
 import { ChatView } from "../../components/chat/ChatView";
+import { UnifiedApprovalInboxPanel } from "../approvals/UnifiedApprovalInboxPanel";
 
 /** Avatars work jobs; editors work projects. Same table, different word. */
 const NOUN: Partial<Record<EmployeeCategory, "Job" | "Project">> = {
@@ -50,6 +51,10 @@ export function EmployeeConsolePage() {
   function body() {
     if (page.id === "chat") {
       return <ChatView />;
+    }
+
+    if (page.id === "approvals" && category === "smm") {
+      return <UnifiedApprovalInboxPanel scope="manager" />;
     }
 
     if (page.id === "dashboard") {

@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -14,7 +15,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { from, rpc } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
-vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: "client-1" }) }));
+vi.mock("react-router-dom", () => ({
+  useParams: () => ({ clientId: "client-1" }),
+  Link: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a>,
+}));
 
 import { GoogleProfilePanel } from "./GoogleProfilePanel";
 
@@ -142,7 +146,7 @@ describe("reviews", () => {
     expect(screen.queryByRole("menuitem", { name: "Draft a reply" })).not.toBeInTheDocument();
   });
 
-  it("offers approval of a drafted reply, and rejection with a reason", async () => {
+  it("routes a drafted reply to the unified Inbox instead of deciding an unchecked version", async () => {
     database({
       replies: [{
         id: "reply-1", client_id: "client-1", review_id: "rev-1",
@@ -153,14 +157,12 @@ describe("reviews", () => {
       }],
     });
     render(<GoogleProfilePanel tab="reviews" />);
-    await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Approve this reply" }));
-    await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("decide_google_review_reply_v6", {
-        p_reply_id: "reply-1",
-        p_approved: true,
-      }),
-    );
+    expect(await screen.findByRole("link", { name: "Review in Approval Inbox" }))
+      .toHaveAttribute("href", "/clients/client-1/delivery/approval-inbox?tab=unified");
+    await userEvent.click(screen.getByRole("button", { name: /^Actions for / }));
+    expect(screen.queryByRole("menuitem", { name: "Approve this reply" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Reject it" })).not.toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalledWith("decide_google_review_reply_v6", expect.anything());
   });
 });
 

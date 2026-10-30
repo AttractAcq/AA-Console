@@ -257,19 +257,6 @@ export function RecruitmentPanel() {
     void refresh();
   }
 
-  async function approveBrief(id: string) {
-    setBusyId(id);
-    setError(null);
-    const { error: rpcError } = await supabase.rpc("approve_recruitment_brief", { p_brief_id: id });
-    setBusyId(null);
-    if (rpcError) {
-      setError(rpcError.message);
-      return;
-    }
-    setNotice("Brief approved. Generate the Meta static next.");
-    void refresh();
-  }
-
   async function generateAd(id: string) {
     setBusyId(id);
     setError(null);
@@ -407,15 +394,13 @@ export function RecruitmentPanel() {
               {b.status.replace(/_/g, " ")}
             </span>,
             b.status === "draft" ? (
-              <button
+              <a
                 key="a"
-                type="button"
-                disabled={busyId === b.id}
-                onClick={() => void approveBrief(b.id)}
-                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                href={`/approvals?source=${encodeURIComponent(b.id)}`}
+                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                Approve brief
-              </button>
+                Review exact brief in Inbox
+              </a>
             ) : b.status === "approved" ? (
               <button
                 key="g"

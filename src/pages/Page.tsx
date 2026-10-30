@@ -42,6 +42,7 @@ import { MotionDesignPanel } from "./motion/MotionDesignPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { EngineInboxPanel } from "./approvals/EngineInboxPanel";
 import { CampaignActionApprovalsPanel } from "./approvals/CampaignActionApprovalsPanel";
+import { UnifiedApprovalInboxPanel } from "./approvals/UnifiedApprovalInboxPanel";
 import { OrganicPanel } from "./distribution/OrganicPanel";
 import { AssetsPanel } from "./distribution/AssetsPanel";
 import { EnginePanel } from "./distribution/EnginePanel";
@@ -201,6 +202,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "engine-inbox": () => <EngineInboxPanel />,
     assets: () => <ApprovalsPanel />,
     "campaign-actions": () => <CampaignActionApprovalsPanel />,
+    unified: () => <UnifiedApprovalInboxPanel />,
   },
   admin: {
     "system-readiness": () => <SystemReadinessPanel />,

@@ -1,0 +1,290 @@
+-- B008 / 278: one exact Google review reply and destination per approval.
+-- The original reply RPC remains the owner. These triggers register its
+-- candidate, then record the human AAL2 event in the same transaction as the
+-- source status transition. This does not activate a Google write executor.
+
+create function public.google_reply_inbox_payload_v6(
+  p_reply public.google_review_replies
+) returns jsonb language plpgsql stable security definer
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_review public.google_reviews%rowtype;
+  v_location public.client_google_locations%rowtype;
+  v_manifest jsonb;
+  v_hash text;
+  v_blocker text;
+begin
+  select * into v_review from public.google_reviews where id = p_reply.review_id;
+  if v_review.id is not null then
+    select * into v_location from public.client_google_locations
+      where id = v_review.location_id;
+  end if;
+  v_manifest := jsonb_build_object(
+    'reply_body', p_reply.body, 'reply_body_sha256', p_reply.body_hash,
+    'review_id', p_reply.review_id,
+    'review_ref', v_review.review_ref,
+    'review_author', v_review.author_name,
+    'review_stars', v_review.star_rating,
+    'review_comment', v_review.comment,
+    'review_url', v_review.review_url,
+    'location_id', v_location.id,
+    'location_ref', v_location.location_ref,
+    'location_title', v_location.title);
+  v_hash := encode(sha256(convert_to(v_manifest::text, 'UTF8')), 'hex');
+  v_blocker := case
+    when v_review.id is null or v_location.id is null
+      then 'The source review or Google location is missing.'
+    when v_review.client_id <> p_reply.client_id
+      or v_location.client_id <> p_reply.client_id
+      then 'The reply, review and location do not belong to one client.'
+    when nullif(btrim(coalesce(v_review.review_ref, '')), '') is null
+      or nullif(btrim(coalesce(v_location.location_ref, '')), '') is null
+      then 'The Google review or location has no exact external destination.'
+    when nullif(btrim(coalesce(p_reply.body, '')), '') is null
+      then 'The reply body is empty.'
+    when v_review.gone_at is not null
+      then 'The source review is no longer present on Google.'
+    when p_reply.body_hash <> encode(sha256(convert_to(p_reply.body, 'UTF8')), 'hex')
+      then 'The reply words do not match their draft SHA-256.'
+    else null end;
+  return jsonb_build_object(
+    'client_id', p_reply.client_id,
+    'source_system', 'aa_console',
+    'source_kind', 'google_review_reply',
+    'source_id', p_reply.id,
+    'source_version', v_hash,
+    'title', 'Google review reply: ' || coalesce(v_location.title, 'missing location'),
+    'artifact_hash', v_hash,
+    'preview', v_manifest,
+    'destination', case when v_location.location_ref is null
+      or v_review.review_ref is null then null else
+      'google_business:' || v_location.location_ref || '/reviews/' ||
+      v_review.review_ref || '/reply' end,
+    'account_ref', v_location.location_ref,
+    'budget', null,
+    'scope', jsonb_build_object(
+      'client_id', p_reply.client_id, 'reply_id', p_reply.id,
+      'review_id', p_reply.review_id, 'review_ref', v_review.review_ref,
+      'location_id', v_location.id, 'location_ref', v_location.location_ref,
+      'body_hash', p_reply.body_hash),
+    'owner_role', 'admin_or_active_client_manager',
+    'requested_by', p_reply.created_by,
+    'requester_kind', case when p_reply.created_by is not null then 'human'
+      when p_reply.drafted_by_job_id is not null then 'agent'
+      else 'unknown' end,
+    'requester_ref', case when p_reply.created_by is null
+      and p_reply.drafted_by_job_id is not null
+      then 'agent_jobs:' || p_reply.drafted_by_job_id::text else null end,
+    'expires_at', p_reply.created_at + interval '7 days',
+    'preview_blocker', v_blocker,
+    'owning_path', '/clients/' || p_reply.client_id::text ||
+      '/google-profile?tab=reviews');
+end;
+$$;
+revoke all on function public.google_reply_inbox_payload_v6(
+  public.google_review_replies) from public, anon, authenticated, service_role;
+
+-- A privileged table writer must not create an already approved source row,
+-- step around the AAL2 transition through another status, or claim that a
+-- reply was sent while this class still has no bound external executor.
+create function public.guard_google_reply_inbox_status_v6()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.status not in ('drafted','awaiting_approval')
+      or new.approved_by is not null or new.approved_at is not null
+      or new.rejection_reason is not null then
+      raise exception 'A Google reply must start as an undecided draft.'
+        using errcode = '23514';
+    end if;
+    return new;
+  end if;
+  if old.status in ('approved','posting','posted')
+    and (new.client_id,new.review_id,new.body,new.body_hash,
+         new.approved_by,new.approved_at)
+      is distinct from
+        (old.client_id,old.review_id,old.body,old.body_hash,
+         old.approved_by,old.approved_at) then
+    raise exception 'The approved Google reply and target are immutable.'
+      using errcode = '23514';
+  end if;
+  if new.status in ('drafted','awaiting_approval')
+    and (new.approved_by is not null or new.approved_at is not null
+      or new.rejection_reason is not null) then
+    raise exception 'An undecided Google reply cannot carry decision metadata.'
+      using errcode = '23514';
+  end if;
+  if new.status = 'approved'
+    and old.status not in ('drafted','awaiting_approval','approved') then
+    raise exception 'Only an undecided Google reply can enter approved state.'
+      using errcode = '23514';
+  end if;
+  if old.status in ('approved','rejected','posting','posted','failed')
+    and new.status is distinct from old.status then
+    raise exception 'A decided Google reply cannot restart or change state.'
+      using errcode = '23514';
+  end if;
+  if new.status in ('posting','posted')
+    and new.status is distinct from old.status then
+    raise exception 'Google reply sending requires a bound exact-version executor.'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.guard_google_reply_inbox_status_v6()
+  from public, anon, authenticated, service_role;
+create trigger google_reply_inbox_status_guard_v6
+  before insert or update on public.google_review_replies
+  for each row execute function public.guard_google_reply_inbox_status_v6();
+
+create function public.register_google_reply_inbox_v6()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public as $$
+begin
+  if new.status in ('drafted', 'awaiting_approval') then
+    perform public.register_approval_request_v6(
+      public.google_reply_inbox_payload_v6(new));
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.register_google_reply_inbox_v6()
+  from public, anon, authenticated, service_role;
+create trigger google_reply_inbox_request_v6
+  after insert or update of body, body_hash, review_id
+  on public.google_review_replies
+  for each row execute function public.register_google_reply_inbox_v6();
+
+create function public.record_google_reply_inbox_decision_v6()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public as $$
+declare
+  v_payload jsonb;
+  v_request public.approval_requests_v6%rowtype;
+begin
+  if old.status in ('drafted', 'awaiting_approval')
+    and new.status in ('posting', 'posted') then
+    raise exception 'A Google reply cannot be sent before its exact approval.'
+      using errcode = '23514';
+  end if;
+  if old.status in ('drafted', 'awaiting_approval')
+    and new.status in ('approved', 'rejected') then
+    if (new.client_id, new.review_id, new.body, new.body_hash)
+       is distinct from (old.client_id, old.review_id, old.body, old.body_hash) then
+      raise exception 'Decide the exact draft already shown in the Inbox.'
+        using errcode = '23514';
+    end if;
+    if new.status = 'approved'
+      and (new.approved_by is distinct from auth.uid()
+        or new.approved_at is null) then
+      raise exception 'The source approval must identify the signed-in human.'
+        using errcode = '42501';
+    end if;
+    v_payload := public.google_reply_inbox_payload_v6(old);
+    if new.status = 'approved' and v_payload->>'preview_blocker' is not null then
+      raise exception 'The Google reply is no longer decision-ready: %',
+        v_payload->>'preview_blocker' using errcode = '23514';
+    end if;
+    select * into v_request from public.approval_requests_v6
+      where source_system = 'aa_console'
+        and source_kind = 'google_review_reply'
+        and source_id = old.id::text
+        and source_version = v_payload->>'source_version';
+    if not found or v_request.artifact_hash is distinct from v_payload->>'artifact_hash'
+      or v_request.preview is distinct from v_payload->'preview'
+      or v_request.destination is distinct from v_payload->>'destination'
+      or v_request.account_ref is distinct from v_payload->>'account_ref'
+      or v_request.scope is distinct from v_payload->'scope'
+      or v_request.preview_blocker is distinct from v_payload->>'preview_blocker' then
+      raise exception 'The Google reply or target changed; draft a new approval.'
+        using errcode = '23514';
+    end if;
+    perform public.record_approval_decision_v6(
+      v_request.id, new.status, v_payload->>'artifact_hash',
+      'google_review_replies:' || old.id::text,
+      new.rejection_reason);
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.record_google_reply_inbox_decision_v6()
+  from public, anon, authenticated, service_role;
+create trigger google_reply_inbox_decision_v6
+  after update of status on public.google_review_replies
+  for each row execute function public.record_google_reply_inbox_decision_v6();
+
+-- The old owning RPC takes only a reply ID. A stale Inbox card must never
+-- approve newly edited words. The wrapper locks the source, checks the exact
+-- version selected by the human, then invokes that same owning RPC. Revoke
+-- direct browser execution so every page uses the version-bound path.
+create function public.decide_google_review_reply_from_inbox_v6(
+  p_reply_id uuid, p_expected_source_version text,
+  p_expected_artifact_hash text, p_approved boolean,
+  p_reason text default null
+) returns public.google_review_replies language plpgsql volatile security definer
+set search_path = pg_catalog, public as $$
+declare
+  v_reply public.google_review_replies%rowtype;
+  v_payload jsonb;
+  v_request public.approval_requests_v6%rowtype;
+begin
+  if auth.role() is distinct from 'authenticated' or auth.uid() is null
+    or public.current_role_of() is null
+    or coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' then
+    raise exception 'A provisioned human with AAL2 must decide this reply.'
+      using errcode = '42501';
+  end if;
+  select * into v_reply from public.google_review_replies
+    where id = p_reply_id for update;
+  if not found or v_reply.status not in ('drafted', 'awaiting_approval') then
+    raise exception 'That reply is not waiting for a decision.' using errcode = '23514';
+  end if;
+  v_payload := public.google_reply_inbox_payload_v6(v_reply);
+  if p_expected_source_version is distinct from v_payload->>'source_version'
+    or p_expected_artifact_hash is distinct from v_payload->>'artifact_hash' then
+    raise exception 'The selected reply card is stale; review the new exact version.'
+      using errcode = '23514';
+  end if;
+  select * into v_request from public.approval_requests_v6
+    where source_system = 'aa_console'
+      and source_kind = 'google_review_reply'
+      and source_id = p_reply_id::text
+      and source_version = p_expected_source_version;
+  if not found or v_request.artifact_hash is distinct from p_expected_artifact_hash
+    or v_request.preview is distinct from v_payload->'preview'
+    or v_request.destination is distinct from v_payload->>'destination'
+    or v_request.account_ref is distinct from v_payload->>'account_ref'
+    or v_request.scope is distinct from v_payload->'scope' then
+    raise exception 'The selected reply card no longer matches the source.'
+      using errcode = '23514';
+  end if;
+  if p_approved and v_payload->>'preview_blocker' is not null then
+    raise exception 'The Google reply is not decision-ready: %',
+      v_payload->>'preview_blocker' using errcode = '23514';
+  end if;
+  return public.decide_google_review_reply_v6(p_reply_id, p_approved, p_reason);
+end;
+$$;
+revoke all on function public.decide_google_review_reply_v6(uuid,boolean,text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.decide_google_review_reply_from_inbox_v6(
+  uuid,text,text,boolean,text) from public, anon, authenticated, service_role;
+grant execute on function public.decide_google_review_reply_from_inbox_v6(
+  uuid,text,text,boolean,text) to authenticated;
+
+-- Historical approved rows are source facts, not fabricated AAL2 events.
+do $$
+declare v_reply public.google_review_replies%rowtype;
+begin
+  for v_reply in select * from public.google_review_replies
+    where status in ('drafted', 'awaiting_approval')
+  loop
+    perform public.register_approval_request_v6(
+      public.google_reply_inbox_payload_v6(v_reply));
+  end loop;
+end;
+$$;
+
+select public.lock_down_definer_functions();
