@@ -1,5 +1,5 @@
 import { LogOut, Menu } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { findAgencyNode, findClientChild } from "../config/navigation";
 import { getMemberSections, teamCategoryLabels } from "../data/team";
 import type { TeamCategory } from "../data/team";
@@ -35,6 +35,7 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
       <nav aria-label="Breadcrumb" className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
         {breadcrumb}
       </nav>
+      <Link to="/security/mfa" className="rounded-md px-2.5 py-1.5 text-sm text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Security</Link>
       <button
         type="button"
         onClick={async () => {
