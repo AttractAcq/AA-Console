@@ -38,6 +38,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          # Build scripts need public Git history but no checkout credential.
+          persist-credentials: false
+          # The live release manifest pins earlier component commits when
+          # Railway correctly skips an unchanged service on this main push.
+          fetch-depth: 0
 
       - name: Require the tested SHA to be current main
         env:
@@ -120,6 +125,17 @@ jobs:
           path: dist
 
       - name: Recheck current main before external publication
+        env:
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: bash scripts/assert-current-deploy-sha.sh "$TESTED_SHA"
+
+      - name: Require live runtime, gateway and schema identities
+        env:
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/assert-live-release-identities.mjs
+
+      # A newer main can arrive during the bounded live deployment wait.
+      - name: Recheck current main after live identity wait
         env:
           TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: bash scripts/assert-current-deploy-sha.sh "$TESTED_SHA"
