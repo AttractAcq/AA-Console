@@ -70,6 +70,16 @@ beforeEach(() => {
 });
 
 describe("identities", () => {
+  it("does not call a status-and-expiry-only identity healthy", async () => {
+    database({ identities: [identity({ blocker: null })] });
+    render(<MetaProfilePanel tab="identities" />);
+    expect(await screen.findByText("No recorded blockers for 1 Meta identity; provider access unverified"))
+      .toBeInTheDocument();
+    expect(screen.getByText("No recorded blocker; provider rights unverified")).toBeInTheDocument();
+    expect(screen.getByText(/It does not verify the current/)).toBeInTheDocument();
+    expect(screen.queryByText(/healthy/i)).not.toBeInTheDocument();
+  });
+
   it("says a broken credential is broken, with what is waiting on it", async () => {
     database({
       identities: [
@@ -99,10 +109,10 @@ describe("identities", () => {
     expect(screen.getByText("3 days left")).toBeInTheDocument();
   });
 
-  it("says plainly when nothing is connected", async () => {
+  it("says plainly when no Meta identity is recorded", async () => {
     database({ identities: [] });
     render(<MetaProfilePanel tab="identities" />);
-    expect(await screen.findByText("No Meta identity is connected")).toBeInTheDocument();
+    expect(await screen.findByText("No Meta identity recorded")).toBeInTheDocument();
     expect(
       screen.getByText("Connect Instagram or Facebook on the Integrations page"),
     ).toBeInTheDocument();

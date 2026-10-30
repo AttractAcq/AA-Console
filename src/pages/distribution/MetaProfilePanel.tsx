@@ -18,16 +18,13 @@ type Tab = "identities" | "profile" | "presence";
  * Meta Profile v2 — Identities, Profile and Presence.
  *
  * v1 reuses the organic post board and the organic metrics tab, which means
- * it answers neither question this page exists for. Is this client's account
- * actually connected? And does the profile hold up when somebody who just saw
- * an ad lands on it?
+ * it shows neither local integration blockers nor the profile a visitor sees
+ * after an ad.
  *
- * The first was answerable all along and nothing asked it: the status, the
- * token expiry and the health detail were already on `client_integrations`,
- * and a disconnected account showed up as an empty post board —
- * indistinguishable from a client with nothing scheduled. So Identities leads,
- * and a broken credential comes with the count of what is waiting on it,
- * because a reconnect with a cost attached gets done.
+ * Identities shows recorded status, expiry and queued work. Those fields can
+ * identify blockers, but cannot prove current account ownership, scope or
+ * publishing rights. A blocked credential comes with the count of work
+ * waiting on it, rather than appearing as an empty post board.
  */
 export function MetaProfilePanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
@@ -116,15 +113,14 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-sm font-medium">
               {identities.length === 0
-                ? "No Meta identity is connected"
+                ? "No Meta identity recorded"
                 : broken > 0
                   ? `${broken} of ${identities.length} identities need attention`
-                  : `${identities.length} identit${identities.length === 1 ? "y" : "ies"} healthy`}
+                  : `No recorded blockers for ${identities.length} Meta identit${identities.length === 1 ? "y" : "ies"}; provider access unverified`}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              A disconnected account says so here rather than appearing as an empty post board.
-              The count of what is waiting on it is attached, because a reconnect with a cost
-              attached gets done.
+              This shows recorded status, expiry and queued posts. It does not verify the current
+              account, token permissions or publishing rights.
             </p>
           </div>
 
@@ -172,8 +168,8 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                   {identity.posts_waiting ?? 0} post
                   {Number(identity.posts_waiting ?? 0) === 1 ? "" : "s"}
                 </span>,
-                <span key="b" className={identity.blocker ? "text-destructive" : "text-brand-strong"}>
-                  {identity.blocker ?? "Nothing"}
+                <span key="b" className={identity.blocker ? "text-destructive" : "text-muted-foreground"}>
+                  {identity.blocker ?? "No recorded blocker; provider rights unverified"}
                 </span>,
               ])}
             />
