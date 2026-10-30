@@ -4,9 +4,11 @@ import { Check, ChevronRight, CircleDashed, CircleDot } from "lucide-react";
 import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
+import { integrationRowsAreValid, providerReadiness, type ReadinessCheck } from "../../lib/integrationReadiness";
 import { cn } from "../../lib/cn";
 import {
   ONBOARDING_STEPS,
+  SYNCING_PROVIDERS,
   missingFor,
   nextStep,
   progress,
@@ -151,7 +153,9 @@ export function OnboardingPanel() {
         supabase.from("client_contact_details").select("*").eq("client_id", clientId).maybeSingle(),
         supabase.from("client_business_context").select("*").eq("client_id", clientId).maybeSingle(),
         supabase.from("client_brand_profiles").select("*").eq("client_id", clientId).maybeSingle(),
-        supabase.from("client_integrations").select("provider").eq("client_id", clientId),
+        supabase.from("client_integrations")
+          .select("client_id, provider, credential_secret_id, credential_label, ad_account_id, status, token_expires_at, last_checked_at, ingest_enabled")
+          .eq("client_id", clientId),
         supabase
           .from("client_onboarding_steps")
           .select("step_key, status")
@@ -165,12 +169,17 @@ export function OnboardingPanel() {
       // not tell.
       const failed = [contact, business, brand, integrations, manual].find((r) => r.error);
       if (failed?.error) throw new Error(failed.error.message);
+      if (!integrationRowsAreValid(integrations.data, clientId)) {
+        throw new Error("Integration readiness is unavailable or returned another client's data.");
+      }
 
       setData({
+        clientId,
+        observedAtMs: Date.now(),
         contact: (contact.data as Record<string, unknown> | null) ?? null,
         business: (business.data as Record<string, unknown> | null) ?? null,
         brand: (brand.data as Record<string, unknown> | null) ?? null,
-        integrations: (integrations.data as { provider: string }[] | null) ?? [],
+        integrations: integrations.data,
         // start_onboarding seeds "onboarding_call"; the model calls it "call".
         manualComplete: ((manual.data as { step_key: string }[] | null) ?? [])
           .filter((r) => r.step_key === CALL_STEP_KEY)
@@ -213,10 +222,22 @@ export function OnboardingPanel() {
       </div>
     );
   }
-  if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (!data || data.clientId !== clientId) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
   const { done, total } = progress(data);
   const form = openStep ? FORM[openStep.key] : undefined;
+  const providerChecks = SYNCING_PROVIDERS.map((provider) => providerReadiness(provider, data.integrations, data.clientId, data.observedAtMs));
+  const dryRunState = providerChecks.some((check) => check.overall === "blocked") ? "Blocked" : "Unknown";
+
+  const renderCheck = (label: string, check: ReadinessCheck) => (
+    <li key={label} className="text-xs text-muted-foreground">
+      <span className="font-medium text-foreground">{label}:</span>{" "}
+      <span className={check.state === "blocked" ? "font-medium text-destructive" : "font-medium text-amber-900"}>
+        {check.state === "blocked" ? "Blocked" : "Unknown"}
+      </span>{" "}
+      — {check.reason}
+    </li>
+  );
 
   return (
     <div className="space-y-4">
@@ -322,6 +343,46 @@ export function OnboardingPanel() {
           );
         })}
       </ol>
+
+      <section aria-label="Provider activation dry run" className="rounded-lg border border-border bg-card p-4">
+        <h3 className="text-sm font-semibold text-card-foreground">Provider activation dry run</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Read-only check for this client. Current result: <span className="font-medium text-foreground">{dryRunState}</span>.
+          A stored provider row or account ID does not verify live access. Account, scope and action
+          checks have no persisted provider diagnostic yet, so this cannot mark the client Ready or
+          switch on distribution. Every external action still requires exact-version Approval Inbox approval.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Metadata read {new Date(data.observedAtMs).toLocaleString()}.{" "}
+          <button type="button" onClick={() => void refresh()} className="text-brand-strong hover:underline">
+            Refresh readiness
+          </button>
+        </p>
+        <div className="mt-3 space-y-3">
+          {providerChecks.map((check) => (
+            <div key={check.provider} className="rounded-md border border-border p-3">
+              <h4 className="text-xs font-semibold capitalize text-card-foreground">
+                {check.provider} · {check.overall === "blocked" ? "Blocked" : "Unknown"}
+              </h4>
+              <ul className="mt-1 space-y-1">
+                {renderCheck("Credential", check.credential)}
+                {renderCheck("Exact account", check.account)}
+                {renderCheck("Required scopes", check.scopes)}
+                {renderCheck("Action rights", check.action)}
+                {renderCheck("Daily metrics sync", check.dailySync)}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Other activation prerequisites, including signed inputs, consent, budget, approval owner,
+          delivery switches and live due-view results, are not evaluated by this provider check.
+          Review the client modules before any activation decision.
+        </p>
+        <Link to={`/clients/${clientId}/account/integrations`} className="mt-2 inline-block text-xs text-brand-strong hover:underline">
+          Review integrations
+        </Link>
+      </section>
 
       {openStep && form && (
         <FormModal
