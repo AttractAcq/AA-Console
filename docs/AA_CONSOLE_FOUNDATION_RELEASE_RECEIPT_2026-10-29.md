@@ -1,0 +1,37 @@
+# AA Console foundation release receipt — 29 October 2026
+
+**Status:** Executed and verified at approximately 22:25 UTC. This is the exact release record for blueprint gate `R000`, not evidence that the acquisition system is complete. Alex directly authorized CI-conditioned merges and releases to `main` for the 100/100 goal, then separately authorized adding production Railway runtime variable `AA_MCP_GATEWAY_URL=https://mcp.attractacq.com` and the resulting redeploy. The later, specific authorization resolved the automatic approval review rejection of the first variable-save attempt. No provider publication, message send, ad build, activation or spend change occurred. Once B008 exists, enter these decisions and their deployed outcomes in the unified Approval Inbox.
+
+## Scope and immutable source evidence
+
+| Order | Reviewed PR head and CI | SQL migration and SHA-256 | Main merge commit | Production result |
+| --- | --- | --- | --- | --- |
+| 1 | [#238](https://github.com/AttractAcq/AA-Console/pull/238) `2e538bbc60e571ce815a8ded9b0b243a1c844371`; [CI run 40958880107](https://github.com/AttractAcq/AA-Console/actions/runs/40958880107) green for its frontend, runtime and gateway jobs; 52 focused Google prerequisite tests and independent narrow review clean | `20261025235000_260_building_the_google_campaign.sql` · `2faa6d2e3494eac3ad92082813566526c376facf52a3c531d77dd84a74963e9e` | [`d0c60e27d6b2b72884ed088e79f7825b02a8b65b`](https://github.com/AttractAcq/AA-Console/commit/d0c60e27d6b2b72884ed088e79f7825b02a8b65b) at 22:13:52 UTC | Migration 260 applied alone after dry-run; matching runtime deployment `6f24b059-e6f3-4392-ab70-52a0ccdcfd79` became active; heartbeat matched `d0c60e27d6b2`, healthy/live/enabled. |
+| 2 | [#235](https://github.com/AttractAcq/AA-Console/pull/235) `c1d409e4b5d62989fe4807493008340abb60a76b`; all four jobs green in [CI run 40962326256](https://github.com/AttractAcq/AA-Console/actions/runs/40962326256), with [schema replay artifact 12936392677](https://github.com/AttractAcq/AA-Console/actions/runs/40962326256/artifacts/12936392677) | `20261029120000_261_system_readiness_inventory.sql` · `c317c9788cabf490979e2d6b8e76830b6f2e9c3499ebfbc5583e781e92515032`; `20261029130000_262_runtime_heartbeat_retention.sql` · `04f3b9b9bbffbd8f05206f3b3caf9ed7d88b5488a97fa6c8e984e2727a3d2e6c` | [`d5910b9f610318276f1ae63d67ef607c00f96439`](https://github.com/AttractAcq/AA-Console/commit/d5910b9f610318276f1ae63d67ef607c00f96439) at 22:17:44 UTC | Dry-run selected only 261 and 262, then both applied in order. Linked remote/local migration history matched through `20261029130000`. Railway runtime deployment `1b58e06d-24ee-4535-9c09-3f67c3b3fc21` and gateway deployment `7412cb1f-6f29-4ae4-b0fa-8f7554ad84f9` were active at the merge SHA; the browser readiness page reported the same SHA. |
+
+`supabase db push --linked --dry-run` was run immediately before each production push and selected only the expected migration(s). The schema replay artifact covers fresh, released, upgrade and clean replay through 262; migration histories; security/catalog assertions; identical clean/upgrade fingerprints; and generated-type parity. These checks establish release integrity, not real-account acquisition acceptance.
+
+## Drain, switches and no external effect
+
+- Before migration 260, a read-only production query found **zero** `google_ads_sheet` jobs in every status. `agents.paused` was set `true` at 22:13:24 UTC, then restored `false` at 22:16:24 UTC after matching runtime and migration 260 were verified. The sheet queue remained empty; therefore no newly derived manifest-bound sheet was observed during this release. That live sheet acceptance remains B091 work.
+- After 260, production showed `sheet_paused=true`, `google_build_supported=false`, and `paid_google_campaigns=0`. The runtime readiness inventory after 262 showed workers/workflow on, while publishing, proof publishing, campaign actions, lead magnet delivery and outbound messaging remained off; DB engine switch was off. Eighteen cron jobs were active, including heartbeat retention. No Google Ads writer or spend activation was enabled.
+- Public signup remained off in production Supabase Auth. Migration 263 and the later Auth hardening work were not part of this release.
+
+## Deployed application and authenticated probes
+
+After Alex's specific approval, Railway saved `AA_MCP_GATEWAY_URL=https://mcp.attractacq.com` to the production `AA-Console` runtime service and deployed staged change 1. The new runtime deployment `c7620a47-fdab-443f-b55a-b44506408a4c` became **ACTIVE**; this was a config redeploy of commit `d5910b9f610318276f1ae63d67ef607c00f96439`. The gateway deployment remained `7412cb1f-6f29-4ae4-b0fa-8f7554ad84f9` at that same commit. At approximately 22:25 UTC, the signed-in Console `/admin?tab=system-readiness` page reported:
+
+| Probe | Readback |
+| --- | --- |
+| Browser | Full SHA `d5910b9f610318276f1ae63d67ef607c00f96439`; authenticated admin page rendered. |
+| Runtime | Full SHA `d5910b9f610318276f1ae63d67ef607c00f96439`; public `/health` reported `enabled=true`, `workers=2`. |
+| Gateway | Authenticated internal readiness probe **On** and full SHA `d5910b9f610318276f1ae63d67ef607c00f96439`. The public `/health` only reports `{"status":"ok"}` and was not treated as the SHA proof. |
+| Database/worker | Migration head `20261029130000`; repaired `agent_runtime_status` returned a fresh healthy/live worker with the full 40-character SHA above and enabled metadata after the config redeploy. Eighteen cron jobs active. |
+
+The readiness page briefly showed a heartbeat read error during runtime redeployment. Refresh after the deployment became active returned fresh workers and no heartbeat error. The observation is a point-in-time production readback, not a guarantee of future availability. The operational rollback for 262 is to unschedule the bounded prune job, retain action audit rows and use the reviewed corrective migration path in [the retention runbook](https://github.com/AttractAcq/AA-Console/blob/main/docs/runtime-heartbeat-retention.md). Do not replay migrations 244–262.
+
+## Gate disposition and remaining work
+
+**R000 closed:** direct Alex authorization, exact PR heads and green CI, ordered migration receipts, matched active browser/runtime/gateway commit, fresh repaired heartbeat, authenticated gateway probe, and disabled external action switches were observed. **B001 remains in progress** until its separate authenticated staging inventory and complete credential/account health are captured. **B002 remains in progress**: production `/admin?tab=schema-parity` still says no validated report is available, and no fresh staging/production parity report has been ingested. **B091 remains in progress** because the empty sheet queue prevented a new sheet proof and `google_ad_build` intentionally remains unsupported.
+
+**B003 closed separately:** `main` now requires the schema replay, frontend, agent runtime and MCP gateway checks, with strict up-to-date branches and admin enforcement. A ready temporary [negative PR #244](https://github.com/AttractAcq/AA-Console/pull/244) at `ae3fd544176ff1cb191d3a702b00bc8ef2b5fa8d` failed the [schema order check](https://github.com/AttractAcq/AA-Console/actions/runs/40965609502/job/123769209844) and GitHub reported `mergeable_state=blocked`. It was closed unmerged and its fixture branch deleted; `main` remained `d5910b9f610318276f1ae63d67ef607c00f96439`.
