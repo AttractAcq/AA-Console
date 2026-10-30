@@ -3,14 +3,17 @@
 // must be reviewed before an operator can wire this to a production runner.
 import { attestProductionRelease, verifyApprovedProductionRelease } from './production-release-attestation.mjs'
 import { REQUIRED_RELEASE_CHECKS } from './verify-github-release-candidate.mjs'
+import {
+  APPROVED_RELEASE_APP_CHECK, approvedReleaseCheckExternalId,
+} from './production-release-head-check-contract.mjs'
 
 const REPOSITORY = 'AttractAcq/AA-Console'
 const API = `https://api.github.com/repos/${REPOSITORY}`
 const SHA = /^[0-9a-f]{40}$/
 const HASH = /^[0-9a-f]{64}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const TRUSTED_CHECK = 'Approved production release (trusted)'
 const TRUSTED_WORKFLOW = '.github/workflows/production-release-approval.yml'
+const REQUEST_MARKER = /^AA-Release-Request: ([0-9a-f-]+)$/i
 
 function fail(message) { throw new Error(`Trusted production merge blocked: ${message}`) }
 function samePlan(a, b) {
@@ -50,18 +53,23 @@ async function githubGet(path, token, fetcher) {
 }
 
 function checkRunId(run) {
-  const match = /^https:\/\/github\.com\/AttractAcq\/AA-Console\/actions\/runs\/([1-9]\d*)\/job\/([1-9]\d*)$/.exec(run.details_url ?? '')
-  if (!match || Number(match[2]) !== run.id) fail('trusted check lacks a GitHub Actions run identity')
+  const match = /^https:\/\/github\.com\/AttractAcq\/AA-Console\/actions\/runs\/([1-9]\d*)$/.exec(run.details_url ?? '')
+  if (!match) fail('App check lacks a trusted GitHub Actions run identity')
   return Number(match[1])
 }
 
 // A green check is only a snapshot. This read is repeated after the database
 // lease has made human revocation mutually exclusive with the merge attempt.
 export function assertProtectedReleaseBoundary({ plan, branch, pr, protection,
-  checks, trustedRun, actor, mergerLogin }) {
+  checks, trustedRun, actor, mergerLogin, trustedApp }) {
   if (typeof mergerLogin !== 'string' || !/^[A-Za-z0-9-]{1,39}$/.test(mergerLogin)
       || actor?.login !== mergerLogin || actor?.type !== 'User')
     fail('merger token is not the sole reviewed service user')
+  if (!Number.isSafeInteger(trustedApp?.id) || trustedApp.id <= 0
+      || typeof trustedApp?.slug !== 'string'
+      || !/^[a-z0-9-]{1,80}$/.test(trustedApp.slug)
+      || trustedApp.slug === 'github-actions')
+    fail('dedicated check App identity is not pinned by reviewed configuration')
   if (branch?.name !== 'main' || branch?.commit?.sha !== plan.baseSha
       || pr?.number !== plan.prNumber || pr?.state !== 'open' || pr?.draft !== false
       || pr?.merged_at != null || pr?.mergeable !== true
@@ -70,6 +78,11 @@ export function assertProtectedReleaseBoundary({ plan, branch, pr, protection,
       || pr?.head?.repo?.full_name !== REPOSITORY
       || pr?.base?.repo?.full_name !== REPOSITORY)
     fail('current main, PR base or PR head changed')
+  const markers = typeof pr.body === 'string' && pr.body.length <= 256_000
+    ? pr.body.split(/\r?\n/).map((line) => REQUEST_MARKER.exec(line))
+      .filter(Boolean).map((match) => match[1].toLowerCase()) : []
+  if (markers.length !== 1 || markers[0] !== plan.requestId)
+    fail('current PR does not locate the exact approved Inbox request')
   const required = protection?.required_status_checks
   if (required?.strict !== true || protection?.enforce_admins?.enabled !== true
       || protection?.allow_force_pushes?.enabled === true
@@ -85,7 +98,7 @@ export function assertProtectedReleaseBoundary({ plan, branch, pr, protection,
       || !Number.isSafeInteger(checks.total_count)
       || checks.total_count !== checks.check_runs.length || checks.total_count > 100)
     fail('protected check evidence is incomplete')
-  const requiredNames = [...REQUIRED_RELEASE_CHECKS, TRUSTED_CHECK]
+  const requiredNames = [...REQUIRED_RELEASE_CHECKS, APPROVED_RELEASE_APP_CHECK]
   if (new Set(required.checks.map((check) => check.context)).size !== required.checks.length)
     fail('required check names are duplicated')
   if (required.checks.length !== requiredNames.length
@@ -96,34 +109,41 @@ export function assertProtectedReleaseBoundary({ plan, branch, pr, protection,
     const runs = checks.check_runs.filter((check) => check.name === name)
     if (rules.length !== 1 || runs.length !== 1) fail(`required check ${name} is absent or duplicated`)
     const [rule] = rules; const [run] = runs
+    const expectedApp = name === APPROVED_RELEASE_APP_CHECK
+      ? trustedApp : { id: rule.app_id, slug: 'github-actions' }
     if (!Number.isSafeInteger(rule.app_id) || rule.app_id <= 0
-        || run.app?.id !== rule.app_id || run.app?.slug !== 'github-actions'
+        || (name === APPROVED_RELEASE_APP_CHECK && rule.app_id !== trustedApp.id)
+        || run.app?.id !== expectedApp.id || run.app?.slug !== expectedApp.slug
         || run.head_sha !== plan.headSha || run.status !== 'completed'
         || run.conclusion !== 'success' || !Number.isSafeInteger(run.id) || run.id <= 0)
       fail(`required check ${name} is not green on the exact PR head from its pinned app`)
   }
-  const trusted = checks.check_runs.find((check) => check.name === TRUSTED_CHECK)
+  const trusted = checks.check_runs.find((check) => check.name === APPROVED_RELEASE_APP_CHECK)
   if (trustedRun?.id !== checkRunId(trusted)
       || trustedRun?.path !== TRUSTED_WORKFLOW
       || trustedRun?.event !== 'pull_request_target'
       || trustedRun?.head_sha !== plan.baseSha
+      || !Number.isSafeInteger(trustedRun?.run_attempt)
+      || trustedRun.run_attempt <= 0
       || trustedRun?.status !== 'completed' || trustedRun?.conclusion !== 'success'
       || trustedRun?.repository?.full_name !== REPOSITORY
       || !Array.isArray(trustedRun?.pull_requests)
       || trustedRun.pull_requests.length !== 1
       || trustedRun.pull_requests[0]?.number !== plan.prNumber
       || trustedRun.pull_requests[0]?.head?.sha !== plan.headSha
-      || trustedRun.pull_requests[0]?.base?.sha !== plan.baseSha)
-    fail('trusted check is not the protected-base release workflow')
+      || trustedRun.pull_requests[0]?.base?.sha !== plan.baseSha
+      || trusted.external_id !== approvedReleaseCheckExternalId(plan,
+        trustedRun.id, trustedRun.run_attempt))
+    fail('App check does not bind the exact protected-base release workflow and plan')
   return true
 }
 
 // Read-only GitHub boundary used both before and immediately after the lease.
-// The protected check currently runs on pull_request_target; if GitHub does
-// not attach that check to the PR head, this fails closed until a live pilot
-// establishes a safe required-check topology.
+// The dedicated App check is attached to the PR head and binds the trusted
+// protected-base workflow run in external_id. A live pilot must prove GitHub
+// accepts it as a required exact-head check before any runner is activated.
 export async function readProtectedReleaseBoundary({ plan, token, mergerLogin,
-  fetcher = fetch }) {
+  trustedApp, fetcher = fetch }) {
   if (!validPlan(plan, plan?.requestId)) fail('approved merge plan is incomplete')
   const [branch, pr, protection, checks, actor] = await Promise.all([
     githubGet('/branches/main', token, fetcher),
@@ -132,11 +152,11 @@ export async function readProtectedReleaseBoundary({ plan, token, mergerLogin,
     githubGet(`/commits/${plan.headSha}/check-runs?filter=latest&per_page=100`, token, fetcher),
     githubGet('/user', token, fetcher),
   ])
-  const trusted = checks?.check_runs?.find((check) => check.name === TRUSTED_CHECK)
-  if (!trusted) fail('trusted release check is absent')
+  const trusted = checks?.check_runs?.find((check) => check.name === APPROVED_RELEASE_APP_CHECK)
+  if (!trusted) fail('approved exact-head App check is absent')
   const trustedRun = await githubGet(`/actions/runs/${checkRunId(trusted)}`, token, fetcher)
   assertProtectedReleaseBoundary({ plan, branch, pr, protection,
-    checks, trustedRun, actor, mergerLogin })
+    checks, trustedRun, actor, mergerLogin, trustedApp })
   const finalBranch = await githubGet('/branches/main', token, fetcher)
   if (finalBranch?.commit?.sha !== plan.baseSha)
     fail('main advanced during protected release boundary read')
@@ -263,7 +283,7 @@ export async function runTrustedProductionReleaseMerger({ requestId, attester,
 // Explicit wiring for a later custody-reviewed runner; not invoked anywhere.
 export async function mergeApprovedProductionRelease({ requestId, supabaseUrl,
   serviceRoleKey, verificationToken, mergerToken, checkoutDir, mergerLogin,
-  fetcher = fetch }) {
+  trustedApp, fetcher = fetch }) {
   if (verificationToken === mergerToken)
     fail('GitHub verification and merge credentials must be distinct')
   const options = { requestId, supabaseUrl, serviceRoleKey,
@@ -273,7 +293,7 @@ export async function mergeApprovedProductionRelease({ requestId, supabaseUrl,
     attester: () => attestProductionRelease({ ...options, refreshApproved: true }),
     verifier: () => verifyApprovedProductionRelease(options),
     boundary: (plan) => readProtectedReleaseBoundary({ plan, token: mergerToken,
-      mergerLogin, fetcher }),
+      mergerLogin, trustedApp, fetcher }),
     lease: createProductionReleaseLeaseStore({ supabaseUrl, serviceRoleKey, fetcher }),
     mergeEffect: createGithubMergeEffect({ token: mergerToken, fetcher }),
     observeMerge: (plan, proposedSha) => readObservedGithubMerge({ plan, proposedSha,
