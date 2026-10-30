@@ -190,6 +190,17 @@ describe("the daily check", () => {
     expect(events[0]!.description).toMatch(/1 skipped/);
   });
 
+  it("preserves status when Meta returns HTTP 200 with a non-JSON body", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true, status: 200, json: async () => { throw new SyntaxError("not JSON"); },
+    }));
+    const { sb, updates, events } = database([row({ status: "active" })]);
+    await runTokenHealthJob(sb, config, agent, job, 0, { check: debugToken, now: () => NOW });
+    expect(updates).toEqual([]);
+    expect(events[0]!.description).toMatch(/1 skipped/);
+    expect((events[0]!.payload as { trouble: string[] }).trouble[0]).toMatch(/did not establish token validity/);
+  });
+
   it.each(["status", "credential_secret_id"])("discards a stale verdict after concurrent %s change", async (field) => {
     const { sb, updates, stored, events } = database([row()], {
       beforeWrite: (rows) => { rows[0]![field as "status" | "credential_secret_id"] = field === "status" ? "revoked" : "secret-2"; },

@@ -48,24 +48,32 @@ function expiryOf(value: unknown): number | null {
  * across it.
  */
 export function readTokenHealth(payload: unknown, now: number = Date.now()): TokenVerdict {
-  const data = ((payload as { data?: DebugTokenData } | null)?.data ?? {}) as DebugTokenData;
+  const envelope = payload && typeof payload === "object" ? payload as { data?: unknown; error?: unknown } : null;
+  const data = envelope?.data && typeof envelope.data === "object" ? envelope.data as DebugTokenData : null;
+  const topError = envelope?.error && typeof envelope.error === "object"
+    ? envelope.error as { message?: unknown; code?: unknown } : null;
+  const innerError = data?.error && typeof data.error === "object" ? data.error : null;
+  const authError = [innerError, topError].find((error) => Number(error?.code) === 190);
+  const nonAuthError = [innerError, topError].find((error) =>
+    error?.code != null && Number(error.code) !== 190);
 
-  // An explicit error inside a 200 response. Meta does this for a revoked
-  // token rather than failing the request, so a reader that only checks the
-  // HTTP status calls a dead token healthy.
-  const innerError = data.error;
-  if (innerError && typeof innerError === "object") {
-    const message = typeof innerError.message === "string" ? innerError.message : "Meta rejected this token.";
-    return { status: "error", detail: message, expiresAt: null, usable: false };
+  // A Meta OAuth error or explicit false is evidence that the credential is
+  // invalid. Any other error, missing data, or unknown validity is a failed
+  // probe, not a reason to revoke a working integration.
+  if (nonAuthError) {
+    throw new Error("Meta debug_token returned a non-auth error; token validity is unknown.");
   }
-
-  if (data.is_valid !== true) {
+  if (authError || data?.is_valid === false) {
+    const message = typeof authError?.message === "string" ? authError.message : null;
     return {
       status: "error",
-      detail: "Meta says this token is no longer valid. Reconnect the integration to replace it.",
+      detail: message ?? "Meta says this token is no longer valid. Reconnect the integration to replace it.",
       expiresAt: null,
       usable: false,
     };
+  }
+  if (!data || data.is_valid !== true || innerError || topError) {
+    throw new Error("Meta debug_token did not establish token validity.");
   }
 
   // Two clocks: the token's own expiry, and when data access lapses. The
