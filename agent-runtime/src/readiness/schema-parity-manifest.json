@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "4050ec5db95a7a76e4c279c6631ee0573c641fbea120fc98cdb585742bc9094a",
+  "migrationSourceDigest": "446bf0bcaa0d16f1ba6f14b83267df483a1b78ad410327874c140238e3e12c3d",
   "generatedTypesSha256": "b080885bac8902bf929816a2d3f0c59e020e8acc7c319c976739fcc23c12365e",
   "generatedSchemaBodySha256": "e61a007fe5ba70174deefa96aeb5cb28493d46d25c491f56148f8564f75ab37e",
   "localMigrations": [
@@ -2075,6 +2075,27 @@
       "filename": "20261030160000_279_approval_class_coverage.sql",
       "sha256": "735b1a8a405fc808c5a7361e93c6b7c1261ec6407aa3af7f7a60754a3ac8a2ac",
       "trimmedMd5": "30d96c69111d847a5951dcaece88da9b"
+    },
+    {
+      "version": "20261101000000",
+      "name": "280_public_route_quota",
+      "filename": "20261101000000_280_public_route_quota.sql",
+      "sha256": "bbf3299ac0ea7bf1b7ee38200bbd5f34ed3c199551ba2bf06ba9b8bfd9e31b75",
+      "trimmedMd5": "bda8157c423743d1e22163b6ae43a369"
+    },
+    {
+      "version": "20261101010000",
+      "name": "281_sales_runtime_budget_reservations",
+      "filename": "20261101010000_281_sales_runtime_budget_reservations.sql",
+      "sha256": "3600ff45da23e894ccac95a8683333a07cd9d737fac0282f9a3190b441adae53",
+      "trimmedMd5": "c15c412b4a766612479d6f371ca7ecb6"
+    },
+    {
+      "version": "20261101020000",
+      "name": "282_public_perimeter_admin_status",
+      "filename": "20261101020000_282_public_perimeter_admin_status.sql",
+      "sha256": "11c4af5a9a43df974540a2e0724d6314254ba28f1bd3b37ad8b6f386d4fc6721",
+      "trimmedMd5": "90bd4058fa24acaa7378e6a92ecd0ab8"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
