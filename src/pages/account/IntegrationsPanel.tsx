@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
@@ -12,17 +12,11 @@ import { SYNCING_PROVIDERS } from "../../lib/onboarding";
 import { cn } from "../../lib/cn";
 import { MetricsBackfill } from "../../components/MetricsBackfill";
 import { integrationCapabilitySummary } from "./integrationHealth";
+import { integrationRowsAreValid, providerReadiness, type IntegrationEvidence, type ReadinessCheck } from "../../lib/integrationReadiness";
 
-type Integration = {
+type Integration = IntegrationEvidence & {
   id: string;
-  provider: string;
-  credential_label: string | null;
   access_level: string | null;
-  status: string;
-  ingest_enabled: boolean;
-  last_checked_at: string | null;
-  token_expires_at: string | null;
-  ad_account_id: string | null;
   meta_page_id: string | null;
   meta_pixel_id: string | null;
 };
@@ -112,34 +106,62 @@ export function IntegrationsPanel() {
   const [addOpen, setAddOpen] = useState(false);
   const [adSettings, setAdSettings] = useState<Integration | null>(null);
   const { clientId } = useParams<{ clientId: string }>();
-  const [rows, setRows] = useState<Integration[]>([]);
-  const [saving, setSaving] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<{ clientId: string; rows: Integration[]; observedAtMs: number } | null>(null);
+  const [saving, setSaving] = useState<{ clientId: string; integrationId: string } | null>(null);
+  const [error, setError] = useState<{ clientId: string; message: string } | null>(null);
+  const [loadError, setLoadError] = useState<{ clientId: string; message: string } | null>(null);
+  const activeClient = useRef<string | null>(null);
+  const requestGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
-    if (!clientId) return;
+    if (!clientId || activeClient.current !== clientId) return;
+    const generation = ++requestGeneration.current;
+    const isCurrent = () => activeClient.current === clientId && requestGeneration.current === generation;
     setLoadError(null);
     try {
       const { data, error } = await supabase
         .from("client_integrations")
-        .select("id, provider, credential_label, access_level, status, ingest_enabled, last_checked_at, token_expires_at, ad_account_id, meta_page_id, meta_pixel_id")
+        .select("id, client_id, provider, credential_secret_id, credential_label, access_level, status, ingest_enabled, last_checked_at, token_expires_at, ad_account_id, meta_page_id, meta_pixel_id")
         .eq("client_id", clientId)
         .order("provider");
       if (error) throw error;
-      setRows((data ?? []) as Integration[]);
+      if (!integrationRowsAreValid(data, clientId)
+        || !data.every((row) => typeof row.id === "string" && typeof row.access_level !== "undefined")) {
+        throw new Error("Integration evidence is unavailable or returned another client's data.");
+      }
+      if (isCurrent()) setSnapshot({ clientId, rows: data as Integration[], observedAtMs: Date.now() });
     } catch (error) {
-      setLoadError("Failed to load integrations: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+      if (isCurrent()) {
+        setLoadError({
+          clientId,
+          message: "Failed to load integrations: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"),
+        });
+      }
     }
   }, [clientId]);
 
   useEffect(() => {
+    activeClient.current = clientId ?? null;
+    // The render guard below closes a previous client's dialog immediately;
+    // clearing the selection also keeps it closed if the route later returns.
+    setAdSettings(null);
     void refresh();
-  }, [refresh]);
+    return () => {
+      activeClient.current = null;
+      requestGeneration.current += 1;
+    };
+  }, [clientId, refresh]);
+
+  const rows = snapshot && snapshot.clientId === clientId ? snapshot.rows : [];
+  const selectedAdSettingsId = adSettings && clientId && adSettings.client_id === clientId
+    ? adSettings.id : null;
+  const currentAdSettings = selectedAdSettingsId && snapshot?.clientId === clientId
+    ? rows.find((row) => row.id === selectedAdSettingsId && row.client_id === clientId) ?? null
+    : null;
 
   const adSettingsValues = useMemo(
-    () => ({ meta_page_id: adSettings?.meta_page_id ?? "", meta_pixel_id: adSettings?.meta_pixel_id ?? "" }),
-    [adSettings],
+    () => ({ meta_page_id: currentAdSettings?.meta_page_id ?? "", meta_pixel_id: currentAdSettings?.meta_pixel_id ?? "" }),
+    [currentAdSettings],
   );
 
   /**
@@ -148,63 +170,96 @@ export function IntegrationsPanel() {
    * want for a one-off backfill without arming a recurring job.
    */
   const setIngest = async (integration: Integration, enabled: boolean) => {
-    setSaving(integration.id);
+    if (!clientId || activeClient.current !== clientId || integration.client_id !== clientId) return;
+    setSaving({ clientId, integrationId: integration.id });
     setError(null);
     // Optimistic: the switch should move under the finger, not after a
     // round trip. Rolled back below if the write is refused.
-    setRows((prev) =>
-      prev.map((r) => (r.id === integration.id ? { ...r, ingest_enabled: enabled } : r)),
-    );
+    setSnapshot((prev) => {
+      if (!prev || prev.clientId !== clientId) return prev;
+      return {
+        ...prev,
+        rows: prev.rows.map((r) => r.id === integration.id ? { ...r, ingest_enabled: enabled } : r),
+      };
+    });
     const { error: updateError } = await supabase
       .from("client_integrations")
       .update({ ingest_enabled: enabled })
-      .eq("id", integration.id);
+      .eq("id", integration.id)
+      .eq("client_id", clientId);
     if (updateError) {
-      setRows((prev) =>
-        prev.map((r) => (r.id === integration.id ? { ...r, ingest_enabled: !enabled } : r)),
-      );
-      setError(updateError.message);
+      setSnapshot((prev) => {
+        if (!prev || prev.clientId !== clientId) return prev;
+        return {
+          ...prev,
+          rows: prev.rows.map((r) => r.id === integration.id ? { ...r, ingest_enabled: !enabled } : r),
+        };
+      });
+      if (clientId) setError({ clientId, message: updateError.message });
     }
-    setSaving(null);
+    setSaving((prev) => prev?.clientId === clientId && prev.integrationId === integration.id ? null : prev);
   };
 
-  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
+  if (loadError && loadError.clientId === clientId) return <div role="alert"><p>{loadError.message}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
+  if (!clientId) return <p role="alert">No client selected.</p>;
+  if (!snapshot || snapshot.clientId !== clientId) return <p className="text-sm text-muted-foreground">Loading integrations…</p>;
 
   // The credentials onboarding asks for, and whether they have arrived. Read
   // from the same list onboarding scores itself against, so the two cannot
   // disagree about what "credentials collected" means.
-  const connected = new Set(rows.map((r) => r.provider));
-  const outstanding = SYNCING_PROVIDERS.filter((p) => !connected.has(p));
+  const providerChecks = SYNCING_PROVIDERS.map((provider) =>
+    providerReadiness(provider, rows, clientId, snapshot.observedAtMs));
+  const renderCheck = (label: string, check: ReadinessCheck) => (
+    <li key={label} className="text-xs text-muted-foreground">
+      <span className="font-medium text-foreground">{label}:</span>{" "}
+      <span className={check.state === "blocked" ? "font-medium text-destructive" : "font-medium text-amber-900"}>
+        {check.state === "blocked" ? "Blocked" : "Unknown"}
+      </span>{" "}— {check.reason}
+    </li>
+  );
 
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          {outstanding.length === 0 ? (
-            <>
-              Both provider entries onboarding asks for are listed. Account access and required scopes
-              still need verification before reporting or publishing is trusted.
-            </>
-          ) : (
-            <>
-              Onboarding is waiting on:{" "}
-              <span className="font-medium capitalize text-foreground">
-                {outstanding.join(", ")}
-              </span>
-              . Until these are here, reporting and attribution have nothing to read.
-            </>
-          )}
+          Meta and Instagram activation evidence is shown below. A stored integration or account ID
+          does not establish provider access, scopes, or permission to publish.
         </p>
         <Button icon={Plus} onClick={() => setAddOpen(true)}>
           Add
         </Button>
       </div>
 
-      {error && (
+      {error?.clientId === clientId && (
         <p role="alert" className="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
+          {error.message}
         </p>
       )}
+
+      <section aria-label="Provider access evidence" className="mb-4 rounded-lg border border-border bg-card p-4">
+        <h3 className="text-sm font-semibold text-card-foreground">Provider access evidence</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Read-only metadata for this client, checked {new Date(snapshot.observedAtMs).toLocaleString()}.
+          No provider account or scope readback is persisted yet, so this checklist cannot grant
+          publication or ad rights. Every external action still requires exact-version Approval Inbox approval.
+        </p>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {providerChecks.map((check) => (
+            <div key={check.provider} className="rounded-md border border-border p-3">
+              <h4 className="text-xs font-semibold capitalize text-card-foreground">
+                {check.provider} · {check.overall === "blocked" ? "Blocked" : "Unknown"}
+              </h4>
+              <ul className="mt-2 space-y-1">
+                {renderCheck("Vault credential", check.credential)}
+                {renderCheck("Recorded account", check.account)}
+                {renderCheck("Required scopes", check.scopes)}
+                {renderCheck("Action rights", check.action)}
+                {renderCheck("Daily metrics sync", check.dailySync)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <DataTable
         columns={["Integration", "Credential", "Declared access", "Status", "Provider capability", "Daily sync", "Ads"]}
@@ -242,7 +297,7 @@ export function IntegrationsPanel() {
                 role="switch"
                 aria-checked={r.ingest_enabled}
                 aria-label={`Daily sync for ${r.provider}`}
-                disabled={saving === r.id}
+                disabled={saving?.clientId === clientId && saving.integrationId === r.id}
                 onClick={() => void setIngest(r, !r.ingest_enabled)}
                 className={cn(
                   "relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50",
@@ -292,7 +347,7 @@ export function IntegrationsPanel() {
       {clientId && rows.some((r) => SYNCS[r.provider]) && <MetricsBackfill clientId={clientId} />}
 
       <FormModal
-        open={adSettings !== null}
+        open={currentAdSettings !== null}
         onClose={() => setAdSettings(null)}
         title="Meta ad settings"
         intro="What building ads in Meta needs beyond the credential. Ads are always built paused; launching happens in Ads Manager."
@@ -300,13 +355,16 @@ export function IntegrationsPanel() {
         initialValues={adSettingsValues}
         submitLabel="Save"
         onSubmit={async (v) => {
-          if (!adSettings) throw new Error("No integration selected.");
+          if (!clientId || activeClient.current !== clientId || !currentAdSettings) {
+            throw new Error("No current-client integration selected.");
+          }
           const pageId = numericId(v.meta_page_id, "The page ID");
           if (!pageId) throw new Error("The page ID is required.");
           const { error } = await supabase
             .from("client_integrations")
             .update({ meta_page_id: pageId, meta_pixel_id: numericId(v.meta_pixel_id, "The pixel ID") })
-            .eq("id", adSettings.id);
+            .eq("id", currentAdSettings.id)
+            .eq("client_id", clientId);
           if (error) throw new Error(error.message);
         }}
         onSaved={refresh}
