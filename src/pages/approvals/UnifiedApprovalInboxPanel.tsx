@@ -63,6 +63,17 @@ function clientSourcePath(path: string | null, clientId: string): string | null 
   }
 }
 
+function sourcePathForRequest(request: UnifiedApprovalRequest, clientId: string): string | null {
+  if (request.client_id !== clientId) return null;
+  if (request.source_system === "aa_console"
+    && request.source_kind === "recruitment_brief"
+    && request.owner_role === "admin"
+    && request.owning_path === "/team?tab=recruitment") {
+    return request.owning_path;
+  }
+  return clientSourcePath(request.owning_path, clientId);
+}
+
 function previewMissing(request: UnifiedApprovalRequest): string | null {
   if (request.preview_blocker?.trim()) return request.preview_blocker;
   if (!request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)) {
@@ -133,7 +144,7 @@ function RequestCard({ request, history, clientId, aal, busy, onDecide }: {
 }) {
   const [rejectionReason, setRejectionReason] = useState("");
   const blocker = previewMissing(request);
-  const sourcePath = clientSourcePath(request.owning_path, clientId);
+  const sourcePath = sourcePathForRequest(request, clientId);
   const html = exactHtml(request.preview);
   const canRejectCampaign = isCampaignRejectionReady(request, clientId);
   const canApproveCampaign = isCampaignApprovalReady(request, clientId);

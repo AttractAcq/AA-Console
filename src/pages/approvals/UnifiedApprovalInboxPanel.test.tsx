@@ -121,6 +121,28 @@ describe("unified approval inbox", () => {
     expect(screen.queryByRole("link", { name: "View owning source" })).not.toBeInTheDocument();
   });
 
+  it("links only an admin recruitment brief to the exact team route", async () => {
+    requests = [
+      { ...request, id: "recruitment", title: "Editor brief", source_system: "aa_console",
+        source_kind: "recruitment_brief", owning_path: "/team?tab=recruitment" },
+      { ...request, id: "other-kind", title: "Other team card", source_system: "aa_console",
+        source_kind: "campaign_action", owning_path: "/team?tab=recruitment" },
+      { ...request, id: "other-client", title: "Cross-client brief", client_id: "client-2",
+        source_system: "aa_console", source_kind: "recruitment_brief",
+        owning_path: "/team?tab=recruitment" },
+      { ...request, id: "alternate-route", title: "Other team tab", source_system: "aa_console",
+        source_kind: "recruitment_brief", owning_path: "/team?tab=admin" },
+    ];
+    show();
+    const recruitment = await screen.findByRole("article", { name: "Editor brief" });
+    expect(within(recruitment).getByRole("link", { name: "View owning source" }))
+      .toHaveAttribute("href", "/team?tab=recruitment");
+    for (const title of ["Other team card", "Cross-client brief", "Other team tab"]) {
+      expect(within(screen.getByRole("article", { name: title }))
+        .queryByRole("link", { name: "View owning source" })).not.toBeInTheDocument();
+    }
+  });
+
   it("filters across statuses and source types and shows decision history", async () => {
     const user = userEvent.setup();
     requests = [request, { ...request, id: "request-2", title: "Proof placement",
