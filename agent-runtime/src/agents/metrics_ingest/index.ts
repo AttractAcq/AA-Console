@@ -62,18 +62,16 @@ async function loadCredentials(sb: SupabaseClient, clientId: string, surface: Su
 
   const { data: integration, error } = await sb
     .from("client_integrations")
-    .select("credential_label, ad_account_id, status")
+    .select("id, credential_label, ad_account_id, status")
     .eq("client_id", clientId)
     .eq("provider", provider)
-    // The states the scheduler enqueues from (migration 124). Requiring
-    // 'active' alone meant a newly connected integration was queued every
-    // morning and then refused here as "no active integration", because
-    // only a successful ingest ever writes 'active'.
-    .in("status", ["connected", "active"])
     .maybeSingle();
   if (error) throw new Error(`Could not read the integration: ${error.message}`);
   if (!integration) return null;
 
+  // This service-only RPC is the execution-time eligibility gate. It checks
+  // state, known expiry, Vault presence and provider-row ambiguity in SQL.
+  // The earlier queue decision can become stale before this worker runs.
   const { data: token, error: secretError } = await sb.rpc("integration_secret", {
     p_client_id: clientId,
     p_provider: provider,
@@ -86,7 +84,8 @@ async function loadCredentials(sb: SupabaseClient, clientId: string, surface: Su
   if (surface === "paid") {
     const account = adAccountFor(integration);
     if ("problem" in account) throw new Error(account.problem);
-    return { provider, accessToken: String(token), accountId: account.id };
+    return { provider, accessToken: String(token), accountId: account.id,
+      integrationId: integration.id, status: integration.status };
   }
 
   if (!integration.credential_label) return null;
@@ -94,7 +93,26 @@ async function loadCredentials(sb: SupabaseClient, clientId: string, surface: Su
     provider,
     accessToken: String(token),
     accountId: String(integration.credential_label),
+    integrationId: integration.id,
+    status: integration.status,
   };
+}
+
+async function recordSuccessfulPull(
+  sb: SupabaseClient,
+  credential: NonNullable<Awaited<ReturnType<typeof loadCredentials>>>,
+) {
+  // Only a newly connected row earns active. In particular, a successful
+  // pull must not erase an expiring warning. The status compare prevents a
+  // late job from reopening a row that health marked error or reconnected.
+  const { error } = await sb.from("client_integrations")
+    .update({
+      status: credential.status === "connected" ? "active" : credential.status,
+      last_checked_at: new Date().toISOString(),
+    })
+    .eq("id", credential.integrationId)
+    .eq("status", credential.status);
+  if (error) throw new Error(`Could not record the integration pull: ${error.message}`);
 }
 
 /** Attaches our own campaign/post ids where the external id is one we know. */
@@ -174,8 +192,8 @@ export async function runMetricsIngestJob(
       ok: false,
       retryable: false,
       failureMessage:
-        `This client has no active ${PROVIDER_FOR_SURFACE[surface] ?? surface} integration. ` +
-        "Connect one in Account → Integrations, then re-run.",
+        `This client has no currently usable ${PROVIDER_FOR_SURFACE[surface] ?? surface} integration. ` +
+        "Check status, expiry, account and credential in Account → Integrations, then re-run.",
     };
   }
 
@@ -196,8 +214,8 @@ export async function runMetricsIngestJob(
         await sb
           .from("client_integrations")
           .update({ status: "error", last_checked_at: new Date().toISOString() })
-          .eq("client_id", job.client_id)
-          .eq("provider", credentials.provider);
+          .eq("id", credentials.integrationId)
+          .eq("status", credentials.status);
       }
       return { ok: false, retryable: error.retryable, failureMessage: error.message };
     }
@@ -210,11 +228,7 @@ export async function runMetricsIngestJob(
 
   if (rows.length === 0) {
     await appendEvent(sb, job.id, "Nothing came back for that window.");
-    await sb
-      .from("client_integrations")
-      .update({ status: "active", last_checked_at: new Date().toISOString() })
-      .eq("client_id", job.client_id)
-      .eq("provider", credentials.provider);
+    await recordSuccessfulPull(sb, credentials);
     return { ok: true, retryable: false };
   }
 
@@ -231,11 +245,7 @@ export async function runMetricsIngestJob(
   }
 
   const mapped = prepared.filter((r) => r.campaign_id || r.post_id).length;
-  await sb
-    .from("client_integrations")
-    .update({ status: "active", last_checked_at: new Date().toISOString() })
-    .eq("client_id", job.client_id)
-    .eq("provider", credentials.provider);
+  await recordSuccessfulPull(sb, credentials);
 
   await appendEvent(
     sb,
