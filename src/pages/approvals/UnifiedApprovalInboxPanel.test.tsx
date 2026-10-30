@@ -91,6 +91,33 @@ const readyRecruitment = {
   owner_role: "admin", owning_path: "/team?tab=recruitment",
 };
 
+const invitationSourceId = "11111111-1111-4111-8111-111111111111";
+const invitationHash = "e".repeat(64);
+const readyInvitation = {
+  ...request,
+  id: "33333333-3333-4333-8333-333333333333", client_id: null,
+  source_system: "auth", source_kind: "console_invitation",
+  source_id: invitationSourceId, source_version: invitationHash,
+  artifact_hash: invitationHash, title: "Invite New Editor",
+  expires_at: "2035-01-01T00:00:00Z", destination: "new@example.com",
+  account_ref: "auth@attractacq.com", budget: null,
+  preview: {
+    recipient_email: "new@example.com", sender_account: "auth@attractacq.com",
+    target_role: "employee", target_member_id: "22222222-2222-4222-8222-222222222222",
+    target_client_id: null, team_category: "editors", team_member_generation: 0,
+    full_name: "New Editor", redirect_origin: "https://console.attractacq.com",
+    redirect_url: `https://console.attractacq.com/invite/accept?request=${invitationSourceId}`,
+    auth_project_origin: "https://project.supabase.co",
+    sender_verification_id: "44444444-4444-4444-8444-444444444444",
+    smtp_evidence_sha256: "b".repeat(64), template_subject: "Your AA Console invitation",
+    template_body: "Use this invitation link.", template_sha256: "c".repeat(64),
+    expires_at: "2035-01-01T00:00:00Z",
+  },
+  scope: { target_role: "employee", target_member_id: "22222222-2222-4222-8222-222222222222",
+    target_client_id: null },
+  owner_role: "admin", owning_path: "/approvals",
+};
+
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
@@ -462,6 +489,47 @@ describe("unified approval inbox", () => {
       p_expected_artifact_hash: "d".repeat(64),
     }));
     expect(rpc).not.toHaveBeenCalledWith("approve_recruitment_brief", expect.anything());
+  });
+
+  it("decides an exact agency invitation in the global Inbox through its owning RPC", async () => {
+    requests = [readyInvitation];
+    rpc.mockImplementation(async () => {
+      requests = [{ ...readyInvitation, status: "approved", source_state: "source_decided" }];
+      decisions = [{ request_id: readyInvitation.id, decision: "approved", actor_id: "human-1",
+        actor_aal: "aal2", reason: null, decided_at: "2026-10-30T09:00:00Z" }];
+      return { data: null, error: null };
+    });
+    show("global");
+    const card = await screen.findByRole("article", { name: "Invite New Editor" });
+    expect(within(card).getByText("Auth invitation decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_console_invitation_v6", {
+      p_request_id: invitationSourceId,
+      p_expected_source_version: invitationHash,
+      p_expected_artifact_hash: invitationHash,
+      p_approved: true,
+    }));
+    expect(await screen.findByText("Decision history (1)")).toBeInTheDocument();
+  });
+
+  it("keeps agency invitation decisions out of the client Inbox", async () => {
+    requests = [readyInvitation];
+    show("client");
+    await waitFor(() => expect(screen.queryByRole("article", { name: "Invite New Editor" }))
+      .not.toBeInTheDocument());
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("re-reads the exact invitation preview before recording a decision", async () => {
+    requests = [readyInvitation];
+    freshRequest = { ...readyInvitation,
+      preview: { ...readyInvitation.preview, template_body: "Changed body" } };
+    show("global");
+    const card = await screen.findByRole("article", { name: "Invite New Editor" });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByText(/This exact request changed or is no longer pending/))
+      .toHaveAttribute("role", "alert");
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("keeps blocked and changed recruitment cards read-only or rejects the click", async () => {

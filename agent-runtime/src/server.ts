@@ -55,6 +55,7 @@ import { handleSchemaParity } from "./readiness/schema-parity-route.js";
 import { currentReleaseProbe } from "./readiness/release-probe.js";
 import { handleSitesRoute } from "./github/sites-route.js";
 import { logger } from "./logging/logger.js";
+import { handleInvitationRequest, handleInvitationSend, handleInvitationAccept, handleInvitationList, handleInvitationInspect } from "./invitations/routes.js";
 import { authenticatePublicIngress, IngressRefusal, isSignedPublicPath } from "./public/ingress-auth.js";
 
 const config = loadConfig();
@@ -261,6 +262,27 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
 
   if (req.url === "/admin/proof-capture") {
     void handleProofCaptureAdmin(req, res, sb, config);
+    return;
+  }
+
+  if (req.url === "/admin/invitations/request") {
+    void handleInvitationRequest(req, res, sb, config);
+    return;
+  }
+  if (req.url === "/admin/invitations/send") {
+    void handleInvitationSend(req, res, sb, config);
+    return;
+  }
+  if (req.url === "/admin/invitations/accept") {
+    void handleInvitationAccept(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/invitations/list") {
+    void handleInvitationList(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/invitations/inspect") {
+    void handleInvitationInspect(req, res, sb);
     return;
   }
 

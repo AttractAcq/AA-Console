@@ -107,6 +107,8 @@ export interface RuntimeConfig {
   resendFrom: string;
   /** Where an emailed brief links back to. */
   consoleUrl: string;
+  /** Exact sender configured in Supabase Auth SMTP; absent disables invitation requests. */
+  authInviteSenderEmail: string | null;
 }
 
 // The one origin this system is served from. Both the CORS allow-list and
@@ -340,6 +342,7 @@ export function loadConfig(): RuntimeConfig {
     // http://localhost:5173 in front of them, which is a dead link on every
     // machine but the one that sent it.
     consoleUrl: (optionalEnv("CONSOLE_URL") ?? CONSOLE_ORIGIN).replace(/\/+$/, ""),
+    authInviteSenderEmail: optionalEnv("AUTH_INVITE_SENDER_EMAIL")?.toLowerCase() ?? null,
   };
 }
 

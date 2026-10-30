@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import { supabase } from "../../lib/supabase";
+import { invitationApprovalBlocker, invitationCanApprove, invitationCanReject } from "../../lib/invitationApproval";
 import type { Database } from "../../types/database";
 
 const PAGE_SIZE = 50;
@@ -183,6 +184,10 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isGoogleReplyRejectionReady(request, clientId);
 }
 
+function isInvitation(request: UnifiedApprovalRequest): boolean {
+  return request.source_system === "auth" && request.source_kind === "console_invitation";
+}
+
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignApprovalReady(request, clientId)
     || isGoogleReplyApprovalReady(request, clientId)
@@ -221,22 +226,27 @@ function exactHtml(preview: unknown): string | null {
   return typeof html === "string" && html.trim() ? html : null;
 }
 
-function RequestCard({ request, history, clientId, manager, aal, busy, onDecide }: {
+function RequestCard({ request, history, clientId, manager, global, aal, busy, onDecide }: {
   request: UnifiedApprovalRequest;
   history: UnifiedApprovalDecision[];
   clientId: string;
   manager: boolean;
+  global: boolean;
   aal: "aal2" | "aal1" | "unavailable";
   busy: boolean;
   onDecide: (request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) => Promise<void>;
 }) {
   const [rejectionReason, setRejectionReason] = useState("");
-  const blocker = previewMissing(request);
+  const blocker = isInvitation(request)
+    ? invitationApprovalBlocker(request) : previewMissing(request);
   const sourcePath = manager ? null : sourcePathForRequest(request, clientId);
   const html = exactHtml(request.preview);
-  const canReject = isRejectionReady(request, clientId);
-  const canApprove = isApprovalReady(request, clientId);
-  const decisionLabel = request.source_kind === "google_review_reply"
+  const canReject = (global && !manager && isInvitation(request) && invitationCanReject(request))
+    || isRejectionReady(request, clientId);
+  const canApprove = (global && !manager && isInvitation(request) && invitationCanApprove(request))
+    || isApprovalReady(request, clientId);
+  const decisionLabel = isInvitation(request) ? "Auth invitation"
+    : request.source_kind === "google_review_reply"
     ? "Google review reply" : request.source_kind === "recruitment_brief"
       ? "Recruitment brief" : "Campaign action";
 
@@ -463,10 +473,14 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   }
 
   async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) {
+    const agencyInvitation = global && isInvitation(request);
     const targetClientId = multiClient ? request.client_id : clientId;
-    if (!targetClientId || request.client_id !== targetClientId || (decision === "approved"
-      ? !isApprovalReady(request, targetClientId)
-      : !isRejectionReady(request, targetClientId))) return;
+    const ready = agencyInvitation
+      ? (decision === "approved" ? invitationCanApprove(request) : invitationCanReject(request))
+      : !!targetClientId && request.client_id === targetClientId
+        && (decision === "approved" ? isApprovalReady(request, targetClientId)
+          : isRejectionReady(request, targetClientId));
+    if (!ready) return;
     setBusyId(request.id);
     setDecisionError(null);
     try {
@@ -477,20 +491,34 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       }
       setAal("aal2");
 
-      const current = await supabase.from("approval_inbox_v6").select("*")
-        .eq("id", request.id).eq("client_id", targetClientId).maybeSingle();
+      const currentQuery = supabase.from("approval_inbox_v6").select("*").eq("id", request.id);
+      const current = await (targetClientId
+        ? currentQuery.eq("client_id", targetClientId)
+        : currentQuery.is("client_id", null)).maybeSingle();
       if (current.error) throw current.error;
       const currentRequest = current.data ? validatedRequest(current.data) : null;
-      if (!currentRequest || (decision === "approved"
-        ? !isApprovalReady(currentRequest, targetClientId)
-        : !isRejectionReady(currentRequest, targetClientId))
+      const currentReady = currentRequest && (agencyInvitation
+        ? (decision === "approved" ? invitationCanApprove(currentRequest)
+          : invitationCanReject(currentRequest))
+        : !!targetClientId && (decision === "approved"
+          ? isApprovalReady(currentRequest, targetClientId)
+          : isRejectionReady(currentRequest, targetClientId)));
+      if (!currentRequest || !currentReady
         || !sameVersion(request, currentRequest)) {
         throw new Error("This exact request changed or is no longer pending. Review the refreshed card before deciding.");
       }
       if (decision === "rejected" && !reason?.trim()) {
         throw new Error("Enter a reason before rejecting this request.");
       }
-      const outcome = request.source_kind === "google_review_reply"
+      const outcome = agencyInvitation
+        ? await supabase.rpc("decide_console_invitation_v6", {
+          p_request_id: request.source_id,
+          p_expected_source_version: request.source_version,
+          p_expected_artifact_hash: request.artifact_hash!,
+          p_approved: decision === "approved",
+          ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+        })
+        : request.source_kind === "google_review_reply"
         ? await supabase.rpc("decide_google_review_reply_from_inbox_v6", {
           p_reply_id: request.source_id,
           p_expected_source_version: request.source_version,
@@ -560,7 +588,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
               : "Canonical requests and decision history appear here as source adapters are connected. "}
           {manager
             ? "Complete campaign action and Google review reply requests can be decided here through their owning functions."
-            : "Complete campaign action, Google review reply and recruitment brief requests can be decided here through their owning functions."}
+            : "Complete campaign action, Google review reply, recruitment brief and Auth invitation requests can be decided here through their owning functions."}
           {manager ? " Other requests remain read-only. " : " Other requests link to their owning source. "}
           Coverage is incomplete: work not yet mirrored here remains in its owning queue.
           Pending here reflects the canonical ledger; each owning source is checked again before a decision.
@@ -630,7 +658,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             </p> : <div className="space-y-4">{visible.map((request) => (
               <RequestCard key={request.id} request={request} history={historyByRequest.get(request.id) ?? []}
                 clientId={multiClient ? request.client_id ?? "" : clientId ?? ""}
-                manager={manager}
+                manager={manager} global={global}
                 aal={aal} busy={busyId === request.id} onDecide={decide} />
             ))}</div>}
             {(page > 0 || hasNextPage) && <nav aria-label="Approval pages" className="flex items-center gap-3">
