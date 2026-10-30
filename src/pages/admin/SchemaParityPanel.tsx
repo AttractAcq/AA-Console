@@ -134,7 +134,7 @@ export function SchemaParityPanel({ report: suppliedReport }: { report?: unknown
           <caption className="p-3 text-left font-semibold">Migration history</caption>
           <thead><tr className="border-y border-border"><th className="p-2">Environment</th><th className="p-2">Entries</th><th className="p-2">Head</th><th className="p-2">Stored SQL payload</th><th className="p-2">Status</th></tr></thead>
           <tbody>
-            <tr><th className="p-2 font-medium">Local working tree</th><td className="p-2">{report.localMigrations.count}</td><td className="p-2 font-mono">{report.localMigrations.head ?? "Unknown"}</td><td className="p-2">Source files</td><td className="p-2">Source files</td></tr>
+            <tr><th className="p-2 font-medium">Source manifest</th><td className="p-2">{report.localMigrations.count}</td><td className="p-2 font-mono">{report.localMigrations.head ?? "Unknown"}</td><td className="p-2">Tracked migrations</td><td className="p-2">Tracked migrations</td></tr>
             {environments.map((name) => <tr key={name} className="border-t border-border"><th className="p-2 font-medium capitalize">{name}</th><td className="p-2">{report.environments[name]?.migrationHistory?.count ?? "Unknown"}</td><td className="p-2 font-mono">{report.environments[name]?.migrationHistory?.head ?? "Unknown"}</td><td className="p-2">{report.environments[name]?.migrationHistory?.storedSqlPayloadUnavailable === undefined ? "Unknown" : `${report.environments[name]?.migrationHistory?.storedSqlPayloadUnavailable} unavailable`}</td><td className="p-2">{report.environments[name]?.errors.length ? "Incomplete" : "Read"}</td></tr>)}
           </tbody>
         </table>
