@@ -444,8 +444,8 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const [requests, setRequests] = useState<UnifiedApprovalRequest[]>([]);
   const [decisions, setDecisions] = useState<UnifiedApprovalDecision[]>([]);
   const [statusFilter, setStatusFilter] = useState(initialSource ? "all" : "pending");
-  const [clientFilter, setClientFilter] = useState("all");
-  const [kindFilter, setKindFilter] = useState("all");
+  const [clientFilter, setClientFilter] = useState<string | null>(null);
+  const [kindFilter, setKindFilter] = useState<string | null>(null);
   const [clientFilterDraft, setClientFilterDraft] = useState("");
   const [kindFilterDraft, setKindFilterDraft] = useState("");
   const [search, setSearch] = useState(initialSource ?? "");
@@ -470,9 +470,9 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       if (!multiClient) query = query.eq("client_id", clientId!);
       else if (manager) query = query.eq("owner_role", "admin_or_active_client_manager");
       else if (clientFilter === "agency-wide") query = query.is("client_id", null);
-      else if (clientFilter !== "all") query = query.eq("client_id", clientFilter);
+      else if (clientFilter !== null) query = query.eq("client_id", clientFilter);
       if (statusFilter !== "all") query = query.eq("status", statusFilter);
-      if (kindFilter !== "all") query = query.eq("source_kind", kindFilter);
+      if (kindFilter !== null) query = query.eq("source_kind", kindFilter);
       if (sourceDeepLink) query = query.eq("source_id", sourceDeepLink);
       // Fetch one sentinel row so the next-page control is based on evidence.
       // Each history query is then bounded to the 50 cards actually displayed.
@@ -603,17 +603,17 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const kinds = useMemo(() => [...new Set([
     ...RELEASED_SOURCE_KINDS,
     ...requests.map((request) => request.source_kind),
-    ...(kindFilter === "all" ? [] : [kindFilter]),
+    ...(kindFilter === null ? [] : [kindFilter]),
   ])].sort(), [requests, kindFilter]);
   const clients = useMemo(() => [...new Set([
     ...requests.map((request) => request.client_id ?? "agency-wide"),
-    ...(clientFilter === "all" ? [] : [clientFilter]),
+    ...(clientFilter === null ? [] : [clientFilter]),
   ])].sort(), [requests, clientFilter]);
 
   function applyExactFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setClientFilter(clientFilterDraft.trim() || "all");
-    setKindFilter(kindFilterDraft.trim() || "all");
+    setClientFilter(clientFilterDraft.trim() || null);
+    setKindFilter(kindFilterDraft.trim() || null);
     setSourceDeepLink(null);
     setSearch("");
     setPageState({ scopeKey, page: 0 });
@@ -694,8 +694,8 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
           <p className="min-w-full text-xs text-muted-foreground">
             Exact filters search every request page. Suggestions are shortcuts; enter any client ID or source kind. Leave a field blank for all. Use agency-wide for requests without a client.
           </p>
-          {(clientFilter !== "all" || kindFilter !== "all") && <p role="status" className="min-w-full text-xs text-muted-foreground">
-            Applied: client {clientFilter === "all" ? "all" : clientFilter}; source {kindFilter === "all" ? "all" : kindFilter}.
+          {(clientFilter !== null || kindFilter !== null) && <p role="status" className="min-w-full text-xs text-muted-foreground">
+            Applied: client {clientFilter === null ? "any" : clientFilter}; source {kindFilter === null ? "any" : kindFilter}.
           </p>}
         </form>
         <label className="min-w-48 flex-[2] text-sm font-medium">Search current page

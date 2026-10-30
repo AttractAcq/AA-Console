@@ -263,6 +263,32 @@ describe("unified approval inbox", () => {
     expect(historyIds.at(-1)).toEqual(["request-59"]);
   });
 
+  it("treats a literal all source kind as an exact filter, then clears it to any source", async () => {
+    const user = userEvent.setup();
+    requests = [
+      { ...request, id: "request-all", title: "Literal all source", source_kind: "all" },
+      { ...request, id: "request-campaign", title: "Campaign action source" },
+    ];
+    show("global");
+    expect(await screen.findByRole("article", { name: "Literal all source" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Campaign action source" })).toBeInTheDocument();
+
+    const sourceInput = screen.getByLabelText("Source type");
+    await user.type(sourceInput, "all");
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => expect(screen.queryByRole("article", { name: "Campaign action source" }))
+      .not.toBeInTheDocument());
+    expect(screen.getByRole("article", { name: "Literal all source" })).toBeInTheDocument();
+    expect(historyIds.at(-1)).toEqual(["request-all"]);
+    expect(screen.getByRole("status", { name: "", hidden: false })).toHaveTextContent("source all");
+
+    await user.clear(sourceInput);
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(await screen.findByRole("article", { name: "Campaign action source" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Literal all source" })).toBeInTheDocument();
+    expect(historyIds.at(-1)).toEqual(["request-all", "request-campaign"]);
+  });
+
   it("filters agency-wide requests by a null client without inventing a client ID", async () => {
     requests = [request, { ...request, id: "agency-1", client_id: null,
       title: "Agency release decision" }];
