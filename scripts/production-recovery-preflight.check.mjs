@@ -131,14 +131,30 @@ test('rejects Auth and client count or sorted-UUID digest drift', () => {
 
 test('requires separate Storage metadata, bucket and object-byte evidence', () => {
   assert.throws(() => run((_, r) => { r.storage.objectCount++ }), /Storage object bytes are incomplete/)
-  assert.throws(() => run((_, r) => { r.storage.bucketCount++ }), /Storage metadata/)
-  assert.throws(() => run((_, r) => { r.storage.objectMetadataSha256 = d('5') }), /Storage metadata/)
-  assert.throws(() => run((_, r) => { r.storage.byteManifestSha256 = d('6') }), /Storage metadata/)
+  assert.throws(() => run((_, r) => {
+    r.storage.objectCount++
+    r.storage.byteCount++
+  }), /Storage object count/)
+  assert.throws(() => run((_, r) => { r.storage.bucketCount++ }), /Storage bucket count/)
+  assert.throws(() => run((_, r) => { r.storage.bucketConfigSha256 = d('5') }), /Storage bucket configuration/)
+  assert.throws(() => run((_, r) => { r.storage.byteManifestSha256 = d('6') }), /Storage byte manifest/)
   assert.throws(() => run((s) => { s.storage.byteCount = 0 }), /Storage object bytes are incomplete/)
   assert.throws(() => run((s, r) => {
     s.storage.objectCount = r.storage.objectCount = 0
     s.storage.byteCount = r.storage.byteCount = 0
   }), /empty Storage object manifest/)
+})
+
+test('matching Storage byte-manifest digest cannot hide changed physical metadata', () => {
+  assert.throws(() => run((_, restore) => {
+    restore.storage.objectMetadataSha256 = d('5')
+  }), /Storage object metadata differs despite matching byte manifest/)
+})
+
+test('matching Storage row metadata cannot hide a changed byte-manifest digest', () => {
+  assert.throws(() => run((_, restore) => {
+    restore.storage.byteManifestSha256 = d('6')
+  }), /Storage byte manifest differs/)
 })
 
 test('requires Vault secret inventory and decryption, including on the disposable target', () => {
