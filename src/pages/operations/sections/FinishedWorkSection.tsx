@@ -5,7 +5,8 @@ import { EmptyState } from "../../../components/EmptyState";
 import { MediaCard, StatusBadge } from "../../../components/MediaCard";
 import { mediaFilters } from "../../../data/mediaFilters";
 import type { MediaFilterId } from "../../../data/mediaFilters";
-import { REVIEW_TONE, shortDate, signPaths } from "../../../lib/media";
+import { REVIEW_TONE, shortDate } from "../../../lib/media";
+import { useSignedPreviewPaths } from "../../../lib/useSignedPreviewPaths";
 import type { MediaAsset } from "../../../lib/media";
 import { supabase } from "../../../lib/supabase";
 
@@ -14,7 +15,7 @@ export function FinishedWorkSection() {
   const { memberId } = useParams<{ memberId: string }>();
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.storage_path));
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -36,7 +37,6 @@ export function FinishedWorkSection() {
       if (error) throw error;
       const rows = (data ?? []) as MediaAsset[];
       setAssets(rows);
-      setUrls(await signPaths("client-media", rows.map((r) => r.storage_path)));
     } catch (error) {
       setLoadError("Failed to load submissions: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
     } finally {

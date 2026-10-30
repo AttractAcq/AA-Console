@@ -37,6 +37,8 @@ import { isPlatform } from "../../content/platform-limits.js";
 import { MAX_FRAMES, MIN_FRAMES, isContentFormat } from "../../content/format.js";
 import { adapterFor } from "../../publishing/registry.js";
 import { compose } from "../../publishing/caption.js";
+import { PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS, safeProviderErrorMessage } from "../../storage/signed-url-policy.js";
+import { requireOrganicRoute } from "./organic-route.js";
 import {
   PublishError,
   type PublishAdapter,
@@ -46,8 +48,6 @@ import {
 } from "../../publishing/types.js";
 
 const MEDIA_BUCKET = "client-media";
-/** Long enough for Meta to fetch a reel, short enough not to be a public link. */
-const SIGNED_URL_SECONDS = 60 * 60;
 const DEFAULT_BATCH = 5;
 
 export interface ClaimedPost {
@@ -75,6 +75,7 @@ export async function prepare(
   sb: SupabaseClient,
   post: ClaimedPost,
 ): Promise<PublishRequest> {
+  await requireOrganicRoute(sb, post);
   if (!isPlatform(post.platform)) {
     throw new PublishError(`This post is for "${post.platform}", which has no rules on file.`, false);
   }
@@ -113,7 +114,7 @@ export async function prepare(
   if (!path) throw new PublishError("The asset has no file to post.", false);
   const { data: signed, error: signError } = await sb.storage
     .from(MEDIA_BUCKET)
-    .createSignedUrl(path, SIGNED_URL_SECONDS);
+    .createSignedUrl(path, PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS);
   const mediaUrl = signed?.signedUrl?.trim() ?? "";
   if (signError || !mediaUrl.startsWith("https://")) {
     // The platform fetches this URL itself, so anything it cannot reach is
@@ -150,7 +151,7 @@ export async function prepare(
     }
     const { data: signedFrames, error: frameError } = await sb.storage
       .from(MEDIA_BUCKET)
-      .createSignedUrls(paths, SIGNED_URL_SECONDS);
+      .createSignedUrls(paths, PROVIDER_MEDIA_FETCH_URL_TTL_SECONDS);
     if (frameError || !signedFrames || signedFrames.length !== paths.length) {
       throw new PublishError(`Could not sign URLs for this ${format}'s ${paths.length} frames.`, true);
     }
@@ -207,6 +208,7 @@ async function publishStory(
   sb: SupabaseClient,
   adapter: PublishAdapter,
   request: PublishRequest,
+  post: ClaimedPost,
   jobId: string,
 ): Promise<PublishSuccess> {
   if (!adapter.publishFrame) {
@@ -236,6 +238,7 @@ async function publishStory(
   let sent = 0;
   for (const frame of frames) {
     if (already.has(frame.position)) continue;
+    await requireOrganicRoute(sb, post);
     const result = await adapter.publishFrame(request, frame);
     const { error: frameError } = await sb.rpc("record_frame_published", {
       p_post_id: request.postId,
@@ -306,10 +309,13 @@ export async function runPublisherJob(
     try {
       const request = await prepare(sb, post);
       const adapter = adapterFor(post.platform)!;
-      const result =
-        request.contentFormat === "story"
-          ? await publishStory(sb, adapter, request, job.id)
-          : await adapter.publish(request);
+      let result: PublishSuccess;
+      if (request.contentFormat === "story") {
+        result = await publishStory(sb, adapter, request, post, job.id);
+      } else {
+        await requireOrganicRoute(sb, post);
+        result = await adapter.publish(request);
+      }
 
       const { error: recordError } = await sb.rpc("record_post_published", {
         p_post_id: post.post_id,
@@ -352,7 +358,7 @@ export async function runPublisherJob(
     } catch (thrown) {
       failed += 1;
       const retryable = thrown instanceof PublishError ? thrown.retryable : false;
-      const reason = thrown instanceof Error ? thrown.message : String(thrown);
+      const reason = safeProviderErrorMessage(thrown instanceof Error ? thrown.message : String(thrown));
       const { error: failError } = await sb.rpc("record_post_publish_failure", {
         p_post_id: post.post_id,
         p_reason: reason,

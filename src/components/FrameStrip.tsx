@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { fetchFrames } from "../lib/frames";
 import type { Frame } from "../lib/frames";
-import { signPaths } from "../lib/media";
+import { useSignedPreviewPaths } from "../lib/useSignedPreviewPaths";
 import { supabase } from "../lib/supabase";
 import { Modal } from "./Modal";
 import { cn } from "../lib/cn";
@@ -33,7 +33,7 @@ export function FrameStrip({
   onError: (message: string) => void;
 }) {
   const [frames, setFrames] = useState<Frame[]>([]);
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", frames.map((frame) => frame.storage_path));
   const [loading, setLoading] = useState(true);
   const [remaking, setRemaking] = useState<Frame | null>(null);
   const [feedback, setFeedback] = useState("");
@@ -44,7 +44,6 @@ export function FrameStrip({
     try {
       const rows = await fetchFrames(assetId);
       setFrames(rows);
-      setUrls(await signPaths("client-media", rows.map((f) => f.storage_path)));
     } catch {
       // A strip that cannot load is decoration failing, not the asset being
       // broken — the same rule countFrames follows. The modal around it must

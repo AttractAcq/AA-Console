@@ -41,7 +41,7 @@ describe("signPaths", () => {
   it("dedupes paths before requesting signed URLs", async () => {
     createSignedUrls.mockResolvedValueOnce({ data: [], error: null });
     await signPaths("client-media", ["a.png", "a.png", "b.png"]);
-    expect(createSignedUrls).toHaveBeenCalledWith(["a.png", "b.png"], 3600);
+    expect(createSignedUrls).toHaveBeenCalledWith(["a.png", "b.png"], 900);
   });
 
   it("drops entries that failed to sign", async () => {

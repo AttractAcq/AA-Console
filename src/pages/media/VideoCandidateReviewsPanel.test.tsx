@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 
@@ -32,8 +32,8 @@ it("shows rejected candidate footage and the precise quality failure", async () 
   render(<VideoCandidateReviewsPanel clientId="client-1" titles={new Map([["reel-1", "Consultation reel"]])} />);
   expect(await screen.findByText("Consultation reel · cut attempt 2")).toBeInTheDocument();
   expect(screen.getByText("Internal QA: rejected")).toBeInTheDocument();
-  const video = screen.getByRole("region", { name: "Video quality reviews" }).querySelector("video");
-  expect(video?.getAttribute("src")).toBe("https://example.test/candidate.mp4");
+  await waitFor(() => expect(screen.getByRole("region", { name: "Video quality reviews" })
+    .querySelector("video")?.getAttribute("src")).toBe("https://example.test/candidate.mp4"));
   await userEvent.click(screen.getByText("Inspect media and creative checks"));
   expect(screen.getByText("1 frozen interval of at least 2s detected.")).toBeInTheDocument();
   expect(screen.getByRole("listitem")).toHaveTextContent("brief execution · fail · 1.5s: Action absent");

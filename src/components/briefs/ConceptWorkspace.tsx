@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { CalendarPlus, Check, Pencil, RefreshCw, ThumbsUp } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { signPaths } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { cn } from "../../lib/cn";
+import { assertOrganicScheduleRoute, PAID_SCHEDULING_BLOCKER } from "../../lib/scheduleRoute";
 
 export type Generation = {
   id: string;
@@ -88,7 +89,12 @@ export function ConceptWorkspace({
   onChanged: () => void;
 }) {
   const [renders, setRenders] = useState<Render[]>([]);
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const [assetPaths, setAssetPaths] = useState<Map<string, string>>(new Map());
+  const signedAssets = useSignedPreviewPaths("client-media", [...assetPaths.values()]);
+  const urls = new Map([...assetPaths].flatMap(([id, path]) => {
+    const url = signedAssets.get(path);
+    return url ? [[id, url] as const] : [];
+  }));
   const [assets, setAssets] = useState<Map<string, AssetState>>(new Map());
   const [scheduleDate, setScheduleDate] = useState("");
   const [channel, setChannel] = useState<"organic" | "paid">("organic");
@@ -112,7 +118,7 @@ export function ConceptWorkspace({
 
       const ids = rows.map((r) => r.asset_id).filter((id): id is string => Boolean(id));
       if (ids.length === 0) {
-        setUrls(new Map());
+        setAssetPaths(new Map());
         return;
       }
       const { data: assetRows, error: assetError } = await supabase
@@ -120,14 +126,7 @@ export function ConceptWorkspace({
         .select("id, storage_path, review_status, ref_number")
         .in("id", ids);
       if (assetError) throw assetError;
-      const signed = await signPaths("client-media", (assetRows ?? []).map((a) => a.storage_path));
-      setUrls(
-        new Map(
-          (assetRows ?? [])
-            .map((a) => [a.id, signed.get(a.storage_path) ?? ""] as [string, string])
-            .filter(([, u]) => u),
-        ),
-      );
+      setAssetPaths(new Map((assetRows ?? []).map((asset) => [asset.id, asset.storage_path])));
 
       // Whether each asset has already been booked in, so the action bar
       // offers the next step rather than one that has been taken.
@@ -221,16 +220,19 @@ export function ConceptWorkspace({
     }
     setBusy("schedule");
     setError(null);
-    const { error: rpcError } = await supabase.rpc("schedule_asset", {
-      p_asset_id: assetId,
-      p_date: scheduleDate,
-      p_channel: channel,
-    });
-    if (rpcError) setError(rpcError.message);
-    else {
+    try {
+      await assertOrganicScheduleRoute(assetId, channel);
+      const { error: rpcError } = await supabase.rpc("schedule_asset", {
+        p_asset_id: assetId,
+        p_date: scheduleDate,
+        p_channel: channel,
+      });
+      if (rpcError) throw new Error(rpcError.message);
       setScheduleDate("");
       await load();
       onChanged();
+    } catch (scheduleError) {
+      setError(scheduleError instanceof Error ? scheduleError.message : "Could not schedule this asset.");
     }
     setBusy(null);
   };
@@ -494,6 +496,7 @@ export function ConceptWorkspace({
                   className="rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <select
+                  aria-label="Channel"
                   value={channel}
                   onChange={(e) => setChannel(e.target.value as "organic" | "paid")}
                   className="rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -501,9 +504,12 @@ export function ConceptWorkspace({
                   <option value="organic">Organic</option>
                   <option value="paid">Paid</option>
                 </select>
+                {channel === "paid" && (
+                  <span role="status" className="text-xs text-destructive">{PAID_SCHEDULING_BLOCKER}</span>
+                )}
                 <button
                   type="button"
-                  disabled={busy === "schedule"}
+                  disabled={busy === "schedule" || channel !== "organic"}
                   onClick={() => void schedule(chosen.asset_id as string)}
                   className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                 >

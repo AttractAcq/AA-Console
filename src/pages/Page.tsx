@@ -42,12 +42,14 @@ import { MotionDesignPanel } from "./motion/MotionDesignPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { EngineInboxPanel } from "./approvals/EngineInboxPanel";
 import { CampaignActionApprovalsPanel } from "./approvals/CampaignActionApprovalsPanel";
+import { UnifiedApprovalInboxPanel } from "./approvals/UnifiedApprovalInboxPanel";
 import { OrganicPanel } from "./distribution/OrganicPanel";
 import { AssetsPanel } from "./distribution/AssetsPanel";
 import { EnginePanel } from "./distribution/EnginePanel";
 import { PaidPanel } from "./distribution/PaidPanel";
 import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "./sales/SalesOverviewPanel";
+import { SalesAccessRequestsPanel } from "./sales/SalesAccessRequestsPanel";
 import { CampaignExecutionPanel } from "./campaigns/CampaignExecutionPanel";
 import { SitesPanel } from "./sites/SitesPanel";
 import { GitHubSettingsPanel } from "./sites/GitHubSettingsPanel";
@@ -75,6 +77,8 @@ import { ChatPanel } from "./team/ChatPanel";
 import { AgentsPanel } from "./team/AgentsPanel";
 import { FinancialsPanel } from "./admin/FinancialsPanel";
 import { SopsPanel } from "./admin/SopsPanel";
+import { SystemReadinessPanel } from "./admin/SystemReadinessPanel";
+import { LiveSchemaParityPanel } from "./admin/LiveSchemaParityPanel";
 import { ContentAssetTable } from "../components/content/ContentAssetTable";
 import { ContentAssetsWorkspace, LEGACY_LIBRARY_TABS } from "../components/content/ContentAssetsWorkspace";
 import { MarketOpportunitiesPanel } from "./opportunities/MarketOpportunitiesPanel";
@@ -178,7 +182,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   // page could never answer.
   "sales-os": {
     capture: () => <LeadCapturePanel />,
-    leads: () => <ProspectsLeadsPanel />,
+    leads: () => <><SalesAccessRequestsPanel /><ProspectsLeadsPanel /></>,
     agents: () => <SalesOverviewPanel />,
   },
   "motion-design": {
@@ -199,8 +203,11 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "engine-inbox": () => <EngineInboxPanel />,
     assets: () => <ApprovalsPanel />,
     "campaign-actions": () => <CampaignActionApprovalsPanel />,
+    unified: () => <UnifiedApprovalInboxPanel />,
   },
   admin: {
+    "system-readiness": () => <SystemReadinessPanel />,
+    "schema-parity": () => <LiveSchemaParityPanel />,
     financials: () => <FinancialsPanel />,
     sops: () => <SopsPanel />,
   },

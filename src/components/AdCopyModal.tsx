@@ -106,8 +106,8 @@ export function AdCopyModal({
           : "Saving copy puts this asset into the campaign's next Meta build. Blank fields were drafted from the brief — edit them before saving."
       }
       fields={fields}
-      // The panel behind this refreshes live, which hands it new rows. The
-      // draft is what keeps half-written copy through that.
+      // The panel behind this refreshes live. FormModal keeps in-progress
+      // copy in memory through refreshes without storing it in the browser.
       draftKey={asset ? `ad-copy:${asset.id}` : undefined}
       initialValues={initialValues as Record<string, string> | undefined}
       submitLabel="Save ad copy"

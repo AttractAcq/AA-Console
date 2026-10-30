@@ -12,7 +12,8 @@ import { AddProofModal } from "../../components/proof/AddProofModal";
 import { ActiveCampaignsView, ActiveOrganicView, ActiveConversionView } from "./ClientViews";
 import { findConsolePage } from "../../config/consoleNav";
 import { useAuth } from "../../context/auth";
-import { fetchClientAssets, shortDate, signPaths } from "../../lib/media";
+import { fetchClientAssets, shortDate } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import type { MediaAsset } from "../../lib/media";
 import { supabase } from "../../lib/supabase";
 import { VideoApprovalRoute } from "../../components/VideoApprovalRoute";
@@ -29,7 +30,8 @@ export function ClientConsolePage() {
   const [client, setClient] = useState<ClientRow | null>(null);
   const [context, setContext] = useState<ContextRow | null>(null);
   const [pending, setPending] = useState<MediaAsset[]>([]);
-  const [videoUrls, setVideoUrls] = useState<ReadonlyMap<string, string>>(new Map());
+  const videoUrls = useSignedPreviewPaths("client-media", pending.filter((asset) => asset.media_type === "video")
+    .map((asset) => asset.render_path ?? asset.storage_path));
   const [counts, setCounts] = useState({ distributed: 0, proof: 0 });
   const [proofOpen, setProofOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -75,8 +77,6 @@ export function ClientConsolePage() {
       .map((asset) => asset.id));
     const visible = ready.filter((asset) => asset.media_type !== "video" || requested.has(asset.id));
     setPending(visible);
-    setVideoUrls(await signPaths("client-media", video.filter((asset) => requested.has(asset.id))
-      .map((asset) => asset.render_path ?? asset.storage_path)));
     } catch (error) {
       setLoadError("Failed to load client overview: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
     }

@@ -9,7 +9,8 @@ import { mediaFilters } from "../../data/mediaFilters";
 import type { MediaFilterId } from "../../data/mediaFilters";
 import { formatLabel } from "../../lib/contentFormat";
 import { platformLabel } from "../../lib/postPlatform";
-import { fetchClientAssets, signPaths } from "../../lib/media";
+import { fetchClientAssets } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import type { MediaAsset } from "../../lib/media";
 import {
   DELETE_ASSET_WARNING,
@@ -60,7 +61,7 @@ export function ContentAssetTable({ approved }: { approved: boolean }) {
   const [activeFilter, setActiveFilter] = useState<MediaFilterId>(mediaFilters[0].id);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [briefs, setBriefs] = useState<ReadonlyMap<string, BriefRow>>(new Map());
-  const [urls, setUrls] = useState<ReadonlyMap<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.render_path || asset.storage_path));
   const [viewing, setViewing] = useState<BriefRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -90,7 +91,6 @@ export function ContentAssetTable({ approved }: { approved: boolean }) {
         setBriefs(new Map());
       }
 
-      setUrls(await signPaths("client-media", rows.map((row) => row.render_path || row.storage_path)));
     } catch (error) {
       setLoadError(
         "Failed to load assets: " + (error instanceof Error ? error.message : "Unknown query error"),

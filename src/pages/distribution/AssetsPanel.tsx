@@ -7,9 +7,11 @@ import { MediaDetailModal } from "../../components/MediaDetailModal";
 import { Modal } from "../../components/Modal";
 import { fetchClientAssets, fetchTextBodies, shortDate, signPaths } from "../../lib/media";
 import type { MediaAsset } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { POST_PLATFORMS, platformLabel } from "../../lib/postPlatform";
 import { DEFAULT_POST_TIME } from "../../lib/postTime";
 import { supabase } from "../../lib/supabase";
+import { assertOrganicScheduleRoute, PAID_SCHEDULING_BLOCKER } from "../../lib/scheduleRoute";
 import type { Database } from "../../types/database";
 
 interface Booking {
@@ -34,7 +36,7 @@ export function AssetsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [bookings, setBookings] = useState<Map<string, Booking>>(new Map());
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.storage_path));
   const [bodies, setBodies] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -79,9 +81,8 @@ export function AssetsPanel() {
       }
       setBookings(booked);
 
-      const signed = await signPaths("client-media", rows.map((r) => r.storage_path));
-      setUrls(signed);
-      setBodies(await fetchTextBodies(rows.filter((r) => r.media_type === "text"), signed));
+      const textRows = rows.filter((row) => row.media_type === "text");
+      setBodies(await fetchTextBodies(textRows, await signPaths("client-media", textRows.map((row) => row.storage_path))));
     } catch (err) {
       setLoadError(
         "Failed to load approved assets: " + (err instanceof Error ? err.message : "Unknown error"),
@@ -99,20 +100,24 @@ export function AssetsPanel() {
     if (!scheduling) return;
     setBusy(true);
     setError(null);
-    const { error: rpcError } = await supabase.rpc("schedule_asset", {
-      p_asset_id: scheduling.id,
-      p_date: date,
-      p_channel: channel,
-      ...(time ? { p_time: time } : {}),
-      ...(platform
-        ? { p_platform: platform as Database["public"]["Enums"]["post_platform"] }
-        : {}),
-    });
-    setBusy(false);
-    if (rpcError) {
-      setError(rpcError.message);
+    try {
+      await assertOrganicScheduleRoute(scheduling.id, channel, clientId);
+      const { error: rpcError } = await supabase.rpc("schedule_asset", {
+        p_asset_id: scheduling.id,
+        p_date: date,
+        p_channel: channel,
+        ...(time ? { p_time: time } : {}),
+        ...(platform
+          ? { p_platform: platform as Database["public"]["Enums"]["post_platform"] }
+          : {}),
+      });
+      if (rpcError) throw new Error(rpcError.message);
+    } catch (scheduleError) {
+      setError(scheduleError instanceof Error ? scheduleError.message : "Could not schedule this asset.");
+      setBusy(false);
       return;
     }
+    setBusy(false);
     setScheduling(null);
     setDate("");
     setTime(DEFAULT_POST_TIME);
@@ -148,12 +153,6 @@ export function AssetsPanel() {
           ? `${waiting} still ${waiting === 1 ? "has" : "have"} no date.`
           : "All of it is scheduled."}
       </p>
-
-      {error && (
-        <p role="alert" className="mb-3 text-sm text-destructive">
-          {error}
-        </p>
-      )}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading approved assets…</p>
@@ -191,6 +190,7 @@ export function AssetsPanel() {
                       onClick={() => {
                         setScheduling(asset);
                         setChannel("organic");
+                        setError(null);
                       }}
                       className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
@@ -244,6 +244,9 @@ export function AssetsPanel() {
               <option value="paid">Paid</option>
             </select>
           </label>
+          {channel === "paid" && (
+            <p role="status" className="text-sm text-destructive">{PAID_SCHEDULING_BLOCKER}</p>
+          )}
           <label className="block">
             <span className="text-sm font-medium text-card-foreground">Platform (optional)</span>
             <select
@@ -260,6 +263,9 @@ export function AssetsPanel() {
               ))}
             </select>
           </label>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">{error}</p>
+          )}
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
@@ -270,7 +276,7 @@ export function AssetsPanel() {
             </button>
             <button
               type="button"
-              disabled={!date || busy}
+              disabled={!date || busy || channel !== "organic"}
               onClick={() => void schedule()}
               className="rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >

@@ -7,6 +7,7 @@ import type { AgentRow } from "../../orchestration/registry.js";
 import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
+import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../storage/signed-url-policy.js";
 import { probeDurationSec } from "../video_edit/media.js";
 import { hasAudioStream } from "../source_video_edit/transcript.js";
 import { motionCapability } from "../motion_design/render.js";
@@ -60,7 +61,7 @@ export async function runRepurposeClipJob(sb: SupabaseClient, _config: RuntimeCo
     const clipDuration = await probeDurationSec(output);
     const path = `${request.client_id}/repurpose-clips/${request.id}/source.mp4`;
     const { error: uploadError } = await sb.storage.from("client-media").upload(path,
-      await readFile(output), { upsert: true, contentType: "video/mp4" });
+      await readFile(output), { upsert: true, contentType: "video/mp4", cacheControl: PRIVATE_OBJECT_CACHE_CONTROL_SECONDS });
     if (uploadError) throw new Error(`Could not store extracted clip: ${uploadError.message}`);
     const { error: completeError } = await sb.rpc("complete_repurpose_clip", {
       p_request_id: request.id, p_storage_path: path,

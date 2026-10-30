@@ -4,14 +4,15 @@ import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
-import { FormModal, clearDraft } from "../../components/forms/FormModal";
+import { FormModal } from "../../components/forms/FormModal";
 import { GenerateWithAIDialog } from "../../components/forms/GenerateWithAIDialog";
 import type { GeneratedBrief } from "../../components/forms/generatedBrief";
 import type { FieldDef } from "../../components/forms/fields";
 import { MediaCard, StatusBadge } from "../../components/MediaCard";
 import { MediaDetailModal } from "../../components/MediaDetailModal";
 import { cn } from "../../lib/cn";
-import { REVIEW_TONE, signPaths, type MediaAsset } from "../../lib/media";
+import { REVIEW_TONE, type MediaAsset } from "../../lib/media";
+import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import {
   RECRUITMENT_ROLES,
   RECRUITMENT_ROLE_LABEL,
@@ -100,7 +101,7 @@ export function RecruitmentPanel() {
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [pending, setPending] = useState<MediaAsset[]>([]);
   const [approved, setApproved] = useState<MediaAsset[]>([]);
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", [...pending, ...approved].map((asset) => asset.storage_path));
   const [concepts, setConcepts] = useState<Map<string, Record<string, unknown>>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -175,8 +176,6 @@ export function RecruitmentPanel() {
       const brand = brandRes.data as { colour_primary: string | null; imagery_style: string | null } | null;
       setBrandReady(Boolean(brand && (brand.colour_primary || brand.imagery_style)));
 
-      const paths = [...nextPending, ...nextApproved].map((a) => a.storage_path);
-      setUrls(await signPaths("client-media", paths));
 
       const briefIds = [...new Set([...nextPending, ...nextApproved].map((a) => a.brief_id).filter(Boolean))] as string[];
       if (briefIds.length > 0) {
@@ -254,19 +253,6 @@ export function RecruitmentPanel() {
         ? `Deleted, along with ${removed} generated image${removed === 1 ? "" : "s"}.`
         : "Deleted.",
     );
-    void refresh();
-  }
-
-  async function approveBrief(id: string) {
-    setBusyId(id);
-    setError(null);
-    const { error: rpcError } = await supabase.rpc("approve_recruitment_brief", { p_brief_id: id });
-    setBusyId(null);
-    if (rpcError) {
-      setError(rpcError.message);
-      return;
-    }
-    setNotice("Brief approved. Generate the Meta static next.");
     void refresh();
   }
 
@@ -407,15 +393,13 @@ export function RecruitmentPanel() {
               {b.status.replace(/_/g, " ")}
             </span>,
             b.status === "draft" ? (
-              <button
+              <a
                 key="a"
-                type="button"
-                disabled={busyId === b.id}
-                onClick={() => void approveBrief(b.id)}
-                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                href={`/approvals?source=${encodeURIComponent(b.id)}`}
+                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                Approve brief
-              </button>
+                Review exact brief in Inbox
+              </a>
             ) : b.status === "approved" ? (
               <button
                 key="g"
@@ -626,6 +610,7 @@ export function RecruitmentPanel() {
             ? { ...aiDraft, apply_url: "", compensation_text: "" }
             : { call_to_action: DEFAULT_CTA }
         }
+        resetKey={aiDraft}
         onSubmit={async (v) => {
           if (!draftRole) return;
           const { error: rpcError } = await supabase.rpc("create_recruitment_brief", {
@@ -660,9 +645,6 @@ export function RecruitmentPanel() {
           payload={{ role: draftRole }}
           onClose={() => setGenerating(false)}
           onGenerated={(draft) => {
-            // A saved draft wins over initialValues inside FormModal, so a
-            // half-typed form would silently swallow what was just generated.
-            clearDraft(`recruitment-brief:${draftRole}`);
             setAiDraft(draft);
           }}
         />

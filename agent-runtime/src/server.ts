@@ -49,6 +49,9 @@ import { handlePillarDraft } from "./pillars/draft-route.js";
 import { handleContextDraft } from "./context/draft-route.js";
 import { handleRecruitmentDraft } from "./recruitment/draft-route.js";
 import { handleGitHubStatus } from "./github/status-route.js";
+import { handleSystemReadiness } from "./readiness/route.js";
+import { handleSchemaParity } from "./readiness/schema-parity-route.js";
+import { currentReleaseProbe } from "./readiness/release-probe.js";
 import { handleSitesRoute } from "./github/sites-route.js";
 import { logger } from "./logging/logger.js";
 
@@ -237,6 +240,16 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.url === "/admin/system-readiness") {
+    void handleSystemReadiness(req, res, sb, config);
+    return;
+  }
+
+  if (req.url === "/admin/schema-parity") {
+    void handleSchemaParity(req, res, sb, config);
+    return;
+  }
+
   if (req.url === "/admin/briefs/draft") {
     if (req.method !== "POST") {
       json(405, { ok: false, error: "POST only" });
@@ -331,6 +344,19 @@ const server = http.createServer((req, res) => {
       workflowEnabled: Boolean(workflows),
       pid: process.pid,
     });
+    return;
+  }
+
+  if (req.url === "/release/identities") {
+    res.setHeader("Cache-Control", "no-store");
+    if (req.method !== "GET") {
+      json(405, { observationsComplete: false, reason: "method_not_allowed" });
+      return;
+    }
+    void currentReleaseProbe(sb, config).then(
+      (probe) => json(probe.observationsComplete ? 200 : 503, probe),
+      () => json(503, { observationsComplete: false, reason: "release_probe_unavailable" }),
+    );
     return;
   }
 

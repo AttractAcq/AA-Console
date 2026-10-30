@@ -224,6 +224,23 @@ beforeAll(async () => {
   await db.exec(await migration("20261007100000_162_three_the_sweep_could_not_fix.sql"));
   await db.exec(await migration("20261008090000_168_the_exposure_view_needs_to_know_every_gate.sql"));
 
+  // The full replay also has migration 166's assignment state machine. This
+  // fixture is deliberately only the slot half; supply its exact signature
+  // so migration 264 can run unmodified and its grant revocation is tested.
+  await db.exec(`
+    create type assignment_stage as enum ('assigned','approved');
+    create table job_assignments (id uuid primary key, client_id uuid, asset_id uuid);
+    create function public.may_touch_assignment(uuid) returns boolean
+      language sql security definer as $$ select true $$;
+    create function public.advance_assignment(uuid, assignment_stage, text, text, uuid)
+      returns job_assignments language sql security definer as
+      $$ select null::job_assignments $$;
+    grant execute on function public.may_touch_assignment(uuid) to authenticated;
+    grant execute on function public.advance_assignment(uuid, assignment_stage, text, text, uuid)
+      to authenticated;
+  `);
+  await db.exec(await migration("20261029150000_264_low_level_transition_isolation.sql"));
+
   await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
                  select set_config('request.jwt.claim.sub','${ADMIN}',false);`);
 });
@@ -322,7 +339,7 @@ describe("advance_slot, which had no permission check of any kind", () => {
     expect(stage).toBe("awaiting_approval");
   });
 
-  it("lets a person who can reach the client move it", async () => {
+  it("lets the database owner move it for fixture setup", async () => {
     const slot = await slotAt("qa");
     await db.exec(`select advance_slot('${slot}','awaiting_approval'::slot_stage,'human')`);
     const { stage } = await one<{ stage: string }>(
@@ -374,6 +391,64 @@ describe("advance_slot, which had no permission check of any kind", () => {
     await expect(
       db.exec(`update content_slots set stage = 'published' where id = '${slot}'`),
     ).rejects.toThrow(/through advance_slot/);
+  });
+});
+
+describe("B005: a human uses the named slot decision, not the state-machine writer", () => {
+  it("grants the low-level writer only to the service role", async () => {
+    const grants = await one<{ human: boolean; anon: boolean; service: boolean }>(`
+      select
+        has_function_privilege('authenticated',
+          'public.advance_slot(uuid,slot_stage,text,text,text,uuid,numeric,uuid,uuid,uuid,uuid,text)',
+          'execute') as human,
+        has_function_privilege('anon',
+          'public.advance_slot(uuid,slot_stage,text,text,text,uuid,numeric,uuid,uuid,uuid,uuid,text)',
+          'execute') as anon,
+        has_function_privilege('service_role',
+          'public.advance_slot(uuid,slot_stage,text,text,text,uuid,numeric,uuid,uuid,uuid,uuid,text)',
+          'execute') as service
+    `);
+    expect(grants).toEqual({ human: false, anon: false, service: true });
+  });
+
+  it("denies a same-client signed-in caller at the SQL EXECUTE boundary", async () => {
+    const slot = await slotAt("awaiting_approval", OTHER);
+    await db.exec(`set role authenticated;
+                   select set_config('request.jwt.claim.sub','${STAFF}',false);`);
+    try {
+      await expect(
+        db.query(`select advance_slot('${slot}','scheduled'::slot_stage,'human')`),
+      ).rejects.toThrow(/permission denied/i);
+    } finally {
+      await db.exec(`reset role;
+                     select set_config('request.jwt.claim.sub','${ADMIN}',false);`);
+    }
+    const { stage } = await one<{ stage: string }>(
+      `select stage from content_slots where id = '${slot}'`,
+    );
+    expect(stage).toBe("awaiting_approval");
+  });
+
+  it("keeps approve_slot executable and records a real human review and post", async () => {
+    const slot = await slotAt("awaiting_approval", OTHER);
+    await db.exec(`set role authenticated;
+                   select set_config('request.jwt.claim.sub','${STAFF}',false);`);
+    try {
+      await db.query(`select approve_slot('${slot}','Approved by the client')`);
+    } finally {
+      await db.exec(`reset role;
+                     select set_config('request.jwt.claim.sub','${ADMIN}',false);`);
+    }
+    const { stage, scheduled_post_id } = await one<{
+      stage: string; scheduled_post_id: string | null;
+    }>(`select stage, scheduled_post_id from content_slots where id = '${slot}'`);
+    expect(stage).toBe("scheduled");
+    expect(scheduled_post_id).not.toBeNull();
+    const reviews = await rows<{ reviewed_by: string }>(
+      `select r.reviewed_by from client_asset_reviews r
+       join content_slots s on s.asset_id = r.asset_id where s.id = '${slot}'`,
+    );
+    expect(reviews).toEqual([{ reviewed_by: STAFF }]);
   });
 });
 

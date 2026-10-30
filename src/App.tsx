@@ -12,6 +12,8 @@ import { EmployeeConsolePage } from "./pages/employee/EmployeeConsolePage";
 import { MemberDetailPage } from "./pages/operations/MemberDetailPage";
 import { AgentDetailPage } from "./pages/team/AgentDetailPage";
 import { CampaignExecutionPanel } from "./pages/campaigns/CampaignExecutionPanel";
+import { UnifiedApprovalInboxPanel } from "./pages/approvals/UnifiedApprovalInboxPanel";
+import { MfaSecurityPage } from "./pages/MfaSecurityPage";
 import { ThemeProvider } from "./context/theme";
 import { AuthProvider } from "./context/auth";
 import { agencyNav, clientNavGroups, legacyDeliveryRedirects } from "./config/navigation";
@@ -39,6 +41,7 @@ export default function App() {
             <Route path="/landing" element={<LandingPage />} />
 
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/security/mfa" element={<MfaSecurityPage />} />
 
             <Route path="/client/login" element={<ClientLoginPage />} />
             <Route
@@ -78,6 +81,7 @@ export default function App() {
             >
               <Route index element={<Page node={dashboardNode} />} />
               <Route path="clients" element={<ClientsPage />} />
+              <Route path="approvals" element={<UnifiedApprovalInboxPanel scope="global" />} />
               <Route path="admin" element={<Page node={adminNode} />} />
 
               <Route path="operations" element={<Page node={operationsNode} />} />

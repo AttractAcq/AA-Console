@@ -12,6 +12,7 @@ import { dateSortOptions } from "../data/sortOptions";
 import type { SortOptionId } from "../data/sortOptions";
 import { REVIEW_TONE, fetchClientAssets, fetchTextBodies, shortDate, signPaths } from "../lib/media";
 import type { MediaAsset } from "../lib/media";
+import { useSignedPreviewPaths } from "../lib/useSignedPreviewPaths";
 
 /** What this library holds, for a sentence. */
 function libraryNoun(
@@ -66,7 +67,7 @@ export function MediaLibrary({
   const { clientId } = useParams<{ clientId: string }>();
   const [sort, setSort] = useState<SortOptionId>(dateSortOptions[0].id);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
-  const [urls, setUrls] = useState<Map<string, string>>(new Map());
+  const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.storage_path));
   const [bodies, setBodies] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<MediaAsset | null>(null);
@@ -89,13 +90,10 @@ export function MediaLibrary({
       ascending: sort === "oldest",
     });
     setAssets(rows);
-    const signed = await signPaths("client-media", rows.map((r) => r.storage_path));
-    setUrls(signed);
-
     // A text asset's file IS the content, so fetch it. Capped and
     // best-effort: one unreadable file must not blank the whole library.
     if (mediaType === "text") {
-      setBodies(await fetchTextBodies(rows, signed));
+      setBodies(await fetchTextBodies(rows, await signPaths("client-media", rows.map((row) => row.storage_path))));
     }
     setFrameCounts(await countFrames(rows.map((r) => r.id)));
     setLoading(false);

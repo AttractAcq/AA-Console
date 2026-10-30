@@ -49,13 +49,10 @@ afterEach(cleanup);
 
 // Storage leaks between tests, and it is not obvious that it does.
 //
-// FormModal deliberately restores a saved draft over initialValues, so a
-// cancelled edit is not lost. That means one test typing an invalid value
-// into a modal leaves a draft that the *next* test silently restores — which
-// is exactly how a BrandPanel test passed here and failed in CI, where the
-// files happened to run in a different order. AgentActivityBar's dismissals
-// live in sessionStorage for the same reason. Clearing both after every test
-// removes the whole class rather than the one instance.
+// FormModal restores explicitly allowed, tab-scoped draft fields over server
+// values. Without cleanup, one test's safe selection could affect another
+// test. AgentActivityBar's dismissals also live in sessionStorage. Clearing
+// both stores after every test keeps their cases independent.
 afterEach(() => {
   try {
     localStorage.clear();

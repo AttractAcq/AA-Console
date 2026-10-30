@@ -122,7 +122,7 @@ describe("ReelShotsPanel", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /cut the reel/i })).toBeInTheDocument());
     expect(from).toHaveBeenCalledWith("agent_jobs");
     expect(screen.getByText("All 1 clips on file.")).toBeInTheDocument();
-    expect(screen.getByAltText("Opening still for shot 1")).toHaveAttribute("src", "https://signed/stills/1.png");
+    await waitFor(() => expect(screen.getByAltText("Opening still for shot 1")).toHaveAttribute("src", "https://signed/stills/1.png"));
     expect(screen.getByLabelText("Higgsfield clip for shot 1")).toHaveAttribute("src", "https://signed/clips/1.mp4");
   });
 
@@ -145,8 +145,8 @@ describe("ReelShotsPanel", () => {
 
     // "Cut on file" with no way to watch it is a claim a reviewer has to
     // take on trust.
+    await waitFor(() => expect(document.querySelector("video")).not.toBeNull());
     const player = document.querySelector("video");
-    expect(player).not.toBeNull();
     expect(player!.getAttribute("src")).toBe("https://signed/cuts/a.mp4");
   });
 

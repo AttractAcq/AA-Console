@@ -2,13 +2,18 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, useParams, fetchClientAssets } = vi.hoisted(() => ({
+const { from, rpc, useParams, fetchClientAssets, assertOrganicScheduleRoute } = vi.hoisted(() => ({
   from: vi.fn(),
   rpc: vi.fn(),
   useParams: vi.fn(),
   fetchClientAssets: vi.fn(),
+  assertOrganicScheduleRoute: vi.fn(),
 }));
 vi.mock("../lib/supabase", () => ({ supabase: { from, rpc } }));
+vi.mock("../lib/scheduleRoute", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/scheduleRoute")>()),
+  assertOrganicScheduleRoute,
+}));
 vi.mock("react-router-dom", () => ({ useParams }));
 vi.mock("../lib/media", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/media")>()),
@@ -68,6 +73,7 @@ beforeEach(() => {
     { id: "asset-1", ref_number: "AA-014", title: "Chair shot" },
   ]);
   rpc.mockResolvedValue({ error: null });
+  assertOrganicScheduleRoute.mockResolvedValue(undefined);
   from.mockImplementation(byTable([post()]));
 });
 
@@ -99,6 +105,25 @@ describe("the board", () => {
 });
 
 describe("scheduling", () => {
+  it("shows the paid blocker and offers no paid schedule action", async () => {
+    render(<DistributionBoard channel="paid" />);
+    expect(await screen.findByRole("status")).toHaveTextContent(/Paid scheduling is unavailable/i);
+    expect(screen.getByRole("button", { name: "Schedule Paid" })).toBeDisabled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("keeps the organic form open when lineage is unverified", async () => {
+    assertOrganicScheduleRoute.mockRejectedValueOnce(new Error("Scheduling blocked: no verified organic campaign route"));
+    const dialog = await openScheduler();
+    await userEvent.selectOptions(dialog.getByLabelText(/^Asset/), "asset-1");
+    await userEvent.type(dialog.getByLabelText(/^Date/), "2026-10-09");
+    await userEvent.click(dialog.getByRole("button", { name: "Schedule" }));
+
+    expect(await dialog.findByRole("alert")).toHaveTextContent(/no verified organic campaign route/i);
+    expect(assertOrganicScheduleRoute).toHaveBeenCalledWith("asset-1", "organic", "client-1");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("sends the platform the operator picked", async () => {
     const dialog = await openScheduler();
     await userEvent.selectOptions(dialog.getByLabelText(/^Asset/), "asset-1");
@@ -114,6 +139,7 @@ describe("scheduling", () => {
         p_platform: "tiktok",
       }),
     );
+    expect(assertOrganicScheduleRoute).toHaveBeenCalledWith("asset-1", "organic", "client-1");
   });
 
   // Undecided is a real answer. "" would fail the enum, so the key is left
