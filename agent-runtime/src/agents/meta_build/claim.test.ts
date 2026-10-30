@@ -176,7 +176,7 @@ describe("v6 Meta build claim", () => {
 });
 
 describe("Meta runner boundary", () => {
-  it("stops a v6 job without claim context before credentials, currency or provider writes", async () => {
+  it("stops a v6 job before reads, credentials, currency or provider writes", async () => {
     const from = vi.fn((table: string) => {
       if (table !== "client_campaigns") throw new Error(`Unexpected read of ${table}`);
       const query = {
@@ -195,14 +195,14 @@ describe("Meta runner boundary", () => {
       { writer, currency },
     );
     expect(result).toMatchObject({ ok: false, retryable: false });
-    expect(result.failureMessage).toMatch(/no exact campaign action execution/);
-    expect(from).toHaveBeenCalledTimes(1);
+    expect(result.failureMessage).toMatch(/exact-version AAL2 Approval Inbox decision/);
+    expect(from).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
     expect(writer).not.toHaveBeenCalled();
     expect(currency).not.toHaveBeenCalled();
   });
 
-  it("preserves the existing legacy path without consulting the v6 claim", async () => {
+  it("holds the legacy path before reads or any claim check", async () => {
     const from = vi.fn((table: string) => {
       if (table === "client_campaigns") {
         const query = {
@@ -229,9 +229,10 @@ describe("Meta runner boundary", () => {
       { from, rpc } as unknown as SupabaseClient,
       {} as RuntimeConfig, {} as AgentRow, { ...job, params: null },
     );
-    expect(result).toMatchObject({ ok: false, retryable: true });
+    expect(result).toMatchObject({ ok: false, retryable: false });
+    expect(result.failureMessage).toMatch(/exact-version AAL2 Approval Inbox decision/);
     expect(from.mock.calls.map(([table]) => table))
-      .toEqual(["client_campaigns", "agent_jobs"]);
+      .toEqual([]);
     expect(rpc).not.toHaveBeenCalled();
   });
 });
