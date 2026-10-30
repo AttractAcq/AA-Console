@@ -54,6 +54,7 @@ function SalesAccessRequestsPanelForScope({ clientId }: { clientId: string }) {
   const refreshSequence = useRef(0);
   const refresh = useCallback(async () => {
     const sequence = ++refreshSequence.current;
+    setLoaded(false);
     setLoadError(null);
     try {
       const [memberResult, requestResult] = await Promise.all([
@@ -125,6 +126,10 @@ function SalesAccessRequestsPanelForScope({ clientId }: { clientId: string }) {
       Request an exact client, team member, employee account and grant or revoke action for human review in the Approval Inbox.
       Approval requires AAL2. Request history is not proof of current access: the live grant and activation switch are not readable here yet.
     </p>
+    {actionError && <p role="alert" className="mt-3 text-sm text-destructive">{actionError}</p>}
+    {createdId && <p role="status" className="mt-3 text-sm">
+      Request created. <Link className="text-primary underline" to={`/approvals?source=${encodeURIComponent(createdId)}`}>Review its exact version in the Approval Inbox</Link>.
+    </p>}
     {!loaded ? <p className="mt-4 text-sm">Loading sales access requests…</p>
       : loadError ? <div className="mt-4" role="alert">
         <p>{loadError}</p>
@@ -166,10 +171,6 @@ function SalesAccessRequestsPanelForScope({ clientId }: { clientId: string }) {
           className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
           {busy ? "Requesting…" : action === "grant" ? "Request sales access grant" : "Request sales access revoke"}
         </button>
-        {actionError && <p role="alert" className="mt-3 text-sm text-destructive">{actionError}</p>}
-        {createdId && <p role="status" className="mt-3 text-sm">
-          Request created. <Link className="text-primary underline" to={`/approvals?source=${encodeURIComponent(createdId)}`}>Review its exact version in the Approval Inbox</Link>.
-        </p>}
         <div className="mt-6">
           <h3 className="text-sm font-semibold">Recent source requests</h3>
           <p className="mt-1 text-xs text-muted-foreground">Up to 50 recent requests for this client. Status records the decision, not whether access is currently active.</p>

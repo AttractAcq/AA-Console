@@ -115,6 +115,19 @@ describe("admin sales access source requests", () => {
     expect(screen.queryByRole("link", { name: /Review its exact version/ })).not.toBeInTheDocument();
   });
 
+  it("keeps the exact Inbox link when history refresh fails after request creation", async () => {
+    rpc.mockImplementation(async () => {
+      state.requestError = "History temporarily unavailable";
+      return { data: REQUEST, error: null };
+    });
+    show();
+    await userEvent.selectOptions(await screen.findByLabelText("Team member"), MEMBER);
+    await userEvent.click(screen.getByRole("button", { name: "Request sales access grant" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("History temporarily unavailable");
+    expect(screen.getByRole("link", { name: /Review its exact version/ }))
+      .toHaveAttribute("href", `/approvals?source=${REQUEST}`);
+  });
+
   it("fails closed on source-read failure and on a non-admin profile", async () => {
     state.requestError = "Read denied";
     const view = show();
