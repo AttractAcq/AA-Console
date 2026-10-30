@@ -9,6 +9,14 @@ type Observation<T> = {
   reason: string | null;
 };
 
+type EvidenceCheck = {
+  state: "observed" | "unknown" | "error";
+  checkedAt: string;
+  evidenceAt: string | null;
+  source: string;
+  reason: string | null;
+};
+
 type Catalog = {
   migrationHead: string | null;
   migrationCount: number | null;
@@ -43,11 +51,12 @@ type ClientInventory = {
     lastCheckedAt: string | null;
     tokenExpiresAt: string | null;
     accountIds: { adAccountId: string | null; metaPageId: string | null; metaPixelId: string | null };
+    providerHealth: EvidenceCheck;
   }[];
 };
 
 export type SystemReadinessSnapshot = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   capturedAt: string;
   environment: {
     name: string | null;
@@ -74,7 +83,20 @@ export type SystemReadinessSnapshot = {
     messageChannels: { key: string; transport: string; supported: boolean; canInitiate: boolean }[];
   }>;
   clients: Observation<ClientInventory[]>;
+  evidenceCoverage: Record<
+    "runtimeDeployment" | "runtimeWorkers" | "gatewayDeployment" | "schemaCatalog" |
+    "schemaParity" | "cronCatalog" | "cronExecution" | "switchInventory" |
+    "credentialValidity" | "providerAccountHealth" | "otherEnvironment" | "externalEffects",
+    EvidenceCheck
+  >;
 };
+
+function evidenceCheck(
+  state: EvidenceCheck["state"], checkedAt: string, source: string,
+  reason: string | null, evidenceAt: string | null = null,
+): EvidenceCheck {
+  return { state, checkedAt, evidenceAt, source, reason };
+}
 
 function observed<T>(value: T): Observation<T> {
   return { state: "observed", checkedAt: new Date().toISOString(), value, reason: null };
@@ -301,12 +323,80 @@ async function clients(sb: SupabaseClient): Promise<Observation<ClientInventory[
             metaPageId: asString(row.meta_page_id),
             metaPixelId: asString(row.meta_pixel_id),
           },
+          providerHealth: evidenceCheck(
+            "unknown", new Date().toISOString(), "client_integrations metadata",
+            "No live provider account probe or credential validation was performed by this inventory.",
+            null,
+          ),
         })),
       };
     }));
   } catch {
     return failed("Client switches or integration metadata could not be read.");
   }
+}
+
+function evidenceCoverage(snapshot: Omit<SystemReadinessSnapshot, "evidenceCoverage">): SystemReadinessSnapshot["evidenceCoverage"] {
+  const at = snapshot.capturedAt;
+  const sha = snapshot.runtime.sha;
+  const beats = snapshot.runtime.heartbeats;
+  const liveWorkers = beats.state === "observed" ? beats.value?.filter((beat) => beat.isLive) ?? [] : [];
+  const fleetMatches = sha !== null && liveWorkers.length > 0 &&
+    liveWorkers.every((beat) => beat.enabled === true && beat.sha === sha);
+  const gatewaySha = snapshot.gateway.value?.sha;
+  const database = snapshot.database;
+  const switchSourcesObserved = snapshot.global.state === "observed" &&
+    typeof snapshot.global.value?.engineEnabled === "boolean" &&
+    snapshot.clients.state === "observed" &&
+    snapshot.clients.value?.every((client) => Object.values(client.switches).every(
+      (value) => typeof value === "boolean",
+    )) === true;
+  return {
+    runtimeDeployment: evidenceCheck(
+      sha ? "observed" : "unknown", at, "RAILWAY_GIT_COMMIT_SHA",
+      sha ? null : "The runtime did not report a full 40-character deployed commit.",
+    ),
+    runtimeWorkers: evidenceCheck(
+      beats.state === "error" ? "error" : fleetMatches ? "observed" : "unknown",
+      beats.checkedAt, "agent_runtime_status latest heartbeat per worker",
+      fleetMatches ? null : beats.reason ?? "No complete set of fresh, enabled workers matches the runtime's full deployed commit.",
+      fleetMatches ? liveWorkers.map((beat) => beat.reportedAt).sort().at(-1) ?? null : null,
+    ),
+    gatewayDeployment: evidenceCheck(
+      snapshot.gateway.state === "error" ? "error" : gatewaySha ? "observed" : "unknown",
+      snapshot.gateway.checkedAt, "authenticated gateway internal readiness probe",
+      gatewaySha ? null : snapshot.gateway.reason ?? "The gateway did not report a full 40-character deployed commit.",
+      gatewaySha ? snapshot.gateway.value?.observedAt ?? null : null,
+    ),
+    schemaCatalog: evidenceCheck(
+      database.state === "error" ? "error" : database.value?.migrationHead && database.value.migrationCount !== null ? "observed" : "unknown",
+      database.checkedAt, "system_readiness_catalog RPC",
+      database.value?.migrationHead && database.value.migrationCount !== null ? null :
+      database.reason ?? "The database migration head or count is unavailable.",
+    ),
+    schemaParity: evidenceCheck("unknown", at, "B002 independent schema parity check",
+      "Catalog object counts do not verify object definitions or migration parity."),
+    cronCatalog: evidenceCheck(
+      database.state === "error" ? "error" : Array.isArray(database.value?.cronJobs) ? "observed" : "unknown",
+      database.checkedAt, "system_readiness_catalog RPC cron metadata",
+      Array.isArray(database.value?.cronJobs) ? null : database.reason ?? "The cron catalog is unavailable.",
+    ),
+    cronExecution: evidenceCheck("unknown", at, "cron execution receipts",
+      "A scheduled cron entry does not prove a recent successful run."),
+    switchInventory: evidenceCheck(
+      snapshot.global.state === "error" || snapshot.clients.state === "error" ? "error" : switchSourcesObserved ? "observed" : "unknown",
+      at, "runtime configuration and global/client database switches",
+      switchSourcesObserved ? null : "Global or client switch inventory could not be completely read.",
+    ),
+    credentialValidity: evidenceCheck("unknown", at, "credential presence flags",
+      "A configured credential may be expired, revoked, scoped incorrectly, or inaccessible to its provider."),
+    providerAccountHealth: evidenceCheck("unknown", at, "client_integrations metadata",
+      "Connected account identifiers and stored status are not live provider account checks."),
+    otherEnvironment: evidenceCheck("unknown", at, "separate authenticated environment inventory",
+      "This snapshot covers only the environment serving the request; capture the other environment separately."),
+    externalEffects: evidenceCheck("unknown", at, "provider receipts and read-back",
+      "This read-only inventory does not verify published content, sent messages, spend, leads, or bookings."),
+  };
 }
 
 async function gateway(config: RuntimeConfig, fetcher: typeof fetch): Promise<SystemReadinessSnapshot["gateway"]> {
@@ -345,8 +435,8 @@ export async function collectSystemReadiness(
   const [heartbeatResult, catalogResult, globalResult, clientResult, gatewayResult] = await Promise.all([
     heartbeats(sb), catalog(sb), globalConfiguration(sb), clients(sb), gateway(config, fetcher),
   ]);
-  return {
-    schemaVersion: 1,
+  const snapshot: Omit<SystemReadinessSnapshot, "evidenceCoverage"> = {
+    schemaVersion: 2,
     capturedAt,
     environment: {
       name: env.RAILWAY_ENVIRONMENT_NAME ?? env.AA_ENVIRONMENT ?? null,
@@ -380,4 +470,5 @@ export async function collectSystemReadiness(
     global: globalResult,
     clients: clientResult,
   };
+  return { ...snapshot, evidenceCoverage: evidenceCoverage(snapshot) };
 }
