@@ -110,9 +110,9 @@ change before that pin requires the final observed runtime SHA, not the first.
   drift, AAL1/member/service rejection, direct canonical-RPC denial, exact
   admin approval, stale-proof revocation, reasoned rejection and preservation
   of 292's held organic package Inbox branch.
-- Inbox UI: 33 cases cover global/card routing, AAL2 exact decision,
-  changed-proof rejection on refresh and reasoned revocation after a proof
-  becomes stale.
+- Inbox UI: 34 cases cover global/card routing, AAL2 exact decision,
+  changed-proof rejection on refresh, reasoned revocation after a proof
+  becomes stale and the client Inbox's held-source default visibility.
 - Attester and read-only premerge assertion: five tests cover exact binding,
   self-fetch/server-only submit, a GitHub head advance before any proof write,
   a changed base and human revocation during recheck.
