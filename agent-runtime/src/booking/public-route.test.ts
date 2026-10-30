@@ -44,8 +44,8 @@ function response() {
 const TOKEN = "a".repeat(64);
 const db = (over: Record<string, unknown> = {}) => {
   const rpc = vi.fn(async (name: string, _args?: unknown) => {
-    if (name === "admit_public_route_v6") return { data: true, error: null };
     if (name in over) return over[name] as { data: unknown; error: unknown };
+    if (name === "admit_public_route_v6") return { data: true, error: null };
     if (name === "public_slots_for_link_v6") {
       return { data: [{ starts_at: "2026-11-02T10:00:00Z" }], error: null };
     }
@@ -80,9 +80,22 @@ describe("which requests are ours", () => {
 describe("reading the free times", () => {
   it("returns the slots the database computed", async () => {
     const { res, out } = response();
-    await handlePublicBooking(request(`/public/book/v1/${TOKEN}/slots`), res, db().sb);
+    const { sb, rpc } = db();
+    await handlePublicBooking(request(`/public/book/v1/${TOKEN}/slots`), res, sb);
     expect(out.status).toBe(200);
     expect(JSON.parse(out.body).slots).toHaveLength(1);
+    expect(rpc.mock.calls.map((call) => call[0])).toEqual([
+      "admit_public_route_v6", "public_slots_for_link_v6",
+    ]);
+  });
+
+  it("refuses a saturated caller before reading slots", async () => {
+    const { res, out } = response();
+    const { sb, rpc } = db({ admit_public_route_v6: { data: false, error: null } });
+    await handlePublicBooking(request(`/public/book/v1/${TOKEN}/slots`), res, sb);
+    expect(out.status).toBe(429);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).not.toHaveBeenCalledWith("public_slots_for_link_v6", expect.anything());
   });
 
   it("answers an empty list for a dead link, so a token cannot be probed", async () => {

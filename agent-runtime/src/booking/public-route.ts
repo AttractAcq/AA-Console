@@ -87,6 +87,13 @@ export async function handlePublicBooking(
       json(405, { error: "GET only" });
       return;
     }
+    const admitted = await admitPublicRequest(req, sb, config, "booking_slots", parsed.token);
+    if (!admitted.allowed) {
+      json(admitted.reason === "quota" ? 429 : 503, {
+        error: admitted.reason === "quota" ? "Please try again shortly." : "Could not read the available times.",
+      });
+      return;
+    }
     const { data, error } = await sb.rpc("public_slots_for_link_v6", {
       p_token: parsed.token,
       p_days: 14,

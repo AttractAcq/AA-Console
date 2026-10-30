@@ -189,11 +189,16 @@ export async function handlePublicSales(
     return;
   }
 
-  // Count even unknown deployment IDs before resolver work. Otherwise a
-  // caller can rotate public IDs and escape the shared caller limit.
-  const admission = req.method === "POST" && route.action === "message"
-    ? await admitPublicRequest(req, sb, config, "sales_message", route.publicId)
-    : null;
+  // Count even unknown deployment IDs before resolver work. Dynamic config
+  // reads and preflights also hit the database; static widget.js does not.
+  const quotaRoute = req.method === "OPTIONS" ||
+    (route.action === "config" && req.method === "GET") ? "sales_config" :
+    route.action === "message" && req.method === "POST" ? "sales_message" : null;
+  if (!quotaRoute) {
+    deny("bad_request");
+    return;
+  }
+  const admission = await admitPublicRequest(req, sb, config, quotaRoute, route.publicId);
   if (admission && !admission.allowed) {
     deny(admission.reason === "quota" ? "rate_limited" : "error");
     return;
@@ -242,7 +247,7 @@ export async function handlePublicSales(
     return;
   }
 
-  const ipHash = admission?.allowed ? admission.ipHash.slice(0, 32) : null;
+  const ipHash = admission.allowed ? admission.ipHash.slice(0, 32) : null;
   let reservationId: string | null = null;
 
   const log = async (outcome: string, costUsd = 0, conversationId?: string): Promise<void> => {

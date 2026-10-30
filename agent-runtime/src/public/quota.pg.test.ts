@@ -92,6 +92,8 @@ describe("shared atomic public admission", () => {
   });
 
   it("denies unknown routes, malformed handles and non-service callers", async () => {
+    expect(await admit("sales_config", "7".repeat(64), "8".repeat(64))).toBe(true);
+    expect(await admit("booking_slots", "9".repeat(64), "0".repeat(64))).toBe(true);
     await expect(admit("unknown")).rejects.toThrow(/Unknown public quota route/);
     await expect(admit("lead_submit", "raw-ip")).rejects.toThrow(/Invalid public quota handle/);
     await db.exec("select set_config('test.role','authenticated',false)");

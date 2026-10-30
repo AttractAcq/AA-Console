@@ -5,7 +5,8 @@ import type { RuntimeConfig } from "../config.js";
 import { logger } from "../logging/logger.js";
 import { resolveCallerIp } from "./client-ip.js";
 
-export type PublicRoute = "lead_submit" | "proof_config" | "proof_submit" | "sales_message" | "booking_submit";
+export type PublicRoute = "lead_submit" | "proof_config" | "proof_submit" |
+  "sales_config" | "sales_message" | "booking_slots" | "booking_submit";
 export type Admission = { allowed: true; ipHash: string } | { allowed: false; reason: "invalid_peer" | "quota" | "store_error" };
 
 export function saltedPublicHash(value: string, salt: string): string {

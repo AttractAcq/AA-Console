@@ -1,5 +1,6 @@
--- B006. One atomic admission ledger for every public POST route. The runtime
--- supplies only salted/digested handles; this table never stores raw IPs,
+-- B006. One atomic admission ledger for every public database-backed route.
+-- Static widget JavaScript and proof-portal HTML are served without DB work.
+-- The runtime supplies only salted/digested handles; no raw IPs,
 -- tokens, contact details or request bodies.
 create table public.public_route_quota_buckets (
   route text not null,
@@ -41,7 +42,9 @@ begin
     when 'lead_submit' then v_ip_limit := 30; v_subject_limit := 10;
     when 'proof_config' then v_ip_limit := 30; v_subject_limit := 15;
     when 'proof_submit' then v_ip_limit := 15; v_subject_limit := 15;
+    when 'sales_config' then v_ip_limit := 30; v_subject_limit := 120;
     when 'sales_message' then v_ip_limit := 12; v_subject_limit := 120;
+    when 'booking_slots' then v_ip_limit := 30; v_subject_limit := 120;
     when 'booking_submit' then v_ip_limit := 10; v_subject_limit := 60;
     else raise exception 'Unknown public quota route';
   end case;
