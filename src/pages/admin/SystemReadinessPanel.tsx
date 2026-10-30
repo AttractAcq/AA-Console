@@ -61,7 +61,8 @@ type Snapshot = {
     engineEnabled: boolean | null;
     publishingPlatforms: { platform: string; supported: boolean }[];
     proofDestinations: { key: string; mode: string; supported: boolean }[];
-    campaignActionExecutors: { key: string; module: string; supported: boolean }[];
+    campaignActionExecutors: { key: string; module: string; supported: boolean; handlerRegistered?: boolean }[];
+    campaignActionHandlerParity?: { state: "aligned" | "blocked"; unhandledSupportedKeys: string[] };
     messageChannels: { key: string; transport: string; supported: boolean; canInitiate: boolean }[];
   }>;
   clients: Observation<{
@@ -214,7 +215,12 @@ export function SystemReadinessPanel() {
           <p>Database engine switch: {state(snapshot.global.value.engineEnabled)}</p>
           <p className="mt-1">Publishing adapters: {snapshot.global.value.publishingPlatforms.map((platform) => `${platform.platform} ${platform.supported ? "supported" : "unsupported"}`).join(" · ") || "None"}</p>
           <p className="mt-1">Proof destinations: {snapshot.global.value.proofDestinations.map((destination) => `${destination.key} ${destination.supported ? "supported" : "unsupported"} (${destination.mode})`).join(" · ") || "None"}</p>
-          <p className="mt-1">Campaign action executors: {snapshot.global.value.campaignActionExecutors.map((action) => `${action.key} ${action.supported ? "supported" : "unsupported"} (${action.module})`).join(" · ") || "None"}</p>
+          <p className="mt-1">Campaign action executors: {snapshot.global.value.campaignActionExecutors.map((action) => `${action.key} ${action.supported ? "database supported" : "database unsupported"}, ${action.handlerRegistered === true ? "runtime handler registered" : action.handlerRegistered === false ? "no runtime handler" : "runtime handler unknown"} (${action.module})`).join(" · ") || "None"}</p>
+          {snapshot.global.value.campaignActionHandlerParity?.state === "blocked" &&
+            <p role="alert" className="mt-2 text-destructive">Campaign action execution is blocked: the database marks {snapshot.global.value.campaignActionHandlerParity.unhandledSupportedKeys.join(", ")} supported, but this runtime has no campaign action handler. No action should be claimed until the mismatch is repaired.</p>}
+          {!snapshot.global.value.campaignActionHandlerParity &&
+            <p role="status" className="mt-2 text-muted-foreground">Campaign action handler parity is unknown in this runtime build.</p>}
+          <p className="mt-2 text-xs text-muted-foreground">A registered handler does not prove a connected account, current approval, or external result.</p>
           <p className="mt-1">Message channels: {snapshot.global.value.messageChannels.map((channel) => `${channel.key} ${channel.supported ? "supported" : "unsupported"}, ${channel.canInitiate ? "can initiate" : "reply only"} (${channel.transport})`).join(" · ") || "None"}</p>
           <p className="mt-2 text-xs text-muted-foreground">Source: engine_controls, platform_publishing, proof_destinations, campaign_action_executors and message_channels; checked {stamp(snapshot.global.checkedAt)}.</p>
         </div>}

@@ -23,7 +23,17 @@ function fixture() {
     engine_controls: [{ id: true, enabled: false }],
     platform_publishing: [{ platform: "instagram", supported: true }],
     proof_destinations: [{ destination_key: "google_business_profile", mode: "api", supported: true }],
-    campaign_action_executors: [{ action_key: "google_ad_build", executor_module: "google_ads_studio", supported: false }],
+    campaign_action_executors: [
+      { action_key: "campaign_launch", executor_module: "campaign_factory", supported: false },
+      { action_key: "meta_ad_build", executor_module: "meta_ads_studio", supported: false },
+      { action_key: "google_ad_build", executor_module: "google_ads_studio", supported: false },
+      { action_key: "organic_publish", executor_module: "content_distribution", supported: false },
+      { action_key: "proof_publish", executor_module: "proof_distribution", supported: true },
+      { action_key: "page_deploy", executor_module: "website_studio", supported: true },
+      { action_key: "lead_message", executor_module: "sales_os", supported: true },
+      { action_key: "profile_update", executor_module: "google_profile", supported: false },
+      { action_key: "budget_change", executor_module: "meta_ads_studio", supported: true },
+    ],
     message_channels: [{ channel_key: "email", transport: "resend", supported: true, can_initiate: true }],
     client_proof_destinations: [{ client_id: "client-1", destination_key: "google_business_profile",
       enabled: false, account_ref: "possibly-private-account-ref" }],
@@ -80,9 +90,12 @@ describe("B001 system inventory", () => {
     expect(snapshot.runtime.credentialPresence).toMatchObject({ anthropic: true, openai: true });
     expect(snapshot.gateway.state).toBe("unknown");
     expect(snapshot.global.value?.engineEnabled).toBe(false);
-    expect(snapshot.global.value?.campaignActionExecutors).toEqual([{
-      key: "google_ad_build", module: "google_ads_studio", supported: false,
-    }]);
+    expect(snapshot.global.value?.campaignActionExecutors).toContainEqual({
+      key: "google_ad_build", module: "google_ads_studio", supported: false, handlerRegistered: false,
+    });
+    expect(snapshot.global.value?.campaignActionHandlerParity).toEqual({
+      state: "aligned", unhandledSupportedKeys: [],
+    });
     expect(snapshot.global.value?.messageChannels).toEqual([{
       key: "email", transport: "resend", supported: true, canInitiate: true,
     }]);
@@ -140,6 +153,24 @@ describe("B001 system inventory", () => {
     const exported = JSON.stringify(snapshot);
     for (const secret of ["secret-1", "secret-2", "secret-3", "secret-4", "secret-5"])
       expect(exported).not.toContain(secret);
+  });
+
+  it("reports Meta and profile SQL support as blocked by missing runtime handlers", async () => {
+    const { sb, config, rows } = fixture();
+    rows.campaign_action_executors = rows.campaign_action_executors!.map((row) => ({
+      ...row,
+      supported: ["meta_ad_build", "profile_update"].includes(String(row.action_key)) ? true : row.supported,
+    }));
+    const snapshot = await collectSystemReadiness(sb, config, fetch, {});
+    expect(snapshot.global.value?.campaignActionHandlerParity).toEqual({
+      state: "blocked", unhandledSupportedKeys: ["meta_ad_build", "profile_update"],
+    });
+    expect(snapshot.global.value?.campaignActionExecutors).toContainEqual({
+      key: "google_ad_build", module: "google_ads_studio", supported: false, handlerRegistered: false,
+    });
+    rows.campaign_action_executors = [{ action_key: "proof_publish", supported: null }];
+    const malformed = await collectSystemReadiness(sb, config, fetch, {});
+    expect(malformed.global.state).toBe("error");
   });
 
   it("does not turn a gateway timeout or missing catalog into a healthy assertion", async () => {

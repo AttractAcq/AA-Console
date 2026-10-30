@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
 import { deployedCommitSha } from "./version.js";
+import { HANDLERS } from "../campaigns/actions/executor.js";
+import { inspectCampaignActionRegistry } from "../campaigns/actions/support.js";
 
 type Observation<T> = {
   state: "observed" | "unknown" | "error";
@@ -112,7 +114,8 @@ export type SystemReadinessSnapshot = {
     engineEnabled: boolean | null;
     publishingPlatforms: { platform: string; supported: boolean }[];
     proofDestinations: { key: string; mode: string; supported: boolean }[];
-    campaignActionExecutors: { key: string; module: string; supported: boolean }[];
+    campaignActionExecutors: { key: string; module: string; supported: boolean; handlerRegistered: boolean }[];
+    campaignActionHandlerParity: { state: "aligned" | "blocked"; unhandledSupportedKeys: string[] };
     messageChannels: { key: string; transport: string; supported: boolean; canInitiate: boolean }[];
   }>;
   clients: Observation<ClientInventory[]>;
@@ -268,6 +271,7 @@ async function globalConfiguration(sb: SupabaseClient): Promise<SystemReadinessS
       allRows(sb, "campaign_action_executors", "action_key,executor_module,supported"),
       allRows(sb, "message_channels", "channel_key,transport,supported,can_initiate"),
     ]);
+    const actionRegistry = inspectCampaignActionRegistry(actions, new Set(Object.keys(HANDLERS)));
     return observed({
       engineEnabled: asBool(controls[0]?.enabled),
       publishingPlatforms: publishing.map((row) => ({
@@ -277,11 +281,11 @@ async function globalConfiguration(sb: SupabaseClient): Promise<SystemReadinessS
         key: asString(row.destination_key) ?? "unknown",
         mode: asString(row.mode) ?? "unknown", supported: row.supported === true,
       })),
-      campaignActionExecutors: actions.map((row) => ({
-        key: asString(row.action_key) ?? "unknown",
-        module: asString(row.executor_module) ?? "unknown",
-        supported: row.supported === true,
-      })),
+      campaignActionExecutors: actionRegistry.actions,
+      campaignActionHandlerParity: {
+        state: actionRegistry.unhandledSupportedKeys.length > 0 ? "blocked" : "aligned",
+        unhandledSupportedKeys: actionRegistry.unhandledSupportedKeys,
+      },
       messageChannels: channels.map((row) => ({
         key: asString(row.channel_key) ?? "unknown",
         transport: asString(row.transport) ?? "unknown",
