@@ -1,5 +1,5 @@
 /**
- * Applying an approved profile change — G05.
+ * Applying an approved profile change — G05, currently held before claim.
  *
  * `google_profile_changes` and `meta_profile_changes` have recorded
  * decisions since 240 and 241, with `applied` and `failed` statuses and
@@ -17,10 +17,10 @@
  *
  * UNPROVEN, AND SAYING SO
  *
- * No client has a connected Google Business credential, so this has never
- * run against a real profile. It is written to the real endpoint and gated
- * on the credential existing; the acceptance gate is a field changing on a
- * real profile, not this file.
+ * The existing source decisions have no exact AAL2 Approval Inbox binding
+ * or last-moment prewrite verifier. The worker stays held before any claim,
+ * credential read or provider call. The adapter code remains available for
+ * later integration and testing, but it does not establish live acceptance.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -34,6 +34,7 @@ import { logger } from "../logging/logger.js";
 import {
   PlacementTransportError, patchLocationField,
 } from "../proof-distribution/google-business.js";
+import { profileUpdatePrewriteProblem } from "./prewrite-gate.js";
 
 const DEFAULT_BATCH = 5;
 
@@ -64,6 +65,15 @@ export async function applyProfileChanges(
     return { ok: true, retryable: false };
   }
 
+  const prewriteProblem = profileUpdatePrewriteProblem();
+  if (prewriteProblem) {
+    await appendEvent(sb, job.id, prewriteProblem, "warn");
+    return { ok: false, retryable: false, failureMessage: prewriteProblem };
+  }
+
+  // Unavailable until the exact AAL2 source and prewrite gate replace the
+  // hold above. Retain the adapter so that transition can be reviewed as one
+  // release rather than rebuilding the transport under a new approval model.
   const { data, error } = await sb.rpc("claim_profile_changes", {
     p_limit: DEFAULT_BATCH,
   } as never);

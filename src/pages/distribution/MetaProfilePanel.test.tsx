@@ -187,7 +187,10 @@ describe("proposed changes", () => {
   it("does not claim an approved change was applied", async () => {
     database({ changes: [change({ status: "approved", approved_at: "2026-10-24T10:00:00Z" })] });
     render(<MetaProfilePanel tab="profile" />);
-    expect(await screen.findByText("held for Inbox binding and an adapter")).toBeInTheDocument();
+    // The older decision cannot authorize the provider write; the runtime
+    // hold is visible even where the profile has a recorded approval.
+    expect(await screen.findByText("held for Inbox binding and an adapter; no field PATCH")).toBeInTheDocument();
+    expect(screen.getByText(/exact-version AAL2 Approval Inbox decision/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
 
