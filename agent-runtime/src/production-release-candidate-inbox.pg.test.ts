@@ -732,6 +732,10 @@ describe("trusted exact-version production release decision migration 293", () =
       "select public.abort_production_release_merge_lease_v6($1,$2)",
       [lease!.id, "Ambiguous GitHub response"]))
       .rejects.toThrow(/cannot be aborted without GitHub reconciliation/);
+    await expect(db.query(
+      "select public.reconcile_unmerged_production_release_merge_lease_v6($1,$2,$3)",
+      [lease!.id, "f".repeat(64), "PR still open after GitHub rejection"]))
+      .rejects.toThrow(/Only an aged dispatched merge/);
     await expect(asRole("service_role", null, "aal1",
       "select public.complete_production_release_merge_lease_v6($1,$2)",
       [lease!.id, "short-sha"]))
@@ -766,5 +770,47 @@ describe("trusted exact-version production release decision migration 293", () =
         [signature]);
       expect(grants).toEqual({ anon: false, human: false, service: true });
     }
+    const [reconciliation] = await asRole<{ anon: boolean; human: boolean; service: boolean }>(
+      "service_role", null, "aal1",
+      `select has_function_privilege('anon',$1,'execute') as anon,
+              has_function_privilege('authenticated',$1,'execute') as human,
+              has_function_privilege('service_role',$1,'execute') as service`,
+      ["public.reconcile_unmerged_production_release_merge_lease_v6(uuid,text,text)"]);
+    expect(reconciliation).toEqual({ anon: false, human: false, service: false });
+  });
+
+  it("permits only a database owner to reconcile a proven unmerged aged dispatch", async () => {
+    const { source, card } = await submitted("306");
+    const proof = packet(source);
+    await attest(card.id, proof);
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,$4,'approved','')",
+      [card.id, card.source_version, card.artifact_hash, proof.packetSha256]);
+    const [decision] = await asRole<{ id: string }>("service_role", null,
+      "aal1", "select id from public.approval_decision_events_v6 where request_id=$1",
+      [card.id]);
+    const { rows } = await db.query<{ id: string }>(`
+      insert into public.production_release_merge_leases_v6 (
+        request_id,decision_id,source_version,packet_sha256,
+        pr_number,head_sha,base_sha,merge_method,state,dispatched_at
+      ) values ($1,$2,$3,$4,306,$5,$6,'squash','dispatched',
+        clock_timestamp()-interval '6 minutes') returning id`,
+      [card.id, decision!.id, card.source_version, proof.packetSha256, HEAD, BASE]);
+    const id = rows[0]!.id;
+    const reconcile = "select public.reconcile_unmerged_production_release_merge_lease_v6($1,$2,$3)";
+    await expect(asRole("service_role", null, "aal1", reconcile,
+      [id, "f".repeat(64), "PR still open"]))
+      .rejects.toThrow(/permission denied|Only the database owner/);
+    await expect(db.query(reconcile, [id, "bad", "PR still open"]))
+      .rejects.toThrow(/saved evidence digest/);
+    await db.query(reconcile, [id, "f".repeat(64), "PR still open; reviewed GitHub evidence saved"]);
+    const [state] = (await db.query<{ state: string; reconciliation_evidence_sha256: string }>(
+      "select state,reconciliation_evidence_sha256 from public.production_release_merge_leases_v6 where id=$1",
+      [id])).rows;
+    expect(state).toMatchObject({ state: "aborted",
+      reconciliation_evidence_sha256: "f".repeat(64) });
+    await asRole("authenticated", ADMIN, "aal2",
+      "select public.decide_production_release_candidate_v6($1,$2,$3,'','revoked',$4)",
+      [card.id, card.source_version, card.artifact_hash, "Manual unmerged reconciliation"]);
   });
 });

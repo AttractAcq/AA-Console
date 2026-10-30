@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "b48b77392a33f28310ab90fc1d777dbd3ca86b492cecf638411e2fbf92628eda",
-  "generatedTypesSha256": "a59aa87dd0082cf38147f7cf4f68d160fb31320411479fb12f3cf6a424aa571a",
-  "generatedSchemaBodySha256": "2b32ade768f257f1e38e3874d5df9c7b20230386e9ee55672d72bbe6c5b48033",
+  "migrationSourceDigest": "2c95d3fc2cab8b5c012f394bb5447a74a29d99b8f2c5e3ebf65e472098be3d1a",
+  "generatedTypesSha256": "b1b844d904fbe977781360143cd51273c61a4fbf485ac8b25670f555c7c0e413",
+  "generatedSchemaBodySha256": "feaa693ab226b64366191325ee97a0940b7c74f2f74d961464e9110e24c7cc61",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2199,8 +2199,8 @@
       "version": "20261101140000",
       "name": "297_production_release_merge_lease",
       "filename": "20261101140000_297_production_release_merge_lease.sql",
-      "sha256": "7039e3abda15ef62dd9f958195733838f34432288b6bad2e50f2b1190653904d",
-      "trimmedMd5": "920eeda01472daf4fa9bec88bff7e1a0"
+      "sha256": "fab9ac7ede8edd2ac979df8f8c1d86d9d792c1b46936a4c21daf1cc0a1452812",
+      "trimmedMd5": "216a7989f087ef6a95b65e515df5cc1c"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

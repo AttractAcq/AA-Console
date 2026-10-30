@@ -111,12 +111,38 @@ and [strict required status checks](https://docs.github.com/en/rest/branches/bra
 
 If dispatch or the GitHub merge response is ambiguous, the lease stays
 unresolved. The process never retries the merge or automatically clears a
-dispatched lease. A human must inspect the PR, `main`, and GitHub audit log,
-then record a reviewed reconciliation. This can temporarily block revocation;
-the Approval Inbox must show that pending outcome before a live pilot. The
+dispatched lease. This can temporarily block revocation; the Approval Inbox
+must show that pending outcome before a live pilot. The
 297 database RPC records a claimed observed merge SHA, so its production
 credential must be held only by the reviewed merger process; a general
 service-role key shared with other runtimes is insufficient custody.
+
+### Manual dispatched-lease reconciliation (exception runbook)
+
+1. Stop the merger runner for this request and **do not retry the GitHub
+   merge call**. Record request UUID, lease UUID, exact PR/head/base/packet,
+   dispatch timestamp, the HTTP outcome or timeout, and the latest canonical
+   Inbox decision. If the lease is still `active` and the process has not
+   called dispatch, the trusted runner may use its pre-dispatch abort RPC.
+2. Wait at least five minutes from `dispatched_at`. Read the GitHub PR, its
+   merge status and merge commit, current `main` ref and ancestry, check runs,
+   and the repository audit log twice at different times. Save both raw
+   first-party observations with timestamps in a controlled evidence file;
+   record its SHA-256 and the reviewers' names. An open PR alone is not proof
+   if an asynchronous or queued merge may still be pending.
+3. If the PR is merged, verify the merge commit against the exact approved
+   head and `main` ancestry, then let the trusted merger record `completed`
+   with that full observed SHA. If the effect is still uncertain, leave the
+   lease `dispatched`, keep revocation blocked, and escalate to Alex; never
+   invent a negative outcome.
+4. Only if the saved evidence proves **no merge occurred and none is pending**,
+   a database owner (`postgres`) invokes
+   `reconcile_unmerged_production_release_merge_lease_v6(lease_uuid,
+   evidence_sha256, reason)` through a reviewed SQL session. The function
+   requires an aged dispatch, writes the digest and reason into both lease
+   and append-only event ledger, and has no app, browser or `service_role`
+   execute grant. The operator then re-reads the ledger and the Inbox; a
+   provisioned human AAL2 admin may revoke the approved plan if needed.
 
 **Q020 / activation blocker:** Alex must approve a dedicated merger identity,
 separate read-only GitHub verifier and write-capable merger tokens, and

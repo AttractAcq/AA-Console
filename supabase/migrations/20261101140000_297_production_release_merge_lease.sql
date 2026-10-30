@@ -19,15 +19,22 @@ create table public.production_release_merge_leases_v6 (
   completed_at timestamptz,
   aborted_at timestamptz,
   observed_merge_sha text check (observed_merge_sha ~ '^[0-9a-f]{40}$'),
+  reconciliation_evidence_sha256 text
+    check (reconciliation_evidence_sha256 ~ '^[0-9a-f]{64}$'),
   abort_reason text,
   check ((state = 'active' and dispatched_at is null and completed_at is null
-      and aborted_at is null and observed_merge_sha is null and abort_reason is null)
+      and aborted_at is null and observed_merge_sha is null
+      and reconciliation_evidence_sha256 is null and abort_reason is null)
     or (state = 'dispatched' and dispatched_at is not null and completed_at is null
-      and aborted_at is null and observed_merge_sha is null and abort_reason is null)
+      and aborted_at is null and observed_merge_sha is null
+      and reconciliation_evidence_sha256 is null and abort_reason is null)
     or (state = 'completed' and dispatched_at is not null and completed_at is not null
-      and aborted_at is null and observed_merge_sha is not null and abort_reason is null)
-    or (state = 'aborted' and dispatched_at is null and completed_at is null
+      and aborted_at is null and observed_merge_sha is not null
+      and reconciliation_evidence_sha256 is null and abort_reason is null)
+    or (state = 'aborted' and completed_at is null
       and aborted_at is not null and observed_merge_sha is null
+      and ((dispatched_at is null and reconciliation_evidence_sha256 is null)
+        or (dispatched_at is not null and reconciliation_evidence_sha256 is not null))
       and nullif(btrim(abort_reason),'') is not null))
 );
 create index production_release_merge_leases_v6_state_idx
@@ -44,6 +51,8 @@ create table public.production_release_merge_lease_events_v6 (
   lease_id uuid not null references public.production_release_merge_leases_v6(id) on delete restrict,
   state text not null check (state in ('active','dispatched','completed','aborted')),
   observed_merge_sha text check (observed_merge_sha ~ '^[0-9a-f]{40}$'),
+  reconciliation_evidence_sha256 text
+    check (reconciliation_evidence_sha256 ~ '^[0-9a-f]{64}$'),
   reason text,
   recorded_at timestamptz not null default clock_timestamp()
 );
@@ -73,7 +82,7 @@ begin
     or old.merge_method is distinct from new.merge_method
     or old.created_at is distinct from new.created_at
     or not ((old.state = 'active' and new.state in ('dispatched','aborted'))
-      or (old.state = 'dispatched' and new.state = 'completed')) then
+      or (old.state = 'dispatched' and new.state in ('completed','aborted'))) then
     raise exception 'Release merge lease transition is invalid.' using errcode = '23514';
   end if;
   return new;
@@ -334,6 +343,52 @@ revoke execute on function public.complete_production_release_merge_lease_v6(uui
   from public, anon, authenticated, service_role;
 grant execute on function public.complete_production_release_merge_lease_v6(uuid,text)
   to service_role;
+
+-- Exceptional manual path only: after a dispatched synchronous merge call has
+-- definitively been observed unmerged, a database owner may release the lock.
+-- Neither service_role nor any browser role can claim a negative GitHub fact.
+create function public.reconcile_unmerged_production_release_merge_lease_v6(
+  p_lease_id uuid, p_evidence_sha256 text, p_reason text
+) returns uuid language plpgsql volatile security invoker
+set search_path = pg_catalog, public set timezone = 'UTC' as $$
+declare
+  v_request_id uuid;
+  v_lease public.production_release_merge_leases_v6%rowtype;
+begin
+  if current_user is distinct from 'postgres' then
+    raise exception 'Only the database owner may reconcile an unmerged release.'
+      using errcode = '42501';
+  end if;
+  if not coalesce(p_evidence_sha256 ~ '^[0-9a-f]{64}$',false)
+    or nullif(btrim(coalesce(p_reason,'')),'') is null
+    or length(p_reason) > 2000 then
+    raise exception 'A saved evidence digest and concise reason are required.'
+      using errcode = '22023';
+  end if;
+  select request_id into v_request_id from public.production_release_merge_leases_v6
+    where id = p_lease_id;
+  if not found then raise exception 'Release merge lease is missing.' using errcode = '23514'; end if;
+  perform 1 from public.approval_requests_v6 where id = v_request_id for update;
+  select * into v_lease from public.production_release_merge_leases_v6
+    where id = p_lease_id for update;
+  if v_lease.state is distinct from 'dispatched'
+    or v_lease.dispatched_at > clock_timestamp() - interval '5 minutes' then
+    raise exception 'Only an aged dispatched merge may be manually reconciled unmerged.'
+      using errcode = '23514';
+  end if;
+  update public.production_release_merge_leases_v6
+    set state = 'aborted', aborted_at = clock_timestamp(),
+      abort_reason = btrim(p_reason),
+      reconciliation_evidence_sha256 = p_evidence_sha256
+    where id = p_lease_id;
+  insert into public.production_release_merge_lease_events_v6(
+    lease_id,state,reason,reconciliation_evidence_sha256
+  ) values (p_lease_id,'aborted',btrim(p_reason),p_evidence_sha256);
+  return p_lease_id;
+end;
+$$;
+revoke execute on function public.reconcile_unmerged_production_release_merge_lease_v6(uuid,text,text)
+  from public, anon, authenticated, service_role;
 
 insert into public.approval_class_coverage_versions_v6 (
   class_id,revision,class_key,title,source_state,source_evidence,

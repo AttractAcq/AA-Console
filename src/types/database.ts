@@ -15529,6 +15529,7 @@ export type Database = {
           lease_id: string
           observed_merge_sha: string | null
           reason: string | null
+          reconciliation_evidence_sha256: string | null
           recorded_at: string
           state: string
         }
@@ -15538,6 +15539,7 @@ export type Database = {
           lease_id: string
           observed_merge_sha?: string | null
           reason?: string | null
+          reconciliation_evidence_sha256?: string | null
           recorded_at?: string
           state: string
         }
@@ -15547,6 +15549,7 @@ export type Database = {
           lease_id?: string
           observed_merge_sha?: string | null
           reason?: string | null
+          reconciliation_evidence_sha256?: string | null
           recorded_at?: string
           state?: string
         }
@@ -15575,6 +15578,7 @@ export type Database = {
           observed_merge_sha: string | null
           packet_sha256: string
           pr_number: number
+          reconciliation_evidence_sha256: string | null
           request_id: string
           source_version: string
           state: string
@@ -15593,6 +15597,7 @@ export type Database = {
           observed_merge_sha?: string | null
           packet_sha256: string
           pr_number: number
+          reconciliation_evidence_sha256?: string | null
           request_id: string
           source_version: string
           state?: string
@@ -15611,6 +15616,7 @@ export type Database = {
           observed_merge_sha?: string | null
           packet_sha256?: string
           pr_number?: number
+          reconciliation_evidence_sha256?: string | null
           request_id?: string
           source_version?: string
           state?: string
@@ -27709,6 +27715,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      reconcile_unmerged_production_release_merge_lease_v6: {
+        Args: {
+          p_evidence_sha256: string
+          p_lease_id: string
+          p_reason: string
+        }
+        Returns: string
       }
       reconcile_workflow_runs: {
         Args: { p_limit?: number }
