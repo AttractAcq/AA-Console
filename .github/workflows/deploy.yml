@@ -1,12 +1,13 @@
 name: Deploy to GitHub Pages
 
 # console.attractacq.com. The runtime (Railway) is deployed separately from
-# agent-runtime/ — this publishes only the browser app.
+# agent-runtime/ — this publishes only the browser app. A main push starts CI;
+# the browser is built only after that exact main SHA passes every CI job.
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
 
 permissions:
   contents: read
@@ -21,6 +22,13 @@ concurrency:
 
 jobs:
   build-and-deploy:
+    # workflow_run is privileged. PR runs, forks, and failed/incomplete CI
+    # never check out code or receive the Pages/secret-bearing job context.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -28,16 +36,29 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Require the tested SHA to be current main
+        env:
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: bash scripts/assert-current-deploy-sha.sh "$TESTED_SHA"
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      # Pages runs independently of CI on main. Keep a missing migration
-      # dependency from publishing a frontend built against the wrong schema.
+      # Keep a missing migration dependency from publishing a frontend built
+      # against the wrong schema, even after an all-green CI run.
       - name: Require sequential migration dependencies
         run: node scripts/schema-migration-order.mjs
+
+      # A PR can introduce a migration before it is applied to production.
+      # Wait for the reviewed marker update instead of publishing a browser
+      # that expects a schema which has not been released yet.
+      - name: Require released schema marker at tracked head
+        run: node scripts/require-released-schema.mjs
 
       - run: npm ci
 
@@ -70,7 +91,7 @@ jobs:
       - name: Build
         env:
           # Non-secret identity of the browser bundle actually published.
-          VITE_BUILD_SHA: ${{ github.sha }}
+          VITE_BUILD_SHA: ${{ github.event.workflow_run.head_sha }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           # Optional. Absent means the Master AI reports itself unconfigured
@@ -97,6 +118,11 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
+      - name: Recheck current main before external publication
+        env:
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: bash scripts/assert-current-deploy-sha.sh "$TESTED_SHA"
 
       - name: Deploy to GitHub Pages
         id: deployment
