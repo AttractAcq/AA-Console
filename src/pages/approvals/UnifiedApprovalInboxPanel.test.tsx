@@ -277,6 +277,20 @@ describe("unified approval inbox", () => {
     expect(screen.getByText("No requests match these filters.")).toBeInTheDocument();
   });
 
+  it("shows a superseded source card as terminal and removes its decision controls", async () => {
+    requests = [{ ...readyCampaign, status: "superseded", source_state: "superseded" }];
+    show("client", "/approvals?source=action-1");
+    const card = await screen.findByRole("article", { name: "Build the Meta ad" });
+    expect(within(card).getByText("Live source state")).toBeInTheDocument();
+    expect(within(card).getByRole("alert")).toHaveTextContent(
+      "The owning source is superseded. This card cannot be decided.",
+    );
+    expect(within(card).queryByRole("button", { name: "Approve exact version" }))
+      .not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Reject with reason" }))
+      .not.toBeInTheDocument();
+  });
+
   it("does not suggest the queue is empty when decision history fails", async () => {
     decisionError = { message: "History unavailable" };
     show();

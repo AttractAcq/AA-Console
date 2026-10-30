@@ -56,6 +56,10 @@ create table public.approval_request_evidence_v6 (
 
 create table public.approval_decision_events_v6 (
   id uuid primary key default gen_random_uuid(),
+  -- Allocated only after record_approval_decision_v6 takes the request-row
+  -- lock, so this is the durable order even when transaction start times
+  -- precede an earlier decision's commit.
+  event_order bigint generated always as identity unique,
   request_id uuid not null references public.approval_requests_v6(id) on delete restrict,
   decision text not null check (decision in ('approved', 'rejected', 'revoked')),
   actor_id uuid not null,
@@ -68,7 +72,7 @@ create table public.approval_decision_events_v6 (
   check (decision = 'approved' or nullif(btrim(coalesce(reason, '')), '') is not null)
 );
 create index approval_decision_events_v6_latest_idx
-  on public.approval_decision_events_v6 (request_id, decided_at desc, id desc);
+  on public.approval_decision_events_v6 (request_id, event_order desc);
 
 -- Table owners retain DDL control for later migrations, but no existing row
 -- may be revised or removed as part of an application action.
@@ -179,7 +183,7 @@ left join public.approval_request_evidence_v6 e on e.request_id = r.id
 left join lateral (
   select de.decision from public.approval_decision_events_v6 de
   where de.request_id = r.id
-  order by de.decided_at desc, de.id desc limit 1
+  order by de.event_order desc limit 1
 ) d on true;
 revoke all on public.approval_inbox_v6 from public, anon, authenticated, service_role;
 grant select on public.approval_inbox_v6 to authenticated, service_role;
@@ -460,7 +464,7 @@ begin
   end if;
 
   select * into v_latest from public.approval_decision_events_v6
-    where request_id = p_request_id order by decided_at desc, id desc limit 1;
+    where request_id = p_request_id order by event_order desc limit 1;
   if p_decision = 'revoked' then
     if v_latest.decision is distinct from 'approved' then
       raise exception 'Only an approved request can be revoked.' using errcode = '23514';
@@ -468,7 +472,8 @@ begin
   elsif v_latest.id is not null then
     raise exception 'This approval request has already been decided.' using errcode = '23514';
   elsif p_decision = 'approved'
-    and v_request.expires_at is not null and v_request.expires_at <= now() then
+    and v_request.expires_at is not null
+    and v_request.expires_at <= clock_timestamp() then
     raise exception 'This approval request has expired.' using errcode = '23514';
   end if;
 

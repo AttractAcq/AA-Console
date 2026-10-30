@@ -4,6 +4,168 @@
 -- AAL2 decision and last-moment external executor attestation are separate.
 -- Revisions are append-only and can be advanced only by a later migration.
 
+-- A frozen card is still only pending while its owning source remains on the
+-- same exact version. The source is checked live under a scoped definer: a
+-- later source edit, archive, cancellation, or new Engine epoch cannot leave
+-- a misleading actionable card in the canonical view. Unknown source kinds
+-- fail closed until their own adapter extends this function.
+create function public.approval_source_state_v6(p_request_id uuid)
+returns text language plpgsql stable security definer
+set search_path = pg_catalog, public as $$
+declare
+  v_request public.approval_requests_v6%rowtype;
+  v_source_id uuid;
+  v_status text;
+  v_version text;
+  v_hash text;
+  v_archived_at timestamptz;
+  v_payload jsonb;
+  v_slot_stage text;
+  v_epoch text;
+  v_epoch_count integer;
+begin
+  select * into v_request from public.approval_requests_v6 where id = p_request_id;
+  if not found then return 'unverified'; end if;
+  if auth.role() is distinct from 'service_role'
+    and (auth.role() is distinct from 'authenticated'
+      or not public.can_review_approval_request_v6(
+        v_request.client_id, v_request.owner_role)) then
+    return 'unverified';
+  end if;
+  if v_request.source_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    then return 'unverified'; end if;
+  v_source_id := v_request.source_id::uuid;
+
+  if v_request.source_system = 'aa_console'
+    and v_request.source_kind = 'campaign_action' then
+    select a.status, a.request_hash into v_status, v_version
+      from public.campaign_action_approvals a where a.id = v_source_id;
+    if not found then return 'cancelled'; end if;
+    if v_status <> 'pending' then return 'source_decided'; end if;
+    if v_version is distinct from v_request.source_version then return 'superseded'; end if;
+    return 'pending';
+  elsif v_request.source_system = 'aa_console'
+    and v_request.source_kind = 'client_sales_entitlement' then
+    select s.status, s.scope_hash into v_status, v_version
+      from public.client_sales_entitlement_requests s where s.id = v_source_id;
+    if not found then return 'cancelled'; end if;
+    if v_status <> 'pending' then return 'source_decided'; end if;
+    if v_version is distinct from v_request.source_version then return 'superseded'; end if;
+    return 'pending';
+  elsif v_request.source_system = 'aa_console'
+    and v_request.source_kind = 'recruitment_brief' then
+    select b.status::text, b.archived_at,
+      public.recruitment_brief_snapshot_hash_v6(b)
+      into v_status, v_archived_at, v_hash
+      from public.client_briefs b where b.id = v_source_id;
+    if not found or v_archived_at is not null then return 'cancelled'; end if;
+    if v_status <> 'draft' then return 'source_decided'; end if;
+    if v_request.artifact_hash is distinct from v_hash
+      or v_request.source_version !~ ('^' || v_hash || ':v[1-9][0-9]*$')
+      then return 'superseded'; end if;
+    return 'pending';
+  elsif v_request.source_system = 'aa_console'
+    and v_request.source_kind = 'google_review_reply' then
+    select g.status, public.google_reply_inbox_payload_v6(g)
+      into v_status, v_payload from public.google_review_replies g
+      where g.id = v_source_id;
+    if not found then return 'cancelled'; end if;
+    if v_status not in ('drafted','awaiting_approval') then return 'source_decided'; end if;
+    if v_payload->>'source_version' is distinct from v_request.source_version
+      or v_payload->>'artifact_hash' is distinct from v_request.artifact_hash
+      or v_payload->'preview' is distinct from v_request.preview
+      or v_payload->>'destination' is distinct from v_request.destination
+      or v_payload->>'account_ref' is distinct from v_request.account_ref
+      or v_payload->'scope' is distinct from v_request.scope
+      or v_payload->>'preview_blocker' is distinct from v_request.preview_blocker
+      then return 'superseded'; end if;
+    return 'pending';
+  elsif v_request.source_system = 'aa_console'
+    and v_request.source_kind = 'engine_slot' then
+    select s.stage::text into v_slot_stage from public.content_slots s
+      where s.id = v_source_id;
+    if not found then return 'cancelled'; end if;
+    if v_slot_stage <> 'awaiting_approval' then return 'source_decided'; end if;
+    -- Older slot events have transaction-start timestamps and random UUIDs,
+    -- neither of which proves order after concurrent serialized transitions.
+    -- Multiple approval entries therefore remain unverified and blocked.
+    select count(*)::integer, min(e.id::text) into v_epoch_count, v_epoch
+      from public.slot_events e
+      where e.slot_id = v_source_id and e.to_stage::text = 'awaiting_approval';
+    if v_epoch_count <> 1 then return 'unverified'; end if;
+    if v_epoch is distinct from v_request.source_version then return 'superseded'; end if;
+    return 'pending';
+  elsif v_request.source_system = 'auth'
+    and v_request.source_kind = 'console_invitation' then
+    -- B004 creates this source in 284. Until then there are no valid cards.
+    if to_regclass('public.console_invitation_requests_v6') is null
+      then return 'unverified'; end if;
+    execute 'select status,payload_hash from public.console_invitation_requests_v6 where id=$1'
+      into v_status,v_version using v_source_id;
+    if not found then return 'cancelled'; end if;
+    if v_version is distinct from v_request.source_version then return 'superseded'; end if;
+    if v_status = 'requested' then return 'pending'; end if;
+    if v_status = 'cancelled' then return 'cancelled'; end if;
+    if v_status in ('reconcile','conflict') then return 'source_held'; end if;
+    return 'source_decided';
+  end if;
+  return 'unverified';
+end;
+$$;
+revoke all on function public.approval_source_state_v6(uuid)
+  from public, anon, authenticated, service_role;
+grant execute on function public.approval_source_state_v6(uuid)
+  to authenticated, service_role;
+
+create or replace view public.approval_inbox_v6 with (security_invoker = true) as
+select
+  r.id, r.client_id, r.source_system, r.source_kind, r.source_id,
+  r.source_version, r.title,
+  case
+    when s.source_state in ('cancelled','superseded','source_held','unverified')
+      then s.source_state
+    when d.decision = 'revoked' then 'revoked'
+    when d.decision = 'rejected' then 'rejected'
+    when r.expires_at is not null and r.expires_at <= now() then 'expired'
+    when d.decision = 'approved' then 'approved'
+    when s.source_state <> 'pending' then s.source_state
+    else 'pending'
+  end as status,
+  r.requested_at, r.requested_by, r.requester_kind, r.requester_ref,
+  r.expires_at,
+  coalesce(e.artifact_hash, r.artifact_hash) as artifact_hash,
+  coalesce(e.preview, r.preview) as preview,
+  coalesce(e.destination, r.destination) as destination,
+  coalesce(e.account_ref, r.account_ref) as account_ref,
+  coalesce(e.budget, r.budget) as budget,
+  coalesce(e.scope, r.scope) as scope,
+  r.owner_role,
+  case
+    when r.expires_at is null then 'An expiry is missing.'
+    when nullif(btrim(coalesce(r.owner_role, '')), '') is null then 'The decision owner is missing.'
+    when e.id is not null then null
+    when nullif(btrim(coalesce(r.preview_blocker, '')), '') is not null then r.preview_blocker
+    when r.artifact_hash is null then 'The exact artifact hash is missing.'
+    when r.preview is null or jsonb_typeof(r.preview) <> 'object'
+      or r.preview = '{}'::jsonb then 'The exact artifact preview is missing.'
+    when r.scope is null or r.scope = '{}'::jsonb then 'The exact scope is missing.'
+    else null
+  end as preview_blocker,
+  r.owning_path,
+  s.source_state
+from public.approval_requests_v6 r
+left join public.approval_request_evidence_v6 e on e.request_id = r.id
+left join lateral (
+  select de.decision from public.approval_decision_events_v6 de
+  where de.request_id = r.id
+  order by de.event_order desc limit 1
+) d on true
+cross join lateral (
+  select public.approval_source_state_v6(r.id) as source_state
+) s;
+revoke all on public.approval_inbox_v6 from public, anon, authenticated, service_role;
+grant select on public.approval_inbox_v6 to authenticated, service_role;
+
 create table public.approval_class_coverage_versions_v6 (
   class_id smallint not null check (class_id > 0),
   revision integer not null check (revision > 0),

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "fa244aa354d2f4c15054e769ea6d797c5c4bfa6bce03da2145f4d56f23904d67",
-  "generatedTypesSha256": "4e9c5b29204a66967040fbcce422379e5d90808f204f9382295536dd80c0a388",
-  "generatedSchemaBodySha256": "b8641d628c063ac43b321a63ca8a0c249f16b3aa24bd766ae699bccdecf264d4",
+  "migrationSourceDigest": "3f3884194ffa35998bcd7fb2e0264c4e1da1b63a8c6c8facf84f779bfc7dc247",
+  "generatedTypesSha256": "b080885bac8902bf929816a2d3f0c59e020e8acc7c319c976739fcc23c12365e",
+  "generatedSchemaBodySha256": "e61a007fe5ba70174deefa96aeb5cb28493d46d25c491f56148f8564f75ab37e",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2031,8 +2031,8 @@
       "version": "20261030110000",
       "name": "273_canonical_approval_ledger",
       "filename": "20261030110000_273_canonical_approval_ledger.sql",
-      "sha256": "f5c671850e3bcae6437c40c03fbfdffd992eff912f9dc86236a9befc621853af",
-      "trimmedMd5": "38ac65b451e40be293b157263e3efcce"
+      "sha256": "c547896719c8124555d95b857a83ab6b4063ce8f3165c0b86602914420f0e75e",
+      "trimmedMd5": "e972b3d80b4cc1bcabec2ff00f6021c6"
     },
     {
       "version": "20261030120000",
@@ -2073,8 +2073,8 @@
       "version": "20261030160000",
       "name": "279_approval_class_coverage",
       "filename": "20261030160000_279_approval_class_coverage.sql",
-      "sha256": "7bfe198ab378704501c4f74e8ee1286aeb34a7a9c7d37e7a4cc42f6e548c7667",
-      "trimmedMd5": "420757808962332f122d6b54e73ed56e"
+      "sha256": "f00163d31481a7f1a4f36934fdf62fe936a6cebd12fce8b493285737a3d3ba4b",
+      "trimmedMd5": "2ef8c65ed8415885362e0b5aaaf0d03d"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

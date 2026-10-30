@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import { supabase } from "../../lib/supabase";
+import type { Database } from "../../types/database";
 
 const PAGE_SIZE = 50;
+type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
 /**
  * The read projection for B008. The owning source keeps its decision RPC;
@@ -18,6 +20,7 @@ export interface UnifiedApprovalRequest {
   source_version: string;
   title: string;
   status: string;
+  source_state?: string | null;
   requested_at: string;
   requested_by: string | null;
   requester_kind: string;
@@ -41,6 +44,17 @@ export interface UnifiedApprovalDecision {
   actor_aal: string | null;
   reason: string | null;
   decided_at: string;
+  event_order?: number;
+}
+
+function validatedRequest(row: ApprovalViewRow): UnifiedApprovalRequest {
+  for (const key of ["id", "source_system", "source_kind", "source_id",
+    "source_version", "title", "status", "requested_at", "requester_kind"] as const) {
+    if (typeof row[key] !== "string" || !row[key]?.trim()) {
+      throw new Error(`Approval projection has no valid ${key}; this page cannot safely decide it.`);
+    }
+  }
+  return row as UnifiedApprovalRequest;
 }
 
 function printable(value: unknown): string {
@@ -181,6 +195,7 @@ function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest
     && left.source_kind === right.source_kind && left.owner_role === right.owner_role
     && left.source_version === right.source_version
     && left.status === right.status
+    && left.source_state === right.source_state
     && left.expires_at === right.expires_at
     && left.artifact_hash === right.artifact_hash
     && left.destination === right.destination
@@ -252,6 +267,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
         <div><dt className="text-xs text-muted-foreground">Destination</dt><dd className="break-all">{request.destination || "Not supplied"}</dd></div>
         <div><dt className="text-xs text-muted-foreground">Account</dt><dd className="break-all">{request.account_ref || "Not supplied"}</dd></div>
         <div><dt className="text-xs text-muted-foreground">Source version</dt><dd className="break-all font-mono text-xs">{request.source_version || "Not supplied"}</dd></div>
+        {request.source_state && <div><dt className="text-xs text-muted-foreground">Live source state</dt>
+          <dd>{request.source_state.replaceAll("_", " ")}</dd></div>}
         <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Exact artifact hash</dt><dd className="break-all font-mono text-xs">{request.artifact_hash || "Not supplied"}</dd></div>
       </dl>
 
@@ -262,6 +279,11 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
       ) : (
         <p className="mt-4 text-xs text-muted-foreground">Exact-version snapshot recorded. Decisions use the owning source's approval function.</p>
       )}
+      {request.source_state && request.source_state !== "pending"
+        && request.status !== "approved" && request.status !== "rejected"
+        && request.status !== "revoked" && <p role="alert" className="mt-3 text-sm text-destructive">
+          The owning source is {request.source_state.replaceAll("_", " ")}. This card cannot be decided.
+        </p>}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div>
@@ -293,7 +315,7 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
         {history.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">No decision has been recorded for this request.</p> : (
           <ol className="mt-3 space-y-3">
             {history.map((event, index) => (
-              <li key={`${event.decided_at}-${index}`} className="border-t border-border pt-2 text-xs">
+              <li key={event.event_order ?? `${event.decided_at}-${index}`} className="border-t border-border pt-2 text-xs">
                 <p className="font-medium">{event.decision.replaceAll("_", " ")} · {dateLabel(event.decided_at)}</p>
                 <p className="mt-1 text-muted-foreground">Human: {event.actor_id || "Not recorded"} · Assurance: {event.actor_aal || "Not recorded"}</p>
                 {event.reason && <p className="mt-1 whitespace-pre-wrap">Reason: {event.reason}</p>}
@@ -392,14 +414,14 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         .order("id", { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
       if (requestResult.error) throw requestResult.error;
-      const pageRows: UnifiedApprovalRequest[] = requestResult.data ?? [];
+      const pageRows = (requestResult.data ?? []).map(validatedRequest);
       const rows = pageRows.slice(0, PAGE_SIZE);
       const ids = rows.map((row) => row.id);
       let decisionRows: UnifiedApprovalDecision[] = [];
       if (ids.length > 0) {
         const decisionResult = await supabase.from("approval_decision_events_v6")
-          .select("request_id,decision,actor_id,actor_aal,reason,decided_at")
-          .in("request_id", ids).order("decided_at", { ascending: false });
+          .select("request_id,decision,actor_id,actor_aal,reason,decided_at,event_order")
+          .in("request_id", ids).order("event_order", { ascending: false });
         if (decisionResult.error) throw decisionResult.error;
         decisionRows = decisionResult.data ?? [];
       }
@@ -458,10 +480,11 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       const current = await supabase.from("approval_inbox_v6").select("*")
         .eq("id", request.id).eq("client_id", targetClientId).maybeSingle();
       if (current.error) throw current.error;
-      if (!current.data || (decision === "approved"
-        ? !isApprovalReady(current.data, targetClientId)
-        : !isRejectionReady(current.data, targetClientId))
-        || !sameVersion(request, current.data)) {
+      const currentRequest = current.data ? validatedRequest(current.data) : null;
+      if (!currentRequest || (decision === "approved"
+        ? !isApprovalReady(currentRequest, targetClientId)
+        : !isRejectionReady(currentRequest, targetClientId))
+        || !sameVersion(request, currentRequest)) {
         throw new Error("This exact request changed or is no longer pending. Review the refreshed card before deciding.");
       }
       if (decision === "rejected" && !reason?.trim()) {
@@ -552,6 +575,10 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
             <option value="pending">Pending</option><option value="approved">Approved</option>
             <option value="rejected">Rejected</option><option value="expired">Expired</option>
+            <option value="revoked">Revoked</option><option value="superseded">Superseded</option>
+            <option value="cancelled">Cancelled</option><option value="source_held">Source held</option>
+            <option value="source_decided">Source decided without a mirrored event</option>
+            <option value="unverified">Source unverified</option>
             <option value="all">All statuses</option>
           </select>
         </label>
@@ -583,7 +610,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         </label>
       </div>
 
-      {!global && !clientId && <p role="alert" className="text-sm text-destructive">Select a client to view approvals.</p>}
+      {!multiClient && !clientId && <p role="alert" className="text-sm text-destructive">Select a client to view approvals.</p>}
       {error && !waiting && <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
         <p>{error}</p><button type="button" onClick={retry} className="mt-2 underline">Retry</button>
       </div>}

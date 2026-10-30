@@ -292,6 +292,51 @@ export type Database = {
         }
         Relationships: []
       }
+      approval_class_coverage_versions_v6: {
+        Row: {
+          blocker: string | null
+          class_id: number
+          class_key: string
+          decision_evidence: string | null
+          decision_state: string
+          executor_evidence: string | null
+          executor_state: string
+          recorded_at: string
+          revision: number
+          source_evidence: string | null
+          source_state: string
+          title: string
+        }
+        Insert: {
+          blocker?: string | null
+          class_id: number
+          class_key: string
+          decision_evidence?: string | null
+          decision_state: string
+          executor_evidence?: string | null
+          executor_state: string
+          recorded_at?: string
+          revision: number
+          source_evidence?: string | null
+          source_state: string
+          title: string
+        }
+        Update: {
+          blocker?: string | null
+          class_id?: number
+          class_key?: string
+          decision_evidence?: string | null
+          decision_state?: string
+          executor_evidence?: string | null
+          executor_state?: string
+          recorded_at?: string
+          revision?: number
+          source_evidence?: string | null
+          source_state?: string
+          title?: string
+        }
+        Relationships: []
+      }
       approval_decision_events_v6: {
         Row: {
           actor_aal: string
@@ -299,6 +344,7 @@ export type Database = {
           artifact_hash: string | null
           decided_at: string
           decision: string
+          event_order: number
           id: string
           reason: string | null
           request_id: string
@@ -310,6 +356,7 @@ export type Database = {
           artifact_hash?: string | null
           decided_at?: string
           decision: string
+          event_order?: never
           id?: string
           reason?: string | null
           request_id: string
@@ -321,6 +368,7 @@ export type Database = {
           artifact_hash?: string | null
           decided_at?: string
           decision?: string
+          event_order?: never
           id?: string
           reason?: string | null
           request_id?: string
@@ -331,14 +379,14 @@ export type Database = {
             foreignKeyName: "approval_decision_events_v6_request_id_fkey"
             columns: ["request_id"]
             isOneToOne: false
-            referencedRelation: "approval_requests_v6"
+            referencedRelation: "approval_inbox_v6"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "approval_decision_events_v6_request_id_fkey"
             columns: ["request_id"]
             isOneToOne: false
-            referencedRelation: "approval_inbox_v6"
+            referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
         ]
@@ -391,14 +439,14 @@ export type Database = {
             foreignKeyName: "approval_request_evidence_v6_request_id_fkey"
             columns: ["request_id"]
             isOneToOne: true
-            referencedRelation: "approval_requests_v6"
+            referencedRelation: "approval_inbox_v6"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "approval_request_evidence_v6_request_id_fkey"
             columns: ["request_id"]
             isOneToOne: true
-            referencedRelation: "approval_inbox_v6"
+            referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
         ]
@@ -481,8 +529,29 @@ export type Database = {
             foreignKeyName: "approval_requests_v6_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -7557,11 +7626,13 @@ export type Database = {
           action: string
           bound_user_id: string
           client_id: string
+          client_name_snapshot: string | null
           decided_at: string | null
           decided_by: string | null
           decision_note: string | null
           id: string
           member_id: string
+          member_name_snapshot: string | null
           requested_at: string
           requested_by: string
           scope_hash: string
@@ -7571,11 +7642,13 @@ export type Database = {
           action: string
           bound_user_id: string
           client_id: string
+          client_name_snapshot?: string | null
           decided_at?: string | null
           decided_by?: string | null
           decision_note?: string | null
           id?: string
           member_id: string
+          member_name_snapshot?: string | null
           requested_at?: string
           requested_by: string
           scope_hash: string
@@ -7585,11 +7658,13 @@ export type Database = {
           action?: string
           bound_user_id?: string
           client_id?: string
+          client_name_snapshot?: string | null
           decided_at?: string | null
           decided_by?: string | null
           decision_note?: string | null
           id?: string
           member_id?: string
+          member_name_snapshot?: string | null
           requested_at?: string
           requested_by?: string
           scope_hash?: string
@@ -7742,6 +7817,13 @@ export type Database = {
             columns: ["granted_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_sales_entitlements_inbox_decision_fk"
+            columns: ["inbox_decision_id"]
+            isOneToOne: false
+            referencedRelation: "approval_decision_events_v6"
             referencedColumns: ["id"]
           },
           {
@@ -19235,6 +19317,36 @@ export type Database = {
         }
         Relationships: []
       }
+      approval_class_coverage_v6: {
+        Row: {
+          blocker: string | null
+          class_id: number | null
+          class_key: string | null
+          decision_evidence: string | null
+          decision_state: string | null
+          executor_evidence: string | null
+          executor_state: string | null
+          overall_status: string | null
+          recorded_at: string | null
+          revision: number | null
+          source_evidence: string | null
+          source_state: string | null
+          title: string | null
+        }
+        Relationships: []
+      }
+      approval_coverage_summary_v6: {
+        Row: {
+          blocked_classes: number | null
+          expected_classes: number | null
+          fully_operational: boolean | null
+          inventoried_classes: number | null
+          inventory_version: string | null
+          missing_classes: number | null
+          operational_classes: number | null
+        }
+        Relationships: []
+      }
       approval_inbox: {
         Row: {
           asset_id: string | null
@@ -19298,24 +19410,54 @@ export type Database = {
           client_id: string | null
           destination: string | null
           expires_at: string | null
-          id: string
+          id: string | null
           owner_role: string | null
           owning_path: string | null
           preview: Json | null
           preview_blocker: string | null
-          requested_at: string
+          requested_at: string | null
           requested_by: string | null
-          requester_kind: string
+          requester_kind: string | null
           requester_ref: string | null
           scope: Json | null
-          source_id: string
-          source_kind: string
-          source_system: string
-          source_version: string
-          status: string
-          title: string
+          source_id: string | null
+          source_kind: string | null
+          source_state: string | null
+          source_system: string | null
+          source_version: string | null
+          status: string | null
+          title: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
       }
       approval_queue_slots: {
         Row: {
@@ -23305,34 +23447,6 @@ export type Database = {
     }
     Functions: {
       aa_house_client_id: { Args: never; Returns: string }
-      attach_approval_evidence_v6: {
-        Args: {
-          p_evidence: Json
-          p_evidence_ref: string
-          p_request_id: string
-          p_source_version: string
-        }
-        Returns: string
-      }
-      can_review_approval_request_v6: {
-        Args: { p_client_id: string; p_owner_role: string }
-        Returns: boolean
-      }
-      record_approval_decision_v6: {
-        Args: {
-          p_artifact_hash: string
-          p_decision: string
-          p_reason?: string
-          p_request_id: string
-          p_source_decision_ref: string
-        }
-        Returns: string
-      }
-      register_approval_request_v6: {
-        Args: { p_request: Json }
-        Returns: string
-      }
-      reject_approval_ledger_mutation_v6: { Args: never; Returns: unknown }
       accept_assignment: {
         Args: { p_assignment_id: string }
         Returns: {
@@ -23667,6 +23781,10 @@ export type Database = {
         Args: { p_max: number; p_values: string[] }
         Returns: boolean
       }
+      approval_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       approve_idea_and_generate_brief: {
         Args: { p_idea_id: string }
         Returns: string
@@ -23769,9 +23887,9 @@ export type Database = {
       approve_recruitment_brief_from_inbox_v6: {
         Args: {
           p_brief_id: string
-          p_request_id: string
-          p_expected_source_version: string
           p_expected_artifact_hash: string
+          p_expected_source_version: string
+          p_request_id: string
         }
         Returns: undefined
       }
@@ -23870,6 +23988,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      attach_approval_evidence_v6: {
+        Args: {
+          p_evidence: Json
+          p_evidence_ref: string
+          p_request_id: string
+          p_source_version: string
+        }
+        Returns: string
+      }
       attach_campaign_manifest_intelligence_v6: {
         Args: { p_manifest_id: string; p_snapshot_id: string }
         Returns: undefined
@@ -23877,6 +24004,12 @@ export type Database = {
       attach_campaign_offer_v6: {
         Args: { p_manifest_id: string; p_offer_version_id: string }
         Returns: undefined
+      }
+      attach_campaign_page_inbox_evidence_v6: {
+        Args: {
+          p_snapshot: Database["public"]["Tables"]["campaign_page_approval_snapshots"]["Row"]
+        }
+        Returns: string
       }
       attach_motion_design: {
         Args: { p_brief_id?: string; p_project_id: string }
@@ -24025,6 +24158,12 @@ export type Database = {
         Returns: string
       }
       caller_gate_markers: { Args: never; Returns: string }
+      campaign_action_inbox_payload_v6: {
+        Args: {
+          p_action: Database["public"]["Tables"]["campaign_action_approvals"]["Row"]
+        }
+        Returns: Json
+      }
       campaign_readiness: {
         Args: { p_campaign_id: string }
         Returns: {
@@ -24039,6 +24178,10 @@ export type Database = {
       can_read_client_sales_data: { Args: { target: string }; Returns: boolean }
       can_read_workflow_lead_attribution: {
         Args: { p_run_id: string }
+        Returns: boolean
+      }
+      can_review_approval_request_v6: {
+        Args: { p_client_id: string; p_owner_role: string }
         Returns: boolean
       }
       can_run_agent: {
@@ -24952,8 +25095,14 @@ export type Database = {
         }
         Returns: undefined
       }
-      decide_google_review_reply_v6: {
-        Args: { p_approved: boolean; p_reason?: string; p_reply_id: string }
+      decide_google_review_reply_from_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_expected_artifact_hash: string
+          p_expected_source_version: string
+          p_reason?: string
+          p_reply_id: string
+        }
         Returns: {
           approved_at: string | null
           approved_by: string | null
@@ -24981,15 +25130,28 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      decide_google_review_reply_from_inbox_v6: {
-        Args: {
-          p_reply_id: string
-          p_expected_source_version: string
-          p_expected_artifact_hash: string
-          p_approved: boolean
-          p_reason?: string
+      decide_google_review_reply_v6: {
+        Args: { p_approved: boolean; p_reason?: string; p_reply_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          attempts: number
+          body: string
+          body_hash: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          drafted_by_job_id: string | null
+          external_ref: string | null
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          posted_at: string | null
+          rejection_reason: string | null
+          review_id: string
+          status: string
+          updated_at: string
         }
-        Returns: Database["public"]["Tables"]["google_review_replies"]["Row"]
         SetofOptions: {
           from: "*"
           to: "google_review_replies"
@@ -25244,6 +25406,10 @@ export type Database = {
       }
       engine_is_enabled: { Args: { p_client_id: string }; Returns: boolean }
       engine_jobs_in_flight: { Args: { p_client_id: string }; Returns: number }
+      engine_slot_inbox_payload_v6: {
+        Args: { p_event: Database["public"]["Tables"]["slot_events"]["Row"] }
+        Returns: Json
+      }
       engine_tick: {
         Args: { p_now?: string }
         Returns: {
@@ -25399,6 +25565,12 @@ export type Database = {
         Args: {
           p_copy: Database["public"]["Tables"]["google_ads_copy"]["Row"]
           p_sheet: Database["public"]["Tables"]["google_ads_build_sheets"]["Row"]
+        }
+        Returns: Json
+      }
+      google_reply_inbox_payload_v6: {
+        Args: {
+          p_reply: Database["public"]["Tables"]["google_review_replies"]["Row"]
         }
         Returns: Json
       }
@@ -26483,6 +26655,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      record_approval_decision_v6: {
+        Args: {
+          p_artifact_hash: string
+          p_decision: string
+          p_reason?: string
+          p_request_id: string
+          p_source_decision_ref: string
+        }
+        Returns: string
+      }
       record_budget_change_applied: {
         Args: { p_change_id: string; p_external_ref?: string }
         Returns: undefined
@@ -26864,6 +27046,14 @@ export type Database = {
         }
       }
       recover_lead: { Args: { p_lead_id: string }; Returns: undefined }
+      recruitment_brief_snapshot_hash_v6: {
+        Args: { p_brief: Database["public"]["Tables"]["client_briefs"]["Row"] }
+        Returns: string
+      }
+      recruitment_brief_snapshot_v6: {
+        Args: { p_brief: Database["public"]["Tables"]["client_briefs"]["Row"] }
+        Returns: Json
+      }
       regenerate_asset: {
         Args: {
           p_asset_id: string
@@ -26906,6 +27096,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      register_approval_request_v6: {
+        Args: { p_request: Json }
+        Returns: string
+      }
+      register_recruitment_brief_inbox_v6: {
+        Args: { p_brief: Database["public"]["Tables"]["client_briefs"]["Row"] }
+        Returns: string
       }
       reject_slot: {
         Args: { p_reason: string; p_slot_id: string }
@@ -27168,6 +27366,10 @@ export type Database = {
           p_source_asset_id: string
           p_source_proof_id: string
         }
+        Returns: string
+      }
+      request_recruitment_brief_approval_v6: {
+        Args: { p_brief_id: string }
         Returns: string
       }
       request_recruitment_meta_build: {
@@ -27438,6 +27640,18 @@ export type Database = {
       revoke_message_template_approval_v6: {
         Args: { p_approval_id: string; p_reason: string }
         Returns: undefined
+      }
+      sales_entitlement_inbox_binding_valid_v6: {
+        Args: {
+          p_entitlement: Database["public"]["Tables"]["client_sales_entitlements"]["Row"]
+        }
+        Returns: boolean
+      }
+      sales_entitlement_inbox_payload_v6: {
+        Args: {
+          p_request: Database["public"]["Tables"]["client_sales_entitlement_requests"]["Row"]
+        }
+        Returns: Json
       }
       sales_entitlement_scope_hash: {
         Args: {

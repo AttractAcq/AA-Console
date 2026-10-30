@@ -350,4 +350,29 @@ describe("canonical approval ledger migration 273", () => {
     )).rows[0]!;
     expect(event).toMatchObject({ actor_id: ADMIN, actor_aal: "aal2", reason: "Withdrawn" });
   });
+
+  it("orders decisions by post-lock insertion even when transaction timestamps run backward", async () => {
+    const id = await register(candidate());
+    // A waiting transaction can start before the approval commits, then
+    // acquire the request lock and insert a revocation afterward. PostgreSQL
+    // now() retains that earlier transaction-start timestamp.
+    await db.query(`insert into public.approval_decision_events_v6
+      (request_id,decision,actor_id,actor_aal,artifact_hash,source_decision_ref,decided_at)
+      values ($1,'approved',$2,'aal2',$3,'order-approval','2030-01-01T00:00:00Z')`,
+    [id, ADMIN, HASH]);
+    await db.query(`insert into public.approval_decision_events_v6
+      (request_id,decision,actor_id,actor_aal,artifact_hash,source_decision_ref,reason,decided_at)
+      values ($1,'revoked',$2,'aal2',$3,'order-revocation','Withdrawn','2029-01-01T00:00:00Z')`,
+    [id, ADMIN, HASH]);
+    const events = (await db.query<{ decision: string; event_order: number }>(
+      "select decision,event_order from public.approval_decision_events_v6 where request_id=$1 order by event_order",
+      [id],
+    )).rows;
+    expect(events.map((event) => event.decision)).toEqual(["approved", "revoked"]);
+    expect(events[1]!.event_order).toBeGreaterThan(events[0]!.event_order);
+    expect((await view(id)).status).toBe("revoked");
+    await expect(asRole("authenticated", ADMIN, "aal2",
+      "select public.fixture_decide_approval($1,'revoked',$2,'order-third','Again')", [id, HASH],
+    )).rejects.toThrow(/only an approved request can be revoked/i);
+  });
 });
