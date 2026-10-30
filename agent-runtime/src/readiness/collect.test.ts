@@ -96,6 +96,10 @@ describe("B001 system inventory", () => {
       state: "held",
       reason: expect.stringMatching(/exact-version AAL2 Approval Inbox decision/),
     });
+    expect(snapshot.runtime.actionHolds.genericCampaignActionClaim).toMatchObject({
+      state: "held",
+      reason: expect.stringMatching(/no atomic action-key and handler-ownership gate/),
+    });
     expect(snapshot.gateway.state).toBe("unknown");
     expect(snapshot.global.value?.engineEnabled).toBe(false);
     expect(snapshot.global.value?.campaignActionExecutors).toContainEqual({

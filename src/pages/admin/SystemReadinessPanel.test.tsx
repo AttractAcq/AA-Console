@@ -39,7 +39,12 @@ it("exports the same captured facts shown in the admin view on repeated download
     schemaVersion: 2, capturedAt: "2026-10-29T12:00:00Z",
     environment: { name: "staging", railwayEnvironmentId: "railway-stage", supabaseProjectRef: "stage-project" },
     runtime: { sha, switches: { workers: true }, credentialPresence: { anthropic: true },
-      actionHolds: { profileFieldPatch: { state: "held", reason: "Exact Inbox gate is not connected." } },
+      actionHolds: {
+        profileFieldPatch: { state: "held", reason: "Exact Inbox gate is not connected." },
+        genericCampaignActionClaim: {
+          state: "held", reason: "The SQL claim lacks an atomic handler-ownership gate.",
+        },
+      },
       heartbeats: { state: "observed", checkedAt: "2026-10-29T12:00:00Z", value: [], reason: null } },
     gateway: { state: "observed", checkedAt: "2026-10-29T12:00:00Z",
       value: { sha, observedAt: "2026-10-29T12:00:00Z",
@@ -86,7 +91,9 @@ it("exports the same captured facts shown in the admin view on repeated download
   expect(screen.getByText(/Dual mode can still admit legacy environment identities/)).toBeInTheDocument();
   expect(screen.getByText(/live provider health Unknown/)).toBeInTheDocument();
   expect(screen.getByText("Profile field PATCH")).toBeInTheDocument();
-  expect(screen.getByText("Held")).toBeInTheDocument();
+  expect(screen.getByText("Generic campaign action claims")).toBeInTheDocument();
+  expect(screen.getAllByText("Held")).toHaveLength(2);
+  expect(screen.getByText("The SQL claim lacks an atomic handler-ownership gate.")).toBeInTheDocument();
   expect(screen.getByText("Exact Inbox gate is not connected.")).toBeInTheDocument();
   expect(screen.getByText(/last recorded integration check Unknown/)).toBeInTheDocument();
   expect(screen.getByText("No live provider probe.")).toBeInTheDocument();
@@ -97,7 +104,10 @@ it("exports the same captured facts shown in the admin view on repeated download
   expect(first).toBe(second);
   expect(JSON.parse(first)).toMatchObject({
     capturedAt: "2026-10-29T12:00:00Z", environment: { name: "staging" },
-    runtime: { sha, actionHolds: { profileFieldPatch: { state: "held" } } },
+    runtime: { sha, actionHolds: {
+      profileFieldPatch: { state: "held" },
+      genericCampaignActionClaim: { state: "held" },
+    } },
     gateway: { value: { configured: { botAuthMode: "dual" } } },
     browser: { capturedAt: "2026-10-29T12:00:00Z" },
     evidenceCoverage: { providerAccountHealth: { state: "unknown" } },
