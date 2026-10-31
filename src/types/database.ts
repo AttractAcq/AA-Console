@@ -21201,10 +21201,12 @@ export type Database = {
         Row: {
           active_pillars: number | null
           active_platforms: number | null
+          advances_without_a_person: boolean | null
           approval_mode: string | null
           client_id: string | null
           client_name: string | null
           enabled: boolean | null
+          engine_running: boolean | null
           month_cap_usd: number | null
           plan_horizon_days: number | null
           posting_windows: number | null
@@ -28053,6 +28055,49 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "client_booking_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_client_engine_budget_v6: {
+        Args: {
+          p_cap_usd: number
+          p_client_id: string
+          p_month: string
+          p_note?: string
+        }
+        Returns: {
+          cap_usd: number
+          client_id: string
+          created_at: string
+          month: string
+          note: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_engine_budgets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_client_timezone_v6: {
+        Args: { p_client_id: string; p_timezone: string }
+        Returns: {
+          created_at: string
+          id: string
+          initials: string
+          is_internal: boolean
+          location: string | null
+          name: string
+          sector: string | null
+          tier: string | null
+          timezone: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "clients"
           isOneToOne: true
           isSetofReturn: false
         }
