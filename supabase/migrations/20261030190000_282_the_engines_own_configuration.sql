@@ -152,7 +152,11 @@ comment on function public.set_client_timezone_v6(uuid, text) is
 
 -- Columns are added at the end so this stays a replace rather than a drop:
 -- the browser reads this view and a drop would take it away mid-session.
-create or replace view public.engine_readiness as
+-- security_invoker stays on: without it the view runs as its owner and the
+-- caller's row-level security on clients and settings stops applying.
+-- create or replace does not carry the option over, so it is restated.
+create or replace view public.engine_readiness
+  with (security_invoker = true) as
  select c.id as client_id,
     c.name as client_name,
     c.timezone,
