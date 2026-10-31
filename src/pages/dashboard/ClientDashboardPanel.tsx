@@ -7,6 +7,7 @@ import { ConfirmModal } from "../../components/forms/FormModal";
 import { RunAgentModal } from "../../components/agents/RunAgentModal";
 import { supabase } from "../../lib/supabase";
 import { MasterAIChatDialog } from "../../components/masterai/MasterAIChatDialog";
+import { ClientSwitchPanel } from "../../components/switches/ClientSwitchPanel";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { totalSpend, unresolvedFailures } from "../../lib/jobHistory";
@@ -96,6 +97,8 @@ export function ClientDashboardPanel() {
           {notice}
         </p>
       )}
+
+      {clientId && <ClientSwitchPanel clientId={clientId} />}
 
       <Panel title="Agent spend"><p className="text-2xl font-semibold text-card-foreground">${spend.toFixed(2)}</p></Panel>
 
