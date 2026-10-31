@@ -146,6 +146,19 @@ diff -u "$evidence_dir/upgrade.fingerprint.json" \
     exit 1
   }
 
+# Run a real two-session lock-order regression against the same disposable
+# local PostgreSQL server, in its own database so replay fingerprints stay
+# unchanged. PGlite cannot expose this class of deadlock.
+if bash scripts/test-b006-budget-locks.sh "$((port_base + 2))" \
+  >"$run_dir/b006-budget-lock.private.log" 2>&1; then
+  printf 'passed\n' >"$evidence_dir/b006-budget-lock.status.txt"
+  echo 'B006 two-connection budget lock order passed.'
+else
+  printf 'failed\n' >"$evidence_dir/b006-budget-lock.status.txt"
+  tail -12 "$run_dir/b006-budget-lock.private.log" >&2
+  exit 1
+fi
+
 if ! supabase_local gen types --local --lang typescript --schema public,graphql_public \
   >"$evidence_dir/database.generated.ts" \
   2>"$run_dir/private-gen-types.log"; then

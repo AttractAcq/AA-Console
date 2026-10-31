@@ -255,14 +255,14 @@ describe("the second switch", () => {
     await waitFor(() =>
       expect(rpc).toHaveBeenCalledWith("set_publishing_enabled", { p_client_id: "c1", p_enabled: true }),
     );
-    expect(await screen.findByText(/runtime has to have it on too/)).toBeInTheDocument();
+    expect(await screen.findByText(/Exact outgoing Approval Inbox authority/)).toBeInTheDocument();
   });
 
   it("offers to stop once it is on", async () => {
     withState(ready);
     state.publishing = true;
     render(<EnginePanel />);
-    expect(await screen.findByText(/Approved posts go out on this client's accounts/)).toBeInTheDocument();
+    expect(await screen.findByText(/Client publishing switch is on/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Stop publishing" }));
     await waitFor(() =>
       expect(rpc).toHaveBeenCalledWith("set_publishing_enabled", { p_client_id: "c1", p_enabled: false }),
@@ -271,8 +271,7 @@ describe("the second switch", () => {
 
   it("does not claim a client with no settings at all is publishing", async () => {
     // The fallback is what a client who has never been configured reads,
-    // and "posts go out on this client's accounts" would be a lie about a
-    // real account.
+    // and the empty state must not imply publication authority.
     withState(ready);
     state.noSettings = true;
     render(<EnginePanel />);
@@ -317,8 +316,8 @@ describe("why nothing went out", () => {
     ];
     render(<EnginePanel />);
     expect(await screen.findByText("Publishing is off for this client.")).toBeInTheDocument();
-    expect(screen.getByText("Ready to go out.")).toBeInTheDocument();
-    expect(screen.getByText(/1 of 2 ready/)).toBeInTheDocument();
+    expect(screen.getByText(/No listed blocker; exact Inbox publication approval/)).toBeInTheDocument();
+    expect(screen.getByText(/1 of 2 without a listed blocker/)).toBeInTheDocument();
     expect(screen.getByText("2 attempts")).toBeInTheDocument();
   });
 
@@ -326,7 +325,7 @@ describe("why nothing went out", () => {
     withState(ready);
     render(<EnginePanel />);
     await screen.findByText(/Nothing is posted/);
-    expect(screen.queryByText(/Waiting to go out/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Publication queue/)).not.toBeInTheDocument();
   });
 });
 

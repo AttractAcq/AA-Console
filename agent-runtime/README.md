@@ -69,7 +69,9 @@ worker's job.
 | `AGENT_RUNTIME_LEASE_SECONDS` | no | `900` | Must be 30–3600; `claim_agent_job` rejects anything else |
 | `AGENT_RUNTIME_EMPTY_QUEUE_BACKOFF_MS` | no | `5000` | |
 | `AGENT_RUNTIME_MODEL` | no | `claude-opus-5` | |
-| `AGENT_RUNTIME_SHARED_SECRET` | no | — | Required in `X-Runtime-Secret` on `/status` when set |
+| `AGENT_RUNTIME_SHARED_SECRET` | production | — | Separate random 32-byte secret; required in `X-Runtime-Secret` on `/status` |
+| `PUBLIC_SALES_IP_SALT` | production | — | Independent random 32-byte salt for public caller hashes |
+| `PUBLIC_TRUSTED_PROXY_CIDRS` | no | — | Narrow CIDRs of verified direct proxies; unset ignores forwarding headers |
 | `PORT` | no | `8787` | Railway sets this |
 
 Config fails closed: a missing required variable throws at startup rather
@@ -79,7 +81,7 @@ than surfacing as undefined behaviour later.
 
 - `GET /health` — unauthenticated, no secrets. Railway's health check.
 - `GET /status` — config summary and registered agent keys. Gated by
-  `AGENT_RUNTIME_SHARED_SECRET` when set.
+  `AGENT_RUNTIME_SHARED_SECRET`.
 
 ## Local development
 

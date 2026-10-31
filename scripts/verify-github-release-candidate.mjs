@@ -15,6 +15,14 @@ const MIGRATION = /^(\d{14})_([A-Za-z0-9_.-]+)\.sql$/
 const NUMBERED_MIGRATION = /^\d{14}_(\d+)_/
 const MAX_CHECK_RUNS = 1000
 const CI_WORKFLOW_PATH = '.github/workflows/ci.yml'
+const RELEASE_CHECK_WORKFLOW_PATH = '.github/workflows/production-release-approval.yml'
+const RELEASE_GATE_PATHS = Object.freeze([
+  RELEASE_CHECK_WORKFLOW_PATH,
+  'scripts/check-approved-production-release.mjs',
+  'scripts/verify-approved-production-release.mjs',
+  'scripts/production-release-attestation.mjs',
+  'scripts/verify-github-release-candidate.mjs',
+])
 
 export const REQUIRED_RELEASE_CHECKS = Object.freeze([
   'Agent runtime (typecheck, test, build)',
@@ -88,9 +96,14 @@ function git(checkoutDir, args, encoding = 'utf8') {
   } catch { fail(`Git checkout cannot verify ${args[0]} against the committed PR tree`) }
 }
 
-function migrationEvidence(checkoutDir, headSha, baseSha) {
+function migrationEvidence(checkoutDir, headSha, baseSha, trustedBaseCheckout) {
   const checkedOut = git(checkoutDir, ['rev-parse', 'HEAD']).trim()
-  if (checkedOut !== headSha) fail('checked-out HEAD differs from the GitHub PR head')
+  if (trustedBaseCheckout) {
+    if (checkedOut !== baseSha) fail('trusted checkout HEAD differs from the GitHub PR base')
+    // The PR commit is data in this mode. It is never checked out or run in
+    // the secret-bearing pull_request_target job.
+    git(checkoutDir, ['cat-file', '-e', `${headSha}^{commit}`])
+  } else if (checkedOut !== headSha) fail('checked-out HEAD differs from the GitHub PR head')
   git(checkoutDir, ['cat-file', '-e', `${baseSha}^{commit}`])
   git(checkoutDir, ['merge-base', '--is-ancestor', baseSha, headSha])
 
@@ -147,6 +160,19 @@ function trustedWorkflowEvidence(checkoutDir, headSha, baseSha) {
   const digest = sha256(baseBytes)
   if (sha256(headBytes) !== digest)
     fail('PR changes the CI workflow that defines required release checks')
+  // The first reviewed installation adds this file to a base that does not
+  // have it. Once installed, no candidate may weaken or remove its own gate.
+  const baseReleaseCheckExists = git(checkoutDir,
+    ['ls-tree', '--name-only', '-z', baseSha, '--', RELEASE_CHECK_WORKFLOW_PATH])
+    .split('\0').includes(RELEASE_CHECK_WORKFLOW_PATH)
+  if (baseReleaseCheckExists) {
+    for (const path of RELEASE_GATE_PATHS) {
+      const baseBytes = git(checkoutDir, ['show', `${baseSha}:${path}`], 'buffer')
+      const headBytes = git(checkoutDir, ['show', `${headSha}:${path}`], 'buffer')
+      if (sha256(baseBytes) !== sha256(headBytes))
+        fail(`PR changes trusted production release gate code: ${path}`)
+    }
+  }
   return digest
 }
 
@@ -165,7 +191,7 @@ function checkedRunId(check, repository) {
  */
 export async function verifyGithubReleaseCandidate({
   prNumber, checkoutDir = process.cwd(), fetcher = fetch, token = null,
-  timeoutMs = 10000,
+  timeoutMs = 10000, trustedBaseCheckout = false,
 }) {
   if (!Number.isSafeInteger(prNumber) || prNumber <= 0) fail('PR number is invalid')
   checkoutDir = resolve(checkoutDir)
@@ -224,7 +250,7 @@ export async function verifyGithubReleaseCandidate({
         && item.head?.sha === headSha && item.base?.sha === baseSha))
     fail('required check run is not a successful exact-head CI run for this PR/base')
 
-  const migrations = migrationEvidence(checkoutDir, headSha, baseSha)
+  const migrations = migrationEvidence(checkoutDir, headSha, baseSha, trustedBaseCheckout)
   const workflowSha256 = trustedWorkflowEvidence(checkoutDir, headSha, baseSha)
   // GitHub may receive a force push or base-branch advance while the checks
   // and committed SQL are being read. Never return a packet for that stale PR.

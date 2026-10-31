@@ -4,6 +4,7 @@ import type { RuntimeConfig } from "../config.js";
 import { AuthError, requireAdmin } from "../master/auth.js";
 import { collectSystemReadiness } from "./collect.js";
 import { logger } from "../logging/logger.js";
+import { requestProxyDiagnostic } from "./proxy.js";
 
 /** Admin-only inventory. A failure in one source is recorded as unknown/error;
  * it never silently converts into a healthy status or a secret-bearing log. */
@@ -29,7 +30,8 @@ export async function handleSystemReadiness(
     return;
   }
   try {
-    json(200, { ok: true, ...await collectSystemReadiness(sb, config) });
+    json(200, { ok: true, ...await collectSystemReadiness(sb, config),
+      requestProxy: requestProxyDiagnostic(req, config.trustedProxies, config.publicIngressRequired) });
   } catch (error) {
     logger.error("system_readiness_failed", { error: error instanceof Error ? error.name : "unknown" });
     json(503, { ok: false, error: "The system inventory could not be collected." });

@@ -61,12 +61,14 @@ beforeEach(async () => {
   db = new PGlite();
   await db.exec(`
  create role authenticated; create role anon; create role service_role;
- create schema auth; create schema cron;
+ create schema auth; create schema cron; create schema vault;
  create function auth.role() returns text language sql as $$select coalesce(current_setting('test.role',true),'authenticated')$$;
  create function auth.uid() returns uuid language sql as $$select '${MANAGER}'::uuid$$;
  create function is_admin() returns boolean language sql as $$select true$$;
  create function active_video_approval_manager(uuid) returns uuid language sql as $$select '${MANAGER}'::uuid$$;
  create function can_access_client(p_client uuid) returns boolean language sql as $$select p_client = '${CLIENT}'::uuid$$;
+ create function may_advance_slot(p_client uuid) returns boolean language sql as
+   $$select auth.role() = 'service_role' or can_access_client(p_client)$$;
  create function lock_down_definer_functions() returns integer language sql as $$select 0$$;
  create function set_updated_at() returns trigger language plpgsql as $$begin return new; end$$;
 
@@ -80,7 +82,9 @@ beforeEach(async () => {
  create table profiles(id uuid primary key);
  create table client_integrations(id uuid primary key default gen_random_uuid(),
    client_id uuid, provider text, credential_label text, ad_account_id text,
+   credential_secret_id uuid, token_expires_at timestamptz,
    status text not null default 'connected');
+ create table vault.decrypted_secrets(id uuid primary key, decrypted_secret text);
  create table client_content_pillars(id uuid primary key, client_id uuid, name text);
  create table client_pages(id uuid primary key, client_id uuid);
  create table client_media_assets(id uuid primary key, client_id uuid, review_status text,
@@ -281,6 +285,42 @@ describe("migration 260 remains a prerequisite", () => {
     );
     expect(approvals).toHaveLength(1);
     expect(approvals[0]!.scope).not.toHaveProperty("requested_by");
+  });
+
+  it("accepts a still-valid expiring grant, then blocks the approved build after expiry", async () => {
+    await completeFixture();
+    await db.exec("update campaign_action_executors set supported=true where action_key='google_ad_build'");
+
+    // Apply the B014 credential gate and its Google build replacements against
+    // the same prerequisite schema used by the existing build tests.
+    const b014 = await sql("20261101080000_294_integration_credential_eligibility.sql");
+    await db.exec(b014.split("create or replace function public.enqueue_metrics_ingest_jobs")[0]!);
+    await db.exec(
+      b014.split("-- Google Ads account binding and its due view may not use a stricter label-only test.")[1]!
+        .split("-- Google Business profile execution readiness uses the same gate.")[0]!,
+    );
+    await db.exec(`
+      insert into vault.decrypted_secrets(id, decrypted_secret)
+        values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'test-token');
+      update client_integrations
+         set status='expiring', token_expires_at=now()+interval '1 day',
+             credential_secret_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+       where provider='google_ads';
+    `);
+
+    expect(await blocker()).toBeNull();
+    const approvalId = await request();
+    const executionId = await approveAndClaim(approvalId);
+    await db.exec(`
+      update client_integrations
+         set token_expires_at=now()-interval '1 second'
+       where provider='google_ads';
+    `);
+    expect(await blocker()).toContain("currently usable Google Ads integration");
+    await asService();
+    await expect(db.query("select start_google_build_v6($1)", [executionId]))
+      .rejects.toThrow("approved Google Ads account is no longer usable");
+    expect(await rows("select id from google_ads_builds")).toHaveLength(0);
   });
 
   it("rejects null or overlong ad-copy elements before any build can use them", async () => {

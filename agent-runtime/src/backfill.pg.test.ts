@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 /**
- * Migration 165 against a real Postgres.
+ * Migrations 165 and 291 against a real Postgres.
  *
  * enqueue_metrics_ingest_jobs takes a window and nothing ever passed it one,
  * so the only history this system has ever pulled is the trailing seven days
@@ -50,7 +50,7 @@ async function integration(
                          ${over.secret === false ? "null" : `'${SECRET}'`},
                          '${over.status ?? "connected"}',
                          ${over.ingest ?? true})
-                 on conflict (client_id, provider) do update
+                 on conflict (client_id, provider, credential_label) do update
                    set status = excluded.status, ingest_enabled = excluded.ingest_enabled,
                        credential_secret_id = excluded.credential_secret_id`);
 }
@@ -90,9 +90,16 @@ beforeAll(async () => {
       created_at timestamptz not null default clock_timestamp(), completed_at timestamptz);
 
     create table client_integrations (id uuid primary key default gen_random_uuid(),
-      client_id uuid, provider text, credential_secret_id uuid,
+      client_id uuid, provider text, credential_label text not null default 'default',
+      credential_secret_id uuid, token_expires_at timestamptz,
+      health_detail text, last_checked_at timestamptz,
       status text not null default 'connected', ingest_enabled boolean not null default true,
-      unique (client_id, provider));
+      unique (client_id, provider, credential_label));
+
+    create schema vault;
+    create table vault.decrypted_secrets (id uuid primary key, decrypted_secret text);
+    create function may_advance_slot(p uuid) returns boolean language sql stable as
+      $$ select coalesce(auth.role(), '') in ('service_role', '') or can_access_client(p) $$;
 
     create table metrics_daily (id uuid primary key default gen_random_uuid(),
       client_id uuid, surface metric_surface, entity_type metric_entity, external_id text,
@@ -110,12 +117,17 @@ beforeAll(async () => {
   `);
 
   await db.exec(await migration("20261007130000_165_a_backfill_can_be_asked_for.sql"));
+  const eligibility = await migration("20261101080000_294_integration_credential_eligibility.sql");
+  await db.exec(eligibility.split("-- Google Ads account binding and its due view")[0]!);
   await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
                  select set_config('request.jwt.claim.sub','${ADMIN}',false);`);
 });
 
 beforeEach(async () => {
-  await db.exec(`delete from agent_jobs; delete from client_integrations; delete from metrics_daily;`);
+  await db.exec(`delete from agent_jobs; delete from client_integrations; delete from metrics_daily;
+                 delete from vault.decrypted_secrets;
+                 insert into vault.decrypted_secrets (id, decrypted_secret)
+                 values ('${SECRET}', 'one-token');`);
   await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
                  select set_config('request.jwt.claim.sub','${ADMIN}',false);`);
 });
@@ -186,9 +198,75 @@ describe("the switch it deliberately ignores", () => {
 
   it("accepts an expiring token, which still works", async () => {
     await integration("meta", { status: "expiring" });
+    await db.exec(`update client_integrations set token_expires_at = now() + interval '1 day'`);
     expect(
       await rows(`select request_metrics_backfill('${CLIENT}', date '2026-09-01', date '2026-09-07')`),
     ).toHaveLength(1);
+  });
+});
+
+describe("the one execution-time credential contract", () => {
+  it("allows a known-future expiring grant through queue, secret, backfill and Account health", async () => {
+    await integration("meta", { status: "expiring" });
+    await db.exec(`update client_integrations set token_expires_at = now() + interval '1 day'`);
+    expect((await one<{ usable: boolean }>(`select integration_usable('${CLIENT}', 'meta') as usable`)).usable).toBe(true);
+    expect((await one<{ secret: string }>(`select integration_secret('${CLIENT}', 'meta') as secret`)).secret).toBe("one-token");
+    expect((await one<{ usable: boolean; headline: string }>(`select usable, headline from integration_health`)))
+      .toMatchObject({ usable: true, headline: "Expiring soon" });
+    expect((await one<{ queued: number }>(`select enqueue_metrics_ingest_jobs(7) as queued`)).queued).toBe(1);
+    expect(await rows(`select request_metrics_backfill('${CLIENT}', date '2026-09-01', date '2026-09-07')`))
+      .toHaveLength(1);
+  });
+
+  it("blocks an expiring row without a known future expiry", async () => {
+    await integration("meta", { status: "expiring" });
+    expect((await one<{ usable: boolean }>(`select integration_usable('${CLIENT}', 'meta') as usable`)).usable).toBe(false);
+    expect((await one<{ secret: string | null }>(`select integration_secret('${CLIENT}', 'meta') as secret`)).secret).toBeNull();
+    expect((await one<{ headline: string }>(`select headline from integration_health`)).headline).toBe("Expiry unknown");
+    expect((await one<{ queued: number }>(`select enqueue_metrics_ingest_jobs(7) as queued`)).queued).toBe(0);
+  });
+
+  it("refuses a known expired token even if health has not changed its connected or active label", async () => {
+    for (const status of ["connected", "active", "expiring"]) {
+      await db.exec(`delete from client_integrations`);
+      await integration("meta", { status });
+      await db.exec(`update client_integrations set token_expires_at = now() - interval '1 second'`);
+      expect((await one<{ usable: boolean }>(`select integration_usable('${CLIENT}', 'meta') as usable`)).usable).toBe(false);
+      expect((await one<{ secret: string | null }>(`select integration_secret('${CLIENT}', 'meta') as secret`)).secret).toBeNull();
+      expect((await one<{ headline: string }>(`select headline from integration_health`)).headline).toBe("Expired");
+      expect((await one<{ queued: number }>(`select enqueue_metrics_ingest_jobs(7) as queued`)).queued).toBe(0);
+    }
+  });
+
+  it("refuses error, revoked and expired status labels regardless of a future date", async () => {
+    for (const status of ["error", "revoked", "expired"]) {
+      await db.exec(`delete from client_integrations`);
+      await integration("meta", { status });
+      await db.exec(`update client_integrations set token_expires_at = now() + interval '1 month'`);
+      expect((await one<{ usable: boolean }>(`select integration_usable('${CLIENT}', 'meta') as usable`)).usable).toBe(false);
+      expect((await one<{ secret: string | null }>(`select integration_secret('${CLIENT}', 'meta') as secret`)).secret).toBeNull();
+    }
+  });
+
+  it("fails closed for a missing or empty Vault secret and for two provider rows", async () => {
+    await integration("meta");
+    await db.exec(`delete from vault.decrypted_secrets`);
+    expect((await one<{ usable: boolean }>(`select integration_usable('${CLIENT}', 'meta') as usable`)).usable).toBe(false);
+    await db.exec(`insert into vault.decrypted_secrets values ('${SECRET}', '  ')`);
+    expect((await one<{ secret: string | null }>(`select integration_secret('${CLIENT}', 'meta') as secret`)).secret).toBeNull();
+    await db.exec(`update vault.decrypted_secrets set decrypted_secret = 'one-token';
+                   insert into client_integrations
+                     (client_id, provider, credential_label, credential_secret_id, status, ingest_enabled)
+                   values ('${CLIENT}', 'meta', 'another-account', '${SECRET}', 'error', true)`);
+    expect((await one<{ usable: boolean }>(`select integration_usable('${CLIENT}', 'meta') as usable`)).usable).toBe(false);
+    expect((await one<{ secret: string | null }>(`select integration_secret('${CLIENT}', 'meta') as secret`)).secret).toBeNull();
+  });
+
+  it("does not reveal another client's usable state through the public status RPC", async () => {
+    await integration("meta");
+    const value = await as<{ usable: boolean | null }>(STAFF,
+      `select integration_usable('${CLIENT}', 'meta') as usable`);
+    expect(value[0]?.usable).toBeNull();
   });
 });
 

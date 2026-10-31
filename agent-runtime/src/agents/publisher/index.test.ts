@@ -58,6 +58,7 @@ function database(
     routeCampaign?: Record<string, unknown> | null;
     routeReadError?: string;
     routePostReads?: Array<Record<string, unknown> | null>;
+    prewriteDenied?: boolean;
   } = {},
 ) {
   const events: Record<string, unknown>[] = [];
@@ -65,6 +66,9 @@ function database(
   let routePostReads = 0;
   const rpc = vi.fn(async (name: string) => {
     if (name === "claim_posts_for_publishing") return { data: options.claimed ?? [POST], error: null };
+    if (name === "require_organic_publication_prewrite_v6") return options.prewriteDenied
+      ? { data: null, error: { message: "Exact Inbox approval missing" } }
+      : { data: { artifact_hash: "a".repeat(64) }, error: null };
     if (name === "integration_secret") {
       return { data: "token" in options ? options.token : "a-token", error: null };
     }
@@ -214,6 +218,19 @@ describe("the switch", () => {
 });
 
 describe("the sweep", () => {
+  it("stops a legacy claimed Engine post before integration, token, media URL or provider write", async () => {
+    const { sb, rpc, signCalls } = database({ prewriteDenied: true });
+    const result = await runPublisherJob(sb, on, agent, job);
+    expect(result.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("require_organic_publication_prewrite_v6", {
+      p_post_id: POST.post_id,
+    });
+    expect(rpc.mock.calls.some((call) => call[0] === "integration_secret")).toBe(false);
+    expect(signCalls).toHaveLength(0);
+    expect(publish).not.toHaveBeenCalled();
+    expect(failureFor(rpc, POST.post_id)?.p_reason).toMatch(/Exact outgoing publication approval/);
+  });
+
   it("uses the fixed provider fetch lifetime for a post and every carousel frame", async () => {
     const { sb, signCalls } = database();
     await prepare(sb, CAROUSEL);

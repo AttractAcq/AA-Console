@@ -140,6 +140,8 @@ beforeAll(async () => {
     create function can_access_client(p uuid) returns boolean language sql stable security definer as
       $$ select is_admin() or exists (select 1 from client_members m
             where m.client_id=p and m.user_id=auth.uid()) $$;
+    create function may_advance_slot(p uuid) returns boolean language sql stable security definer as
+      $$ select coalesce(auth.role(), '') in ('service_role', '') or can_access_client(p) $$;
     create function client_timezone(p uuid) returns text language sql stable security definer as
       $$ select coalesce((select timezone from clients where id=p),'Europe/London') $$;
 
@@ -176,7 +178,8 @@ beforeAll(async () => {
       created_at timestamptz not null default now(), updated_at timestamptz not null default now());
 
     create table client_integrations (id uuid primary key default gen_random_uuid(),
-      client_id uuid, provider text, credential_secret_id uuid, status text not null default 'connected',
+      client_id uuid, provider text, credential_secret_id uuid,
+      token_expires_at timestamptz, status text not null default 'connected',
       unique (client_id, provider));
 
     create function integration_secret(p_client_id uuid, p_provider text) returns text
@@ -247,6 +250,8 @@ beforeAll(async () => {
   ]) {
     await db.exec(await migration(f));
   }
+  const eligibility = await migration("20261101080000_294_integration_credential_eligibility.sql");
+  await db.exec(eligibility.split("create or replace function public.enqueue_metrics_ingest_jobs")[0]!);
   await db.exec(`select set_config('request.jwt.claim.sub','${ADMIN}',false);
                  select set_config('request.jwt.claim.role','authenticated',false);`);
 });
@@ -352,10 +357,20 @@ describe("what is stopping each thing that would not go out", () => {
 
   it("refuses an integration whose token is known not to work", async () => {
     const { post } = await publishablePost();
-    for (const status of ["error", "expiring", "revoked"]) {
+    for (const status of ["error", "expired", "revoked"]) {
       await db.exec(`update client_integrations set status = '${status}' where client_id = '${CLIENT}'`);
       expect(await blockerOf(post)).toMatch(/No usable instagram integration/);
     }
+  });
+
+  it("accepts a future expiring grant and blocks it at the recorded expiry without a sweep", async () => {
+    const { post } = await publishablePost();
+    await db.exec(`update client_integrations set status = 'expiring',
+                   token_expires_at = now() + interval '1 day' where client_id = '${CLIENT}'`);
+    expect(await blockerOf(post)).toBeNull();
+    await db.exec(`update client_integrations set token_expires_at = now() - interval '1 second'
+                   where client_id = '${CLIENT}'`);
+    expect(await blockerOf(post)).toMatch(/No usable instagram integration/);
   });
 
   it("says a post is not due rather than sending it early", async () => {

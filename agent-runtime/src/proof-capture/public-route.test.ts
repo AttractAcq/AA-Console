@@ -1,9 +1,12 @@
 import { Readable } from "node:stream";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { RuntimeConfig } from "../config.js";
+import { parseTrustedProxies } from "../public/client-ip.js";
 import { expect, it, vi } from "vitest";
 import { handlePublicProof, hashCaptureToken } from "./public-route.js";
 const token = "a".repeat(64);
+const config = { publicIpSalt: "test-salt", trustedProxies: parseTrustedProxies(undefined) } as RuntimeConfig;
 async function run(
   url: string,
   body: unknown,
@@ -17,6 +20,7 @@ async function run(
   req.method = method;
   req.url = url;
   req.headers = { authorization: `Bearer ${auth}` };
+  Object.defineProperty(req, "socket", { value: { remoteAddress: "203.0.113.9" } });
   const result = { status: 0, headers: {} as Record<string, string>, body: "" };
   const res = {
     writeHead: (status: number, headers: Record<string, string>) => {
@@ -27,12 +31,12 @@ async function run(
       result.body = body;
     },
   } as unknown as ServerResponse;
-  await handlePublicProof(req, res, sb);
+  await handlePublicProof(req, res, sb, config);
   return result;
 }
 function database(revoked = false) {
   const lookup = vi.fn();
-  const rpc = vi.fn().mockResolvedValue({ data: "proof", error: null });
+  const rpc = vi.fn(async (name: string) => ({ data: name === "admit_public_route_v6" ? true : "proof", error: null }));
   return {
     lookup,
     rpc,
@@ -79,11 +83,21 @@ it("serves no-store portal with per-response CSP nonce", async () => {
 });
 it("rejects missing and revoked tokens", async () => {
   const { sb, rpc } = database(true);
-  expect(
-    (await run("/public/proof/config", {}, sb, "POST", "invalid")).status,
-  ).toBe(404);
-  expect((await run("/public/proof/config", {}, sb)).status).toBe(404);
-  expect(rpc).not.toHaveBeenCalled();
+  const malformed = await run("/public/proof/config", {}, sb, "POST", "invalid");
+  const revoked = await run("/public/proof/config", {}, sb);
+  expect(malformed.status).toBe(404);
+  expect(revoked.status).toBe(404);
+  expect(malformed.body).toBe(revoked.body);
+  expect(rpc).not.toHaveBeenCalledWith("accept_proof_capture_submission", expect.anything());
+});
+it("checks the shared quota before link lookup or large body parsing", async () => {
+  const lookup = vi.fn(() => { throw new Error("must not look up"); });
+  const rpc = vi.fn(async () => ({ data: false, error: null }));
+  const result = await run("/public/proof/submit", { consent: false },
+    { rpc, from: lookup } as unknown as SupabaseClient);
+  expect(result.status).toBe(429);
+  expect(lookup).not.toHaveBeenCalled();
+  expect(rpc).toHaveBeenCalledTimes(1);
 });
 it("looks up hash and scopes setup to link client", async () => {
   const { sb, lookup } = database();
@@ -110,7 +124,7 @@ it("requires consent then persists through atomic RPC", async () => {
     consent: false,
   };
   expect((await run("/public/proof/submit", body, sb)).status).toBe(400);
-  expect(rpc).not.toHaveBeenCalled();
+  expect(rpc).not.toHaveBeenCalledWith("accept_proof_capture_submission", expect.anything());
   expect(
     (await run("/public/proof/submit", { ...body, consent: true }, sb)).status,
   ).toBe(200);
