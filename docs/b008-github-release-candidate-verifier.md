@@ -39,6 +39,15 @@ before the released source marker, or that changes the marker within the PR.
 The marker is source evidence only; it does not prove the live production
 migration head.
 
+The held trusted GitHub check uses `trustedBaseCheckout: true` through
+`check-approved-production-release.mjs`. That mode requires the checked-out
+commit to equal the protected PR **base**, then reads the fetched PR head only
+with Git object operations (`cat-file`, `show`, `ls-tree`, `diff`). It does not
+execute candidate code. After the release-check workflow is installed on the
+base, ordinary candidates cannot change that workflow or the four scripts it
+executes. The first installation is an explicitly reviewed bootstrap because
+the base has no gate file to compare.
+
 The typed packet is declared in
 `scripts/verify-github-release-candidate.d.mts`. Its deterministic
 `packetSha256` hashes canonical JSON excluding the digest field. The packet

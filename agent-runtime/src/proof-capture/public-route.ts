@@ -1,18 +1,20 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createHash, randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { RuntimeConfig } from "../config.js";
 import { readJsonBody, UUID } from "../mcp/http.js";
+import { admitPublicRequest } from "../public/quota.js";
 import { CAPTURE_HTML } from "./portal.js";
 import { PROOF_CATEGORIES } from "./taxonomy.js";
 import { verifyCaptureFile } from "./files.js";
 import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../storage/signed-url-policy.js";
-const attempts = new Map<string, { count: number; until: number }>();
 export const hashCaptureToken = (token: string) =>
   createHash("sha256").update(token).digest("hex");
 export async function handlePublicProof(
   req: IncomingMessage,
   res: ServerResponse,
   sb: SupabaseClient,
+  config: RuntimeConfig,
 ): Promise<void> {
   const json = (status: number, body: unknown) => {
     res.writeHead(status, {
@@ -41,28 +43,21 @@ export async function handlePublicProof(
     json(404, { error: "Not found" });
     return;
   }
-  const token = (req.headers.authorization ?? "").replace(/^Bearer /, "");
+  const rawAuthorization = req.headers.authorization ?? "";
+  const admitted = await admitPublicRequest(req, sb, config,
+    req.url === "/public/proof/config" ? "proof_config" : "proof_submit", rawAuthorization);
+  if (!admitted.allowed) {
+    json(admitted.reason === "quota" ? 429 : 503, {
+      error: admitted.reason === "quota" ? "Please try again shortly." : "Capture link unavailable.",
+    });
+    return;
+  }
+  const token = rawAuthorization.replace(/^Bearer /, "");
   if (!/^[a-f0-9]{64}$/.test(token)) {
     json(404, { error: "Capture link unavailable." });
     return;
   }
-  const hash = hashCaptureToken(token),
-    now = Date.now();
-  if (attempts.size > 5000)
-    for (const [k, v] of attempts) if (v.until < now) attempts.delete(k);
-  if (attempts.size >= 5000 && !attempts.has(hash)) {
-    json(429, { error: "Please try again shortly." });
-    return;
-  }
-  const limit = attempts.get(hash);
-  if (limit && limit.until > now && limit.count >= 15) {
-    json(429, { error: "Too many attempts. Please wait a minute." });
-    return;
-  }
-  attempts.set(hash, {
-    count: limit && limit.until > now ? limit.count + 1 : 1,
-    until: limit && limit.until > now ? limit.until : now + 60000,
-  });
+  const hash = hashCaptureToken(token), now = Date.now();
 
   try {
     const { data: link, error } = await sb
@@ -72,7 +67,7 @@ export async function handlePublicProof(
       .maybeSingle();
     if (error) throw error;
     if (!link || link.revoked_at || Date.parse(link.expires_at) <= now) {
-      json(404, { error: "Capture link unavailable or expired." });
+      json(404, { error: "Capture link unavailable." });
       return;
     }
     const { data: config, error: ce } = await sb

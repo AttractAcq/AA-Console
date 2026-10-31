@@ -15,6 +15,7 @@ import { startProofCoordinator } from "./proof-capture/coordinator.js";
 // loops run and the process is inert.
 
 import http from "node:http";
+import { timingSafeEqual } from "node:crypto";
 import { handleMcpBrief } from "./mcp/brief-route.js";
 import { handleMcpOrchestration } from "./mcp/orchestration-route.js";
 import { handleMcpCampaign } from "./mcp/campaign-route.js";
@@ -54,6 +55,8 @@ import { handleSchemaParity } from "./readiness/schema-parity-route.js";
 import { currentReleaseProbe } from "./readiness/release-probe.js";
 import { handleSitesRoute } from "./github/sites-route.js";
 import { logger } from "./logging/logger.js";
+import { handleInvitationRequest, handleInvitationSend, handleInvitationAccept, handleInvitationList, handleInvitationInspect } from "./invitations/routes.js";
+import { authenticatePublicIngress, IngressRefusal, isSignedPublicPath } from "./public/ingress-auth.js";
 
 const config = loadConfig();
 const sb = serviceClient(config);
@@ -89,6 +92,33 @@ const workflows =
     : null;
 
 const server = http.createServer((req, res) => {
+  if (config.publicIngressRequired && isSignedPublicPath(req.url)) {
+    void authenticatePublicIngress(req, config.publicIngressSecret!, async (nonceHash, issuedAt) => {
+      const { data, error } = await sb.rpc("claim_public_ingress_nonce_v1", {
+        p_nonce_hash: nonceHash, p_issued_at: issuedAt,
+      } as never);
+      if (error) throw error;
+      return data === true;
+    }).then(
+      (signed) => dispatchRequest(signed, res),
+      (error: unknown) => {
+        const status = error instanceof IngressRefusal ? error.status : 503;
+        logger.warn("public_ingress_refused", {
+          reason: error instanceof IngressRefusal ? error.message : "verification_error",
+        });
+        if (!res.headersSent) {
+          res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store",
+            "Connection": "close" });
+          res.end(JSON.stringify({ error: "Request unavailable" }));
+        }
+      },
+    );
+    return;
+  }
+  dispatchRequest(req, res);
+});
+
+function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
   const json = (status: number, body: unknown): void => {
     res.writeHead(status, { "Content-Type": "application/json" });
     res.end(JSON.stringify(body));
@@ -173,7 +203,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url?.startsWith("/public/proof")) {
-    void handlePublicProof(req, res, sb);
+    void handlePublicProof(req, res, sb, config);
     return;
   }
   // The only way into this system for somebody who is not signed in. Handled
@@ -192,7 +222,7 @@ const server = http.createServer((req, res) => {
   // A prospect taking a slot in a client's week. Public for the same reason
   // the lead form is: it lives on the client's own site.
   if (isBookingRequest(req.url)) {
-    void handlePublicBooking(req, res, sb);
+    void handlePublicBooking(req, res, sb, config);
     return;
   }
   if (req.url === "/internal/proof-capture/event") {
@@ -232,6 +262,27 @@ const server = http.createServer((req, res) => {
 
   if (req.url === "/admin/proof-capture") {
     void handleProofCaptureAdmin(req, res, sb, config);
+    return;
+  }
+
+  if (req.url === "/admin/invitations/request") {
+    void handleInvitationRequest(req, res, sb, config);
+    return;
+  }
+  if (req.url === "/admin/invitations/send") {
+    void handleInvitationSend(req, res, sb, config);
+    return;
+  }
+  if (req.url === "/admin/invitations/accept") {
+    void handleInvitationAccept(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/invitations/list") {
+    void handleInvitationList(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/invitations/inspect") {
+    void handleInvitationInspect(req, res, sb);
     return;
   }
 
@@ -361,10 +412,12 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url === "/status") {
-    if (
-      config.sharedSecret &&
-      req.headers["x-runtime-secret"] !== config.sharedSecret
-    ) {
+    const supplied = req.headers["x-runtime-secret"];
+    const expected = config.sharedSecret;
+    const suppliedBytes = typeof supplied === "string" ? Buffer.from(supplied) : null;
+    const expectedBytes = expected ? Buffer.from(expected) : null;
+    if (!suppliedBytes || !expectedBytes || suppliedBytes.length !== expectedBytes.length
+      || !timingSafeEqual(suppliedBytes, expectedBytes)) {
       json(401, { ok: false, error: "unauthorized" });
       return;
     }
@@ -381,7 +434,7 @@ const server = http.createServer((req, res) => {
   }
 
   json(404, { ok: false, error: "not found" });
-});
+}
 
 server.listen(config.healthPort, "0.0.0.0", () => {
   logger.info("health_server_listening", { port: config.healthPort });

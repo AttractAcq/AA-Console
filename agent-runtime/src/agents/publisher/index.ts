@@ -70,11 +70,35 @@ export interface ClaimedPost {
   attempt: number;
 }
 
+/**
+ * The SQL claim is not an external-write grant. In particular, a legacy
+ * `approve_slot` can create a slot-backed post without a canonical outgoing
+ * decision. Migration 292 deliberately refuses this RPC for every post until
+ * a byte-bound AAL2 decision and prewrite check are implemented. Keep this
+ * call before any integration, token, signed URL or provider operation.
+ */
+export async function requireOutgoingPublicationPrewrite(
+  sb: SupabaseClient,
+  postId: string,
+): Promise<void> {
+  const { data, error } = await sb.rpc("require_organic_publication_prewrite_v6", {
+    p_post_id: postId,
+  } as never);
+  const artifactHash = (data as { artifact_hash?: unknown } | null)?.artifact_hash;
+  if (error || typeof artifactHash !== "string" || !/^[0-9a-f]{64}$/.test(artifactHash)) {
+    throw new PublishError(
+      `Exact outgoing publication approval is unavailable: ${error?.message ?? "no approved package"}`,
+      false,
+    );
+  }
+}
+
 /** Everything that can stop one post, before anything is sent. */
 export async function prepare(
   sb: SupabaseClient,
   post: ClaimedPost,
 ): Promise<PublishRequest> {
+  await requireOutgoingPublicationPrewrite(sb, post.post_id);
   await requireOrganicRoute(sb, post);
   if (!isPlatform(post.platform)) {
     throw new PublishError(`This post is for "${post.platform}", which has no rules on file.`, false);
@@ -238,6 +262,7 @@ async function publishStory(
   let sent = 0;
   for (const frame of frames) {
     if (already.has(frame.position)) continue;
+    await requireOutgoingPublicationPrewrite(sb, post.post_id);
     await requireOrganicRoute(sb, post);
     const result = await adapter.publishFrame(request, frame);
     const { error: frameError } = await sb.rpc("record_frame_published", {
@@ -313,6 +338,7 @@ export async function runPublisherJob(
       if (request.contentFormat === "story") {
         result = await publishStory(sb, adapter, request, post, job.id);
       } else {
+        await requireOutgoingPublicationPrewrite(sb, post.post_id);
         await requireOrganicRoute(sb, post);
         result = await adapter.publish(request);
       }
