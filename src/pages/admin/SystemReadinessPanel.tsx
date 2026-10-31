@@ -11,6 +11,37 @@ type Observation<T> = {
   reason: string | null;
 };
 
+type EvidenceCheck = {
+  state: "observed" | "unknown" | "error";
+  checkedAt: string;
+  evidenceAt: string | null;
+  source: string;
+  reason: string | null;
+};
+
+const EVIDENCE_LABELS: Record<string, string> = {
+  runtimeDeployment: "Runtime deployed commit",
+  runtimeWorkers: "Runtime worker fleet",
+  gatewayDeployment: "Gateway deployed commit",
+  schemaCatalog: "Database schema catalog",
+  schemaParity: "Database schema parity",
+  cronCatalog: "Cron schedule catalog",
+  cronExecution: "Cron execution",
+  switchInventory: "Runtime and database switches",
+  credentialValidity: "Credential validity",
+  providerAccountHealth: "Provider account health",
+  otherEnvironment: "Other environment inventory",
+  externalEffects: "External action results",
+};
+
+const CRON_ISSUE_LABELS: Record<string, string> = {
+  missing: "Missing",
+  inactive: "Inactive",
+  schedule_mismatch: "Schedule differs",
+  duplicate: "Duplicate name",
+  unexpected: "Not in registry",
+};
+
 type Snapshot = {
   schemaVersion: number;
   capturedAt: string;
@@ -18,6 +49,10 @@ type Snapshot = {
   runtime: {
     sha: string | null;
     switches: Record<string, boolean>;
+    actionHolds?: {
+      profileFieldPatch?: { state: "held"; reason: string };
+      genericCampaignActionClaim?: { state: "held"; reason: string };
+    };
     credentialPresence: Record<string, boolean>;
     heartbeats: Observation<{
       workerId: string; sha: string | null; reportedVersion: string | null;
@@ -34,11 +69,26 @@ type Snapshot = {
     objects: Record<string, number>;
     cronJobs: { name: string; schedule: string; active: boolean }[] | null;
   }>;
+  cronScheduleAudit?: {
+    state: "matches" | "drift" | "unknown";
+    registryHead: string;
+    observedHead: string | null;
+    expectedCount: number;
+    observedCount: number | null;
+    reason: string | null;
+    rows: {
+      name: string;
+      expectedSchedule: string | null;
+      observed: { schedule: string; active: boolean }[];
+      issues: string[];
+    }[];
+  };
   global: Observation<{
     engineEnabled: boolean | null;
     publishingPlatforms: { platform: string; supported: boolean }[];
     proofDestinations: { key: string; mode: string; supported: boolean }[];
-    campaignActionExecutors: { key: string; module: string; supported: boolean }[];
+    campaignActionExecutors: { key: string; module: string; supported: boolean; handlerRegistered?: boolean }[];
+    campaignActionHandlerParity?: { state: "aligned" | "blocked"; unhandledSupportedKeys: string[] };
     messageChannels: { key: string; transport: string; supported: boolean; canInitiate: boolean }[];
   }>;
   clients: Observation<{
@@ -51,20 +101,10 @@ type Snapshot = {
       provider: string; status: string; ingestEnabled: boolean; hasCredential: boolean;
       lastCheckedAt: string | null; tokenExpiresAt: string | null;
       accountIds: Record<string, string | null>;
+      providerHealth?: EvidenceCheck;
     }[];
   }[]>;
-  publicPerimeter?: Observation<{
-    asOf: string; budgetDay: string;
-    quotaLastHour: { route: string; bucketKind: string; activeBuckets: number; countedAttempts: number }[];
-    budgetsToday: { deploymentId: string; messages: number; committedUsd: number;
-      heldUsd: number; uncertainCount: number }[];
-    unresolvedUncertain: number;
-  }>;
-  requestProxy?: {
-    directPeer: string | null; forwardedHops: string[];
-    chainStatus: "absent" | "invalid" | "ignored_untrusted_peer" | "trusted_peer";
-    trustedProxyCount: number; signedIngressRequired: boolean; callerIpUsedForQuota: string | null;
-  };
+  evidenceCoverage?: Record<string, EvidenceCheck>;
 };
 
 function stamp(value: string | null | undefined): string {
@@ -102,7 +142,6 @@ export function SystemReadinessPanel() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [budgetPage, setBudgetPage] = useState(0);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -110,7 +149,6 @@ export function SystemReadinessPanel() {
     try {
       const result = await readRuntime<Snapshot>("/admin/system-readiness");
       setSnapshot(result);
-      setBudgetPage(0);
     } catch (cause) {
       setSnapshot(null);
       setError(cause instanceof Error ? cause.message : "System readiness is unavailable.");
@@ -148,6 +186,23 @@ export function SystemReadinessPanel() {
     {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
     {loading && !snapshot && <p role="status" className="text-sm text-muted-foreground">Collecting system evidence…</p>}
     {snapshot && <>
+      <section aria-label="Evidence coverage" className="space-y-3">
+        <h2 className="text-lg font-semibold">Evidence coverage</h2>
+        <p className="text-sm text-muted-foreground">Recorded means the named source returned evidence at capture time. It does not certify the feature or an external provider action.</p>
+        {!snapshot.evidenceCoverage && <p role="status" className="text-sm text-muted-foreground">This runtime has not supplied machine-readable evidence coverage. Refresh after its deployment.</p>}
+        {snapshot.evidenceCoverage && <dl className="grid gap-3 lg:grid-cols-2">
+          {Object.entries(EVIDENCE_LABELS).map(([key, label]) => {
+            const check = snapshot.evidenceCoverage?.[key];
+            return <div key={key} className="rounded-lg border border-border bg-card p-4 text-sm">
+              <dt className="font-medium">{label}</dt>
+              <dd className="mt-1">{check?.state === "observed" ? "Recorded" : check?.state === "error" ? "Could not verify" : "Unknown"}</dd>
+              <dd className="mt-1 text-xs text-muted-foreground">Source: {check?.source ?? "Unknown"}; checked {stamp(check?.checkedAt)}; source evidence {stamp(check?.evidenceAt)}.</dd>
+              {check?.reason && <dd className="mt-1 text-xs text-muted-foreground">{check.reason}</dd>}
+            </div>;
+          })}
+        </dl>}
+      </section>
+
       <section aria-label="Code and deployment identity" className="space-y-3">
         <h2 className="text-lg font-semibold">Code and deployed services</h2>
         <div className="grid gap-3 lg:grid-cols-2">
@@ -181,12 +236,37 @@ export function SystemReadinessPanel() {
               <div key={key} className="flex justify-between gap-3"><dt>{key}</dt><dd>{value ? "Present" : "Missing"}</dd></div>)}</dl>
           </div>
         </div>
+        <div className="rounded-lg border border-border bg-card p-4 text-sm">
+          <h3 className="font-medium">Generic campaign action claims</h3>
+          <p className="mt-1 font-medium text-destructive">
+            {snapshot.runtime.actionHolds?.genericCampaignActionClaim?.state === "held" ? "Held" : "Unknown"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {snapshot.runtime.actionHolds?.genericCampaignActionClaim?.reason
+              ?? "This runtime has not reported whether generic campaign action claims are held."}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4 text-sm">
+          <h3 className="font-medium">Profile field PATCH</h3>
+          <p className="mt-1 font-medium text-destructive">
+            {snapshot.runtime.actionHolds?.profileFieldPatch?.state === "held" ? "Held" : "Unknown"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {snapshot.runtime.actionHolds?.profileFieldPatch?.reason
+              ?? "This runtime has not reported whether profile field writes are held."}
+          </p>
+        </div>
         <ObservationMessage observation={snapshot.global} />
         {snapshot.global.value && <div className="rounded-lg border border-border bg-card p-4 text-sm">
           <p>Database engine switch: {state(snapshot.global.value.engineEnabled)}</p>
           <p className="mt-1">Publishing adapters: {snapshot.global.value.publishingPlatforms.map((platform) => `${platform.platform} ${platform.supported ? "supported" : "unsupported"}`).join(" · ") || "None"}</p>
           <p className="mt-1">Proof destinations: {snapshot.global.value.proofDestinations.map((destination) => `${destination.key} ${destination.supported ? "supported" : "unsupported"} (${destination.mode})`).join(" · ") || "None"}</p>
-          <p className="mt-1">Campaign action executors: {snapshot.global.value.campaignActionExecutors.map((action) => `${action.key} ${action.supported ? "supported" : "unsupported"} (${action.module})`).join(" · ") || "None"}</p>
+          <p className="mt-1">Campaign action executors: {snapshot.global.value.campaignActionExecutors.map((action) => `${action.key} ${action.supported ? "database supported" : "database unsupported"}, ${action.handlerRegistered === true ? "runtime handler registered" : action.handlerRegistered === false ? "no runtime handler" : "runtime handler unknown"} (${action.module})`).join(" · ") || "None"}</p>
+          {snapshot.global.value.campaignActionHandlerParity?.state === "blocked" &&
+            <p role="alert" className="mt-2 text-destructive">Campaign action execution is blocked: the database marks {snapshot.global.value.campaignActionHandlerParity.unhandledSupportedKeys.join(", ")} supported, but this runtime has no campaign action handler. No action should be claimed until the mismatch is repaired.</p>}
+          {!snapshot.global.value.campaignActionHandlerParity &&
+            <p role="status" className="mt-2 text-muted-foreground">Campaign action handler parity is unknown in this runtime build.</p>}
+          <p className="mt-2 text-xs text-muted-foreground">A registered handler does not prove a connected account, current approval, or external result.</p>
           <p className="mt-1">Message channels: {snapshot.global.value.messageChannels.map((channel) => `${channel.key} ${channel.supported ? "supported" : "unsupported"}, ${channel.canInitiate ? "can initiate" : "reply only"} (${channel.transport})`).join(" · ") || "None"}</p>
           <p className="mt-2 text-xs text-muted-foreground">Source: engine_controls, platform_publishing, proof_destinations, campaign_action_executors and message_channels; checked {stamp(snapshot.global.checkedAt)}.</p>
         </div>}
@@ -217,73 +297,46 @@ export function SystemReadinessPanel() {
           <p>Tracked migration entries: {snapshot.database.value.migrationCount ?? "Unknown"}. Catalog objects: {Object.entries(snapshot.database.value.objects).map(([name, count]) => `${name} ${count}`).join(" · ")}</p>
           <p className="mt-2 text-xs text-muted-foreground">Source: service-only system_readiness_catalog RPC. This counts objects; B002 checks their definitions and drift.</p>
           {snapshot.database.value.cronJobs === null ? <p className="mt-2">Cron catalog unavailable.</p> :
-            <ul className="mt-2 space-y-1">{snapshot.database.value.cronJobs.map((job) =>
-              <li key={job.name} className="flex flex-wrap justify-between gap-2"><span>{job.name}</span><span>{job.active ? "Active" : "Inactive"} · {job.schedule}</span></li>)}</ul>}
+            <ul className="mt-2 space-y-1">{snapshot.database.value.cronJobs.map((job, index) =>
+              <li key={`${job.name}-${index}`} className="flex flex-wrap justify-between gap-2"><span>{job.name}</span><span>{job.active ? "Active" : "Inactive"} · {job.schedule}</span></li>)}</ul>}
         </div>}
       </section>
 
-      <section aria-label="Public acquisition perimeter" className="space-y-3">
-        <h2 className="text-lg font-semibold">Public acquisition perimeter</h2>
-        {snapshot.requestProxy && <div className="rounded-lg border border-border bg-card p-4 text-sm">
-          <h3 className="font-medium">This admin request's proxy path</h3>
-          <p className="mt-2">Direct socket peer: <code>{snapshot.requestProxy.directPeer ?? "Invalid"}</code></p>
-          <p className="mt-1">Forwarded chain: {snapshot.requestProxy.chainStatus.replaceAll("_", " ")}; {snapshot.requestProxy.forwardedHops.length ?
-            snapshot.requestProxy.forwardedHops.map((hop, index) => <code key={`${index}-${hop}`} className="mr-2">{hop}</code>) : "no valid hops"}</p>
-          <p className="mt-1">Configured trusted proxy CIDRs: {snapshot.requestProxy.trustedProxyCount}. Signed public ingress: {snapshot.requestProxy.signedIngressRequired ? "required" : "off"}.</p>
-          <p className="mt-1">Public quota identity: {snapshot.requestProxy.signedIngressRequired ?
-            "verified signed client IP from the isolated ingress" :
-            <>direct socket peer fallback; this admin request resolves to <code>{snapshot.requestProxy.callerIpUsedForQuota ?? "Refused"}</code></>}.</p>
-          <p className="mt-2 text-xs text-muted-foreground">Only this authenticated admin request is inspected. The raw forwarding header is never returned or logged. Railway does not publish stable ingress proxy CIDRs; this chain is diagnostic, not proof of trust.</p>
-        </div>}
-        {!snapshot.publicPerimeter && <p className="text-sm text-muted-foreground">This runtime build has no public perimeter inventory.</p>}
-        {snapshot.publicPerimeter && <ObservationMessage observation={snapshot.publicPerimeter} />}
-        {snapshot.publicPerimeter?.value && <>
-          <p className="text-xs text-muted-foreground">Checked {stamp(snapshot.publicPerimeter.value.asOf)}. Counted attempts are capped within each quota bucket; they are not a count of every refused request. These aggregate metrics contain no caller IP or token handles.</p>
-          <div className="grid gap-3 lg:grid-cols-2">
-            <Fact label="Unresolved paid requests" observedAt={snapshot.publicPerimeter.checkedAt}>
-              {snapshot.publicPerimeter.value.unresolvedUncertain}
-            </Fact>
-            <Fact label={`Held paid budget · ${snapshot.publicPerimeter.value.budgetDay}`} observedAt={snapshot.publicPerimeter.checkedAt}>
-              ${snapshot.publicPerimeter.value.budgetsToday.reduce((sum, row) => sum + row.heldUsd, 0).toFixed(2)}
-            </Fact>
-          </div>
-          <div className="overflow-x-auto rounded-lg border border-border bg-card p-4">
-            <h3 className="font-medium">Quota buckets · last hour</h3>
-            {snapshot.publicPerimeter.value.quotaLastHour.length === 0 ?
-              <p className="mt-2 text-sm text-muted-foreground">No public POST attempts recorded.</p> :
-              <table className="mt-2 w-full text-left text-sm"><thead><tr>
-                <th className="p-2">Route</th><th className="p-2">Bucket</th>
-                <th className="p-2">Active buckets</th><th className="p-2">Counted attempts</th>
-              </tr></thead><tbody>{snapshot.publicPerimeter.value.quotaLastHour.map((row) =>
-                <tr key={`${row.route}-${row.bucketKind}`} className="border-t border-border">
-                  <td className="p-2 font-mono text-xs">{row.route}</td><td className="p-2">{row.bucketKind}</td>
-                  <td className="p-2">{row.activeBuckets}</td><td className="p-2">{row.countedAttempts}</td>
-                </tr>)}</tbody></table>}
-          </div>
-          <div className="overflow-x-auto rounded-lg border border-border bg-card p-4">
-            <h3 className="font-medium">Paid widget budgets · {snapshot.publicPerimeter.value.budgetDay}</h3>
-            {snapshot.publicPerimeter.value.budgetsToday.length === 0 ?
-              <p className="mt-2 text-sm text-muted-foreground">No paid widget reservations today.</p> : <>
-              <table className="mt-2 w-full text-left text-sm"><thead><tr>
-                <th className="p-2">Deployment</th><th className="p-2">Messages</th>
-                <th className="p-2">Settled USD</th><th className="p-2">Held USD</th>
-                <th className="p-2">Uncertain today</th>
-              </tr></thead><tbody>{snapshot.publicPerimeter.value.budgetsToday.slice(budgetPage * 20, budgetPage * 20 + 20).map((row) =>
-                <tr key={row.deploymentId} className="border-t border-border">
-                  <td className="p-2 font-mono text-xs">{row.deploymentId}</td><td className="p-2">{row.messages}</td>
-                  <td className="p-2">${row.committedUsd.toFixed(4)}</td>
-                  <td className="p-2">${row.heldUsd.toFixed(4)}</td><td className="p-2">{row.uncertainCount}</td>
-                </tr>)}</tbody></table>
-              <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                <span>Showing {budgetPage * 20 + 1}–{Math.min((budgetPage + 1) * 20, snapshot.publicPerimeter.value.budgetsToday.length)} of {snapshot.publicPerimeter.value.budgetsToday.length}</span>
-                <div className="flex gap-2">
-                  <Button disabled={budgetPage === 0} onClick={() => setBudgetPage((page) => page - 1)}>Previous</Button>
-                  <Button disabled={(budgetPage + 1) * 20 >= snapshot.publicPerimeter.value.budgetsToday.length} onClick={() => setBudgetPage((page) => page + 1)}>Next</Button>
-                </div>
-              </div></>}
-            <p className="mt-2 text-xs text-muted-foreground">These are runtime cost estimates, not provider billing receipts. An uncertain reserve stays held until verified against provider usage.</p>
-          </div>
-        </>}
+      <section aria-label="Cron schedule configuration" className="space-y-3">
+        <h2 className="text-lg font-semibold">Cron schedule configuration</h2>
+        <p className="text-sm text-muted-foreground">This compares names, schedules and active flags with the released migration registry. A matching catalog does not prove that any job ran or succeeded; cron execution remains unverified.</p>
+        {!snapshot.cronScheduleAudit || snapshot.cronScheduleAudit.state === "unknown" ?
+          <p role="status" className="rounded-md border border-border p-3 text-sm text-muted-foreground">
+            Schedule comparison unknown: {snapshot.cronScheduleAudit?.reason ?? "This runtime has not supplied a versioned cron comparison."}
+          </p> : <>
+            <p role={snapshot.cronScheduleAudit.state === "drift" ? "alert" : "status"}
+              className="rounded-md border border-border p-3 text-sm">
+              {snapshot.cronScheduleAudit.state === "drift"
+                ? `Cron catalog drift: ${snapshot.cronScheduleAudit.reason ?? "Review the entries below."}`
+                : `Cron catalog matches ${snapshot.cronScheduleAudit.expectedCount} expected schedules.`}
+              {` Registry migration ${snapshot.cronScheduleAudit.registryHead}; observed ${snapshot.cronScheduleAudit.observedCount ?? "unknown"} rows.`}
+            </p>
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full text-left text-sm">
+                <caption className="sr-only">Expected and observed cron schedule entries</caption>
+                <thead className="border-b border-border text-xs text-muted-foreground">
+                  <tr><th scope="col" className="p-3">Job</th><th scope="col" className="p-3">Expected</th>
+                    <th scope="col" className="p-3">Observed</th><th scope="col" className="p-3">Catalog result</th></tr>
+                </thead>
+                <tbody>{snapshot.cronScheduleAudit.rows.map((row) =>
+                  <tr key={row.name} className="border-b border-border last:border-b-0">
+                    <th scope="row" className="p-3 font-mono font-normal">{row.name}</th>
+                    <td className="p-3 font-mono">{row.expectedSchedule ?? "Not registered"}</td>
+                    <td className="p-3 font-mono">{row.observed.length
+                      ? row.observed.map((item) => `${item.schedule} (${item.active ? "active" : "inactive"})`).join("; ")
+                      : "Missing"}</td>
+                    <td className="p-3">{row.issues.length
+                      ? row.issues.map((issue) => CRON_ISSUE_LABELS[issue] ?? "Unrecognized issue").join("; ")
+                      : "Matches registry"}</td>
+                  </tr>)}</tbody>
+              </table>
+            </div>
+          </>}
       </section>
 
       <section aria-label="Client configuration" className="space-y-3">
@@ -298,7 +351,7 @@ export function SystemReadinessPanel() {
           <p className="mt-1 text-sm">Proof destinations: {client.proofDestinations.length ? client.proofDestinations.map((destination) => `${destination.key} ${state(destination.enabled)}${destination.hasAccountRef ? " (account linked)" : ""}`).join(" · ") : "None configured"}</p>
           <p className="mt-1 text-sm">Sales agent deployments: {client.salesAgentDeployments.length ? client.salesAgentDeployments.map((deployment) => `${deployment.pageId ?? deployment.id} ${state(deployment.enabled)}`).join(" · ") : "None configured"}</p>
           <ul className="mt-2 space-y-1 text-sm">{client.integrations.map((integration, index) =>
-            <li key={`${integration.provider}-${index}`}>{integration.provider}: {integration.status}; ingest {state(integration.ingestEnabled)}; credential {integration.hasCredential ? "present" : "missing"}; checked {stamp(integration.lastCheckedAt)}; token expiry {stamp(integration.tokenExpiresAt)}; account IDs {Object.entries(integration.accountIds).filter(([, value]) => value).map(([key, value]) => `${key} ${value}`).join(", ") || "Unknown"}</li>)}</ul>
+            <li key={`${integration.provider}-${index}`}>{integration.provider}: {integration.status}; ingest {state(integration.ingestEnabled)}; credential {integration.hasCredential ? "present" : "missing"}; last recorded integration check {stamp(integration.lastCheckedAt)}; token expiry {stamp(integration.tokenExpiresAt)}; account IDs {Object.entries(integration.accountIds).filter(([, value]) => value).map(([key, value]) => `${key} ${value}`).join(", ") || "Unknown"}; live provider health {integration.providerHealth?.state === "observed" ? "Recorded" : integration.providerHealth?.state === "error" ? "Could not verify" : "Unknown"}{integration.providerHealth?.reason && <span className="block text-xs text-muted-foreground">{integration.providerHealth.reason}</span>}</li>)}</ul>
         </div>)}
       </section>
 

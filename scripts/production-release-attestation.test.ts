@@ -25,7 +25,7 @@ const candidate = {
   checks: NAMES.map((name) => ({ name, head_sha: HEAD, run_id: '41005193831',
     conclusion: 'success' })),
   migrations: [{ version: '20261101040000',
-    filename: '20261101040000_287_organic_schedule_route.sql', sha256: HASH }],
+    filename: '20261101040000_290_organic_schedule_route.sql', sha256: HASH }],
   schema: { current_head: '20261101033000', target_head: '20261101040000' },
   deployment: { browser_pr_head_sha: HEAD },
 }

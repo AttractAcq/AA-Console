@@ -129,7 +129,7 @@ beforeAll(async () => {
   for (const name of [
     "20261019110000_220_carousels_go_out_whole.sql",
     "20261019120000_221_a_story_is_many_posts.sql",
-    "20261101040000_287_organic_schedule_route.sql",
+    "20261101040000_290_organic_schedule_route.sql",
   ]) await db.exec(await migration(name));
 }, 60000);
 

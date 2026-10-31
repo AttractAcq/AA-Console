@@ -7,6 +7,7 @@ const { from, rpc, getAAL } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), g
 vi.mock("../../lib/supabase", () => ({ supabase: {
   from, rpc, auth: { mfa: { getAuthenticatorAssuranceLevel: getAAL } },
 } }));
+vi.mock("./ApprovalCoveragePanel", () => ({ ApprovalCoveragePanel: () => null }));
 vi.mock("react-router-dom", async (original) => ({
   ...(await original<typeof import("react-router-dom")>()),
   useParams: () => ({ clientId: "client-1" }),
@@ -91,54 +92,33 @@ const readyRecruitment = {
   owner_role: "admin", owning_path: "/team?tab=recruitment",
 };
 
-const invitationSourceId = "11111111-1111-4111-8111-111111111111";
-const invitationHash = "e".repeat(64);
-const readyInvitation = {
+const salesRequestId = "11111111-1111-4111-8111-111111111111";
+const salesHash = "f".repeat(64);
+const readySales = {
   ...request,
-  id: "33333333-3333-4333-8333-333333333333", client_id: null,
-  source_system: "auth", source_kind: "console_invitation",
-  source_id: invitationSourceId, source_version: invitationHash,
-  artifact_hash: invitationHash, title: "Invite New Editor",
-  expires_at: "2035-01-01T00:00:00Z", destination: "new@example.com",
-  account_ref: "auth@attractacq.com", budget: null,
+  id: "sales-inbox-1", source_system: "aa_console", source_kind: "client_sales_entitlement",
+  source_id: salesRequestId, source_version: salesHash, artifact_hash: salesHash,
+  title: "Grant sales access", source_state: "pending",
+  requested_by: "admin-1", requester_kind: "human", requester_ref: null,
+  expires_at: "2030-01-01T00:00:00Z",
   preview: {
-    recipient_email: "new@example.com", sender_account: "auth@attractacq.com",
-    target_role: "employee", target_member_id: "22222222-2222-4222-8222-222222222222",
-    target_client_id: null, team_category: "editors", team_member_generation: 0,
-    full_name: "New Editor", redirect_origin: "https://console.attractacq.com",
-    redirect_url: `https://console.attractacq.com/invite/accept?request=${invitationSourceId}`,
-    auth_project_origin: "https://project.supabase.co",
-    sender_verification_id: "44444444-4444-4444-8444-444444444444",
-    smtp_evidence_sha256: "b".repeat(64), template_subject: "Your AA Console invitation",
-    template_body: "Use this invitation link.", template_sha256: "c".repeat(64),
-    expires_at: "2035-01-01T00:00:00Z",
+    action: "grant", client_name: "Service Client", member_name: "Employee One",
+    client_id: "client-1", member_id: "member-1", bound_user_id: "employee-1",
+    permission: "Read and manage this client's leads and conversations",
   },
-  scope: { target_role: "employee", target_member_id: "22222222-2222-4222-8222-222222222222",
-    target_client_id: null },
-  owner_role: "admin", owning_path: "/approvals",
+  destination: "client_sales_os:client-1", account_ref: "employee-1", budget: null,
+  scope: {
+    client_id: "client-1", member_id: "member-1", bound_user_id: "employee-1",
+    action: "grant", scope_hash: salesHash,
+  },
+  owner_role: "admin", preview_blocker: null,
+  owning_path: "/clients/client-1/delivery/sales-os?tab=leads",
 };
 
-const releaseHash = "f".repeat(64);
-const releaseHead = "a".repeat(40);
-const readyRelease = {
-  ...request,
-  id: "release-request-1", client_id: null, source_system: "aa_console",
-  source_kind: "production_release",
-  source_id: "55555555-5555-4555-8555-555555555555",
-  source_version: releaseHash, artifact_hash: releaseHash,
-  title: "Production release PR #301", status: "pending", source_state: "pending",
-  expires_at: "2035-01-01T00:00:00Z", owner_role: "admin", preview_blocker: null,
-  preview: {
-    candidate: { repository: "AttractAcq/AA-Console", pr: { number: "301", head_sha: releaseHead } },
-    trusted_github_evidence: {
-      premergePrHeadSha: releaseHead, packetSha256: "b".repeat(64),
-      pr: { head: { sha: releaseHead } },
-      checks: { workflowRunId: "41005193831" },
-    },
-  },
-  scope: { pr_head_sha: releaseHead, migration_target_head: "20261101100000" },
-  destination: "AA-Console production release", account_ref: "prod-env",
-  owning_path: null,
+const readySalesRevoke = {
+  ...readySales, id: "sales-inbox-revoke", source_id: "22222222-2222-4222-8222-222222222222",
+  title: "Revoke sales access", preview: { ...readySales.preview, action: "revoke" },
+  scope: { ...readySales.scope, action: "revoke" },
 };
 
 function wireDatabase() {
@@ -192,19 +172,6 @@ beforeEach(() => {
 });
 
 describe("unified approval inbox", () => {
-  it("shows a held organic publication card on initial client load", async () => {
-    requests = [{ ...request, id: "organic-package-1",
-      source_system: "aa_console", source_kind: "organic_publication",
-      title: "Organic publication: instagram", status: "source_held",
-      source_state: "source_held", preview_blocker: "Exact outgoing AAL2 decision is not connected." }];
-    show();
-    const card = await screen.findByRole("article", { name: "Organic publication: instagram" });
-    expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue("all");
-    expect(within(card).getByText(/Exact outgoing AAL2 decision is not connected/))
-      .toBeInTheDocument();
-    expect(within(card).queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
-  });
-
   it("shows only manager-owned cards across assigned clients and no admin source links", async () => {
     requests = [
       { ...readyCampaign, id: "manager-client-1", title: "Client one action",
@@ -275,6 +242,68 @@ describe("unified approval inbox", () => {
     expect(historyIds.at(-1)).toHaveLength(1);
   });
 
+  it("applies exact source and client filters to requests beyond the first page", async () => {
+    requests = Array.from({ length: 60 }, (_, index) => ({
+      ...request, id: `request-${index}`, source_id: `action-${index}`,
+      title: index === 59 ? "Off-page source" : `Queued ${index}`,
+      client_id: index === 59 ? "client-59" : "client-1",
+      source_kind: index === 59 ? "future_source_kind" : "campaign_action",
+    }));
+    show("global");
+    expect(await screen.findByRole("article", { name: "Queued 0" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Off-page source" })).not.toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText("Client ID"), "client-59");
+    await userEvent.type(screen.getByLabelText("Source type"), "future_source_kind");
+    await userEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(await screen.findByRole("article", { name: "Off-page source" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Queued 0" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+    expect(clientEqValues).toContain("client-59");
+    expect(historyIds.at(-1)).toEqual(["request-59"]);
+  });
+
+  it("treats a literal all source kind as an exact filter, then clears it to any source", async () => {
+    const user = userEvent.setup();
+    requests = [
+      { ...request, id: "request-all", title: "Literal all source", source_kind: "all" },
+      { ...request, id: "request-campaign", title: "Campaign action source" },
+    ];
+    show("global");
+    expect(await screen.findByRole("article", { name: "Literal all source" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Campaign action source" })).toBeInTheDocument();
+
+    const sourceInput = screen.getByLabelText("Source type");
+    await user.type(sourceInput, "all");
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => expect(screen.queryByRole("article", { name: "Campaign action source" }))
+      .not.toBeInTheDocument());
+    expect(screen.getByRole("article", { name: "Literal all source" })).toBeInTheDocument();
+    expect(historyIds.at(-1)).toEqual(["request-all"]);
+    expect(screen.getByRole("status", { name: "", hidden: false })).toHaveTextContent("source all");
+
+    await user.clear(sourceInput);
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(await screen.findByRole("article", { name: "Campaign action source" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Literal all source" })).toBeInTheDocument();
+    expect(historyIds.at(-1)).toEqual(["request-all", "request-campaign"]);
+  });
+
+  it("filters agency-wide requests by a null client without inventing a client ID", async () => {
+    requests = [request, { ...request, id: "agency-1", client_id: null,
+      title: "Agency release decision" }];
+    show("global");
+    expect(await screen.findByRole("article", { name: "Build the Meta ad" }))
+      .toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Client ID"), "agency-wide");
+    await userEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(await screen.findByRole("article", { name: "Agency release decision" }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Build the Meta ad" }))
+      .not.toBeInTheDocument();
+    expect(clientEqValues).toEqual([]);
+  });
+
   it("makes missing exact preview and hash explicit without offering approval", async () => {
     requests = [{ ...request, preview: null, artifact_hash: null,
       preview_blocker: "Legacy request has no frozen words." }];
@@ -325,8 +354,6 @@ describe("unified approval inbox", () => {
       actor_aal: "aal2", reason: "Rights verified", decided_at: "2026-10-30T09:00:00Z" }];
     show();
     expect(await screen.findByText("Build the Meta ad")).toBeInTheDocument();
-    expect(screen.getByText("Proof placement")).toBeInTheDocument();
-    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "pending");
     expect(screen.queryByText("Proof placement")).not.toBeInTheDocument();
     await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "approved");
     expect(screen.getByText("Proof placement")).toBeInTheDocument();
@@ -335,7 +362,8 @@ describe("unified approval inbox", () => {
     expect(screen.getByText(/Human: human-1 · Assurance: aal2/)).toBeInTheDocument();
     expect(screen.getByText("Reason: Rights verified")).toBeInTheDocument();
     await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "all");
-    await user.selectOptions(screen.getByRole("combobox", { name: "Source type" }), "campaign_action");
+    await user.type(screen.getByLabelText("Source type"), "campaign_action");
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
     expect(screen.getByText("Build the Meta ad")).toBeInTheDocument();
     expect(screen.queryByText("Proof placement")).not.toBeInTheDocument();
     await user.type(screen.getByRole("searchbox", { name: "Search current page" }), "no match");
@@ -529,47 +557,6 @@ describe("unified approval inbox", () => {
     expect(rpc).not.toHaveBeenCalledWith("approve_recruitment_brief", expect.anything());
   });
 
-  it("decides an exact agency invitation in the global Inbox through its owning RPC", async () => {
-    requests = [readyInvitation];
-    rpc.mockImplementation(async () => {
-      requests = [{ ...readyInvitation, status: "approved", source_state: "source_decided" }];
-      decisions = [{ request_id: readyInvitation.id, decision: "approved", actor_id: "human-1",
-        actor_aal: "aal2", reason: null, decided_at: "2026-10-30T09:00:00Z" }];
-      return { data: null, error: null };
-    });
-    show("global");
-    const card = await screen.findByRole("article", { name: "Invite New Editor" });
-    expect(within(card).getByText("Auth invitation decision")).toBeInTheDocument();
-    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_console_invitation_v6", {
-      p_request_id: invitationSourceId,
-      p_expected_source_version: invitationHash,
-      p_expected_artifact_hash: invitationHash,
-      p_approved: true,
-    }));
-    expect(await screen.findByText("Decision history (1)")).toBeInTheDocument();
-  });
-
-  it("keeps agency invitation decisions out of the client Inbox", async () => {
-    requests = [readyInvitation];
-    show("client");
-    await waitFor(() => expect(screen.queryByRole("article", { name: "Invite New Editor" }))
-      .not.toBeInTheDocument());
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("re-reads the exact invitation preview before recording a decision", async () => {
-    requests = [readyInvitation];
-    freshRequest = { ...readyInvitation,
-      preview: { ...readyInvitation.preview, template_body: "Changed body" } };
-    show("global");
-    const card = await screen.findByRole("article", { name: "Invite New Editor" });
-    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
-    expect(await screen.findByText(/This exact request changed or is no longer pending/))
-      .toHaveAttribute("role", "alert");
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
   it("keeps blocked and changed recruitment cards read-only or rejects the click", async () => {
     const user = userEvent.setup();
     requests = [
@@ -634,6 +621,172 @@ describe("unified approval inbox", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it("shows exact sales scope and decides a staged grant through its AAL2 owning RPC", async () => {
+    const user = userEvent.setup();
+    requests = [readySales];
+    rpc.mockImplementation(async () => {
+      requests = [{ ...readySales, status: "approved", source_state: "source_decided" }];
+      decisions = [{ request_id: readySales.id, decision: "approved", actor_id: "admin-1",
+        actor_aal: "aal2", reason: "Approved from unified Approval Inbox",
+        decided_at: "2026-10-30T09:00:00Z" }];
+      return { data: null, error: null };
+    });
+    show("global");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    expect(within(card).getByText(/Employee One/)).toBeInTheDocument();
+    expect(within(card).getAllByText(/member-1/)).toHaveLength(2);
+    expect(within(card).getByText(/Before enabling access, audit every approved, unrevoked grant/)).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "Open sales access requests" }))
+      .toHaveAttribute("href", "/clients/client-1/delivery/sales-os?tab=leads");
+    await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_sales_entitlement", {
+      p_request_id: salesRequestId, p_scope_hash: salesHash,
+      p_approve: true, p_note: "Approved from unified Approval Inbox",
+    }));
+    await waitFor(() => expect(screen.getByText("Decision history (1)")).toBeInTheDocument());
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("uses the exact sales revoke source and requires a reason for rejection", async () => {
+    const user = userEvent.setup();
+    requests = [readySalesRevoke];
+    show("global");
+    const card = await screen.findByRole("article", { name: "Revoke sales access" });
+    expect(within(card).getByText("Sales access decision")).toBeInTheDocument();
+    const reject = within(card).getByRole("button", { name: "Reject with reason" });
+    expect(reject).toBeDisabled();
+    await user.type(within(card).getByRole("textbox", { name: "Reason to reject" }), " Wrong account ");
+    await user.click(reject);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_sales_entitlement", {
+      p_request_id: readySalesRevoke.source_id, p_scope_hash: salesHash,
+      p_approve: false, p_note: "Wrong account",
+    }));
+  });
+
+  it("closes an expired sales request by rejection and never offers approval", async () => {
+    const user = userEvent.setup();
+    requests = [{ ...readySales, status: "expired", expires_at: "2020-01-01T00:00:00Z" }];
+    show("global");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "expired");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    await user.type(within(card).getByRole("textbox", { name: "Reason to reject" }), "Window closed");
+    await user.click(within(card).getByRole("button", { name: "Reject with reason" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_sales_entitlement", {
+      p_request_id: salesRequestId, p_scope_hash: salesHash,
+      p_approve: false, p_note: "Window closed",
+    }));
+  });
+
+  it("offers only reasoned rejection when the live sales target becomes held", async () => {
+    const user = userEvent.setup();
+    requests = [{ ...readySales, status: "source_held", source_state: "source_held" }];
+    show("global");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "source_held");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    expect(within(card).getAllByText(/only be closed with a reasoned rejection/)).toHaveLength(2);
+    await user.type(within(card).getByRole("textbox", { name: "Reason to reject" }), "Employee account relinked");
+    await user.click(within(card).getByRole("button", { name: "Reject with reason" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_sales_entitlement", {
+      p_request_id: salesRequestId, p_scope_hash: salesHash,
+      p_approve: false, p_note: "Employee account relinked",
+    }));
+  });
+
+  it("keeps sales grants read-only for managers and malformed or superseded scopes", async () => {
+    requests = [readySales];
+    show("manager", "/employee/approvals");
+    expect(await screen.findByRole("heading", { name: "Manager approval inbox" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Grant sales access" })).not.toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("renders an incomplete sales card without hiding another valid decision", async () => {
+    requests = [{ ...readySales, id: "sales-incomplete", preview: null }, readySales];
+    show("global");
+    expect(await screen.findAllByRole("article", { name: "Grant sales access" })).toHaveLength(2);
+    // Both rows share a title; locate the blocked row by its projection ID.
+    const blocked = document.getElementById("approval-sales-incomplete")?.closest("article");
+    expect(blocked).toBeInTheDocument();
+    expect(within(blocked as HTMLElement).getByText(/exact artifact preview is missing/i)).toBeInTheDocument();
+    expect(within(blocked as HTMLElement).queryByRole("button", { name: "Approve exact version" }))
+      .not.toBeInTheDocument();
+    const valid = document.getElementById("approval-sales-inbox-1")?.closest("article");
+    expect(valid).toBeInTheDocument();
+    expect(within(valid as HTMLElement).getByRole("button", { name: "Approve exact version" }))
+      .toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["wrong owner", { owner_role: "admin_or_active_client_manager" }],
+    ["changed artifact", { artifact_hash: "e".repeat(64) }],
+    ["changed scope", { scope: { ...readySales.scope, member_id: "member-2" } }],
+    ["changed destination", { destination: "client_sales_os:another-client" }],
+    ["changed account", { account_ref: "employee-2" }],
+    ["changed action", { preview: { ...readySales.preview, action: "revoke" } }],
+    ["missing frozen name", { preview: { ...readySales.preview, member_name: "" } }],
+    ["no human origin", { requester_kind: "service", requested_by: null }],
+    ["source decided", { status: "source_decided", source_state: "source_decided" }],
+  ])("keeps a sales card read-only with %s", async (_label, change) => {
+    requests = [{ ...readySales, ...change }];
+    show("global");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Status" }), "all");
+    const card = await screen.findByRole("article");
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Reject with reason" })).not.toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rechecks AAL2 and a fresh exact sales card before calling the source", async () => {
+    requests = [readySales];
+    getAAL.mockResolvedValueOnce({ data: { currentLevel: "aal2" }, error: null })
+      .mockResolvedValue({ data: { currentLevel: "aal1" }, error: null });
+    show("global");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Complete MFA to reach AAL2/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a sales scope change between render and click", async () => {
+    requests = [readySales];
+    freshRequest = { ...readySales, scope: { ...readySales.scope, member_id: "member-2" } };
+    show("global");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByText(/This exact request changed or is no longer pending/))
+      .toHaveAttribute("role", "alert");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["requester", { requested_by: "admin-2" }],
+    ["request timestamp", { requested_at: "2026-10-30T08:00:01Z" }],
+    ["title", { title: "Revoke sales access" }],
+  ])("rejects a %s change between render and click", async (_label, change) => {
+    requests = [readySales];
+    freshRequest = { ...readySales, ...change };
+    show("global");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByText(/This exact request changed or is no longer pending/))
+      .toHaveAttribute("role", "alert");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a rejected sales source RPC without claiming a decision", async () => {
+    requests = [readySales];
+    rpc.mockResolvedValue({ data: null, error: { message: "The team member identity changed." } });
+    show("global");
+    const card = await screen.findByRole("article", { name: "Grant sales access" });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The team member identity changed.");
+    expect(await within(await screen.findByRole("article", { name: "Grant sales access" }))
+      .findByRole("button", { name: "Approve exact version" })).toBeInTheDocument();
+  });
+
   it("shows every client and the house client in the admin global Inbox with safe source links", async () => {
     requests = [
       { ...request, id: "first", title: "First client", client_id: "client-1",
@@ -658,101 +811,10 @@ describe("unified approval inbox", () => {
     expect(within(screen.getByRole("article", { name: "House recruitment" }))
       .getByRole("link", { name: "View owning source" }))
       .toHaveAttribute("href", "/team?tab=recruitment");
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Client" }), "client-2");
-    expect(screen.getByText("Second client")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Client ID"), "client-2");
+    await userEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    expect(await screen.findByText("Second client")).toBeInTheDocument();
     expect(screen.queryByText("House recruitment")).not.toBeInTheDocument();
-  });
-
-  it("shows a held agency-wide release card by default without decision controls", async () => {
-    requests = [{ ...request, id: "release-1", client_id: null,
-      source_system: "aa_console", source_kind: "production_release", title: "Production release PR #271",
-      status: "source_held", source_state: "source_held",
-      preview_blocker: "Release checks and deployment are not independently attested." }];
-    show("global");
-    const card = await screen.findByRole("article", { name: "Production release PR #271" });
-    expect(screen.getByRole("combobox", { name: "Status" })).toHaveValue("all");
-    expect(within(card).getByText("Agency-wide")).toBeInTheDocument();
-    expect(within(card).getAllByRole("alert")[0]).toHaveTextContent("not independently attested");
-    expect(within(card).queryByRole("button", { name: "Approve exact version" }))
-      .not.toBeInTheDocument();
-    expect(within(card).queryByRole("button", { name: "Reject with reason" }))
-      .not.toBeInTheDocument();
-  });
-
-  it("decides only a trusted, fresh release plan from the global Inbox", async () => {
-    requests = [readyRelease];
-    rpc.mockImplementation(async () => {
-      requests = [{ ...readyRelease, status: "approved" }];
-      decisions = [{ request_id: readyRelease.id, decision: "approved", actor_id: "human-1",
-        actor_aal: "aal2", reason: null, decided_at: "2026-10-30T09:00:00Z" }];
-      return { data: null, error: null };
-    });
-    show("global");
-    const card = await screen.findByRole("article", { name: "Production release PR #301" });
-    expect(within(card).getByText("Production release plan decision")).toBeInTheDocument();
-    expect(within(card).getByText(/Merge, migration, Railway and Pages each require/))
-      .toBeInTheDocument();
-    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith(
-      "decide_production_release_candidate_v6", {
-        p_request_id: readyRelease.id,
-        p_expected_source_version: releaseHash,
-        p_expected_artifact_hash: releaseHash,
-        p_expected_packet_sha256: "b".repeat(64),
-        p_decision: "approved",
-        p_reason: "",
-      },
-    ));
-    expect(await screen.findByText("Decision history (1)")).toBeInTheDocument();
-  });
-
-  it("rejects a release click when the verified PR head changes before decision", async () => {
-    requests = [readyRelease];
-    freshRequest = { ...readyRelease,
-      preview: { ...readyRelease.preview,
-        trusted_github_evidence: {
-          ...readyRelease.preview.trusted_github_evidence,
-          premergePrHeadSha: "c".repeat(40),
-        },
-      },
-    };
-    show("global");
-    const card = await screen.findByRole("article", { name: "Production release PR #301" });
-    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
-    expect(await screen.findByText(/This exact request changed or is no longer pending/))
-      .toHaveAttribute("role", "alert");
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("allows an AAL2 admin to revoke an approved release plan after proof ages out", async () => {
-    requests = [{ ...readyRelease, status: "source_held", source_state: "source_held",
-      preview_blocker: "Refresh trusted GitHub evidence" }];
-    decisions = [{ request_id: readyRelease.id, decision: "approved", actor_id: "human-1",
-      actor_aal: "aal2", reason: null, decided_at: "2026-10-30T09:00:00Z",
-      event_order: 3 }];
-    rpc.mockImplementation(async () => {
-      requests = [{ ...readyRelease, status: "revoked" }];
-      decisions = [{ request_id: readyRelease.id, decision: "revoked", actor_id: "human-1",
-        actor_aal: "aal2", reason: "Plan changed", decided_at: "2026-10-30T09:15:00Z",
-        event_order: 4 }];
-      return { data: null, error: null };
-    });
-    show("global");
-    const card = await screen.findByRole("article", { name: "Production release PR #301" });
-    expect(within(card).queryByRole("button", { name: "Reject with reason" })).not.toBeInTheDocument();
-    await userEvent.type(within(card).getByRole("textbox", { name: "Reason to revoke" }),
-      "Plan changed");
-    await userEvent.click(within(card).getByRole("button", { name: "Revoke with reason" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith(
-      "decide_production_release_candidate_v6", {
-        p_request_id: readyRelease.id,
-        p_expected_source_version: releaseHash,
-        p_expected_artifact_hash: releaseHash,
-        p_expected_packet_sha256: "b".repeat(64),
-        p_decision: "revoked",
-        p_reason: "Plan changed",
-      },
-    ));
   });
 
   it("uses a global card's own client for a fresh exact-version decision read", async () => {

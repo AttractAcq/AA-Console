@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Check, ChevronRight, CircleDashed, CircleDot } from "lucide-react";
 import { FormModal } from "../../components/forms/FormModal";
 import type { FieldDef } from "../../components/forms/fields";
 import { supabase } from "../../lib/supabase";
+import { integrationRowsAreValid, providerReadiness, type ReadinessCheck } from "../../lib/integrationReadiness";
 import { cn } from "../../lib/cn";
 import {
   ONBOARDING_STEPS,
+  SYNCING_PROVIDERS,
   missingFor,
   nextStep,
   progress,
@@ -140,18 +142,26 @@ export function OnboardingPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [data, setData] = useState<OnboardingData | null>(null);
   const [openStep, setOpenStep] = useState<OnboardingStep | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<{ clientId: string; message: string } | null>(null);
+  const [notice, setNotice] = useState<{ clientId: string; message: string } | null>(null);
+  const activeClient = useRef<string | null>(null);
+  const requestGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
-    if (!clientId) return;
+    // A late save, retry or network response from the previous route must not
+    // supersede the new client's request or leave its page stuck loading.
+    if (!clientId || activeClient.current !== clientId) return;
+    const generation = ++requestGeneration.current;
+    const isCurrent = () => activeClient.current === clientId && requestGeneration.current === generation;
     setLoadError(null);
     try {
       const [contact, business, brand, integrations, manual] = await Promise.all([
         supabase.from("client_contact_details").select("*").eq("client_id", clientId).maybeSingle(),
         supabase.from("client_business_context").select("*").eq("client_id", clientId).maybeSingle(),
         supabase.from("client_brand_profiles").select("*").eq("client_id", clientId).maybeSingle(),
-        supabase.from("client_integrations").select("provider").eq("client_id", clientId),
+        supabase.from("client_integrations")
+          .select("client_id, provider, credential_secret_id, credential_label, ad_account_id, status, token_expires_at, last_checked_at, ingest_enabled")
+          .eq("client_id", clientId),
         supabase
           .from("client_onboarding_steps")
           .select("step_key, status")
@@ -165,25 +175,38 @@ export function OnboardingPanel() {
       // not tell.
       const failed = [contact, business, brand, integrations, manual].find((r) => r.error);
       if (failed?.error) throw new Error(failed.error.message);
+      if (!integrationRowsAreValid(integrations.data, clientId)) {
+        throw new Error("Integration readiness is unavailable or returned another client's data.");
+      }
+      if (!isCurrent()) return;
 
       setData({
+        clientId,
+        observedAtMs: Date.now(),
         contact: (contact.data as Record<string, unknown> | null) ?? null,
         business: (business.data as Record<string, unknown> | null) ?? null,
         brand: (brand.data as Record<string, unknown> | null) ?? null,
-        integrations: (integrations.data as { provider: string }[] | null) ?? [],
+        integrations: integrations.data,
         // start_onboarding seeds "onboarding_call"; the model calls it "call".
         manualComplete: ((manual.data as { step_key: string }[] | null) ?? [])
           .filter((r) => r.step_key === CALL_STEP_KEY)
           .map(() => "call" as StepKey),
       });
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Could not load onboarding.");
+      if (isCurrent()) {
+        setLoadError({ clientId, message: error instanceof Error ? error.message : "Could not load onboarding." });
+      }
     }
   }, [clientId]);
 
   useEffect(() => {
+    activeClient.current = clientId ?? null;
     void refresh();
-  }, [refresh]);
+    return () => {
+      activeClient.current = null;
+      requestGeneration.current += 1;
+    };
+  }, [clientId, refresh]);
 
   const next = useMemo(() => (data ? nextStep(data) : null), [data]);
 
@@ -191,7 +214,7 @@ export function OnboardingPanel() {
     if (!clientId) return;
     const { error } = await supabase.rpc("start_onboarding", { p_client_id: clientId });
     if (error) {
-      setLoadError(error.message);
+      setLoadError({ clientId, message: error.message });
       return;
     }
     await supabase
@@ -199,24 +222,36 @@ export function OnboardingPanel() {
       .update({ status: "complete", completed_at: new Date().toISOString() })
       .eq("client_id", clientId)
       .eq("step_key", CALL_STEP_KEY);
-    setNotice("Call marked done.");
+    setNotice({ clientId, message: "Call marked done." });
     void refresh();
   }
 
-  if (loadError) {
+  if (loadError && loadError.clientId === clientId) {
     return (
       <div role="alert" className="text-sm text-destructive">
-        <p>{loadError}</p>
+        <p>{loadError.message}</p>
         <button type="button" onClick={() => void refresh()} className="mt-2 underline">
           Retry
         </button>
       </div>
     );
   }
-  if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (!data || data.clientId !== clientId) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
   const { done, total } = progress(data);
   const form = openStep ? FORM[openStep.key] : undefined;
+  const providerChecks = SYNCING_PROVIDERS.map((provider) => providerReadiness(provider, data.integrations, data.clientId, data.observedAtMs));
+  const dryRunState = providerChecks.some((check) => check.overall === "blocked") ? "Blocked" : "Unknown";
+
+  const renderCheck = (label: string, check: ReadinessCheck) => (
+    <li key={label} className="text-xs text-muted-foreground">
+      <span className="font-medium text-foreground">{label}:</span>{" "}
+      <span className={check.state === "blocked" ? "font-medium text-destructive" : "font-medium text-amber-900"}>
+        {check.state === "blocked" ? "Blocked" : "Unknown"}
+      </span>{" "}
+      — {check.reason}
+    </li>
+  );
 
   return (
     <div className="space-y-4">
@@ -233,9 +268,9 @@ export function OnboardingPanel() {
         </span>
       </div>
 
-      {notice && (
+      {notice?.clientId === clientId && (
         <p role="status" className="text-sm text-brand-strong">
-          {notice}
+          {notice.message}
         </p>
       )}
 
@@ -323,6 +358,46 @@ export function OnboardingPanel() {
         })}
       </ol>
 
+      <section aria-label="Provider activation dry run" className="rounded-lg border border-border bg-card p-4">
+        <h3 className="text-sm font-semibold text-card-foreground">Provider activation dry run</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Read-only check for this client. Current result: <span className="font-medium text-foreground">{dryRunState}</span>.
+          A stored provider row or account ID does not verify live access. Account, scope and action
+          checks have no persisted provider diagnostic yet, so this cannot mark the client Ready or
+          switch on distribution. Every external action still requires exact-version Approval Inbox approval.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Metadata read {new Date(data.observedAtMs).toLocaleString()}.{" "}
+          <button type="button" onClick={() => void refresh()} className="text-brand-strong hover:underline">
+            Refresh readiness
+          </button>
+        </p>
+        <div className="mt-3 space-y-3">
+          {providerChecks.map((check) => (
+            <div key={check.provider} className="rounded-md border border-border p-3">
+              <h4 className="text-xs font-semibold capitalize text-card-foreground">
+                {check.provider} · {check.overall === "blocked" ? "Blocked" : "Unknown"}
+              </h4>
+              <ul className="mt-1 space-y-1">
+                {renderCheck("Credential", check.credential)}
+                {renderCheck("Exact account", check.account)}
+                {renderCheck("Required scopes", check.scopes)}
+                {renderCheck("Action rights", check.action)}
+                {renderCheck("Daily metrics sync", check.dailySync)}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Other activation prerequisites, including signed inputs, consent, budget, approval owner,
+          delivery switches and live due-view results, are not evaluated by this provider check.
+          Review the client modules before any activation decision.
+        </p>
+        <Link to={`/clients/${clientId}/account/integrations`} className="mt-2 inline-block text-xs text-brand-strong hover:underline">
+          Review integrations
+        </Link>
+      </section>
+
       {openStep && form && (
         <FormModal
           open={openStep !== null}
@@ -356,7 +431,8 @@ export function OnboardingPanel() {
             if (error) throw error;
           }}
           onSaved={() => {
-            setNotice(`Saved to ${openStep.livesAt.label}.`);
+            if (activeClient.current !== data.clientId) return;
+            setNotice({ clientId: data.clientId, message: `Saved to ${openStep.livesAt.label}.` });
             setOpenStep(null);
             void refresh();
           }}

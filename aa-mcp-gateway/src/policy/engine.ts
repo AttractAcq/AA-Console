@@ -41,6 +41,7 @@ export class ActionEngine {
     raw: unknown,
     request_id: string = randomUUID(),
     approvedId?: string,
+    approvalTokenId?: string,
   ): Promise<Result> {
     const tool = this.tools.find((t) => t.name === name);
     let input: Record<string, unknown> = {};
@@ -272,6 +273,7 @@ export class ActionEngine {
         (!approved ||
           approved.status !== "approved" ||
           approved.requested_by_bot !== identity.bot ||
+          (approved.request_token_id ?? null) !== (approvalTokenId ?? null) ||
           approved.tool !== name ||
           canonical(approved.structured_payload) !== canonical(input) ||
           Date.parse(approved.expires_at) <= Date.now())
@@ -287,6 +289,7 @@ export class ActionEngine {
         this.store.approval({
           approval_id,
           requested_by_bot: identity.bot,
+          request_token_id: approvalTokenId ?? null,
           requested_action: name,
           tool: name,
           target:
@@ -378,14 +381,23 @@ export class ActionEngine {
       return a;
     });
   }
-  async executeApproval(id: string, identities: Identity[]) {
+  async executeApproval(
+    id: string,
+    identities: Identity[],
+    approvalTokenId?: string,
+  ) {
     const a = this.store.getApproval(id);
     const identity = identities.find((i) => i.bot === a?.requested_by_bot);
+    const tool = this.tools.find((t) => t.name === a?.tool);
     if (
       !a ||
       a.status !== "approved" ||
       a.execution_status !== "not_started" ||
-      !identity
+      !identity ||
+      (a.request_token_id ?? null) !== (approvalTokenId ?? null) ||
+      !tool ||
+      !allowed(identity, tool) ||
+      !identity.clients.includes(String(a.client_id))
     )
       throw new Error("invalid_transition");
     // Synchronous reservation prevents concurrent reviewers from executing the same action.
@@ -397,6 +409,7 @@ export class ActionEngine {
       a.structured_payload,
       randomUUID(),
       id,
+      approvalTokenId,
     );
     a.execution_status = result.status;
     a.status = ["completed", "accepted"].includes(result.status)

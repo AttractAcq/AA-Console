@@ -139,7 +139,7 @@ beforeAll(async () => {
     select set_config('request.jwt.claim.role','service_role',false);
   `); } catch (error) { throw new Error(`fixture failed: ${String(error)}`); }
   const source = await readFile(new URL(
-    "../../supabase/migrations/20261101090000_292_organic_publication_package_boundary.sql",
+    "../../supabase/migrations/20261101090000_295_organic_publication_package_boundary.sql",
     import.meta.url,
   ), "utf8");
   try { await db.exec(source); } catch (error) {

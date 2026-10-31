@@ -293,7 +293,7 @@ describe("migration 260 remains a prerequisite", () => {
 
     // Apply the B014 credential gate and its Google build replacements against
     // the same prerequisite schema used by the existing build tests.
-    const b014 = await sql("20261101080000_291_integration_credential_eligibility.sql");
+    const b014 = await sql("20261101080000_294_integration_credential_eligibility.sql");
     await db.exec(b014.split("create or replace function public.enqueue_metrics_ingest_jobs")[0]!);
     await db.exec(
       b014.split("-- Google Ads account binding and its due view may not use a stricter label-only test.")[1]!

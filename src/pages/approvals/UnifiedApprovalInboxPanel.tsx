@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import { supabase } from "../../lib/supabase";
-import { invitationApprovalBlocker, invitationCanApprove, invitationCanReject } from "../../lib/invitationApproval";
 import type { Database } from "../../types/database";
+import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 
 const PAGE_SIZE = 50;
+const RELEASED_SOURCE_KINDS = [
+  "campaign_action", "client_sales_entitlement", "engine_slot",
+  "google_review_reply", "recruitment_brief",
+] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
 /**
@@ -179,70 +183,63 @@ function isRecruitmentBriefApprovalReady(request: UnifiedApprovalRequest, client
     && scope.media_type === "image" && scope.apply_url === preview.apply_url;
 }
 
+function isSalesEntitlementRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "client_sales_entitlement"
+    || request.owner_role !== "admin" || request.client_id !== clientId
+    || !(["pending", "expired", "source_held"].includes(request.status))
+    || !(["pending", "source_held"].includes(request.source_state ?? ""))
+    || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const action = preview.action;
+  const hash = request.source_version;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(request.source_id)
+    && /^[0-9a-f]{64}$/.test(hash)
+    && request.artifact_hash === hash && scope.scope_hash === hash
+    && (action === "grant" || action === "revoke") && scope.action === action
+    && request.title === (action === "grant" ? "Grant sales access" : "Revoke sales access")
+    && typeof preview.client_name === "string" && !!preview.client_name.trim()
+    && typeof preview.member_name === "string" && !!preview.member_name.trim()
+    && preview.permission === "Read and manage this client's leads and conversations"
+    && preview.client_id === clientId && scope.client_id === clientId
+    && typeof preview.member_id === "string" && !!preview.member_id
+    && scope.member_id === preview.member_id
+    && typeof preview.bound_user_id === "string" && !!preview.bound_user_id
+    && scope.bound_user_id === preview.bound_user_id
+    && request.account_ref === preview.bound_user_id
+    && request.destination === `client_sales_os:${clientId}`
+    && request.requester_kind === "human" && !!request.requested_by;
+}
+
+function isSalesEntitlementApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  return isSalesEntitlementRejectionReady(request, clientId)
+    && request.status === "pending" && request.source_state === "pending" && !isExpired(request);
+}
+
 function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignRejectionReady(request, clientId)
-    || isGoogleReplyRejectionReady(request, clientId);
-}
-
-function isInvitation(request: UnifiedApprovalRequest): boolean {
-  return request.source_system === "auth" && request.source_kind === "console_invitation";
-}
-
-function isProductionRelease(request: UnifiedApprovalRequest): boolean {
-  return request.source_system === "aa_console"
-    && request.source_kind === "production_release"
-    && request.client_id === null && request.owner_role === "admin"
-    && request.source_version === request.artifact_hash
-    && /^[0-9a-f]{64}$/.test(request.source_version)
-    && typeof request.source_id === "string" && /^[0-9a-f-]{36}$/i.test(request.source_id);
-}
-
-function releaseProofHash(request: UnifiedApprovalRequest): string | null {
-  const preview = request.preview as Record<string, unknown> | null;
-  const proof = preview?.trusted_github_evidence as Record<string, unknown> | undefined;
-  return typeof proof?.packetSha256 === "string"
-    && /^[0-9a-f]{64}$/.test(proof.packetSha256)
-    ? proof.packetSha256 : null;
-}
-
-function releaseCanApprove(request: UnifiedApprovalRequest): boolean {
-  if (!isProductionRelease(request) || request.status !== "pending"
-    || request.source_state !== "pending" || isExpired(request)
-    || previewMissing(request)) return false;
-  const preview = request.preview as Record<string, unknown>;
-  const candidate = preview?.candidate as Record<string, unknown> | undefined;
-  const proof = preview?.trusted_github_evidence as Record<string, unknown> | undefined;
-  const pr = candidate?.pr as Record<string, unknown> | undefined;
-  const verifiedPr = proof?.pr as Record<string, unknown> | undefined;
-  const head = verifiedPr?.head as Record<string, unknown> | undefined;
-  return candidate?.repository === "AttractAcq/AA-Console"
-    && pr?.head_sha === head?.sha
-    && proof?.premergePrHeadSha === head?.sha
-    && releaseProofHash(request) !== null;
-}
-
-function releaseCanReject(request: UnifiedApprovalRequest): boolean {
-  return isProductionRelease(request)
-    && (request.status === "pending" || request.status === "source_held"
-      || request.status === "expired");
-}
-
-function releaseCanRevoke(request: UnifiedApprovalRequest, latestDecision?: string): boolean {
-  return isProductionRelease(request) && latestDecision === "approved"
-    && (request.status === "approved" || request.status === "source_held"
-      || request.status === "expired");
+    || isGoogleReplyRejectionReady(request, clientId)
+    || isSalesEntitlementRejectionReady(request, clientId);
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignApprovalReady(request, clientId)
     || isGoogleReplyApprovalReady(request, clientId)
-    || isRecruitmentBriefApprovalReady(request, clientId);
+    || isRecruitmentBriefApprovalReady(request, clientId)
+    || isSalesEntitlementApprovalReady(request, clientId);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
   return left.id === right.id && left.source_id === right.source_id
     && left.client_id === right.client_id && left.source_system === right.source_system
     && left.source_kind === right.source_kind && left.owner_role === right.owner_role
+    && left.title === right.title && left.requested_at === right.requested_at
+    && left.requested_by === right.requested_by
+    && left.requester_kind === right.requester_kind
+    && left.requester_ref === right.requester_ref
+    && left.owning_path === right.owning_path
     && left.source_version === right.source_version
     && left.status === right.status
     && left.source_state === right.source_state
@@ -271,34 +268,31 @@ function exactHtml(preview: unknown): string | null {
   return typeof html === "string" && html.trim() ? html : null;
 }
 
-function RequestCard({ request, history, clientId, manager, global, aal, busy, onDecide }: {
+function RequestCard({ request, history, clientId, manager, aal, busy, onDecide }: {
   request: UnifiedApprovalRequest;
   history: UnifiedApprovalDecision[];
   clientId: string;
   manager: boolean;
-  global: boolean;
   aal: "aal2" | "aal1" | "unavailable";
   busy: boolean;
-  onDecide: (request: UnifiedApprovalRequest, decision: "approved" | "rejected" | "revoked", reason?: string) => Promise<void>;
+  onDecide: (request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) => Promise<void>;
 }) {
   const [rejectionReason, setRejectionReason] = useState("");
-  const latestDecision = history[0]?.decision;
-  const blocker = isInvitation(request)
-    ? invitationApprovalBlocker(request) : previewMissing(request);
+  const location = useLocation();
+  const blocker = previewMissing(request);
   const sourcePath = manager ? null : sourcePathForRequest(request, clientId);
   const html = exactHtml(request.preview);
-  const canReject = (global && !manager && isInvitation(request) && invitationCanReject(request))
-    || (global && !manager && latestDecision !== "approved" && releaseCanReject(request))
-    || isRejectionReady(request, clientId);
-  const canApprove = (global && !manager && isInvitation(request) && invitationCanApprove(request))
-    || (global && !manager && releaseCanApprove(request))
-    || isApprovalReady(request, clientId);
-  const canRevoke = global && !manager && releaseCanRevoke(request, latestDecision);
-  const decisionLabel = isInvitation(request) ? "Auth invitation"
-    : isProductionRelease(request) ? "Production release plan"
-    : request.source_kind === "google_review_reply"
+  const salesGrant = request.source_kind === "client_sales_entitlement"
+    && request.preview !== null && typeof request.preview === "object"
+    && !Array.isArray(request.preview)
+    && (request.preview as Record<string, unknown>).action === "grant";
+  const salesManagerCard = manager && request.source_kind === "client_sales_entitlement";
+  const canReject = !salesManagerCard && isRejectionReady(request, clientId);
+  const canApprove = !salesManagerCard && isApprovalReady(request, clientId);
+  const decisionLabel = request.source_kind === "google_review_reply"
     ? "Google review reply" : request.source_kind === "recruitment_brief"
-      ? "Recruitment brief" : "Campaign action";
+      ? "Recruitment brief" : request.source_kind === "client_sales_entitlement"
+        ? "Sales access" : "Campaign action";
 
   return (
     <article className="rounded-xl border border-border bg-card p-5" aria-labelledby={`approval-${request.id}`}>
@@ -332,6 +326,10 @@ function RequestCard({ request, history, clientId, manager, global, aal, busy, o
         <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Exact artifact hash</dt><dd className="break-all font-mono text-xs">{request.artifact_hash || "Not supplied"}</dd></div>
       </dl>
 
+      {salesGrant && <p role="status" className="mt-4 text-xs text-muted-foreground">
+        Approving this grant records an entitlement for the exact client, team member and employee account above. It becomes active when system-wide sales access is enabled. Before enabling access, audit every approved, unrevoked grant.
+      </p>}
+
       {blocker ? (
         <p role="alert" className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           Incomplete preview: {blocker} This request is not decision-ready.
@@ -342,11 +340,9 @@ function RequestCard({ request, history, clientId, manager, global, aal, busy, o
       {request.source_state && request.source_state !== "pending"
         && request.status !== "approved" && request.status !== "rejected"
         && request.status !== "revoked" && <p role="alert" className="mt-3 text-sm text-destructive">
-          The owning source is {request.source_state.replaceAll("_", " ")}. {releaseCanRevoke(request, latestDecision)
-            ? "This approved release plan is held; you may revoke it with a reason."
-            : isProductionRelease(request) && releaseCanReject(request)
-              ? "This release plan cannot be approved in this state; you may close it with a reasoned rejection."
-              : "This card cannot be decided."}
+          The owning source is {request.source_state.replaceAll("_", " ")}. {canReject
+            ? "Approval is unavailable; this request can only be closed with a reasoned rejection."
+            : "This card cannot be decided."}
         </p>}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -389,21 +385,19 @@ function RequestCard({ request, history, clientId, manager, global, aal, busy, o
         )}
       </details>
 
-      {(canApprove || canReject || canRevoke) && (
+      {(canApprove || canReject) && (
         <div className="mt-4 space-y-3 rounded-lg border border-border p-3">
           <p className="text-sm font-medium">{decisionLabel} decision</p>
           <p className="text-xs text-muted-foreground">
             This calls the source owner for the exact version above. AAL2 is required;
             the source and database recheck the request before recording a decision.
           </p>
-          {isProductionRelease(request) && <p className="text-xs text-muted-foreground">
-            This decision records a release plan. Merge, migration, Railway and Pages each require their own exact-version effect gate and observed receipt.
-          </p>}
           {!canApprove && canReject && <p className="text-xs text-muted-foreground">
-            This request has expired. It can only be closed with a reasoned rejection.
+            This request cannot be approved. It can only be closed with a reasoned rejection.
           </p>}
           {aal !== "aal2" && <p role="status" className="text-sm text-destructive">
-            {aal === "aal1" ? "Complete MFA to reach AAL2 before deciding." : "MFA level could not be verified; decisions are unavailable."}
+            {aal === "aal1" ? "Complete MFA to reach AAL2 before deciding." : "MFA level could not be verified; decisions are unavailable."}{" "}
+            <Link to="/security/mfa" state={{ returnTo: `${location.pathname}${location.search}` }} className="underline">Open account security</Link>
           </p>}
           <div className="flex flex-wrap gap-2">
             {canApprove && <button type="button" disabled={busy || aal !== "aal2"}
@@ -411,8 +405,7 @@ function RequestCard({ request, history, clientId, manager, global, aal, busy, o
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
               Approve exact version
             </button>}
-            {(canReject || canRevoke) && <label className="min-w-48 flex-1 text-sm">
-              {canRevoke ? "Reason to revoke" : "Reason to reject"}
+            {canReject && <label className="min-w-48 flex-1 text-sm">Reason to reject
               <input value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)}
                 disabled={busy || aal !== "aal2"} className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
             </label>}
@@ -421,19 +414,17 @@ function RequestCard({ request, history, clientId, manager, global, aal, busy, o
               className="self-end rounded-lg border border-border px-4 py-2 text-sm font-medium disabled:opacity-50">
               Reject with reason
             </button>}
-            {canRevoke && <button type="button" disabled={busy || aal !== "aal2" || !rejectionReason.trim()}
-              onClick={() => void onDecide(request, "revoked", rejectionReason.trim())}
-              className="self-end rounded-lg border border-destructive/40 px-4 py-2 text-sm font-medium text-destructive disabled:opacity-50">
-              Revoke with reason
-            </button>}
           </div>
         </div>
       )}
 
       <div className="mt-4">
         {sourcePath ? (
-          <Link className="text-sm font-medium text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            to={sourcePath}>View owning source</Link>
+          <>
+            <Link className="text-sm font-medium text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              to={sourcePath}>{request.source_kind === "client_sales_entitlement"
+                ? "Open sales access requests" : "View owning source"}</Link>
+          </>
         ) : <span className="text-xs text-muted-foreground">
           {manager ? "Owning source is unavailable from the manager console." : "Owning source link unavailable."}
         </span>}
@@ -452,11 +443,11 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const initialSource = new URLSearchParams(location.search).get("source");
   const [requests, setRequests] = useState<UnifiedApprovalRequest[]>([]);
   const [decisions, setDecisions] = useState<UnifiedApprovalDecision[]>([]);
-  // Held exact-package requests must remain visible for clients as well as
-  // agency reviewers; a pending-only default hides them from the Inbox.
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [clientFilter, setClientFilter] = useState("all");
-  const [kindFilter, setKindFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(initialSource ? "all" : "pending");
+  const [clientFilter, setClientFilter] = useState<string | null>(null);
+  const [kindFilter, setKindFilter] = useState<string | null>(null);
+  const [clientFilterDraft, setClientFilterDraft] = useState("");
+  const [kindFilterDraft, setKindFilterDraft] = useState("");
   const [search, setSearch] = useState(initialSource ?? "");
   const [sourceDeepLink, setSourceDeepLink] = useState(initialSource);
   const [pageState, setPageState] = useState({ scopeKey, page: 0 });
@@ -479,9 +470,9 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       if (!multiClient) query = query.eq("client_id", clientId!);
       else if (manager) query = query.eq("owner_role", "admin_or_active_client_manager");
       else if (clientFilter === "agency-wide") query = query.is("client_id", null);
-      else if (clientFilter !== "all") query = query.eq("client_id", clientFilter);
+      else if (clientFilter !== null) query = query.eq("client_id", clientFilter);
       if (statusFilter !== "all") query = query.eq("status", statusFilter);
-      if (kindFilter !== "all") query = query.eq("source_kind", kindFilter);
+      if (kindFilter !== null) query = query.eq("source_kind", kindFilter);
       if (sourceDeepLink) query = query.eq("source_id", sourceDeepLink);
       // Fetch one sentinel row so the next-page control is based on evidence.
       // Each history query is then bounded to the 50 cards actually displayed.
@@ -537,22 +528,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
     void refresh();
   }
 
-  async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected" | "revoked", reason?: string) {
-    const agencyInvitation = global && isInvitation(request);
-    const agencyRelease = global && isProductionRelease(request);
-    if (decision === "revoked" && !agencyRelease) return;
+  async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) {
     const targetClientId = multiClient ? request.client_id : clientId;
-    const latestDecision = decisions.find((event) => event.request_id === request.id)?.decision;
-    const ready = agencyInvitation
-      ? (decision === "approved" ? invitationCanApprove(request) : invitationCanReject(request))
-      : agencyRelease
-        ? (decision === "approved" ? releaseCanApprove(request)
-          : decision === "revoked" ? releaseCanRevoke(request, latestDecision)
-          : latestDecision !== "approved" && releaseCanReject(request))
-      : !!targetClientId && request.client_id === targetClientId
-        && (decision === "approved" ? isApprovalReady(request, targetClientId)
-          : isRejectionReady(request, targetClientId));
-    if (!ready) return;
+    if (!targetClientId || (manager && request.source_kind === "client_sales_entitlement")
+      || request.client_id !== targetClientId || (decision === "approved"
+      ? !isApprovalReady(request, targetClientId)
+      : !isRejectionReady(request, targetClientId))) return;
     setBusyId(request.id);
     setDecisionError(null);
     try {
@@ -563,47 +544,20 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       }
       setAal("aal2");
 
-      const currentQuery = supabase.from("approval_inbox_v6").select("*").eq("id", request.id);
-      const current = await (targetClientId
-        ? currentQuery.eq("client_id", targetClientId)
-        : currentQuery.is("client_id", null)).maybeSingle();
+      const current = await supabase.from("approval_inbox_v6").select("*")
+        .eq("id", request.id).eq("client_id", targetClientId).maybeSingle();
       if (current.error) throw current.error;
       const currentRequest = current.data ? validatedRequest(current.data) : null;
-      const currentReady = currentRequest && (agencyInvitation
-        ? (decision === "approved" ? invitationCanApprove(currentRequest)
-          : invitationCanReject(currentRequest))
-        : agencyRelease
-          ? (decision === "approved" ? releaseCanApprove(currentRequest)
-            : decision === "revoked" ? releaseCanRevoke(currentRequest, latestDecision)
-            : latestDecision !== "approved" && releaseCanReject(currentRequest))
-        : !!targetClientId && (decision === "approved"
-          ? isApprovalReady(currentRequest, targetClientId)
-          : isRejectionReady(currentRequest, targetClientId)));
-      if (!currentRequest || !currentReady
+      if (!currentRequest || (decision === "approved"
+        ? !isApprovalReady(currentRequest, targetClientId)
+        : !isRejectionReady(currentRequest, targetClientId))
         || !sameVersion(request, currentRequest)) {
         throw new Error("This exact request changed or is no longer pending. Review the refreshed card before deciding.");
       }
-      if (decision !== "approved" && !reason?.trim()) {
-        throw new Error("Enter a reason before rejecting or revoking this request.");
+      if (decision === "rejected" && !reason?.trim()) {
+        throw new Error("Enter a reason before rejecting this request.");
       }
-      const outcome = agencyInvitation
-        ? await supabase.rpc("decide_console_invitation_v6", {
-          p_request_id: request.source_id,
-          p_expected_source_version: request.source_version,
-          p_expected_artifact_hash: request.artifact_hash!,
-          p_approved: decision === "approved",
-          ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
-        })
-        : agencyRelease
-          ? await supabase.rpc("decide_production_release_candidate_v6", {
-            p_request_id: request.id,
-            p_expected_source_version: request.source_version,
-            p_expected_artifact_hash: request.artifact_hash!,
-            p_expected_packet_sha256: releaseProofHash(request) ?? "",
-            p_decision: decision,
-            p_reason: decision === "approved" ? "" : reason!.trim(),
-          })
-        : request.source_kind === "google_review_reply"
+      const outcome = request.source_kind === "google_review_reply"
         ? await supabase.rpc("decide_google_review_reply_from_inbox_v6", {
           p_reply_id: request.source_id,
           p_expected_source_version: request.source_version,
@@ -618,11 +572,20 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             p_expected_source_version: request.source_version,
             p_expected_artifact_hash: request.artifact_hash!,
           })
-        : await supabase.rpc("decide_campaign_action_approval_v6", {
+        : request.source_kind === "client_sales_entitlement"
+          ? await supabase.rpc("decide_client_sales_entitlement", {
+            p_request_id: request.source_id,
+            p_scope_hash: request.source_version,
+            p_approve: decision === "approved",
+            p_note: decision === "rejected" ? reason!.trim() : "Approved from unified Approval Inbox",
+          })
+        : request.source_kind === "campaign_action"
+          ? await supabase.rpc("decide_campaign_action_approval_v6", {
           p_request_id: request.source_id,
           p_decision: decision,
           ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
-        });
+        }) : null;
+      if (!outcome) throw new Error("This request has no supported source decision function.");
       if (outcome.error) throw outcome.error;
       setStatusFilter("all");
       await refresh();
@@ -638,13 +601,23 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const waiting = loading || loadedClientId !== scopeKey;
 
   const kinds = useMemo(() => [...new Set([
+    ...RELEASED_SOURCE_KINDS,
     ...requests.map((request) => request.source_kind),
-    ...(kindFilter === "all" ? [] : [kindFilter]),
+    ...(kindFilter === null ? [] : [kindFilter]),
   ])].sort(), [requests, kindFilter]);
   const clients = useMemo(() => [...new Set([
     ...requests.map((request) => request.client_id ?? "agency-wide"),
-    ...(clientFilter === "all" ? [] : [clientFilter]),
+    ...(clientFilter === null ? [] : [clientFilter]),
   ])].sort(), [requests, clientFilter]);
+
+  function applyExactFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setClientFilter(clientFilterDraft.trim() || null);
+    setKindFilter(kindFilterDraft.trim() || null);
+    setSourceDeepLink(null);
+    setSearch("");
+    setPageState({ scopeKey, page: 0 });
+  }
   const visible = useMemo(() => requests.filter((request) => {
     const needle = search.trim().toLocaleLowerCase();
     return !needle || [request.title, request.source_id, request.source_system, request.source_kind,
@@ -673,12 +646,14 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
               : "Canonical requests and decision history appear here as source adapters are connected. "}
           {manager
             ? "Complete campaign action and Google review reply requests can be decided here through their owning functions."
-            : "Complete campaign action, Google review reply, recruitment brief and Auth invitation requests can be decided here through their owning functions."}
+            : "Complete campaign action, Google review reply, recruitment brief and sales access requests can be decided here through their owning functions."}
           {manager ? " Other requests remain read-only. " : " Other requests link to their owning source. "}
           Coverage is incomplete: work not yet mirrored here remains in its owning queue.
           Pending here reflects the canonical ledger; each owning source is checked again before a decision.
         </p>
       </div>
+
+      {global && <ApprovalCoveragePanel />}
 
       <div className="flex flex-wrap gap-3 rounded-xl border border-border bg-card p-4">
         <label className="min-w-40 flex-1 text-sm font-medium">Status
@@ -695,24 +670,34 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             <option value="all">All statuses</option>
           </select>
         </label>
-        {global && <label className="min-w-40 flex-1 text-sm font-medium">Client
-          <select value={clientFilter} onChange={(event) => {
-            setClientFilter(event.target.value); setPageState({ scopeKey, page: 0 });
-          }}
-            className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
-            <option value="all">All clients</option>
-            {clients.map((id) => <option key={id} value={id}>{id === "agency-wide" ? "Agency-wide" : id}</option>)}
-          </select>
-        </label>}
-        <label className="min-w-40 flex-1 text-sm font-medium">Source type
-          <select value={kindFilter} onChange={(event) => {
-            setKindFilter(event.target.value); setPageState({ scopeKey, page: 0 });
-          }}
-            className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
-            <option value="all">All source types</option>
-            {kinds.map((kind) => <option key={kind} value={kind}>{kind.replaceAll("_", " ")}</option>)}
-          </select>
-        </label>
+        <form onSubmit={applyExactFilters} aria-label="Exact approval filters"
+          className="flex min-w-full flex-wrap items-end gap-3">
+          {global && <label className="min-w-48 flex-1 text-sm font-medium">Client ID
+            <input value={clientFilterDraft} onChange={(event) => setClientFilterDraft(event.target.value)}
+              list="approval-client-suggestions" placeholder="Any client ID, or agency-wide"
+              className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            <datalist id="approval-client-suggestions">
+              {clients.map((id) => <option key={id} value={id} />)}
+            </datalist>
+          </label>}
+          <label className="min-w-48 flex-1 text-sm font-medium">Source type
+            <input value={kindFilterDraft} onChange={(event) => setKindFilterDraft(event.target.value)}
+              list="approval-kind-suggestions" placeholder="Any exact source kind"
+              className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            <datalist id="approval-kind-suggestions">
+              {kinds.map((kind) => <option key={kind} value={kind} />)}
+            </datalist>
+          </label>
+          <button type="submit" className="rounded-lg border border-border px-3 py-2 text-sm font-medium">
+            Apply filters
+          </button>
+          <p className="min-w-full text-xs text-muted-foreground">
+            Exact filters search every request page. Suggestions are shortcuts; enter any client ID or source kind. Leave a field blank for all. Use agency-wide for requests without a client.
+          </p>
+          {(clientFilter !== null || kindFilter !== null) && <p role="status" className="min-w-full text-xs text-muted-foreground">
+            Applied: client {clientFilter === null ? "any" : clientFilter}; source {kindFilter === null ? "any" : kindFilter}.
+          </p>}
+        </form>
         <label className="min-w-48 flex-[2] text-sm font-medium">Search current page
           <input type="search" value={search} onChange={(event) => {
             setSearch(event.target.value); setSourceDeepLink(null);
@@ -743,7 +728,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             </p> : <div className="space-y-4">{visible.map((request) => (
               <RequestCard key={request.id} request={request} history={historyByRequest.get(request.id) ?? []}
                 clientId={multiClient ? request.client_id ?? "" : clientId ?? ""}
-                manager={manager} global={global}
+                manager={manager}
                 aal={aal} busy={busyId === request.id} onDecide={decide} />
             ))}</div>}
             {(page > 0 || hasNextPage) && <nav aria-label="Approval pages" className="flex items-center gap-3">

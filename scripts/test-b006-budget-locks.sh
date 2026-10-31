@@ -61,7 +61,7 @@ insert into public.client_sales_agent_deployments
   values ('11111111-1111-4111-8111-111111111111',null,
           '22222222-2222-4222-8222-222222222222',true,3,1.00,null);
 SQL
-psql_test -f supabase/migrations/20261101010000_281_sales_runtime_budget_reservations.sql \
+psql_test -f supabase/migrations/20261101010000_284_sales_runtime_budget_reservations.sql \
   >"$test_dir/migration.log"
 reservation_id="$(psql_test -c "set test.role='service_role'; select reservation_id from public.reserve_sales_runtime_v6('11111111-1111-4111-8111-111111111111',0.2)")"
 if [[ ! "$reservation_id" =~ ^[0-9a-f-]{36}$ ]]; then

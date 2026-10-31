@@ -54,3 +54,28 @@ The inventory proves configuration and observed dependency state at the
 capture time. B002 verifies migration object parity; provider receipts,
 read-back, spend, leads and bookings belong to their later build gates. A
 successful local test or HTTP 200 does not close B001 or R000.
+
+## Evidence coverage in schema version 2
+
+The admin route and downloaded JSON include `evidenceCoverage`. Each named
+check has a state (`observed`, `unknown`, or `error`), collection time, source,
+source evidence time when there is one, and a reason when evidence is missing.
+`observed` means that the named source returned the narrow fact; it does not
+mean that the whole business capability is ready. A worker fleet is recorded
+only when at least one heartbeat is fresh and every fresh worker is enabled and
+reports the runtime's full commit. A switch inventory is recorded only when
+the global engine switch and every returned client switch have boolean values.
+The cron catalog is separate from cron execution, and object counts are
+separate from schema parity.
+
+Every client integration has `providerHealth.state = unknown` until a separate
+live provider account check is implemented and captured. A stored `connected`
+status, account ID, credential-presence flag, or old `lastCheckedAt` value is
+metadata, not proof that the provider accepts the credential today. The export
+also keeps credential validity, the other environment, and external effects
+explicitly unknown. Capture production and staging separately with an admin
+session in each environment; a single export never asserts parity between them.
+The JSON export remains a repeatable download of the same captured facts until
+Refresh is clicked. The file should be retained as controlled operational
+evidence because it contains client and account identifiers, even though it
+contains no secret values.

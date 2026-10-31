@@ -1,33 +1,62 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
 import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
+import { PROFILE_FIELD_PATCH_HOLD } from "../../../agent-runtime/src/profiles/prewrite-gate.js";
 
-type Identity = Database["public"]["Views"]["meta_identity_health"]["Row"];
+// The view's historical health_detail and derived blocker can include a raw
+// provider OAuth error. Keep both out of the browser response until a SQL
+// migration can scrub the stored data and fix the view itself.
+type Identity = Pick<
+  Database["public"]["Views"]["meta_identity_health"]["Row"],
+  "client_id" | "provider" | "account_ref" | "status" | "token_expires_at" | "days_left" | "posts_waiting"
+>;
 type Presence = Database["public"]["Views"]["meta_profile_presence"]["Row"];
-type ProfileChange = Database["public"]["Tables"]["meta_profile_changes"]["Row"];
+// A historical failure reason may contain raw provider diagnostics. Fetch only
+// the proposal fields used by this screen until the database is scrubbed.
+type ProfileChange = Pick<
+  Database["public"]["Tables"]["meta_profile_changes"]["Row"],
+  "id" | "platform" | "field" | "current_value" | "proposed_value" | "offer_version_id" | "status" | "created_at"
+>;
 
 type Tab = "identities" | "profile" | "presence";
+
+function recordedIdentityAlert(identity: Identity, now = Date.now()): string | null {
+  const status = identity.status ?? "";
+  if (["error", "expired", "revoked"].includes(status)) {
+    return "Recorded integration status blocks this account. Reconnect or review its credential.";
+  }
+  if (!["connected", "active", "expiring"].includes(status)) {
+    return "Integration status needs review before this account is used.";
+  }
+  const expiry = identity.token_expires_at ? Date.parse(identity.token_expires_at) : Number.NaN;
+  if (Number.isFinite(expiry) && expiry <= now) {
+    return "The recorded token expiry has passed. Reconnect before use.";
+  }
+  if (status === "expiring" && !Number.isFinite(expiry)) {
+    return "The integration is marked expiring without a known expiry. Review its credential.";
+  }
+  if (Number.isFinite(expiry) && expiry < now + 7 * 24 * 60 * 60 * 1000) {
+    return "The recorded token expiry is near. Reconnect before it expires.";
+  }
+  return null;
+}
 
 /**
  * Meta Profile v2 — Identities, Profile and Presence.
  *
  * v1 reuses the organic post board and the organic metrics tab, which means
- * it answers neither question this page exists for. Is this client's account
- * actually connected? And does the profile hold up when somebody who just saw
- * an ad lands on it?
+ * it shows neither local integration blockers nor the profile a visitor sees
+ * after an ad.
  *
- * The first was answerable all along and nothing asked it: the status, the
- * token expiry and the health detail were already on `client_integrations`,
- * and a disconnected account showed up as an empty post board —
- * indistinguishable from a client with nothing scheduled. So Identities leads,
- * and a broken credential comes with the count of what is waiting on it,
- * because a reconnect with a cost attached gets done.
+ * Identities shows recorded status, expiry and queued work. Those fields can
+ * identify blockers, but cannot prove current account ownership, scope or
+ * publishing rights. A blocked credential comes with the count of work
+ * waiting on it, rather than appearing as an empty post board.
  */
 export function MetaProfilePanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
@@ -35,8 +64,6 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
   const [presence, setPresence] = useState<Presence[]>([]);
   const [changes, setChanges] = useState<ProfileChange[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -46,7 +73,9 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
     }
     try {
       const [health, posts, proposed] = await Promise.all([
-        supabase.from("meta_identity_health").select("*").eq("client_id", clientId),
+        supabase.from("meta_identity_health")
+          .select("client_id,provider,account_ref,status,token_expires_at,days_left,posts_waiting")
+          .eq("client_id", clientId),
         supabase
           .from("meta_profile_presence")
           .select("*")
@@ -55,19 +84,19 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           .limit(100),
         supabase
           .from("meta_profile_changes")
-          .select("*")
+          .select("id,platform,field,current_value,proposed_value,offer_version_id,status,created_at")
           .eq("client_id", clientId)
           .order("created_at", { ascending: false }),
       ]);
       for (const result of [health, posts, proposed]) {
-        if (result.error) throw new Error(result.error.message);
+        if (result.error) throw new Error("Profile read failed.");
       }
       setIdentities(health.data ?? []);
       setPresence(posts.data ?? []);
       setChanges(proposed.data ?? []);
       setError(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load the profiles.");
+    } catch {
+      setError("Could not load the profiles.");
     } finally {
       setLoading(false);
     }
@@ -77,38 +106,10 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
     void refresh();
   }, [refresh]);
 
-  async function decide(change: ProfileChange, approved: boolean) {
-    if (busy) return;
-    const reason = approved ? undefined : window.prompt("Why is this change not going ahead?");
-    if (!approved && !reason?.trim()) return;
-    setBusy(change.id);
-    setNotice(null);
-    setError(null);
-    try {
-      const { error: rpcError } = await supabase.rpc("decide_meta_profile_change_v6", {
-        p_change_id: change.id,
-        p_approved: approved,
-        ...(reason?.trim() ? { p_reason: reason.trim() } : {}),
-      });
-      if (rpcError) throw new Error(rpcError.message);
-      setNotice(
-        approved
-          ? "Approved. It waits for a Meta profile-write adapter, which does not exist yet."
-          : "Rejected.",
-      );
-      await refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Something went wrong.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const broken = identities.filter((i) => i.blocker).length;
+  const broken = identities.filter((identity) => recordedIdentityAlert(identity)).length;
 
   return (
     <div className="space-y-5">
-      {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
       {tab === "identities" && (
@@ -116,15 +117,14 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-sm font-medium">
               {identities.length === 0
-                ? "No Meta identity is connected"
+                ? "No Meta identity recorded"
                 : broken > 0
                   ? `${broken} of ${identities.length} identities need attention`
-                  : `${identities.length} identit${identities.length === 1 ? "y" : "ies"} healthy`}
+                  : `No status or expiry alerts for ${identities.length} Meta identit${identities.length === 1 ? "y" : "ies"}; credential and provider access unverified`}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              A disconnected account says so here rather than appearing as an empty post board.
-              The count of what is waiting on it is attached, because a reconnect with a cost
-              attached gets done.
+              This shows recorded status, expiry and queued posts. It does not verify the current
+              credential, account, token permissions or publishing rights.
             </p>
           </div>
 
@@ -134,48 +134,51 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
             <DataTable
               columns={["Account", "Status", "Token", "Waiting on it", "What is stopping it"]}
               emptyLabel={loading ? "Loading…" : "No identities"}
-              rows={identities.map((identity) => [
-                <span key="a">
-                  {identity.account_ref ?? "no account id"}
-                  <span className="block text-xs capitalize text-muted-foreground">
-                    {identity.provider}
-                  </span>
-                </span>,
-                <span
-                  key="s"
-                  className={identity.status === "error" ? "text-destructive" : undefined}
-                >
-                  {identity.status}
-                </span>,
-                <span key="t" className="text-xs">
-                  {identity.token_expires_at ? (
-                    <>
-                      {dayOrDash(identity.token_expires_at)}
-                      <span
-                        className={
-                          Number(identity.days_left ?? 0) <= 7
-                            ? "block text-destructive"
-                            : "block text-muted-foreground"
-                        }
-                      >
-                        {identity.days_left} days left
-                      </span>
-                    </>
-                  ) : (
-                    "no expiry recorded"
-                  )}
-                </span>,
-                <span
-                  key="w"
-                  className={Number(identity.posts_waiting ?? 0) > 0 && identity.blocker ? "text-destructive" : undefined}
-                >
-                  {identity.posts_waiting ?? 0} post
-                  {Number(identity.posts_waiting ?? 0) === 1 ? "" : "s"}
-                </span>,
-                <span key="b" className={identity.blocker ? "text-destructive" : "text-brand-strong"}>
-                  {identity.blocker ?? "Nothing"}
-                </span>,
-              ])}
+              rows={identities.map((identity) => {
+                const alert = recordedIdentityAlert(identity);
+                return [
+                  <span key="a">
+                    {identity.account_ref ?? "no account id"}
+                    <span className="block text-xs capitalize text-muted-foreground">
+                      {identity.provider}
+                    </span>
+                  </span>,
+                  <span
+                    key="s"
+                    className={identity.status === "error" ? "text-destructive" : undefined}
+                  >
+                    {identity.status}
+                  </span>,
+                  <span key="t" className="text-xs">
+                    {identity.token_expires_at ? (
+                      <>
+                        {dayOrDash(identity.token_expires_at)}
+                        <span
+                          className={
+                            Number(identity.days_left ?? 0) <= 7
+                              ? "block text-destructive"
+                              : "block text-muted-foreground"
+                          }
+                        >
+                          {identity.days_left} days left
+                        </span>
+                      </>
+                    ) : (
+                      "no expiry recorded"
+                    )}
+                  </span>,
+                  <span
+                    key="w"
+                    className={Number(identity.posts_waiting ?? 0) > 0 && alert ? "text-destructive" : undefined}
+                  >
+                    {identity.posts_waiting ?? 0} post
+                    {Number(identity.posts_waiting ?? 0) === 1 ? "" : "s"}
+                  </span>,
+                  <span key="b" className={alert ? "text-destructive" : "text-muted-foreground"}>
+                    {alert ?? "No status or expiry alert; credential and provider rights unverified"}
+                  </span>,
+                ];
+              })}
             />
           )}
         </div>
@@ -186,17 +189,18 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-semibold">Proposed changes</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              What the profile says now, beside what we would make it say. An approved change
-              waits for a Meta profile-write adapter, which this runtime does not have — so
-              approval records the decision rather than applying it, and this page says so instead
-              of offering a button that would fail.
+              What the profile says now, beside what we would make it say. Direct decisions are
+              held until each exact proposal is bound to the unified Approval Inbox with AAL2
+              approval. This runtime also has no Meta profile-write adapter, so no field change
+              can be applied from this page.
             </p>
+            <p role="status" className="mt-2 text-sm text-destructive">{PROFILE_FIELD_PATCH_HOLD}</p>
           </div>
           {changes.length === 0 && !loading ? (
             <EmptyState label="No profile change has been proposed" />
           ) : (
             <DataTable
-              columns={["Field", "Says now", "Would say", "State", "Actions"]}
+              columns={["Field", "Says now", "Would say", "State"]}
               emptyLabel={loading ? "Loading…" : "Nothing proposed"}
               rows={changes.map((change) => [
                 <span key="f">
@@ -227,20 +231,8 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                   {change.status}
                   {change.status === "approved" && (
                     <span className="block text-xs text-muted-foreground">
-                      waiting for an adapter
+                      held for Inbox binding and an adapter; no field PATCH
                     </span>
-                  )}
-                </span>,
-                <span key="a" className="flex gap-2">
-                  {change.status === "drafted" && (
-                    <>
-                      <Button disabled={busy === change.id} onClick={() => void decide(change, true)}>
-                        Approve
-                      </Button>
-                      <Button disabled={busy === change.id} onClick={() => void decide(change, false)}>
-                        Reject
-                      </Button>
-                    </>
                   )}
                 </span>,
               ])}

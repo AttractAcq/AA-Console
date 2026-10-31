@@ -142,16 +142,16 @@ beforeAll(async () => {
   `);
 
   for (const [file, marker] of [
-    ["20261101130000_296_current_client_role_entitlement.sql", "create or replace function public.accessible_client_ids()"],
-    ["20261101130000_296_current_client_role_entitlement.sql", "create or replace function public.can_access_client(target uuid)"],
+    ["20261101130000_299_current_client_role_entitlement.sql", "create or replace function public.accessible_client_ids()"],
+    ["20261101130000_299_current_client_role_entitlement.sql", "create or replace function public.can_access_client(target uuid)"],
     ["20260925110000_127_retired_team_access.sql", "create or replace function is_member(target uuid)"],
     ["20260925110000_127_retired_team_access.sql", "create or replace function current_member_id()"],
     ["20261029220000_271_profileless_authenticated_scope.sql", "create or replace function public.active_video_approval_manager(p_client_id uuid)"],
     ["20261029220000_271_profileless_authenticated_scope.sql", "create or replace function public.active_creative_director(p_client_id uuid)"],
     ["20261010160000_178_video_edit_intake.sql", "create or replace function is_active_assigned_smm()"],
-    ["20261101130000_296_current_client_role_entitlement.sql", "create or replace function public.sign_video_approval(p_asset_id uuid, p_role text)"],
-    ["20261101130000_296_current_client_role_entitlement.sql", "create or replace function public.creative_seat_of(p_client_id uuid, p_user_id uuid)"],
-    ["20261101130000_296_current_client_role_entitlement.sql", "create or replace function public.guard_video_client_signoff_role()"],
+    ["20261101130000_299_current_client_role_entitlement.sql", "create or replace function public.sign_video_approval(p_asset_id uuid, p_role text)"],
+    ["20261101130000_299_current_client_role_entitlement.sql", "create or replace function public.creative_seat_of(p_client_id uuid, p_user_id uuid)"],
+    ["20261101130000_299_current_client_role_entitlement.sql", "create or replace function public.guard_video_client_signoff_role()"],
   ] as const) {
     await db.exec(functionFrom(await migration(file), marker));
   }
@@ -212,7 +212,7 @@ beforeAll(async () => {
     "select public.active_video_approval_manager($1) user_id", [B]))[0]?.user_id)
     .toBe(CLIENT_SMM);
 
-  await db.exec(await migration("20261101150000_298_current_employee_role_entitlement.sql"));
+  await db.exec(await migration("20261101150000_301_current_employee_role_entitlement.sql"));
 }, 60_000);
 
 afterAll(async () => { await db?.close(); });

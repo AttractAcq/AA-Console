@@ -203,4 +203,39 @@ describe("migration 268: contact and conversation scope", () => {
     for (const table of TABLES) expect(await rows(table), table).toHaveLength(0);
     expect(await attributionRows()).toHaveLength(0);
   });
+
+  it("does not turn a second client's creative job into contact access for a sales employee", async () => {
+    await db.exec(`reset role;
+      delete from sales_grants;
+      update sales_gate set inbox_enforced=true;
+      update team_members set active=true where user_id='${SALES}';
+      insert into sales_grants values
+        ('${CLIENT}','dddddddd-dddd-4ddd-8ddd-dddddddddddd','${SALES}',gen_random_uuid(),null);
+      insert into job_assignments values
+        ('${OTHER}','dddddddd-dddd-4ddd-8ddd-dddddddddddd');`);
+    await asUser(SALES);
+    expect((await db.query<{ broad: boolean }>(
+      "select can_access_client($1) as broad", [OTHER],
+    )).rows[0]?.broad).toBe(true);
+    for (const table of TABLES) {
+      expect((await rows(table)).map((row) => row.marker), table).toEqual(["A"]);
+    }
+    expect((await attributionRows()).map((row) => row.marker)).toEqual(["A"]);
+
+    await db.exec(`reset role; update sales_grants set revoked_at=now()
+      where bound_user_id='${SALES}';`);
+    await asUser(SALES);
+    expect((await db.query<{ broad: boolean }>(
+      "select can_access_client($1) as broad", [OTHER],
+    )).rows[0]?.broad).toBe(true);
+    for (const table of TABLES) expect(await rows(table), table).toHaveLength(0);
+    expect(await attributionRows()).toHaveLength(0);
+
+    await db.exec(`reset role; update team_members set active=false where user_id='${SALES}';`);
+    await asUser(SALES);
+    expect((await db.query<{ broad: boolean }>(
+      "select can_access_client($1) as broad", [OTHER],
+    )).rows[0]?.broad).toBe(false);
+    for (const table of TABLES) expect(await rows(table), table).toHaveLength(0);
+  });
 });

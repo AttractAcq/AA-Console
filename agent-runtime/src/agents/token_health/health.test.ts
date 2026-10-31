@@ -15,7 +15,8 @@ describe("reading a healthy token", () => {
     // expires_at 0 is Meta's "never", not "expired at the epoch".
     const v = readTokenHealth(valid({ expires_at: 0 }), NOW);
     expect(v).toMatchObject({ status: "connected", usable: true, expiresAt: null });
-    expect(v.detail).toMatch(/does not expire/);
+    expect(v.detail).toMatch(/no expiry/);
+    expect(v.detail).toMatch(/permissions are not verified/);
   });
 
   it("is connected when the expiry is comfortably away", () => {
@@ -78,13 +79,35 @@ describe("a token that is gone", () => {
       NOW,
     );
     expect(v).toMatchObject({ status: "error", usable: false });
-    expect(v.detail).toMatch(/invalidated/);
+    expect(v.detail).toMatch(/no longer valid/);
   });
 
-  it("treats a payload it cannot read as an error rather than as healthy", () => {
-    for (const payload of [null, undefined, {}, { data: {} }, "nonsense"]) {
-      expect(readTokenHealth(payload, NOW).usable).toBe(false);
+  it("never copies a provider OAuth error message into stored health detail", () => {
+    const marker = "credential-marker-never-persist";
+    const verdict = readTokenHealth({ data: {
+      is_valid: false, error: { code: 190, message: `Invalid token ${marker}` },
+    } }, NOW);
+    expect(verdict).toMatchObject({ status: "error", usable: false });
+    expect(JSON.stringify(verdict)).not.toContain(marker);
+  });
+
+  it("does not treat a malformed or missing verdict as revocation", () => {
+    for (const payload of [null, undefined, {}, { data: {} }, "nonsense", { data: { is_valid: "false" } }]) {
+      expect(() => readTokenHealth(payload, NOW)).toThrow(/did not establish token validity/);
     }
+  });
+
+  it("does not treat a non-auth error in a 200 response as revocation", () => {
+    for (const isValid of [true, false]) {
+      expect(() => readTokenHealth(
+        { data: { is_valid: isValid, error: { code: 17, message: "Rate limited" } } }, NOW,
+      )).toThrow(/non-auth error/);
+    }
+  });
+
+  it("recognizes a top-level OAuth token error as invalid", () => {
+    expect(readTokenHealth({ error: { code: 190, message: "Invalid OAuth token" } }, NOW))
+      .toMatchObject({ status: "error", usable: false });
   });
 });
 
@@ -93,32 +116,38 @@ describe("what gets written", () => {
   const expiring = readTokenHealth(valid({ expires_at: inDays(2) }), NOW);
   const dead = readTokenHealth({ data: { is_valid: false } }, NOW);
 
-  it("rescues an integration stuck in error when the token is fine again", () => {
-    // The whole reason this agent exists. On 6 October an Instagram
-    // integration sat in error for hours after the fault was fixed, because
-    // nothing could say the token was fine now.
-    expect(statusToWrite("error", healthy)).toBe("connected");
+  it("never reactivates terminal states based on token validity alone", () => {
+    expect(statusToWrite("error", healthy)).toBe("error");
+    expect(statusToWrite("revoked", healthy)).toBe("revoked");
+    expect(statusToWrite("expired", healthy)).toBe("expired");
   });
 
   it("does not promote a never-used integration to active", () => {
     // active means an ingest has actually succeeded. A health check has not
     // ingested anything.
     expect(statusToWrite("connected", healthy)).toBe("connected");
-    expect(statusToWrite("error", healthy)).not.toBe("active");
+    expect(statusToWrite("expiring", healthy)).toBe("expiring");
   });
 
   it("does not demote a working integration either", () => {
     expect(statusToWrite("active", healthy)).toBe("active");
   });
 
-  it("marks a dead token as an error from any state", () => {
-    for (const current of ["connected", "active", "expiring", "error"]) {
+  it("marks a dead token as an error from a checkable state", () => {
+    for (const current of ["connected", "active", "expiring"]) {
       expect(statusToWrite(current, dead)).toBe("error");
     }
+    expect(statusToWrite("revoked", dead)).toBe("revoked");
+    expect(statusToWrite("expired", dead)).toBe("expired");
   });
 
-  it("marks expiring from any usable state, including active", () => {
-    expect(statusToWrite("active", expiring)).toBe("expiring");
-    expect(statusToWrite("connected", expiring)).toBe("expiring");
+  it("records expiry without writing expiring before migration 291 is released", () => {
+    expect(statusToWrite("active", expiring)).toBe("active");
+    expect(statusToWrite("connected", expiring)).toBe("connected");
+    expect(statusToWrite("expiring", expiring)).toBe("expiring");
+  });
+
+  it("fails closed on an unknown integration state", () => {
+    expect(statusToWrite("surprise", healthy)).toBe("error");
   });
 });

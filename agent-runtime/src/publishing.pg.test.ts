@@ -250,7 +250,7 @@ beforeAll(async () => {
   ]) {
     await db.exec(await migration(f));
   }
-  const eligibility = await migration("20261101080000_291_integration_credential_eligibility.sql");
+  const eligibility = await migration("20261101080000_294_integration_credential_eligibility.sql");
   await db.exec(eligibility.split("create or replace function public.enqueue_metrics_ingest_jobs")[0]!);
   await db.exec(`select set_config('request.jwt.claim.sub','${ADMIN}',false);
                  select set_config('request.jwt.claim.role','authenticated',false);`);

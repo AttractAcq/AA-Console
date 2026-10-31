@@ -14,7 +14,10 @@ type EngineRpc =
   | "set_engine_platform"
   | "add_engine_window"
   | "remove_engine_window"
-  | "set_publishing_enabled";
+  | "set_publishing_enabled"
+  | "set_client_engine_budget_v6"
+  | "set_client_timezone_v6"
+  | "set_engine_running";
 
 /**
  * Whether the engine runs for this client, and what it does when it does.
@@ -41,6 +44,8 @@ type Readiness = {
   active_pillars: number;
   month_cap_usd: number | null;
   timezone: string;
+  engine_running: boolean;
+  advances_without_a_person: boolean;
 };
 
 type Settings = {
@@ -70,6 +75,10 @@ type WindowRow = { id: string; weekday: number; starts_at: string; ends_at: stri
 export function EnginePanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [readiness, setReadiness] = useState<Readiness | null>(null);
+  // Held as strings so a half-typed figure does not become 0, and so the
+  // field can start from whatever is already set.
+  const [capDraft, setCapDraft] = useState("");
+  const [zoneDraft, setZoneDraft] = useState("");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [platforms, setPlatforms] = useState<PlatformRow[]>([]);
   const [windows, setWindows] = useState<WindowRow[]>([]);
@@ -101,7 +110,10 @@ export function EnginePanel() {
       setError(failed.message);
       return;
     }
-    setReadiness((r.data as Readiness) ?? null);
+    const nextReadiness = (r.data as Readiness) ?? null;
+    setReadiness(nextReadiness);
+    setCapDraft(nextReadiness?.month_cap_usd != null ? String(nextReadiness.month_cap_usd) : "");
+    setZoneDraft(nextReadiness?.timezone ?? "");
     setSettings((s.data as Settings) ?? null);
     setPlatforms((p.data ?? []) as PlatformRow[]);
     setWindows((w.data ?? []) as WindowRow[]);
@@ -176,6 +188,143 @@ export function EnginePanel() {
           // Naming the blocker beats a disabled button with no explanation.
           <p className="mt-2 text-xs text-muted-foreground">
             Fix “{readiness?.readiness ?? "Not configured"}” before the engine can be switched on.
+          </p>
+        ) : null}
+      </section>
+
+      {/* The three gates engine_tick reads that nothing used to be able to
+          set. Migration 282 added the first two writers; the third was in the
+          database all along with no screen behind it, which is how the engine
+          sat switched off globally while every client's line read "Running". */}
+      <section className="space-y-4 rounded-lg border border-border p-4">
+        <div>
+          <p className="text-sm font-medium text-card-foreground">What it needs before it can run</p>
+          <p className="text-sm text-muted-foreground">
+            The hourly tick reads all three. Any one of them unset means it plans nothing and says so.
+          </p>
+        </div>
+
+        {/* The cap the engine spends against without asking again. */}
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            This month's AI spend cap (USD)
+            <input
+              type="number"
+              min={1}
+              max={10000}
+              step={10}
+              value={capDraft}
+              onChange={(event) => setCapDraft(event.target.value)}
+              aria-label="Monthly AI spend cap in USD"
+              className="w-40 rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={busy || capDraft.trim() === ""}
+            onClick={() =>
+              void call(
+                "set_client_engine_budget_v6",
+                {
+                  p_client_id: clientId,
+                  // The function normalises to the month start, which is what
+                  // the tick joins on.
+                  p_month: new Date().toISOString().slice(0, 10),
+                  p_cap_usd: Number(capDraft),
+                },
+                `This month's cap is now ${Number(capDraft)} USD.`,
+              )
+            }
+            className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
+          >
+            Save cap
+          </button>
+          {readiness?.month_cap_usd == null ? (
+            <p className="text-xs text-muted-foreground">
+              No cap for this month, so the tick skips this client entirely.
+            </p>
+          ) : null}
+        </div>
+
+        {/* The zone every planned slot and booking window is read in. */}
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            Timezone
+            <input
+              type="text"
+              value={zoneDraft}
+              onChange={(event) => setZoneDraft(event.target.value)}
+              placeholder="Africa/Johannesburg"
+              aria-label="Client timezone"
+              className="w-60 rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={busy || zoneDraft.trim() === "" || zoneDraft.trim() === readiness?.timezone}
+            onClick={() =>
+              void call(
+                "set_client_timezone_v6",
+                { p_client_id: clientId, p_timezone: zoneDraft.trim() },
+                `Slots and calls are now read on ${zoneDraft.trim()} time.`,
+              )
+            }
+            className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50"
+          >
+            Save timezone
+          </button>
+          <p className="text-xs text-muted-foreground">
+            Decides which local hour a planned slot lands on, and which hours a prospect can book.
+          </p>
+        </div>
+
+        {/* System-wide, so it is said twice: in the label and in the warning. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+          <div>
+            <p className="text-sm font-medium text-card-foreground">
+              {readiness?.engine_running
+                ? "The engine is on for every client"
+                : "The engine is off for every client"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {readiness?.engine_running
+                ? "Each client's own switch decides whether it runs."
+                : "No client runs while this is off, however its own line reads."}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void call(
+                "set_engine_running",
+                {
+                  p_enabled: !(readiness?.engine_running ?? false),
+                  p_note: readiness?.engine_running
+                    ? "Switched off from the Engine screen."
+                    : "Switched on from the Engine screen.",
+                },
+                readiness?.engine_running
+                  ? "The engine is off for every client."
+                  : "The engine is on for every client.",
+              )
+            }
+            className={`rounded-md px-3 py-2 text-sm disabled:opacity-50 ${
+              readiness?.engine_running
+                ? "bg-destructive text-destructive-foreground"
+                : "bg-primary text-primary-foreground"
+            }`}
+          >
+            {readiness?.engine_running ? "Switch off globally" : "Switch on globally"}
+          </button>
+        </div>
+
+        {/* Running and still waiting on a person is worth saying out loud,
+            because approve_idea_by_policy refuses and the slot simply stops. */}
+        {running && !(readiness?.advances_without_a_person ?? false) ? (
+          <p className="border-t border-border pt-4 text-xs text-muted-foreground">
+            A person is still needed before a slot can pass idea or brief. Switch on approval by policy
+            below for the pipeline to run to the approval queue on its own.
           </p>
         ) : null}
       </section>

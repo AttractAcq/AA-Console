@@ -49,9 +49,9 @@ beforeAll(async () => {
     select set_config('test.role','service_role',false);
   `);
   await db.exec(await readFile(new URL(
-    "../../../supabase/migrations/20261101010000_281_sales_runtime_budget_reservations.sql", import.meta.url), "utf8"));
+    "../../../supabase/migrations/20261101010000_284_sales_runtime_budget_reservations.sql", import.meta.url), "utf8"));
   await db.exec(await readFile(new URL(
-    "../../../supabase/migrations/20261101020000_282_public_perimeter_admin_status.sql", import.meta.url), "utf8"));
+    "../../../supabase/migrations/20261101020000_285_public_perimeter_admin_status.sql", import.meta.url), "utf8"));
 });
 
 beforeEach(async () => {

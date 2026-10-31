@@ -3,12 +3,8 @@
  *
  * Migration 206 gave a person a way to say yes to one exact campaign
  * package, one action, one destination and one artifact version. Migration
- * 230 gave that yes a lifecycle. This is the thing that reads it.
- *
- * A sweep rather than a job per action, for the same reason the publisher is
- * one: what is approved and unblocked is a question about state, not about
- * any single row, and one claim of three actions is one lease instead of
- * three.
+ * 230 gave that yes a lifecycle. This worker entry point is presently held
+ * before reading or claiming any approved action.
  *
  * OFF IS A STATE, NOT AN ERROR
  *
@@ -18,22 +14,14 @@
  * a lie told in the one place a person checks before asking why the client's
  * ads are not live.
  *
- * ONE HANDLER PER ACTION, AND NO DEFAULT
+ * CLAIM HOLD
  *
- * There is no fallback handler. An action with no entry in HANDLERS fails
- * non-retryably and says so, which can only happen if somebody marks an
- * action supported in `campaign_action_executors` without writing its
- * executor -- exactly the mistake worth a loud failure rather than a silent
- * queue.
- *
- * WHAT THIS DOES NOT DECIDE
- *
- * Not whether the package is current, not whether the client is switched on,
- * not whether the approval is stale. `campaign_action_due` decides all of
- * that and `claim_campaign_actions` only claims rows it has cleared, so the
- * revalidation happens inside the same locked statement as the claim. A
- * handler that needs a narrower check than the view can express does it
- * itself, immediately before its write.
+ * Migration 230's claim function cannot restrict a claim to handler-owned
+ * action keys. The registry read and claim used to be separate requests, so
+ * a support-bit change between them could consume an exact human approval.
+ * The registered worker now stops before any registry read or claim. Handler
+ * bodies remain available for direct unit tests and future atomic SQL
+ * integration, but this entry point does not invoke them.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -43,11 +31,9 @@ import type { AgentRow } from "../../orchestration/registry.js";
 import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
-import { logger } from "../../logging/logger.js";
 import { deployCampaignPage } from "./page-deploy.js";
 import { changeAdSetBudget } from "./budget-change.js";
-
-const DEFAULT_BATCH = 3;
+import { GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD } from "./preclaim-hold.js";
 
 export interface ClaimedAction {
   execution_id: string;
@@ -198,7 +184,7 @@ export const HANDLERS: Readonly<Record<string, ActionHandler>> = {
 export async function runCampaignActionJob(
   sb: SupabaseClient,
   runtime: RuntimeConfig,
-  agent: AgentRow,
+  _agent: AgentRow,
   job: AgentJobRow,
 ): Promise<JobResult> {
   if (!runtime.campaignActionsEnabled) {
@@ -211,93 +197,7 @@ export async function runCampaignActionJob(
     return { ok: true, retryable: false };
   }
 
-  const asked = Number((job.params as Record<string, unknown> | null)?.limit ?? DEFAULT_BATCH);
-  const limit = Number.isFinite(asked) && asked > 0 ? Math.min(Math.trunc(asked), 20) : DEFAULT_BATCH;
-  const { data, error } = await sb.rpc("claim_campaign_actions", { p_limit: limit } as never);
-  if (error) throw new Error(`Could not claim campaign actions: ${error.message}`);
-
-  const claimed = (data ?? []) as ClaimedAction[];
-  if (claimed.length === 0) {
-    await appendEvent(sb, job.id, "No approved action is waiting.", "info");
-    return { ok: true, retryable: false };
-  }
-
-  let executed = 0;
-  let failed = 0;
-
-  for (const action of claimed) {
-    try {
-      const handler = HANDLERS[action.action_key];
-      if (!handler) {
-        throw new ActionError(
-          `There is no executor for ${action.action_key.replace(/_/g, " ")} in this runtime.`,
-          false,
-        );
-      }
-      const outcome = await handler(sb, runtime, action);
-
-      const { error: recordError } = await sb.rpc("record_campaign_action_executed", {
-        p_execution_id: action.execution_id,
-        p_external_id: outcome.externalId ?? null,
-        p_external_url: outcome.externalUrl ?? null,
-        p_result: outcome.result ?? null,
-      } as never);
-      // The act has happened. A failure to record it leaves the row claimed
-      // for the reaper, which abandons it and says to go and look -- wrong,
-      // but visible, and the right instruction.
-      if (recordError) {
-        throw new Error(`Done, but could not be recorded: ${recordError.message}`);
-      }
-
-      executed += 1;
-      await appendEvent(
-        sb,
-        job.id,
-        `${action.action_key}: ${outcome.detail ?? "done"}.`,
-        "info",
-        {
-          approval_id: action.approval_id,
-          campaign_id: action.campaign_id,
-          external_id: outcome.externalId ?? null,
-        },
-      );
-      logger.info("campaign_action_executed", {
-        jobId: job.id,
-        approvalId: action.approval_id,
-        actionKey: action.action_key,
-      });
-    } catch (thrown) {
-      failed += 1;
-      const retryable = thrown instanceof ActionError ? thrown.retryable : false;
-      const reason = thrown instanceof Error ? thrown.message : String(thrown);
-      const { error: failError } = await sb.rpc("record_campaign_action_failure", {
-        p_execution_id: action.execution_id,
-        p_reason: reason,
-        p_retryable: retryable,
-      } as never);
-      if (failError) {
-        logger.error("campaign_action_failure_unrecorded", {
-          jobId: job.id,
-          approvalId: action.approval_id,
-          message: failError.message,
-        });
-      }
-      await appendEvent(sb, job.id, `${action.action_key}: ${reason}`, "warn", {
-        approval_id: action.approval_id,
-        retryable,
-      });
-    }
-  }
-
-  await appendEvent(sb, job.id, `${executed} done, ${failed} not.`, failed > 0 ? "warn" : "info", {
-    executed,
-    failed,
-    claimed: claimed.length,
-  });
-
-  void agent;
-  // The sweep did its job even when an action inside it did not: each
-  // failure is recorded against its own execution, and a retry of the sweep
-  // re-claims only what is genuinely still unblocked.
-  return { ok: true, retryable: false };
+  const failureMessage = `${GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD} No action was claimed.`;
+  await appendEvent(sb, job.id, failureMessage, "warn");
+  return { ok: false, retryable: false, failureMessage };
 }

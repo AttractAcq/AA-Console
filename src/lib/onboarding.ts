@@ -1,3 +1,5 @@
+import { providerReadiness, type IntegrationEvidence } from "./integrationReadiness";
+
 /**
  * Onboarding: the one place a client's information is first collected.
  *
@@ -58,8 +60,8 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     key: "credentials",
-    title: "Credentials",
-    why: "Meta and Instagram access, so reporting and attribution have numbers to pull rather than a blank dashboard.",
+    title: "Provider access",
+    why: "Meta and Instagram need a usable credential, an exact account, required scopes and action rights before their capabilities can be trusted.",
     livesAt: { label: "Integrations", path: "account/integrations" },
   },
   {
@@ -73,10 +75,12 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
 
 /** What the app has on file, as the panel loads it. */
 export interface OnboardingData {
+  clientId: string;
+  observedAtMs: number;
   contact: Record<string, unknown> | null;
   business: Record<string, unknown> | null;
   brand: Record<string, unknown> | null;
-  integrations: { provider: string }[];
+  integrations: IntegrationEvidence[];
   /** Manual ticks, still stored because there is nothing else to derive from. */
   manualComplete: StepKey[];
 }
@@ -108,8 +112,17 @@ export type StepState = "done" | "partial" | "empty";
 export function missingFor(key: StepKey, data: OnboardingData): string[] {
   if (key === "call") return data.manualComplete.includes("call") ? [] : ["the call"];
   if (key === "credentials") {
-    const have = new Set(data.integrations.map((i) => i.provider));
-    return SYNCING_PROVIDERS.filter((p) => !have.has(p));
+    // The released backend has no persisted provider account/scope/action
+    // diagnostic. A pair of rows cannot complete provider access by itself.
+    return SYNCING_PROVIDERS.flatMap((provider) => {
+      const result = providerReadiness(provider, data.integrations, data.clientId, data.observedAtMs);
+      const blockers = [result.credential, result.account, result.dailySync]
+        .filter((check) => check.state === "blocked")
+        .map((check) => check.reason);
+      return blockers.length > 0
+        ? blockers
+        : [`${provider} account access, scopes and action rights verification`];
+    });
   }
   const row = key === "contact" ? data.contact : key === "business" ? data.business : data.brand;
   return REQUIRED[key].filter((field) => !filled(row, field));
@@ -127,7 +140,8 @@ export function stepState(key: StepKey, data: OnboardingData): StepState {
   if (key === "call") return "empty";
 
   if (key === "credentials") {
-    return missing.length < SYNCING_PROVIDERS.length ? "partial" : "empty";
+    return data.integrations.some((row) => row.client_id === data.clientId && SYNCING_PROVIDERS.some((provider) => row.provider === provider))
+      ? "partial" : "empty";
   }
   const required = REQUIRED[key as Exclude<StepKey, "call" | "credentials">];
   return missing.length < required.length ? "partial" : "empty";

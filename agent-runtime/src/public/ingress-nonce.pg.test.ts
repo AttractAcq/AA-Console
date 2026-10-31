@@ -22,7 +22,7 @@ beforeAll(async () => {
     select set_config('test.role','service_role',false);
   `);
   await db.exec(await readFile(new URL(
-    "../../../supabase/migrations/20261101000000_280_public_route_quota.sql", import.meta.url), "utf8"));
+    "../../../supabase/migrations/20261101000000_283_public_route_quota.sql", import.meta.url), "utf8"));
 });
 
 describe("atomic ingress nonce claim", () => {

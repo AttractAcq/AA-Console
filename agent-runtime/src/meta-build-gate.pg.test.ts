@@ -180,7 +180,7 @@ beforeEach(async () => {
   await db.exec(await sql("20261015230000_206_v6_action_approvals.sql"));
   await db.exec(await sql("20261022090000_230_campaign_action_executor.sql"));
   await db.exec(await sql("20261024130000_239_a_meta_build_runs_on_an_approval.sql"));
-  await db.exec(await sql("20261101060000_289_meta_v6_atomic_job_binding.sql"));
+  await db.exec(await sql("20261101060000_292_meta_v6_atomic_job_binding.sql"));
   await db.exec("update client_engine_settings set campaign_actions_enabled = true;");
   await asHuman();
 }, 60000);
@@ -336,7 +336,7 @@ describe("migration 289 exact Meta job binding", () => {
       await isolated.exec(`
         create table public.campaign_action_approvals (action_key text);
         insert into public.campaign_action_approvals values ('meta_ad_build');`);
-      await expect(isolated.exec(await sql("20261101060000_289_meta_v6_atomic_job_binding.sql")))
+      await expect(isolated.exec(await sql("20261101060000_292_meta_v6_atomic_job_binding.sql")))
         .rejects.toThrow(/Review existing Meta build approvals/);
     } finally {
       await isolated.close();
