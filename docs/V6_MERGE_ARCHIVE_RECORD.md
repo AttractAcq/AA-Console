@@ -98,6 +98,63 @@ Zero on all three. The stricter rule revokes nobody's access as things stand;
 it only prevents future drift. That is why they were not held back from the
 merge.
 
+## Stale migration numbers left by the renumber (v6.1 doc sweep)
+
+The renumber from 280–298 to 283–301 updated every **filename** reference in
+tests and docs. It did not update prose that names a migration by bare number,
+because those do not match a filename pattern. So documents written while the
+stack used its original numbering now cite numbers that mean something else in
+`main` — the clearest case being `agent-runtime/RAILWAY.md`, which described
+migrations 280, 281 and 282 as the public-route quota, the paid-widget budget
+reserve and the admin status view. Those are 283, 284 and 285 now; in `main`,
+280–282 are the rule-six support flags, the booking and nurture config, and the
+engine config.
+
+`RAILWAY.md` was corrected here because it gates a runtime deploy decision and
+an operator follows it directly. The remaining fourteen files still carry stale
+bare numbers and need one pass in v6.1:
+
+```
+agent-runtime/ingress/README.md
+docs/AA_CONSOLE_100_BUILD_BLUEPRINT.md
+docs/B004_CONTROLLED_INVITATIONS_INTEGRATION.md
+docs/B008_APPROVAL_SOURCE_INVENTORY.md
+docs/b008-github-release-candidate-verifier.md
+docs/b008-production-release-gate.md
+docs/b012-meta-v6-claim-guard.md
+docs/production-recovery-preflight.md
+docs/security/B005-Q022-client-role-entitlement.md
+docs/security/B005-Q022-employee-role-entitlement.md
+docs/security/B005-proof-submission-read-boundary.md
+docs/security/B005-sales-entitlement-boundary.md
+docs/security/organic-publication-authority.md
+```
+
+Two caveats for whoever does it. `AA_CONSOLE_100_BUILD_BLUEPRINT.md` holds a
+**dated snapshot** (30 October) whose numbers were correct when written; that
+section is a historical record and should be left as it reads, or marked as of
+its date, rather than renumbered. And `production-recovery-preflight.md` still
+describes a 296-migration baseline through `20261030160000`, which predates 280
+entirely — it needs repinning to the 301 baseline at 318 migrations, not just a
+number swap.
+
+A future renumber should grep for `migration \d{3}` in prose as well as
+filenames.
+
+## Also open after the v6 merge
+
+- `.github/workflows/production-release-approval.yml` arrived with #297 and runs
+  on every pull request to `main`, but only passes for a non-draft pull request
+  whose body carries exactly one `AA-Release-Request: <uuid>` line, against an
+  approval row in Supabase, with `AA_RELEASE_SUPABASE_SERVICE_ROLE_KEY` set —
+  which it is not. It performs no merge or deployment, so a red result blocks
+  nothing, but every ordinary pull request will show a failing check until the
+  job is scoped with an `if:` guard. Alex's decision on 31 October was to do
+  that in v6.1, folded into the same pass as the `verify-github-release-candidate`
+  workflow-file guard that blocks #257 and #267.
+- Leaked-password protection is disabled in Supabase Auth. Migration 286 retired
+  browser password creation, so the exposure is small, but enabling it is free.
+
 ## Still to clean up in v6.2
 
 Per Alex's direction on 31 October: Rights, Placements, Opt-ins and Motion
