@@ -92,10 +92,19 @@ Studio, Sales OS, and both distribution logs. Built once.
 Per Alex on 31 October: archive, but keep a documented list, because
 undocumented archiving is the habit to break. Clean removal in v6.2.
 
-- Proof Distribution → **Rights**, **Placements**
-- Lead Magnet Studio → **Opt-ins**
-- **Motion Design** (whole module, likely discontinued in favour of the native
-  Claude application)
+- Proof Distribution → **Rights**, **Placements** — the notes call both "not as
+  important" and say "both need to be discontinued"
+- Lead Magnet Studio → **Opt-ins** — "isnt necissary to track"
+
+**Not** Motion Design. The notes say it "can be left alone for now as I believe
+we will discontinue it" — left alone, not removed. An earlier draft of this plan
+listed it here *and* under deferred, which contradicted both the notes and
+itself. It is deferred, and a v6.2 candidate on Alex's word rather than
+inference.
+
+Archived means the way in is gone and the code is not: each panel still
+compiles, so v6.2 deletes it without reopening the decision. The list lives in
+`V6_1_ARCHIVED_SURFACES.md`.
 
 ## Phase 1 — campaign inputs
 
