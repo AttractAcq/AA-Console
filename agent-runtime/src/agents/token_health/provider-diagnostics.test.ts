@@ -3,8 +3,18 @@ import { probeProvider } from "./provider-diagnostics.js";
 
 const NOW = Date.UTC(2027, 0, 1, 12);
 const TOKEN = "private-token-value";
+const key = {
+  clientId: "11111111-1111-4111-8111-111111111111",
+  integrationId: "22222222-2222-4222-8222-222222222222",
+  credentialVersion: "rotation-3",
+  provider: "meta",
+  accountRef: "act_123",
+  actionKey: "meta.account.read",
+};
 const meta = {
   provider: "meta" as const,
+  capabilityKey: key,
+  credentialState: "eligible" as const,
   accessToken: TOKEN,
   expectedAccountId: "act_123",
   expectedAppId: "app-1",
@@ -22,10 +32,13 @@ describe("controlled provider diagnostics", () => {
     const fetchImpl = vi.fn();
     for (const provider of ["google_ads", "resend", "google", "facebook", "other"]) {
       const result = await probeProvider({ provider, accessToken: TOKEN,
+        capabilityKey: { ...key, provider, actionKey: `${provider}.account.read` },
+        credentialState: "eligible",
         fetchImpl: fetchImpl as unknown as typeof fetch, now: () => NOW });
       expect(result.token.state).toBe("unknown");
       expect(result.account.state).toBe("unknown");
       expect(result.action.state).toBe("unknown");
+      expect(result.capability.state).toBe("unknown");
       expect(JSON.stringify(result)).not.toContain(TOKEN);
     }
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -40,6 +53,7 @@ describe("controlled provider diagnostics", () => {
       provider: "meta", token: { state: "verified" }, app: { state: "verified" },
       scopes: { state: "verified" }, account: { state: "verified" },
       action: { state: "unknown" },
+      capability: { state: "verified", reason: "exact_read_verified" },
     });
     expect(result.expiresAt).toBe(new Date(NOW + 30 * 86_400_000).toISOString());
     expect(fetchImpl).toHaveBeenCalledTimes(2);
@@ -56,10 +70,36 @@ describe("controlled provider diagnostics", () => {
     const fetchImpl = vi.fn().mockResolvedValueOnce(reply(valid))
       .mockResolvedValueOnce(reply({ id: "17841400000000000" }));
     const result = await probeProvider({ provider: "instagram", accessToken: TOKEN,
+      capabilityKey: { ...key, provider: "instagram", accountRef: "17841400000000000",
+        actionKey: "instagram.publish" },
+      credentialState: "eligible",
       expectedAccountId: "17841400000000000", expectedAppId: "app-1",
       requiredScopes: ["ads_read"], fetchImpl, now: () => NOW });
     expect(result.account.state).toBe("verified");
     expect(result.action.state).toBe("unknown");
+    expect(result.capability.state).toBe("unknown");
+  });
+
+  it("never probes a revoked or unknown local credential generation", async () => {
+    for (const [credentialState, state, reason] of [
+      ["revoked", "blocked", "credential_revoked"],
+      ["unknown", "unknown", "credential_state_unknown"],
+    ] as const) {
+      const fetchImpl = vi.fn();
+      const result = await probeProvider({ ...meta, credentialState, fetchImpl });
+      expect(result.capability).toMatchObject({ state, reason });
+      expect(result.token.state).toBe("unknown");
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  });
+
+  it("does not return a positive read capability when a probe outlasts its evidence TTL", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(reply(valid))
+      .mockResolvedValueOnce(reply({ id: "act_123" }));
+    const now = vi.fn().mockReturnValueOnce(NOW).mockReturnValueOnce(NOW + 60_000);
+    const result = await probeProvider({ ...meta, now, fetchImpl });
+    expect(result.account.state).toBe("verified");
+    expect(result.capability).toMatchObject({ state: "unknown", reason: "stale_evidence" });
   });
 
   it.each([
@@ -102,6 +142,38 @@ describe("controlled provider diagnostics", () => {
     expect(result.app.state).toBe("unknown");
     expect(result.scopes.state).toBe("unknown");
     expect(result.account.state).toBe("verified");
+    expect(result.capability.state).toBe("unknown");
+  });
+
+  it("binds a successful provider read to the exact requested account reference", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(reply(valid))
+      .mockResolvedValueOnce(reply({ id: "act_123" }));
+    const result = await probeProvider({ ...meta,
+      capabilityKey: { ...key, accountRef: "act_999" }, fetchImpl });
+    expect(result.account.state).toBe("verified");
+    expect(result.capability).toMatchObject({ state: "blocked", reason: "scope_mismatch" });
+  });
+
+  it("never echoes incidental secret fields on the capability key", async () => {
+    const secretKey = { ...key, accessToken: TOKEN,
+      providerBody: { authorization: `Bearer ${TOKEN}` } };
+    const verifiedFetch = vi.fn().mockResolvedValueOnce(reply(valid))
+      .mockResolvedValueOnce(reply({ id: "act_123" }));
+    const verified = await probeProvider({ ...meta, capabilityKey: secretKey,
+      fetchImpl: verifiedFetch });
+    expect(verified.capability.state).toBe("verified");
+    const unknown = await probeProvider({ ...meta, capabilityKey: secretKey,
+      credentialState: "unknown", fetchImpl: vi.fn() });
+    expect(unknown.capability.state).toBe("unknown");
+    const invalid = await probeProvider({ ...meta, capabilityKey: secretKey,
+      expectedAccountId: "invalid-account", fetchImpl: vi.fn() });
+    expect(invalid.capability.state).toBe("blocked");
+    for (const result of [verified, unknown, invalid]) {
+      expect(JSON.stringify(result)).not.toContain(TOKEN);
+      expect(Object.keys(result.capability.key).sort()).toEqual([
+        "accountRef", "actionKey", "clientId", "credentialVersion", "integrationId", "provider",
+      ]);
+    }
   });
 
   it("blocks an exact account mismatch and invalid IDs without leaking credentials", async () => {
@@ -127,9 +199,13 @@ describe("controlled provider diagnostics", () => {
   it("reads only the exact Business Profile location and leaves posting unknown", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(reply({ name: "accounts/a1/locations/l2" }));
     const result = await probeProvider({ provider: "google_business", accessToken: TOKEN,
+      capabilityKey: { ...key, provider: "google_business", accountRef: "accounts/a1/locations/l2",
+        actionKey: "google_business.location.read" },
+      credentialState: "eligible",
       expectedLocationRef: "accounts/a1/locations/l2", fetchImpl, now: () => NOW });
     expect(result).toMatchObject({ token: { state: "verified" }, account: { state: "verified" },
       scopes: { state: "unknown" }, action: { state: "unknown" } });
+    expect(result.capability).toMatchObject({ state: "verified", reason: "exact_read_verified" });
     expect(fetchImpl.mock.calls[0]![0]).toBe("https://mybusiness.googleapis.com/v4/accounts/a1/locations/l2");
     expect(fetchImpl.mock.calls[0]![1]).toMatchObject({ method: "GET", redirect: "error" });
     expect(fetchImpl.mock.calls[0]![1].body).toBeUndefined();
@@ -146,11 +222,17 @@ describe("controlled provider diagnostics", () => {
     ] as const) {
       const fetchImpl = vi.fn().mockResolvedValue(response);
       const result = await probeProvider({ provider: "google_business", accessToken: TOKEN,
+        capabilityKey: { ...key, provider: "google_business", accountRef: "accounts/a1/locations/l2",
+          actionKey: "google_business.location.read" },
+        credentialState: "eligible",
         expectedLocationRef: "accounts/a1/locations/l2", fetchImpl });
       expect(result.account.state).toBe(state);
     }
     const fetchImpl = vi.fn();
     const invalid = await probeProvider({ provider: "google_business", accessToken: TOKEN,
+      capabilityKey: { ...key, provider: "google_business", accountRef: "https://outside.example",
+        actionKey: "google_business.location.read" },
+      credentialState: "eligible",
       expectedLocationRef: "https://outside.example", fetchImpl });
     expect(invalid.account.state).toBe("blocked");
     expect(fetchImpl).not.toHaveBeenCalled();

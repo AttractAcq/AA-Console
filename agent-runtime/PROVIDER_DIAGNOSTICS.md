@@ -24,6 +24,31 @@ missing policies remain `unknown`; explicit invalidity, missing scopes,
 app mismatch and exact account mismatch are `blocked`. The module accepts
 only GET requests to fixed Meta or Google hosts and refuses redirects.
 
+The opt-in `probeProvider` request now requires a `capabilityKey` with the
+exact client ID, integration row ID, nonsecret credential version, provider,
+account/location reference, and action key, plus the current local credential
+state (`eligible`, `revoked`, or `unknown`). A revoked or unknown generation is
+not probed. Its `capability` result is made by
+the pure `evaluateProviderCapability` contract in `provider-capability.ts`.
+It uses a 60-second direct-read evidence window, capped by known token expiry.
+Only `meta.account.read`, `instagram.account.read`, and
+`google_business.location.read` can become `verified`, and only after the
+provider's exact account/location read succeeds with the required supporting
+checks. Configured/connected metadata, another client or row, a rotated
+credential, another destination or action, expired/stale evidence, revocation,
+and unsupported providers cannot produce a positive result. Publish, send,
+build, spend and all other external actions remain `unknown` or `blocked`.
+The result contains only fixed reason codes, timestamps and nonsecret key
+fields; it never contains a credential or provider response body.
+
+The key is caller-supplied local identity, not an assertion from Meta or
+Google that the credential belongs to that AA client and row. A future
+production caller must obtain the key and local state from an authorized,
+exact-row credential lookup and persist evidence against the same credential version. This slice
+does not read a production credential, write a capability record, grant an
+external action, or change any UI status. Q019's schema and controlled real
+provider pilots remain prerequisites for an operational B013 rights gate.
+
 Before operational use, B015 still needs a reviewed account/scope policy for
 each action, per-client OAuth and refresh custody, a way to persist dated
 capability evidence without exposing tokens, due-view preflight, and an
