@@ -1,0 +1,45 @@
+name: Production release approval
+
+# Held bootstrap: this check refreshes only an already human-approved exact
+# GitHub packet in the approval ledger. It performs no merge or deployment.
+# Main protection must require its exact job after credential custody and the
+# no-bypass release policy are reviewed.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited, ready_for_review, labeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  actions: read
+
+jobs:
+  approved-release:
+    name: Approved production release (trusted)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # pull_request_target executes the workflow and scripts from the
+      # protected base. Never checkout the PR head in this secret-bearing job.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Fetch the PR commit as non-executable Git data
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          [[ "$PR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid PR commit SHA'; exit 1; }
+          git fetch --no-tags --no-write-fetch-head origin "$PR_HEAD_SHA"
+      - name: Require current exact AAL2 Inbox release approval
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.AA_RELEASE_SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/check-approved-production-release.mjs

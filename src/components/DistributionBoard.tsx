@@ -122,7 +122,7 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
       name: "scheduled_time",
       label: "Time",
       kind: "time",
-      hint: "The client's local time. Left empty, the post goes out at 09:00 their time.",
+      hint: "The client's local time. Left empty, the calendar entry uses 09:00. Publication remains subject to the Engine route and exact-version approval.",
     },
     {
       name: "platform",
@@ -142,6 +142,11 @@ export function DistributionBoard({ channel }: { channel: "organic" | "paid" }) 
           {PAID_SCHEDULING_BLOCKER}
         </p>
       )}
+      <p className="text-sm text-muted-foreground">
+        Scheduling creates a calendar entry, not a publishable route. A post without an approved
+        Engine slot stays blocked; publication also requires its exact-version Approval Inbox decision.
+        See Engine for the current route blocker.
+      </p>
       <div className="flex justify-end">
         <Button icon={CalendarPlus} disabled={channel === "paid"} onClick={() => setScheduleOpen(true)}>
           Schedule {channel === "paid" ? "Paid" : "Organic"}

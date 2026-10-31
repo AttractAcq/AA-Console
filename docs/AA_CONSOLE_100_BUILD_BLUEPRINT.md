@@ -62,6 +62,13 @@ The GPT must request or derive the following from the business information suppl
 
 > Read the entire `AA_CONSOLE_100_BUILD_BLUEPRINT.md` and the supplied business dossier. Create one persistent goal: preserve the closed release gate `R000`, complete every `B001`–`B106` row in dependency order and obtain the evidence in §6, so AA Console meets the 100/100 definition in §1. Start by rechecking the current repository, production migration/deployment state and any open PR; never assume this document's 30 October snapshot is still current. For each row, inspect its existing code, implement only the missing delta, add meaningful permission, version, idempotency and failure tests, update the UI and backend connections, record evidence and blockers, and then move to the next unblocked row. Use the exact-version human Approval Inbox for every external action. Do not mark a row complete on code or mocked tests when its acceptance criterion requires a real account, external ID, consented lead, booking or revenue event. Alex's recorded instruction for this build session permits merging and releasing all following work to main **only when CI jobs pass**; prepare reviewable PRs, meet the four required branch checks, preserve migration order, and capture each deployed receipt. A separate direct approval authorized the exact production Railway gateway URL variable and redeploy described in the release ledger. Keep a durable progress ledger keyed by the IDs in this document. Report 100/100 only after every mandatory row and the end-to-end acceptance matrix pass.
 
+**Execution order override (30 October revision).** The goal prompt above says
+"in dependency order". Read that as the order defined in §3.1, which puts the
+`L000` live-evidence milestone and its thin path first and distinguishes a
+contract prerequisite from an external-evidence prerequisite. Everything else
+in the prompt stands, including the exact-version Approval Inbox boundary and
+the rule against marking a row complete from code or mocked tests.
+
 Each row below contains its own **Prompt** column. When working on one row, send that prompt with this whole document and the business dossier. The prompt is intentionally specific, but the GPT must first inspect the latest code and adapt file names and schema versions to the current repository. Where a row says **new**, the named component does not yet exist at this snapshot. Where it says **reconcile**, code exists but evidence or wiring is incomplete.
 
 **Definition of done for every code row:** affected backend and frontend paths build; relevant unit, database and integration tests pass; cross-client and role checks are demonstrated; retry/idempotency and stale-version cases are tested; user-facing blocker and success states are visible; a PR links to the row ID; migrations are ordered and reversible where practical; and live evidence is attached when the row's acceptance demands it. The release log records deployed SHA, migration version, feature switches, test account/client and rollback path.
@@ -256,6 +263,82 @@ The merged [delivery-flow map](https://github.com/AttractAcq/AA-Console/blob/mai
 The IDs are in delivery order. `Depends on` is the strict prerequisite set, so independent rows within a phase may be implemented in parallel but **must not be marked live** until their dependencies and the external acceptance gate pass. B003 is an independent CI guard; B002 live parity is a separate row and its open status does not undo the verified B003 check. Downstream rows still require their own named prerequisites. A phase can contain source work while earlier production release approval is pending; no feature switch should be enabled to skip a failed predecessor. The approval contract, identity and event schema, account connections, and a truthful due/blocker view precede every new external executor. Inspect merged PR #233's code as a deployed code/schema slice whose external behavior remains unverified; do not rerun migrations 244–259 or infer external effects from source presence. Repair applied defects with later reviewed migrations. Safe migration 260 is applied with `google_ad_build.supported=false`; any later migration enabling it must wait for the deployed handler, exact approval and real-account proof. For this active build session, Alex directly authorized merges and production releases to `main` when CI jobs pass, superseding the older Chief-of-Staff routing language in `AGENTS.md`; record exact PR, SHA, migration and deployment receipts. Product external effects still require their exact-version human decisions in the unified Approval Inbox.
 
 Every row's Prompt inherits §1 and must update the progress ledger with: `ID`, current SHA, PR, migration IDs, tests, permission/negative tests, deployed SHA, real account/client, external ID/URL, observation time, blocker, rollback and reviewer. Do not store access tokens or personal contact data in that ledger.
+
+### 3.1 Live-first execution order (`L000`)
+
+The order above assumed evidence accumulates upward: harden the foundation,
+then operate on it. In practice that produced a circular dependency. Rows
+demand External or Outcome evidence; that evidence can only come from a
+connected client with its switches on; the switches stayed off until the rows
+were verified. `B091` states the loop plainly -- no manifest-bound sheet could
+be observed "because production had zero paid Google campaigns" -- and `B008`
+records 34 approval classes "inventoried and zero operational" for the same
+reason. On 30 October production held one `client_engine_settings` row with
+every switch false, and zero leads, submissions, enrolments, appointments,
+templates, sequences, booking windows and capture endpoints.
+
+The dependency graph is not wrong. The rule that broke was treating every
+`Depends on` entry as needing *complete* evidence before a dependent row may
+start, which conflated two different things:
+
+- A **contract prerequisite** is code, schema or a due/blocker view the
+  dependent row cannot compile or claim against. It still strictly precedes.
+- An **external-evidence prerequisite** is a row whose own acceptance needs a
+  real account, external ID, consented lead, booking or cash event. It does
+  not block a dependent row from being built, and in several cases its
+  evidence arrives *as a by-product* of the dependent row running.
+
+A row may therefore start once its contract prerequisites have evidence. An
+external-evidence prerequisite does not gate starting; it gates that
+prerequisite's own closure, and both rows stay open until their own acceptance
+is met. Nothing here lets a row be marked live early: §6 is unchanged.
+
+**`L000` -- first live evidence.** A milestone, not a build row: the first
+externally observed act by this system on a real connected account, with its
+durable reference recorded. It is the earliest point at which any row can
+reach the External rung in §2.1, and the seven consecutive local days `B105`
+requires cannot begin before it. Acceptance evidence, either one: an approved
+organic publication on a connected Attract Acquisition account with a stored
+permalink or provider ID; or one sourced and consented lead arriving through a
+live capture endpoint, with its lead row and the exact consent wording
+recorded. Neither is credited from a mock, from a database row alone, or from
+a form posted against an endpoint that is switched off.
+
+**Execution order from this revision.** Work `L000` first, through the
+thinnest path that reaches a real external act, then widen:
+
+1. `L000` prerequisites only: booking configuration (`B066`), one live capture
+   endpoint (`B058`), one approved template and nurture sequence (`B067`,
+   `B068`), and lead magnet build and delivery where the chosen path needs
+   them (`B062`, `B063`). These rest on the capture, courier and booking
+   contracts already deployed, not on the remaining foundation rows.
+2. `L000` itself.
+3. The in-progress foundation rows whose External evidence `L000` traffic
+   then supplies as a by-product, listed below.
+4. Every remaining `B0xx` row in its existing dependency order.
+5. `B105` and `B106`, whose clocks start at `L000`.
+
+**Rows that collect External evidence as a by-product of `L000` traffic**, and
+must not be treated as prerequisites for it:
+
+- `B008` -- approval classes become operational when a real action is approved
+  and executed through the Inbox, not when more classes are inventoried.
+- `B059`, `B060` -- first-party conversion telemetry and the lead/source event
+  spine have no events to join until leads exist.
+- `B010`, `B012`, `B091` -- paid-route rows whose acceptance needs real
+  provider objects. None of them gates the organic `L000` path.
+
+**Unchanged by this revision.** Every external action still requires its
+exact-version human decision in the unified Approval Inbox before execution;
+§1 and §6 stand as written. The generic campaign action claim hold in
+`docs/campaign-action-claim-hold.md` stays closed until its atomic SQL claim
+contract is reviewed and released; the `L000` organic path does not use that
+spine, because the nurture sequencer and outbound courier claim through
+`enroll_due_leads_v6`, `advance_sequences_v6` and `claim_outbound_messages`
+under the client's own outbound switch. §1.1 rule 6 stands: a `supported` flag
+may be true only where the deployed runtime registers the handler, which
+migration 280 corrected and now constrains. No row may be marked verified from
+a mock, and `B105`/`B106` still require two distinct service businesses.
 
 ## 4. Ordered build table
 

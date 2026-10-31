@@ -19,6 +19,7 @@ type Asset = {
 type Campaign = {
   id: string; name: string; daily_budget: number;
   target_countries: string[]; meta_campaign_id: string | null;
+  meta_ad_set_id: string | null;
   meta_built_at: string | null; created_at: string;
 };
 type Integration = {
@@ -69,10 +70,8 @@ export function RecruitmentDistributionPanel() {
           .eq("agent_key", "recruitment_meta_build")
           .eq("client_id", clientId).order("created_at", { ascending: false }).limit(50),
       ]);
-      // recruitment_meta_campaigns arrives with migration 133. Everything
-      // else on this panel reads tables that already exist, so the approved
-      // ads still list and the Meta account still reports — only building is
-      // out of reach. Throwing on this hid all of it behind one error.
+      // If a rollout is still missing migration 133, retain the approved-ad
+      // and Meta-account context while the campaign request is unavailable.
       const campaignsMissing = isMissingTable(rows.error);
       setUnavailable(campaignsMissing);
       const failure = meta.error ?? images.error ?? copy.error
@@ -120,43 +119,44 @@ export function RecruitmentDistributionPanel() {
     setBusy(false);
     if (createError) {
       setError(isMissingFunction(createError)
-        ? `Building is unavailable. ${MIGRATION_PENDING_NOTE}`
+        ? `Campaign requests are unavailable. ${MIGRATION_PENDING_NOTE}`
         : createError.message);
       return;
     }
     setSelected([]); setName(""); setBudget(""); setCountries("");
-    setNotice("Queued. The selected ads will be built in AA's Ads Manager as a paused campaign.");
+    setNotice("Campaign saved and a held Approval Inbox request recorded. No Meta objects were created.");
     void refresh();
   }
 
-  async function retry(id: string) {
+  async function refreshInboxRequest(id: string) {
     setError(null); setNotice(null); setBusy(true);
-    const { error: retryError } = await supabase.rpc("request_recruitment_meta_build", { p_campaign_id: id });
+    const { error: requestError } = await supabase.rpc("request_recruitment_meta_build", { p_campaign_id: id });
     setBusy(false);
-    if (retryError) setError(isMissingFunction(retryError)
-      ? `Building is unavailable. ${MIGRATION_PENDING_NOTE}`
-      : retryError.message);
-    else { setNotice("Recruitment Meta build queued again."); void refresh(); }
+    if (requestError) setError(isMissingFunction(requestError)
+      ? `Inbox requests are unavailable. ${MIGRATION_PENDING_NOTE}`
+      : requestError.message);
+    else { setNotice("The held Approval Inbox request is current. No new Meta objects were created by this request."); void refresh(); }
   }
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading recruitment distribution…</p>;
   return <div className="space-y-5">
     <div>
       <h2 className="text-lg font-semibold">Recruitment Distribution</h2>
-      <p className="text-sm text-muted-foreground">Select approved AA hiring ads and build them in the house Meta ad account. Campaigns, ad sets and ads are created paused.</p>
+      <p className="text-sm text-muted-foreground">Prepare AA hiring ads for exact Approval Inbox review. Meta creation remains held until its AAL2 decision and prewrite checks are connected.</p>
     </div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status" className="text-sm text-brand-strong">{notice}</p>}
+    <a className="text-sm text-brand-strong underline" href="/approvals">Open Approval Inbox</a>
     {unavailable && (
       <p role="status" className="text-sm text-muted-foreground">
-        Building recruitment ads is unavailable. {MIGRATION_PENDING_NOTE} The approved ads below still show what is ready to go.
+        Recruitment campaign requests are unavailable. {MIGRATION_PENDING_NOTE} The approved ads below remain available for review.
       </p>
     )}
     <section className="rounded-lg border border-border p-4">
       <h3 className="font-semibold">AA Ads Manager</h3>
       {accountReady
         ? <p className="text-sm text-muted-foreground">Connected: {integration?.ad_account_id} · Page {integration?.meta_page_id} · Pixel {integration?.meta_pixel_id}</p>
-        : <p className="text-sm text-destructive">Connect AA&apos;s Meta ad account, Facebook page and pixel on the house client before building recruitment ads.</p>}
+        : <p className="text-sm text-muted-foreground">Connect AA&apos;s Meta ad account, Facebook page and pixel before any future approved build. You can still prepare a held request.</p>}
     </section>
     <section className="space-y-3 rounded-lg border border-border p-4">
       <h3 className="font-semibold">New recruitment campaign</h3>
@@ -165,7 +165,7 @@ export function RecruitmentDistributionPanel() {
         <label className="text-sm">Daily budget<input aria-label="Daily budget" type="number" min="0.01" step="0.01" value={budget} onChange={(e) => setBudget(e.target.value)} className="mt-1 w-full rounded border border-input bg-background p-2" /></label>
         <label className="text-sm">Countries<input aria-label="Countries" placeholder="ZA, GB" value={countries} onChange={(e) => setCountries(e.target.value)} className="mt-1 w-full rounded border border-input bg-background p-2" /></label>
       </div>
-      <p className="text-xs text-muted-foreground">Daily budget uses the AA ad account&apos;s currency. The build optimises for completed applications and needs the connected pixel.</p>
+      <p className="text-xs text-muted-foreground">The budget, countries, selected creative and account are frozen in a held Inbox request. No build or spend starts here.</p>
       {eligible.length === 0 ? <p className="text-sm text-muted-foreground">No approved recruitment image has a complete brief and HTTPS apply URL yet.</p> :
         <fieldset className="space-y-2"><legend className="text-sm font-medium">Select ads</legend>
           {eligible.map((asset) => {
@@ -177,21 +177,21 @@ export function RecruitmentDistributionPanel() {
             </label>;
           })}
         </fieldset>}
-      <Button onClick={() => void submit()} disabled={unavailable || !accountReady || busy || eligible.length === 0}>Push selected ads to Ads Manager</Button>
+      <Button onClick={() => void submit()} disabled={unavailable || busy || eligible.length === 0}>Save campaign and request Inbox review</Button>
     </section>
     <section className="space-y-2">
       <h3 className="font-semibold">Recruitment campaigns</h3>
       {unavailable ? <p className="text-sm text-muted-foreground">Recruitment campaigns cannot be listed yet. {MIGRATION_PENDING_NOTE}</p> :
-        campaigns.length === 0 ? <p className="text-sm text-muted-foreground">No recruitment campaigns built yet.</p> :
+        campaigns.length === 0 ? <p className="text-sm text-muted-foreground">No recruitment campaigns prepared yet.</p> :
         campaigns.map((campaign) => {
           const job = lastJob(campaign.id);
           const running = job && ["queued", "claimed", "running"].includes(job.status);
           return <div key={campaign.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
-            <div><p className="font-medium">{campaign.name}</p><p className="text-xs text-muted-foreground">{campaign.target_countries.join(", ")} · {campaign.daily_budget} per day · {campaign.meta_built_at ? "Ready in Ads Manager, paused" : running ? "Building" : job?.status === "failed" ? "Build failed" : "Waiting"}</p>
+            <div><p className="font-medium">{campaign.name}</p><p className="text-xs text-muted-foreground">{campaign.target_countries.join(", ")} · {campaign.daily_budget} per day · {campaign.meta_built_at ? "Created in Ads Manager, paused" : campaign.meta_campaign_id || campaign.meta_ad_set_id ? "Partial Meta objects may exist; reconcile in Ads Manager" : running ? "Legacy build job held; verify outcome" : job?.status === "failed" ? "Legacy build held; inspect failure and provider" : "Held Inbox request; no new Meta objects will be created"}</p>
               {job?.error && <p className="text-xs text-destructive">{job.error}</p>}</div>
             <div className="flex gap-2">
               {campaign.meta_campaign_id && integration?.ad_account_id && <a className="rounded border border-border px-3 py-2 text-sm" href={adsManagerUrl(integration.ad_account_id, campaign.meta_campaign_id)} target="_blank" rel="noopener noreferrer">Open in Ads Manager</a>}
-              {!campaign.meta_built_at && !running && <Button onClick={() => void retry(campaign.id)} disabled={busy}>Retry build</Button>}
+              {!campaign.meta_built_at && <Button onClick={() => void refreshInboxRequest(campaign.id)} disabled={busy}>Refresh Inbox request</Button>}
             </div>
           </div>;
         })}

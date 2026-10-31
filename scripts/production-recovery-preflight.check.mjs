@@ -23,21 +23,21 @@ test('reads tracked history from a checkout path containing spaces and a URL fra
   }
 })
 
-test('accepts a held post-279 migration file without changing the released recovery baseline', () => {
+test('accepts a held post-282 migration file without changing the released recovery baseline', () => {
   const fixtureDir = mkdtempSync(join(tmpdir(), 'aa-q019-release-'))
   try {
     const migrationsDir = join(fixtureDir, 'supabase/migrations')
     const verificationDir = join(fixtureDir, 'supabase/verification')
     mkdirSync(migrationsDir, { recursive: true })
     mkdirSync(verificationDir, { recursive: true })
-    writeFileSync(join(verificationDir, 'released-migration-version.txt'), '20261030160000\n')
+    writeFileSync(join(verificationDir, 'released-migration-version.txt'), '20261030190000\n')
     const sourceMigrationsDir = fileURLToPath(new URL('../supabase/migrations/', import.meta.url))
     for (const name of readdirSync(sourceMigrationsDir).filter((file) => /^\d{14}_.+\.sql$/.test(file))) {
       writeFileSync(join(migrationsDir, name), '')
     }
-    writeFileSync(join(migrationsDir, '20261030170000_280_held_candidate.sql'), '')
+    writeFileSync(join(migrationsDir, '20261231000000_999_held_candidate.sql'), '')
     assert.deepEqual(trackedHistory(fixtureDir), expected)
-    writeFileSync(join(verificationDir, 'released-migration-version.txt'), '20261030170000\n')
+    writeFileSync(join(verificationDir, 'released-migration-version.txt'), '20261231000000\n')
     assert.throws(() => trackedHistory(fixtureDir), /baseline changed/)
   } finally {
     rmSync(fixtureDir, { recursive: true, force: true })
@@ -82,11 +82,11 @@ function run(change) {
   return verifyRecoverySnapshots({ targetRef: PRODUCTION_REF, source, restore, expected, now })
 }
 
-test('accepts a structurally identical offline 279 source and inactive disposable restore, without closing Q019', () => {
+test('accepts a structurally identical offline 282 source and inactive disposable restore, without closing Q019', () => {
   const result = run()
   assert.deepEqual(result, {
     status: 'offline_snapshot_consistent', targetRef: PRODUCTION_REF,
-    sourceMigrationHead: '20261030160000', migrationCount: 296,
+    sourceMigrationHead: '20261030190000', migrationCount: 299,
     cronCount: 18, storageObjectCount: 2, vaultSecretCount: 1,
     allDisposableCronInactive: true, q019Closed: false,
     remaining: 'Verify capture provenance, encrypted off-site retention, hosted recovery path, Auth/settings/secrets and independent restore before production SQL.',

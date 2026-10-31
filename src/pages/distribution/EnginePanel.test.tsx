@@ -255,14 +255,14 @@ describe("the second switch", () => {
     await waitFor(() =>
       expect(rpc).toHaveBeenCalledWith("set_publishing_enabled", { p_client_id: "c1", p_enabled: true }),
     );
-    expect(await screen.findByText(/runtime has to have it on too/)).toBeInTheDocument();
+    expect(await screen.findByText(/Exact outgoing Approval Inbox authority/)).toBeInTheDocument();
   });
 
   it("offers to stop once it is on", async () => {
     withState(ready);
     state.publishing = true;
     render(<EnginePanel />);
-    expect(await screen.findByText(/Approved posts go out on this client's accounts/)).toBeInTheDocument();
+    expect(await screen.findByText(/Client publishing switch is on/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Stop publishing" }));
     await waitFor(() =>
       expect(rpc).toHaveBeenCalledWith("set_publishing_enabled", { p_client_id: "c1", p_enabled: false }),
@@ -271,8 +271,7 @@ describe("the second switch", () => {
 
   it("does not claim a client with no settings at all is publishing", async () => {
     // The fallback is what a client who has never been configured reads,
-    // and "posts go out on this client's accounts" would be a lie about a
-    // real account.
+    // and the empty state must not imply publication authority.
     withState(ready);
     state.noSettings = true;
     render(<EnginePanel />);
@@ -317,8 +316,8 @@ describe("why nothing went out", () => {
     ];
     render(<EnginePanel />);
     expect(await screen.findByText("Publishing is off for this client.")).toBeInTheDocument();
-    expect(screen.getByText("Ready to go out.")).toBeInTheDocument();
-    expect(screen.getByText(/1 of 2 ready/)).toBeInTheDocument();
+    expect(screen.getByText(/No listed blocker; exact Inbox publication approval/)).toBeInTheDocument();
+    expect(screen.getByText(/1 of 2 without a listed blocker/)).toBeInTheDocument();
     expect(screen.getByText("2 attempts")).toBeInTheDocument();
   });
 
@@ -326,6 +325,109 @@ describe("why nothing went out", () => {
     withState(ready);
     render(<EnginePanel />);
     await screen.findByText(/Nothing is posted/);
-    expect(screen.queryByText(/Waiting to go out/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Publication queue/)).not.toBeInTheDocument();
+  });
+});
+
+describe("the gates nothing could set", () => {
+  /** Configured and capped but switched off, which is the ordinary starting point. */
+  const ready = {
+    client_id: "c1",
+    enabled: false,
+    readiness: "Ready, switched off",
+    timezone: "Europe/London",
+    month_cap_usd: null,
+    engine_running: false,
+    advances_without_a_person: false,
+  };
+
+  it("says the missing cap means the tick skips the client, not that it is merely unset", async () => {
+    withState(ready);
+    render(<EnginePanel />);
+    expect(await screen.findByText(/skips this client entirely/)).toBeInTheDocument();
+  });
+
+  it("writes the cap for the month the tick will read", async () => {
+    withState(ready);
+    render(<EnginePanel />);
+
+    const field = await screen.findByLabelText("Monthly AI spend cap in USD");
+    await userEvent.type(field, "250");
+    await userEvent.click(screen.getByRole("button", { name: "Save cap" }));
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("set_client_engine_budget_v6", {
+      p_client_id: "c1",
+      p_month: expect.any(String),
+      p_cap_usd: 250,
+    }));
+  });
+
+  it("does not offer to save a cap nobody typed", async () => {
+    withState(ready);
+    render(<EnginePanel />);
+    expect(await screen.findByRole("button", { name: "Save cap" })).toBeDisabled();
+  });
+
+  it("writes a corrected timezone", async () => {
+    withState(ready);
+    render(<EnginePanel />);
+
+    const field = await screen.findByLabelText("Client timezone");
+    await userEvent.clear(field);
+    await userEvent.type(field, "Africa/Johannesburg");
+    await userEvent.click(screen.getByRole("button", { name: "Save timezone" }));
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("set_client_timezone_v6", {
+      p_client_id: "c1",
+      p_timezone: "Africa/Johannesburg",
+    }));
+  });
+
+  it("does not offer to save the timezone it already has", async () => {
+    withState(ready);
+    render(<EnginePanel />);
+    // Seeded from readiness, so the button has nothing to do until it changes.
+    expect(await screen.findByRole("button", { name: "Save timezone" })).toBeDisabled();
+  });
+
+  it("offers the global switch, which no screen used to expose", async () => {
+    withState(ready);
+    render(<EnginePanel />);
+
+    expect(await screen.findByText(/off for every client/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Switch on globally" }));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("set_engine_running", {
+        p_enabled: true,
+        p_note: expect.any(String),
+      }),
+    );
+  });
+
+  it("warns that a running engine still parks at idea or brief without policy approval", async () => {
+    withState({
+      ...ready,
+      enabled: true,
+      readiness: "Running, but a person must choose each idea",
+      engine_running: true,
+      month_cap_usd: 250,
+      advances_without_a_person: false,
+    });
+    render(<EnginePanel />);
+    expect(await screen.findByText(/still needed before a slot can pass idea or brief/)).toBeInTheDocument();
+  });
+
+  it("drops that warning once the pipeline can advance on its own", async () => {
+    withState({
+      ...ready,
+      enabled: true,
+      readiness: "Running",
+      engine_running: true,
+      month_cap_usd: 250,
+      advances_without_a_person: true,
+    });
+    render(<EnginePanel />);
+    await screen.findByText(/The engine is running for this client/);
+    expect(screen.queryByText(/still needed before a slot can pass/)).not.toBeInTheDocument();
   });
 });

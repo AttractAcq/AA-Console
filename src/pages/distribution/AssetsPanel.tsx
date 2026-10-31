@@ -148,7 +148,9 @@ export function AssetsPanel() {
   return (
     <div>
       <p className="mb-4 text-sm text-muted-foreground">
-        Everything approved and ready to go out.{" "}
+        These assets passed creative review. Scheduling places one on the calendar; it does not
+        authorize publication. A post created here has no approved Engine slot and stays blocked
+        until its exact-version publication approval is connected through Approval Inbox.{" "}
         {waiting > 0
           ? `${waiting} still ${waiting === 1 ? "has" : "have"} no date.`
           : "All of it is scheduled."}
@@ -266,6 +268,10 @@ export function AssetsPanel() {
           {error && (
             <p role="alert" className="text-sm text-destructive">{error}</p>
           )}
+          <p className="text-xs text-muted-foreground">
+            This creates a calendar entry. It stays blocked from publishing until an approved
+            Engine slot and the exact-version Approval Inbox decision are connected.
+          </p>
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"

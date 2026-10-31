@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-10-30T06:51:00Z",
+  "updated_at": "2026-10-30T19:45:00Z",
   "objective": "AA-Console 100/100 autonomous service-business acquisition and content system, subject to exact-version human approval for every external publish, send, deployment, and spend action in one Approval Inbox.",
   "blueprint": {
     "artifact": "docs/AA_CONSOLE_100_BUILD_BLUEPRINT.md",
-    "sha256": "5ba2012c04239ab3fc3186e16fedfb14d789c342f403ac86015ef11dc3fb8bfa",
+    "sha256": "05ee38564286fef2a95d6a9185fd9d0c0361d624be8cd52149806bbdc0647f59",
     "build_rows": 106
   },
   "baseline": {
@@ -79,6 +79,20 @@
     },
     "external_action_switches": "publishing, proof publishing, campaign actions, lead magnet delivery and outbound messaging off; DB engine off; google_ad_build.supported=false",
     "limits": "No newly derived Google sheet was observed because production had zero paid Google campaigns and zero sheet jobs. B001 staging inventory, B002 parity and real-account acquisition remain open."
+  },
+  "l000": {
+    "state": "not_started",
+    "kind": "milestone",
+    "title": "First live evidence",
+    "definition": "The first externally observed act by this system on a real connected account, with its durable reference recorded. Earliest point at which any row can reach the External rung in section 2.1.",
+    "acceptance_evidence": "Either one: an approved organic publication on a connected Attract Acquisition account with a stored permalink or provider ID; or one sourced and consented lead arriving through a live capture endpoint, with its lead row and the exact consent wording recorded. Not credited from a mock, from a database row alone, or from a form posted against a switched-off endpoint.",
+    "authority": "Alex authorised the live-first reordering and the Attract Acquisition organic go-live on 30 October 2026, in session 01HMcL46LcFz8E4KAM2D4dCY.",
+    "thin_path_rows": ["B058", "B066", "B067", "B068", "B062", "B063"],
+    "byproduct_rows": ["B008", "B059", "B060", "B010", "B012", "B091"],
+    "starts_clock_for": ["B105", "B106"],
+    "blocker": "Production holds one client_engine_settings row with every switch false, and zero booking settings, booking windows, capture endpoints, lead magnets, message templates and nurture sequences. Migration 280 is merged to main but not applied; production migration head is 279.",
+    "observed_at": null,
+    "external_reference": null
   },
   "rows": {
     "B001": {
