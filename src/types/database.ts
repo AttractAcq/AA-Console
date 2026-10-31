@@ -4203,6 +4203,8 @@ export type Database = {
           offer_version_id: string | null
           optimisation_event: string | null
           paid_platform: string | null
+          runs_organic: boolean
+          runs_paid: boolean
           starts_on: string | null
           status: string
           target_countries: string[]
@@ -4250,6 +4252,8 @@ export type Database = {
           offer_version_id?: string | null
           optimisation_event?: string | null
           paid_platform?: string | null
+          runs_organic?: boolean
+          runs_paid?: boolean
           starts_on?: string | null
           status?: string
           target_countries?: string[]
@@ -4297,6 +4301,8 @@ export type Database = {
           offer_version_id?: string | null
           optimisation_event?: string | null
           paid_platform?: string | null
+          runs_organic?: boolean
+          runs_paid?: boolean
           starts_on?: string | null
           status?: string
           target_countries?: string[]
@@ -25656,6 +25662,8 @@ export type Database = {
           offer_version_id: string | null
           optimisation_event: string | null
           paid_platform: string | null
+          runs_organic: boolean
+          runs_paid: boolean
           starts_on: string | null
           status: string
           target_countries: string[]

@@ -51,9 +51,34 @@ beforeEach(async () => {
 
  create table clients(id uuid primary key, name text not null default 'A client');
 
+ -- Everything the 232 creator touches, stubbed just enough to apply and run.
+ -- The route handling is what 302 changes; the status gate, readiness read,
+ -- deduplication, offer lookup and link writes are preserved and exercised.
  create table market_opportunities(
    id uuid primary key,
-   client_id uuid not null references clients(id) on delete cascade);
+   client_id uuid not null references clients(id) on delete cascade,
+   name text not null default 'A micro-niche',
+   status text not null default 'approved');
+ create table opportunity_links(
+   opportunity_id uuid not null,
+   client_id uuid not null,
+   role text not null,
+   campaign_id uuid,
+   offer_id uuid,
+   unique (opportunity_id, role, campaign_id));
+ create table opportunity_events(
+   opportunity_id uuid not null, client_id uuid not null,
+   event text not null, actor text not null, detail text);
+ create table opportunity_readiness(
+   opportunity_id uuid primary key, blocker text);
+ create table service_offer_versions(
+   id uuid primary key, offer_id uuid, client_id uuid, version integer not null default 1);
+ create table service_offer_signoffs(
+   offer_version_id uuid, client_id uuid);
+ create function can_shape_opportunity(p uuid) returns boolean
+   language sql stable as $s$ select true $s$;
+ create function opportunity_brief_v6(p uuid) returns text
+   language sql stable as $s$ select 'A generated brief' $s$;
 
  create table client_campaigns(
    id uuid primary key default gen_random_uuid(),
@@ -65,6 +90,8 @@ beforeEach(async () => {
    acquisition_mode text not null default 'legacy',
    paid_platform text,
    cloned_from_campaign_id uuid,
+   created_at timestamptz not null default now(),
+   updated_at timestamptz not null default now(),
    unique (id, client_id));
 
  alter table client_campaigns
@@ -104,6 +131,7 @@ beforeEach(async () => {
 
  insert into clients(id) values('${CLIENT}');
  insert into market_opportunities(id, client_id) values('${OPPORTUNITY}', '${CLIENT}');
+ insert into opportunity_readiness(opportunity_id) values('${OPPORTUNITY}');
  -- The twenty production campaigns are all legacy. Mirror one.
  insert into client_campaigns(client_id, name, brief) values('${CLIENT}', 'Legacy', 'A brief');
  insert into client_ideas(client_id) values('${CLIENT}');`);
@@ -142,6 +170,9 @@ describe("what a campaign may now declare", () => {
   });
 
   it("refuses a paid route with no platform, and a platform with no paid route", async () => {
+    // `paid_platform in (...)` is NULL, not false, when the column is null, and
+    // a CHECK only rejects on false. The first draft of this constraint passed
+    // a paid campaign with no platform for exactly that reason.
     await expect(campaign("both", true, true, null)).rejects.toThrow(/acquisition_route_check/);
     await expect(campaign("organic", true, false, "meta")).rejects.toThrow(
       /acquisition_route_check/,
@@ -155,18 +186,6 @@ describe("what a campaign may now declare", () => {
     ).rejects.toThrow(/immutable/);
   });
 
-  it("links the campaign to the micro-niche it targets", async () => {
-    await db.query(
-      `insert into client_campaigns
-         (client_id, name, brief, acquisition_mode, runs_organic, runs_paid, market_opportunity_id)
-       values ($1,'Targeted','A brief','organic',true,false,$2)`,
-      [CLIENT, OPPORTUNITY],
-    );
-    const row = await one<{ market_opportunity_id: string }>(
-      "select market_opportunity_id from client_campaigns where name = 'Targeted'",
-    );
-    expect(row.market_opportunity_id).toBe(OPPORTUNITY);
-  });
 });
 
 describe("the route on the idea", () => {
@@ -248,5 +267,80 @@ describe("the route on the idea", () => {
         [CLIENT, c.id],
       ),
     ).rejects.toThrow(/acquisition_route/);
+  });
+});
+
+describe("creating a both-route campaign from an opportunity", () => {
+  it("was unreachable before: the creator refused any mode but organic or paid", async () => {
+    const row = await one<{
+      acquisition_mode: string;
+      runs_organic: boolean;
+      runs_paid: boolean;
+      paid_platform: string | null;
+    }>("select * from create_campaign_from_opportunity_v6($1, 'both', 'meta')", [OPPORTUNITY]);
+    expect(row.acquisition_mode).toBe("both");
+    expect(row.runs_organic).toBe(true);
+    expect(row.runs_paid).toBe(true);
+    expect(row.paid_platform).toBe("meta");
+  });
+
+  it("still records the link in both directions", async () => {
+    await db.query("select create_campaign_from_opportunity_v6($1, 'both', 'meta')", [OPPORTUNITY]);
+    const link = await one<{ n: number }>(
+      "select count(*)::int as n from opportunity_links where opportunity_id = $1 and role = 'campaign'",
+      [OPPORTUNITY],
+    );
+    const event = await one<{ detail: string }>(
+      "select detail from opportunity_events where opportunity_id = $1",
+      [OPPORTUNITY],
+    );
+    expect(link.n).toBe(1);
+    expect(event.detail).toContain("both meta");
+  });
+
+  it("treats both as its own combination, so it does not collide with an organic one", async () => {
+    const organic = await one<{ id: string }>(
+      "select id from create_campaign_from_opportunity_v6($1, 'organic')",
+      [OPPORTUNITY],
+    );
+    const both = await one<{ id: string }>(
+      "select id from create_campaign_from_opportunity_v6($1, 'both', 'google')",
+      [OPPORTUNITY],
+    );
+    expect(both.id).not.toBe(organic.id);
+  });
+
+  it("returns the existing campaign rather than a duplicate for the same combination", async () => {
+    const first = await one<{ id: string }>(
+      "select id from create_campaign_from_opportunity_v6($1, 'both', 'meta')",
+      [OPPORTUNITY],
+    );
+    const again = await one<{ id: string }>(
+      "select id from create_campaign_from_opportunity_v6($1, 'both', 'meta')",
+      [OPPORTUNITY],
+    );
+    expect(again.id).toBe(first.id);
+  });
+
+  it("still refuses a both route with no paid platform", async () => {
+    await expect(
+      db.query("select create_campaign_from_opportunity_v6($1, 'both')", [OPPORTUNITY]),
+    ).rejects.toThrow(/Meta Ads or Google Ads/);
+  });
+
+  it("still refuses an opportunity that is not approved", async () => {
+    await db.query("update market_opportunities set status = 'draft' where id = $1", [OPPORTUNITY]);
+    await expect(
+      db.query("select create_campaign_from_opportunity_v6($1, 'both', 'meta')", [OPPORTUNITY]),
+    ).rejects.toThrow(/Approve it before building a campaign/);
+  });
+
+  it("still refuses when readiness reports a blocker", async () => {
+    await db.query("update opportunity_readiness set blocker = 'No proof for this claim.' where opportunity_id = $1", [
+      OPPORTUNITY,
+    ]);
+    await expect(
+      db.query("select create_campaign_from_opportunity_v6($1, 'both', 'meta')", [OPPORTUNITY]),
+    ).rejects.toThrow(/No proof for this claim/);
   });
 });

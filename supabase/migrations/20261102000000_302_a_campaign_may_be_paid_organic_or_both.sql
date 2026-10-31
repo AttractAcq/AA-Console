@@ -53,24 +53,19 @@
 
 alter table public.client_campaigns
   add column runs_organic boolean not null default false,
-  add column runs_paid boolean not null default false,
-  -- The notes: "this starts with the new campaign, which should now be linked
-  -- to the offer and the market opportunity." offer_version_id already exists;
-  -- nothing linked a campaign to the micro-niche it targets.
-  add column market_opportunity_id uuid
-    references public.market_opportunities (id) on delete set null;
+  add column runs_paid boolean not null default false;
+
+-- Deliberately no column for the market opportunity. The notes ask for a
+-- campaign "linked to the offer and the market opportunity", and both links
+-- already exist: offer_version_id on the row, and the opportunity_links table
+-- with role 'campaign', which create_campaign_from_opportunity_v6 writes in
+-- both directions. A column beside that table would be a second source of
+-- truth for one relationship, and the two would drift.
 
 comment on column public.client_campaigns.runs_organic is
   'Whether this campaign produces and distributes organic content. May be true together with runs_paid.';
 comment on column public.client_campaigns.runs_paid is
   'Whether this campaign produces paid creative. May be true together with runs_organic.';
-comment on column public.client_campaigns.market_opportunity_id is
-  'The micro-niche this campaign targets. A secondary offer is built against this opportunity.';
-
-create index client_campaigns_market_opportunity_idx
-  on public.client_campaigns (market_opportunity_id)
-  where market_opportunity_id is not null;
-
 -- `acquisition_mode` stays the column every existing reader consults, and gains
 -- 'both'. The two flags are the authority; the mode must agree with them, so a
 -- reader that checks `= 'organic'` keeps working for an organic-only campaign
@@ -228,22 +223,133 @@ begin
   insert into public.client_campaigns (
     client_id, name, brief, acquisition_mode, paid_platform,
     runs_organic, runs_paid, cloned_from_campaign_id, ideate_on_plan,
-    offer_version_id, market_opportunity_id
+    offer_version_id
   ) values (
     v_source.client_id, v_name, v_source.brief, p_target_mode, p_paid_platform,
     v_organic, v_paid, v_source.id, v_source.ideate_on_plan,
-    v_source.offer_version_id, v_source.market_opportunity_id
+    v_source.offer_version_id
   ) returning id into v_clone_id;
   return v_clone_id;
 end;
 $$;
 
 comment on function public.clone_campaign_for_route(uuid, text, text, text) is
-  'Creates an unplanned campaign running organic, paid, or both from the source brief, offer and market opportunity. No ideas, assets, approvals, external IDs or results are copied.';
+  'Creates an unplanned campaign running organic, paid, or both from the source brief and offer. No ideas, assets, approvals, external IDs or results are copied.';
 
 revoke execute on function public.clone_campaign_for_route(uuid, text, text, text)
   from public, anon;
 grant execute on function public.clone_campaign_for_route(uuid, text, text, text)
   to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- Creating a both-route campaign from an opportunity
+-- ---------------------------------------------------------------------------
+
+-- 232's creator refuses anything but organic or paid, so the route Alex asked
+-- for would have been unreachable from the place campaigns are actually meant
+-- to start. Only the route handling changes here: the opportunity status gate,
+-- the fresh readiness read, the per-route deduplication, the offer-version
+-- lookup and both link writes are preserved exactly.
+create or replace function public.create_campaign_from_opportunity_v6(
+  p_opportunity_id uuid,
+  p_acquisition_mode text,
+  p_paid_platform text default null,
+  p_name text default null
+) returns public.client_campaigns
+language plpgsql security definer set search_path = pg_catalog, public
+as $$
+declare
+  v_opportunity public.market_opportunities%rowtype;
+  v_readiness record;
+  v_offer_version uuid;
+  v_existing public.client_campaigns%rowtype;
+  v_campaign public.client_campaigns%rowtype;
+  v_organic boolean;
+  v_paid boolean;
+begin
+  select * into v_opportunity from public.market_opportunities where id = p_opportunity_id;
+  if not found then raise exception 'No such opportunity.' using errcode = 'P0001'; end if;
+  if coalesce(auth.role(), '') <> 'service_role'
+     and not public.can_shape_opportunity(v_opportunity.client_id) then
+    raise exception 'Only an admin or assigned client manager can create a campaign from an opportunity.'
+      using errcode = 'P0001';
+  end if;
+
+  if p_acquisition_mode not in ('organic', 'paid', 'both') then
+    raise exception 'Choose an organic, paid, or both route.' using errcode = 'P0001';
+  end if;
+  v_organic := p_acquisition_mode in ('organic', 'both');
+  v_paid := p_acquisition_mode in ('paid', 'both');
+  if v_paid and coalesce(p_paid_platform, '') not in ('meta', 'google') then
+    raise exception 'Choose Meta Ads or Google Ads for a paid campaign.' using errcode = 'P0001';
+  end if;
+
+  -- Approved onwards. Everything before that is still being worked out, and
+  -- a campaign against it is money spent on a maybe.
+  if v_opportunity.status not in ('approved', 'active', 'learning', 'scaling') then
+    raise exception 'This opportunity is %. Approve it before building a campaign on it.',
+      v_opportunity.status using errcode = 'P0001';
+  end if;
+
+  -- Readiness read now, not trusted from whenever the approval happened.
+  select * into v_readiness from public.opportunity_readiness
+   where opportunity_id = p_opportunity_id;
+  if v_readiness.blocker is not null then
+    raise exception '%', v_readiness.blocker using errcode = 'P0001';
+  end if;
+
+  -- One campaign per opportunity per route combination. 'both' is its own
+  -- combination, so it does not collide with an existing organic or paid one.
+  select c.* into v_existing
+    from public.client_campaigns c
+    join public.opportunity_links l on l.campaign_id = c.id
+   where l.opportunity_id = p_opportunity_id
+     and l.role = 'campaign'
+     and c.acquisition_mode = p_acquisition_mode
+     and coalesce(c.paid_platform, '') = coalesce(p_paid_platform, '')
+   order by c.created_at
+   limit 1;
+  if found then
+    return v_existing;
+  end if;
+
+  select v.id into v_offer_version
+    from public.opportunity_links l
+    join public.service_offer_versions v
+      on v.offer_id = l.offer_id and v.client_id = l.client_id
+    join public.service_offer_signoffs s
+      on s.offer_version_id = v.id and s.client_id = v.client_id
+   where l.opportunity_id = p_opportunity_id and l.role = 'offer'
+   order by v.version desc
+   limit 1;
+
+  insert into public.client_campaigns (
+    client_id, name, brief, acquisition_mode, paid_platform,
+    runs_organic, runs_paid, offer_version_id)
+  values (
+    v_opportunity.client_id,
+    coalesce(nullif(btrim(coalesce(p_name, '')), ''), v_opportunity.name),
+    public.opportunity_brief_v6(p_opportunity_id),
+    p_acquisition_mode,
+    case when v_paid then p_paid_platform end,
+    v_organic, v_paid,
+    v_offer_version)
+  returning * into v_campaign;
+
+  -- Both directions, unchanged: the link table is the relational record and
+  -- the event is what makes "why does this campaign exist" answerable from
+  -- the opportunity's own history.
+  insert into public.opportunity_links (opportunity_id, client_id, role, campaign_id)
+  values (p_opportunity_id, v_opportunity.client_id, 'campaign', v_campaign.id)
+  on conflict do nothing;
+
+  insert into public.opportunity_events (opportunity_id, client_id, event, actor, detail)
+  values (p_opportunity_id, v_opportunity.client_id, 'linked',
+          case when coalesce(auth.role(), '') = 'service_role' then 'agent' else 'human' end,
+          'Campaign created: ' || v_campaign.name || ' (' || p_acquisition_mode
+            || coalesce(' ' || p_paid_platform, '') || ').');
+
+  return v_campaign;
+end $$;
 
 select lock_down_definer_functions();
