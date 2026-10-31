@@ -53,11 +53,47 @@ These are **not** absorbed. Each holds content that is not in `main`.
 
 | PR | Branch | What is unique to it | Why it is still open |
 |---|---|---|---|
-| #254 | `codex/b006-public-perimeter` | `B006: forward Meta webhook through signed ingress`, plus a readiness-evidence clarification | The ingress files are in the stack; these two refinements on top are not. Needs its own review. |
+| #254 | `codex/b006-public-perimeter` | `B006: forward Meta webhook through signed ingress` (`bba8486`), plus a readiness-evidence clarification (`f487c34`) | The ingress files are in the stack; these two refinements on top are not. **Must not be merged as-is** — see the collision warning below. |
 | #257 | `codex/b002-staging-reconciliation` | 12 commits, data-preserving staging 259–279 reconciliation | Modifies a workflow file, which `verify-github-release-candidate` rejects a pull request for touching. Needs a decision on that guard. |
 | #267 | `codex/b009-fresh-release-probe` | 6 commits, authenticated uncached release probe | Same workflow-file guard as #257. |
-| #298 | `codex/b008-app-head-check` | `scripts/publish-approved-production-release-check.mjs`, `scripts/production-release-head-check-contract.mjs` | Neither file exists in the stack. It is a different design from #288's staged check, not a superset of it. |
+| #298 | `codex/b008-app-head-check` | `scripts/publish-approved-production-release-check.mjs`, `scripts/production-release-head-check-contract.mjs`, and that file's test (`a687dbc`, `042d4a7`, `002d3a7`) | Neither file exists in the stack. A different design from #288's staged check, not a superset of it. **Must not be merged as-is** — see the collision warning below. |
 | #314 | `codex/b013-capability-evaluator-20261030` | `provider-capability.ts` | Not in the stack at all. |
+
+## Why #254 and #298 must never be merged as-is
+
+The renumber changed **labels**, not the 14-digit **versions**. The version is
+the primary key. Both of these branches still carry the pre-renumber filenames,
+so every migration on them collides with the same version already on `main`:
+
+| version | on `main` | on those branches |
+|---|---|---|
+| `20261101000000` | `..._283_public_route_quota.sql` | `..._280_public_route_quota.sql` |
+| `20261101140000` | `..._300_production_release_merge_lease.sql` | `..._297_production_release_merge_lease.sql` |
+
+Merging leaves **two files per version** — three such collisions on #254,
+eighteen on #298. That makes the history ambiguous, breaks
+`scripts/schema-migration-order.mjs`, and breaks the recovery preflight's
+318-migration pin. Every one of those migrations is already applied to
+production under its renumbered name.
+
+#298 additionally resurrects `src/pages/account/IntegrationsPanel.test.tsx`,
+which `main` deleted in favour of two more specific files, and reverts newer
+`main` work: `SystemReadinessPanel.tsx` is 6 commits ahead there,
+`UnifiedApprovalInboxPanel.tsx` 4, `src/types/database.ts` 4,
+`IntegrationsPanel.tsx` 3, `readiness/collect.ts` 5.
+
+**So both are cherry-pick jobs, not merges.** Take the unique commits named in
+the table above onto current `main` as small pull requests. For #254's
+`f487c34`, re-apply its change to `main`'s `SystemReadinessPanel.tsx` rather
+than taking the file wholesale — it is six commits newer there, and taking a
+file wholesale from the older side is exactly what cost a round on #297.
+
+#257 and #267 carry no migrations and so have no collision; they are blocked
+only on the workflow-file guard.
+
+#314 was checked against this and is clean: five files, no migrations, and no
+commit on `main` has touched any of them since its base. It is the one of the
+five that can simply be merged.
 
 ## Conflict resolution rule, and its one exception
 
