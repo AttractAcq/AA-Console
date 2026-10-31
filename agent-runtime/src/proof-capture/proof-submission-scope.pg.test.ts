@@ -100,7 +100,7 @@ beforeAll(async () => {
   expect((await rows()).map((row) => row.submitted_name)).toEqual(["Alice"]);
   await db.exec("reset role");
   await db.exec(await readFile(new URL(
-    "../../../supabase/migrations/20261101110000_294_proof_submission_read_scope.sql",
+    "../../../supabase/migrations/20261101110000_297_proof_submission_read_scope.sql",
     import.meta.url,
   ), "utf8"));
 }, 60000);

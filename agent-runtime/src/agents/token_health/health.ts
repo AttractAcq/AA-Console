@@ -4,16 +4,13 @@
  * M1.2. Split from the agent so it can be tested against the shapes Meta
  * actually returns rather than against a mock of our own idea of them.
  *
- * The state matters more than it looks. `enqueue_metrics_ingest_jobs` only
- * queues integrations in an allow-list, so a wrong answer here does not
- * produce a bad read — it produces silence, which is the failure mode this
- * whole feature exists to end. On 6 October an Instagram integration sat in
- * `error` for hours after the fault that caused it had been fixed, because
- * nothing in the system could say "that token is fine now".
+ * A Meta debug response only describes token validity and expiry. It cannot
+ * establish that the integration still owns the right account or scopes, so
+ * it must not reactivate a disabled integration.
  */
 
-/** The states an integration can be in. `connected` and `active` can be used. */
-export type IntegrationStatus = "connected" | "active" | "expiring" | "error";
+/** The integration states relevant to token health. */
+export type IntegrationStatus = "connected" | "active" | "expiring" | "error" | "expired" | "revoked";
 
 /** A token inside this many days of expiry is worth warning about. */
 export const EXPIRING_WITHIN_DAYS = 7;
@@ -23,7 +20,7 @@ export interface TokenVerdict {
   /** One line for the Integrations panel. Always set, including when healthy. */
   detail: string;
   expiresAt: string | null;
-  /** Whether metrics and publishing may still use it. */
+  /** Whether Meta reports this token as currently valid, not full provider authorization. */
   usable: boolean;
 }
 
@@ -51,24 +48,32 @@ function expiryOf(value: unknown): number | null {
  * across it.
  */
 export function readTokenHealth(payload: unknown, now: number = Date.now()): TokenVerdict {
-  const data = ((payload as { data?: DebugTokenData } | null)?.data ?? {}) as DebugTokenData;
+  const envelope = payload && typeof payload === "object" ? payload as { data?: unknown; error?: unknown } : null;
+  const data = envelope?.data && typeof envelope.data === "object" ? envelope.data as DebugTokenData : null;
+  const topError = envelope?.error && typeof envelope.error === "object"
+    ? envelope.error as { message?: unknown; code?: unknown } : null;
+  const innerError = data?.error && typeof data.error === "object" ? data.error : null;
+  const authError = [innerError, topError].find((error) => Number(error?.code) === 190);
+  const nonAuthError = [innerError, topError].find((error) =>
+    error?.code != null && Number(error.code) !== 190);
 
-  // An explicit error inside a 200 response. Meta does this for a revoked
-  // token rather than failing the request, so a reader that only checks the
-  // HTTP status calls a dead token healthy.
-  const innerError = data.error;
-  if (innerError && typeof innerError === "object") {
-    const message = typeof innerError.message === "string" ? innerError.message : "Meta rejected this token.";
-    return { status: "error", detail: message, expiresAt: null, usable: false };
+  // A Meta OAuth error or explicit false is evidence that the credential is
+  // invalid. Any other error, missing data, or unknown validity is a failed
+  // probe, not a reason to revoke a working integration.
+  if (nonAuthError) {
+    throw new Error("Meta debug_token returned a non-auth error; token validity is unknown.");
   }
-
-  if (data.is_valid !== true) {
+  if (authError || data?.is_valid === false) {
     return {
       status: "error",
+      // Provider error strings are untrusted and may echo credential bytes.
       detail: "Meta says this token is no longer valid. Reconnect the integration to replace it.",
       expiresAt: null,
       usable: false,
     };
+  }
+  if (!data || data.is_valid !== true || innerError || topError) {
+    throw new Error("Meta debug_token did not establish token validity.");
   }
 
   // Two clocks: the token's own expiry, and when data access lapses. The
@@ -107,7 +112,9 @@ export function readTokenHealth(payload: unknown, now: number = Date.now()): Tok
 
   return {
     status: "connected",
-    detail: expiresAt ? "Healthy." : "Healthy, and does not expire.",
+    detail: expiresAt
+      ? "Meta reports this token valid; account and required permissions are not verified."
+      : "Meta reports this token valid; no expiry date was established, and account and required permissions are not verified.",
     expiresAt,
     usable: true,
   };
@@ -116,14 +123,15 @@ export function readTokenHealth(payload: unknown, now: number = Date.now()): Tok
 /**
  * The status to write, given what the token says and where the integration is.
  *
- * `active` is earned: it means an ingest has actually succeeded. A health
- * check finding a healthy token must not promote a never-used integration to
- * `active`, and must not demote a working one to `connected` either — so a
- * healthy verdict leaves `active` alone and only rescues `error`.
+ * A valid Meta token does not prove the expected account or permission set.
+ * Therefore this worker can only preserve a usable state or demote one on a
+ * definitive invalid response. A terminal state needs a new credential or
+ * guarded operator review. In particular, do not write `expiring` from a
+ * usable state: released SQL still rejects it until migration 291 is applied.
  */
 export function statusToWrite(current: string, verdict: TokenVerdict): IntegrationStatus {
+  if (current === "error" || current === "expired" || current === "revoked") return current;
+  if (current !== "connected" && current !== "active" && current !== "expiring") return "error";
   if (!verdict.usable) return "error";
-  if (verdict.status === "expiring") return "expiring";
-  if (current === "active") return "active";
-  return "connected";
+  return current;
 }

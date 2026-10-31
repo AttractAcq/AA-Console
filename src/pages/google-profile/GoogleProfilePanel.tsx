@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { Button } from "../../components/Button";
@@ -9,9 +9,12 @@ import { FormModal } from "../../components/forms/FormModal";
 import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
+import { PROFILE_FIELD_PATCH_HOLD } from "../../../agent-runtime/src/profiles/prewrite-gate.js";
 
 type Location = Database["public"]["Tables"]["client_google_locations"]["Row"];
 type ProfileDue = Database["public"]["Views"]["google_profile_due"]["Row"];
+type ProfileChange = Pick<Database["public"]["Tables"]["google_profile_changes"]["Row"],
+  "id" | "location_id" | "field" | "current_value" | "proposed_value" | "status">;
 type Review = Database["public"]["Tables"]["google_reviews"]["Row"];
 type Reply = Database["public"]["Tables"]["google_review_replies"]["Row"];
 type Placement = Database["public"]["Tables"]["proof_placements"]["Row"];
@@ -38,8 +41,15 @@ type Tab = "location" | "reviews" | "posts" | "metrics";
  */
 export function GoogleProfilePanel({ tab }: { tab: Tab }) {
   const { clientId } = useParams<{ clientId: string }>();
+  // The router reuses this page between clients. Remount the client-owned
+  // state, including open forms and notices, before rendering another client.
+  return <GoogleProfileClientPanel key={clientId ?? "no-client"} clientId={clientId} tab={tab} />;
+}
+
+function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: Tab }) {
   const [locations, setLocations] = useState<Location[]>([]);
   const [due, setDue] = useState<ReadonlyMap<string, ProfileDue>>(new Map());
+  const [changes, setChanges] = useState<ProfileChange[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
@@ -47,22 +57,32 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<Review | null>(null);
+  const [connectOpening, setConnectOpening] = useState<number | null>(null);
+  const [replyOpening, setReplyOpening] = useState<{ id: number; review: Review } | null>(null);
+  const nextOpeningId = useRef(0);
+  const connectOpeningRef = useRef<number | null>(null);
+  const replyOpeningRef = useRef<number | null>(null);
+  const requestGeneration = useRef(0);
+  const activeVisit = useRef(true);
 
   const refresh = useCallback(async () => {
+    const generation = ++requestGeneration.current;
+    const isCurrent = () => activeVisit.current && requestGeneration.current === generation;
     if (!clientId) {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
       return;
     }
     try {
-      const [locs, board, revs, reps, place] = await Promise.all([
+      const [locs, board, proposed, revs, reps, place] = await Promise.all([
         supabase
           .from("client_google_locations")
           .select("*")
           .eq("client_id", clientId)
           .order("created_at", { ascending: false }),
         supabase.from("google_profile_due").select("*").eq("client_id", clientId),
+        supabase.from("google_profile_changes")
+          .select("id,location_id,field,current_value,proposed_value,status")
+          .eq("client_id", clientId).order("created_at", { ascending: false }).limit(100),
         supabase
           .from("google_reviews")
           .select("*")
@@ -77,39 +97,77 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
           .eq("destination_key", "google_business_profile")
           .order("created_at", { ascending: false }),
       ]);
-      for (const result of [locs, board, revs, reps, place]) {
+      for (const result of [locs, board, proposed, revs, reps, place]) {
         if (result.error) throw new Error(result.error.message);
       }
+      if (!isCurrent()) return;
       setLocations(locs.data ?? []);
       setDue(new Map((board.data ?? []).map((r) => [String(r.location_id), r])));
+      setChanges(proposed.data ?? []);
       setReviews(revs.data ?? []);
       setReplies(reps.data ?? []);
       setPlacements(place.data ?? []);
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load the profile.");
+      if (isCurrent()) {
+        setError(cause instanceof Error ? cause.message : "Could not load the profile.");
+      }
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [clientId]);
 
   useEffect(() => {
+    activeVisit.current = true;
     void refresh();
+    return () => {
+      activeVisit.current = false;
+      requestGeneration.current += 1;
+    };
   }, [refresh]);
 
+  function openConnect() {
+    if (!activeVisit.current) return;
+    const opening = ++nextOpeningId.current;
+    connectOpeningRef.current = opening;
+    setConnectOpening(opening);
+  }
+
+  function closeConnect(opening: number | null) {
+    if (!activeVisit.current || opening === null || connectOpeningRef.current !== opening) return;
+    connectOpeningRef.current = null;
+    setConnectOpening(null);
+  }
+
+  function openReply(review: Review) {
+    if (!activeVisit.current || review.client_id !== clientId) return;
+    const opening = ++nextOpeningId.current;
+    replyOpeningRef.current = opening;
+    setReplyOpening({ id: opening, review });
+  }
+
+  function closeReply(opening: number | null) {
+    if (!activeVisit.current || opening === null || replyOpeningRef.current !== opening) return;
+    replyOpeningRef.current = null;
+    setReplyOpening(null);
+  }
+
   async function act(key: string, work: () => Promise<void>, said: string) {
-    if (busy) return;
+    if (!activeVisit.current || busy) return;
     setBusy(key);
     setNotice(null);
     setError(null);
     try {
       await work();
+      if (!activeVisit.current) return;
       setNotice(said);
       await refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Something went wrong.");
+      if (activeVisit.current) {
+        setError(cause instanceof Error ? cause.message : "Something went wrong.");
+      }
     } finally {
-      setBusy(null);
+      if (activeVisit.current) setBusy(null);
     }
   }
 
@@ -123,6 +181,9 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
 
       {tab === "location" && (
         <div className="space-y-4">
+          <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+            {PROFILE_FIELD_PATCH_HOLD}
+          </p>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
             <div>
               <p className="text-sm font-medium">
@@ -131,11 +192,14 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
                   : `${locations.length} location${locations.length === 1 ? "" : "s"} connected`}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Reading a profile is not changing one. Every field change and every reply waits
-                for a person, and proof reaches the profile through Proof Distribution.
+                Reading a profile is not changing one. Profile field proposals stay recorded
+                under the hold above. Review replies require their own decision, and proof
+                reaches the profile through Proof Distribution.
               </p>
             </div>
-            <Button onClick={() => setConnecting(true)}>Connect a location</Button>
+            <Button onClick={openConnect}>
+              Connect a location
+            </Button>
           </div>
 
           {locations.length === 0 && !loading ? (
@@ -170,7 +234,7 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
                         : "mt-3 text-sm text-brand-strong"
                     }
                   >
-                    {board?.blocker ?? "Readable, and nothing is blocking a change."}
+                    {board?.blocker ?? "No location-read blocker was reported."}
                   </p>
 
                   <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-4">
@@ -203,8 +267,8 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
 
                   {(location.missing_fields ?? []).length > 0 && (
                     <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
-                      Missing from the profile: {(location.missing_fields ?? []).join(", ")}. Each
-                      is an approved change, not an edit this page makes by itself.
+                      Missing from the profile: {(location.missing_fields ?? []).join(", ")}. A
+                      field proposal is recorded for review; automatic field PATCH is held.
                     </p>
                   )}
                   <p className="mt-2 text-xs text-muted-foreground">
@@ -214,6 +278,36 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
               );
             })
           )}
+          <section className="space-y-3 rounded-lg border border-border bg-card p-4">
+            <div>
+              <h3 className="font-semibold">Recent recorded field proposals</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Approval in the older profile-change table does not authorize a provider PATCH.
+                These records need an exact Approval Inbox decision and prewrite verification.
+              </p>
+            </div>
+            <DataTable
+              columns={["Location", "Field", "Current", "Proposed", "Record status", "Execution"]}
+              emptyLabel={loading ? "Loading…" : "No profile field proposal has been recorded"}
+              rows={changes.map((change) => [
+                <span key="location" className="text-xs">
+                  {locations.find((location) => location.id === change.location_id)?.title ?? "Unknown location"}
+                </span>,
+                <span key="field">{change.field.replace(/_/g, " ")}</span>,
+                <span key="current" className="text-xs">{change.current_value ?? "empty"}</span>,
+                <span key="proposed" className="text-xs">{change.proposed_value}</span>,
+                <span key="status">{change.status.replace(/_/g, " ")}</span>,
+                <span key="execution" className={change.status === "applied"
+                  ? "text-xs text-muted-foreground" : "text-xs text-destructive"}>
+                  {change.status === "applied"
+                    ? "Recorded as applied; external readback remains separate."
+                    : change.status === "rejected"
+                      ? "Rejected; no field PATCH."
+                      : "Held; no field PATCH will be claimed."}
+                </span>,
+              ])}
+            />
+          </section>
         </div>
       )}
 
@@ -280,7 +374,7 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
                         }]
                       : []),
                     ...(!reply && !r.gone_at
-                      ? [{ label: "Draft a reply", onSelect: () => setReplyingTo(r) }]
+                      ? [{ label: "Draft a reply", onSelect: () => openReply(r) }]
                       : []),
                   ]}
                 />,
@@ -332,8 +426,9 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
       )}
 
       <FormModal
-        open={connecting}
-        onClose={() => setConnecting(false)}
+        key={`connect-${connectOpening ?? "closed"}`}
+        open={connectOpening !== null}
+        onClose={() => closeConnect(connectOpening)}
         title="Connect a Business Profile location"
         submitLabel="Connect"
         intro="The location as Google addresses it. Connecting records it; it reads nothing until a google_business credential exists on the Integrations page."
@@ -347,7 +442,12 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
           { name: "address", label: "Address", kind: "text" },
         ]}
         onSubmit={async (values) => {
-          if (!clientId) throw new Error("No client selected.");
+          if (!activeVisit.current || !clientId) {
+            throw new Error("Client selection changed. Reopen the form.");
+          }
+          if (connectOpening === null || connectOpeningRef.current !== connectOpening) {
+            throw new Error("This form has been replaced. Reopen it.");
+          }
           const { error: insertError } = await supabase.from("client_google_locations").insert({
             client_id: clientId,
             location_ref: String(values.location_ref).trim(),
@@ -355,34 +455,46 @@ export function GoogleProfilePanel({ tab }: { tab: Tab }) {
             address: values.address ? String(values.address).trim() : null,
           });
           if (insertError) throw new Error(insertError.message);
-          setNotice("Connected. Nothing is read until a credential exists.");
+          if (activeVisit.current && connectOpeningRef.current === connectOpening) {
+            setNotice("Connected. Nothing is read until a credential exists.");
+          }
         }}
         onSaved={() => {
-          setConnecting(false);
+          if (!activeVisit.current || connectOpeningRef.current !== connectOpening) return;
+          closeConnect(connectOpening);
           void refresh();
         }}
       />
 
       <FormModal
-        open={replyingTo !== null}
-        onClose={() => setReplyingTo(null)}
-        title={replyingTo ? `Reply to ${replyingTo.author_name ?? "a review"}` : "Draft a reply"}
+        key={`reply-${replyOpening?.id ?? "closed"}`}
+        open={replyOpening !== null}
+        onClose={() => closeReply(replyOpening?.id ?? null)}
+        title={replyOpening ? `Reply to ${replyOpening.review.author_name ?? "a review"}` : "Draft a reply"}
         submitLabel="Save the draft"
         intro="A reply is an external effect on somebody else's profile, so it waits for approval. The exact words are hashed: editing them afterwards means asking again."
         fields={[
           { name: "body", label: "Reply", kind: "textarea", required: true, rows: 5 },
         ]}
         onSubmit={async (values) => {
-          if (!replyingTo) throw new Error("No review selected.");
+          if (!activeVisit.current || !clientId || !replyOpening || replyOpening.review.client_id !== clientId) {
+            throw new Error("Client selection changed. Reopen the form.");
+          }
+          if (replyOpeningRef.current !== replyOpening.id) {
+            throw new Error("This form has been replaced. Reopen it.");
+          }
           const { error: rpcError } = await supabase.rpc("draft_google_review_reply_v6", {
-            p_review_id: replyingTo.id,
+            p_review_id: replyOpening.review.id,
             p_body: String(values.body),
           });
           if (rpcError) throw new Error(rpcError.message);
-          setNotice("Drafted. It waits for a person.");
+          if (activeVisit.current && replyOpeningRef.current === replyOpening.id) {
+            setNotice("Drafted. It waits for a person.");
+          }
         }}
         onSaved={() => {
-          setReplyingTo(null);
+          if (!activeVisit.current || !replyOpening || replyOpeningRef.current !== replyOpening.id) return;
+          closeReply(replyOpening.id);
           void refresh();
         }}
       />

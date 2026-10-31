@@ -179,8 +179,8 @@ beforeAll(async () => {
     "20260926110000_133_recruitment_meta_distribution.sql",
     "20261030110000_273_canonical_approval_ledger.sql",
     "20261030160000_279_approval_class_coverage.sql",
-    "20261101050000_288_production_release_candidate_inbox.sql",
-    "20261101070000_290_meta_legacy_producer_containment.sql",
+    "20261101050000_291_production_release_candidate_inbox.sql",
+    "20261101070000_293_meta_legacy_producer_containment.sql",
   ]) await db.exec(await migration(name));
   await db.exec("set timezone='UTC'");
 }, 60_000);

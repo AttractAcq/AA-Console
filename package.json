@@ -11,6 +11,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "pretest": "node --test scripts/production-recovery-preflight.check.mjs",
     "test": "vitest run",
     "postinstall": "node scripts/exclude-node-modules-from-icloud.mjs",
     "sync:platform-limits": "node scripts/sync-platform-limits.mjs",

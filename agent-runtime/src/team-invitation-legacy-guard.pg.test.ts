@@ -67,7 +67,7 @@ beforeAll(async () => {
       'contractor'::public.engagement_type,'old@example.com','abc')`);
   expect(oldResult).toHaveLength(1);
   expect((await db.query("select id from auth.users")).rows).toHaveLength(1);
-  await db.exec(await migration("20261101030000_283_retire_browser_password_creation.sql"));
+  await db.exec(await migration("20261101030000_286_retire_browser_password_creation.sql"));
 }, 60_000);
 
 afterAll(async () => { await db?.close(); });

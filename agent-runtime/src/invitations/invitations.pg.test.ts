@@ -114,9 +114,9 @@ beforeAll(async () => {
   `);
   await db.exec(await migration("20261030110000_273_canonical_approval_ledger.sql"));
   await db.exec(await migration("20261030160000_279_approval_class_coverage.sql"));
-  await db.exec(await migration("20261101031000_284_console_invitation_requests.sql"));
-  await db.exec(await migration("20261101032000_285_console_invitation_decision_and_send.sql"));
-  await db.exec(await migration("20261101033000_286_console_invitation_acceptance.sql"));
+  await db.exec(await migration("20261101031000_287_console_invitation_requests.sql"));
+  await db.exec(await migration("20261101032000_288_console_invitation_decision_and_send.sql"));
+  await db.exec(await migration("20261101033000_289_console_invitation_acceptance.sql"));
   verificationId = (await asRole<{ id: string }>("authenticated",ADMIN,"aal2",
     `select public.record_console_auth_sender_verification_v6(
       $1,$2,$3,$4,$5,$6,$7) as id`,

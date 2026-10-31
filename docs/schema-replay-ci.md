@@ -92,8 +92,14 @@ The corrected source still seeds named accounts. B004's controlled Auth Admin
 provisioning, first-admin recovery, password rotation, TOTP at decision paths,
 and production account provenance remain separate acceptance gates.
 
-This check covers schema replay and a stable set of security assertions. B005
-adds the complete cross-client identity and `SECURITY DEFINER` test matrix.
+This check covers schema replay and a stable set of security assertions. The
+B005 replay-only `b005-definer-grant-contract.sql` now refuses any anonymous
+`SECURITY DEFINER` execution in `public` or `mcp_internal`, checks the
+service-only lead predicate and sequence sweep, and preserves signed-in access
+to the two scoped sales RLS predicates. Its PGlite tests deliberately add an
+unsafe grant and remove a required grant to prove the gate fails. This is a
+catalog grant regression check; the complete cross-client identity and
+`SECURITY DEFINER` behavior matrix still needs live/staging role testing.
 The `Schema replay (clean, upgrade, catalog, types)` status must also be marked
 required in GitHub branch protection; the workflow file alone cannot change
 that repository setting. On 29 October 2026 after PRs #238 and #235 merged,

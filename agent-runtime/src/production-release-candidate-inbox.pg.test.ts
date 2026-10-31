@@ -34,7 +34,7 @@ function candidate(overrides: Record<string, unknown> = {}) {
     })),
     migrations: [{
       version: "20261101040000",
-      filename: "20261101040000_287_organic_schedule_route.sql",
+      filename: "20261101040000_290_organic_schedule_route.sql",
       sha256: HASH,
     }],
     schema: { current_head: "20261101033000", target_head: "20261101040000" },
@@ -203,7 +203,7 @@ beforeAll(async () => {
   for (const name of [
     "20261030110000_273_canonical_approval_ledger.sql",
     "20261030160000_279_approval_class_coverage.sql",
-    "20261101050000_288_production_release_candidate_inbox.sql",
+    "20261101050000_291_production_release_candidate_inbox.sql",
   ]) await db.exec(await migration(name));
   // Migration 290 defines this adapter. The focused PGlite fixture does not
   // replay Meta tables, so provide the unrelated branch of the 293 view.
@@ -212,11 +212,11 @@ beforeAll(async () => {
   await db.exec(`create function public.organic_publication_source_state_v6(uuid)
     returns text language sql stable as $$ select 'source_held'::text $$`);
   await db.exec(await migration(
-    "20261101100000_293_trusted_production_release_decision.sql"));
+    "20261101100000_296_trusted_production_release_decision.sql"));
   await db.exec(await migration(
-    "20261101120000_295_approved_release_proof_refresh.sql"));
+    "20261101120000_298_approved_release_proof_refresh.sql"));
   await db.exec(await migration(
-    "20261101140000_297_production_release_merge_lease.sql"));
+    "20261101140000_300_production_release_merge_lease.sql"));
   await db.exec("set timezone='UTC'");
 }, 60_000);
 

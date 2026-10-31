@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "2c95d3fc2cab8b5c012f394bb5447a74a29d99b8f2c5e3ebf65e472098be3d1a",
-  "generatedTypesSha256": "b1b844d904fbe977781360143cd51273c61a4fbf485ac8b25670f555c7c0e413",
-  "generatedSchemaBodySha256": "feaa693ab226b64366191325ee97a0940b7c74f2f74d961464e9110e24c7cc61",
+  "migrationSourceDigest": "0b998cdf0cdc0cd0d1523cb674d2ac9b462299a11c8b656494c88ae890cf44d9",
+  "generatedTypesSha256": "0779ff04ba52c4dd5e067b58e5fe575112d5b0569f2f124a11c855a03002a5be",
+  "generatedSchemaBodySha256": "6222be2202949a4affebc5afcae6f405a3612b699f2b8b4ab9835d5ec07fc0dd",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2077,130 +2077,158 @@
       "trimmedMd5": "30d96c69111d847a5951dcaece88da9b"
     },
     {
+      "version": "20261030170000",
+      "name": "280_rule_six_supported_flags",
+      "filename": "20261030170000_280_rule_six_supported_flags.sql",
+      "sha256": "f5269191957505630737cd4b45fbf44d4a2e979331181500bf0ddc4e3ade63eb",
+      "trimmedMd5": "6a7334b953fe805647161970b2d8edf8"
+    },
+    {
+      "version": "20261030180000",
+      "name": "281_the_configuration_nobody_can_enter",
+      "filename": "20261030180000_281_the_configuration_nobody_can_enter.sql",
+      "sha256": "3d82c86d9f1334aa9c50c325a2122e396fcbd582668ab946557308c9ad94e642",
+      "trimmedMd5": "eda4a0222c026fbab3c577c54732fd2a"
+    },
+    {
+      "version": "20261030190000",
+      "name": "282_the_engines_own_configuration",
+      "filename": "20261030190000_282_the_engines_own_configuration.sql",
+      "sha256": "560cca1b036500083f0e8582ad02d47b9470fd0ac03ebb86e89342967454eda6",
+      "trimmedMd5": "27873059446fd16f2cccd35c60871ff4"
+    },
+    {
       "version": "20261101000000",
-      "name": "280_public_route_quota",
-      "filename": "20261101000000_280_public_route_quota.sql",
+      "name": "283_public_route_quota",
+      "filename": "20261101000000_283_public_route_quota.sql",
       "sha256": "e1bb71ef97e832621c5f7e26dc58b8e3188b94240553eb602d0efa4b1998f9c9",
       "trimmedMd5": "40683ae384fcb5daddc752110695b205"
     },
     {
       "version": "20261101010000",
-      "name": "281_sales_runtime_budget_reservations",
-      "filename": "20261101010000_281_sales_runtime_budget_reservations.sql",
+      "name": "284_sales_runtime_budget_reservations",
+      "filename": "20261101010000_284_sales_runtime_budget_reservations.sql",
       "sha256": "53cffed5ee5f6e093e24010de00aace6662f3de5150f21d1d3ab395a266192ba",
       "trimmedMd5": "2fb8a94b201526bb0825ed8f6c20394a"
     },
     {
       "version": "20261101020000",
-      "name": "282_public_perimeter_admin_status",
-      "filename": "20261101020000_282_public_perimeter_admin_status.sql",
+      "name": "285_public_perimeter_admin_status",
+      "filename": "20261101020000_285_public_perimeter_admin_status.sql",
       "sha256": "11c4af5a9a43df974540a2e0724d6314254ba28f1bd3b37ad8b6f386d4fc6721",
       "trimmedMd5": "90bd4058fa24acaa7378e6a92ecd0ab8"
     },
     {
       "version": "20261101030000",
-      "name": "283_retire_browser_password_creation",
-      "filename": "20261101030000_283_retire_browser_password_creation.sql",
+      "name": "286_retire_browser_password_creation",
+      "filename": "20261101030000_286_retire_browser_password_creation.sql",
       "sha256": "d18474623337c48bf1312d7ed857fbb5d12ad5870b33ac4d1ead1e53be7e9361",
       "trimmedMd5": "3ff9e74d18c57a11971af7749b6b1a6b"
     },
     {
       "version": "20261101031000",
-      "name": "284_console_invitation_requests",
-      "filename": "20261101031000_284_console_invitation_requests.sql",
+      "name": "287_console_invitation_requests",
+      "filename": "20261101031000_287_console_invitation_requests.sql",
       "sha256": "9664aae0b4ceaaa04ba1334918a613e7d966f8f83252fd3d571e9f51497da8c4",
       "trimmedMd5": "669a10407c2363f6edfec8b6ba0e216e"
     },
     {
       "version": "20261101032000",
-      "name": "285_console_invitation_decision_and_send",
-      "filename": "20261101032000_285_console_invitation_decision_and_send.sql",
+      "name": "288_console_invitation_decision_and_send",
+      "filename": "20261101032000_288_console_invitation_decision_and_send.sql",
       "sha256": "069aff006c0dd787bce6e8e044765d63d26536370405756febc9b0cae38b1774",
       "trimmedMd5": "9fd26cc5a7b9d15770452cab74871e0c"
     },
     {
       "version": "20261101033000",
-      "name": "286_console_invitation_acceptance",
-      "filename": "20261101033000_286_console_invitation_acceptance.sql",
+      "name": "289_console_invitation_acceptance",
+      "filename": "20261101033000_289_console_invitation_acceptance.sql",
       "sha256": "ea3c599ace3519f6b50fd6f83db41e530d6a40ca895d622bf3018196ae27ab87",
       "trimmedMd5": "f458a44157f9fa28c79c14e3ded8f619"
     },
     {
       "version": "20261101040000",
-      "name": "287_organic_schedule_route",
-      "filename": "20261101040000_287_organic_schedule_route.sql",
+      "name": "290_organic_schedule_route",
+      "filename": "20261101040000_290_organic_schedule_route.sql",
       "sha256": "f1e734dc16ef04b72a1ab6921b2329a7d49272b99ced6fc8d2fed8b270e79dbd",
       "trimmedMd5": "61d04c2c6f5c5222b0be34411198ba69"
     },
     {
       "version": "20261101050000",
-      "name": "288_production_release_candidate_inbox",
-      "filename": "20261101050000_288_production_release_candidate_inbox.sql",
+      "name": "291_production_release_candidate_inbox",
+      "filename": "20261101050000_291_production_release_candidate_inbox.sql",
       "sha256": "59568099d26eecf09b0fdcdfc0d77ec2c40f721f05c83df6218363f7c0273566",
       "trimmedMd5": "ff48771174b5570560c65055e0bd07f1"
     },
     {
       "version": "20261101060000",
-      "name": "289_meta_v6_atomic_job_binding",
-      "filename": "20261101060000_289_meta_v6_atomic_job_binding.sql",
+      "name": "292_meta_v6_atomic_job_binding",
+      "filename": "20261101060000_292_meta_v6_atomic_job_binding.sql",
       "sha256": "e64074e004ebc305cfd68d5055897d6cebe41895ea65b65bed35c3e774206c54",
       "trimmedMd5": "4649e8b23d6e8c94ae6aee0a8d61f39f"
     },
     {
       "version": "20261101070000",
-      "name": "290_meta_legacy_producer_containment",
-      "filename": "20261101070000_290_meta_legacy_producer_containment.sql",
+      "name": "293_meta_legacy_producer_containment",
+      "filename": "20261101070000_293_meta_legacy_producer_containment.sql",
       "sha256": "e81ed4dce71fcbe13efc99c0db4be96fb6bef1d20bbf6e19c7e098a98698c92c",
       "trimmedMd5": "4c89e92c09b867a23bcb413f4bfae228"
     },
     {
       "version": "20261101080000",
-      "name": "291_integration_credential_eligibility",
-      "filename": "20261101080000_291_integration_credential_eligibility.sql",
+      "name": "294_integration_credential_eligibility",
+      "filename": "20261101080000_294_integration_credential_eligibility.sql",
       "sha256": "832693904f2ef224628f941f5b725db06d63400ddf506a3265ffd6ecf0f49fc8",
       "trimmedMd5": "22d5b38321a448f088127dc9266927b3"
     },
     {
       "version": "20261101090000",
-      "name": "292_organic_publication_package_boundary",
-      "filename": "20261101090000_292_organic_publication_package_boundary.sql",
+      "name": "295_organic_publication_package_boundary",
+      "filename": "20261101090000_295_organic_publication_package_boundary.sql",
       "sha256": "1252a74d1818b90c47d3906bd921553ead19e3a0c84ae3f7c144bac182c8adeb",
       "trimmedMd5": "e37064763da43de9fe9f59b0c51d695c"
     },
     {
       "version": "20261101100000",
-      "name": "293_trusted_production_release_decision",
-      "filename": "20261101100000_293_trusted_production_release_decision.sql",
+      "name": "296_trusted_production_release_decision",
+      "filename": "20261101100000_296_trusted_production_release_decision.sql",
       "sha256": "177ec5e32852e74daf8fbf9e92a7a6c4606659a63845346fd552bdb2b48de7ca",
       "trimmedMd5": "0d985424c96be1e7105da94c0fdafe37"
     },
     {
       "version": "20261101110000",
-      "name": "294_proof_submission_read_scope",
-      "filename": "20261101110000_294_proof_submission_read_scope.sql",
+      "name": "297_proof_submission_read_scope",
+      "filename": "20261101110000_297_proof_submission_read_scope.sql",
       "sha256": "cac27a9136fafe30a9b79941547b237fdc127dbc88de5f59ad17228b19dd7937",
       "trimmedMd5": "00640e4db0f3671dec8e565e9db78a03"
     },
     {
       "version": "20261101120000",
-      "name": "295_approved_release_proof_refresh",
-      "filename": "20261101120000_295_approved_release_proof_refresh.sql",
+      "name": "298_approved_release_proof_refresh",
+      "filename": "20261101120000_298_approved_release_proof_refresh.sql",
       "sha256": "6015269018f36db5bd6b28ff09119ca91acb1bc08171de6c4f0b3a1352a8ff5d",
       "trimmedMd5": "a1f03b4c586a30d20bab440c15c30444"
     },
     {
       "version": "20261101130000",
-      "name": "296_current_client_role_entitlement",
-      "filename": "20261101130000_296_current_client_role_entitlement.sql",
+      "name": "299_current_client_role_entitlement",
+      "filename": "20261101130000_299_current_client_role_entitlement.sql",
       "sha256": "6a35c77e2d2d9d831114d68820998a42635d59af7918fbbb2088fd275f244d08",
       "trimmedMd5": "b186165c42fb272031a06ddd9edb1c5b"
     },
     {
       "version": "20261101140000",
-      "name": "297_production_release_merge_lease",
-      "filename": "20261101140000_297_production_release_merge_lease.sql",
+      "name": "300_production_release_merge_lease",
+      "filename": "20261101140000_300_production_release_merge_lease.sql",
       "sha256": "fab9ac7ede8edd2ac979df8f8c1d86d9d792c1b46936a4c21daf1cc0a1452812",
       "trimmedMd5": "216a7989f087ef6a95b65e515df5cc1c"
+    },
+    {
+      "version": "20261101150000",
+      "name": "301_current_employee_role_entitlement",
+      "filename": "20261101150000_301_current_employee_role_entitlement.sql",
+      "sha256": "bdf220695c094bab22270a51067a23e22161cfdaab74663538a609fe27586856",
+      "trimmedMd5": "0ad85101165e1d27b4ee5572eefa2c0d"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

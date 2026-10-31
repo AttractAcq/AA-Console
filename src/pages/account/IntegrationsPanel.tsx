@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
@@ -11,23 +11,18 @@ import { supabase } from "../../lib/supabase";
 import { SYNCING_PROVIDERS } from "../../lib/onboarding";
 import { cn } from "../../lib/cn";
 import { MetricsBackfill } from "../../components/MetricsBackfill";
+import { integrationCapabilitySummary } from "./integrationHealth";
+import { integrationRowsAreValid, providerReadiness, type IntegrationEvidence, type ReadinessCheck } from "../../lib/integrationReadiness";
 
-type Integration = {
+type Integration = IntegrationEvidence & {
   id: string;
-  provider: string;
-  credential_label: string | null;
   access_level: string | null;
-  status: string;
-  usable: boolean;
-  headline: string | null;
-  health_detail: string | null;
-  token_expires_at: string | null;
-  ingest_enabled: boolean;
-  last_checked_at: string | null;
-  ad_account_id: string | null;
   meta_page_id: string | null;
   meta_pixel_id: string | null;
 };
+
+type AddSelection = { clientId: string; routeVisit: number; token: number };
+type MetaSettingsSelection = { integration: Integration; routeVisit: number; token: number };
 
 /**
  * What building ads needs from the Meta account beyond the token. The page
@@ -69,6 +64,12 @@ const SYNCS: Record<string, string> = {
   instagram: "Organic post and account metrics, daily",
 };
 
+function dateLabel(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString();
+}
+
 const FIELDS: FieldDef[] = [
   {
     name: "provider",
@@ -105,55 +106,104 @@ const FIELDS: FieldDef[] = [
 ];
 
 export function IntegrationsPanel() {
-  const [addOpen, setAddOpen] = useState(false);
-  const [adSettings, setAdSettings] = useState<Integration | null>(null);
+  const [addOpenClient, setAddOpenClient] = useState<AddSelection | null>(null);
+  const [adSettings, setAdSettings] = useState<MetaSettingsSelection | null>(null);
   const { clientId } = useParams<{ clientId: string }>();
-  const [rows, setRows] = useState<Integration[]>([]);
-  const [saving, setSaving] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<{ clientId: string; rows: Integration[]; observedAtMs: number } | null>(null);
+  const [pendingIngest, setPendingIngest] = useState<Record<string, number>>({});
+  const [error, setError] = useState<{ clientId: string; message: string } | null>(null);
+  const [loadError, setLoadError] = useState<{ clientId: string; message: string } | null>(null);
+  const activeClient = useRef<string | null>(null);
+  const routeVisit = useRef(0);
+  const nextFormToken = useRef(0);
+  const nextIngestToken = useRef(0);
+  const activeIngestWrites = useRef(new Map<string, number>());
+  const activeAddSelection = useRef<AddSelection | null>(null);
+  const activeMetaSelection = useRef<MetaSettingsSelection | null>(null);
+  const requestGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
-    if (!clientId) return;
+    if (!clientId || activeClient.current !== clientId) return;
+    const generation = ++requestGeneration.current;
+    const isCurrent = () => activeClient.current === clientId && requestGeneration.current === generation;
     setLoadError(null);
     try {
-      const [integrations, health] = await Promise.all([
-        supabase
-          .from("client_integrations")
-          .select("id, provider, credential_label, access_level, status, ingest_enabled, last_checked_at, ad_account_id, meta_page_id, meta_pixel_id")
-          .eq("client_id", clientId)
-          .order("provider"),
-        supabase
-          .from("integration_health")
-          .select("integration_id, usable, headline, health_detail, token_expires_at")
-          .eq("client_id", clientId),
-      ]);
-      if (integrations.error) throw integrations.error;
-      if (health.error) throw health.error;
-      const byId = new Map((health.data ?? []).map((row) => [row.integration_id, row]));
-      setRows((integrations.data ?? []).map((row) => {
-        const state = byId.get(row.id);
-        return {
-          ...row,
-          usable: state?.usable === true,
-          headline: state?.headline ?? "Health unavailable",
-          health_detail: state?.health_detail ?? null,
-          token_expires_at: state?.token_expires_at ?? null,
-        };
-      }));
+      const { data, error } = await supabase
+        .from("client_integrations")
+        .select("id, client_id, provider, credential_secret_id, credential_label, access_level, status, ingest_enabled, last_checked_at, token_expires_at, ad_account_id, meta_page_id, meta_pixel_id")
+        .eq("client_id", clientId)
+        .order("provider");
+      if (error) throw error;
+      if (!integrationRowsAreValid(data, clientId)
+        || !data.every((row) => typeof row.id === "string" && typeof row.access_level !== "undefined")) {
+        throw new Error("Integration evidence is unavailable or returned another client's data.");
+      }
+      if (isCurrent()) setSnapshot({ clientId, rows: data as Integration[], observedAtMs: Date.now() });
     } catch (error) {
-      setLoadError("Failed to load integrations: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"));
+      if (isCurrent()) {
+        setLoadError({
+          clientId,
+          message: "Failed to load integrations: " + (error instanceof Error ? error.message : (error as { message?: string })?.message ?? "Unknown query error"),
+        });
+      }
     }
   }, [clientId]);
 
   useEffect(() => {
+    activeClient.current = clientId ?? null;
+    routeVisit.current += 1;
+    // The render guard below closes a previous client's dialog immediately;
+    // clearing the selection also keeps it closed if the route later returns.
+    activeMetaSelection.current = null;
+    activeAddSelection.current = null;
+    setAdSettings(null);
+    setAddOpenClient(null);
+    setError(null);
     void refresh();
-  }, [refresh]);
+    return () => {
+      activeClient.current = null;
+      requestGeneration.current += 1;
+    };
+  }, [clientId, refresh]);
+
+  const rows = snapshot && snapshot.clientId === clientId ? snapshot.rows : [];
+  const addOpen = addOpenClient?.clientId === clientId && snapshot?.clientId === clientId;
+  const selectedAdSettingsId = adSettings && clientId && adSettings.integration.client_id === clientId
+    ? adSettings.integration.id : null;
+  const currentAdSettings = selectedAdSettingsId && snapshot?.clientId === clientId
+    ? rows.find((row) => row.id === selectedAdSettingsId && row.client_id === clientId) ?? null
+    : null;
 
   const adSettingsValues = useMemo(
-    () => ({ meta_page_id: adSettings?.meta_page_id ?? "", meta_pixel_id: adSettings?.meta_pixel_id ?? "" }),
-    [adSettings],
+    () => ({ meta_page_id: currentAdSettings?.meta_page_id ?? "", meta_pixel_id: currentAdSettings?.meta_pixel_id ?? "" }),
+    [currentAdSettings],
   );
+
+  const openMetaSettings = (integration: Integration) => {
+    if (!clientId || activeClient.current !== clientId || integration.client_id !== clientId) return;
+    const selection = { integration, routeVisit: routeVisit.current, token: ++nextFormToken.current };
+    activeMetaSelection.current = selection;
+    setAdSettings(selection);
+  };
+
+  const openAddIntegration = () => {
+    if (!clientId || activeClient.current !== clientId) return;
+    const selection = { clientId, routeVisit: routeVisit.current, token: ++nextFormToken.current };
+    activeAddSelection.current = selection;
+    setAddOpenClient(selection);
+  };
+
+  const metaSelectionIsCurrent = (selection: MetaSettingsSelection | null) =>
+    !!selection && !!clientId && activeClient.current === clientId
+    && selection.integration.client_id === clientId
+    && selection.routeVisit === routeVisit.current
+    && activeMetaSelection.current === selection;
+
+  const addSelectionIsCurrent = (selection: AddSelection | null) =>
+    !!selection && !!clientId && activeClient.current === clientId
+    && selection.clientId === clientId
+    && selection.routeVisit === routeVisit.current
+    && activeAddSelection.current === selection;
 
   /**
    * Turns the scheduled pull on or off for one integration. This gates the
@@ -161,87 +211,142 @@ export function IntegrationsPanel() {
    * want for a one-off backfill without arming a recurring job.
    */
   const setIngest = async (integration: Integration, enabled: boolean) => {
-    setSaving(integration.id);
+    if (!clientId || activeClient.current !== clientId || integration.client_id !== clientId) return;
+    const key = `${clientId}:${integration.id}`;
+    if (activeIngestWrites.current.has(key)) return;
+    const token = ++nextIngestToken.current;
+    const visit = routeVisit.current;
+    // A read begun before this optimistic write cannot replace its pending
+    // value. The final read below reconciles all fields after confirmation.
+    const evidenceGeneration = ++requestGeneration.current;
+    activeIngestWrites.current.set(key, token);
+    setPendingIngest((prev) => ({ ...prev, [key]: token }));
     setError(null);
-    // Optimistic: the switch should move under the finger, not after a
-    // round trip. Rolled back below if the write is refused.
-    setRows((prev) =>
-      prev.map((r) => (r.id === integration.id ? { ...r, ingest_enabled: enabled } : r)),
-    );
-    const { error: updateError } = await supabase
+    // Optimistic: the switch should move under the finger. It stays pending
+    // until the update returns one exact-client row with the requested value.
+    setSnapshot((prev) => {
+      if (!prev || prev.clientId !== clientId) return prev;
+      return {
+        ...prev,
+        rows: prev.rows.map((r) => r.id === integration.id ? { ...r, ingest_enabled: enabled } : r),
+      };
+    });
+    // PostgREST may report error: null for an UPDATE that touched zero rows.
+    const { data: updated, error: updateError } = await supabase
       .from("client_integrations")
       .update({ ingest_enabled: enabled })
-      .eq("id", integration.id);
-    if (updateError) {
-      setRows((prev) =>
-        prev.map((r) => (r.id === integration.id ? { ...r, ingest_enabled: !enabled } : r)),
-      );
-      setError(updateError.message);
-    }
-    setSaving(null);
+      .eq("id", integration.id)
+      .eq("client_id", clientId)
+      .select("id, client_id, ingest_enabled");
+    const confirmed = Array.isArray(updated) && updated.length === 1
+      && updated[0].id === integration.id && updated[0].client_id === clientId
+      && updated[0].ingest_enabled === enabled;
+    const writeError = updateError?.message
+      ?? (confirmed ? null : "Daily sync change was not confirmed for this client.");
+    const sameEvidence = activeClient.current === clientId
+      && routeVisit.current === visit && requestGeneration.current === evidenceGeneration;
+    if (writeError && sameEvidence) setError({ clientId, message: writeError });
+    // Reconcile every outcome from the server. This also restores other
+    // integration fields from a refresh invalidated at toggle start.
+    if (activeClient.current === clientId) await refresh();
+    if (activeIngestWrites.current.get(key) === token) activeIngestWrites.current.delete(key);
+    setPendingIngest((prev) => {
+      if (prev[key] !== token) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   };
 
-  if (loadError) return <div role="alert"><p>{loadError}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
+  if (loadError && loadError.clientId === clientId) return <div role="alert"><p>{loadError.message}</p><button type="button" onClick={() => void refresh()}>Retry</button></div>;
+  if (!clientId) return <p role="alert">No client selected.</p>;
+  if (!snapshot || snapshot.clientId !== clientId) return <p className="text-sm text-muted-foreground">Loading integrations…</p>;
 
   // The credentials onboarding asks for, and whether they have arrived. Read
   // from the same list onboarding scores itself against, so the two cannot
   // disagree about what "credentials collected" means.
-  const connected = new Set(rows.filter((r) => r.usable).map((r) => r.provider));
-  const outstanding = SYNCING_PROVIDERS.filter((p) => !connected.has(p));
+  const providerChecks = SYNCING_PROVIDERS.map((provider) =>
+    providerReadiness(provider, rows, clientId, snapshot.observedAtMs));
+  const renderCheck = (label: string, check: ReadinessCheck) => (
+    <li key={label} className="text-xs text-muted-foreground">
+      <span className="font-medium text-foreground">{label}:</span>{" "}
+      <span className={check.state === "blocked" ? "font-medium text-destructive" : "font-medium text-amber-900"}>
+        {check.state === "blocked" ? "Blocked" : "Unknown"}
+      </span>{" "}— {check.reason}
+    </li>
+  );
 
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          {outstanding.length === 0 ? (
-            <>
-              Both reporting credentials are currently eligible to read. Provider account and
-              permission checks still apply when a pull runs.
-            </>
-          ) : (
-            <>
-              Onboarding is waiting on:{" "}
-              <span className="font-medium capitalize text-foreground">
-                {outstanding.join(", ")}
-              </span>
-              . Connect or repair them before a scheduled pull can run.
-            </>
-          )}
+          Meta and Instagram activation evidence is shown below. A stored integration or account ID
+          does not establish provider access, scopes, or permission to publish.
         </p>
-        <Button icon={Plus} onClick={() => setAddOpen(true)}>
+        <Button icon={Plus} onClick={openAddIntegration}>
           Add
         </Button>
       </div>
 
-      {error && (
+      {error?.clientId === clientId && (
         <p role="alert" className="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
+          {error.message}
         </p>
       )}
 
+      <section aria-label="Provider access evidence" className="mb-4 rounded-lg border border-border bg-card p-4">
+        <h3 className="text-sm font-semibold text-card-foreground">Provider access evidence</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Read-only metadata for this client, checked {new Date(snapshot.observedAtMs).toLocaleString()}.
+          No provider account or scope readback is persisted yet, so this checklist cannot grant
+          publication or ad rights. Every external action still requires exact-version Approval Inbox approval.
+        </p>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {providerChecks.map((check) => (
+            <div key={check.provider} className="rounded-md border border-border p-3">
+              <h4 className="text-xs font-semibold capitalize text-card-foreground">
+                {check.provider} · {check.overall === "blocked" ? "Blocked" : "Unknown"}
+              </h4>
+              <ul className="mt-2 space-y-1">
+                {renderCheck("Vault credential", check.credential)}
+                {renderCheck("Recorded account", check.account)}
+                {renderCheck("Required scopes", check.scopes)}
+                {renderCheck("Action rights", check.action)}
+                {renderCheck("Daily metrics sync", check.dailySync)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <DataTable
-        columns={["Integration", "Credential", "Access Level", "Status", "Daily sync", "Ads"]}
+        columns={["Integration", "Credential", "Declared access", "Status", "Provider capability", "Daily sync", "Ads"]}
         emptyLabel="No integrations connected yet"
         rows={rows.map((r) => [
           <span key="p" className="capitalize">{r.provider}</span>,
           r.credential_label ?? "—",
           r.access_level ?? "—",
-          <span
-            key="s"
-            className={cn(
-              "inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize",
-              !r.usable
-                ? "bg-destructive/10 text-destructive"
-                : r.headline === "Expiring soon"
-                  ? "bg-amber-100 text-amber-900"
-                  : "bg-primary/10 text-brand-strong",
-            )}
-          >
-            {r.status} · {r.headline}
-            {r.token_expires_at && (
-              <span className="block normal-case">Expires {new Date(r.token_expires_at).toLocaleDateString()}</span>
-            )}
-            {r.health_detail && <span className="block normal-case">{r.health_detail}</span>}
+          <div key="s" className="space-y-1">
+            <span
+              className={cn(
+                "inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+                ["error", "expired", "revoked"].includes(r.status)
+                  ? "bg-destructive/10 text-destructive"
+                  : r.status === "expiring"
+                    ? "bg-amber-100 text-amber-900"
+                    : "bg-muted text-foreground",
+              )}
+            >
+              {r.status}
+            </span>
+            {/* metrics_ingest and token_health both write this timestamp. */}
+            {dateLabel(r.last_checked_at) &&
+              <span className="block text-xs text-muted-foreground">Last recorded integration activity {dateLabel(r.last_checked_at)}</span>}
+            {dateLabel(r.token_expires_at) &&
+              <span className="block text-xs text-muted-foreground">Recorded expiry {dateLabel(r.token_expires_at)}</span>}
+          </div>,
+          <span key="h" className="text-xs text-muted-foreground">
+            {integrationCapabilitySummary(r.provider, r.status, r.token_expires_at)}
           </span>,
           SYNCS[r.provider] ? (
             <div key="t" className="flex items-center gap-2">
@@ -250,7 +355,7 @@ export function IntegrationsPanel() {
                 role="switch"
                 aria-checked={r.ingest_enabled}
                 aria-label={`Daily sync for ${r.provider}`}
-                disabled={saving === r.id}
+                disabled={pendingIngest[`${clientId}:${r.id}`] !== undefined}
                 onClick={() => void setIngest(r, !r.ingest_enabled)}
                 className={cn(
                   "relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50",
@@ -266,10 +371,7 @@ export function IntegrationsPanel() {
                 />
               </button>
               <span className="text-xs text-muted-foreground">
-                {r.ingest_enabled ? (r.usable ? "On" : "On · waiting for credential") : "Off"}
-                {r.last_checked_at && r.ingest_enabled
-                  ? ` · last ${new Date(r.last_checked_at).toLocaleDateString()}`
-                  : ""}
+                {r.ingest_enabled ? "On" : "Off"}
               </span>
             </div>
           ) : (
@@ -281,7 +383,7 @@ export function IntegrationsPanel() {
             <button
               key="a"
               type="button"
-              onClick={() => setAdSettings(r)}
+              onClick={() => openMetaSettings(r)}
               className="text-xs text-brand-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {r.meta_page_id ? `Page ${r.meta_page_id}` : "Add page for ads"}
@@ -303,35 +405,58 @@ export function IntegrationsPanel() {
       {clientId && rows.some((r) => SYNCS[r.provider]) && <MetricsBackfill clientId={clientId} />}
 
       <FormModal
-        open={adSettings !== null}
-        onClose={() => setAdSettings(null)}
+        key={`meta-settings:${clientId}:${adSettings?.token ?? "closed"}`}
+        open={currentAdSettings !== null}
+        onClose={() => {
+          if (!metaSelectionIsCurrent(adSettings)) return;
+          activeMetaSelection.current = null;
+          setAdSettings((prev) => prev === adSettings ? null : prev);
+        }}
         title="Meta ad settings"
         intro="What building ads in Meta needs beyond the credential. Ads are always built paused; launching happens in Ads Manager."
         fields={META_AD_FIELDS}
         initialValues={adSettingsValues}
         submitLabel="Save"
         onSubmit={async (v) => {
-          if (!adSettings) throw new Error("No integration selected.");
+          if (!clientId || !currentAdSettings || !metaSelectionIsCurrent(adSettings)) {
+            throw new Error("No current-client integration selected.");
+          }
           const pageId = numericId(v.meta_page_id, "The page ID");
           if (!pageId) throw new Error("The page ID is required.");
-          const { error } = await supabase
+          const pixelId = numericId(v.meta_pixel_id, "The pixel ID");
+          // Require the returned row: error: null alone does not prove a write.
+          const { data: updated, error } = await supabase
             .from("client_integrations")
-            .update({ meta_page_id: pageId, meta_pixel_id: numericId(v.meta_pixel_id, "The pixel ID") })
-            .eq("id", adSettings.id);
+            .update({ meta_page_id: pageId, meta_pixel_id: pixelId })
+            .eq("id", currentAdSettings.id)
+            .eq("client_id", clientId)
+            .select("id, client_id, meta_page_id, meta_pixel_id");
           if (error) throw new Error(error.message);
+          if (!Array.isArray(updated) || updated.length !== 1
+            || updated[0].id !== currentAdSettings.id || updated[0].client_id !== clientId
+            || updated[0].meta_page_id !== pageId || updated[0].meta_pixel_id !== pixelId) {
+            throw new Error("Meta settings were not confirmed for this client.");
+          }
         }}
-        onSaved={refresh}
+        onSaved={() => { if (metaSelectionIsCurrent(adSettings)) void refresh(); }}
       />
 
       <FormModal
+        key={`add-integration:${clientId}:${addOpenClient?.token ?? "closed"}`}
         open={addOpen}
-        onClose={() => setAddOpen(false)}
+        onClose={() => {
+          if (!addSelectionIsCurrent(addOpenClient)) return;
+          activeAddSelection.current = null;
+          setAddOpenClient((prev) => prev === addOpenClient ? null : prev);
+        }}
         title="Add Integration"
         draftKey={clientId ? integrationDraftKey(clientId) : undefined}
         fields={FIELDS}
         submitLabel="Connect"
         onSubmit={async (v) => {
-          if (!clientId) throw new Error("No client selected.");
+          if (!clientId || !addOpen || !addSelectionIsCurrent(addOpenClient)) {
+            throw new Error("No current-client integration form selected.");
+          }
           const { error } = await supabase.rpc("admin_store_integration_credential", {
             p_client_id: clientId,
             p_provider: v.provider as string,
@@ -341,7 +466,7 @@ export function IntegrationsPanel() {
           });
           if (error) throw new Error(error.message);
         }}
-        onSaved={refresh}
+        onSaved={() => { if (addSelectionIsCurrent(addOpenClient)) void refresh(); }}
       />
     </div>
   );

@@ -227,7 +227,7 @@ beforeAll(async () => {
 
   await db.exec("reset role");
   await db.exec(await readFile(new URL(
-    "../../../supabase/migrations/20261101130000_296_current_client_role_entitlement.sql",
+    "../../../supabase/migrations/20261101130000_299_current_client_role_entitlement.sql",
     import.meta.url,
   ), "utf8"));
 }, 60000);

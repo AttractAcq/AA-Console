@@ -1,11 +1,24 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RuntimeConfig } from "../config.js";
+import { auditCronCatalog, type CronCatalogAudit } from "./cron-catalog.js";
+import { PROFILE_FIELD_PATCH_HOLD } from "../profiles/prewrite-gate.js";
 import { deployedCommitSha } from "./version.js";
+import { HANDLERS } from "../campaigns/actions/executor.js";
+import { inspectCampaignActionRegistry } from "../campaigns/actions/support.js";
+import { GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD } from "../campaigns/actions/preclaim-hold.js";
 
 type Observation<T> = {
   state: "observed" | "unknown" | "error";
   checkedAt: string;
   value: T | null;
+  reason: string | null;
+};
+
+type EvidenceCheck = {
+  state: "observed" | "unknown" | "error";
+  checkedAt: string;
+  evidenceAt: string | null;
+  source: string;
   reason: string | null;
 };
 
@@ -43,24 +56,45 @@ type ClientInventory = {
     lastCheckedAt: string | null;
     tokenExpiresAt: string | null;
     accountIds: { adAccountId: string | null; metaPageId: string | null; metaPixelId: string | null };
+    providerHealth: EvidenceCheck;
   }[];
 };
 
-type PublicPerimeter = {
-  asOf: string;
-  budgetDay: string;
-  quotaLastHour: {
-    route: string; bucketKind: string; activeBuckets: number; countedAttempts: number;
-  }[];
-  budgetsToday: {
-    deploymentId: string; messages: number; committedUsd: number;
-    heldUsd: number; uncertainCount: number;
-  }[];
-  unresolvedUncertain: number;
-};
+function providerHealthReason(row: Record<string, unknown>, now: number): string {
+  const status = asString(row.status);
+  if (["error", "expired", "revoked"].includes(status ?? "")) {
+    return "The stored integration status blocks use; no live account or scope check was performed.";
+  }
+  const expiresAt = asString(row.token_expires_at);
+  if (status === "expiring" && (!expiresAt || !Number.isFinite(Date.parse(expiresAt)))) {
+    return "An expiring integration lacks a known future expiry and is not usable; no live account or scope check was performed.";
+  }
+  if (expiresAt && Number.isFinite(Date.parse(expiresAt)) && Date.parse(expiresAt) <= now) {
+    return "The recorded token expiry is past; no live account or scope check was performed.";
+  }
+  if (!["connected", "active", "expiring"].includes(status ?? "")) {
+    return "The stored integration status is not recognized as usable; no live provider check was performed.";
+  }
+  if (typeof row.credential_secret_id !== "string") {
+    return "No credential is configured; no live provider check was performed.";
+  }
+  switch (asString(row.provider)) {
+    case "meta":
+    case "instagram":
+      return "The daily Meta token check does not verify the exact account, required scopes, or publish/ads rights.";
+    case "google_business":
+      return "Business Profile location readback, OAuth scope, and local-post permission are unverified.";
+    case "google_ads":
+      return "Google Ads OAuth, developer token, exact customer access, and build rights are unverified.";
+    case "resend":
+      return "A client integration row does not verify the runtime email key, sending domain, or send permission.";
+    default:
+      return "This provider has no live account, scope, or action-capability diagnostic.";
+  }
+}
 
 export type SystemReadinessSnapshot = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   capturedAt: string;
   environment: {
     name: string | null;
@@ -70,6 +104,10 @@ export type SystemReadinessSnapshot = {
   runtime: {
     sha: string | null;
     switches: Record<string, boolean>;
+    actionHolds: {
+      profileFieldPatch: { state: "held"; reason: string };
+      genericCampaignActionClaim: { state: "held"; reason: string };
+    };
     credentialPresence: Record<string, boolean>;
     heartbeats: Observation<Heartbeat[]>;
   };
@@ -79,16 +117,30 @@ export type SystemReadinessSnapshot = {
     configured: { aaInternalApi: boolean; botAuthMode: string };
   }>;
   database: Observation<Catalog>;
+  cronScheduleAudit: CronCatalogAudit;
   global: Observation<{
     engineEnabled: boolean | null;
     publishingPlatforms: { platform: string; supported: boolean }[];
     proofDestinations: { key: string; mode: string; supported: boolean }[];
-    campaignActionExecutors: { key: string; module: string; supported: boolean }[];
+    campaignActionExecutors: { key: string; module: string; supported: boolean; handlerRegistered: boolean }[];
+    campaignActionHandlerParity: { state: "aligned" | "blocked"; unhandledSupportedKeys: string[] };
     messageChannels: { key: string; transport: string; supported: boolean; canInitiate: boolean }[];
   }>;
   clients: Observation<ClientInventory[]>;
-  publicPerimeter: Observation<PublicPerimeter>;
+  evidenceCoverage: Record<
+    "runtimeDeployment" | "runtimeWorkers" | "gatewayDeployment" | "schemaCatalog" |
+    "schemaParity" | "cronCatalog" | "cronExecution" | "switchInventory" |
+    "credentialValidity" | "providerAccountHealth" | "otherEnvironment" | "externalEffects",
+    EvidenceCheck
+  >;
 };
+
+function evidenceCheck(
+  state: EvidenceCheck["state"], checkedAt: string, source: string,
+  reason: string | null, evidenceAt: string | null = null,
+): EvidenceCheck {
+  return { state, checkedAt, evidenceAt, source, reason };
+}
 
 function observed<T>(value: T): Observation<T> {
   return { state: "observed", checkedAt: new Date().toISOString(), value, reason: null };
@@ -227,6 +279,7 @@ async function globalConfiguration(sb: SupabaseClient): Promise<SystemReadinessS
       allRows(sb, "campaign_action_executors", "action_key,executor_module,supported"),
       allRows(sb, "message_channels", "channel_key,transport,supported,can_initiate"),
     ]);
+    const actionRegistry = inspectCampaignActionRegistry(actions, new Set(Object.keys(HANDLERS)));
     return observed({
       engineEnabled: asBool(controls[0]?.enabled),
       publishingPlatforms: publishing.map((row) => ({
@@ -236,11 +289,11 @@ async function globalConfiguration(sb: SupabaseClient): Promise<SystemReadinessS
         key: asString(row.destination_key) ?? "unknown",
         mode: asString(row.mode) ?? "unknown", supported: row.supported === true,
       })),
-      campaignActionExecutors: actions.map((row) => ({
-        key: asString(row.action_key) ?? "unknown",
-        module: asString(row.executor_module) ?? "unknown",
-        supported: row.supported === true,
-      })),
+      campaignActionExecutors: actionRegistry.actions,
+      campaignActionHandlerParity: {
+        state: actionRegistry.unhandledSupportedKeys.length > 0 ? "blocked" : "aligned",
+        unhandledSupportedKeys: actionRegistry.unhandledSupportedKeys,
+      },
       messageChannels: channels.map((row) => ({
         key: asString(row.channel_key) ?? "unknown",
         transport: asString(row.transport) ?? "unknown",
@@ -315,6 +368,10 @@ async function clients(sb: SupabaseClient): Promise<Observation<ClientInventory[
             metaPageId: asString(row.meta_page_id),
             metaPixelId: asString(row.meta_pixel_id),
           },
+          providerHealth: evidenceCheck(
+            "unknown", new Date().toISOString(), "client_integrations metadata",
+            providerHealthReason(row, Date.now()), null,
+          ),
         })),
       };
     }));
@@ -323,61 +380,67 @@ async function clients(sb: SupabaseClient): Promise<Observation<ClientInventory[
   }
 }
 
-/** The SQL feed is bounded to 200 deployments per page and contains no IP or
- * token handles. The admin route authenticates before calling this collector. */
-async function publicPerimeter(sb: SupabaseClient): Promise<Observation<PublicPerimeter>> {
-  try {
-    const budgetsToday: PublicPerimeter["budgetsToday"] = [];
-    let cursor: string | null = null;
-    let first: Record<string, unknown> | null = null;
-    const visited = new Set<string>();
-    for (let page = 0; page < 100; page += 1) {
-      const { data, error } = await sb.rpc("public_perimeter_status_v6", {
-        p_limit: 200, p_after_deployment_id: cursor,
-      });
-      if (error) throw new Error("public perimeter RPC unavailable");
-      const raw = record(data);
-      if (!Array.isArray(raw.quotaLastHour) || !Array.isArray(raw.budgetsToday)
-          || typeof raw.asOf !== "string" || typeof raw.budgetDay !== "string"
-          || asNumber(raw.unresolvedUncertain) === null)
-        throw new Error("public perimeter response invalid");
-      if (!first) first = raw;
-      budgetsToday.push(...raw.budgetsToday.map((value) => {
-        const row = record(value);
-        const messages = asNumber(row.messages);
-        const committedUsd = asNumber(row.committedUsd);
-        const heldUsd = asNumber(row.heldUsd);
-        const uncertainCount = asNumber(row.uncertainCount);
-        if (typeof row.deploymentId !== "string" || messages === null ||
-            committedUsd === null || heldUsd === null || uncertainCount === null)
-          throw new Error("public budget response invalid");
-        return { deploymentId: row.deploymentId, messages, committedUsd, heldUsd, uncertainCount };
-      }));
-      const next = raw.nextDeploymentCursor;
-      if (next === null) {
-        const quotaLastHour = (first.quotaLastHour as unknown[]).map((value) => {
-          const row = record(value);
-          const activeBuckets = asNumber(row.activeBuckets);
-          const countedAttempts = asNumber(row.countedAttempts);
-          if (typeof row.route !== "string" || typeof row.bucketKind !== "string"
-              || activeBuckets === null || countedAttempts === null)
-            throw new Error("public quota response invalid");
-          return { route: row.route, bucketKind: row.bucketKind, activeBuckets, countedAttempts };
-        });
-        return observed({
-          asOf: first.asOf as string, budgetDay: first.budgetDay as string,
-          quotaLastHour, budgetsToday,
-          unresolvedUncertain: first.unresolvedUncertain as number,
-        });
-      }
-      if (typeof next !== "string" || visited.has(next)) throw new Error("public perimeter cursor invalid");
-      visited.add(next);
-      cursor = next;
-    }
-    throw new Error("public perimeter inventory exceeds 20,000 deployments");
-  } catch {
-    return failed("Public route quotas or paid widget budgets could not be verified.");
-  }
+function evidenceCoverage(snapshot: Omit<SystemReadinessSnapshot, "evidenceCoverage">): SystemReadinessSnapshot["evidenceCoverage"] {
+  const at = snapshot.capturedAt;
+  const sha = snapshot.runtime.sha;
+  const beats = snapshot.runtime.heartbeats;
+  const liveWorkers = beats.state === "observed" ? beats.value?.filter((beat) => beat.isLive) ?? [] : [];
+  const fleetMatches = sha !== null && liveWorkers.length > 0 &&
+    liveWorkers.every((beat) => beat.enabled === true && beat.sha === sha);
+  const gatewaySha = snapshot.gateway.value?.sha;
+  const database = snapshot.database;
+  const switchSourcesObserved = snapshot.global.state === "observed" &&
+    typeof snapshot.global.value?.engineEnabled === "boolean" &&
+    snapshot.clients.state === "observed" &&
+    snapshot.clients.value?.every((client) => Object.values(client.switches).every(
+      (value) => typeof value === "boolean",
+    )) === true;
+  return {
+    runtimeDeployment: evidenceCheck(
+      sha ? "observed" : "unknown", at, "RAILWAY_GIT_COMMIT_SHA",
+      sha ? null : "The runtime did not report a full 40-character deployed commit.",
+    ),
+    runtimeWorkers: evidenceCheck(
+      beats.state === "error" ? "error" : fleetMatches ? "observed" : "unknown",
+      beats.checkedAt, "agent_runtime_status latest heartbeat per worker",
+      fleetMatches ? null : beats.reason ?? "No complete set of fresh, enabled workers matches the runtime's full deployed commit.",
+      fleetMatches ? liveWorkers.map((beat) => beat.reportedAt).sort().at(-1) ?? null : null,
+    ),
+    gatewayDeployment: evidenceCheck(
+      snapshot.gateway.state === "error" ? "error" : gatewaySha ? "observed" : "unknown",
+      snapshot.gateway.checkedAt, "authenticated gateway internal readiness probe",
+      gatewaySha ? null : snapshot.gateway.reason ?? "The gateway did not report a full 40-character deployed commit.",
+      gatewaySha ? snapshot.gateway.value?.observedAt ?? null : null,
+    ),
+    schemaCatalog: evidenceCheck(
+      database.state === "error" ? "error" : database.value?.migrationHead && database.value.migrationCount !== null ? "observed" : "unknown",
+      database.checkedAt, "system_readiness_catalog RPC",
+      database.value?.migrationHead && database.value.migrationCount !== null ? null :
+      database.reason ?? "The database migration head or count is unavailable.",
+    ),
+    schemaParity: evidenceCheck("unknown", at, "B002 independent schema parity check",
+      "Catalog object counts do not verify object definitions or migration parity."),
+    cronCatalog: evidenceCheck(
+      database.state === "error" ? "error" : Array.isArray(database.value?.cronJobs) ? "observed" : "unknown",
+      database.checkedAt, "system_readiness_catalog RPC cron metadata",
+      Array.isArray(database.value?.cronJobs) ? null : database.reason ?? "The cron catalog is unavailable.",
+    ),
+    cronExecution: evidenceCheck("unknown", at, "cron execution receipts",
+      "A scheduled cron entry does not prove a recent successful run."),
+    switchInventory: evidenceCheck(
+      snapshot.global.state === "error" || snapshot.clients.state === "error" ? "error" : switchSourcesObserved ? "observed" : "unknown",
+      at, "runtime configuration and global/client database switches",
+      switchSourcesObserved ? null : "Global or client switch inventory could not be completely read.",
+    ),
+    credentialValidity: evidenceCheck("unknown", at, "credential presence flags",
+      "A configured credential may be expired, revoked, scoped incorrectly, or inaccessible to its provider."),
+    providerAccountHealth: evidenceCheck("unknown", at, "client_integrations metadata",
+      "Connected account identifiers and stored status are not live provider account checks."),
+    otherEnvironment: evidenceCheck("unknown", at, "separate authenticated environment inventory",
+      "This snapshot covers only the environment serving the request; capture the other environment separately."),
+    externalEffects: evidenceCheck("unknown", at, "provider receipts and read-back",
+      "This read-only inventory does not verify published content, sent messages, spend, leads, or bookings."),
+  };
 }
 
 async function gateway(config: RuntimeConfig, fetcher: typeof fetch): Promise<SystemReadinessSnapshot["gateway"]> {
@@ -413,12 +476,11 @@ export async function collectSystemReadiness(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<SystemReadinessSnapshot> {
   const capturedAt = new Date().toISOString();
-  const [heartbeatResult, catalogResult, globalResult, clientResult, gatewayResult, perimeterResult] = await Promise.all([
+  const [heartbeatResult, catalogResult, globalResult, clientResult, gatewayResult] = await Promise.all([
     heartbeats(sb), catalog(sb), globalConfiguration(sb), clients(sb), gateway(config, fetcher),
-    publicPerimeter(sb),
   ]);
-  return {
-    schemaVersion: 1,
+  const snapshot: Omit<SystemReadinessSnapshot, "evidenceCoverage"> = {
+    schemaVersion: 2,
     capturedAt,
     environment: {
       name: env.RAILWAY_ENVIRONMENT_NAME ?? env.AA_ENVIRONMENT ?? null,
@@ -427,6 +489,10 @@ export async function collectSystemReadiness(
     },
     runtime: {
       sha: deployedCommitSha(env),
+      actionHolds: {
+        profileFieldPatch: { state: "held", reason: PROFILE_FIELD_PATCH_HOLD },
+        genericCampaignActionClaim: { state: "held", reason: GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD },
+      },
       switches: {
         workers: config.enabled,
         workflow: config.workflowEnabled,
@@ -449,8 +515,12 @@ export async function collectSystemReadiness(
     },
     gateway: gatewayResult,
     database: catalogResult,
+    cronScheduleAudit: auditCronCatalog(
+      catalogResult.value?.migrationHead ?? null,
+      catalogResult.value?.cronJobs ?? null,
+    ),
     global: globalResult,
     clients: clientResult,
-    publicPerimeter: perimeterResult,
   };
+  return { ...snapshot, evidenceCoverage: evidenceCoverage(snapshot) };
 }

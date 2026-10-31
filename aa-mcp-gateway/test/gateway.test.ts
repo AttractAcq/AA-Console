@@ -353,14 +353,10 @@ test("approval rejection, expiration and revoked scope block execution", async (
         );
       } else {
         engine.decide(r.approval_id!, "human", "approved");
-        assert.equal(
-          (
-            await engine.executeApproval(r.approval_id!, [
-              { ...production, clients: [] },
-            ])
-          ).status,
-          "rejected",
-        );
+        await assert.rejects(() => engine.executeApproval(r.approval_id!, [
+          { ...production, clients: [] },
+        ]), /invalid_transition/);
+        assert.equal(store.getApproval(r.approval_id!).execution_status, "not_started");
       }
     }
   } finally {
@@ -391,6 +387,9 @@ test("concurrent idempotency reservation prevents duplicate adapter invocation",
 test("HTTP MCP discovery/call and human-only approval boundary", async () => {
   const { store, engine } = fixture();
   const c = config({
+    // This fixture has no AA resolver; local env mode is the supported
+    // development path for gateway-local workflow controls.
+    BOT_AUTH_MODE: "env",
     BOT_CREDENTIALS_JSON: JSON.stringify([
       { ...identity, token: "a".repeat(40) },
     ]),

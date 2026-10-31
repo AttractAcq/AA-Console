@@ -117,7 +117,7 @@ beforeAll(async () => {
   `);
 
   await db.exec(await migration("20261007130000_165_a_backfill_can_be_asked_for.sql"));
-  const eligibility = await migration("20261101080000_291_integration_credential_eligibility.sql");
+  const eligibility = await migration("20261101080000_294_integration_credential_eligibility.sql");
   await db.exec(eligibility.split("-- Google Ads account binding and its due view")[0]!);
   await db.exec(`select set_config('request.jwt.claim.role','authenticated',false);
                  select set_config('request.jwt.claim.sub','${ADMIN}',false);`);
