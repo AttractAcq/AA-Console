@@ -5,10 +5,10 @@ import { Search } from "lucide-react";
 import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
 import { ActionMenu } from "../../components/ActionMenu";
-import { ConfirmModal, FormModal } from "../../components/forms/FormModal";
+import { FormModal } from "../../components/forms/FormModal";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
-import { enqueueAgentJob } from "../../lib/supabase";
+import { enqueueAgentJob, supabase } from "../../lib/supabase";
 import { dayOrDash } from "../../lib/contentRecords";
 import {
   ATTRIBUTE_KINDS, AWARENESS_STAGES, CLASSIFICATION_HINT, CONFIDENCE_LEVELS,
@@ -173,18 +173,40 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
         <p className="text-sm text-muted-foreground">Choose an opportunity above.</p>
       )}
 
-      <ConfirmModal
+      {/* A form rather than a confirmation, because the notes ask for the one
+          thing this run could never be told: "there is no way to instruct it
+          how many opportunities to assess; this full control is important".
+          Bounded to 2..8, which is the range the agent is known to honour --
+          migration 304 refuses anything outside it before a job is queued, and
+          the agent clamps again rather than trusting the row. */}
+      <FormModal
         open={discovering}
         onClose={() => setDiscovering(false)}
         title="Find micro-market opportunities"
-        body="Reads this client's market, ICP, association and competitor records and proposes the specific buying situations worth pursuing. Everything it finds arrives as a hypothesis at discovered status — nothing is approved, and nothing can be spent against until a person evidences it and scores it. Takes a few minutes."
-        confirmLabel="Find opportunities"
-        onConfirm={async () => {
+        intro="Reads this client's market, ICP, association and competitor records and proposes the specific buying situations worth pursuing. Everything it finds arrives as a hypothesis at discovered status — nothing is approved, and nothing can be spent against until a person evidences it and scores it. Takes a few minutes."
+        fields={[{
+          name: "count",
+          label: "How many to look for",
+          kind: "number",
+          required: true,
+          hint: "Between 2 and 8. One is not a comparison, and past eight they stop being genuinely distinct.",
+        }]}
+        initialValues={{ count: "4" }}
+        submitLabel="Find opportunities"
+        onSubmit={async (values) => {
           if (!clientId) throw new Error("No client selected.");
-          await enqueueAgentJob({ agentKey: "opportunity_discovery", clientId });
-          setNotice("Looking. Anything found appears here as a hypothesis.");
+          const count = Number(values.count);
+          const { error: rpcError } = await supabase.rpc("request_opportunity_discovery_v6", {
+            p_client_id: clientId,
+            p_count: count,
+          });
+          // A real Error, not the Supabase error object: the modal renders
+          // `message`, and throwing a bare object shows "[object Object]"
+          // where the database's own refusal should be.
+          if (rpcError) throw new Error(rpcError.message);
+          setNotice(`Looking for ${count}. Anything found appears here as a hypothesis.`);
         }}
-        onDone={refresh}
+        onSaved={refresh}
       />
 
       {/* Creating the campaign is where the opportunity work either reaches

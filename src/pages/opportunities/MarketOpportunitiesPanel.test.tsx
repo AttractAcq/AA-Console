@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,6 +24,7 @@ const {
   enqueueAgentJob,
   fetchStageTemplates,
   setStageTemplate,
+  rpc,
 } = vi.hoisted(() => ({
   createCampaignFromOpportunity: vi.fn(),
   fetchOpportunities: vi.fn(),
@@ -31,6 +32,7 @@ const {
   enqueueAgentJob: vi.fn(),
   fetchStageTemplates: vi.fn(),
   setStageTemplate: vi.fn(),
+  rpc: vi.fn(),
 }));
 
 /** The query string the panel reads. Defaults to none, so existing tests are unaffected. */
@@ -49,7 +51,7 @@ vi.mock("../../lib/opportunities", async () => {
   };
 });
 vi.mock("../../lib/supabase", () => ({
-  supabase: { from: vi.fn(), rpc: vi.fn() },
+  supabase: { from: vi.fn(), rpc: (...a: unknown[]) => rpc(...(a as [])) },
   enqueueAgentJob: (...a: unknown[]) => enqueueAgentJob(...(a as [])),
 }));
 vi.mock("../../lib/useAgentJobs", () => ({
@@ -375,5 +377,72 @@ describe("the Discover table carries the whole progression", () => {
     render(<MarketOpportunitiesPanel view="discover" />);
     expect(await screen.findByRole("columnheader", { name: "Status" })).toBeInTheDocument();
     expect(screen.getByText("active")).toBeInTheDocument();
+  });
+});
+
+describe("saying how many opportunities to look for", () => {
+  /**
+   * The notes: "there is no way to instruct it how many opportunities to
+   * assess; this full control is important".
+   *
+   * It goes through request_opportunity_discovery_v6 rather than the generic
+   * enqueuer, because that one takes no parameters at all and widening it
+   * would let a browser caller shape the input of every agent in the system.
+   */
+  beforeEach(() => {
+    rpc.mockResolvedValue({ data: "job-1", error: null });
+  });
+
+  it("asks for the number the operator typed", async () => {
+    const user = userEvent.setup();
+    render(<MarketOpportunitiesPanel view="discover" />);
+    await user.click(await screen.findByRole("button", { name: "Find opportunities" }));
+
+    const dialog = await screen.findByRole("dialog");
+    const count = within(dialog).getByLabelText(/How many to look for/);
+    await user.clear(count);
+    await user.type(count, "6");
+    await user.click(within(dialog).getByRole("button", { name: "Find opportunities" }));
+
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("request_opportunity_discovery_v6", {
+        p_client_id: "client-1",
+        p_count: 6,
+      }),
+    );
+  });
+
+  it("defaults to four rather than leaving it blank", async () => {
+    const user = userEvent.setup();
+    render(<MarketOpportunitiesPanel view="discover" />);
+    await user.click(await screen.findByRole("button", { name: "Find opportunities" }));
+    expect(await screen.findByLabelText(/How many to look for/)).toHaveValue(4);
+  });
+
+  it("does not use the generic enqueuer, which cannot carry the count", async () => {
+    const user = userEvent.setup();
+    render(<MarketOpportunitiesPanel view="discover" />);
+    await user.click(await screen.findByRole("button", { name: "Find opportunities" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Find opportunities" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalled());
+    expect(enqueueAgentJob).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the database's refusal rather than reporting success", async () => {
+    // 304 refuses anything outside 2..8 before a job is queued, and the
+    // message is the useful part.
+    rpc.mockResolvedValue({
+      data: null,
+      error: { message: "Ask for between 2 and 8 opportunities in one pass." },
+    });
+    const user = userEvent.setup();
+    render(<MarketOpportunitiesPanel view="discover" />);
+    await user.click(await screen.findByRole("button", { name: "Find opportunities" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Find opportunities" }));
+    expect(
+      await screen.findByText(/Ask for between 2 and 8 opportunities in one pass/),
+    ).toBeInTheDocument();
   });
 });

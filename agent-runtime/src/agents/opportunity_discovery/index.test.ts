@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { validateDiscoveryOutput, type SourceRecord } from "./index.js";
+import { requestedCount, validateDiscoveryOutput, type SourceRecord } from "./index.js";
 
 /**
  * The validator is where this agent earns its place.
@@ -120,5 +120,41 @@ describe("what it refuses", () => {
     expect(run([])).toMatchObject({ error: "No opportunities were returned." });
     const many = Array.from({ length: 9 }, (_, i) => ({ ...ok(), name: `Opportunity ${i}` }));
     expect(run(many)).toMatchObject({ error: expect.stringContaining("8 is the limit") });
+  });
+});
+
+describe("how many opportunities this pass was asked for", () => {
+  /**
+   * Migration 304 gives the console a narrow way to say so, and it is the only
+   * browser-reachable job parameter in the system. So the agent reads it
+   * defensively: the ceiling it is known to honour stays the authority, not
+   * whatever arrived in the job row.
+   */
+  it("uses the requested count when it is sensible", () => {
+    expect(requestedCount({ opportunity_count: 6 })).toBe(6);
+    expect(requestedCount({ opportunity_count: 2 })).toBe(2);
+  });
+
+  it("falls back to a default when no parameter was set at all", () => {
+    // A cron or the gateway queues this with no params, and did so long before
+    // 304 existed.
+    expect(requestedCount(null)).toBe(4);
+    expect(requestedCount({})).toBe(4);
+  });
+
+  it("clamps to the agent's own ceiling rather than trusting the request", () => {
+    // The RPC already refuses anything outside 2..8, but a job row is not only
+    // ever written by that RPC, and a larger pass is a provider bill.
+    expect(requestedCount({ opportunity_count: 40 })).toBe(8);
+    expect(requestedCount({ opportunity_count: 1 })).toBe(2);
+    expect(requestedCount({ opportunity_count: 0 })).toBe(2);
+    expect(requestedCount({ opportunity_count: -5 })).toBe(2);
+  });
+
+  it("ignores a value that is not a whole number", () => {
+    expect(requestedCount({ opportunity_count: "eight" })).toBe(4);
+    expect(requestedCount({ opportunity_count: 3.5 })).toBe(4);
+    expect(requestedCount({ opportunity_count: null })).toBe(4);
+    expect(requestedCount({ opportunity_count: true })).toBe(4);
   });
 });

@@ -42,6 +42,23 @@ const AWARENESS = ["unaware", "problem_aware", "solution_aware", "product_aware"
 
 /** Enough to be worth a person's attention, few enough that each is thought through. */
 const MAX_OPPORTUNITIES = 8;
+const DEFAULT_OPPORTUNITIES = 4;
+
+/**
+ * How many opportunities this pass was asked for.
+ *
+ * Migration 304 gives the console a narrow way to say so, and that is the only
+ * browser-reachable job parameter in the system. It is still read defensively
+ * here: a job may be queued by a cron or the gateway with no params at all, and
+ * MAX_OPPORTUNITIES stays the authority rather than whatever arrived, so a
+ * malformed or oversized request cannot talk this agent into a larger pass than
+ * it is known to do well.
+ */
+export function requestedCount(params: Record<string, unknown> | null): number {
+  const asked = params?.opportunity_count;
+  if (typeof asked !== "number" || !Number.isInteger(asked)) return DEFAULT_OPPORTUNITIES;
+  return Math.min(Math.max(asked, 2), MAX_OPPORTUNITIES);
+}
 
 const words = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 const list = (value: unknown): string[] =>
@@ -86,6 +103,9 @@ export function validateDiscoveryOutput(
 ): { opportunities: DiscoveredOpportunity[] } | { error: string } {
   const raw = Array.isArray(submitted.opportunities) ? submitted.opportunities : [];
   if (raw.length === 0) return { error: "No opportunities were returned." };
+  // Still the agent's own ceiling, not the requested number: asking for four
+  // and being handed six is a model that over-delivered, which is worth
+  // keeping, while more than eight is the case this refuses.
   if (raw.length > MAX_OPPORTUNITIES) {
     return { error: `${raw.length} opportunities were returned; ${MAX_OPPORTUNITIES} is the limit.` };
   }
@@ -266,7 +286,12 @@ export async function runOpportunityDiscoveryJob(
     .limit(10);
   const offerNames = (offers ?? []).map((o) => String((o as { name?: string }).name ?? "")).filter(Boolean);
 
-  await appendEvent(sb, job.id, `Reading ${sources.length} intelligence records for buying situations.`);
+  const wanted = requestedCount(job.params);
+  await appendEvent(
+    sb,
+    job.id,
+    `Reading ${sources.length} intelligence records for buying situations, looking for ${wanted}.`,
+  );
 
   let result;
   try {
@@ -287,7 +312,7 @@ Do not invent statistics, market sizes, percentages, customer counts or research
 
 Every opportunity needs real objections. A buying situation with nothing standing in the way has not been thought about.
 
-Propose between two and ${MAX_OPPORTUNITIES} opportunities that are genuinely distinct from each other. Call submit_opportunities once.`,
+Propose ${wanted} opportunities that are genuinely distinct from each other, or fewer if this client's records do not honestly support that many. Call submit_opportunities once.`,
       prompt: `Find the micro-market opportunities in this client's intelligence.
 
 ${offerNames.length > 0 ? `WHAT THE BUSINESS SELLS\n${offerNames.join("\n")}\n` : ""}

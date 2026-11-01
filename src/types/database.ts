@@ -28560,6 +28560,10 @@ export type Database = {
         }
         Returns: string
       }
+      request_opportunity_discovery_v6: {
+        Args: { p_client_id: string; p_count?: number }
+        Returns: string
+      }
       request_proof_artifact_v6: {
         Args: {
           p_artifact_kind: string

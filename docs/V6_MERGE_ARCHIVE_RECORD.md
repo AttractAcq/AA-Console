@@ -154,7 +154,7 @@ engine config.
 
 `AA_CONSOLE_100_BUILD_BLUEPRINT.md` is **deliberately not renumbered**. Its 30 October section is a dated snapshot that was accurate when written; a snapshot quietly edited stops being evidence of anything. It is marked superseded and points here instead.
 
-`agent-runtime/ingress/README.md` is the one file left, held back on purpose: it sits under `agent-runtime/`, which the release gate's component-pin check treats as a runtime change regardless of the change being prose, so correcting it costs a Railway redeploy and a repin. It should ride along with the next change that touches that directory for real.
+`agent-runtime/ingress/README.md` was the one file left, and was corrected on 1 November 2026 riding with migration 304's agent change, which touches that directory anyway. It had been held back on purpose: it sits under `agent-runtime/`, which the release gate's component-pin check treats as a runtime change regardless of the change being prose, so correcting it costs a Railway redeploy and a repin. It should ride along with the next change that touches that directory for real.
 
 The files swept:
 
