@@ -137,6 +137,53 @@ Two functional gaps the notes name:
   run needs a count, then selection of which to evaluate and strategise, then
   approval of which to activate.
 
+### 1.2a The Evaluate and Strategise agents need a decision first
+
+The notes ask that "the agents should do the evaluation and the strategise
+modules within the market opportunities model", leaving the human only to run a
+Discover pass and to approve or activate.
+
+**The database currently forbids exactly that, and on purpose.** Both
+`score_market_opportunity_v6` and `set_opportunity_status_v6` guard on
+`can_shape_opportunity`, which is
+
+```sql
+select coalesce(public.is_admin(), false)
+    or coalesce(auth.uid() = public.active_video_approval_manager(p_client_id), false);
+```
+
+`is_admin()` reads `profiles.role` for `auth.uid()`, and `auth.uid()` is null for
+the agent runtime, so both are **false for an agent**. An evaluation agent would
+be refused before it wrote anything.
+
+That is not an oversight to patch around. Scoring is the gate that lets money be
+spent against a hypothesis: `set_opportunity_status_v6` reads the readiness view
+on approval rather than trusting the person, and readiness depends on the score.
+So permitting an agent to score moves who may assert the thing that unlocks
+spend.
+
+**What the change would be, if Alex wants it:**
+
+1. a service-role branch on `score_market_opportunity_v6` only — never on
+   `set_opportunity_status_v6`, so approval and activation stay human exactly as
+   the notes describe
+2. the score attributed to the agent rather than to nobody.
+   `opportunity_scores.scored_by` already exists and
+   `opportunity_events.actor` already carries `'agent'` as a value, so an
+   agent-authored score is distinguishable from a person's on the screen and in
+   the history. A human looking at an approved opportunity should be able to see
+   whether a person scored it.
+3. the same treatment for whatever the Strategise agent writes, which needs its
+   own pass over the strategy writers to see which of them share the guard.
+
+**Recommended:** do it, narrowly, in that shape. The alternative reading — that
+scoring must stay human — would mean the notes' "completely autonomous" cannot
+include evaluation, and that is a product decision rather than a technical one.
+
+Until it is decided, Market Opportunities works as it does today: a human scores
+in the Evaluate view, and the Discover table carries the whole status
+progression.
+
 ## Phase 2 — the campaign spine
 
 3. **Campaign planner agent** — decides landing page or not, sales agent or not,
