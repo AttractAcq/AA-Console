@@ -2,7 +2,7 @@ import { ProofFactoryV2Panel } from "./proof-bank/ProofFactoryV2Panel";
 import { LeadMagnetStudioPanel } from "./lead-magnet/LeadMagnetStudioPanel";
 import { LeadCapturePanel } from "./sales/LeadCapturePanel";
 import { CampaignPagePublishPanel } from "./sites/CampaignPagePublishPanel";
-import { OfferLiveUsePanel } from "./offer/OfferLiveUsePanel";
+import { OfferStudioPanel } from "./offer/OfferStudioPanel";
 import { MetaBuildApprovalPanel } from "./campaigns/MetaBuildApprovalPanel";
 import { GoogleProfilePanel } from "./google-profile/GoogleProfilePanel";
 import { GoogleAdsStudioPanel } from "./google-ads/GoogleAdsStudioPanel";
@@ -159,8 +159,8 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     reporting: () => <OrganicReportingPanel />,
   },
   "offer-studio": {
-    "live-use": () => <OfferLiveUsePanel />,
-    offers: () => <ServiceOffersPanel />,
+    offers: () => <OfferStudioPanel />,
+    versions: () => <ServiceOffersPanel />,
   },
   "website-studio": {
     publish: () => <CampaignPagePublishPanel />,

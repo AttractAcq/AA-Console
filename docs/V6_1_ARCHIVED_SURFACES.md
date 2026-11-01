@@ -22,6 +22,12 @@ Removed from `src/config/navigation.ts` only. `src/config/navigation.test.ts`
 pins the remaining tab lists, so a reinstated tab fails a test rather than
 arriving unnoticed in a merge.
 
+## Archived in v6.1, Phase 1.1
+
+| Surface | Where the code still is | Why |
+|---|---|---|
+| Offer Studio → **Live use** | `src/pages/offer/OfferLiveUsePanel.tsx` | Its question — where is a superseded version still live? — is a real one and is **not** dropped. It moved into the Offers table, where a drifting offer is named on the offer it belongs to rather than in a separate list, with the specifics in that row's detail. The panel and its 2 tests still compile. |
+
 ## Explicitly *not* archived
 
 **Motion Design** stays exactly as it is. The notes say "This page can be left
