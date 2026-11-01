@@ -28414,6 +28414,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      request_opportunity_discovery_v6: {
+        Args: { p_client_id: string; p_count?: number }
+        Returns: string
+      }
       repurpose_asset: {
         Args: { p_asset_id: string; p_formats: string[] }
         Returns: string
