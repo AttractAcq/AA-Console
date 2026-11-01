@@ -28414,10 +28414,6 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      request_opportunity_discovery_v6: {
-        Args: { p_client_id: string; p_count?: number }
-        Returns: string
-      }
       repurpose_asset: {
         Args: { p_asset_id: string; p_formats: string[] }
         Returns: string
@@ -28562,6 +28558,10 @@ export type Database = {
           p_prompt: string
           p_revision_of?: string
         }
+        Returns: string
+      }
+      request_opportunity_discovery_v6: {
+        Args: { p_client_id: string; p_count?: number }
         Returns: string
       }
       request_proof_artifact_v6: {
