@@ -437,8 +437,9 @@ export const v6ModuleNodes: NavNode[] = [
   { id: "proof-distribution", label: "Proof Distribution", path: "proof-distribution", icon: Share2,
     capability: "expanding", tabs: [
       { id: "destinations", label: "Destinations" },
-      { id: "placements", label: "Placements" },
-      { id: "rights", label: "Rights" },
+      // Placements and Rights are archived: see docs/V6_1_ARCHIVED_SURFACES.md.
+      // Their panels still build; only the way in is gone, so v6.2 can delete
+      // the code without a second decision.
     ] },
   { id: "content-distribution", label: "Organic Content Distribution", path: "content-distribution", icon: Share2,
     capability: "expanding", tabs: [
@@ -482,7 +483,8 @@ export const v6ModuleNodes: NavNode[] = [
   { id: "lead-magnet-studio", label: "Lead Magnet Studio", path: "lead-magnet-studio", icon: UserPlus,
     capability: "expanding", tabs: [
       { id: "magnets", label: "Magnets" }, { id: "build", label: "Build" },
-      { id: "delivery", label: "Delivery" }, { id: "optins", label: "Opt-ins" },
+      { id: "delivery", label: "Delivery" },
+      // Opt-ins is archived: see docs/V6_1_ARCHIVED_SURFACES.md.
     ] },
   { id: "sales-os", label: "Sales OS", path: "sales-os", icon: MessagesSquare,
     capability: "expanding", tabs: [

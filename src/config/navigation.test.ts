@@ -61,9 +61,14 @@ describe("client delivery navigation", () => {
     expect(v6ModuleNodes.filter((node) => node.tabs?.length === 0)).toEqual([]);
     expect(v6ModuleNodes.filter((node) => !node.tabs).map((node) => node.id))
       .toEqual(["campaign-factory"]);
+    // Three tabs are archived rather than deleted, per Alex on 31 October:
+    // the notes call Placements and Rights "not as important ... both need to
+    // be discontinued", and Opt-ins "isnt necissary to track". Their panels
+    // still compile; only the route in is gone. Pinned here so a reinstated
+    // tab is a deliberate act rather than a merge artefact.
     expect(v6ModuleNodes.find((node) => node.id === "lead-magnet-studio")?.tabs?.map((tab) => tab.id))
-      .toEqual(["magnets", "build", "delivery", "optins"]);
+      .toEqual(["magnets", "build", "delivery"]);
     expect(v6ModuleNodes.find((node) => node.id === "proof-distribution")?.tabs?.map((tab) => tab.id))
-      .toEqual(["destinations", "placements", "rights"]);
+      .toEqual(["destinations"]);
   });
 });

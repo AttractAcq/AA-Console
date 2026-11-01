@@ -4203,6 +4203,8 @@ export type Database = {
           offer_version_id: string | null
           optimisation_event: string | null
           paid_platform: string | null
+          runs_organic: boolean
+          runs_paid: boolean
           starts_on: string | null
           status: string
           target_countries: string[]
@@ -4250,6 +4252,8 @@ export type Database = {
           offer_version_id?: string | null
           optimisation_event?: string | null
           paid_platform?: string | null
+          runs_organic?: boolean
+          runs_paid?: boolean
           starts_on?: string | null
           status?: string
           target_countries?: string[]
@@ -4297,6 +4301,8 @@ export type Database = {
           offer_version_id?: string | null
           optimisation_event?: string | null
           paid_platform?: string | null
+          runs_organic?: boolean
+          runs_paid?: boolean
           starts_on?: string | null
           status?: string
           target_countries?: string[]
@@ -5225,6 +5231,7 @@ export type Database = {
       }
       client_ideas: {
         Row: {
+          acquisition_route: string | null
           archived_at: string | null
           body: string | null
           campaign_id: string | null
@@ -5249,6 +5256,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          acquisition_route?: string | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -5273,6 +5281,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          acquisition_route?: string | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -25656,6 +25665,8 @@ export type Database = {
           offer_version_id: string | null
           optimisation_event: string | null
           paid_platform: string | null
+          runs_organic: boolean
+          runs_paid: boolean
           starts_on: string | null
           status: string
           target_countries: string[]

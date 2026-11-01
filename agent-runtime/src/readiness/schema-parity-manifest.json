@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "0b998cdf0cdc0cd0d1523cb674d2ac9b462299a11c8b656494c88ae890cf44d9",
-  "generatedTypesSha256": "0779ff04ba52c4dd5e067b58e5fe575112d5b0569f2f124a11c855a03002a5be",
-  "generatedSchemaBodySha256": "6222be2202949a4affebc5afcae6f405a3612b699f2b8b4ab9835d5ec07fc0dd",
+  "migrationSourceDigest": "eb69d1478e6f570e8fa7391c40d18bf703ba93fd6cf16eadff5266f869d09952",
+  "generatedTypesSha256": "b4ba78bcf7dd4af9b97a6e8c5b5dae8601471c63b32d1e1f541a4150fa557fdd",
+  "generatedSchemaBodySha256": "e8787cdaeb320df78f9ad626fb0fa481a09a343c8ac6d5fe2a118a38dd4be35b",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2229,6 +2229,13 @@
       "filename": "20261101150000_301_current_employee_role_entitlement.sql",
       "sha256": "bdf220695c094bab22270a51067a23e22161cfdaab74663538a609fe27586856",
       "trimmedMd5": "0ad85101165e1d27b4ee5572eefa2c0d"
+    },
+    {
+      "version": "20261102000000",
+      "name": "302_a_campaign_may_be_paid_organic_or_both",
+      "filename": "20261102000000_302_a_campaign_may_be_paid_organic_or_both.sql",
+      "sha256": "caa3d32b25552f1c7f962717a6936244eb0af5406694ec532620f5a7a620ea37",
+      "trimmedMd5": "5345624874d5c09585adae78c44c9bde"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
