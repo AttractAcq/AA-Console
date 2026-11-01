@@ -409,6 +409,10 @@ export const v6ModuleNodes: NavNode[] = [
       { id: "proof-intelligence", label: "Proof Intelligence" },
       { id: "branding-strategy", label: "Branding Strategy" },
       { id: "content-pillars", label: "Content Pillars" },
+      // The notes: "the offer strategy tab needs to be moved back to under the
+      // strategy module as its own tab." Moving it also needs Page.tsx's
+      // strategyTabIds, or the filter there files it under Intelligence.
+      { id: "offer-strategy", label: "Offer Strategy" },
       { id: "money-model-strategy", label: "Money Model Strategy" },
     ] },
   // Between intelligence and campaigns on purpose: an opportunity is the
@@ -472,7 +476,7 @@ export const v6ModuleNodes: NavNode[] = [
     capability: "expanding", tabs: [
       { id: "live-use", label: "Live use" },
       { id: "offers", label: "Service Offers" },
-      { id: "offer-strategy", label: "Offer Strategy" },
+      // Offer Strategy moved to Intelligence OS, Strategy half.
     ] },
   { id: "website-studio", label: "Website Studio", path: "website-studio", icon: Globe,
     capability: "expanding", tabs: [

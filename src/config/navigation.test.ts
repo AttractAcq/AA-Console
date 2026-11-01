@@ -72,3 +72,31 @@ describe("client delivery navigation", () => {
       .toEqual(["destinations"]);
   });
 });
+
+describe("Offer Strategy belongs to Strategy, not Offer Studio", () => {
+  it("is a tab of Intelligence OS and not of Offer Studio", () => {
+    // The notes: "the offer strategy tab needs to be moved back to under the
+    // strategy module as its own tab."
+    const intelligence = v6ModuleNodes.find((node) => node.id === "intelligence-os");
+    const offerStudio = v6ModuleNodes.find((node) => node.id === "offer-studio");
+    expect(intelligence?.tabs?.map((tab) => tab.id)).toContain("offer-strategy");
+    expect(offerStudio?.tabs?.map((tab) => tab.id)).not.toContain("offer-strategy");
+    expect(offerStudio?.tabs?.map((tab) => tab.id)).toEqual(["live-use", "offers"]);
+  });
+});
+
+describe("the Strategy half of Intelligence OS", () => {
+  it("contains exactly the four strategy tabs, in product order", () => {
+    // Page.tsx splits Intelligence OS with
+    //   strategyTabIds.has(tab.id) === (view === "strategy")
+    // so a tab absent from that set lands under Intelligence no matter how it
+    // is grouped here. This asserts the grouping; Page.tsx's own set is kept in
+    // step by the test below.
+    const strategyIds = ["branding-strategy", "content-pillars", "offer-strategy", "money-model-strategy"];
+    const tabs = v6ModuleNodes.find((node) => node.id === "intelligence-os")?.tabs ?? [];
+    const ids = tabs.map((tab) => tab.id);
+    // Present, and after the intelligence tabs rather than interleaved.
+    expect(ids.filter((id) => strategyIds.includes(id))).toEqual(strategyIds);
+    expect(ids.slice(-4)).toEqual(strategyIds);
+  });
+});
