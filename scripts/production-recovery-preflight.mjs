@@ -47,7 +47,7 @@ export function trackedHistory(root = sourceRoot) {
   const marker = readFileSync(join(root, 'supabase/verification/released-migration-version.txt'), 'utf8').trim()
   const migrations = readdirSync(join(root, 'supabase/migrations'))
     .filter((name) => /^\d{14}_.+\.sql$/.test(name) && name.slice(0, 14) <= marker).sort()
-  if (migrations.length !== 318 || marker !== '20261101150000' ||
+  if (migrations.length !== 320 || marker !== '20261102010000' ||
       !migrations.at(-1)?.startsWith(`${marker}_`)) {
     fail('Current production recovery baseline changed; review and repin before use')
   }
@@ -107,7 +107,7 @@ function validateVault(value, label) {
 
 function validateCron(value, label, isRestore) {
   if (!Array.isArray(value) || value.length !== CURRENT_CRON_COUNT) {
-    fail(`${label} cron count differs from reviewed 301 baseline`)
+    fail(`${label} cron count differs from reviewed 303 baseline`)
   }
   const names = new Set()
   for (const job of value) {
