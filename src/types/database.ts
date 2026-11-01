@@ -5231,6 +5231,7 @@ export type Database = {
       }
       client_ideas: {
         Row: {
+          acquisition_route: string | null
           archived_at: string | null
           body: string | null
           campaign_id: string | null
@@ -5255,6 +5256,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          acquisition_route?: string | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -5279,6 +5281,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          acquisition_route?: string | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
