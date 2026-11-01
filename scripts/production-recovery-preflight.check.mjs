@@ -30,7 +30,7 @@ test('accepts a held post-282 migration file without changing the released recov
     const verificationDir = join(fixtureDir, 'supabase/verification')
     mkdirSync(migrationsDir, { recursive: true })
     mkdirSync(verificationDir, { recursive: true })
-    writeFileSync(join(verificationDir, 'released-migration-version.txt'), '20261102010000\n')
+    writeFileSync(join(verificationDir, 'released-migration-version.txt'), '20261102020000\n')
     const sourceMigrationsDir = fileURLToPath(new URL('../supabase/migrations/', import.meta.url))
     for (const name of readdirSync(sourceMigrationsDir).filter((file) => /^\d{14}_.+\.sql$/.test(file))) {
       writeFileSync(join(migrationsDir, name), '')
@@ -86,7 +86,7 @@ test('accepts a structurally identical offline 282 source and inactive disposabl
   const result = run()
   assert.deepEqual(result, {
     status: 'offline_snapshot_consistent', targetRef: PRODUCTION_REF,
-    sourceMigrationHead: '20261102010000', migrationCount: 320,
+    sourceMigrationHead: '20261102020000', migrationCount: 321,
     cronCount: 18, storageObjectCount: 2, vaultSecretCount: 1,
     allDisposableCronInactive: true, q019Closed: false,
     remaining: 'Verify capture provenance, encrypted off-site retention, hosted recovery path, Auth/settings/secrets and independent restore before production SQL.',
