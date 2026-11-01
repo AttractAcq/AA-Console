@@ -212,7 +212,9 @@ progression.
 10. **Approval Inbox unification** — four views into one. The notes say the
     approval routes are "specifically unknown", so the existing routes need
     mapping before any UI work, and that mapping should happen before Phase 2's
-    plan review gate depends on it.
+    plan review gate depends on it. **That mapping is done — see 10a below**,
+    and it changes the shape of this item: the unified spine already exists and
+    carries nine routes, so item 10 is wiring and deletion, not a build.
 11. **Distribution workers** — organic on a cron schedule, paid bundles handed
     to the human paid-ads operator, page published to GitHub, lead magnet bundle
     delivered.
@@ -220,6 +222,88 @@ progression.
     plus a Distribution Log table of what went where and when.
 13. **Organic Content Distribution** — Destinations (Facebook, Instagram) plus a
     Distribution Log. The Engine tab retires into the Dashboard switch panel.
+
+### 10a. The approval routes, mapped
+
+The notes called the approval routes "specifically unknown", and the plan made
+mapping them a prerequisite for the Phase 2 plan review gate. They are now
+mapped, from the live database rather than from the UI, because the UI is the
+part that turned out to be behind.
+
+**There is already one unified spine, and it is complete.** `approval_requests_v6`
+is the single request table, `register_approval_request_v6` its single writer,
+`record_approval_decision_v6` its single decision recorder, and
+`approval_inbox_v6` the single read model. Nine routes are registered against
+it, each with its own registrar and its own source-state resolver:
+
+| `source_system` / `source_kind` | source of truth | registrar | resolver | decision |
+| --- | --- | --- | --- | --- |
+| `aa_console` / `campaign_action` | `campaign_action_approvals` | `register_campaign_action_inbox_v6` | `approval_source_state_v6` | `decide_campaign_action_approval_v6` |
+| `aa_console` / `client_sales_entitlement` | `client_sales_entitlement_requests` | `sales_entitlement_inbox_insert_v6` | `approval_source_state_v6` | `decide_client_sales_entitlement` |
+| `aa_console` / `recruitment_brief` | `client_briefs` | `register_recruitment_brief_inbox_v6` | `approval_source_state_v6` | `approve_recruitment_brief_from_inbox_v6` |
+| `aa_console` / `google_review_reply` | `google_review_replies` | `register_google_reply_inbox_v6` | `approval_source_state_v6` | `decide_google_review_reply_from_inbox_v6` |
+| `aa_console` / `engine_slot` | `content_slots` + `slot_events` | `register_engine_slot_inbox_v6` | `approval_source_state_v6` | — not wired in the unified panel |
+| `auth` / `console_invitation` | `console_invitation_requests_v6` | `request_console_invitation_v6` | `approval_source_state_v6` | `decide_console_invitation_v6`, not wired |
+| `aa_console` / `production_release` | `production_release_candidates_v6` | `submit_production_release_candidate_v6` | `production_release_source_state_v6` | `decide_production_release_candidate_v6`, not wired |
+| `aa_console` / `recruitment_meta_build` | recruitment Meta build | `request_recruitment_meta_build` | `recruitment_meta_build_source_state_v6` | contained, see below |
+| `aa_console` / `organic_publication` | organic publication package | `register_organic_publication_package_v6` | `organic_publication_source_state_v6` | contained, see below |
+
+So the work in item 10 is not "build a unified inbox". It is to finish wiring
+the one that exists, and that is a smaller and better-understood job than the
+notes assumed.
+
+**The unified panel decides four of the nine.** `UnifiedApprovalInboxPanel`
+calls the campaign-action, sales-entitlement, recruitment-brief and
+google-reply RPCs. Engine slots, console invitations and production releases
+are registered and resolved but have no decision path in that panel; the last
+two are decided elsewhere today, which is defensible, and engine slots are
+decided in a *second* implementation, which is not.
+
+**Two routes are deliberately undecidable.** `recruitment_meta_build` and
+`organic_publication` carry an unconditional `preview_blocker` in the view, so
+their cards can never present as decidable:
+
+> Recruitment Meta creation still lacks exact media bytes and an AAL2 prewrite gate.
+> Organic publication lacks rights provenance, exact AAL2 approval and prewrite attestation.
+
+That is the containment migrations 293 and 295 added on purpose. Item 11 cannot
+distribute organic content through this gate until that blocker is lifted, and
+lifting it means supplying rights provenance and a prewrite attestation, not
+editing the string. **Phase 4 ordering follows from this**: item 11's organic
+worker is gated on 10a, not merely sequenced after it.
+
+**The spine has never carried a request.** `approval_requests_v6` and
+`approval_decision_events_v6` both hold zero rows, as do
+`campaign_action_approvals`, `content_slots` and
+`campaign_page_approval_snapshots`. This is not a defect: five of the nine
+registrars grant `execute` to nobody, so they are reachable only from inside
+the owning act's own definer function — a card is a side effect of the act that
+needs approving, never something a caller elects to create. Two more are
+`service_role` only. The inbox is empty because the acts have not fired, which
+is what "ready for v6.1" means here rather than something to fix.
+
+**The real gap is the one queue with real data.** `client_media_assets` holds
+110 rows and is approved by `review_media_asset`, which does not call
+`register_approval_request_v6` and has no `source_kind` in the spine at all. So
+media-asset review — the only approval in this system that has ever actually
+happened — is the single route with no representation in the unified inbox.
+Item 10 should add it as a tenth route before retiring `ApprovalsPanel`, or the
+unification loses the only queue in production use.
+
+**A soft edge worth knowing.** `source_system` and `source_kind` are
+length-bounded free text, with no enumeration and no foreign key. A registrar
+passing an unknown pair gets a card whose resolver falls through to
+`'unverified'`, which the view surfaces as that status and which no decision
+RPC will act on. It fails closed, so this is not urgent; but it means the route
+list above is discoverable only by reading `approval_inbox_v6` and
+`approval_source_state_v6`, which is why it is written down here.
+
+**What item 10 therefore is**, in order: add the media-asset route; wire the
+engine-slot decision into the unified panel and delete `EngineInboxPanel` and
+the legacy `approval_inbox` view with it; fold `ApprovalsPanel` and
+`CampaignActionApprovalsPanel` into the unified panel, whose RPC the latter
+already shares; then reduce the four tabs to one page. The two contained routes
+stay contained and visible.
 
 ## Phase 5 — read-only views and the archive
 
