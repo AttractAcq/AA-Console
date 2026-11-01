@@ -1,7 +1,7 @@
 # B005 Q022: conditional current employee role entitlement
 
 Migration 298 is a held prototype. Do not apply it until Alex decides Q022,
-recovery evidence is available for Q019, and migrations 280–297 are released
+recovery evidence is available for Q019, and migrations 283–300 are released
 in order. It does not enable an external provider or change a publishing
 switch.
 
@@ -10,12 +10,12 @@ switch.
 An active `team_members` row and its `client_assignments` or
 `job_assignments` grant employee authority only while the linked account's
 current `profiles.role` is `employee`. A user whose profile is `client` keeps
-their own `client_users` entitlement under migration 296, but a stale team row
+their own `client_users` entitlement under migration 299, but a stale team row
 does not make them an editor, SMM, creative director, or assignee. An admin
 still has separate administrator access. Service and cron lookups resolve a
 valid employee assignment without requiring a human JWT.
 
-This is the reverse of migration 296, which makes `client_users` require a
+This is the reverse of migration 299, which makes `client_users` require a
 current client profile. Neither migration removes historical rows. If Alex
 chooses legitimate dual-role accounts, provision an explicit scoped model
 instead of applying 296 or 298.
@@ -31,7 +31,7 @@ instead of applying 296 or 298.
 | `is_active_assigned_smm` | Client profile SMM can read the editor roster | Current employee role required |
 | `active_video_approval_manager` | Client profile can become an SMM for video, proof, pages, content and Storage policies/RPCs | Latest active SMM must have current employee role; invalid latest seat returns `NULL` instead of reviving an older assignee |
 | `active_creative_director` / `creative_seat_of` | Client profile can gain creative director approval seat | Latest active director must have current employee role; invalid latest seat returns `NULL` |
-| Video finalization trigger | A profile can change role after an SMM signoff and before final approval | Lock the latest active SMM assignment, team row and employee profile at the final write; preserve migration 296's nominated-client lock |
+| Video finalization trigger | A profile can change role after an SMM signoff and before final approval | Lock the latest active SMM assignment, team row and employee profile at the final write; preserve migration 299's nominated-client lock |
 | `is_channel_member` | Explicit channel membership allows client chat access | Unchanged: client chat membership is intentional and independent of team assignment |
 | Sales entitlement helpers | `is_eligible_lead_owner` already checks the bound user's employee profile | Unchanged |
 
@@ -68,3 +68,7 @@ The `media_obj_employee_insert` policy currently uses broad
 own client folder even though the policy name says employee. That existing
 same-client behavior is preserved here. Whether upload roles should split is
 a separate product/ACL decision.
+
+---
+
+*Migration numbers in this document refer to the released labels. The nineteen migrations integrated by #297 were renumbered from their original 280–298 to 283–301; references here were corrected on 1 November 2026. See `V6_MERGE_ARCHIVE_RECORD.md`.*

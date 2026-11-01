@@ -218,7 +218,7 @@ This is a source audit, not evidence of a production deployment.
   reviewed with it. Do not enable employee Sales access from the 268 table
   policies alone. `lead_pipeline_counts` is `security_invoker` from 267.
 - B004/privacy: `proof_capture_submissions` holds submitted names and consent.
-  Held migration 294 narrows the migration-216 broad assignment SELECT to
+  Held migration 297 narrows the migration-216 broad assignment SELECT to
   current admin, same-client client profile, and active SMM seat. It remains
   unapplied with the 280–294 stack; see
   `docs/security/B005-proof-submission-read-boundary.md`.
@@ -239,3 +239,7 @@ This is a source audit, not evidence of a production deployment.
   current client profile role for this branch in every affected table, RPC,
   and Storage policy. Do not enable the employee Sales route on an implicit
   membership interpretation.
+
+---
+
+*Migration numbers in this document refer to the released labels. The nineteen migrations integrated by #297 were renumbered from their original 280–298 to 283–301; references here were corrected on 1 November 2026. See `V6_MERGE_ARCHIVE_RECORD.md`.*

@@ -146,9 +146,17 @@ reserve and the admin status view. Those are 283, 284 and 285 now; in `main`,
 280–282 are the rule-six support flags, the booking and nurture config, and the
 engine config.
 
-`RAILWAY.md` was corrected here because it gates a runtime deploy decision and
-an operator follows it directly. The remaining fourteen files still carry stale
-bare numbers and need one pass in v6.1:
+`RAILWAY.md` was corrected first because it gates a runtime deploy decision and an operator follows it directly.
+
+**The rest of the sweep was done on 1 November 2026.** Ten documents had their references corrected (stack label + 3) with every anchor verified to match exactly once, never as a blanket sweep, because 280, 281 and 282 also exist for real and mean something else entirely. Each now carries a footnote saying the numbers are released labels.
+
+`production-recovery-preflight.md` needed repinning rather than renumbering, as predicted: it described a 296-migration baseline through `20261030160000`, which predates 280 entirely. It now states the 318-migration, 301 baseline the script asserts.
+
+`AA_CONSOLE_100_BUILD_BLUEPRINT.md` is **deliberately not renumbered**. Its 30 October section is a dated snapshot that was accurate when written; a snapshot quietly edited stops being evidence of anything. It is marked superseded and points here instead.
+
+`agent-runtime/ingress/README.md` is the one file left, held back on purpose: it sits under `agent-runtime/`, which the release gate's component-pin check treats as a runtime change regardless of the change being prose, so correcting it costs a Railway redeploy and a repin. It should ride along with the next change that touches that directory for real.
+
+The files swept:
 
 ```
 agent-runtime/ingress/README.md

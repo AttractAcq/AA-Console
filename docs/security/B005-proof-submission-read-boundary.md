@@ -1,4 +1,4 @@
-# Proof capture submission read boundary (held migration 294)
+# Proof capture submission read boundary (held migration 297)
 
 Migration 216 gave every authenticated `can_access_client(client_id)` caller
 direct `SELECT` access to `proof_capture_submissions`. That helper includes
@@ -35,3 +35,7 @@ manager transfer and retirement, role changes, anonymous/profileless denial
 and service reads. The full disposable schema replay must also pass before
 this branch can be considered for release. No live SQL should be applied until
 the held stack's recovery and exact-approval release gates are satisfied.
+
+---
+
+*Migration numbers in this document refer to the released labels. The nineteen migrations integrated by #297 were renumbered from their original 280–298 to 283–301; references here were corrected on 1 November 2026. See `V6_MERGE_ARCHIVE_RECORD.md`.*

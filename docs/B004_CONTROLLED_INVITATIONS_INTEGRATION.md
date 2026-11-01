@@ -1,6 +1,6 @@
 # B004 controlled invitations: integration and release contract
 
-This dependent branch builds on B004 migration 283 and adds 284–286. It is a
+This dependent branch builds on B004 migration 286 and adds 287–289. It is a
 review slice. No Auth invitation has been sent. Apply only after the released
 B008 canonical approval ledger 273–279 and B006 280–282, then 283, in order.
 The PGlite test replays the committed 273 and 279 migrations so invitation
@@ -67,7 +67,7 @@ email with different bytes or link semantics; that executor must register a
 
 `/admin/invitations/inspect` reveals a minimal invitation preview only to the
 exact invited Auth user ID and email. `/admin/invitations/accept` verifies that
-session against Supabase Auth and passes the ID to migration 286. The database
+session against Supabase Auth and passes the ID to migration 289. The database
 requires matching confirmed Auth ID/email, a live sent request, active
 unlinked target, and no existing profile. It creates the profile and roster or
 client link in one transaction. Repeated acceptance by the same user is a
@@ -141,3 +141,7 @@ The browser page asks for explicit acceptance after showing role and recipient.
 
 No secret, invitation token or provider link belongs in a database event,
 browser response, log or review artifact.
+
+---
+
+*Migration numbers in this document refer to the released labels. The nineteen migrations integrated by #297 were renumbered from their original 280–298 to 283–301; references here were corrected on 1 November 2026. See `V6_MERGE_ARCHIVE_RECORD.md`.*
