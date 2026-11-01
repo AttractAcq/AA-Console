@@ -315,3 +315,65 @@ describe("the template planner", () => {
     ).toBeTruthy();
   });
 });
+
+/** Open the row's action menu on the Discover table. */
+async function openDiscoverActions() {
+  render(<MarketOpportunitiesPanel view="discover" />);
+  await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+}
+
+describe("the Discover table carries the whole progression", () => {
+  /**
+   * The notes: "Activate can rather be in the table in the Discover - the
+   * actions buttons, so it is easier to navigate to see what market
+   * opportunities are active."
+   *
+   * Discover used to offer only validate, work on it and reject, so moving an
+   * opportunity forward meant leaving the table for a separate view reached
+   * through a dropdown. Both views now build their actions from one list, so
+   * the status gating cannot differ between them.
+   */
+  it("offers the campaign hand-off from the table, not only from Activate", async () => {
+    await openDiscoverActions();
+    expect(await screen.findByRole("menuitem", { name: "Create a campaign" })).toBeInTheDocument();
+  });
+
+  it("offers Approve from the table for a validated opportunity", async () => {
+    fetchOpportunities.mockResolvedValue([opportunity({ status: "validated" })]);
+    await openDiscoverActions();
+    expect(await screen.findByRole("menuitem", { name: "Approve" })).toBeInTheDocument();
+  });
+
+  it("offers the next step for each stage, and only that step", async () => {
+    fetchOpportunities.mockResolvedValue([opportunity({ status: "active" })]);
+    await openDiscoverActions();
+    expect(await screen.findByRole("menuitem", { name: "Mark learning" })).toBeInTheDocument();
+    // Not two stages at once: scaling comes after learning, not beside it.
+    expect(screen.queryByRole("menuitem", { name: "Scale it" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Mark active" })).not.toBeInTheDocument();
+  });
+
+  it("still withholds the hand-off while something is blocking", async () => {
+    // The gating has to survive being shared: the database refuses this and a
+    // button that always fails is worse than no button.
+    fetchReadiness.mockResolvedValue(
+      readiness({ blocker: "1 claim has no proof on file. Capture it, or change the claim." }),
+    );
+    await openDiscoverActions();
+    expect(screen.queryByRole("menuitem", { name: "Create a campaign" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer Pause before anything is approved", async () => {
+    fetchOpportunities.mockResolvedValue([opportunity({ status: "discovered" })]);
+    await openDiscoverActions();
+    expect(await screen.findByRole("menuitem", { name: "Mark validated" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Pause" })).not.toBeInTheDocument();
+  });
+
+  it("shows the status as its own column so an active one is visible at a glance", async () => {
+    fetchOpportunities.mockResolvedValue([opportunity({ status: "active" })]);
+    render(<MarketOpportunitiesPanel view="discover" />);
+    expect(await screen.findByRole("columnheader", { name: "Status" })).toBeInTheDocument();
+    expect(screen.getByText("active")).toBeInTheDocument();
+  });
+});

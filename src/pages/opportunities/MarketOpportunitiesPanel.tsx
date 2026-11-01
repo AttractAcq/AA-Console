@@ -137,6 +137,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
           onDiscover={() => setDiscovering(true)}
           onSelect={select}
           onAct={act}
+          onBuild={setBuilding}
         />
       )}
       {view !== "discover" && (
@@ -275,8 +276,94 @@ function OpportunityPicker({
   );
 }
 
+/**
+ * The actions for one opportunity, in one place.
+ *
+ * The notes: "Activate can rather be in the table in the Discover - the actions
+ * buttons, so it is easier to navigate to see what market opportunities are
+ * active." Discover offered only validate, work on it and reject, while the
+ * whole status progression -- approve, create a campaign, mark active, mark
+ * learning, scale -- lived in a separate Activate view reached through a
+ * dropdown.
+ *
+ * Copying that list into the table would have left two sources of truth for
+ * which action a status allows, and they would have drifted the first time the
+ * lifecycle changed. So it is built once here and both callers use it.
+ *
+ * Every item is gated on the status that actually permits it, and the campaign
+ * hand-off additionally on nothing blocking, because the database refuses it
+ * otherwise and a button that always fails is worse than no button.
+ */
+function opportunityActions({
+  opportunity: o, readiness: r, onSelect, onAct, onBuild,
+}: {
+  opportunity: Opportunity;
+  readiness: Readiness | undefined;
+  onSelect: (id: string) => void;
+  onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
+  onBuild: (opportunity: Opportunity) => void;
+}) {
+  return [
+    ...(o.status === "discovered"
+      ? [{
+          label: "Mark validated",
+          onSelect: () => void onAct(o.id, () => setStatus(o.id, "validated"), "Validated."),
+        }]
+      : []),
+    ...(o.status === "validated" && !r?.blocker
+      ? [{
+          label: "Approve",
+          onSelect: () => void onAct(o.id, () => setStatus(o.id, "approved"), "Approved."),
+        }]
+      : []),
+    ...(["approved", "active", "learning", "scaling"].includes(o.status) && !r?.blocker
+      ? [{ label: "Create a campaign", onSelect: () => onBuild(o) }]
+      : []),
+    ...(o.status === "approved"
+      ? [{
+          label: "Mark active",
+          onSelect: () => void onAct(o.id, () => setStatus(o.id, "active"), "Active."),
+        }]
+      : []),
+    ...(o.status === "active"
+      ? [{
+          label: "Mark learning",
+          onSelect: () => void onAct(o.id, () => setStatus(o.id, "learning"), "Learning."),
+        }]
+      : []),
+    ...(o.status === "learning"
+      ? [{
+          label: "Scale it",
+          onSelect: () => void onAct(o.id, () => setStatus(o.id, "scaling"), "Scaling."),
+        }]
+      : []),
+    { label: "Work on it", onSelect: () => onSelect(o.id) },
+    ...(r?.blocker ? [{ label: "Why not ready", onSelect: () => onSelect(o.id) }] : []),
+    ...(["approved", "active", "learning", "scaling"].includes(o.status)
+      ? [{
+          label: "Pause",
+          onSelect: () => {
+            const why = window.prompt("Why is this stopping?");
+            if (why?.trim()) void onAct(o.id, () => setStatus(o.id, "paused", why.trim()), "Paused.");
+          },
+        }]
+      : []),
+    {
+      label: "Reject",
+      destructive: true,
+      onSelect: () => {
+        const why = window.prompt("Why is this not worth pursuing?");
+        if (why?.trim()) {
+          void onAct(o.id, () => setStatus(o.id, "rejected", why.trim()), "Rejected.");
+        }
+      },
+    },
+  ];
+}
+
 function DiscoverView({
   clientId, opportunities, readiness, loading, busy, discovering, onDiscover, onSelect, onAct,
+  onBuild,
 }: {
   clientId: string | undefined;
   opportunities: Opportunity[];
@@ -287,6 +374,7 @@ function DiscoverView({
   onDiscover: () => void;
   onSelect: (id: string) => void;
   onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
+  onBuild: (opportunity: Opportunity) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -302,7 +390,10 @@ function DiscoverView({
       </div>
 
       <DataTable
-        columns={["Opportunity", "Micro-market", "Trigger", "Confidence", "Proposed", "Found", "Actions"]}
+        // Status is its own column rather than a subtitle under the name: the
+        // notes ask that it be easy "to see what market opportunities are
+        // active", and a caption under a button is not that.
+        columns={["Opportunity", "Status", "Micro-market", "Trigger", "Confidence", "Proposed", "Found", "Actions"]}
         emptyLabel={loading ? "Loading opportunities…" : "No opportunities yet — run a discovery pass"}
         rows={opportunities.map((o) => [
           <button
@@ -312,8 +403,8 @@ function DiscoverView({
             className="text-left hover:underline"
           >
             {o.name}
-            <span className="block text-xs text-muted-foreground">{o.status}</span>
           </button>,
+          <span key="s" className="capitalize">{o.status}</span>,
           <span key="m">{o.micro_market}</span>,
           <span key="t">{o.purchase_trigger ?? "—"}</span>,
           <ConfidenceTag key="c" confidence={o.confidence} />,
@@ -323,28 +414,13 @@ function DiscoverView({
             key="a"
             name={o.name}
             busy={busy === o.id}
-            items={[
-              ...(o.status === "discovered"
-                ? [{
-                    label: "Mark validated",
-                    onSelect: () => void onAct(o.id, () => setStatus(o.id, "validated"), "Validated."),
-                  }]
-                : []),
-              { label: "Work on it", onSelect: () => onSelect(o.id) },
-              ...(readiness.get(o.id)?.blocker
-                ? [{ label: "Why not ready", onSelect: () => onSelect(o.id) }]
-                : []),
-              {
-                label: "Reject",
-                destructive: true,
-                onSelect: () => {
-                  const why = window.prompt("Why is this not worth pursuing?");
-                  if (why?.trim()) {
-                    void onAct(o.id, () => setStatus(o.id, "rejected", why.trim()), "Rejected.");
-                  }
-                },
-              },
-            ]}
+            items={opportunityActions({
+              opportunity: o,
+              readiness: readiness.get(o.id),
+              onSelect,
+              onAct,
+              onBuild,
+            })}
           />,
         ])}
       />
@@ -741,47 +817,13 @@ function ActivateView({
               key="a"
               name={o.name}
               busy={busy === o.id}
-              items={[
-                ...(o.status === "validated" && !r?.blocker
-                  ? [{
-                      label: "Approve",
-                      onSelect: () => void onAct(o.id, () => setStatus(o.id, "approved"), "Approved."),
-                    }]
-                  : []),
-                // The hand-off. Offered from approved onwards and only while
-                // nothing is blocking, because the database refuses it
-                // otherwise and a button that always fails is worse than no
-                // button.
-                ...(["approved", "active", "learning", "scaling"].includes(o.status) && !r?.blocker
-                  ? [{ label: "Create a campaign", onSelect: () => onBuild(o) }]
-                  : []),
-                ...(o.status === "approved"
-                  ? [{
-                      label: "Mark active",
-                      onSelect: () => void onAct(o.id, () => setStatus(o.id, "active"), "Active."),
-                    }]
-                  : []),
-                ...(o.status === "active"
-                  ? [{
-                      label: "Mark learning",
-                      onSelect: () => void onAct(o.id, () => setStatus(o.id, "learning"), "Learning."),
-                    }]
-                  : []),
-                ...(o.status === "learning"
-                  ? [{
-                      label: "Scale it",
-                      onSelect: () => void onAct(o.id, () => setStatus(o.id, "scaling"), "Scaling."),
-                    }]
-                  : []),
-                { label: "Work on it", onSelect: () => onSelect(o.id) },
-                {
-                  label: "Pause",
-                  onSelect: () => {
-                    const why = window.prompt("Why is this stopping?");
-                    if (why?.trim()) void onAct(o.id, () => setStatus(o.id, "paused", why.trim()), "Paused.");
-                  },
-                },
-              ]}
+              items={opportunityActions({
+                opportunity: o,
+                readiness: r,
+                onSelect,
+                onAct,
+                onBuild,
+              })}
             />,
           ];
         })}
