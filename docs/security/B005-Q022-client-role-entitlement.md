@@ -1,7 +1,7 @@
 # B005 Q022: conditional current client role entitlement
 
 **Status: held design prototype.** Migration 296 must not be applied until Alex
-chooses Q022. This branch is stacked on held migrations 280–295 and cannot be
+chooses Q022. This branch is stacked on held migrations 283–298 and cannot be
 released independently. The proposed rule is: a `client_users` row authorizes
 the client console and client-sensitive data only while the same account has a
 current `profiles.role = 'client'`. The row remains in place for history and
@@ -37,7 +37,7 @@ frontend use of `client_users`. Rows marked *central* are closed by replacing
 | Contact and sales RLS | Migration 49 `ccd_client_read`; 60 `le_client_read`; 67 `csa_client_read`, `sac_client_read`; 129 `lead_identities_client_read`, `archived_leads_client_read` | Central predicate now denies stale membership. Explicit, current sales employee grants in migration 267 remain separate. |
 | Commercial, campaign, site and page RLS | Migration 72 `cc_client_read`, `cart_client_read`; 79 `cms_client_read`; 80 `csr_client_read`, `csad_client_read`; 82 `cpr_client_read`, `cpf_client_read`; 142 `client_engine_budgets_client_read` | Central predicate now denies stale membership. The policy name `cc_client_read` on campaigns is distinct from the contract policy of the same name on another table. |
 | Lead/contact RPCs | Migration 267 `may_manage_client_leads` calls `is_client_user`; migration 268 `can_read_client_sales_data` and guarded reads/writes delegate to it | Stale membership no longer grants read or mutation; service, admin and explicitly approved active sales employee paths remain. |
-| Proof read and upload | Migration 266 `cpa_client_insert`, `proof_obj_client_insert`, `proof_obj_client_read`; migration 294 `proof_submissions_read` | Central predicate closes client membership route. Migration 294 already required role client as a second gate; active SMM seat stays independent. |
+| Proof read and upload | Migration 266 `cpa_client_insert`, `proof_obj_client_insert`, `proof_obj_client_read`; migration 297 `proof_submissions_read` | Central predicate closes client membership route. Migration 294 already required role client as a second gate; active SMM seat stays independent. |
 | Client media row | Migration 05 `cma_client_read` used raw membership | Replaced by `is_client_user`; owner/assigned-employee and admin policies remain separate. |
 | Contract and billing rows | Migration 07 `cc_client_read` on `client_contracts` and `cbill_client_read` on `client_billing` used raw membership | Replaced by `is_client_user`. |
 | Onboarding write | Migration 272 `cos_client_update` used raw membership in both `USING` and `WITH CHECK` | Both sides use `is_client_user`, retaining the onboarding-form key condition and migration 272 identity trigger. |
@@ -46,7 +46,7 @@ frontend use of `client_users`. Rows marked *central* are closed by replacing
 | Video client approval | Migration 175 `video_approval_state` listed raw members; `request_video_client_approval` nominated any raw member; `sign_video_approval` and `decline_video_client_approval` trusted the saved nomination | Candidate list and nomination require current client role; sign/decline recheck it; state makes old signoff false after role drift. A final-write trigger locks profile and membership rows before video approval commit. |
 | Creative decision seat | Migration 247 `creative_seat_of` labelled any raw member as `client` | Requires the nominated profile's current client role. Director/SMM/admin precedence remains. |
 | Membership row and frontend | Migration 01 `client_users_self_read` showed a non-client its own row; `src/context/auth.tsx` reads that row after loading `profiles` | Self-read now requires role client; frontend receives no client ID for employee/profileless accounts. Admin policy is separate. |
-| Provisioning and target enumeration | Migration 11 creates initial membership; migration 286 invitation acceptance inserts it; migration 175 reads client accounts; migration 247 resolves a seat for a target user | Writes retain their contract, while target lists and seat resolution filter current role. No historical rows are deleted. |
+| Provisioning and target enumeration | Migration 11 creates initial membership; migration 289 invitation acceptance inserts it; migration 175 reads client accounts; migration 247 resolves a seat for a target user | Writes retain their contract, while target lists and seat resolution filter current role. No historical rows are deleted. |
 | Bot/service paths | MCP Bot RPCs use separate active-bot and exact-client grant checks; service role bypasses RLS or follows its own guarded RPCs | No Bot grant is derived from `client_users`; service/cron route is preserved. |
 
 ## Verification and limits
@@ -72,3 +72,7 @@ an explicit live sales employee entitlement remains governed by migration 267.
 The earlier B005 work split those from client commercial membership. Any future
 policy that directly joins `client_users` must use the Q022 role rule once Alex
 has selected it.
+
+---
+
+*Migration numbers in this document refer to the released labels. The nineteen migrations integrated by #297 were renumbered from their original 280–298 to 283–301; references here were corrected on 1 November 2026. See `V6_MERGE_ARCHIVE_RECORD.md`.*

@@ -42,7 +42,7 @@ change before that pin requires the final observed runtime SHA, not the first.
 
 ## 293 implementation contract
 
-1. A provisioned admin at AAL2 submits migration 288's immutable candidate
+1. A provisioned admin at AAL2 submits migration 291's immutable candidate
    into the **global** Approval Inbox. Its initial status is `source_held`.
 2. A server operator runs `scripts/production-release-attestation.mjs` with
    the Inbox request UUID. The script reads that source with a server-only
@@ -255,7 +255,7 @@ Pages gate and live adverse-case pilot are complete.
 
 ## Focused verification in this held patch
 
-- PGlite: migration 293 cases cover the held source, server-only proof,
+- PGlite: migration 296 cases cover the held source, server-only proof,
   digest/PR/CI/SQL drift, AAL1/member/service rejection, exact admin approval,
   stale-proof revocation, reasoned rejection and preservation of 292's held
   organic package Inbox branch. Migration 295 cases cover an unchanged packet
@@ -272,3 +272,7 @@ Pages gate and live adverse-case pilot are complete.
 - Existing Pages guard: `scripts/assert-current-deploy-sha.test.mjs`
   exercises a newer `main` arriving between tested SHA selection and the
   publication check. This is the same class of race observed in run 41014777972.
+
+---
+
+*Migration numbers in this document refer to the released labels. The nineteen migrations integrated by #297 were renumbered from their original 280–298 to 283–301; references here were corrected on 1 November 2026. See `V6_MERGE_ARCHIVE_RECORD.md`.*

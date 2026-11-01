@@ -84,7 +84,16 @@ import { ContentAssetsWorkspace, LEGACY_LIBRARY_TABS } from "../components/conte
 import { MarketOpportunitiesPanel } from "./opportunities/MarketOpportunitiesPanel";
 import { ProofDistributionPanel } from "./proof-distribution/ProofDistributionPanel";
 
-const strategyTabIds = new Set(["branding-strategy", "content-pillars", "money-model-strategy"]);
+// Which of Intelligence OS's tabs belong to its Strategy half. The filter below
+// is `strategyTabIds.has(tab.id) === (view === "strategy")`, so a tab missing
+// from this set renders under Intelligence however it is grouped in
+// navigation.ts -- which is why moving Offer Strategy is four edits, not one.
+const strategyTabIds = new Set([
+  "branding-strategy",
+  "content-pillars",
+  "offer-strategy",
+  "money-model-strategy",
+]);
 
 const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   "intelligence-os": {
@@ -98,6 +107,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     "proof-intelligence": () => <ProofIntelligencePanel />,
     "branding-strategy": () => <BrandingStrategyPanel />,
     "content-pillars": () => <ContentPillarsPanel />,
+    "offer-strategy": () => <OfferStrategyPanel />,
     "money-model-strategy": () => <MoneyModelStrategyPanel />,
   },
   "market-opportunities": {
@@ -151,7 +161,6 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   "offer-studio": {
     "live-use": () => <OfferLiveUsePanel />,
     offers: () => <ServiceOffersPanel />,
-    "offer-strategy": () => <OfferStrategyPanel />,
   },
   "website-studio": {
     publish: () => <CampaignPagePublishPanel />,

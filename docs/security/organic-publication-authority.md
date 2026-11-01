@@ -1,6 +1,6 @@
 # B011 organic publication authority: route matrix and acceptance contract
 
-This document describes the held migration 292 slice. It is a design and test
+This document describes the held migration 295 slice. It is a design and test
 contract, not a statement that organic publication is operational. Production
 publisher and per-client publishing switches remain off.
 
@@ -113,5 +113,9 @@ use a protected immutable object namespace and verify its bytes. The source
 asset `usage_rights` field is nullable and has no clearance evidence for
 generated media; proof rights are a separate table. A rights attestation
 workflow and a source-specific AAL2 decision RPC are required before the
-outgoing card can be approved. Until both exist, migration 292 must hold the
+outgoing card can be approved. Until both exist, migration 295 must hold the
 claim and show a blocker, even for legacy Engine slots that were approved.
+
+---
+
+*Migration numbers in this document refer to the released labels. The nineteen migrations integrated by #297 were renumbered from their original 280–298 to 283–301; references here were corrected on 1 November 2026. See `V6_MERGE_ARCHIVE_RECORD.md`.*

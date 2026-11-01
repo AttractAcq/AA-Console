@@ -57,10 +57,10 @@ sets `productionSchemaVerified: false` and `releaseAuthorized: false`.
 
 ## Controlled rollout sequence
 
-1. Keep this verifier informational while the held migration 288 release source
+1. Keep this verifier informational while the held migration 291 release source
    remains blocked. Review its packet against the PR's exact head and base.
 2. Build a trusted server-side bridge that binds the verified packet to the
-   immutable release candidate source in migration 288. Collect independent
+   immutable release candidate source in migration 291. Collect independent
    production schema, Railway project/service identity, switch and rollback
    evidence. The migration's candidate shape additionally needs a merge method,
    environment/service IDs and component pins. A browser or Bot claim must
@@ -77,3 +77,7 @@ sets `productionSchemaVerified: false` and `releaseAuthorized: false`.
 Railway's linked-branch Auto Deploy and Wait for CI settings live outside this
 repository. Verify and control them before treating a merge as effect-free.
 This code slice changes no production configuration or release switch.
+
+---
+
+*Migration numbers in this document refer to the released labels. The nineteen migrations integrated by #297 were renumbered from their original 280–298 to 283–301; references here were corrected on 1 November 2026. See `V6_MERGE_ARCHIVE_RECORD.md`.*
