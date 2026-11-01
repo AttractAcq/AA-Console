@@ -17985,18 +17985,21 @@ export type Database = {
           client_id: string
           created_at: string
           id: string
+          kind: string
           service_name: string
         }
         Insert: {
           client_id: string
           created_at?: string
           id?: string
+          kind?: string
           service_name: string
         }
         Update: {
           client_id?: string
           created_at?: string
           id?: string
+          kind?: string
           service_name?: string
         }
         Relationships: [
