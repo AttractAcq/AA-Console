@@ -490,9 +490,12 @@ export const v6ModuleNodes: NavNode[] = [
     ] },
   { id: "lead-magnet-studio", label: "Lead Magnet Studio", path: "lead-magnet-studio", icon: UserPlus,
     capability: "expanding", tabs: [
-      { id: "magnets", label: "Magnets" }, { id: "build", label: "Build" },
-      { id: "delivery", label: "Delivery" },
-      // Opt-ins is archived: see docs/V6_1_ARCHIVED_SURFACES.md.
+      // One operating page, per phase 3 item 7. Build was this table with a
+      // create button on top, so the button moved onto the page. Delivery's
+      // switch was already on the Dashboard panel and its approval queue is
+      // now in the row detail, next to the bytes it decides. Opt-ins is
+      // archived; capture endpoints live in Sales OS -> Capture.
+      { id: "magnets", label: "Magnets" },
     ] },
   { id: "sales-os", label: "Sales OS", path: "sales-os", icon: MessagesSquare,
     capability: "expanding", tabs: [

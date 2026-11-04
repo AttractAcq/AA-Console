@@ -394,7 +394,11 @@ export function PageBuilderPanel({
               <div className="mt-4 border-t border-border pt-3">
                 {pageLinks.some((link) => link.page_id === p.id &&
                   campaigns.some((campaign) => campaign.id === link.campaign_id &&
-                    (campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "paid"))) ? (
+                    // 'both' is a v6 route like the other two; omitting it hid
+                    // the approval button on a campaign that has pages to approve.
+                    (campaign.acquisition_mode === "organic"
+                      || campaign.acquisition_mode === "paid"
+                      || campaign.acquisition_mode === "both"))) ? (
                   <PageApprovalButton pageId={p.id}
                     ready={Boolean(p.html && p.current_revision) &&
                       repos.some((repo) => repo.status === "ready" && Boolean(repo.pages_url))} />

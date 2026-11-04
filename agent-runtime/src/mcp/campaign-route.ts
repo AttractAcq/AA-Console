@@ -123,8 +123,12 @@ routes["/internal/mcp/campaign/create-v6"] = {
     if (client_id === undefined || client_id === false
       || name === undefined || name === false
       || brief === undefined || brief === false
-      || (acquisition_mode !== "organic" && acquisition_mode !== "paid")
-      || (acquisition_mode === "paid" && paid_platform !== "meta" && paid_platform !== "google")
+      // 'both' is a real route since migration 302: a campaign may run paid
+      // and organic together. It carries a paid platform exactly as 'paid'
+      // does, because the paid half still has to name its inventory.
+      || (acquisition_mode !== "organic" && acquisition_mode !== "paid" && acquisition_mode !== "both")
+      || ((acquisition_mode === "paid" || acquisition_mode === "both")
+          && paid_platform !== "meta" && paid_platform !== "google")
       || (acquisition_mode === "organic" && paid_platform !== undefined)
       || offer_version_id === false
       || !subset(body, ["client_id", "name", "brief", "acquisition_mode", "paid_platform", "offer_version_id"])) return;
@@ -134,7 +138,7 @@ routes["/internal/mcp/campaign/create-v6"] = {
       p_name: name,
       p_brief: brief,
       p_acquisition_mode: acquisition_mode,
-      p_paid_platform: acquisition_mode === "paid" ? paid_platform : null,
+      p_paid_platform: acquisition_mode === "organic" ? null : paid_platform,
       p_offer_version_id: offer_version_id ?? null,
     };
   },

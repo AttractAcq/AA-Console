@@ -76,9 +76,14 @@ export function CampaignLaunchGate({ due }: { due: LaunchDue }) {
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
         <Fact label="Actions done" value={`${due.actions_done ?? 0}/${due.required_actions ?? 0}`} />
-        {due.acquisition_mode === "organic" ? (
+        {/* A 'both' campaign runs the two routes together, so it is the one
+            case that owes both numbers. Showing only spend, as the old
+            organic-or-else branch did, would have read as a paid campaign
+            with no organic obligation. */}
+        {due.acquisition_mode !== "paid" && (
           <Fact label="Posts published" value={String(due.posts_published ?? 0)} />
-        ) : (
+        )}
+        {due.acquisition_mode !== "organic" && (
           <Fact
             label="Spending days"
             value={due.spend_bindable ? String(due.spending_days ?? 0) : "unknown"}
@@ -88,7 +93,8 @@ export function CampaignLaunchGate({ due }: { due: LaunchDue }) {
         <Fact label="Leads attributed" value={String(due.leads_attributed ?? 0)} />
       </dl>
 
-      {!due.spend_bindable && due.acquisition_mode === "paid" && (
+      {!due.spend_bindable
+        && (due.acquisition_mode === "paid" || due.acquisition_mode === "both") && (
         <p className="text-xs text-muted-foreground">
           No external campaign id is bound, so spend cannot be read from here at all. That is a
           different problem from a campaign that is bound and spending nothing.

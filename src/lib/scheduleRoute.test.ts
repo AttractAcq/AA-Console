@@ -56,6 +56,27 @@ describe("browser scheduling route gate", () => {
     ]);
   });
 
+  it("allows organic scheduling under a paid-and-organic campaign", async () => {
+    // Migration 302's third route. A 'both' campaign genuinely runs organic,
+    // so its organic posts are exactly what this gate is for -- and it always
+    // carries a paid_platform, because the route CHECK requires one. The old
+    // organic-only test demanded mode === "organic" AND paid_platform === null,
+    // so it failed such a campaign twice over and blocked every post under it.
+    rows.set("client_campaigns", {
+      id: "campaign-1", client_id: "client-1", acquisition_mode: "both", paid_platform: "meta",
+    });
+    await expect(assertOrganicScheduleRoute("asset-1", "organic", "client-1"))
+      .resolves.toBeUndefined();
+  });
+
+  it("still blocks a paid-and-organic campaign with no platform, which cannot exist", async () => {
+    rows.set("client_campaigns", {
+      id: "campaign-1", client_id: "client-1", acquisition_mode: "both", paid_platform: null,
+    });
+    await expect(assertOrganicScheduleRoute("asset-1", "organic", "client-1"))
+      .rejects.toMatchObject({ reason: "unverified" });
+  });
+
   it("rejects a paid or unknown requested channel without reading lineage", async () => {
     await expect(assertOrganicScheduleRoute("asset-1", "paid")).rejects.toMatchObject({
       code: "schedule_route_blocked", reason: "paid_channel",

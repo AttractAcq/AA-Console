@@ -182,10 +182,7 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     metrics: () => <GoogleProfilePanel tab="metrics" />,
   },
   "lead-magnet-studio": {
-    magnets: () => <LeadMagnetStudioPanel tab="magnets" />,
-    build: () => <LeadMagnetStudioPanel tab="build" />,
-    delivery: () => <LeadMagnetStudioPanel tab="delivery" />,
-    optins: () => <LeadMagnetStudioPanel tab="optins" />,
+    magnets: () => <LeadMagnetStudioPanel />,
   },
   // Capture leads, because where a lead came from is the question the old
   // page could never answer.

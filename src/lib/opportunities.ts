@@ -219,7 +219,7 @@ export const CLASSIFICATION_HINT: Record<string, string> = {
  */
 export async function createCampaignFromOpportunity(args: {
   opportunityId: string;
-  acquisitionMode: "organic" | "paid";
+  acquisitionMode: "organic" | "paid" | "both";
   paidPlatform?: "meta" | "google" | null;
   name?: string | null;
 }): Promise<{ id: string; name: string }> {
@@ -230,7 +230,9 @@ export async function createCampaignFromOpportunity(args: {
     // default to null in SQL, and the generated type says optional rather
     // than nullable — which are the same thing to the function, and only one
     // of which compiles.
-    ...(args.acquisitionMode === "paid" && args.paidPlatform
+    // 'both' carries a paid platform too: its paid half still names its
+    // inventory, and the route CHECK requires one.
+    ...((args.acquisitionMode === "paid" || args.acquisitionMode === "both") && args.paidPlatform
       ? { p_paid_platform: args.paidPlatform }
       : {}),
     ...(args.name?.trim() ? { p_name: args.name.trim() } : {}),

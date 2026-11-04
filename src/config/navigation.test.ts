@@ -66,8 +66,12 @@ describe("client delivery navigation", () => {
     // be discontinued", and Opt-ins "isnt necissary to track". Their panels
     // still compile; only the route in is gone. Pinned here so a reinstated
     // tab is a deliberate act rather than a merge artefact.
+    // Lead Magnet Studio is down to its one page (phase 3 item 7): Build was
+    // this table with a create button above it, and Delivery's three parts
+    // went to the Dashboard switch panel, the row detail and the row detail
+    // again. docs/V6_1_ARCHIVED_SURFACES.md §Phase 3.7 says where each went.
     expect(v6ModuleNodes.find((node) => node.id === "lead-magnet-studio")?.tabs?.map((tab) => tab.id))
-      .toEqual(["magnets", "build", "delivery"]);
+      .toEqual(["magnets"]);
     expect(v6ModuleNodes.find((node) => node.id === "proof-distribution")?.tabs?.map((tab) => tab.id))
       .toEqual(["destinations"]);
   });

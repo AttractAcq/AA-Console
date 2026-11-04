@@ -200,7 +200,13 @@ export async function runCampaignPlanJob(
   if (!campaign) {
     return { ok: false, retryable: false, failureMessage: "That campaign no longer exists." };
   }
-  const isV6 = campaign.acquisition_mode === "organic" || campaign.acquisition_mode === "paid";
+  // 'both' is as v6 as the other two: migration 302 added it for a campaign
+  // that runs paid and organic together. Leaving it out here sent such a
+  // campaign down the legacy path, skipping the intelligence and offer
+  // snapshots that every v6 plan is built from.
+  const isV6 = campaign.acquisition_mode === "organic"
+    || campaign.acquisition_mode === "paid"
+    || campaign.acquisition_mode === "both";
   // A committed batch survives worker crashes. The same job must still finish
   // package creation and links after a crash between the SQL save and return.
   if (savedPlanNeedsFinalization(campaign, job.id)) {
@@ -317,7 +323,15 @@ export async function runCampaignPlanJob(
       ? "This is a PAID META campaign. Route creative to Meta/Facebook/Instagram ads only. Do not add Google or organic publication as campaign distribution."
       : campaign.acquisition_mode === "paid" && campaign.paid_platform === "google"
         ? "This is a PAID GOOGLE campaign. Route creative to Google search ads only. Do not add Meta or organic publication as campaign distribution."
-        : "This is a legacy campaign. Preserve its historical routing without inferring a v6 mode.";
+        // A 'both' campaign runs the two routes together, so it is the one
+        // case that must plan organic AND paid. Saying "and nothing else"
+        // matters as much as the rest: the rival ad platform stays out, and
+        // the validator refuses a plan missing either half.
+        : campaign.acquisition_mode === "both" && campaign.paid_platform === "meta"
+          ? "This is a PAID-AND-ORGANIC META campaign. Plan BOTH organic distribution AND Meta/Facebook/Instagram ads, and say which pieces serve which route. Do not add Google destinations."
+          : campaign.acquisition_mode === "both" && campaign.paid_platform === "google"
+            ? "This is a PAID-AND-ORGANIC GOOGLE campaign. Plan BOTH organic distribution AND Google search ads, and say which pieces serve which route. Do not add Meta destinations."
+            : "This is a legacy campaign. Preserve its historical routing without inferring a v6 mode.";
 
   const system = `You plan marketing campaigns for Attract Acquisition, a marketing agency.
 

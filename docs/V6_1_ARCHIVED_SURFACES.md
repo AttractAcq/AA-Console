@@ -28,6 +28,27 @@ arriving unnoticed in a merge.
 |---|---|---|
 | Offer Studio → **Live use** | `src/pages/offer/OfferLiveUsePanel.tsx` | Its question — where is a superseded version still live? — is a real one and is **not** dropped. It moved into the Offers table, where a drifting offer is named on the offer it belongs to rather than in a separate list, with the specifics in that row's detail. The panel and its 2 tests still compile. |
 
+## Archived in v6.1, Phase 3.7
+
+Lead Magnet Studio became one page. Three of its four tabs went, and none of
+them was simply deleted — each one's question is still answerable, somewhere
+it belongs better.
+
+| Surface | Where the code still is | Why |
+|---|---|---|
+| Lead Magnet Studio → **Build** | folded into `src/pages/lead-magnet/LeadMagnetStudioPanel.tsx` | It was a second list of the same magnets with a create button above it. The button is the page's action now; the list was the table twice. Nothing to preserve. |
+| Lead Magnet Studio → **Delivery** | folded into the same panel | Three separate things lived here. The **delivery switch** was already duplicated on the Dashboard switch panel, which is where the notes put every switch, so this copy went and the Dashboard's is now asserted by a test rather than assumed. The **approval queue** moved into the row detail. **What-is-owed** moved with it, scoped to the open magnet. |
+| Lead Magnet Studio → **Opt-ins** | `src/pages/sales/LeadCapturePanel.tsx` | Capture endpoints are created and switched in Sales OS → Capture, which the notes leave alone, and its tests already covered the show-the-token-once rule. Nothing became unreachable, so the duplicate here went rather than being rebuilt. |
+
+**What did not flatten.** The approval act stayed a full panel rather than
+becoming a row-menu item. Approving a magnet means approving exact bytes and
+the words that carry them, and the old Delivery tab showed the recorded scope
+and payload hash before you decided. A menu item that approved something you
+could not see would have been a worse page, not a tidier one, so the decision
+sits in the detail panel beside the thing it decides — and it shows what the
+*approval* recorded, not what the version row says now, because the gap
+between those two is exactly the "changed after approval" blocker.
+
 ## Explicitly *not* archived
 
 **Motion Design** stays exactly as it is. The notes say "This page can be left
@@ -45,8 +66,9 @@ connect-modules in the shape of the Proof Production capture methods, and a
 **Distribution Log** showing what went where and when. Destinations survives
 here; the log arrives in Phase 4 of the build plan.
 
-Opt-ins likewise folds into the single-page Lead Magnet Studio of Phase 3,
-which is a table of magnets plus one build button.
+Opt-ins folded into the single-page Lead Magnet Studio, which is a table of
+magnets plus one build button. That page is built: see Phase 3.7 above for
+where each of its three retired tabs went.
 
 ## For v6.2
 
