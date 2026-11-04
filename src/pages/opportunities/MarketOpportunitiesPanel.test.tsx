@@ -24,6 +24,11 @@ const {
   enqueueAgentJob,
   fetchStageTemplates,
   setStageTemplate,
+  fetchOpenProposals,
+  acceptScoreProposal,
+  rejectProposal,
+  requestEvaluation,
+  requestStrategy,
   rpc,
 } = vi.hoisted(() => ({
   createCampaignFromOpportunity: vi.fn(),
@@ -32,6 +37,11 @@ const {
   enqueueAgentJob: vi.fn(),
   fetchStageTemplates: vi.fn(),
   setStageTemplate: vi.fn(),
+  fetchOpenProposals: vi.fn(),
+  acceptScoreProposal: vi.fn(),
+  rejectProposal: vi.fn(),
+  requestEvaluation: vi.fn(),
+  requestStrategy: vi.fn(),
   rpc: vi.fn(),
 }));
 
@@ -45,9 +55,16 @@ vi.mock("../../lib/opportunities", async () => {
     createCampaignFromOpportunity,
     fetchOpportunities,
     fetchReadiness,
-    fetchScoreFactors: async () => [],
+    fetchScoreFactors: async () => [
+      { factor: "economic_value", weight: 0.2, label: "Economic value" },
+    ],
     fetchStageTemplates,
     setStageTemplate,
+    fetchOpenProposals,
+    acceptScoreProposal,
+    rejectProposal,
+    requestEvaluation,
+    requestStrategy,
   };
 });
 vi.mock("../../lib/supabase", () => ({
@@ -99,6 +116,32 @@ beforeEach(() => {
   fetchOpportunities.mockResolvedValue([opportunity()]);
   fetchReadiness.mockResolvedValue(readiness());
   createCampaignFromOpportunity.mockResolvedValue({ id: "camp-1", name: "Garage-to-Gym Conversion" });
+  fetchOpenProposals.mockResolvedValue([]);
+  acceptScoreProposal.mockResolvedValue(undefined);
+  rejectProposal.mockResolvedValue(undefined);
+  requestEvaluation.mockResolvedValue(undefined);
+  requestStrategy.mockResolvedValue(undefined);
+});
+
+/** What the Evaluate agent writes: factors, their reasoning, and the case. */
+const scoreProposal = (over: Record<string, unknown> = {}) => ({
+  id: "prop-1",
+  opportunity_id: "opp-1",
+  client_id: "client-1",
+  kind: "score",
+  payload: {
+    factors: { economic_value: 90 },
+    reasoning: { economic_value: "Highest-margin job they do." },
+  },
+  rationale: "Strong value, proof is the gap.",
+  proposed_by: "opportunity_evaluate",
+  proposed_by_job_id: "job-1",
+  proposed_at: "2026-11-04T10:00:00Z",
+  resolution: "open",
+  resolved_by: null,
+  resolved_at: null,
+  rejection_reason: null,
+  ...over,
 });
 
 /** Open the row's action menu on the Activate view. */
@@ -481,5 +524,89 @@ describe("saying how many opportunities to look for", () => {
     expect(
       await screen.findByText(/Ask for between 2 and 8 opportunities in one pass/),
     ).toBeInTheDocument();
+  });
+});
+
+describe("asking an agent, and deciding on what it says", () => {
+  it("offers both agents on a row, whatever its status", async () => {
+    // Asking a machine to think costs a run, not a commitment, so neither is
+    // gated the way approving or scaling is.
+    const user = userEvent.setup();
+    await openActions();
+    await user.click(await screen.findByRole("menuitem", { name: "Evaluate with an agent" }));
+    await waitFor(() => expect(requestEvaluation).toHaveBeenCalledWith("client-1", "opp-1"));
+
+    await openActions();
+    await user.click(await screen.findByRole("menuitem", { name: "Strategise with an agent" }));
+    await waitFor(() => expect(requestStrategy).toHaveBeenCalledWith("client-1", "opp-1"));
+  });
+
+  it("shows the reasoning beside each number, not just a total", async () => {
+    // The whole point of a human accepting is that they can disagree with the
+    // argument. A panel showing only a score would be a rubber stamp.
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([scoreProposal()]);
+    render(<MarketOpportunitiesPanel view="evaluate" />);
+
+    const heading = await screen.findByText("A score is proposed");
+    // Scoped to the proposal: the Evaluate form below it also labels the
+    // factors, and a bare getByText would pass on the wrong one.
+    const card = within(heading.closest("section")!);
+    expect(card.getByText("Strong value, proof is the gap.")).toBeInTheDocument();
+    expect(card.getByText("Economic value")).toBeInTheDocument();
+    expect(card.getByText("90")).toBeInTheDocument();
+    expect(card.getByText("Highest-margin job they do.")).toBeInTheDocument();
+    expect(card.getByText(/Drafted by opportunity_evaluate/)).toBeInTheDocument();
+    expect(card.getByText(/nothing\s+is scored until you accept it/)).toBeInTheDocument();
+  });
+
+  it("accepts by proposal id, sending no numbers of its own", async () => {
+    // accept_opportunity_score_proposal_v6 reads the factors from the stored
+    // row, so what is scored cannot drift from what was rendered and read.
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([scoreProposal()]);
+    render(<MarketOpportunitiesPanel view="evaluate" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Accept this score" }));
+    await waitFor(() => expect(acceptScoreProposal).toHaveBeenCalledWith("prop-1"));
+    expect(acceptScoreProposal).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires a reason before rejecting", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([scoreProposal()]);
+    const prompt = vi.spyOn(window, "prompt").mockReturnValue("   ");
+    render(<MarketOpportunitiesPanel view="evaluate" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Reject" }));
+    expect(rejectProposal).not.toHaveBeenCalled();
+    prompt.mockRestore();
+  });
+
+  it("sends a strategy proposal to the editors rather than offering one-click apply", async () => {
+    // Those six fields already have editors in the Strategise view. A second
+    // write path for them would be two places to change the same thing.
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([
+      scoreProposal({
+        id: "prop-2",
+        kind: "strategy",
+        payload: { fields: { positioning: "The room you already own" } },
+        proposed_by: "opportunity_strategise",
+      }),
+    ]);
+    render(<MarketOpportunitiesPanel view="evaluate" />);
+    expect(await screen.findByText("A strategy is proposed")).toBeInTheDocument();
+    expect(screen.getByText("The room you already own")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept this score" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Apply these in the Strategise view/)).toBeInTheDocument();
+  });
+
+  it("shows only the open proposals for the opportunity in front of you", async () => {
+    search.value = "opportunity=opp-1";
+    fetchOpenProposals.mockResolvedValue([
+      scoreProposal({ id: "prop-3", opportunity_id: "opp-elsewhere" }),
+    ]);
+    render(<MarketOpportunitiesPanel view="evaluate" />);
+    await screen.findByText(/Garage-to-Gym/);
+    expect(screen.queryByText("A score is proposed")).not.toBeInTheDocument();
   });
 });

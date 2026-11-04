@@ -14592,6 +14592,125 @@ export type Database = {
           },
         ]
       }
+      opportunity_proposals: {
+        Row: {
+          client_id: string
+          id: string
+          kind: string
+          opportunity_id: string
+          payload: Json
+          proposed_at: string
+          proposed_by: string
+          proposed_by_job_id: string | null
+          rationale: string
+          rejection_reason: string | null
+          resolution: string
+          resolved_at: string | null
+          resolved_by: string | null
+        }
+        Insert: {
+          client_id: string
+          id?: string
+          kind: string
+          opportunity_id: string
+          payload: Json
+          proposed_at?: string
+          proposed_by: string
+          proposed_by_job_id?: string | null
+          rationale: string
+          rejection_reason?: string | null
+          resolution?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          client_id?: string
+          id?: string
+          kind?: string
+          opportunity_id?: string
+          payload?: Json
+          proposed_at?: string
+          proposed_by?: string
+          proposed_by_job_id?: string | null
+          rationale?: string
+          rejection_reason?: string | null
+          resolution?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_proposals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_origins"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_proposed_by_job_id_fkey"
+            columns: ["proposed_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       opportunity_score_factors: {
         Row: {
           factor: string
@@ -24367,6 +24486,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      accept_opportunity_score_proposal_v6: {
+        Args: { p_note?: string; p_proposal_id: string }
+        Returns: {
+          classification: string
+          client_id: string
+          factors: Json
+          id: string
+          note: string | null
+          opportunity_id: string
+          scored_at: string
+          scored_by: string | null
+          total: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "opportunity_scores"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       accept_proof_capture_submission: {
         Args: {
           p_body: string
@@ -28305,6 +28444,10 @@ export type Database = {
         Args: { p_brief: Database["public"]["Tables"]["client_briefs"]["Row"] }
         Returns: string
       }
+      reject_opportunity_proposal_v6: {
+        Args: { p_proposal_id: string; p_reason: string }
+        Returns: undefined
+      }
       reject_slot: {
         Args: { p_reason: string; p_slot_id: string }
         Returns: {
@@ -28560,8 +28703,25 @@ export type Database = {
         }
         Returns: string
       }
+      request_offer_compile_v6: {
+        Args: {
+          p_client_id: string
+          p_kind: string
+          p_opportunity_id?: string
+          p_source: string
+        }
+        Returns: string
+      }
       request_opportunity_discovery_v6: {
         Args: { p_client_id: string; p_count?: number }
+        Returns: string
+      }
+      request_opportunity_evaluation_v6: {
+        Args: { p_client_id: string; p_opportunity_id: string }
+        Returns: string
+      }
+      request_opportunity_strategy_v6: {
+        Args: { p_client_id: string; p_opportunity_id: string }
         Returns: string
       }
       request_proof_artifact_v6: {

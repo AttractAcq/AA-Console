@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "f5daa2b15e7b69e35acb69c31e9d091a5655b4418d1970f745deb7d2e39a6cb8",
-  "generatedTypesSha256": "f854c3158ec21c40465ccdec5842ca0bfdeb2742500b42c929b8893b48083e12",
-  "generatedSchemaBodySha256": "a4cf320db7691b903070a10c676acfeff238c430bf085adaab79dc86a0b0580a",
+  "migrationSourceDigest": "d51abf63116b0b05af3f58dbe042889d8a081724eb0f26f804edc51bc3bf8718",
+  "generatedTypesSha256": "45bfc789b5ed59829d1a2ea73aa0f7277def34dcb02e34df2ab85e12aa6a192b",
+  "generatedSchemaBodySha256": "a9c93eca478046667b664ebd9819c449e9b465aa46a05e514ac5260b6c815878",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2257,6 +2257,20 @@
       "filename": "20261104000000_305_the_mcp_campaign_writer_learns_the_route_flags.sql",
       "sha256": "8e2c3bdc7807c722f7f6454a1c0296e992b69a3a6632eeb8fbd06ee5c49acbac",
       "trimmedMd5": "87713a9fa709cea30717a3a63392b7ec"
+    },
+    {
+      "version": "20261104010000",
+      "name": "306_an_agent_may_propose_a_score_not_assert_one",
+      "filename": "20261104010000_306_an_agent_may_propose_a_score_not_assert_one.sql",
+      "sha256": "b7bf38424b60b4300d7ac16c515aa5339bbb8d8d2145908efd0880bdc01a6f40",
+      "trimmedMd5": "d0846b2889784a34e72987ebb13ea94c"
+    },
+    {
+      "version": "20261104020000",
+      "name": "307_the_offer_compiler",
+      "filename": "20261104020000_307_the_offer_compiler.sql",
+      "sha256": "9f6be92826e26ee4b4eb375fb7f6a291a1f2aca09a9a70f6562c60f8d59981ec",
+      "trimmedMd5": "10f291e251a0bacc20618741fa38b141"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

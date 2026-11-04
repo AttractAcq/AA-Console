@@ -13,8 +13,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * use tab existed to answer still gets answered -- on the offer it belongs to,
  * rather than in a list somebody has to go and look at.
  */
-const { from, insert } = vi.hoisted(() => ({ from: vi.fn(), insert: vi.fn() }));
-vi.mock("../../lib/supabase", () => ({ supabase: { from } }));
+const { from, insert, rpc } = vi.hoisted(() => ({
+  from: vi.fn(), insert: vi.fn(), rpc: vi.fn(),
+}));
+vi.mock("../../lib/supabase", () => ({
+  supabase: { from, rpc: (...a: unknown[]) => rpc(...(a as [])) },
+}));
 
 import { OfferStudioPanel } from "./OfferStudioPanel";
 
@@ -78,6 +82,7 @@ vi.mock("react-router-dom", async (importOriginal) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rpc.mockResolvedValue({ error: null });
 });
 
 describe("the two buttons the notes ask for", () => {
@@ -194,5 +199,54 @@ describe("the detail", () => {
       "href",
       "/clients/client-1/delivery/offer-studio?tab=versions&offer=offer-1",
     );
+  });
+});
+
+describe("compiling an offer instead of writing one", () => {
+  it("asks the compiler for a main or a secondary offer", async () => {
+    // The notes: "agent compiles from Offer Strategy or from the micro-niche".
+    // Only the strategy source is offered here; the micro-niche one needs an
+    // opportunity, and that choice belongs on the opportunity.
+    database({ offers: [] });
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
+    expect(rpc).toHaveBeenCalledWith("request_offer_compile_v6", {
+      p_client_id: "client-1", p_kind: "main", p_source: "strategy",
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Compile a secondary offer" }));
+    expect(rpc).toHaveBeenCalledWith("request_offer_compile_v6", {
+      p_client_id: "client-1", p_kind: "secondary", p_source: "strategy",
+    });
+  });
+
+  it("creates no offer itself: the agent drafts one", async () => {
+    // Compiling must not also insert an empty offer row. Two offers from one
+    // click is the bug a shared busy flag invites.
+    database({ offers: [] });
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("says what the database said when it refuses", async () => {
+    // The refusals are informative -- no offer strategy yet, or a compile
+    // already running -- so they are shown rather than flattened.
+    database({ offers: [] });
+    rpc.mockResolvedValue({
+      error: { message: "This client has no offer strategy yet." },
+    });
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
+    expect(await screen.findByRole("alert"))
+      .toHaveTextContent("This client has no offer strategy yet.");
+  });
+
+  it("confirms what was queued when it works", async () => {
+    database({ offers: [] });
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Compile a secondary offer" }));
+    expect(await screen.findByRole("status"))
+      .toHaveTextContent(/drafting a secondary offer from the offer strategy/);
   });
 });

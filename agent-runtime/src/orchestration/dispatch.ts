@@ -50,6 +50,9 @@ import { runRepurposeJob } from "../agents/repurpose/index.js";
 import { runProofDiscoveryJob } from "../agents/proof_discovery/index.js";
 import { runProofArtifactJob } from "../agents/proof_artifact/index.js";
 import { runOpportunityDiscoveryJob } from "../agents/opportunity_discovery/index.js";
+import { runOpportunityEvaluateJob } from "../agents/opportunity_evaluate/index.js";
+import { runOpportunityStrategiseJob } from "../agents/opportunity_strategise/index.js";
+import { runOfferCompileJob } from "../agents/offer_compile/index.js";
 import { runSalesAgentJob } from "../agents/sales_agent/index.js";
 import { runCampaignPlanJob } from "../agents/campaign_plan/index.js";
 import { runPageAuditJob } from "../agents/page_audit/index.js";
@@ -102,6 +105,15 @@ const RUNNERS: Record<string, JobRunner> = {
   proof_discovery: runProofDiscoveryJob,
   proof_artifact: runProofArtifactJob,
   opportunity_discovery: runOpportunityDiscoveryJob,
+  // Proposes a score; it cannot assert one. See migration 306 and
+  // the agent's own header for why that is deliberate.
+  opportunity_evaluate: runOpportunityEvaluateJob,
+  // Writes the working-out it is allowed to write; proposes the summary
+  // fields it is not. The split is the codebase's, not this agent's.
+  opportunity_strategise: runOpportunityStrategiseJob,
+  // Drafts an offer version, which the existing sign-off flow already
+  // treats as a proposal. Leaves price and claims to a person.
+  offer_compile: runOfferCompileJob,
   landing_page: runLandingPageJob,
   // The page, and then the thing standing on it.
   sales_agent: runSalesAgentJob,
