@@ -10,10 +10,13 @@ describe("client delivery navigation", () => {
       "Proof Production Factory", "Content Production Factory", "Proof Distribution",
       "Organic Content Distribution", "Google Ads Studio", "Meta Ads Studio", "Google Profile",
       "Meta Profile", "Offer Studio", "Website Studio", "Lead Magnet Studio",
-      "Sales OS", "Attribution OS", "Motion Design", "Archive",
+      // Motion Design is archived, on Alex's decision of 4 November. Only the
+      // route in is gone; its panels still compile. See
+      // docs/V6_1_ARCHIVED_SURFACES.md.
+      "Sales OS", "Attribution OS", "Archive",
     ]);
     expect(v6ModuleNodes).toHaveLength(16);
-    expect(new Set(clientNavGroups[0]?.children?.map((node) => node.path)).size).toBe(20);
+    expect(new Set(clientNavGroups[0]?.children?.map((node) => node.path)).size).toBe(19);
     // v1 is archived, so no page offers a version to choose between. The
     // ten that did are now simply the page, and Intelligence OS keeps the
     // only `?view=` there is: two halves of one module, not two versions.

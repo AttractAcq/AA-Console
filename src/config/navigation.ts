@@ -523,10 +523,12 @@ export const clientNavGroups: NavNode[] = [
         { id: "unified", label: "Unified" },
       ] },
     ...v6ModuleNodes,
-    { ...legacyUtility("motion-design"), tabs: [
-      { id: "scenes", label: "Scenes" }, { id: "renders", label: "Renders" },
-      { id: "brief", label: "Brief" },
-    ] },
+    // Motion Design is archived, on Alex's decision of 4 November resolving the
+    // contradiction between his notes ("can be left alone for now as I believe
+    // we will discontinue it") and his phase 0 list, which named it among the
+    // surfaces to archive-and-document. Only the route in is gone:
+    // MotionScenesPanel and MotionDesignPanel still compile, and the code
+    // cleanup waits for v6.2 with the rest. See docs/V6_1_ARCHIVED_SURFACES.md.
     legacyUtility("archive"),
   ] },
   ...legacyClientNavGroups.slice(1),

@@ -137,11 +137,14 @@ undocumented archiving is the habit to break. Clean removal in v6.2.
   important" and say "both need to be discontinued"
 - Lead Magnet Studio → **Opt-ins** — "isnt necissary to track"
 
-**Not** Motion Design. The notes say it "can be left alone for now as I believe
-we will discontinue it" — left alone, not removed. An earlier draft of this plan
-listed it here *and* under deferred, which contradicted both the notes and
-itself. It is deferred, and a v6.2 candidate on Alex's word rather than
-inference.
+**And Motion Design**, decided on 4 November. This one needed asking. The notes
+said it "can be left alone for now as I believe we will discontinue it" — left
+alone, not removed — while the phase 0 list named it among the surfaces to
+archive *and* again under "deliberately deferred", two of the three fates in one
+message. The plan held it as deferred and flagged the conflict rather than
+picking, which is why it was still open when the rest of phase 0 was done. Asked
+directly, Alex chose to archive it now. Only the route in is gone; both of its
+panels still compile.
 
 Archived means the way in is gone and the code is not: each panel still
 compiles, so v6.2 deletes it without reopening the decision. The list lives in
@@ -375,7 +378,6 @@ stay contained and visible.
 
 - **Attribution OS** — "this is massive so we will leave this for now"
 - **Master AI** on the Dashboard — Alex's instruction on 31 October
-- **Motion Design** — see 0.3
 - **Sales OS capture portal** — purpose not yet settled
 
 ## Open questions

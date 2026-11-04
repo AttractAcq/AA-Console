@@ -7,7 +7,6 @@ import { MetaBuildApprovalPanel } from "./campaigns/MetaBuildApprovalPanel";
 import { GoogleProfilePanel } from "./google-profile/GoogleProfilePanel";
 import { GoogleAdsStudioPanel } from "./google-ads/GoogleAdsStudioPanel";
 import { MetaProfilePanel } from "./distribution/MetaProfilePanel";
-import { MotionScenesPanel } from "./motion/MotionScenesPanel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -38,7 +37,6 @@ import { ContentArchivePanel } from "./archive/ContentArchivePanel";
 import { ARCHIVE_DOMAINS, SimpleArchivePanel } from "./archive/SimpleArchivePanel";
 import { BriefsPanel } from "./ideation/BriefsPanel";
 import { EditRepurposePanel } from "./media/EditRepurposePanel";
-import { MotionDesignPanel } from "./motion/MotionDesignPanel";
 import { ApprovalsPanel } from "./approvals/ApprovalsPanel";
 import { EngineInboxPanel } from "./approvals/EngineInboxPanel";
 import { CampaignActionApprovalsPanel } from "./approvals/CampaignActionApprovalsPanel";
@@ -190,11 +188,6 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     capture: () => <LeadCapturePanel />,
     leads: () => <><SalesAccessRequestsPanel /><ProspectsLeadsPanel /></>,
     agents: () => <SalesOverviewPanel />,
-  },
-  "motion-design": {
-    scenes: () => <MotionScenesPanel tab="scenes" />,
-    renders: () => <MotionScenesPanel tab="renders" />,
-    brief: () => <MotionDesignPanel />,
   },
   "attribution-os": {
     overview: () => <AttributionPanel />,

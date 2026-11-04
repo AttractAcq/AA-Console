@@ -49,14 +49,29 @@ sits in the detail panel beside the thing it decides — and it shows what the
 *approval* recorded, not what the version row says now, because the gap
 between those two is exactly the "changed after approval" blocker.
 
-## Explicitly *not* archived
+## Archived in v6.1, Phase 0.3 — Motion Design
 
-**Motion Design** stays exactly as it is. The notes say "This page can be left
-alone for now as I believe we will discontinue it" — left alone, not removed.
-An earlier draft of the v6.1 plan listed it for archiving in 0.3 while also
-listing it as deferred, which contradicted the notes and itself; the plan now
-says deferred in both places. It is a candidate for v6.2, on Alex's word rather
-than inference.
+| Surface | Where the code still is | Why |
+|---|---|---|
+| **Motion Design** (whole module: Scenes, Renders, Brief) | `src/pages/motion/MotionScenesPanel.tsx`, `src/pages/motion/MotionDesignPanel.tsx` | Alex's decision of 4 November. Only the route in is gone; both panels still compile, as with every other archived surface. |
+
+This one needed asking rather than inferring, because the instructions
+conflicted and the conflict was not resolvable from the text:
+
+- the 31 October notes said "This page can be left alone for now as I believe
+  we will discontinue it" — left alone, not removed
+- the phase 0 list named Motion Design among the surfaces to
+  archive-and-document, **and** named it again under "deliberately deferred"
+
+So one instruction said leave it, one said archive it, and one said defer it —
+two of those three in the same message. The plan recorded it as deferred and
+flagged the contradiction rather than picking, which is why it was still open
+when phase 0 was otherwise finished. Asked directly on 4 November, Alex chose
+to archive it now.
+
+Worth keeping as a process note: a surface named in two places with two
+different fates is not a detail to resolve by inference. It is one question,
+and asking it cost a sentence.
 
 ## What replaces them
 
