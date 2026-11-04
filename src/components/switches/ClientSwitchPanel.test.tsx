@@ -77,6 +77,23 @@ describe("every switch in one place", () => {
     expect(screen.getByText(/Approved posts sit on the calendar/)).toBeInTheDocument();
   });
 
+  it("owns the lead magnet delivery switch, which Lead Magnet Studio no longer duplicates", async () => {
+    // Phase 3 item 7 collapsed Lead Magnet Studio to one page and dropped its
+    // copy of this switch, on the grounds that the notes put every switch
+    // here. That made this panel the only control over whether a machine
+    // emails a stranger a file, so it is asserted rather than assumed.
+    render(<ClientSwitchPanel clientId="c1" />);
+    expect(await screen.findByText("Deliver lead magnets")).toBeInTheDocument();
+    expect(screen.getByText(/Opt-ins are recorded and nothing is delivered/)).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByLabelText("Switch on Deliver lead magnets"));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("set_lead_magnet_delivery_enabled", {
+        p_client_id: "c1", p_enabled: true,
+      }),
+    );
+  });
+
   it("names what else has to be true, so a flipped switch is not mistaken for a finished job", async () => {
     render(<ClientSwitchPanel clientId="c1" />);
     // Publishing needs a deployment variable the browser cannot set.

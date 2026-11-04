@@ -200,7 +200,21 @@ progression.
    for landing pages and offer pages; agent builders; autonomous under the
    campaign worker; publish to GitHub after approval.
 7. **Lead Magnet Studio** — one page, table plus a build button. Download only,
-   no distribution. Opt-ins dropped.
+   no distribution. Opt-ins dropped. **Done.** Four tabs became one page on
+   `IndexDetail`. Build was the table twice, so its button became the page's
+   action. Delivery held three separable things: its switch was already
+   duplicated on the Dashboard panel, where the notes put every switch, so
+   that copy went; the approval queue moved into the row detail; what-is-owed
+   moved with it, scoped by version id rather than by magnet name, since two
+   magnets may share a name and a rename would silently empty the list.
+   Opt-ins went to Sales OS → Capture, which already creates endpoints and
+   already tested the token-shown-once rule.
+
+   The approval act deliberately did **not** flatten into a row menu: it
+   approves exact bytes plus the words carrying them, and it shows the scope
+   and payload hash the *approval* recorded rather than what the version row
+   says now, because the gap between those two is the "changed after approval"
+   blocker. See `docs/V6_1_ARCHIVED_SURFACES.md` §Phase 3.7.
 8. **Sales OS** — Agents becomes the main table page. **Pipeline CRM moves to
    Attribution OS.** The agent distributes to its associated page without a
    developer. Capture portal left alone for now.
