@@ -65,6 +65,37 @@ export function normaliseChannels(raw: unknown): string[] {
   return [...seen];
 }
 
+/** Destinations that belong to each paid platform, and nowhere else. */
+const META_DESTINATIONS = ["meta", "facebook", "instagram"];
+const GOOGLE_DESTINATIONS = ["google", "google_ads", "search"];
+/** YouTube is Google's inventory for a Meta campaign's purposes, not for its own. */
+const GOOGLE_DESTINATIONS_FOR_META_EXCLUSION = [...GOOGLE_DESTINATIONS, "youtube"];
+const PAID_CHANNEL_PATTERN = /(^|[_ -])(ads?|paid|ppc)([_ -]|$)/i;
+
+/** The paid half of a route: present platform, no rival platform. Shared by
+ *  `paid` and `both`, which differ only in whether organic may also appear. */
+function paidHalfProblem(
+  paidPlatform: unknown,
+  channels: string[],
+  label: string,
+): string | null {
+  if (paidPlatform === "meta") {
+    if (!channels.some((channel) => META_DESTINATIONS.includes(channel)))
+      return `${label} needs a Meta, Facebook or Instagram destination.`;
+    if (channels.some((channel) => GOOGLE_DESTINATIONS_FOR_META_EXCLUSION.includes(channel)))
+      return `${label} cannot include a Google destination.`;
+    return null;
+  }
+  if (paidPlatform === "google") {
+    if (!channels.some((channel) => GOOGLE_DESTINATIONS.includes(channel)))
+      return `${label} needs a Google or search destination.`;
+    if (channels.some((channel) => META_DESTINATIONS.includes(channel)))
+      return `${label} cannot include a Meta destination.`;
+    return null;
+  }
+  return "A paid campaign needs a supported platform.";
+}
+
 /** Route is a stored campaign decision; the model cannot turn organic into paid. */
 export function planRouteProblem(
   mode: unknown,
@@ -73,26 +104,30 @@ export function planRouteProblem(
 ): string | null {
   if (mode === "legacy" || mode == null) return null;
   if (mode === "organic") {
-    if (channels.some((channel) => /(^|[_ -])(ads?|paid|ppc)([_ -]|$)/i.test(channel)))
+    if (channels.some((channel) => PAID_CHANNEL_PATTERN.test(channel)))
       return "An organic campaign cannot include a paid advertising channel.";
     return null;
   }
-  if (mode !== "paid") return "The campaign has an unknown acquisition route.";
-  if (paidPlatform === "meta") {
-    if (!channels.some((channel) => ["meta", "facebook", "instagram"].includes(channel)))
-      return "A paid Meta campaign needs a Meta, Facebook or Instagram destination.";
-    if (channels.some((channel) => ["google", "google_ads", "search", "youtube"].includes(channel)))
-      return "A paid Meta campaign cannot include a Google destination.";
+  if (mode === "paid") return paidHalfProblem(paidPlatform, channels, "A paid campaign");
+  if (mode === "both") {
+    // Migration 302 made 'both' a real route because a campaign may run paid
+    // and organic together. Its CHECK guarantees runs_organic AND runs_paid,
+    // so a plan that covers only one of them claims a route the campaign does
+    // not deliver -- and readiness would then report ready with half the work
+    // missing, which is the false "ready" this validator exists to prevent.
+    const paid = paidHalfProblem(paidPlatform, channels, "A paid-and-organic campaign");
+    if (paid) return paid;
+    const organic = channels.filter(
+      (channel) =>
+        !META_DESTINATIONS.includes(channel) &&
+        !GOOGLE_DESTINATIONS_FOR_META_EXCLUSION.includes(channel) &&
+        !PAID_CHANNEL_PATTERN.test(channel),
+    );
+    if (organic.length === 0)
+      return "A paid-and-organic campaign needs an organic destination as well as its paid one.";
     return null;
   }
-  if (paidPlatform === "google") {
-    if (!channels.some((channel) => ["google", "google_ads", "search"].includes(channel)))
-      return "A paid Google campaign needs a Google or search destination.";
-    if (channels.some((channel) => ["meta", "facebook", "instagram"].includes(channel)))
-      return "A paid Google campaign cannot include a Meta destination.";
-    return null;
-  }
-  return "A paid campaign needs a supported platform.";
+  return "The campaign has an unknown acquisition route.";
 }
 
 /**

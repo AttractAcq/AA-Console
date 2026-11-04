@@ -75,7 +75,15 @@ export async function assertOrganicScheduleRoute(
       throw new ScheduleRouteBlockedError("unverified");
     }
     if (campaign.acquisition_mode === "paid") throw new ScheduleRouteBlockedError("paid_campaign");
-    if (campaign.acquisition_mode !== "organic" || campaign.paid_platform !== null) {
+    // A 'both' campaign runs organic alongside paid (migration 302), so organic
+    // content under it is exactly what this path is for. It necessarily carries
+    // a paid_platform -- the route CHECK requires one -- so the organic-only
+    // test of "no paid platform" would have blocked every such post. Before
+    // 302 there were only two routes and that test was equivalent to the mode
+    // check; it stopped being equivalent the moment a third route existed.
+    if (campaign.acquisition_mode === "both") {
+      if (campaign.paid_platform === null) throw new ScheduleRouteBlockedError("unverified");
+    } else if (campaign.acquisition_mode !== "organic" || campaign.paid_platform !== null) {
       throw new ScheduleRouteBlockedError("unverified");
     }
   } catch (error) {

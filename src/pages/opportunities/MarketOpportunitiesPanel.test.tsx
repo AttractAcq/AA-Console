@@ -175,6 +175,43 @@ describe("creating the campaign", () => {
     expect(await screen.findByText(/The planner is writing it now/)).toBeInTheDocument();
   });
 
+  it("creates a paid-and-organic campaign as 'both', not quietly as organic", async () => {
+    // The route this dialog writes is immutable, and it used to read
+    // `values.acquisition_mode === "paid" ? "paid" : "organic"` -- so choosing
+    // paid-and-organic would have created an ORGANIC campaign, with the
+    // mistake only surfacing later as paid work that never happened. That is
+    // the worst shape of this bug, which is why it is pinned.
+    const user = userEvent.setup();
+    await openActions();
+    await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+
+    await user.selectOptions(screen.getByLabelText(/Route/), "both");
+    await user.selectOptions(screen.getByLabelText(/Paid platform/), "google");
+    await user.click(screen.getByRole("button", { name: "Create and plan" }));
+
+    await waitFor(() =>
+      expect(createCampaignFromOpportunity).toHaveBeenCalledWith({
+        opportunityId: "opp-1",
+        acquisitionMode: "both",
+        paidPlatform: "google",
+        name: "",
+      }),
+    );
+  });
+
+  it("asks for a platform for the paid half of a paid-and-organic campaign", async () => {
+    // 'both' needs a platform for the same reason 'paid' does: the paid half
+    // names its inventory, and the route CHECK requires one.
+    const user = userEvent.setup();
+    await openActions();
+    await user.click(await screen.findByRole("menuitem", { name: "Create a campaign" }));
+    await user.selectOptions(screen.getByLabelText(/Route/), "both");
+    await user.click(screen.getByRole("button", { name: "Create and plan" }));
+
+    expect(await screen.findByText(/Choose Meta Ads or Google Ads/)).toBeInTheDocument();
+    expect(createCampaignFromOpportunity).not.toHaveBeenCalled();
+  });
+
   it("asks for a platform before letting a paid campaign through", async () => {
     const user = userEvent.setup();
     await openActions();

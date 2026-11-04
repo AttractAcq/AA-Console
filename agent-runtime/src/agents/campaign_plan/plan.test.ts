@@ -28,6 +28,46 @@ describe("v6 campaign route validation", () => {
     expect(planRouteProblem("paid", "google", ["search"])).toBeNull();
     expect(planRouteProblem("paid", "google", ["facebook"])).toMatch(/Google/i);
   });
+
+  // Migration 302 made 'both' a real route. Before this, the validator's
+  // `if (mode !== "paid")` fall-through rejected every such plan as "an
+  // unknown acquisition route", so the route the database accepted could
+  // never be planned.
+  it("accepts a paid-and-organic campaign that plans both halves", () => {
+    expect(planRouteProblem("both", "meta", ["instagram", "google_business_profile", "facebook"]))
+      .toBeNull();
+    expect(planRouteProblem("both", "google", ["search", "google_business_profile"])).toBeNull();
+  });
+
+  it("does not let 'both' become an unknown route", () => {
+    // The specific regression: a valid 'both' plan must not be refused at all.
+    expect(planRouteProblem("both", "meta", ["facebook", "blog"])).toBeNull();
+    // And a genuinely unknown mode still is one.
+    expect(planRouteProblem("hybrid", "meta", ["facebook"])).toMatch(/unknown acquisition route/i);
+  });
+
+  it("requires both halves of a paid-and-organic campaign", () => {
+    // Its CHECK guarantees runs_organic AND runs_paid, so a plan covering one
+    // half claims a route the campaign does not deliver.
+    expect(planRouteProblem("both", "meta", ["facebook", "instagram"]))
+      .toMatch(/organic destination/i);
+    expect(planRouteProblem("both", "meta", ["blog", "google_business_profile"]))
+      .toMatch(/Meta, Facebook or Instagram/i);
+  });
+
+  it("keeps the rival ad platform out of a paid-and-organic campaign", () => {
+    expect(planRouteProblem("both", "meta", ["facebook", "blog", "google_ads"]))
+      .toMatch(/cannot include a Google destination/i);
+    expect(planRouteProblem("both", "google", ["search", "blog", "instagram"]))
+      .toMatch(/cannot include a Meta destination/i);
+  });
+
+  it("still demands a supported platform for the paid half", () => {
+    expect(planRouteProblem("both", null, ["facebook", "blog"]))
+      .toMatch(/supported platform/i);
+    expect(planRouteProblem("both", "tiktok", ["facebook", "blog"]))
+      .toMatch(/supported platform/i);
+  });
 });
 
 describe("planner crash recovery", () => {

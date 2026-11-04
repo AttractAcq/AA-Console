@@ -218,19 +218,23 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
         onClose={() => setBuilding(null)}
         title={building ? `Create a campaign for ${building.name}` : "Create a campaign"}
         submitLabel="Create and plan"
-        intro="The campaign takes this opportunity's problem, outcome, trigger, positioning and objections as its brief, and binds the approved offer it is linked to. The route cannot be changed afterwards — the other route is a second campaign with its own lineage. Planning runs straight after, and costs what a plan costs."
+        intro="The campaign takes this opportunity's problem, outcome, trigger, positioning and objections as its brief, and binds the approved offer it is linked to. The route cannot be changed afterwards — a different route is a second campaign with its own lineage. Planning runs straight after, and costs what a plan costs."
         fields={[
           {
             name: "acquisition_mode", label: "Route", kind: "select", required: true,
             options: [
               { value: "organic", label: "Organic" },
               { value: "paid", label: "Paid" },
+              { value: "both", label: "Paid and organic together" },
             ],
-            hint: "A campaign is one or the other, for its whole life.",
+            hint: "Fixed for the campaign's whole life. Paid and organic together is one campaign running both routes, not two campaigns.",
           },
           {
             name: "paid_platform", label: "Paid platform", kind: "select",
-            showIf: { field: "acquisition_mode", equals: ["paid"] },
+            // 'both' needs a platform for the same reason 'paid' does: the paid
+            // half still has to name its inventory, and the route CHECK
+            // requires one.
+            showIf: { field: "acquisition_mode", equals: ["paid", "both"] },
             options: [
               { value: "meta", label: "Meta Ads" },
               { value: "google", label: "Google Ads (no builder yet)" },
@@ -244,15 +248,22 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
         ]}
         onSubmit={async (values) => {
           if (!building) throw new Error("No opportunity selected.");
-          const mode = values.acquisition_mode === "paid" ? "paid" : "organic";
+          // Read the choice rather than collapsing anything that is not "paid"
+          // into "organic". That collapse predates 'both' and would have
+          // silently created an organic campaign for someone who asked for
+          // both -- the worst kind of wrong, because the route is immutable
+          // and the mistake is only visible later as missing paid work.
+          const chosen = values.acquisition_mode;
+          const mode = chosen === "paid" ? "paid" : chosen === "both" ? "both" : "organic";
           const platform = values.paid_platform === "google" ? "google" : "meta";
-          if (mode === "paid" && !values.paid_platform) {
-            throw new Error("Choose Meta Ads or Google Ads for a paid campaign.");
+          const needsPlatform = mode === "paid" || mode === "both";
+          if (needsPlatform && !values.paid_platform) {
+            throw new Error("Choose Meta Ads or Google Ads for the paid half of this campaign.");
           }
           const campaign = await createCampaignFromOpportunity({
             opportunityId: building.id,
             acquisitionMode: mode,
-            paidPlatform: mode === "paid" ? platform : null,
+            paidPlatform: needsPlatform ? platform : null,
             name: typeof values.name === "string" ? values.name : null,
           });
           // Queued separately, exactly as the Campaign Factory form does it,

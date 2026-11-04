@@ -81,6 +81,47 @@ Twelve migrations and roughly sixteen runtime and frontend files read
 `acquisition_mode`. Each has to be assessed, not bulk-edited — the failure mode
 here is a guard that looks relaxed and is actually open.
 
+#### 0.1a Migration 302 was only the schema half
+
+Asked what stage the build was at, I checked `both` end to end rather than
+from memory, and it was not usable. 302 taught the database the route and left
+six code paths on two. One of them was a regression 302 itself introduced.
+
+**The regression.** 302 added `runs_organic` and `runs_paid` defaulting to
+false and made the route CHECK require the mode and the flags to agree. It
+taught `create_campaign_from_opportunity_v6` and `clone_campaign_for_route` to
+set them, and missed `mcp_campaign_create_v6`, which sets the mode and leaves
+the flags alone. Every branch of that CHECK but `legacy` needs a flag true, so
+from the moment 302 was applied **that function could not create a campaign in
+any v6 mode** — organic and paid included, both of which had worked before.
+Verified against the live constraint: the predicate is false for
+`('organic',f,f,null)`, `('paid',f,f,'meta')` and `('both',f,f,'meta')`, true
+only for `('legacy',f,f,null)`.
+
+It stayed hidden because no v6 campaign has ever been created — all 20 are
+`legacy` — and that path is service-role only, reached by a bot rather than by
+the console. Latent, not harmless. `campaign_execution`, the third writer,
+inserts only `(client_id, name, brief)` and so takes the `legacy` default; it
+needed no change.
+
+**What else assumed two routes.** The campaign planner refused `both` outright:
+`planRouteProblem` fell through to "the campaign has an unknown acquisition
+route", and `isV6` tested `organic || paid` so such a campaign was planned as
+*legacy* — told to "preserve its historical routing". The MCP gateway's
+`create-v6` parse rejected the mode. The console's own create dialog read
+`values.acquisition_mode === "paid" ? "paid" : "organic"`, so choosing
+paid-and-organic would have created an **organic** campaign on an immutable
+route, the mistake surfacing later as paid work that never happened.
+`assertOrganicScheduleRoute` demanded `mode === "organic"` *and*
+`paid_platform === null`, and a `both` campaign fails both — so every organic
+post under it was blocked, which is precisely the half Alex asked for. Page
+approval was hidden, and the launch gate showed spend but not posts.
+
+Migration 305 and the surrounding commit close all of it. The lesson worth
+keeping: **adding a value to an enum-like column is not a schema change, it is
+a change to every branch that reads the column.** 302 should have shipped with
+the sweep for `acquisition_mode ===` that found these in minutes.
+
 ### 0.2 The shared index-table pattern
 
 One component, with tests: index table, row click to detail, row actions.
