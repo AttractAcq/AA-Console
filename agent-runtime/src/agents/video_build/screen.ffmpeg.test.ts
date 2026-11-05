@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,11 +17,26 @@ import { DEAD_CLIP_COVERAGE, generatedClipProblem, probeGeneratedClip } from "./
  * numbers no detector ever produces would pass every unit test and catch
  * nothing in production.
  *
- * ffmpeg is installed in the agent-runtime image (see agent-runtime/Dockerfile)
- * for video_edit's render, so it is available wherever video_build runs.
+ * ffmpeg is installed in the agent-runtime image (agent-runtime/Dockerfile) and
+ * on the CI runner (.github/workflows/ci.yml), so these run in both. They skip
+ * on a build without the two detectors, following the convention
+ * video_edit/render.test.ts set: a developer's Homebrew ffmpeg omits filters,
+ * and hard-failing there would make the suite unrunnable locally for a reason
+ * that has nothing to do with the code.
  */
 const run = promisify(execFile);
 let dir: string;
+
+function ffmpegFilters(): string {
+  try {
+    return execFileSync("ffmpeg", ["-hide_banner", "-filters"], { encoding: "utf8" });
+  } catch {
+    return "";
+  }
+}
+
+const filters = ffmpegFilters();
+const hasDetectors = /\bblackdetect\b/.test(filters) && /\bfreezedetect\b/.test(filters);
 
 const clip = (name: string) => join(dir, `${name}.mp4`);
 
@@ -33,6 +48,7 @@ async function generate(name: string, source: string) {
 }
 
 beforeAll(async () => {
+  if (!hasDetectors) return;
   dir = await mkdtemp(join(tmpdir(), "aa-screen-ffmpeg-"));
   await Promise.all([
     // Nothing rendered at all.
@@ -52,7 +68,7 @@ afterAll(async () => {
   if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {});
 });
 
-describe("measuring real clips", () => {
+describe.skipIf(!hasDetectors)("measuring real clips", () => {
   it("refuses a clip that rendered nothing", async () => {
     const probe = await probeGeneratedClip(clip("black"));
     expect(probe.has_video_stream).toBe(true);
@@ -91,7 +107,7 @@ describe("measuring real clips", () => {
   });
 });
 
-describe("why the threshold is not 1.0", () => {
+describe.skipIf(!hasDetectors)("why the threshold is not 1.0", () => {
   it("measures a wholly black clip at just under the whole", async () => {
     // blackdetect reports whole runs and the last frames fall outside one, so
     // a clip that is black end to end measures about 0.99 rather than 1.0.
