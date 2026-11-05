@@ -137,11 +137,14 @@ undocumented archiving is the habit to break. Clean removal in v6.2.
   important" and say "both need to be discontinued"
 - Lead Magnet Studio → **Opt-ins** — "isnt necissary to track"
 
-**Not** Motion Design. The notes say it "can be left alone for now as I believe
-we will discontinue it" — left alone, not removed. An earlier draft of this plan
-listed it here *and* under deferred, which contradicted both the notes and
-itself. It is deferred, and a v6.2 candidate on Alex's word rather than
-inference.
+**And Motion Design**, decided on 4 November. This one needed asking. The notes
+said it "can be left alone for now as I believe we will discontinue it" — left
+alone, not removed — while the phase 0 list named it among the surfaces to
+archive *and* again under "deliberately deferred", two of the three fates in one
+message. The plan held it as deferred and flagged the conflict rather than
+picking, which is why it was still open when the rest of phase 0 was done. Asked
+directly, Alex chose to archive it now. Only the route in is gone; both of its
+panels still compile.
 
 Archived means the way in is gone and the code is not: each panel still
 compiles, so v6.2 deletes it without reopening the decision. The list lives in
@@ -178,7 +181,7 @@ Two functional gaps the notes name:
   run needs a count, then selection of which to evaluate and strategise, then
   approval of which to activate.
 
-### 1.2a The Evaluate and Strategise agents need a decision first
+### 1.2a The Evaluate and Strategise agents needed a decision first — **decided and built**
 
 The notes ask that "the agents should do the evaluation and the strategise
 modules within the market opportunities model", leaving the human only to run a
@@ -224,6 +227,77 @@ include evaluation, and that is a product decision rather than a technical one.
 Until it is decided, Market Opportunities works as it does today: a human scores
 in the Evaluate view, and the Discover table carries the whole status
 progression.
+
+#### 1.2b How it was resolved, and what was wrong in #327
+
+Asked on 4 November, Alex chose **the agent proposes and a human accepts**. So
+**no guard was widened.** `can_shape_opportunity` is untouched,
+`score_market_opportunity_v6` is untouched, and neither agent can score.
+
+Migration 306 adds `opportunity_proposals`, and
+`accept_opportunity_score_proposal_v6` performs the ordinary human scoring act
+with the factors exactly as proposed — it adds no permission of its own, so
+there is still exactly one rule about who may score and it lives in one place.
+
+**#327 overstated the problem.** It said the agents were blocked by
+`can_shape_opportunity`. True of scoring and status, but three of the shaping
+writers already carry a service-role branch:
+
+| | |
+|---|---|
+| agent may write | `set_opportunity_attributes_v6`, `set_opportunity_awareness_v6`, `link_opportunity_v6` |
+| human only | `set_opportunity_fields_v6`, `score_market_opportunity_v6`, `set_opportunity_status_v6`, `set_opportunity_confidence_v6` |
+
+So an agent shaping an opportunity was never unprecedented. The codebase
+already draws the line this build keeps: **structured working-out** an agent
+may write, **the opportunity's own commercial claim** a person asserts. The
+Strategise agent therefore writes its attributes and awareness messages
+directly and proposes only the narrative fields.
+
+It also deliberately does **not** use the approval spine. All nine of those
+routes are human decisions about outward acts — publish, spend, grant access,
+cut a release — and two are contained because that bar is high. A drafted
+evaluation goes nowhere and costs nothing; accepting it is just the scoring a
+person could have done unaided. If it later belongs in the Inbox it becomes
+route ten then.
+
+#### 1.2c What was built
+
+- **`opportunity_evaluate`** — scores the seven factors with per-factor
+  reasoning and proposes it. Reads the factors and weights from
+  `opportunity_score_factors` rather than carrying a copy, and does not compute
+  the total: the scorer does that at acceptance, so a proposal accepted after a
+  reweight is scored on the new weights.
+- **`opportunity_strategise`** — writes the problems, outcomes, motivations,
+  triggers and objections, and a message per awareness stage; proposes the six
+  narrative fields. Refuses fewer than two objections, and refuses an entry
+  stage it wrote no message for, because the first thing a campaign would do is
+  reach for copy that does not exist.
+- **The Evaluate view** shows each proposal with the reasoning beside every
+  number, because accepting is asserting the thing that unlocks spend and a
+  person who can only see a total is rubber-stamping. Accepting sends the
+  proposal id and no numbers, so what is scored cannot drift from what was read.
+
+#### 1.1a The offer compiler — **built**
+
+The notes' "agent compiles from Offer Strategy or from the micro-niche". #324
+built the page and the two buttons; this is the compiling half, as
+`offer_compile` plus migration 307.
+
+No permission change was needed and that is worth recording:
+`create_service_offer_version_v6` already names `service_role` in its own
+guard. Unlike scoring, this one needed checking rather than arguing about.
+
+The asymmetry is not an oversight in either direction. An offer version is a
+draft that is reviewed and signed off, and nothing spends because it exists —
+**the propose-then-accept shape was already implemented here by the version and
+sign-off flow**, so no proposal table was added. A score is an assertion that
+unlocks spend, and had no draft state at all.
+
+It leaves **price and claims empty on purpose**: a price is a commercial
+decision with margin behind it, and a claim is a promise that needs proof,
+which is what the claims system exists to tie together. The RPC permits both to
+be absent, and absent is the honest answer from an agent.
 
 ## Phase 2 — the campaign spine
 
@@ -375,7 +449,6 @@ stay contained and visible.
 
 - **Attribution OS** — "this is massive so we will leave this for now"
 - **Master AI** on the Dashboard — Alex's instruction on 31 October
-- **Motion Design** — see 0.3
 - **Sales OS capture portal** — purpose not yet settled
 
 ## Open questions

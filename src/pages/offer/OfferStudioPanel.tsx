@@ -54,6 +54,7 @@ export function OfferStudioPanel() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -106,6 +107,39 @@ export function OfferStudioPanel() {
     await refresh();
   }
 
+  /**
+   * Ask the Offer Compiler for one instead of writing it yourself.
+   *
+   * The notes ask for exactly this: "agent compiles from Offer Strategy or from
+   * the micro-niche". Only the strategy source is offered here, because the
+   * micro-niche one needs an opportunity and that choice belongs on the
+   * opportunity rather than on a dropdown of every opportunity the client has.
+   *
+   * It drafts a version and stops. Price and claims are left empty on purpose
+   * -- a price is a commercial decision and a claim needs proof -- and nothing
+   * is live until the version is signed off, which is the gate that already
+   * existed.
+   */
+  async function compile(kind: "main" | "secondary") {
+    if (!clientId) return;
+    setBusy(`compile-${kind}`);
+    setError(null);
+    const { error: rpcError } = await supabase.rpc("request_offer_compile_v6", {
+      p_client_id: clientId,
+      p_kind: kind,
+      p_source: "strategy",
+    });
+    setBusy(null);
+    if (rpcError) {
+      // The database explains itself here -- no offer strategy yet, or a
+      // compile already running -- so show what it said.
+      setError(rpcError.message);
+      return;
+    }
+    setNotice(`Queued. The compiler is drafting a ${kind} offer from the offer strategy.`);
+    await refresh();
+  }
+
   const versionsFor = (offer: Offer) => versions.filter((version) => version.offer_id === offer.id);
   const signedOff = (versionId: string) =>
     signoffs.some((signoff) => signoff.offer_version_id === versionId);
@@ -145,6 +179,11 @@ export function OfferStudioPanel() {
 
   return (
     <div className="space-y-3">
+      {notice && (
+        <p role="status" className="text-sm text-brand-strong">
+          {notice}
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -171,6 +210,20 @@ export function OfferStudioPanel() {
               className="bg-muted text-foreground hover:bg-muted"
             >
               {busy === "secondary" ? "…" : "New secondary offer"}
+            </Button>
+            <Button
+              disabled={busy !== null}
+              onClick={() => void compile("main")}
+              className="bg-muted text-foreground hover:bg-muted"
+            >
+              {busy === "compile-main" ? "…" : "Compile a main offer"}
+            </Button>
+            <Button
+              disabled={busy !== null}
+              onClick={() => void compile("secondary")}
+              className="bg-muted text-foreground hover:bg-muted"
+            >
+              {busy === "compile-secondary" ? "…" : "Compile a secondary offer"}
             </Button>
           </div>
         }

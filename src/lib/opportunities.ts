@@ -359,3 +359,60 @@ export async function fetchCampaignPlan(opportunityId: string): Promise<Campaign
   if (error) throw new Error(error.message);
   return (data ?? []) as CampaignPlanStep[];
 }
+
+/**
+ * What an agent proposed about an opportunity, for a person to decide on.
+ *
+ * Migration 306. An agent cannot score an opportunity -- `can_shape_opportunity`
+ * is false for the runtime and deliberately stays that way, because scoring is
+ * what unlocks spend against a hypothesis -- so the Evaluate agent writes a row
+ * here and a person accepts it. Accepting IS the ordinary human scoring act:
+ * `accept_opportunity_score_proposal_v6` calls the same guarded function the
+ * Evaluate view calls, with the factors exactly as proposed.
+ *
+ * The same channel carries the Strategise agent's narrative fields, which it
+ * also may not write. Its attributes and awareness messages it writes directly,
+ * because those paths already permit a service-role caller.
+ */
+export type OpportunityProposal = Database["public"]["Tables"]["opportunity_proposals"]["Row"];
+
+/** Only the undecided ones: a resolved proposal is history, not a decision. */
+export async function fetchOpenProposals(clientId: string): Promise<OpportunityProposal[]> {
+  const { data, error } = await supabase
+    .from("opportunity_proposals")
+    .select("*")
+    .eq("client_id", clientId)
+    .eq("resolution", "open")
+    .order("proposed_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function requestEvaluation(clientId: string, opportunityId: string): Promise<void> {
+  const { error } = await supabase.rpc("request_opportunity_evaluation_v6", {
+    p_client_id: clientId, p_opportunity_id: opportunityId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function requestStrategy(clientId: string, opportunityId: string): Promise<void> {
+  const { error } = await supabase.rpc("request_opportunity_strategy_v6", {
+    p_client_id: clientId, p_opportunity_id: opportunityId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function acceptScoreProposal(proposalId: string, note?: string): Promise<void> {
+  const { error } = await supabase.rpc("accept_opportunity_score_proposal_v6", {
+    p_proposal_id: proposalId,
+    ...(note?.trim() ? { p_note: note.trim() } : {}),
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function rejectProposal(proposalId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc("reject_opportunity_proposal_v6", {
+    p_proposal_id: proposalId, p_reason: reason,
+  });
+  if (error) throw new Error(error.message);
+}

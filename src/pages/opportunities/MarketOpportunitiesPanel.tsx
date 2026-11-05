@@ -13,10 +13,13 @@ import { dayOrDash } from "../../lib/contentRecords";
 import {
   ATTRIBUTE_KINDS, AWARENESS_STAGES, CLASSIFICATION_HINT, CONFIDENCE_LEVELS,
   createCampaignFromOpportunity,
+  acceptScoreProposal, fetchOpenProposals, rejectProposal,
+  requestEvaluation, requestStrategy,
   fetchOpportunities, fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
   fetchStageTemplates, setStageTemplate,
   setAttributes, setAwarenessStage, setConfidence, setFields, setStatus,
-  type Opportunity, type OpportunityConfidence, type Readiness, type ScoreFactor,
+  type Opportunity, type OpportunityConfidence, type OpportunityProposal,
+  type Readiness, type ScoreFactor,
   type StageTemplateCandidate,
 } from "../../lib/opportunities";
 
@@ -50,6 +53,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [readiness, setReadiness] = useState<ReadonlyMap<string, Readiness>>(new Map());
   const [factors, setFactors] = useState<ScoreFactor[]>([]);
+  const [proposals, setProposals] = useState<OpportunityProposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,12 +68,14 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
       return;
     }
     try {
-      const [list, ready, scoring] = await Promise.all([
+      const [list, ready, scoring, open] = await Promise.all([
         fetchOpportunities(clientId), fetchReadiness(clientId), fetchScoreFactors(),
+        fetchOpenProposals(clientId),
       ]);
       setOpportunities(list);
       setReadiness(ready);
       setFactors(scoring);
+      setProposals(open);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load opportunities.");
@@ -148,6 +154,14 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
         />
       )}
       {view === "evaluate" && selected && (
+        <ProposalsPanel
+          proposals={proposals.filter((proposal) => proposal.opportunity_id === selected.id)}
+          factors={factors}
+          busy={busy}
+          onAct={act}
+        />
+      )}
+      {view === "evaluate" && selected && (
         <EvaluateView
           opportunity={selected}
           readiness={readiness.get(selected.id)}
@@ -163,6 +177,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
         <ActivateView
           opportunities={opportunities}
           readiness={readiness}
+          clientId={clientId}
           busy={busy}
           onSelect={select}
           onAct={act}
@@ -327,11 +342,138 @@ function OpportunityPicker({
  * hand-off additionally on nothing blocking, because the database refuses it
  * otherwise and a button that always fails is worse than no button.
  */
+/**
+ * What an agent proposed, for a person to accept or reject.
+ *
+ * This is where the decision Alex made on 4 November lands: the agent does the
+ * evaluation and a human asserts it. So the panel is built to be ARGUED with
+ * rather than clicked through -- every factor shows the agent's reasoning next
+ * to its number, because accepting is asserting the thing that unlocks spend
+ * and a person who can only see a total is rubber-stamping.
+ *
+ * Accepting sends no numbers of its own. `accept_opportunity_score_proposal_v6`
+ * reads the factors from the stored proposal, so what gets scored is exactly
+ * what was proposed and read, and the two cannot drift between the render and
+ * the click.
+ */
+function ProposalsPanel({
+  proposals, factors, busy, onAct,
+}: {
+  proposals: OpportunityProposal[];
+  factors: ScoreFactor[];
+  busy: string | null;
+  onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
+}) {
+  if (proposals.length === 0) return null;
+  const labelFor = (factor: string) =>
+    factors.find((f) => f.factor === factor)?.label ?? factor.replace(/_/g, " ");
+
+  return (
+    <div className="space-y-3">
+      {proposals.map((proposal) => {
+        const payload = (proposal.payload ?? {}) as {
+          factors?: Record<string, number>;
+          reasoning?: Record<string, string>;
+          fields?: Record<string, string>;
+        };
+        const scored = Object.entries(payload.factors ?? {});
+        const fields = Object.entries(payload.fields ?? {});
+        return (
+          <section
+            key={proposal.id}
+            className="rounded-lg border border-brand-strong/40 bg-brand-subtle/20 p-4"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="font-semibold">
+                  {proposal.kind === "score" ? "A score is proposed" : "A strategy is proposed"}
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Drafted by {proposal.proposed_by} · {dayOrDash(proposal.proposed_at)} · nothing
+                  is scored until you accept it
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-3 text-sm">{proposal.rationale}</p>
+
+            {scored.length > 0 && (
+              <dl className="mt-3 space-y-2 text-sm">
+                {scored.map(([factor, score]) => (
+                  <div key={factor} className="grid grid-cols-[10rem,3rem,1fr] items-start gap-2">
+                    <dt className="text-muted-foreground">{labelFor(factor)}</dt>
+                    <dd className="font-medium">{score}</dd>
+                    <dd className="text-xs text-muted-foreground">
+                      {payload.reasoning?.[factor] ?? ""}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
+            {fields.length > 0 && (
+              <dl className="mt-3 space-y-1 text-sm">
+                {fields.map(([field, value]) => (
+                  <div key={field} className="grid grid-cols-[10rem,1fr] items-start gap-2">
+                    <dt className="text-muted-foreground">{field.replace(/_/g, " ")}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {proposal.kind === "score" ? (
+                <Button
+                  disabled={busy === proposal.id}
+                  onClick={() =>
+                    void onAct(
+                      proposal.id,
+                      () => acceptScoreProposal(proposal.id),
+                      "Accepted. Scored as proposed, by you.",
+                    )
+                  }
+                >
+                  Accept this score
+                </Button>
+              ) : (
+                // Strategy fields are applied in the Strategise view, where the
+                // existing editors already own those writes. Offering a
+                // one-click apply here would be a second write path for the
+                // same six fields.
+                <p className="text-xs text-muted-foreground">
+                  Apply these in the Strategise view, where you can edit them first.
+                </p>
+              )}
+              <Button
+                disabled={busy === proposal.id}
+                onClick={() => {
+                  const why = window.prompt("Why is this not right?");
+                  if (why?.trim()) {
+                    void onAct(
+                      proposal.id,
+                      () => rejectProposal(proposal.id, why.trim()),
+                      "Rejected. The next pass can read why.",
+                    );
+                  }
+                }}
+              >
+                Reject
+              </Button>
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 function opportunityActions({
-  opportunity: o, readiness: r, onSelect, onAct, onBuild,
+  opportunity: o, readiness: r, clientId, onSelect, onAct, onBuild,
 }: {
   opportunity: Opportunity;
   readiness: Readiness | undefined;
+  clientId: string | undefined;
   onSelect: (id: string) => void;
   onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
   onBuild: (opportunity: Opportunity) => void;
@@ -369,6 +511,25 @@ function opportunityActions({
           label: "Scale it",
           onSelect: () => void onAct(o.id, () => setStatus(o.id, "scaling"), "Scaling."),
         }]
+      : []),
+    // Asking a machine to think about it costs a run, not a commitment, so
+    // neither is gated on status. Each refuses a concurrent second pass in SQL
+    // rather than here.
+    ...(clientId
+      ? [
+          {
+            label: "Evaluate with an agent",
+            onSelect: () =>
+              void onAct(o.id, () => requestEvaluation(clientId, o.id),
+                "Queued. It proposes a score; you accept it."),
+          },
+          {
+            label: "Strategise with an agent",
+            onSelect: () =>
+              void onAct(o.id, () => requestStrategy(clientId, o.id),
+                "Queued. It writes the working-out and proposes the summary."),
+          },
+        ]
       : []),
     { label: "Work on it", onSelect: () => onSelect(o.id) },
     ...(r?.blocker ? [{ label: "Why not ready", onSelect: () => onSelect(o.id) }] : []),
@@ -450,6 +611,7 @@ function DiscoverView({
             items={opportunityActions({
               opportunity: o,
               readiness: readiness.get(o.id),
+              clientId,
               onSelect,
               onAct,
               onBuild,
@@ -812,10 +974,11 @@ function StrategizeView({
 }
 
 function ActivateView({
-  opportunities, readiness, busy, onSelect, onAct, onBuild,
+  opportunities, readiness, clientId, busy, onSelect, onAct, onBuild,
 }: {
   opportunities: Opportunity[];
   readiness: ReadonlyMap<string, Readiness>;
+  clientId: string | undefined;
   busy: string | null;
   onSelect: (id: string) => void;
   onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
@@ -853,6 +1016,7 @@ function ActivateView({
               items={opportunityActions({
                 opportunity: o,
                 readiness: r,
+                clientId,
                 onSelect,
                 onAct,
                 onBuild,
