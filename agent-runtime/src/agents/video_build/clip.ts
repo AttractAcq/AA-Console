@@ -23,6 +23,45 @@ import {
   type GeneratedClipProbe,
 } from "./screen.js";
 
+export class ClipStoreError extends Error {
+  readonly retryable: boolean;
+  /** Event-log slug, when this is something more specific than a store failure. */
+  readonly reason: string | undefined;
+  /** What was actually measured, when the message itself has to stay constant. */
+  readonly detail: string | undefined;
+
+  constructor(message: string, retryable: boolean, reason?: string, detail?: string) {
+    super(message);
+    this.name = "ClipStoreError";
+    this.retryable = retryable;
+    this.reason = reason;
+    this.detail = detail;
+  }
+}
+
+/** The slug a clip refused by the screen carries into the job's event log. */
+export const UNUSABLE_CLIP_REASON = "generated_clip_unusable";
+
+/**
+ * The one sentence a refused clip fails with.
+ *
+ * Deliberately CONSTANT, and not the specific measurement. It becomes the
+ * step's blocker, and `retry_failed_higgsfield_motion_step` matches a blocker
+ * by exact string -- a message that varied with the defect ("black for the
+ * whole of its 5s", "does not move for...") could never be matched, so the
+ * recovery route could never cover a probe refusal.
+ *
+ * Same shape as the Higgsfield failure it sits beside, which has one fixed
+ * blocker and keeps its request id elsewhere. What was measured goes into the
+ * job's event log as `measured`, where an operator checking the step will
+ * read it.
+ *
+ * Changing this string breaks that match, so it is pinned by a test and named
+ * in migration 311.
+ */
+export const UNUSABLE_CLIP_BLOCKER =
+  "A generated clip had no shot in it. What was measured is recorded. It was not stored and was not submitted again.";
+
 /**
  * Measure the downloaded bytes before they are stored.
  *
@@ -55,16 +94,17 @@ async function screenClipBytes(bytes: Buffer, probe: ClipProbe): Promise<void> {
     } catch (caught) {
       // A clip ffprobe cannot read is not a shot, and saying so beats storing
       // bytes nothing could decode.
-      const detail = caught instanceof Error ? caught.name : "Error";
+      const name = caught instanceof Error ? caught.name : "Error";
       throw new ClipStoreError(
-        `The generated clip could not be inspected (${detail}), so it was not stored.`,
+        UNUSABLE_CLIP_BLOCKER,
         false,
         UNUSABLE_CLIP_REASON,
+        `The generated clip could not be inspected (${name}).`,
       );
     }
     const problem = generatedClipProblem(measured);
     if (problem) {
-      throw new ClipStoreError(`${problem} It was not stored and was not submitted again.`, false, UNUSABLE_CLIP_REASON);
+      throw new ClipStoreError(UNUSABLE_CLIP_BLOCKER, false, UNUSABLE_CLIP_REASON, problem);
     }
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
@@ -77,21 +117,6 @@ export const CLIENT_MEDIA_BUCKET = "client-media";
 /** Cockpit check-shot-generation uses about two minutes for the download. */
 export const CLIP_DOWNLOAD_TIMEOUT_MS = 120_000;
 
-export class ClipStoreError extends Error {
-  readonly retryable: boolean;
-  /** Event-log slug, when this is something more specific than a store failure. */
-  readonly reason: string | undefined;
-
-  constructor(message: string, retryable: boolean, reason?: string) {
-    super(message);
-    this.name = "ClipStoreError";
-    this.retryable = retryable;
-    this.reason = reason;
-  }
-}
-
-/** The slug a clip refused by the screen carries into the job's event log. */
-export const UNUSABLE_CLIP_REASON = "generated_clip_unusable";
 
 export function clipStoragePath(clientId: string, frameId: string): string {
   const client = pathSegment(clientId, "client");

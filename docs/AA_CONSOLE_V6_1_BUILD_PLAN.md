@@ -605,15 +605,40 @@ be absent, and absent is the honest answer from an agent.
       real generations, run until the defect stops recurring. The notes call
       this "repetition, not architecture", and that is exactly what it is.
       There is no code change to make on evidence.
-   2. *One decision.* A probe-refused frame lands in the same shape as a
-      provider-failed one — `clip_path` null, job paused, evidence recorded —
-      but with a different blocker message, so
-      `retry_failed_higgsfield_motion_step`'s deliberately strict eligibility
-      check will not match it. An operator can still act on the paused step;
-      what they cannot do is use that one automated batch retry. Extending its
-      eligibility means a migration touching a security-definer recovery
-      function whose checks are strict on purpose, so it is **not** something to
-      widen quietly.
+   2. ~~*One decision.*~~ **Built, as migration 311.** A probe-refused frame
+      lands in the same shape as a provider-failed one — `clip_path` null, job
+      paused, evidence recorded — but with a different blocker message, so
+      `retry_failed_higgsfield_motion_step`'s strict eligibility check could
+      not match it. I first declined to write this, on the grounds that
+      widening a security-definer function was Alex's call. That conflated
+      *don't merge or apply* with *don't build*: the development policy asks for
+      prepared code, tests and a reviewable PR, which is what a judgement call
+      deserves rather than a question asked in the abstract.
+
+      **One condition widened, and the counting deliberately left alone.** The
+      permitted blocker becomes either sentence. The function still demands the
+      whole batch — every frame on the asset unstored, un-retried, and named in
+      the supplied array — so a *partial* refusal stays ineligible and stays
+      manual. That is what keeps this from becoming a per-shot re-roll against a
+      paid provider, and the cap of one retry per frame is the only thing
+      standing in front of that. Relaxing it is a separate decision and is not
+      taken here.
+
+      **The blocker string became a cross-language contract.** Eligibility is an
+      equality check, so a message that named the defect ("black for the whole
+      of its 5s") could never be matched. The runtime now fails every refusal
+      with one constant sentence — `UNUSABLE_CLIP_BLOCKER` — and puts the
+      measurement in the job event as `measured`, exactly as the Higgsfield
+      failure beside it keeps one fixed blocker and stores its request id
+      elsewhere. A test reads the migration file and asserts the two sides still
+      agree, because drift here would silently remove the recovery route with
+      nothing failing to point at the cause.
+
+      Tested with 212 loaded from its own file rather than a hand-written stub —
+      the lesson 310 taught — and the valuable half of the eight cases is what
+      is still refused: another blocker, a partial refusal, a second retry, a
+      job whose error has drifted from the step's blocker, a batch that misses a
+      frame, and a caller who is not the service role.
 
 ## Phase 4 — the gate and distribution
 
