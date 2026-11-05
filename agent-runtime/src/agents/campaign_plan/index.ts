@@ -27,6 +27,7 @@ import {
   normaliseChannels,
   planProblem,
   planRouteProblem,
+  routeVolumes,
   planSummary,
   resolveNeeds,
   MAX_CONTENT,
@@ -116,6 +117,18 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
           additionalProperties: false,
         },
       }} : {}),
+      // Only a 'both' campaign has a split to decide, and routeVolumes derives
+      // it for the other routes rather than trusting an answer to a question
+      // that was not asked. Described rather than required, because requiring
+      // it would make every single-route plan carry two meaningless numbers.
+      organic_content_count: {
+        type: "integer",
+        description: "For a PAID-AND-ORGANIC campaign only: how many of content_count are organic pieces. Must sum with paid_content_count to content_count, and neither may be zero.",
+      },
+      paid_content_count: {
+        type: "integer",
+        description: "For a PAID-AND-ORGANIC campaign only: how many of content_count are paid pieces.",
+      },
       needs_landing_page: { type: "boolean", description: "Whether this campaign needs its own landing page built." },
       needs_sales_agent: { type: "boolean", description: "Whether it needs a client-facing sales agent on that page." },
       reasoning: { type: "string", description: "Why this shape, and what you deliberately left out." },
@@ -328,9 +341,9 @@ export async function runCampaignPlanJob(
         // matters as much as the rest: the rival ad platform stays out, and
         // the validator refuses a plan missing either half.
         : campaign.acquisition_mode === "both" && campaign.paid_platform === "meta"
-          ? "This is a PAID-AND-ORGANIC META campaign. Plan BOTH organic distribution AND Meta/Facebook/Instagram ads, and say which pieces serve which route. Do not add Google destinations."
+          ? "This is a PAID-AND-ORGANIC META campaign. Plan BOTH organic distribution AND Meta/Facebook/Instagram ads, and say which pieces serve which route. Do not add Google destinations. Also set organic_content_count and paid_content_count: how content_count divides between the two routes. Both must be non-zero -- a campaign running both routes with nothing planned for one is not running both -- and they must sum to content_count."
           : campaign.acquisition_mode === "both" && campaign.paid_platform === "google"
-            ? "This is a PAID-AND-ORGANIC GOOGLE campaign. Plan BOTH organic distribution AND Google search ads, and say which pieces serve which route. Do not add Meta destinations."
+            ? "This is a PAID-AND-ORGANIC GOOGLE campaign. Plan BOTH organic distribution AND Google search ads, and say which pieces serve which route. Do not add Meta destinations. Also set organic_content_count and paid_content_count: how content_count divides between the two routes. Both must be non-zero -- a campaign running both routes with nothing planned for one is not running both -- and they must sum to content_count."
             : "This is a legacy campaign. Preserve its historical routing without inferring a v6 mode.";
 
   const system = `You plan marketing campaigns for Attract Acquisition, a marketing agency.
@@ -477,6 +490,17 @@ Call ${submitTool.name} once when you are done.`;
     return { ok: false, retryable: true, failureMessage: routeProblem, usage };
   }
 
+  // The per-route volumes the notes ask for. Resolved before the save so a
+  // split that does not add up fails the run, rather than committing a plan
+  // whose halves disagree with its total and leaving migration 308's CHECK to
+  // reject the setter afterwards.
+  const volumes = campaign.acquisition_mode === "legacy"
+    ? null
+    : routeVolumes(campaign.acquisition_mode, plan.content_count, result.submitted);
+  if (volumes && "error" in volumes) {
+    return { ok: false, retryable: true, failureMessage: volumes.error, usage };
+  }
+
   if (includeIdeas) {
     let ideas;
     try {
@@ -501,6 +525,17 @@ Call ${submitTool.name} once when you are done.`;
       p_plan: plan,
     });
     if (error) throw new Error(`Failed to write campaign plan: ${error.message}`);
+  }
+
+  // After the save: content_count has to exist before it can be divided, and
+  // set_campaign_route_volumes_v6 checks the split against the stored total.
+  if (volumes && !("error" in volumes)) {
+    const { error } = await sb.rpc("set_campaign_route_volumes_v6", {
+      p_campaign_id: campaign.id,
+      p_organic: volumes.organic,
+      p_paid: volumes.paid,
+    });
+    if (error) throw new Error(`Failed to record the route volumes: ${error.message}`);
   }
 
   if (isV6) {

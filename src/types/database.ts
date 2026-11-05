@@ -4202,6 +4202,8 @@ export type Database = {
           offer_summary: string | null
           offer_version_id: string | null
           optimisation_event: string | null
+          organic_content_count: number
+          paid_content_count: number
           paid_platform: string | null
           runs_organic: boolean
           runs_paid: boolean
@@ -4251,6 +4253,8 @@ export type Database = {
           offer_summary?: string | null
           offer_version_id?: string | null
           optimisation_event?: string | null
+          organic_content_count?: number
+          paid_content_count?: number
           paid_platform?: string | null
           runs_organic?: boolean
           runs_paid?: boolean
@@ -4300,6 +4304,8 @@ export type Database = {
           offer_summary?: string | null
           offer_version_id?: string | null
           optimisation_event?: string | null
+          organic_content_count?: number
+          paid_content_count?: number
           paid_platform?: string | null
           runs_organic?: boolean
           runs_paid?: boolean

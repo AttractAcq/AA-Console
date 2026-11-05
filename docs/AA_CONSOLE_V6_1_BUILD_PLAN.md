@@ -303,7 +303,28 @@ be absent, and absent is the honest answer from an agent.
 
 3. **Campaign planner agent** — decides landing page or not, sales agent or not,
    organic volume and type, paid volume and type, pillars and positioning per
-   route.
+   route. **Largely already existed**, which is the thing to know before
+   budgeting for it: `campaign_plan` already decides the landing page, the
+   sales agent, the content pillars as an enum of this campaign's own pillars,
+   the KPI, the content count and the ideas.
+
+   What it could not do was divide that count between routes, because
+   `content_count` is one number. For a single-route campaign that is the
+   answer; for the `both` route 302 added, "twelve pieces" could mean twelve
+   organic and no ads, and readiness could not tell. **Migration 308 and
+   `routeVolumes` close that**, and the split is derived rather than asked for
+   on single-route campaigns so the model cannot get wrong a question it was
+   not asked.
+
+   **A design bug a test caught, worth recording.** 308's constraint first
+   required the split to equal `content_count`. The planner saves its plan —
+   which sets `content_count` — and *then* records the split, because a total
+   has to exist before it can be divided. An equality constraint rejects the
+   first of those two statements, and Postgres cannot defer a CHECK. So the
+   constraint now forbids only what is never acceptable at any instant
+   (negative counts, pieces on a route the campaign does not run, a split
+   larger than the plan) and the function enforces exactness in one statement.
+   The first version of 308 could not have saved a plan at all.
 4. **Plan review gate** — correctable in the Inbox or in the campaign before the
    agent runs.
 5. **The single multi-step sweep** — one run driving every asset to

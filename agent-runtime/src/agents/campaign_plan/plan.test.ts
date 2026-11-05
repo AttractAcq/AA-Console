@@ -10,6 +10,7 @@ import {
   normaliseChannels,
   planProblem,
   planRouteProblem,
+  routeVolumes,
   planSummary,
   resolveNeeds,
   MAX_CONTENT,
@@ -558,5 +559,63 @@ describe("the submit tool asks for a format", () => {
 
   it("stays free of the keywords a strict schema rejects", () => {
     expect(unsupportedStrictKeywords(submitToolFor().inputSchema)).toEqual([]);
+  });
+});
+
+describe("how a both-route campaign divides its volume", () => {
+  // The notes ask the planner for "organic volume and type, paid volume and
+  // type". content_count is one number, so for a both-route campaign it says
+  // nothing about the split -- "twelve pieces" could be twelve organic and no
+  // ads, and readiness could not tell.
+  it("derives the split for a single-route campaign rather than asking", () => {
+    // A single-route campaign's volume IS its route's volume, so the model
+    // cannot get it wrong by answering a question it was not asked.
+    expect(routeVolumes("organic", 8, {})).toEqual({ organic: 8, paid: 0 });
+    expect(routeVolumes("paid", 8, {})).toEqual({ organic: 0, paid: 8 });
+    // And it ignores numbers it did not ask for.
+    expect(routeVolumes("organic", 8, { organic_content_count: 3, paid_content_count: 5 }))
+      .toEqual({ organic: 8, paid: 0 });
+  });
+
+  it("takes the split a both-route campaign states", () => {
+    expect(routeVolumes("both", 12, { organic_content_count: 8, paid_content_count: 4 }))
+      .toEqual({ organic: 8, paid: 4 });
+  });
+
+  it("refuses a split that does not add up, and says which numbers", () => {
+    // "Invalid split" in a job failure tells whoever reads it nothing.
+    expect(routeVolumes("both", 12, { organic_content_count: 8, paid_content_count: 2 }))
+      .toEqual({ error: "The split is 8 organic plus 2 paid, which is 10, but the plan asks for 12 pieces." });
+  });
+
+  it("refuses a both-route campaign that plans nothing for one route", () => {
+    // Running both routes with nothing on one is not running both, whatever
+    // the flags say.
+    expect(routeVolumes("both", 12, { organic_content_count: 12, paid_content_count: 0 }))
+      .toEqual({ error: "A paid-and-organic campaign needs pieces on both routes; this plans 12 organic and 0 paid." });
+  });
+
+  it("refuses a split that is not two whole counts", () => {
+    for (const bad of [{ organic_content_count: 6 },
+                       { organic_content_count: 6, paid_content_count: -1 },
+                       { organic_content_count: 6.5, paid_content_count: 5.5 },
+                       { organic_content_count: null, paid_content_count: 6 }]) {
+      const out = routeVolumes("both", 12, bad as Record<string, unknown>);
+      expect(out).toHaveProperty("error");
+    }
+  });
+
+  it("coerces a numeric string, as asCount already does for content_count", () => {
+    // Documented rather than incidental: the submit tool types these as
+    // integers, so a string is already a schema violation. Coercing matches
+    // the asCount helper beside it instead of being stricter in one place and
+    // forgiving in the other.
+    expect(routeVolumes("both", 12, { organic_content_count: "8", paid_content_count: "4" }))
+      .toEqual({ organic: 8, paid: 4 });
+  });
+
+  it("still refuses a mode that is not a route", () => {
+    expect(routeVolumes("hybrid", 8, {}))
+      .toEqual({ error: "The campaign has an unknown acquisition route." });
   });
 });

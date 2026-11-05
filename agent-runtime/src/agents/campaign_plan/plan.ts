@@ -96,6 +96,52 @@ function paidHalfProblem(
   return "A paid campaign needs a supported platform.";
 }
 
+/**
+ * How a campaign's planned pieces divide between its routes.
+ *
+ * Only a 'both' campaign has a split to decide: a single-route campaign's
+ * volume IS its route's volume, so it is derived rather than asked for, and
+ * the model cannot get it wrong by answering a question it was not asked.
+ *
+ * For 'both' the two numbers must sum to content_count. Migration 308's CHECK
+ * is the backstop and set_campaign_route_volumes_v6 refuses the same cases,
+ * but catching it here means the run fails with the numbers in the message
+ * rather than as a constraint violation nobody can read.
+ */
+export function routeVolumes(
+  mode: unknown,
+  contentCount: number,
+  submitted: Record<string, unknown>,
+): { organic: number; paid: number } | { error: string } {
+  if (mode === "organic") return { organic: contentCount, paid: 0 };
+  if (mode === "paid") return { organic: 0, paid: contentCount };
+  if (mode !== "both") return { error: "The campaign has an unknown acquisition route." };
+
+  const whole = (v: unknown): number | null => {
+    const n = typeof v === "number" ? v : Number(v);
+    if (!Number.isInteger(n) || n < 0) return null;
+    return n;
+  };
+  const organic = whole(submitted.organic_content_count);
+  const paid = whole(submitted.paid_content_count);
+  if (organic === null || paid === null) {
+    return {
+      error: "A paid-and-organic campaign has to say how many pieces are organic and how many are paid.",
+    };
+  }
+  if (organic + paid !== contentCount) {
+    return {
+      error: `The split is ${organic} organic plus ${paid} paid, which is ${organic + paid}, but the plan asks for ${contentCount} pieces.`,
+    };
+  }
+  if (organic === 0 || paid === 0) {
+    return {
+      error: `A paid-and-organic campaign needs pieces on both routes; this plans ${organic} organic and ${paid} paid.`,
+    };
+  }
+  return { organic, paid };
+}
+
 /** Route is a stored campaign decision; the model cannot turn organic into paid. */
 export function planRouteProblem(
   mode: unknown,
