@@ -24844,6 +24844,10 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: string
       }
+      approve_campaign_plan_v6: {
+        Args: { p_campaign_id: string; p_note?: string }
+        Returns: undefined
+      }
       approve_idea_and_generate_brief: {
         Args: { p_idea_id: string }
         Returns: string
@@ -24941,10 +24945,6 @@ export type Database = {
       }
       approve_recruitment_brief: {
         Args: { p_brief_id: string }
-        Returns: undefined
-      }
-      approve_campaign_plan_v6: {
-        Args: { p_campaign_id: string; p_note?: string }
         Returns: undefined
       }
       approve_recruitment_brief_from_inbox_v6: {
@@ -25230,6 +25230,12 @@ export type Database = {
           p_action: Database["public"]["Tables"]["campaign_action_approvals"]["Row"]
         }
         Returns: Json
+      }
+      campaign_plan_fingerprint: {
+        Args: {
+          p_campaign: Database["public"]["Tables"]["client_campaigns"]["Row"]
+        }
+        Returns: string
       }
       campaign_readiness: {
         Args: { p_campaign_id: string }
@@ -25853,7 +25859,13 @@ export type Database = {
           offer_summary: string | null
           offer_version_id: string | null
           optimisation_event: string | null
+          organic_content_count: number
+          paid_content_count: number
           paid_platform: string | null
+          plan_approved_at: string | null
+          plan_approved_by: string | null
+          plan_approved_fingerprint: string | null
+          plan_review_note: string | null
           runs_organic: boolean
           runs_paid: boolean
           starts_on: string | null
