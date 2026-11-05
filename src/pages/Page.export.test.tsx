@@ -153,8 +153,12 @@ it("gives Website Studio v2 the offer-page builder v1 had", async () => {
   render(<MemoryRouter initialEntries={["/clients/client-1/delivery/website-studio"]}>
     <Routes><Route path="/clients/:clientId/delivery/website-studio" element={<Page node={node} />} /></Routes>
   </MemoryRouter>);
+  // Phase 3 item 9: Sites leads, and Results is gone -- it rendered the same
+  // PagesReportingPanel with the same pageType that Attribution OS -> Landing
+  // Pages renders, so it was a duplicate route rather than a tab. The
+  // offer-page builder this test exists to protect is untouched.
   expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-    "Publish", "Landing Pages", "Offer Pages", "Sites", "Results",
+    "Sites", "Landing Pages", "Offer Pages", "Publish",
   ]);
   await user.click(screen.getByRole("tab", { name: "Offer Pages" }));
   expect(screen.getByText("Page builder · offer")).toBeInTheDocument();

@@ -392,7 +392,7 @@ export const legacyDeliveryRedirects: Record<string, string> = {
   "campaign-execution": "campaign-factory",
   conversion: "website-studio",
   sales: "sales-os?tab=agents",
-  "prospects-leads": "sales-os?tab=leads",
+  "prospects-leads": "attribution-os?tab=leads",
   economics: "attribution-os?tab=economics",
 };
 
@@ -484,9 +484,21 @@ export const v6ModuleNodes: NavNode[] = [
     ] },
   { id: "website-studio", label: "Website Studio", path: "website-studio", icon: Globe,
     capability: "expanding", tabs: [
-      { id: "publish", label: "Publish" }, { id: "landing-pages", label: "Landing Pages" },
-      { id: "offer-pages", label: "Offer Pages" }, { id: "sites", label: "Sites" },
-      { id: "landing-reporting", label: "Results" },
+      // Sites first: phase 3 item 9 makes this module a Sites table with build
+      // buttons, and SitesPanel already carries the table, the publish control
+      // and the agent attach.
+      { id: "sites", label: "Sites" },
+      { id: "landing-pages", label: "Landing Pages" },
+      { id: "offer-pages", label: "Offer Pages" },
+      // Publish stays its own tab for now. It is NOT the publish button on a
+      // site row: it is the board of what happened to each campaign page
+      // decision, and it carries a state nothing else does -- "published, and
+      // nobody has tested the form yet", which looks identical to working.
+      { id: "publish", label: "Publish" },
+      // Results is gone. It rendered PagesReportingPanel with pageType
+      // "landing" -- byte for byte what Attribution OS -> Landing Pages
+      // already renders. Two routes to one component is not a tab, it is a
+      // duplicate, and reporting belongs to Attribution OS.
     ] },
   { id: "lead-magnet-studio", label: "Lead Magnet Studio", path: "lead-magnet-studio", icon: UserPlus,
     capability: "expanding", tabs: [
@@ -499,14 +511,26 @@ export const v6ModuleNodes: NavNode[] = [
     ] },
   { id: "sales-os", label: "Sales OS", path: "sales-os", icon: MessagesSquare,
     capability: "expanding", tabs: [
-      { id: "capture", label: "Capture" }, { id: "leads", label: "Pipeline" },
+      // Agents first, per phase 3 item 11: "Agents as the main table page".
+      // The first tab is the one the module opens on, so the order IS the
+      // claim about what this module is for.
       { id: "agents", label: "Agents" },
+      // Capture is "left alone for now" in the notes, and it is also the only
+      // place capture endpoints are created now that Lead Magnet Studio's
+      // Opt-ins is archived.
+      { id: "capture", label: "Capture" },
+      // Pipeline moved to Attribution OS. It is a record of what happened to
+      // the leads, which is an attribution question rather than a sales-agent
+      // one.
     ] },
   { id: "attribution-os", label: "Attribution OS", path: "attribution-os", icon: BarChart3,
     capability: "expanding", tabs: [
       { id: "overview", label: "Attribution" }, { id: "organic", label: "Organic" },
       { id: "paid", label: "Paid" }, { id: "landing-pages", label: "Landing Pages" },
-      { id: "offer-pages", label: "Offer Pages" }, { id: "commentary", label: "Commentary" },
+      { id: "offer-pages", label: "Offer Pages" },
+      // Arrived from Sales OS in phase 3 item 11.
+      { id: "leads", label: "Pipeline" },
+      { id: "commentary", label: "Commentary" },
       { id: "economics", label: "Economics" },
     ] },
 ];

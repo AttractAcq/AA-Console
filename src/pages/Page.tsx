@@ -161,12 +161,13 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     versions: () => <ServiceOffersPanel />,
   },
   "website-studio": {
-    publish: () => <CampaignPagePublishPanel />,
+    sites: () => <SitesPanel />,
     "landing-pages": () => <PageBuilderPanel pageType="landing" />,
     "offer-pages": () => <PageBuilderPanel pageType="offer" />,
-    sites: () => <SitesPanel />,
-    // Offer results are not here: Attribution OS reports on offer pages.
-    "landing-reporting": () => <PagesReportingPanel pageType="landing" />,
+    publish: () => <CampaignPagePublishPanel />,
+    // Results is archived: it rendered the same PagesReportingPanel, with the
+    // same pageType, that Attribution OS -> Landing Pages renders. Reporting
+    // belongs there.
   },
   "google-ads-studio": {
     sheet: () => <GoogleAdsStudioPanel tab="sheet" />,
@@ -185,9 +186,8 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   // Capture leads, because where a lead came from is the question the old
   // page could never answer.
   "sales-os": {
-    capture: () => <LeadCapturePanel />,
-    leads: () => <><SalesAccessRequestsPanel /><ProspectsLeadsPanel /></>,
     agents: () => <SalesOverviewPanel />,
+    capture: () => <LeadCapturePanel />,
   },
   "attribution-os": {
     overview: () => <AttributionPanel />,
@@ -195,6 +195,11 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     paid: () => <PaidReportingPanel />,
     "landing-pages": () => <PagesReportingPanel pageType="landing" />,
     "offer-pages": () => <PagesReportingPanel pageType="offer" />,
+    // Moved from Sales OS with the Pipeline tab. The access-requests panel
+    // comes with it: it is the gate on who may see these leads, and splitting
+    // the two would leave a list of names with its permission control on
+    // another page.
+    leads: () => <><SalesAccessRequestsPanel /><ProspectsLeadsPanel /></>,
     commentary: () => <CommentaryPanel />,
     economics: () => <ClientEconomicsPanel />,
   },

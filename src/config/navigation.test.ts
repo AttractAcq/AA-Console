@@ -110,3 +110,45 @@ describe("the Strategy half of Intelligence OS", () => {
     expect(ids.slice(-4)).toEqual(strategyIds);
   });
 });
+
+describe("Pipeline belongs to Attribution OS, not Sales OS", () => {
+  it("opens Sales OS on Agents, which is what that module is for", () => {
+    // Phase 3 item 11: "Agents as the main table page". The first tab is the
+    // one the module opens on, so the order is the claim.
+    expect(v6ModuleNodes.find((node) => node.id === "sales-os")?.tabs?.map((tab) => tab.id))
+      .toEqual(["agents", "capture"]);
+  });
+
+  it("moved Pipeline to Attribution OS rather than dropping it", () => {
+    // It is a record of what happened to the leads, which is an attribution
+    // question. Pinned in both directions so the move cannot half-happen.
+    expect(v6ModuleNodes.find((node) => node.id === "attribution-os")?.tabs?.map((tab) => tab.id))
+      .toContain("leads");
+    expect(v6ModuleNodes.find((node) => node.id === "sales-os")?.tabs?.map((tab) => tab.id))
+      .not.toContain("leads");
+  });
+
+  it("sends the old prospects-leads link to where the page went", () => {
+    // A redirect left pointing at sales-os?tab=leads would land on a tab that
+    // no longer exists, which is worse than no redirect.
+    expect(legacyDeliveryRedirects["prospects-leads"]).toBe("attribution-os?tab=leads");
+  });
+});
+
+describe("Website Studio has no duplicate of Attribution OS", () => {
+  it("drops Results, which rendered the same component with the same prop", () => {
+    // website-studio -> landing-reporting was PagesReportingPanel
+    // pageType="landing", and attribution-os -> landing-pages is the same
+    // component with the same prop. Two routes to one view is a duplicate.
+    const tabs = v6ModuleNodes.find((node) => node.id === "website-studio")?.tabs?.map((t) => t.id);
+    expect(tabs).toEqual(["sites", "landing-pages", "offer-pages", "publish"]);
+    expect(tabs).not.toContain("landing-reporting");
+    expect(v6ModuleNodes.find((node) => node.id === "attribution-os")?.tabs?.map((t) => t.id))
+      .toContain("landing-pages");
+  });
+
+  it("opens on Sites, which is the table the notes ask this module to become", () => {
+    expect(v6ModuleNodes.find((node) => node.id === "website-studio")?.tabs?.[0]?.id)
+      .toBe("sites");
+  });
+});

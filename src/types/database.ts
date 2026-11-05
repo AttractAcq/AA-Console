@@ -14703,6 +14703,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "opportunity_proposals_proposed_by_job_id_fkey"
+            columns: ["proposed_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_proposed_by_job_id_fkey"
+            columns: ["proposed_by_job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
             foreignKeyName: "opportunity_proposals_resolved_by_fkey"
             columns: ["resolved_by"]
             isOneToOne: false

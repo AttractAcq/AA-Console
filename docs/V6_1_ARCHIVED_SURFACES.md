@@ -73,6 +73,17 @@ Worth keeping as a process note: a surface named in two places with two
 different fates is not a detail to resolve by inference. It is one question,
 and asking it cost a sentence.
 
+## Archived in v6.1, Phase 3.9 and 3.11
+
+| Surface | Where the code still is | Why |
+|---|---|---|
+| Website Studio → **Results** | `src/pages/reporting/PagesReportingPanel.tsx` | Not archived so much as **de-duplicated**. It rendered `PagesReportingPanel` with `pageType="landing"` — byte for byte what Attribution OS → Landing Pages already renders. Two routes to one component is a duplicate, not a tab, and reporting belongs to Attribution OS. The component is untouched and still reached from there. |
+| Sales OS → **Pipeline** | `src/pages/sales/ProspectsLeadsPanel.tsx` | **Moved, not archived**: it is now Attribution OS → Pipeline. What happened to the leads is an attribution question rather than a sales-agent one. `SalesAccessRequestsPanel` moved with it, because it is the gate on who may see those leads and splitting the two would leave a list of names with its permission control on another page. The `prospects-leads` legacy redirect follows it. |
+
+Sales OS now opens on **Agents**, per the notes' "Agents as the main table
+page". The first tab is the one a module opens on, so the order is the claim
+about what the module is for.
+
 ## What replaces them
 
 Neither Proof Distribution tab leaves a gap. The notes ask for that module to

@@ -40,7 +40,10 @@ it.each([
   ["campaign-execution", "/clients/c1/delivery/campaign-factory"],
   ["conversion", "/clients/c1/delivery/website-studio"],
   ["sales", "/clients/c1/delivery/sales-os?tab=agents"],
-  ["prospects-leads", "/clients/c1/delivery/sales-os?tab=leads"],
+  // Pipeline moved to Attribution OS in phase 3 item 11, so the redirect
+  // follows it. Left pointing at sales-os?tab=leads it would land on a tab
+  // that no longer exists, which is worse than no redirect at all.
+  ["prospects-leads", "/clients/c1/delivery/attribution-os?tab=leads"],
   ["economics", "/clients/c1/delivery/attribution-os?tab=economics"],
 ])("sends the archived %s page to its v6 replacement", (from, expected) => {
   go(`/clients/c1/delivery/${from}`);
