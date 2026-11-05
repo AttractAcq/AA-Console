@@ -53,6 +53,7 @@ import { runOpportunityDiscoveryJob } from "../agents/opportunity_discovery/inde
 import { runOpportunityEvaluateJob } from "../agents/opportunity_evaluate/index.js";
 import { runOpportunityStrategiseJob } from "../agents/opportunity_strategise/index.js";
 import { runOfferCompileJob } from "../agents/offer_compile/index.js";
+import { runCampaignSweepJob } from "../agents/campaign_sweep/index.js";
 import { runSalesAgentJob } from "../agents/sales_agent/index.js";
 import { runCampaignPlanJob } from "../agents/campaign_plan/index.js";
 import { runPageAuditJob } from "../agents/page_audit/index.js";
@@ -114,6 +115,9 @@ const RUNNERS: Record<string, JobRunner> = {
   // Drafts an offer version, which the existing sign-off flow already
   // treats as a proposal. Leaves price and claims to a person.
   offer_compile: runOfferCompileJob,
+  // Composes a workflow run for an approved plan. The engine that drives it
+  // already existed; this is the composer. Calls no model.
+  campaign_sweep: runCampaignSweepJob,
   landing_page: runLandingPageJob,
   // The page, and then the thing standing on it.
   sales_agent: runSalesAgentJob,

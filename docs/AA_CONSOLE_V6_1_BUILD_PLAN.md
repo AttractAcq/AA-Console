@@ -390,28 +390,63 @@ be absent, and absent is the honest answer from an agent.
    migration has to extend it with a `campaign_sweep` kind. All 10 live runs
    are `daily_content_package` at `v5.daily.1`.
 
-   **The open design question, which should not be guessed at.** The sweep's
-   relationship to `provision_campaign`. That function already creates the
-   landing page and the sales agent and enqueues their agents, so a sweep that
-   adds the same two steps duplicates it — and this phase has already removed
-   three duplications of exactly that shape. Either:
+   **The design question, now settled.** The sweep's relationship to
+   `provision_campaign`. That function already creates the landing page and the
+   sales agent and enqueues their agents, so a sweep that adds the same two
+   steps duplicates it — and this phase had already removed three duplications
+   of exactly that shape. The two options were for the sweep to **subsume** it,
+   or to cover **only** what it does not.
 
-   - the sweep **subsumes** it, covering the build artifacts and the content
-     pieces as one step graph, and `provision_campaign` becomes the sweep's
-     first steps rather than a separate act; or
-   - the sweep covers **only** what `provision_campaign` does not — the
-     content pieces per route, using 308's split — and the two run side by
-     side with a clear boundary.
+   **Decided: the sweep covers the content chain; `provision_campaign` keeps
+   the build artifacts.** Subsuming reads better against "one run driving every
+   asset", but it would mean replacing a path that is tested, has a button, and
+   was just gated by 309, with a step graph that does the same two inserts —
+   for a phrase. The content pieces are the genuinely multi-step part, and they
+   are what had no orchestration at all. The boundary is stated in the
+   migration and in the panel, so the next reader does not have to rediscover
+   which act owns what.
 
-   The first is cleaner and matches "one run driving every asset". The second
-   is smaller and does not touch a working path. It also depends on what the
-   content chain actually is: the daily-package pipeline already chains brief,
-   copy, creative and QA steps, and the sweep should reuse that chain rather
-   than restate it.
+   **What the chain reuses.** Not a new shape: the daily content package's,
+   exactly — `ideation` on the client, then `brief` from that idea, then
+   `creative_build` from that brief, per piece. Those agents already understand
+   that shape and the reconciler already drives it. The ideas depend on each
+   other rather than running in parallel, which is also what the daily package
+   does (`static_a_idea` depends on `story_idea`); that is deliberate there and
+   worth keeping, because each idea is written knowing what the earlier ones
+   said, so a campaign gets genuinely distinct pieces instead of several
+   models' first instinct.
 
-   Settling that needs a read of the daily-package step graph, and it is the
-   kind of decision worth making deliberately rather than at the end of a long
-   session. Recorded here so the next pass starts from it.
+   **Why the composer is an agent rather than an RPC.** Both engine functions
+   require `auth.role() = 'service_role'`. A definer function does not change
+   `auth.role()` — it reads the caller's JWT claim — so a browser cannot
+   compose a run however the function is declared. That is a deliberate
+   property of the engine, not something to work around. So
+   `request_campaign_sweep_v6` is a narrow writer that checks the gate and
+   queues the `campaign_sweep` agent, and the runtime composes the run as
+   service_role. Same shape as `request_opportunity_discovery_v6`. The composer
+   calls no model and spends nothing.
+
+   **The gate is checked twice, on purpose.** `request_campaign_sweep_v6`
+   checks it when the sweep is *asked for*; the runtime composes the run later,
+   and 309's whole point is that a plan stays correctable, so the approval may
+   have been withdrawn in between. `campaign_sweep_blocker_v6` re-checks
+   immediately before the first write and returns the reason rather than a
+   constraint error.
+
+   **Both places that list the kind.** `workflow_runs_kind_check` lists the
+   permitted kinds and `create_workflow_run` repeats that list in its own body.
+   Changing only the constraint would leave the function refusing every sweep
+   with "Unknown workflow kind" — a half-change that looks applied and is not.
+   310 reproduces the function with one list extended and nothing else touched,
+   and the test asserts both paths separately.
+
+   **Still owed from the planner: per-piece type.** The notes ask it for
+   "organic volume and type, paid volume and type". 308 gave volume per route;
+   nothing in a plan says whether a given piece is a reel, a carousel or a
+   single image. So every piece composes as a single image, which is the
+   conservative shape, and the mix stays a planner decision. A composer
+   choosing the creative mix would be a product decision made in the wrong
+   place.
 
 ## Phase 3 — the factories the sweep calls
 
@@ -438,11 +473,18 @@ be absent, and absent is the honest answer from an agent.
    screenshot as working. That belongs in the Sites detail eventually, not in
    a row action.
 
-   **Still owed:** autonomous operation when called by the campaign worker.
-   Deliberately left with the sweep rather than guessed at here, because the
-   sweep is the thing that would call these builders. Building it from this
-   end first would mean designing a caller that does not exist yet and
-   rewriting the interface when it does.
+   **"Autonomous under the campaign worker" was already there — and 2.7 is
+   what it was missing.** This was held back to settle with the sweep, on the
+   grounds that the sweep would be the caller. It is not: `provision_campaign`
+   is. It inserts the `client_pages` row, records the artifact, and
+   `enqueue_agent_job_internal('landing_page', ...)` — a page built from a
+   campaign with nobody opening a builder, and the same for `sales_agent`. That
+   has been the behaviour, not a gap.
+
+   What it genuinely lacked was a plan worth building from: it ran off one the
+   planner had marked approved itself. Migration 309 is therefore the whole of
+   what this item was owed, and the sweep deliberately does **not** duplicate
+   those two steps. Nothing further to build here.
 7. **Lead Magnet Studio** — one page, table plus a build button. Download only,
    no distribution. Opt-ins dropped. **Done.** Four tabs became one page on
    `IndexDetail`. Build was the table twice, so its button became the page's

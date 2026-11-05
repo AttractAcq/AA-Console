@@ -25241,6 +25241,10 @@ export type Database = {
           requirement: string
         }[]
       }
+      campaign_sweep_blocker_v6: {
+        Args: { p_campaign_id: string }
+        Returns: string
+      }
       can_access_client: { Args: { target: string }; Returns: boolean }
       can_read_client_sales_data: { Args: { target: string }; Returns: boolean }
       can_read_workflow_lead_attribution: {
@@ -28693,6 +28697,10 @@ export type Database = {
         Args: { p_actor: string; p_campaign_id: string }
         Returns: string
       }
+      request_campaign_sweep_v6: {
+        Args: { p_campaign_id: string }
+        Returns: string
+      }
       request_client_sales_entitlement: {
         Args: { p_action: string; p_client_id: string; p_member_id: string }
         Returns: string
@@ -29431,6 +29439,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_campaign_route_volumes_v6: {
+        Args: { p_campaign_id: string; p_organic: number; p_paid: number }
+        Returns: undefined
       }
       set_client_booking_enabled_v6: {
         Args: { p_client_id: string; p_enabled: boolean }

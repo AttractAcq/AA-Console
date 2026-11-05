@@ -375,6 +375,12 @@ export function CampaignExecutionPanel() {
     inFlight.filter((j) => j.agent_key === "campaign_plan").map((j) => j.input_id),
   );
 
+  // Same reasoning for a sweep in flight. request_campaign_sweep_v6 refuses a
+  // second one anyway; this is so the button says so before it is pressed.
+  const sweeping = new Set(
+    inFlight.filter((j) => j.agent_key === "campaign_sweep").map((j) => j.input_id),
+  );
+
   /**
    * Start the planner on a campaign that has no plan.
    *
@@ -429,6 +435,33 @@ export function CampaignExecutionPanel() {
       return;
     }
     setNotice(`Plan approved for "${campaign.name}". The agents can build from it now.`);
+    void refresh();
+  };
+
+  /**
+   * Sweep an approved plan into work (migration 310).
+   *
+   * This queues the composer rather than composing anything here.
+   * create_workflow_run requires auth.role() = 'service_role', and a definer
+   * function does not change auth.role() -- it reads the caller's JWT claim --
+   * so a browser cannot write a workflow run however the function is declared.
+   * The runtime composes it, and re-checks the approval first, because
+   * correcting a plan withdraws it.
+   */
+  const sweep = async (campaign: Campaign) => {
+    setBusy(true);
+    setProblem(null);
+    const { error } = await supabase.rpc("request_campaign_sweep_v6", {
+      p_campaign_id: campaign.id,
+    });
+    setBusy(false);
+    if (error) {
+      setProblem(error.message);
+      return;
+    }
+    setNotice(
+      `Sweeping "${campaign.name}" into work. A step chain per planned piece; each still needs its own approval before anything goes out.`,
+    );
     void refresh();
   };
 
@@ -688,6 +721,34 @@ export function CampaignExecutionPanel() {
                     onClick={() => void approvePlan(c)}
                   >
                     {c.plan_approved_at === null ? "Approve this plan" : "Approve again"}
+                  </button>
+                </div>
+              )}
+              {/* The sweep (migration 310). One workflow run per approved plan:
+                  idea, brief and creative per planned piece, each carrying its
+                  route, driven by the reconciler that already runs the daily
+                  package. It does not create the landing page or the sales
+                  agent -- provision_campaign owns those, which is why Build
+                  remains its own action. */}
+              {c.built_at && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
+                  <div>
+                    <p className="text-sm font-medium">Sweep into work</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {c.plan_approved_at === null
+                        ? "Approve the plan first. A sweep is the moment a plan becomes work, so it refuses an unreviewed one."
+                        : sweeping.has(c.id)
+                          ? "A sweep of this campaign is queued. One at a time, so two sweeps cannot compose the same steps twice."
+                          : `Composes a chain per planned piece (${c.content_count} ${c.content_count === 1 ? "piece" : "pieces"}): idea, brief, then creative. Nothing distributes without its own approval.`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={buttonClass}
+                    disabled={busy || c.plan_approved_at === null || sweeping.has(c.id)}
+                    onClick={() => void sweep(c)}
+                  >
+                    {sweeping.has(c.id) ? "Sweeping…" : "Sweep into work"}
                   </button>
                 </div>
               )}
