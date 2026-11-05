@@ -301,6 +301,8 @@ be absent, and absent is the honest answer from an agent.
 
 ## Phase 2 — the campaign spine
 
+**Complete.** Migrations 308, 309 and 310.
+
 3. **Campaign planner agent** — decides landing page or not, sales agent or not,
    organic volume and type, paid volume and type, pillars and positioning per
    route. **Largely already existed**, which is the thing to know before
@@ -450,6 +452,8 @@ be absent, and absent is the honest answer from an agent.
 
 ## Phase 3 — the factories the sweep calls
 
+**Complete except item 9**, which needs generation budget and somebody to look at the output rather than a code change. Items 6, 7 and 8 are done, and in all three cases most of what the plan budgeted for already existed.
+
 6. **Website Studio** — five tabs collapse to a Sites table plus build buttons
    for landing pages and offer pages; agent builders; autonomous under the
    campaign worker; publish to GitHub after approval. **Mostly done** (item 9
@@ -503,9 +507,59 @@ be absent, and absent is the honest answer from an agent.
    blocker. See `docs/V6_1_ARCHIVED_SURFACES.md` §Phase 3.7.
 8. **Sales OS** — Agents becomes the main table page. **Pipeline CRM moves to
    Attribution OS.** The agent distributes to its associated page without a
-   developer. Capture portal left alone for now.
+   developer. Capture portal left alone for now. **Done — and the last part was
+   already built.**
+
+   Agents is the main page (`sales-os` is two tabs, `agents` first). Pipeline
+   and its access-requests panel moved to Attribution OS in 3.11; the two moved
+   together because the second is the gate on who may see the first, and
+   splitting them would leave a list of names with its permission control on
+   another page. Capture is deliberately untouched, as the notes ask.
+
+   **"Distributes to its associated page without a developer" is built, and
+   built in the only place it could safely go.** A generated page may not
+   contain a `<script>` — `htmlSafetyProblem` refuses one on every path that
+   writes `client_pages.html`, and after publishing that rule is the only thing
+   between model output and a visitor's browser. So the widget cannot live in
+   the stored HTML, and relaxing the rule to put it there would trade the
+   published-page threat model for a convenience.
+
+   It is injected at **publish** instead: `htmlToPublish` appends AA's own
+   hosted snippet when the page has a sales-agent deployment, so the stored
+   bytes stay script-free and the only script on a published page is one AA
+   controls. The widget is served from the runtime rather than copied into each
+   client repository, so a fix to it does not require a commit to every site AA
+   has ever published.
+
+   `publicIdToEmbed` prefers the *enabled* deployment — the agent a visitor
+   will actually reach — and otherwise the newest attachment, so
+   attach-then-republish still embeds while Enable stays a separate switch. The
+   runtime refuses a disabled deployment on every request, so the embed is not
+   the authority on whether the agent answers.
+
+   The console half is there too: an attach select writes `page_id`, and
+   approval is a signature rather than a status — `approveFields` deliberately
+   does not touch `status`, and the confirm body makes a person read the
+   greeting, the qualification questions, the objections and the guardrails
+   first. `liveStateOf` keeps "Live — not approved" and "Live — approved" as
+   different badges, because an agent nobody has read is not ready for a site.
 9. **Content Production tuning** — the two named defects: video generation, and
    the text inside image content. Repetition, not architecture.
+
+   **Both named defects already have substantial fixes, and what remains cannot
+   be finished from here.** `concept.ts` diagnosed the image defect — *"the
+   safest output was the wrong deliverable"*, a model reaching for a typography
+   card whenever it was unsure — and now requires a background plus a treatment
+   with no typography-only option available to it. `acceptance.ts` has a
+   model-led screen covering `caption_readability` and `brief_execution`.
+
+   The notes call this "repetition, not architecture", and that is exactly why:
+   closing it means generating video and images, looking at them, and judging
+   whether they are good — creative judgement on real output, run until the
+   defect stops recurring. There is no code change to make on evidence, and
+   inventing one would be guessing at a problem that is only visible in the
+   artefacts. **This needs Alex, or a session with generation budget and
+   somebody to look at the results.**
 
 ## Phase 4 — the gate and distribution
 

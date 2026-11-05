@@ -142,12 +142,21 @@ beforeEach(async () => {
    returns table (created text, artifact_id uuid)
    language plpgsql volatile security definer set search_path = public
    as $a$ begin return; end $a$;
- -- create_workflow_run as it was: the old kind list in its own body.
+ -- create_workflow_run as migration 190 really declares it, character for
+ -- character in the header: the three defaults and the search_path included,
+ -- with the old kind list in its own body.
+ --
+ -- This matters more than it looks. The first version of this scaffold declared
+ -- it WITHOUT the defaults, and so did 310's replacement -- so the replace
+ -- succeeded here and failed on a real database with "cannot remove parameter
+ -- defaults from existing function". A scaffold that is merely plausible proves
+ -- the migration against itself. Copy the real declaration.
  create function create_workflow_run(
    p_client_id uuid, p_kind text, p_workflow_version text, p_idempotency_key text,
-   p_input_snapshot jsonb, p_deadline_at timestamptz, p_campaign_id uuid,
-   p_root_request_id text, p_created_by uuid) returns workflow_runs
-   language plpgsql volatile security definer set search_path = public
+   p_input_snapshot jsonb, p_deadline_at timestamptz,
+   p_campaign_id uuid default null, p_root_request_id text default null,
+   p_created_by uuid default null) returns workflow_runs
+   language plpgsql security definer set search_path to 'public'
  as $a$
  declare v_run workflow_runs;
  begin

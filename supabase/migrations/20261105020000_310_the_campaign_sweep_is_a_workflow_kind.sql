@@ -56,21 +56,20 @@ alter table public.workflow_runs
     kind = any (array['daily_content_package', 'client_launch_package', 'campaign_sweep'])
   );
 
--- Reproduced from the live definition with 'campaign_sweep' added to the kind
--- list. Nothing else is changed.
+-- Reproduced from migration 190's definition with 'campaign_sweep' added to the
+-- kind list. Nothing else is changed, signature and search_path included.
+-- The header is 190's, character for character, including the three defaults
+-- and the search_path. `create or replace` refuses to remove a parameter
+-- default ("cannot remove parameter defaults from existing function"), so a
+-- reproduction that tidies the signature does not apply at all -- and a test
+-- whose scaffold declares the function without those defaults will not notice.
 create or replace function public.create_workflow_run(
-  p_client_id uuid,
-  p_kind text,
-  p_workflow_version text,
-  p_idempotency_key text,
-  p_input_snapshot jsonb,
-  p_deadline_at timestamptz,
-  p_campaign_id uuid,
-  p_root_request_id text,
-  p_created_by uuid
+  p_client_id uuid, p_kind text, p_workflow_version text, p_idempotency_key text,
+  p_input_snapshot jsonb, p_deadline_at timestamptz,
+  p_campaign_id uuid default null, p_root_request_id text default null,
+  p_created_by uuid default null
 ) returns public.workflow_runs
-language plpgsql volatile security definer
-set search_path = pg_catalog, public
+language plpgsql security definer set search_path to 'public'
 as $$
 declare v_run workflow_runs;
 begin

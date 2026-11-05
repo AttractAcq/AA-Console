@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "946290207d0a7cb19ce40ae2244dcb04f80a1fc407197a4f904c40453e6bd6d4",
+  "migrationSourceDigest": "ca1d20dbc8ad33ca20e0af6763e44f003b00b3ae5b640b99b3ff79c90007a2fb",
   "generatedTypesSha256": "046aa348b8b9aa973a8a00089c9c55437a462d33c3028a53a3f212a0b9ccd9e7",
   "generatedSchemaBodySha256": "93b51b42a2d2ed09fb6397ce078c7f1b0c58a8b056eab8755ecb8573d7001511",
   "localMigrations": [
@@ -2290,8 +2290,8 @@
       "version": "20261105020000",
       "name": "310_the_campaign_sweep_is_a_workflow_kind",
       "filename": "20261105020000_310_the_campaign_sweep_is_a_workflow_kind.sql",
-      "sha256": "1decf8f088ae5d5768fef852e02e0a42846f9f89df4db5d80e7b6a107f10f46e",
-      "trimmedMd5": "c6566faa9c92188b0260df2c5cee6d92"
+      "sha256": "ad311f1c632a6e0194d58f60769c97940d6fd5d19c464599c7d8757c06394f3a",
+      "trimmedMd5": "d4be481ae8715c188d885997ef0c2a31"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
