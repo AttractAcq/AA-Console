@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CLIENT_MEDIA_BUCKET, CLIP_DOWNLOAD_TIMEOUT_MS, ClipStoreError, clipStoragePath, persistCompletedClip, UNUSABLE_CLIP_REASON } from "./clip.js";
+import { CLIENT_MEDIA_BUCKET, CLIP_DOWNLOAD_TIMEOUT_MS, ClipStoreError, clipStoragePath, persistCompletedClip, UNUSABLE_CLIP_BLOCKER, UNUSABLE_CLIP_REASON } from "./clip.js";
 
 const CLIENT = "client-1";
 const FRAME = "frame-1";
@@ -118,7 +118,7 @@ describe("persistCompletedClip", () => {
           fetchImpl: clipFetch() as unknown as typeof fetch,
           probeImpl: dead({ freeze_intervals: [{ start_sec: 0, end_sec: 5 }] }),
         }),
-      ).rejects.toThrow(/returned a still image rather than a shot/);
+      ).rejects.toThrow(UNUSABLE_CLIP_BLOCKER);
       expect(uploads).toEqual([]);
       expect(writes).toEqual([]);
       // Nothing to remove: it was refused before the upload, not after.
@@ -147,6 +147,28 @@ describe("persistCompletedClip", () => {
       );
     });
 
+    it("fails with one constant sentence, and carries the measurement separately", async () => {
+      // The blocker string has to be constant: migration 311's recovery route
+      // matches a step's blocker by exact string, so a message that varied with
+      // the defect could never be matched. The specific measurement rides along
+      // as `detail`, which the job event logs as `measured`.
+      const { sb } = storageHarness();
+      await persistCompletedClip(sb, {
+        clientId: CLIENT,
+        frameId: FRAME,
+        status: "completed",
+        videoUrl: VIDEO_URL,
+        fetchImpl: clipFetch() as unknown as typeof fetch,
+        probeImpl: dead({ freeze_intervals: [{ start_sec: 0, end_sec: 5 }] }),
+      }).then(
+        () => expect.unreachable("a frozen clip should be refused"),
+        (error: ClipStoreError) => {
+          expect(error.message).toBe(UNUSABLE_CLIP_BLOCKER);
+          expect(error.detail).toMatch(/returned a still image rather than a shot/);
+        },
+      );
+    });
+
     it("is refused when it cannot be inspected at all", async () => {
       const { sb, uploads } = storageHarness();
       await expect(
@@ -158,7 +180,7 @@ describe("persistCompletedClip", () => {
           fetchImpl: clipFetch() as unknown as typeof fetch,
           probeImpl: vi.fn(async () => { throw new Error("ffprobe exploded"); }),
         }),
-      ).rejects.toThrow(/could not be inspected/);
+      ).rejects.toThrow(UNUSABLE_CLIP_BLOCKER);
       expect(uploads).toEqual([]);
     });
   });

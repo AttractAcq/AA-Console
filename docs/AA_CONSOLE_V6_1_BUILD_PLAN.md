@@ -600,20 +600,123 @@ be absent, and absent is the honest answer from an agent.
 
    **What still needs Alex.** Two things, and only these:
 
-   1. *The creative half.* Whether a shot is any **good** — pacing, whether the
-      motion serves the brief, whether the image's text reads — needs eyes on
-      real generations, run until the defect stops recurring. The notes call
-      this "repetition, not architecture", and that is exactly what it is.
-      There is no code change to make on evidence.
-   2. *One decision.* A probe-refused frame lands in the same shape as a
-      provider-failed one — `clip_path` null, job paused, evidence recorded —
-      but with a different blocker message, so
-      `retry_failed_higgsfield_motion_step`'s deliberately strict eligibility
-      check will not match it. An operator can still act on the paused step;
-      what they cannot do is use that one automated batch retry. Extending its
-      eligibility means a migration touching a security-definer recovery
-      function whose checks are strict on purpose, so it is **not** something to
-      widen quietly.
+   1. *The creative half, now with evidence.* I had been reporting this as
+      "needs eyes on real generations" as though that meant NEW generations.
+      It did not: production holds 108 image concepts and 99 stored clips
+      already paid for, and auditing those costs nothing.
+
+      **The image defect is measured, and the fix is demonstrably working.**
+      `creative_generations.concept` records what the model actually chose.
+      Judged against `conceptProblem`'s own criteria:
+
+      | cohort | n | dates | declared no imagery |
+      |---|---|---|---|
+      | before the schema carried `background`/`visual_treatment` | 56 | 5 Sep – 15 Oct | **10 (18%)** |
+      | after | 52 | 18 Sep – 15 Oct | **0** |
+
+      Ten concepts in the old cohort describe themselves as typography — "built
+      entirely from typography", "no photography" — which is the defect caught
+      in production data rather than inferred from a code read. None of the 52
+      post-schema concepts does. 18% to zero.
+
+      A first pass on this looked much worse: 56 of 108 concepts "would be
+      refused". That number was an artefact. `no_background` and
+      `bad_treatment` were both exactly 56, which is the tell -- those rows
+      predate the fields existing at all, so they fail for having no
+      `background` key rather than for asking for a text card. Reporting 52%
+      defective would have been badly wrong.
+
+      **The video defect's catastrophic form is not present.** All 99 stored
+      clips were written before 310's screen existed, so none was ever
+      inspected. Their sizes: smallest 1.4 MB, p05 1.85 MB, median 5.65 MB,
+      largest 11.5 MB, **none under 50 KB**. An all-black or all-still clip is
+      almost entirely inter-frame redundancy and compresses to a tiny fraction
+      of a moving shot -- in this phase's own test fixtures, 5.4 KB against
+      26.6 KB at 320x568. There is no such cluster. So the screen is a guard
+      against a failure that has not happened at scale, not a response to a
+      rampant one. Worth having, because it is cheap and fails closed, but it
+      does not change the priority.
+
+      **What this does not establish, stated plainly.** Both measures are
+      proxies. "Declares no imagery" is textual: a concept could produce a
+      type-heavy image without announcing it, so 0 of 52 means none announced
+      it rather than none occurred. File size rules out the extreme form only --
+      a 3 MB clip can still be a useless slow pan, and a clip can be frozen in
+      part. Confirming either needs the pixels, which needs storage credentials
+      this environment does not have.
+
+      **THE DEFECT APPEARS TO HAVE MIGRATED, AND THIS IS THE THING TO LOOK AT.**
+
+      The post-schema concepts are not weak -- the *shortest* background in
+      that cohort is still 213 characters and describes a real environment,
+      with surfaces, lighting and defocus. The fix changed what the model asks
+      for, not merely what passes. But reading them turns up a pattern the
+      validator cannot see:
+
+      | cohort | printed matter named in `subject` |
+      |---|---|
+      | before | 7 of 56 (**13%**) |
+      | after | 25 of 52 (**48%**) |
+
+      As the typography-card rate went 18% to zero, paper-in-frame went 13% to
+      48%. Nearly half of post-fix image concepts now photograph a worksheet, a
+      calendar, a checklist or a printed page, often "occupying most of the
+      frame".
+
+      That is the same avoidance wearing a different costume. `conceptProblem`
+      closed the route where the model could ask for type on a colour; it
+      cannot tell a photograph of a document from a photograph of a person,
+      because both have a background and a treatment. The model found the
+      nearest safe thing that satisfies every rule.
+
+      **This is a judgement, not a defect, which is why it is not coded
+      against.** Sometimes a photographed worksheet is exactly right -- a lead
+      magnet genuinely is a document, and a post about scheduling may well want
+      a calendar. 48% is a keyword match, not 48% wrong. But the SHIFT is the
+      signal, and whether it is acceptable at that rate is Alex's call on real
+      output, not something to encode on a hunch. Writing a rule against paper
+      would be the third iteration of the same mistake: forbid the safe answer,
+      and the model finds the next safest one.
+
+      So what remains is the judgement the notes meant by "repetition, not
+      architecture" -- and it now has a specific question attached rather than
+      "look at some output": is a photographed document the right deliverable
+      half the time, and if not, is the fix a better brief rather than another
+      prohibition? The audit says this is tuning, not firefighting.
+   2. ~~*One decision.*~~ **Built, as migration 311.** A probe-refused frame
+      lands in the same shape as a provider-failed one — `clip_path` null, job
+      paused, evidence recorded — but with a different blocker message, so
+      `retry_failed_higgsfield_motion_step`'s strict eligibility check could
+      not match it. I first declined to write this, on the grounds that
+      widening a security-definer function was Alex's call. That conflated
+      *don't merge or apply* with *don't build*: the development policy asks for
+      prepared code, tests and a reviewable PR, which is what a judgement call
+      deserves rather than a question asked in the abstract.
+
+      **One condition widened, and the counting deliberately left alone.** The
+      permitted blocker becomes either sentence. The function still demands the
+      whole batch — every frame on the asset unstored, un-retried, and named in
+      the supplied array — so a *partial* refusal stays ineligible and stays
+      manual. That is what keeps this from becoming a per-shot re-roll against a
+      paid provider, and the cap of one retry per frame is the only thing
+      standing in front of that. Relaxing it is a separate decision and is not
+      taken here.
+
+      **The blocker string became a cross-language contract.** Eligibility is an
+      equality check, so a message that named the defect ("black for the whole
+      of its 5s") could never be matched. The runtime now fails every refusal
+      with one constant sentence — `UNUSABLE_CLIP_BLOCKER` — and puts the
+      measurement in the job event as `measured`, exactly as the Higgsfield
+      failure beside it keeps one fixed blocker and stores its request id
+      elsewhere. A test reads the migration file and asserts the two sides still
+      agree, because drift here would silently remove the recovery route with
+      nothing failing to point at the cause.
+
+      Tested with 212 loaded from its own file rather than a hand-written stub —
+      the lesson 310 taught — and the valuable half of the eight cases is what
+      is still refused: another blocker, a partial refusal, a second retry, a
+      job whose error has drifted from the step's blocker, a batch that misses a
+      frame, and a caller who is not the service role.
 
 ## Phase 4 — the gate and distribution
 

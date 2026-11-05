@@ -420,6 +420,12 @@ export async function runVideoBuildJob(
       // delivered, and what it delivered had no shot in it. Diagnosing the two
       // the same way would hide the defect this screen exists to surface.
       reason: (caught instanceof ClipStoreError && caught.reason) || "higgsfield_error",
+      // The blocker sentence is constant so the recovery route can match it;
+      // what was actually measured lives here, which is where an operator
+      // looking at a blocked step will read it.
+      ...(caught instanceof ClipStoreError && caught.detail
+        ? { measured: caught.detail }
+        : {}),
       provider: "higgsfield",
       higgsfield_called: true,
       assembly: assemblyHandoff(),
