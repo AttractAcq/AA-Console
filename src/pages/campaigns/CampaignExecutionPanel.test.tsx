@@ -1017,3 +1017,73 @@ describe("the plan review gate", () => {
   });
 
 });
+
+describe("sweeping a plan into work", () => {
+  const approved = (over: Record<string, unknown> = {}) => planned({
+    plan_approved_at: "2026-11-05T09:00:00Z",
+    plan_approved_fingerprint: "abc",
+    ...over,
+  });
+
+  it("will not sweep an unreviewed plan, and says why", async () => {
+    // A sweep is the moment a plan becomes work, so 309's gate is exactly what
+    // it has to respect. The button says so rather than letting a person press
+    // it and read a refusal.
+    show([planned()]);
+    await open();
+    expect(await plan().findByRole("button", { name: "Sweep into work" })).toBeDisabled();
+    expect(plan().getByText(/Approve the plan first/)).toBeInTheDocument();
+  });
+
+  it("queues the sweep by campaign id, and nothing else", async () => {
+    // Deliberately not create_workflow_run: that needs service_role, and a
+    // definer function does not change auth.role(), so the browser cannot
+    // compose a run however the function is declared. It asks; the runtime
+    // composes.
+    show([approved()]);
+    await open();
+    await userEvent.click(await plan().findByRole("button", { name: "Sweep into work" }));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("request_campaign_sweep_v6", { p_campaign_id: "camp-1" }),
+    );
+    expect(rpc).not.toHaveBeenCalledWith("create_workflow_run", expect.anything());
+    expect(rpc).not.toHaveBeenCalledWith("add_workflow_agent_step", expect.anything());
+  });
+
+  it("says how many pieces the chain will cover", async () => {
+    show([approved({ content_count: 1 })]);
+    await open();
+    expect(await plan().findByText(/1 piece\b/)).toBeInTheDocument();
+  });
+
+  it("will not queue a second while one is in flight", async () => {
+    // request_campaign_sweep_v6 refuses a concurrent sweep anyway; this is so
+    // the button says so before it is pressed. Read from the job queue rather
+    // than local state, so it survives a reload and is still right when the
+    // sweep was started from somewhere else.
+    useAgentJobs.mockReturnValue({
+      inFlight: [{ agent_key: "campaign_sweep", input_id: "camp-1", status: "queued" }],
+      recentFailures: [],
+    });
+    show([approved()]);
+    await open();
+    expect(await plan().findByRole("button", { name: "Sweeping…" })).toBeDisabled();
+    expect(plan().getByText(/A sweep of this campaign is queued/)).toBeInTheDocument();
+  });
+
+  it("is not confused by a sweep of a different campaign", async () => {
+    useAgentJobs.mockReturnValue({
+      inFlight: [{ agent_key: "campaign_sweep", input_id: "camp-other", status: "queued" }],
+      recentFailures: [],
+    });
+    show([approved()]);
+    await open();
+    expect(await plan().findByRole("button", { name: "Sweep into work" })).toBeEnabled();
+  });
+
+  it("offers no sweep on a campaign with no plan", async () => {
+    show([planned({ built_at: null, objective: null })]);
+    await screen.findByText("Winter full-arch push");
+    expect(screen.queryByText("Sweep into work")).not.toBeInTheDocument();
+  });
+});
