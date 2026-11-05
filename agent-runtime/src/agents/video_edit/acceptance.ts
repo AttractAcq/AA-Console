@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 
 import { ProviderError } from "../../tools/anthropic.js";
 import { estimateCostUsd, type TokenUsage } from "../../usage/cost.js";
+import { blackIntervalsFromLog, freezeIntervalsFromLog } from "../../media/ffmpegLog.js";
 import { sampleFrames } from "./media.js";
 
 const run = promisify(execFile);
@@ -44,18 +45,10 @@ export function finalReviewSampleFps(durationSec: number): number {
   return durationSec <= 45 ? 2 : 1;
 }
 
-export function freezeIntervalsFromLog(log: string, durationSec: number) {
-  const starts = [...log.matchAll(/freeze_start:\s*([\d.]+)/g)]
-    .map((match) => Number(match[1]));
-  const ends = [...log.matchAll(/freeze_end:\s*([\d.]+)/g)]
-    .map((match) => Number(match[1]));
-  return starts.map((start, index) => ({
-    start_sec: start,
-    end_sec: ends[index] ?? durationSec,
-  })).filter((interval) => Number.isFinite(interval.start_sec)
-    && Number.isFinite(interval.end_sec)
-    && interval.end_sec - interval.start_sec >= 2);
-}
+// One implementation, in src/media/ffmpegLog.ts, because video_build needs the
+// same parsing against a different standard. Re-exported so this module's
+// callers and tests are unchanged.
+export { freezeIntervalsFromLog };
 
 /** Inspect the actual exported file, rather than trusting the EDL's intended dimensions. */
 export async function probeRenderedVideo(path: string, requireAudio = false): Promise<MediaProbe> {
@@ -96,9 +89,7 @@ export async function probeRenderedVideo(path: string, requireAudio = false): Pr
     "-vf", "blackdetect=d=0.15:pix_th=0.10,freezedetect=n=-55dB:d=2",
     "-an", "-f", "null", "-",
   ], { timeout: 5 * 60_000, maxBuffer: 4 * 1024 * 1024 });
-  const blackIntervals = [...stderr.matchAll(/black_start:([\d.]+) black_end:([\d.]+)/g)]
-    .map((match) => ({ start_sec: Number(match[1]), end_sec: Number(match[2]) }))
-    .filter((interval) => Number.isFinite(interval.start_sec) && Number.isFinite(interval.end_sec));
+  const blackIntervals = blackIntervalsFromLog(stderr);
   if (blackIntervals.length > 0) checks.push(`${blackIntervals.length} black interval(s) detected.`);
   const freezeIntervals = freezeIntervalsFromLog(stderr, duration);
   if (freezeIntervals.length > 0) checks.push(`${freezeIntervals.length} frozen interval(s) of at least 2s detected.`);

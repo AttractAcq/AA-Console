@@ -1,11 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CLIENT_MEDIA_BUCKET, CLIP_DOWNLOAD_TIMEOUT_MS, clipStoragePath, persistCompletedClip } from "./clip.js";
+import { CLIENT_MEDIA_BUCKET, CLIP_DOWNLOAD_TIMEOUT_MS, ClipStoreError, clipStoragePath, persistCompletedClip, UNUSABLE_CLIP_REASON } from "./clip.js";
 
 const CLIENT = "client-1";
 const FRAME = "frame-1";
 const VIDEO_URL = "https://cdn.example.test/renders/clip.mp4";
 const CLIP_BYTES = Uint8Array.from([1, 2, 3, 4, 5]);
+
+/**
+ * A clip the screen is happy with.
+ *
+ * These five bytes are not a video, so the real probe is not asked about them:
+ * what this file tests is downloading, uploading and recording, and the screen
+ * has its own tests in screen.test.ts. Passing it explicitly keeps the stub
+ * visible rather than letting a test quietly skip a production step.
+ */
+const goodClip = vi.fn(async () => ({
+  width: 1080, height: 1920, duration_sec: 5, has_video_stream: true,
+  black_intervals: [], freeze_intervals: [],
+}));
 
 function storageHarness(options?: {
   uploadError?: { message: string; statusCode?: string } | null;
@@ -65,6 +78,7 @@ describe("persistCompletedClip", () => {
       status: "completed",
       videoUrl: VIDEO_URL,
       fetchImpl: fetchImpl as unknown as typeof fetch,
+      probeImpl: goodClip,
     });
 
     expect(clipPath).toBe(`${CLIENT}/generated/clips/${FRAME}.mp4`);
@@ -84,6 +98,71 @@ describe("persistCompletedClip", () => {
     expect(removals).toEqual([]);
   });
 
+  describe("a clip with no shot in it", () => {
+    const dead = (over: Record<string, unknown>) => vi.fn(async () => ({
+      width: 1080, height: 1920, duration_sec: 5, has_video_stream: true,
+      black_intervals: [], freeze_intervals: [], ...over,
+    }));
+
+    it("is not uploaded and does not get a clip_path", async () => {
+      // The point of the screen. Before it, a still the model never animated
+      // was stored and indexed exactly like a good shot, and nobody found out
+      // until a person watched the assembled reel.
+      const { sb, uploads, writes, removals } = storageHarness();
+      await expect(
+        persistCompletedClip(sb, {
+          clientId: CLIENT,
+          frameId: FRAME,
+          status: "completed",
+          videoUrl: VIDEO_URL,
+          fetchImpl: clipFetch() as unknown as typeof fetch,
+          probeImpl: dead({ freeze_intervals: [{ start_sec: 0, end_sec: 5 }] }),
+        }),
+      ).rejects.toThrow(/returned a still image rather than a shot/);
+      expect(uploads).toEqual([]);
+      expect(writes).toEqual([]);
+      // Nothing to remove: it was refused before the upload, not after.
+      expect(removals).toEqual([]);
+    });
+
+    it("is refused without being retried, because the provider already charged", async () => {
+      // Re-running the job would poll the same request and download the same
+      // broken bytes. Regenerating is a separate deliberate act with its own
+      // single-retry budget.
+      const { sb } = storageHarness();
+      await persistCompletedClip(sb, {
+        clientId: CLIENT,
+        frameId: FRAME,
+        status: "completed",
+        videoUrl: VIDEO_URL,
+        fetchImpl: clipFetch() as unknown as typeof fetch,
+        probeImpl: dead({ black_intervals: [{ start_sec: 0, end_sec: 5 }] }),
+      }).then(
+        () => expect.unreachable("a black clip should be refused"),
+        (error: ClipStoreError) => {
+          expect(error.retryable).toBe(false);
+          expect(error.reason).toBe(UNUSABLE_CLIP_REASON);
+          expect(error.message).toMatch(/not stored and was not submitted again/);
+        },
+      );
+    });
+
+    it("is refused when it cannot be inspected at all", async () => {
+      const { sb, uploads } = storageHarness();
+      await expect(
+        persistCompletedClip(sb, {
+          clientId: CLIENT,
+          frameId: FRAME,
+          status: "completed",
+          videoUrl: VIDEO_URL,
+          fetchImpl: clipFetch() as unknown as typeof fetch,
+          probeImpl: vi.fn(async () => { throw new Error("ffprobe exploded"); }),
+        }),
+      ).rejects.toThrow(/could not be inspected/);
+      expect(uploads).toEqual([]);
+    });
+  });
+
   it("does not download while the provider is still working, or when the clip is already stored", async () => {
     const fetchImpl = vi.fn();
     const { sb, uploads } = storageHarness();
@@ -94,6 +173,7 @@ describe("persistCompletedClip", () => {
         status: "in_progress",
         videoUrl: VIDEO_URL,
         fetchImpl: fetchImpl as unknown as typeof fetch,
+        probeImpl: goodClip,
       }),
     ).resolves.toBeNull();
     await expect(
@@ -104,6 +184,7 @@ describe("persistCompletedClip", () => {
         videoUrl: VIDEO_URL,
         existingClipPath: "client-1/generated/clips/frame-1.mp4",
         fetchImpl: fetchImpl as unknown as typeof fetch,
+        probeImpl: goodClip,
       }),
     ).resolves.toBe("client-1/generated/clips/frame-1.mp4");
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -119,6 +200,7 @@ describe("persistCompletedClip", () => {
         status: "Completed",
         videoUrl: VIDEO_URL,
         fetchImpl: clipFetch() as unknown as typeof fetch,
+        probeImpl: goodClip,
       }),
     ).rejects.toThrow(/Could not store the clip: network broke/);
     expect(failed.removals).toEqual([[`${CLIENT}/generated/clips/${FRAME}.mp4`]]);
@@ -134,6 +216,7 @@ describe("persistCompletedClip", () => {
         status: "completed",
         videoUrl: VIDEO_URL,
         fetchImpl: clipFetch() as unknown as typeof fetch,
+        probeImpl: goodClip,
       }),
     ).rejects.toThrow(/was not overwritten/);
     expect(duplicate.removals).toEqual([]);
@@ -148,6 +231,7 @@ describe("persistCompletedClip", () => {
         status: "completed",
         videoUrl: VIDEO_URL,
         fetchImpl: clipFetch() as unknown as typeof fetch,
+        probeImpl: goodClip,
       }),
     ).rejects.toThrow(/Could not record clip_path/);
     expect(removals).toEqual([[`${CLIENT}/generated/clips/${FRAME}.mp4`]]);
@@ -163,6 +247,7 @@ describe("persistCompletedClip", () => {
         status: "completed",
         videoUrl: "http://cdn.example.test/clip.mp4",
         fetchImpl: fetchImpl as unknown as typeof fetch,
+        probeImpl: goodClip,
       }),
     ).rejects.toThrow(/https/);
     expect(fetchImpl).not.toHaveBeenCalled();

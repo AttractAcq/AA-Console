@@ -416,7 +416,10 @@ export async function runVideoBuildJob(
       creative_stage: "motion",
       status: "paused",
       job_outcome: "failed",
-      reason: "higgsfield_error",
+      // A clip the screen refused is not a provider error: the provider
+      // delivered, and what it delivered had no shot in it. Diagnosing the two
+      // the same way would hide the defect this screen exists to surface.
+      reason: (caught instanceof ClipStoreError && caught.reason) || "higgsfield_error",
       provider: "higgsfield",
       higgsfield_called: true,
       assembly: assemblyHandoff(),

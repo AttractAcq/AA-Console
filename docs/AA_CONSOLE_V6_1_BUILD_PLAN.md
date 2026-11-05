@@ -452,7 +452,7 @@ be absent, and absent is the honest answer from an agent.
 
 ## Phase 3 — the factories the sweep calls
 
-**Complete except item 9**, which needs generation budget and somebody to look at the output rather than a code change. Items 6, 7 and 8 are done, and in all three cases most of what the plan budgeted for already existed.
+**Items 6, 7 and 8 complete.** In all three, most of what the plan budgeted for already existed. Item 9's two named defects are both now enforced in code — the image one at the brief, the video one at the clip — and what remains of it is creative judgement on real generations plus one decision about the automated retry route. See item 9.
 
 6. **Website Studio** — five tabs collapse to a Sites table plus build buttons
    for landing pages and offer pages; agent builders; autonomous under the
@@ -546,20 +546,74 @@ be absent, and absent is the honest answer from an agent.
 9. **Content Production tuning** — the two named defects: video generation, and
    the text inside image content. Repetition, not architecture.
 
-   **Both named defects already have substantial fixes, and what remains cannot
-   be finished from here.** `concept.ts` diagnosed the image defect — *"the
+   **The image defect is enforced in code.** `concept.ts` diagnosed it — *"the
    safest output was the wrong deliverable"*, a model reaching for a typography
-   card whenever it was unsure — and now requires a background plus a treatment
-   with no typography-only option available to it. `acceptance.ts` has a
-   model-led screen covering `caption_readability` and `brief_execution`.
+   card whenever it was unsure — and `conceptProblem` now *refuses* a concept
+   with no background or a typography-only treatment. That is a validator, not
+   prompt wording, which is the distinction that matters: a prompt is a request
+   and a validator is a guarantee. Nothing further is owed here.
 
-   The notes call this "repetition, not architecture", and that is exactly why:
-   closing it means generating video and images, looking at them, and judging
-   whether they are good — creative judgement on real output, run until the
-   defect stops recurring. There is no code change to make on evidence, and
-   inventing one would be guessing at a problem that is only visible in the
-   artefacts. **This needs Alex, or a session with generation budget and
-   somebody to look at the results.**
+   **The video defect had a real, unguarded gap, and its measurable half is now
+   closed.** I had written this item off as needing only creative judgement.
+   That was wrong, and worth recording as a process note: nothing looked at a
+   generated clip at all. `persistCompletedClip` checked that the provider
+   answered, that the body was not empty and that the content type said video,
+   and then stored the bytes as a finished shot. A clip that was **black end to
+   end**, or **a still the model never animated**, was indexed exactly like a
+   good one. Nobody found out until a person watched the assembled reel, by
+   which point every shot had been paid for.
+
+   `video_build` now screens a clip before storing it, and refuses only what is
+   broken on any reading: no decodable video stream, a duration too short to be
+   a shot, black end to end, or frozen end to end.
+
+   **Why not reuse `video_edit`'s probe.** It exists for a finished reel and
+   holds it to an export contract — 1080x1920, three to ninety seconds, and
+   *any* black or frozen interval is a defect. Applying that to a generated shot
+   would be wrong rather than merely strict: a shot is five seconds, its
+   dimensions come from the provider, and one that opens dark or holds a beat is
+   a legitimate choice. A screen that rejected good work would be worse than
+   none, because people would learn to route around it. So the *parsing* is
+   shared — one implementation in `src/media/ffmpegLog.ts`, since a second copy
+   would drift the moment ffmpeg changed its log format — and the *judgement* is
+   separate.
+
+   **Why a refusal is not retryable.** The provider has already rendered and
+   charged for the request. Re-running the job would poll the same request and
+   download the same broken bytes. Regenerating is a separate deliberate act
+   with its own budget: `provider_retry_count` is capped at 1 and
+   `retry_failed_higgsfield_motion_step` is how it is spent, after an operator
+   has independently checked each request. So the screen does what every other
+   provider problem in this agent does — stops, records exactly what was
+   measured, and leaves `clip_path` null, which is the state that recovery path
+   looks for.
+
+   **A threshold justified by measurement rather than feel.** "Black end to
+   end" cannot mean 100%: `blackdetect` reports whole runs and the final frames
+   fall outside one, so a wholly black five-second clip measures **0.9917**. A
+   cutoff of 1.0 would have caught none of them. There is a test that asserts
+   this against a real generated clip, so the number stays honest if ffmpeg's
+   reporting changes. The same test pins the other real-world shape: an
+   entirely frozen clip emits `freeze_start` with **no** `freeze_end`, and if
+   the parser did not close it with the duration it would measure as no freeze
+   at all and sail through.
+
+   **What still needs Alex.** Two things, and only these:
+
+   1. *The creative half.* Whether a shot is any **good** — pacing, whether the
+      motion serves the brief, whether the image's text reads — needs eyes on
+      real generations, run until the defect stops recurring. The notes call
+      this "repetition, not architecture", and that is exactly what it is.
+      There is no code change to make on evidence.
+   2. *One decision.* A probe-refused frame lands in the same shape as a
+      provider-failed one — `clip_path` null, job paused, evidence recorded —
+      but with a different blocker message, so
+      `retry_failed_higgsfield_motion_step`'s deliberately strict eligibility
+      check will not match it. An operator can still act on the paused step;
+      what they cannot do is use that one automated batch retry. Extending its
+      eligibility means a migration touching a security-definer recovery
+      function whose checks are strict on purpose, so it is **not** something to
+      widen quietly.
 
 ## Phase 4 — the gate and distribution
 
