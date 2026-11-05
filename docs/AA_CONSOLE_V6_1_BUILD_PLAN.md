@@ -645,11 +645,44 @@ be absent, and absent is the honest answer from an agent.
       part. Confirming either needs the pixels, which needs storage credentials
       this environment does not have.
 
-      So what genuinely remains is the subtler judgement the notes meant by
-      "repetition, not architecture": whether the motion serves the brief,
-      whether pacing works, whether the text in an image reads. That needs
-      somebody looking at output, and the audit above says it is tuning rather
-      than firefighting.
+      **THE DEFECT APPEARS TO HAVE MIGRATED, AND THIS IS THE THING TO LOOK AT.**
+
+      The post-schema concepts are not weak -- the *shortest* background in
+      that cohort is still 213 characters and describes a real environment,
+      with surfaces, lighting and defocus. The fix changed what the model asks
+      for, not merely what passes. But reading them turns up a pattern the
+      validator cannot see:
+
+      | cohort | printed matter named in `subject` |
+      |---|---|
+      | before | 7 of 56 (**13%**) |
+      | after | 25 of 52 (**48%**) |
+
+      As the typography-card rate went 18% to zero, paper-in-frame went 13% to
+      48%. Nearly half of post-fix image concepts now photograph a worksheet, a
+      calendar, a checklist or a printed page, often "occupying most of the
+      frame".
+
+      That is the same avoidance wearing a different costume. `conceptProblem`
+      closed the route where the model could ask for type on a colour; it
+      cannot tell a photograph of a document from a photograph of a person,
+      because both have a background and a treatment. The model found the
+      nearest safe thing that satisfies every rule.
+
+      **This is a judgement, not a defect, which is why it is not coded
+      against.** Sometimes a photographed worksheet is exactly right -- a lead
+      magnet genuinely is a document, and a post about scheduling may well want
+      a calendar. 48% is a keyword match, not 48% wrong. But the SHIFT is the
+      signal, and whether it is acceptable at that rate is Alex's call on real
+      output, not something to encode on a hunch. Writing a rule against paper
+      would be the third iteration of the same mistake: forbid the safe answer,
+      and the model finds the next safest one.
+
+      So what remains is the judgement the notes meant by "repetition, not
+      architecture" -- and it now has a specific question attached rather than
+      "look at some output": is a photographed document the right deliverable
+      half the time, and if not, is the fix a better brief rather than another
+      prohibition? The audit says this is tuning, not firefighting.
    2. ~~*One decision.*~~ **Built, as migration 311.** A probe-refused frame
       lands in the same shape as a provider-failed one — `clip_path` null, job
       paused, evidence recorded — but with a different blocker message, so
