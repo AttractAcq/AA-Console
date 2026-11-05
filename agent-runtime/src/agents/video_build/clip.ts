@@ -12,7 +12,64 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../storage/signed-url-policy.js";
+import {
+  generatedClipProblem,
+  probeGeneratedClip,
+  type GeneratedClipProbe,
+} from "./screen.js";
+
+/**
+ * Measure the downloaded bytes before they are stored.
+ *
+ * Injectable because the real one shells out to ffprobe and ffmpeg, which a
+ * unit test has no business doing against fabricated bytes. Production gets
+ * the real probe by default; a test opts into a stub and says so.
+ */
+export type ClipProbe = (path: string) => Promise<GeneratedClipProbe>;
+
+/**
+ * Refuse a clip with no shot in it, before it is stored.
+ *
+ * A refusal is NOT retryable. The provider has already rendered and charged
+ * for this request, and re-running the job would poll the same request and
+ * download the same broken bytes. Regenerating is a separate, deliberate act
+ * with its own single-retry budget -- `provider_retry_count` is capped at one
+ * and `retry_failed_higgsfield_motion_step` is how it is spent. So this does
+ * what every other provider problem in this agent does: stops, says exactly
+ * what was measured, and leaves `clip_path` null, which is the state that
+ * recovery path looks for.
+ */
+async function screenClipBytes(bytes: Buffer, probe: ClipProbe): Promise<void> {
+  const dir = await mkdtemp(join(tmpdir(), "aa-clip-screen-"));
+  const path = join(dir, "clip.mp4");
+  try {
+    await writeFile(path, bytes);
+    let measured: GeneratedClipProbe;
+    try {
+      measured = await probe(path);
+    } catch (caught) {
+      // A clip ffprobe cannot read is not a shot, and saying so beats storing
+      // bytes nothing could decode.
+      const detail = caught instanceof Error ? caught.name : "Error";
+      throw new ClipStoreError(
+        `The generated clip could not be inspected (${detail}), so it was not stored.`,
+        false,
+        UNUSABLE_CLIP_REASON,
+      );
+    }
+    const problem = generatedClipProblem(measured);
+    if (problem) {
+      throw new ClipStoreError(`${problem} It was not stored and was not submitted again.`, false, UNUSABLE_CLIP_REASON);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
 
 /** Same bucket creative_build writes stills to. */
 export const CLIENT_MEDIA_BUCKET = "client-media";
@@ -22,13 +79,19 @@ export const CLIP_DOWNLOAD_TIMEOUT_MS = 120_000;
 
 export class ClipStoreError extends Error {
   readonly retryable: boolean;
+  /** Event-log slug, when this is something more specific than a store failure. */
+  readonly reason: string | undefined;
 
-  constructor(message: string, retryable: boolean) {
+  constructor(message: string, retryable: boolean, reason?: string) {
     super(message);
     this.name = "ClipStoreError";
     this.retryable = retryable;
+    this.reason = reason;
   }
 }
+
+/** The slug a clip refused by the screen carries into the job's event log. */
+export const UNUSABLE_CLIP_REASON = "generated_clip_unusable";
 
 export function clipStoragePath(clientId: string, frameId: string): string {
   const client = pathSegment(clientId, "client");
@@ -103,6 +166,8 @@ export async function persistCompletedClip(
     existingClipPath?: string | null;
     fetchImpl: typeof fetch;
     timeoutMs?: number;
+    /** Defaults to the real ffprobe/ffmpeg screen; tests pass a stub. */
+    probeImpl?: ClipProbe;
   },
 ): Promise<string | null> {
   if (input.status.trim().toLowerCase() !== "completed") return null;
@@ -119,6 +184,8 @@ export async function persistCompletedClip(
     input.fetchImpl,
     input.timeoutMs ?? CLIP_DOWNLOAD_TIMEOUT_MS,
   );
+  await screenClipBytes(bytes, input.probeImpl ?? probeGeneratedClip);
+
   const storagePath = clipStoragePath(input.clientId, input.frameId);
   const bucket = sb.storage.from(CLIENT_MEDIA_BUCKET);
   const uploaded = await bucket.upload(storagePath, bytes, {

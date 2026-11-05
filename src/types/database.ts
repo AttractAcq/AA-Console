@@ -4202,7 +4202,13 @@ export type Database = {
           offer_summary: string | null
           offer_version_id: string | null
           optimisation_event: string | null
+          organic_content_count: number
+          paid_content_count: number
           paid_platform: string | null
+          plan_approved_at: string | null
+          plan_approved_by: string | null
+          plan_approved_fingerprint: string | null
+          plan_review_note: string | null
           runs_organic: boolean
           runs_paid: boolean
           starts_on: string | null
@@ -4251,7 +4257,13 @@ export type Database = {
           offer_summary?: string | null
           offer_version_id?: string | null
           optimisation_event?: string | null
+          organic_content_count?: number
+          paid_content_count?: number
           paid_platform?: string | null
+          plan_approved_at?: string | null
+          plan_approved_by?: string | null
+          plan_approved_fingerprint?: string | null
+          plan_review_note?: string | null
           runs_organic?: boolean
           runs_paid?: boolean
           starts_on?: string | null
@@ -4300,7 +4312,13 @@ export type Database = {
           offer_summary?: string | null
           offer_version_id?: string | null
           optimisation_event?: string | null
+          organic_content_count?: number
+          paid_content_count?: number
           paid_platform?: string | null
+          plan_approved_at?: string | null
+          plan_approved_by?: string | null
+          plan_approved_fingerprint?: string | null
+          plan_review_note?: string | null
           runs_organic?: boolean
           runs_paid?: boolean
           starts_on?: string | null
@@ -4477,6 +4495,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "service_offer_versions"
             referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_plan_approved_by_fkey"
+            columns: ["plan_approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -24819,6 +24844,10 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: string
       }
+      approve_campaign_plan_v6: {
+        Args: { p_campaign_id: string; p_note?: string }
+        Returns: undefined
+      }
       approve_idea_and_generate_brief: {
         Args: { p_idea_id: string }
         Returns: string
@@ -25202,6 +25231,12 @@ export type Database = {
         }
         Returns: Json
       }
+      campaign_plan_fingerprint: {
+        Args: {
+          p_campaign: Database["public"]["Tables"]["client_campaigns"]["Row"]
+        }
+        Returns: string
+      }
       campaign_readiness: {
         Args: { p_campaign_id: string }
         Returns: {
@@ -25211,6 +25246,10 @@ export type Database = {
           required: number
           requirement: string
         }[]
+      }
+      campaign_sweep_blocker_v6: {
+        Args: { p_campaign_id: string }
+        Returns: string
       }
       can_access_client: { Args: { target: string }; Returns: boolean }
       can_read_client_sales_data: { Args: { target: string }; Returns: boolean }
@@ -25820,7 +25859,13 @@ export type Database = {
           offer_summary: string | null
           offer_version_id: string | null
           optimisation_event: string | null
+          organic_content_count: number
+          paid_content_count: number
           paid_platform: string | null
+          plan_approved_at: string | null
+          plan_approved_by: string | null
+          plan_approved_fingerprint: string | null
+          plan_review_note: string | null
           runs_organic: boolean
           runs_paid: boolean
           starts_on: string | null
@@ -28664,6 +28709,10 @@ export type Database = {
         Args: { p_actor: string; p_campaign_id: string }
         Returns: string
       }
+      request_campaign_sweep_v6: {
+        Args: { p_campaign_id: string }
+        Returns: string
+      }
       request_client_sales_entitlement: {
         Args: { p_action: string; p_client_id: string; p_member_id: string }
         Returns: string
@@ -29402,6 +29451,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_campaign_route_volumes_v6: {
+        Args: { p_campaign_id: string; p_organic: number; p_paid: number }
+        Returns: undefined
       }
       set_client_booking_enabled_v6: {
         Args: { p_client_id: string; p_enabled: boolean }

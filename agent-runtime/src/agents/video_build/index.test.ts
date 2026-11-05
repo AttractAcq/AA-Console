@@ -7,6 +7,20 @@ import { MOTION_PRESET_PLACEHOLDER, serializeShot } from "../brief/shots.js";
 import { ZOOM_IN_MOTION_ID } from "./motions.js";
 import { runVideoBuildJob } from "./index.js";
 
+/**
+ * The clip screen measures real bytes with ffprobe, and these tests hand the
+ * agent fabricated ones. Stubbed to a passing measurement so this file keeps
+ * testing the job, while screen.test.ts tests the judgement and clip.test.ts
+ * tests that a refusal stops the store.
+ */
+vi.mock("./screen.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./screen.js")>()),
+  probeGeneratedClip: vi.fn(async () => ({
+    width: 1080, height: 1920, duration_sec: 5, has_video_stream: true,
+    black_intervals: [], freeze_intervals: [],
+  })),
+}));
+
 const saved = {
   key: process.env.HIGGSFIELD_API_KEY,
   secret: process.env.HIGGSFIELD_API_SECRET,

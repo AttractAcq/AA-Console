@@ -46,6 +46,9 @@ type Campaign = {
   kpi_metric: string | null;
   kpi_target: number | null;
   content_count: number;
+  plan_approved_at: string | null;
+  plan_approved_fingerprint: string | null;
+  plan_review_note: string | null;
   needs_landing_page: boolean;
   needs_sales_agent: boolean;
   built_at: string | null;
@@ -240,7 +243,7 @@ export function CampaignExecutionPanel() {
       const query = supabase
         .from("client_campaigns")
         .select(
-          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at, acquisition_mode, paid_platform, cloned_from_campaign_id, offer_version_id",
+          "id, name, brief, status, objective, audience, offer_summary, core_message, channels, budget, starts_on, ends_on, kpi_metric, kpi_target, content_count, plan_approved_at, plan_approved_fingerprint, plan_review_note, needs_landing_page, needs_sales_agent, built_at, content_ideas_generated_at, ideate_on_plan, launched_at, created_at, template, mirrors_template, daily_budget, target_countries, conversion_event, meta_campaign_id, meta_ad_set_id, meta_built_at, acquisition_mode, paid_platform, cloned_from_campaign_id, offer_version_id",
         )
         .eq("client_id", clientId)
         // A campaign somebody archived is over. It reads from the archive.
@@ -372,6 +375,12 @@ export function CampaignExecutionPanel() {
     inFlight.filter((j) => j.agent_key === "campaign_plan").map((j) => j.input_id),
   );
 
+  // Same reasoning for a sweep in flight. request_campaign_sweep_v6 refuses a
+  // second one anyway; this is so the button says so before it is pressed.
+  const sweeping = new Set(
+    inFlight.filter((j) => j.agent_key === "campaign_sweep").map((j) => j.input_id),
+  );
+
   /**
    * Start the planner on a campaign that has no plan.
    *
@@ -403,6 +412,58 @@ export function CampaignExecutionPanel() {
     void refresh();
   };
 
+
+  /**
+   * Approve this plan for building (migration 309).
+   *
+   * The gate is in provision_campaign, which refuses an unreviewed plan and
+   * refuses one that changed after approval. So this button does not unlock a
+   * screen -- it records a decision about a specific plan, and correcting the
+   * plan afterwards withdraws it.
+   */
+  const approvePlan = async (campaign: Campaign) => {
+    const note = window.prompt("Anything to record about this plan? (optional)") ?? null;
+    setBusy(true);
+    setProblem(null);
+    const { error } = await supabase.rpc("approve_campaign_plan_v6", {
+      p_campaign_id: campaign.id,
+      ...(note?.trim() ? { p_note: note.trim() } : {}),
+    });
+    setBusy(false);
+    if (error) {
+      setProblem(error.message);
+      return;
+    }
+    setNotice(`Plan approved for "${campaign.name}". The agents can build from it now.`);
+    void refresh();
+  };
+
+  /**
+   * Sweep an approved plan into work (migration 310).
+   *
+   * This queues the composer rather than composing anything here.
+   * create_workflow_run requires auth.role() = 'service_role', and a definer
+   * function does not change auth.role() -- it reads the caller's JWT claim --
+   * so a browser cannot write a workflow run however the function is declared.
+   * The runtime composes it, and re-checks the approval first, because
+   * correcting a plan withdraws it.
+   */
+  const sweep = async (campaign: Campaign) => {
+    setBusy(true);
+    setProblem(null);
+    const { error } = await supabase.rpc("request_campaign_sweep_v6", {
+      p_campaign_id: campaign.id,
+    });
+    setBusy(false);
+    if (error) {
+      setProblem(error.message);
+      return;
+    }
+    setNotice(
+      `Sweeping "${campaign.name}" into work. A step chain per planned piece; each still needs its own approval before anything goes out.`,
+    );
+    void refresh();
+  };
 
   const act = async (
     rpc: "provision_campaign" | "launch_campaign",
@@ -635,6 +696,62 @@ export function CampaignExecutionPanel() {
             {v2Tab === "plan" && <section className="space-y-4 py-4" aria-label="Campaign plan">
               <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-semibold">Campaign plan</h3><p className="text-xs text-muted-foreground">{c.built_at ? `Generated ${new Date(c.built_at).toLocaleString()}` : "Awaiting planner"}</p></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => setEditingPlan(c)}>Edit plan</button><button type="button" className={buttonClass} disabled={busy || planning.has(c.id)} onClick={() => setConfirmAction({ campaign: c, kind: "plan" })}>{c.built_at ? "Regenerate plan" : "Run planner"}</button></div></div>
               <dl className="grid gap-4 rounded-lg border border-border bg-card p-4 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">Objective</dt><dd>{c.objective ?? "—"}</dd></div><div><dt className="text-muted-foreground">Audience</dt><dd>{c.audience ?? "—"}</dd></div><div><dt className="text-muted-foreground">Offer</dt><dd>{c.offer_summary ?? "—"}</dd></div><div><dt className="text-muted-foreground">Core message</dt><dd>{c.core_message ?? "—"}</dd></div><div><dt className="text-muted-foreground">Channels</dt><dd>{c.channels?.join(", ") || "—"}</dd></div><div><dt className="text-muted-foreground">Budget</dt><dd>{c.budget == null ? "—" : c.budget.toLocaleString()}</dd></div><div><dt className="text-muted-foreground">Dates</dt><dd>{c.starts_on ?? "—"} to {c.ends_on ?? "—"}</dd></div><div><dt className="text-muted-foreground">KPI</dt><dd>{c.kpi_metric ?? "—"}{c.kpi_target != null ? ` · target ${c.kpi_target}` : ""}</dd></div><div><dt className="text-muted-foreground">Content pieces</dt><dd>{c.content_count}</dd></div><div><dt className="text-muted-foreground">Required builds</dt><dd>{[c.needs_landing_page && "Landing page", c.needs_sales_agent && "Sales agent"].filter(Boolean).join(", ") || "None"}</dd></div></dl>
+              {/* The plan review gate (migration 309). Not a lock on this
+                  screen: provision_campaign refuses an unreviewed plan and
+                  refuses one that changed after approval, so correcting a plan
+                  withdraws its approval and the state below says so. */}
+              {c.built_at && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {c.plan_approved_at === null
+                        ? "This plan has not been reviewed"
+                        : "Plan approved"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {c.plan_approved_at === null
+                        ? "The planner wrote it. Nothing is built from a plan until a person has read it."
+                        : `Approved ${new Date(c.plan_approved_at).toLocaleString()}${c.plan_review_note ? ` · ${c.plan_review_note}` : ""}`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={buttonClass}
+                    disabled={busy}
+                    onClick={() => void approvePlan(c)}
+                  >
+                    {c.plan_approved_at === null ? "Approve this plan" : "Approve again"}
+                  </button>
+                </div>
+              )}
+              {/* The sweep (migration 310). One workflow run per approved plan:
+                  idea, brief and creative per planned piece, each carrying its
+                  route, driven by the reconciler that already runs the daily
+                  package. It does not create the landing page or the sales
+                  agent -- provision_campaign owns those, which is why Build
+                  remains its own action. */}
+              {c.built_at && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
+                  <div>
+                    <p className="text-sm font-medium">Sweep into work</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {c.plan_approved_at === null
+                        ? "Approve the plan first. A sweep is the moment a plan becomes work, so it refuses an unreviewed one."
+                        : sweeping.has(c.id)
+                          ? "A sweep of this campaign is queued. One at a time, so two sweeps cannot compose the same steps twice."
+                          : `Composes a chain per planned piece (${c.content_count} ${c.content_count === 1 ? "piece" : "pieces"}): idea, brief, then creative. Nothing distributes without its own approval.`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={buttonClass}
+                    disabled={busy || c.plan_approved_at === null || sweeping.has(c.id)}
+                    onClick={() => void sweep(c)}
+                  >
+                    {sweeping.has(c.id) ? "Sweeping…" : "Sweep into work"}
+                  </button>
+                </div>
+              )}
             </section>}
             {v2Tab === "launch" && (launchDue.get(c.id)
               ? <section className="py-4" aria-label="Launch"><CampaignLaunchGate due={launchDue.get(c.id)!} /></section>

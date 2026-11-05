@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "d51abf63116b0b05af3f58dbe042889d8a081724eb0f26f804edc51bc3bf8718",
-  "generatedTypesSha256": "239076392094ca12da05c3638355a6d42180635a9bebf6fde5ddc73594f51fcb",
-  "generatedSchemaBodySha256": "029495eab66938034130c00a8b1e2222f8c4bd2c5851c6adfe2ccfd2870134a2",
+  "migrationSourceDigest": "ca1d20dbc8ad33ca20e0af6763e44f003b00b3ae5b640b99b3ff79c90007a2fb",
+  "generatedTypesSha256": "7f2fb6b142075361dda06c788018b0ce965f35fa6e94c7492b820897c0cd27f7",
+  "generatedSchemaBodySha256": "bc0631dee3ca468857f249890334002e706f94b48fd34d10c563ad0276f24af2",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2271,6 +2271,27 @@
       "filename": "20261104020000_307_the_offer_compiler.sql",
       "sha256": "9f6be92826e26ee4b4eb375fb7f6a291a1f2aca09a9a70f6562c60f8d59981ec",
       "trimmedMd5": "10f291e251a0bacc20618741fa38b141"
+    },
+    {
+      "version": "20261105000000",
+      "name": "308_a_both_campaign_plans_each_route_s_volume",
+      "filename": "20261105000000_308_a_both_campaign_plans_each_route_s_volume.sql",
+      "sha256": "30ec658fcf47011f3d4f666661dad6de5269ffb1130ecf8f7762b9411f0def29",
+      "trimmedMd5": "d79ddd70bfd93c8666f0861ffd830f4d"
+    },
+    {
+      "version": "20261105010000",
+      "name": "309_a_plan_is_reviewed_before_the_agents_run",
+      "filename": "20261105010000_309_a_plan_is_reviewed_before_the_agents_run.sql",
+      "sha256": "63e4119680ef18f75531926bcb6b9b5bb96f62f62ab7640202174c26dc1dbcf4",
+      "trimmedMd5": "5a799cd5f3f0cb418a91441b736b42b7"
+    },
+    {
+      "version": "20261105020000",
+      "name": "310_the_campaign_sweep_is_a_workflow_kind",
+      "filename": "20261105020000_310_the_campaign_sweep_is_a_workflow_kind.sql",
+      "sha256": "ad311f1c632a6e0194d58f60769c97940d6fd5d19c464599c7d8757c06394f3a",
+      "trimmedMd5": "d4be481ae8715c188d885997ef0c2a31"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

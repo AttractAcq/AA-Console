@@ -301,19 +301,194 @@ be absent, and absent is the honest answer from an agent.
 
 ## Phase 2 — the campaign spine
 
+**Complete.** Migrations 308, 309 and 310.
+
 3. **Campaign planner agent** — decides landing page or not, sales agent or not,
    organic volume and type, paid volume and type, pillars and positioning per
-   route.
+   route. **Largely already existed**, which is the thing to know before
+   budgeting for it: `campaign_plan` already decides the landing page, the
+   sales agent, the content pillars as an enum of this campaign's own pillars,
+   the KPI, the content count and the ideas.
+
+   What it could not do was divide that count between routes, because
+   `content_count` is one number. For a single-route campaign that is the
+   answer; for the `both` route 302 added, "twelve pieces" could mean twelve
+   organic and no ads, and readiness could not tell. **Migration 308 and
+   `routeVolumes` close that**, and the split is derived rather than asked for
+   on single-route campaigns so the model cannot get wrong a question it was
+   not asked.
+
+   **A design bug a test caught, worth recording.** 308's constraint first
+   required the split to equal `content_count`. The planner saves its plan —
+   which sets `content_count` — and *then* records the split, because a total
+   has to exist before it can be divided. An equality constraint rejects the
+   first of those two statements, and Postgres cannot defer a CHECK. So the
+   constraint now forbids only what is never acceptable at any instant
+   (negative counts, pieces on a route the campaign does not run, a split
+   larger than the plan) and the function enforces exactness in one statement.
+   The first version of 308 could not have saved a plan at all.
 4. **Plan review gate** — correctable in the Inbox or in the campaign before the
-   agent runs.
+   agent runs. **Done** (item 7 in Alex's numbering), as migration 309.
+
+   **"Before the agent runs" is `provision_campaign`.** It refused only when
+   there was no plan at all, and then wrote a landing page row, wrote a sales
+   agent row, and enqueued both jobs. And the plan it ran from was approved by
+   nobody: `save_campaign_plan_only` and `save_campaign_plan_with_ideas` set
+   `built_at` themselves, so the planner marked its own work approved — the
+   prompt even calls such a row an "EXISTING APPROVED CAMPAIGN PLAN".
+
+   **An approval has to name the plan it approved.** A flag would not be a
+   gate: the notes ask for a plan that is *correctable*, and a bare
+   `plan_approved_at` would let the corrected plan provision on a decision made
+   about different text. So the approval records a fingerprint of the planned
+   fields, and `provision_campaign` refuses when the current fingerprint
+   differs. Correcting a plan therefore un-approves it, which is exactly the
+   behaviour the notes describe.
+
+   That is the idiom the rest of the system already uses — an offer approval
+   names the hash of the bytes, the approval spine carries an `artifact_hash` —
+   applied to a plan.
+
+   The fingerprint covers only the planned fields. A campaign that launches or
+   gets an external id has not been replanned, and re-approving for that would
+   train people to click past the gate.
+
+   `approve_campaign_plan_v6` has **no service_role branch**: the whole point
+   is that a machine does not approve its own plan.
 5. **The single multi-step sweep** — one run driving every asset to
    ready-to-distribute by calling the factories, each process individually.
 
+   **The engine already exists and is live.** This is the fourth item in a row
+   where the mechanism was built and the wiring was not, and it is the most
+   consequential: the plan treated this as "the heart of it", and building a
+   second orchestrator beside a working one would have been the worst mistake
+   available in this phase.
+
+   | | |
+   |---|---|
+   | `create_workflow_run(...)` | creates a run, and **already takes a `campaign_id`** |
+   | `add_workflow_agent_step(...)` | a step with `dependencies text[]`, an `agent_key`, and `input_from_step_key` to chain one step's output into the next |
+   | `reconcile_workflow_runs(p_limit)` | the driver, **running every 15 seconds** in the runtime (`src/v5/reconcile.ts`) |
+   | `enqueue_workflow_step_job(...)` | queues a step's agent job — `agent_jobs` stays the only execution queue |
+   | `accept_workflow_step(...)` | records a step's artifact and its QA evidence |
+   | `seal_workflow_run`, `workflow_run_outcomes` | completion and reporting |
+
+   That is the sweep the notes describe, component for component: one run,
+   each process individually, each calling a factory by `agent_key`, driven on
+   a loop. It carries real data — 10 runs, 140 steps.
+
+   **So item 8 is a composer, not an engine**: a function that, given an
+   approved campaign plan, creates a run and adds the steps the plan implies —
+   the landing page, the sales agent, the content pieces per route — with the
+   dependencies between them. Plus the retirement question for the `v5/`
+   label, since the engine is not v5-specific in anything but its directory.
+
+   It must refuse an unapproved plan, which is why 2.7 landed first: the gate
+   exists for the sweep to respect, rather than the sweep being built and then
+   gated.
+
+   **What is concrete.** `workflow_runs_kind_check` permits only
+   `daily_content_package` and `client_launch_package`, so the composer's
+   migration has to extend it with a `campaign_sweep` kind. All 10 live runs
+   are `daily_content_package` at `v5.daily.1`.
+
+   **The design question, now settled.** The sweep's relationship to
+   `provision_campaign`. That function already creates the landing page and the
+   sales agent and enqueues their agents, so a sweep that adds the same two
+   steps duplicates it — and this phase had already removed three duplications
+   of exactly that shape. The two options were for the sweep to **subsume** it,
+   or to cover **only** what it does not.
+
+   **Decided: the sweep covers the content chain; `provision_campaign` keeps
+   the build artifacts.** Subsuming reads better against "one run driving every
+   asset", but it would mean replacing a path that is tested, has a button, and
+   was just gated by 309, with a step graph that does the same two inserts —
+   for a phrase. The content pieces are the genuinely multi-step part, and they
+   are what had no orchestration at all. The boundary is stated in the
+   migration and in the panel, so the next reader does not have to rediscover
+   which act owns what.
+
+   **What the chain reuses.** Not a new shape: the daily content package's,
+   exactly — `ideation` on the client, then `brief` from that idea, then
+   `creative_build` from that brief, per piece. Those agents already understand
+   that shape and the reconciler already drives it. The ideas depend on each
+   other rather than running in parallel, which is also what the daily package
+   does (`static_a_idea` depends on `story_idea`); that is deliberate there and
+   worth keeping, because each idea is written knowing what the earlier ones
+   said, so a campaign gets genuinely distinct pieces instead of several
+   models' first instinct.
+
+   **Why the composer is an agent rather than an RPC.** Both engine functions
+   require `auth.role() = 'service_role'`. A definer function does not change
+   `auth.role()` — it reads the caller's JWT claim — so a browser cannot
+   compose a run however the function is declared. That is a deliberate
+   property of the engine, not something to work around. So
+   `request_campaign_sweep_v6` is a narrow writer that checks the gate and
+   queues the `campaign_sweep` agent, and the runtime composes the run as
+   service_role. Same shape as `request_opportunity_discovery_v6`. The composer
+   calls no model and spends nothing.
+
+   **The gate is checked twice, on purpose.** `request_campaign_sweep_v6`
+   checks it when the sweep is *asked for*; the runtime composes the run later,
+   and 309's whole point is that a plan stays correctable, so the approval may
+   have been withdrawn in between. `campaign_sweep_blocker_v6` re-checks
+   immediately before the first write and returns the reason rather than a
+   constraint error.
+
+   **Both places that list the kind.** `workflow_runs_kind_check` lists the
+   permitted kinds and `create_workflow_run` repeats that list in its own body.
+   Changing only the constraint would leave the function refusing every sweep
+   with "Unknown workflow kind" — a half-change that looks applied and is not.
+   310 reproduces the function with one list extended and nothing else touched,
+   and the test asserts both paths separately.
+
+   **Still owed from the planner: per-piece type.** The notes ask it for
+   "organic volume and type, paid volume and type". 308 gave volume per route;
+   nothing in a plan says whether a given piece is a reel, a carousel or a
+   single image. So every piece composes as a single image, which is the
+   conservative shape, and the mix stays a planner decision. A composer
+   choosing the creative mix would be a product decision made in the wrong
+   place.
+
 ## Phase 3 — the factories the sweep calls
+
+**Items 6, 7 and 8 complete.** In all three, most of what the plan budgeted for already existed. Item 9's two named defects are both now enforced in code — the image one at the brief, the video one at the clip — and what remains of it is creative judgement on real generations plus one decision about the automated retry route. See item 9.
 
 6. **Website Studio** — five tabs collapse to a Sites table plus build buttons
    for landing pages and offer pages; agent builders; autonomous under the
-   campaign worker; publish to GitHub after approval.
+   campaign worker; publish to GitHub after approval. **Mostly done** (item 9
+   in Alex's numbering). Four tabs now, Sites leading, with build buttons on
+   it.
+
+   **The agent builders already existed**, which is worth knowing before
+   anybody budgets for them: `PageBuilderPanel` creates the `client_pages` row
+   and enqueues the `landing_page` agent, and has since v1.
+
+   So the build buttons **link** to the builders rather than repeating them. A
+   button here that created a page and queued the agent would be a second
+   write path for one act — the same duplication this module lost a whole tab
+   for, when **Results** turned out to be Attribution OS's reporting panel
+   reached by a different route. One write path, and Sites is the way in.
+
+   **Publish survived on purpose.** It is not the publish button on a site
+   row: it is the board of what happened to each campaign page decision, and
+   it carries a state nothing else does — *published, and nobody has tested
+   the form yet* — which has the same commit, the same URL and the same
+   screenshot as working. That belongs in the Sites detail eventually, not in
+   a row action.
+
+   **"Autonomous under the campaign worker" was already there — and 2.7 is
+   what it was missing.** This was held back to settle with the sweep, on the
+   grounds that the sweep would be the caller. It is not: `provision_campaign`
+   is. It inserts the `client_pages` row, records the artifact, and
+   `enqueue_agent_job_internal('landing_page', ...)` — a page built from a
+   campaign with nobody opening a builder, and the same for `sales_agent`. That
+   has been the behaviour, not a gap.
+
+   What it genuinely lacked was a plan worth building from: it ran off one the
+   planner had marked approved itself. Migration 309 is therefore the whole of
+   what this item was owed, and the sweep deliberately does **not** duplicate
+   those two steps. Nothing further to build here.
 7. **Lead Magnet Studio** — one page, table plus a build button. Download only,
    no distribution. Opt-ins dropped. **Done.** Four tabs became one page on
    `IndexDetail`. Build was the table twice, so its button became the page's
@@ -332,9 +507,113 @@ be absent, and absent is the honest answer from an agent.
    blocker. See `docs/V6_1_ARCHIVED_SURFACES.md` §Phase 3.7.
 8. **Sales OS** — Agents becomes the main table page. **Pipeline CRM moves to
    Attribution OS.** The agent distributes to its associated page without a
-   developer. Capture portal left alone for now.
+   developer. Capture portal left alone for now. **Done — and the last part was
+   already built.**
+
+   Agents is the main page (`sales-os` is two tabs, `agents` first). Pipeline
+   and its access-requests panel moved to Attribution OS in 3.11; the two moved
+   together because the second is the gate on who may see the first, and
+   splitting them would leave a list of names with its permission control on
+   another page. Capture is deliberately untouched, as the notes ask.
+
+   **"Distributes to its associated page without a developer" is built, and
+   built in the only place it could safely go.** A generated page may not
+   contain a `<script>` — `htmlSafetyProblem` refuses one on every path that
+   writes `client_pages.html`, and after publishing that rule is the only thing
+   between model output and a visitor's browser. So the widget cannot live in
+   the stored HTML, and relaxing the rule to put it there would trade the
+   published-page threat model for a convenience.
+
+   It is injected at **publish** instead: `htmlToPublish` appends AA's own
+   hosted snippet when the page has a sales-agent deployment, so the stored
+   bytes stay script-free and the only script on a published page is one AA
+   controls. The widget is served from the runtime rather than copied into each
+   client repository, so a fix to it does not require a commit to every site AA
+   has ever published.
+
+   `publicIdToEmbed` prefers the *enabled* deployment — the agent a visitor
+   will actually reach — and otherwise the newest attachment, so
+   attach-then-republish still embeds while Enable stays a separate switch. The
+   runtime refuses a disabled deployment on every request, so the embed is not
+   the authority on whether the agent answers.
+
+   The console half is there too: an attach select writes `page_id`, and
+   approval is a signature rather than a status — `approveFields` deliberately
+   does not touch `status`, and the confirm body makes a person read the
+   greeting, the qualification questions, the objections and the guardrails
+   first. `liveStateOf` keeps "Live — not approved" and "Live — approved" as
+   different badges, because an agent nobody has read is not ready for a site.
 9. **Content Production tuning** — the two named defects: video generation, and
    the text inside image content. Repetition, not architecture.
+
+   **The image defect is enforced in code.** `concept.ts` diagnosed it — *"the
+   safest output was the wrong deliverable"*, a model reaching for a typography
+   card whenever it was unsure — and `conceptProblem` now *refuses* a concept
+   with no background or a typography-only treatment. That is a validator, not
+   prompt wording, which is the distinction that matters: a prompt is a request
+   and a validator is a guarantee. Nothing further is owed here.
+
+   **The video defect had a real, unguarded gap, and its measurable half is now
+   closed.** I had written this item off as needing only creative judgement.
+   That was wrong, and worth recording as a process note: nothing looked at a
+   generated clip at all. `persistCompletedClip` checked that the provider
+   answered, that the body was not empty and that the content type said video,
+   and then stored the bytes as a finished shot. A clip that was **black end to
+   end**, or **a still the model never animated**, was indexed exactly like a
+   good one. Nobody found out until a person watched the assembled reel, by
+   which point every shot had been paid for.
+
+   `video_build` now screens a clip before storing it, and refuses only what is
+   broken on any reading: no decodable video stream, a duration too short to be
+   a shot, black end to end, or frozen end to end.
+
+   **Why not reuse `video_edit`'s probe.** It exists for a finished reel and
+   holds it to an export contract — 1080x1920, three to ninety seconds, and
+   *any* black or frozen interval is a defect. Applying that to a generated shot
+   would be wrong rather than merely strict: a shot is five seconds, its
+   dimensions come from the provider, and one that opens dark or holds a beat is
+   a legitimate choice. A screen that rejected good work would be worse than
+   none, because people would learn to route around it. So the *parsing* is
+   shared — one implementation in `src/media/ffmpegLog.ts`, since a second copy
+   would drift the moment ffmpeg changed its log format — and the *judgement* is
+   separate.
+
+   **Why a refusal is not retryable.** The provider has already rendered and
+   charged for the request. Re-running the job would poll the same request and
+   download the same broken bytes. Regenerating is a separate deliberate act
+   with its own budget: `provider_retry_count` is capped at 1 and
+   `retry_failed_higgsfield_motion_step` is how it is spent, after an operator
+   has independently checked each request. So the screen does what every other
+   provider problem in this agent does — stops, records exactly what was
+   measured, and leaves `clip_path` null, which is the state that recovery path
+   looks for.
+
+   **A threshold justified by measurement rather than feel.** "Black end to
+   end" cannot mean 100%: `blackdetect` reports whole runs and the final frames
+   fall outside one, so a wholly black five-second clip measures **0.9917**. A
+   cutoff of 1.0 would have caught none of them. There is a test that asserts
+   this against a real generated clip, so the number stays honest if ffmpeg's
+   reporting changes. The same test pins the other real-world shape: an
+   entirely frozen clip emits `freeze_start` with **no** `freeze_end`, and if
+   the parser did not close it with the duration it would measure as no freeze
+   at all and sail through.
+
+   **What still needs Alex.** Two things, and only these:
+
+   1. *The creative half.* Whether a shot is any **good** — pacing, whether the
+      motion serves the brief, whether the image's text reads — needs eyes on
+      real generations, run until the defect stops recurring. The notes call
+      this "repetition, not architecture", and that is exactly what it is.
+      There is no code change to make on evidence.
+   2. *One decision.* A probe-refused frame lands in the same shape as a
+      provider-failed one — `clip_path` null, job paused, evidence recorded —
+      but with a different blocker message, so
+      `retry_failed_higgsfield_motion_step`'s deliberately strict eligibility
+      check will not match it. An operator can still act on the paused step;
+      what they cannot do is use that one automated batch retry. Extending its
+      eligibility means a migration touching a security-definer recovery
+      function whose checks are strict on purpose, so it is **not** something to
+      widen quietly.
 
 ## Phase 4 — the gate and distribution
 
