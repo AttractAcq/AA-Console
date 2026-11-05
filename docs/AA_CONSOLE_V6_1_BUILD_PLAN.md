@@ -825,7 +825,52 @@ stay contained and visible.
     campaign data for that channel.
 16. **Archive** — add market opportunities, the intelligence and strategy
     models, and lead magnets. Rejected assets land here with their rejection
-    note, so the what-worked trend becomes visible.
+    note, so the what-worked trend becomes visible. **Done**, as migration 312.
+
+    Migration 121 built this pattern and left the door open in its own
+    navigation comment — *"The other three domains get their own tabs here as
+    they are brought over."* This brings the rest over in the same shape, so
+    the archive page still reads every domain with one component rather than
+    seven near-identical tables.
+
+    | domain | table | needed `archived_at` | real rows |
+    |---|---|---|---|
+    | Opportunities | `market_opportunities` | yes | 8 |
+    | Models | `client_agent_records` | yes | 359 |
+    | Lead Magnets | `lead_magnets` | already had it | 0 |
+    | Rejected Creative | `client_media_assets` | already had it | 1 rejected |
+
+    **"The intelligence and strategy models" is one table.** `client_agent_records`
+    holds all ten record domains — icp, competitor, association, market, proof,
+    campaign_intel, brand_strategy, offer_strategy, money_model, reporting —
+    behind one `RecordWorkspace` component. So archiving them is one column and
+    one view, not nine.
+
+    **Rejected creative is deliberately not archived by hand.** The notes ask
+    for the what-worked *trend*, and a trend built only from rejections somebody
+    also remembered to archive is a record of who tidied up. So
+    `rejected_assets_archive` filters on `review_status = 'rejected'`, and its
+    `archived_at` is the moment of rejection taken from the review itself — which
+    means the existing panel orders and dates it with no special case.
+
+    It follows that such a row has nothing to restore: un-rejecting is a review
+    decision, made with `review_media_asset` where the seat rules and the video
+    sign-off chain live, not a restore button on a filing page. The panel gained
+    `restorable: false` so it renders no action rather than one that would do
+    nothing.
+
+    **The note was already being written and nothing could read it back.**
+    `review_media_asset` has always taken `p_reason` and stored it in
+    `client_asset_reviews`. The view joins the latest *rejecting* review, so an
+    asset reworked and refused again shows why it was refused this time.
+
+    **The trap this had to avoid.** `archived_at` on a table whose working list
+    does not filter it means archiving changes nothing visible.
+    `activeLists.test.tsx` exists for exactly that — its comment reads *"a panel
+    that forgets it looks identical until the list is 300 rows long again"* — and
+    `client_agent_records` holds 359 rows across every domain, so a missed
+    filter there would hit all ten workspaces at once. Both new filters have a
+    guard case.
 
 ## Deliberately deferred
 

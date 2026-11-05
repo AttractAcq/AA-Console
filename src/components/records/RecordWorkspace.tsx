@@ -106,6 +106,10 @@ export function RecordWorkspace({ domain }: { domain: RecordDomain }) {
       .select("id, item_key, item_type, title, body, period, display_order, status, edited_at")
       .eq("client_id", clientId)
       .eq("domain", domain)
+      // Archived models live in the Archive (migration 312). This table holds
+      // every domain's records, so without the filter a superseded model keeps
+      // appearing in the working view it was superseded out of.
+      .is("archived_at", null)
       .order("display_order");
     if (error) throw error;
     setRecords((data ?? []) as Record_[]);

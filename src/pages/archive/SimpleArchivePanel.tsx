@@ -8,17 +8,28 @@ import { supabase } from "../../lib/supabase";
 import { shortDate } from "../../lib/media";
 
 /**
- * Pages, campaigns and sales agents in the archive.
+ * The archive's simple domains: pages, campaigns, sales agents, market
+ * opportunities, the intelligence and strategy models, lead magnets, and
+ * rejected creative.
  *
- * One component for three domains because they are the same shape: a thing
- * with a name that somebody decided was finished. Content production earns
- * its own panel — it has a reference that spans six stages and needs them
- * all — but three near-identical tables would be three places to fix the
- * same bug.
+ * One component for all of them because they are the same shape: a thing with
+ * a name that is no longer live work. Content production earns its own panel —
+ * it has a reference that spans six stages and needs them all — but seven
+ * near-identical tables would be seven places to fix the same bug.
  *
- * Each row can be restored. Nothing was copied or deleted to get here, so
- * restoring is just clearing the stamp, which is what makes archiving safe
- * to do without being sure.
+ * Most rows can be restored. Nothing was copied or deleted to get here, so
+ * restoring is just clearing the stamp, which is what makes archiving safe to
+ * do without being sure.
+ *
+ * REJECTED CREATIVE IS THE EXCEPTION, AND IT IS DELIBERATE.
+ *
+ * It is listed by its rejection, not by an archive stamp, because the notes ask
+ * for the what-worked trend — and a trend built only from rejections somebody
+ * also remembered to archive is a record of who tidied up. So it has nothing to
+ * restore: un-rejecting is a review decision, made where the seat rules and the
+ * video sign-off chain live, not a restore button on a filing page. Such a
+ * domain says `restorable: false` and gets no action rather than one that would
+ * not work.
  */
 type Row = {
   id: string;
@@ -31,14 +42,31 @@ type Row = {
 
 export type ArchiveDomain = {
   /** The view to read. */
-  view: "pages_archive" | "campaigns_archive" | "sales_agents_archive";
-  /** The table to write back to when restoring. */
-  table: "client_pages" | "client_campaigns" | "client_sales_agents";
+  view:
+    | "pages_archive"
+    | "campaigns_archive"
+    | "sales_agents_archive"
+    | "opportunities_archive"
+    | "agent_models_archive"
+    | "lead_magnets_archive"
+    | "rejected_assets_archive";
+  /** The table to write back to when restoring. Omitted when nothing restores. */
+  table?:
+    | "client_pages"
+    | "client_campaigns"
+    | "client_sales_agents"
+    | "market_opportunities"
+    | "client_agent_records"
+    | "lead_magnets";
   noun: string;
   kindLabel: string;
   /** The one number worth showing per domain, and what to call it. */
   metric: { field: string; label: string };
   empty: string;
+  /** False where the listing is not an archive stamp and clearing one would do nothing. */
+  restorable?: boolean;
+  /** An extra column worth a domain its own, e.g. why creative was rejected. */
+  extra?: { field: string; label: string };
 };
 
 export const ARCHIVE_DOMAINS: Record<string, ArchiveDomain> = {
@@ -65,6 +93,46 @@ export const ARCHIVE_DOMAINS: Record<string, ArchiveDomain> = {
     kindLabel: "Role",
     metric: { field: "conversations", label: "Conversations" },
     empty: "No archived sales agents. Archive one from Sales Agents when it is retired.",
+  },
+  opportunities: {
+    view: "opportunities_archive",
+    table: "market_opportunities",
+    noun: "opportunity",
+    kindLabel: "Micro-market",
+    // The score it was last given: what it was judged to be worth, rather
+    // than merely that it was shelved.
+    metric: { field: "score", label: "Score" },
+    empty: "No archived opportunities. Archive one from Market Opportunities once it has been decided against or won.",
+  },
+  models: {
+    view: "agent_models_archive",
+    table: "client_agent_records",
+    noun: "model",
+    kindLabel: "Domain",
+    // A gestured-at model and a worked-through one are different things to
+    // find later, and nothing else in the row says which.
+    metric: { field: "words", label: "Words" },
+    empty: "No archived models. Archive an ICP, market, competitor, strategy or money-model record when it is superseded.",
+  },
+  "lead-magnets": {
+    view: "lead_magnets_archive",
+    table: "lead_magnets",
+    noun: "lead magnet",
+    kindLabel: "Format",
+    metric: { field: "versions", label: "Versions" },
+    empty: "No archived lead magnets. Archive one from Lead Magnet Studio when it is finished with.",
+  },
+  rejected: {
+    view: "rejected_assets_archive",
+    noun: "rejected asset",
+    kindLabel: "Media",
+    // How many looks it took. An asset refused on the third review is a
+    // different story from one refused flat.
+    metric: { field: "reviews", label: "Reviews" },
+    extra: { field: "rejection_note", label: "Why" },
+    // Listed by its rejection, not by an archive stamp: see the note above.
+    restorable: false,
+    empty: "No rejected creative. Anything turned down in review appears here with the reason.",
   },
 };
 
@@ -141,7 +209,15 @@ export function SimpleArchivePanel({ domain }: { domain: ArchiveDomain }) {
       </div>
 
       <DataTable
-        columns={["Title", domain.kindLabel, "Status", domain.metric.label, "Archived", ""]}
+        columns={[
+          "Title",
+          domain.kindLabel,
+          "Status",
+          domain.metric.label,
+          ...(domain.extra ? [domain.extra.label] : []),
+          "Archived",
+          "",
+        ]}
         emptyLabel={loading ? "Loading…" : "Nothing matches that search"}
         rows={shown.map((row) => [
           <span key="t" className="text-card-foreground">
@@ -156,18 +232,32 @@ export function SimpleArchivePanel({ domain }: { domain: ArchiveDomain }) {
           <span key="m" className="text-xs text-muted-foreground">
             {String(row[domain.metric.field] ?? 0)}
           </span>,
+          ...(domain.extra
+            ? [
+                <span key="e" className="text-xs text-muted-foreground">
+                  {String(row[domain.extra.field] ?? "—")}
+                </span>,
+              ]
+            : []),
           <span key="a" className="text-xs text-muted-foreground">
             {shortDate(row.archived_at)}
           </span>,
-          <ArchiveAction
-            key="x"
-            table={domain.table}
-            id={row.id}
-            archived
-            noun={domain.noun}
-            onDone={() => void load()}
-            onError={setError}
-          />,
+          // No action where nothing restores: clearing an archive stamp would
+          // not un-reject anything, and a button that does nothing is worse
+          // than no button.
+          domain.restorable === false || !domain.table ? (
+            <span key="x" />
+          ) : (
+            <ArchiveAction
+              key="x"
+              table={domain.table}
+              id={row.id}
+              archived
+              noun={domain.noun}
+              onDone={() => void load()}
+              onError={setError}
+            />
+          ),
         ])}
       />
     </div>

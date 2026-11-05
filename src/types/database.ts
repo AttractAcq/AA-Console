@@ -2985,6 +2985,7 @@ export type Database = {
       }
       client_agent_records: {
         Row: {
+          archived_at: string | null
           body: string | null
           client_id: string
           created_at: string
@@ -3002,6 +3003,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           body?: string | null
           client_id: string
           created_at?: string
@@ -3019,6 +3021,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           body?: string | null
           client_id?: string
           created_at?: string
@@ -12361,6 +12364,7 @@ export type Database = {
       }
       market_opportunities: {
         Row: {
+          archived_at: string | null
           buying_situation: string
           client_id: string
           confidence: Database["public"]["Enums"]["opportunity_confidence"]
@@ -12383,6 +12387,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           buying_situation: string
           client_id: string
           confidence?: Database["public"]["Enums"]["opportunity_confidence"]
@@ -12405,6 +12410,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           buying_situation?: string
           client_id?: string
           confidence?: Database["public"]["Enums"]["opportunity_confidence"]
@@ -20244,6 +20250,48 @@ export type Database = {
       }
     }
     Views: {
+      agent_models_archive: {
+        Row: {
+          archived_at: string | null
+          client_id: string | null
+          created_at: string | null
+          edited_at: string | null
+          id: string | null
+          item_key: string | null
+          kind: string | null
+          period: string | null
+          status: string | null
+          title: string | null
+          words: number | null
+        }
+        Insert: {
+          archived_at?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          edited_at?: string | null
+          id?: string | null
+          item_key?: string | null
+          kind?: string | null
+          period?: string | null
+          status?: never
+          title?: never
+          words?: never
+        }
+        Update: {
+          archived_at?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          edited_at?: string | null
+          id?: string | null
+          item_key?: string | null
+          kind?: string | null
+          period?: string | null
+          status?: never
+          title?: never
+          words?: never
+        }
+        Relationships: []
+      }
       agent_runtime_status: {
         Row: {
           active_jobs: number | null
@@ -22702,6 +22750,48 @@ export type Database = {
           },
         ]
       }
+      lead_magnets_archive: {
+        Row: {
+          archived_at: string | null
+          audience: string | null
+          campaign_id: string | null
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          kind: string | null
+          objective: string | null
+          status: string | null
+          title: string | null
+          versions: number | null
+        }
+        Insert: {
+          archived_at?: string | null
+          audience?: string | null
+          campaign_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          kind?: never
+          objective?: string | null
+          status?: never
+          title?: string | null
+          versions?: never
+        }
+        Update: {
+          archived_at?: string | null
+          audience?: string | null
+          campaign_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          kind?: never
+          objective?: string | null
+          status?: never
+          title?: string | null
+          versions?: never
+        }
+        Relationships: []
+      }
       lead_pipeline_counts: {
         Row: {
           client_id: string | null
@@ -23441,6 +23531,51 @@ export type Database = {
           },
         ]
       }
+      opportunities_archive: {
+        Row: {
+          archived_at: string | null
+          client_id: string | null
+          confidence: string | null
+          core_problem: string | null
+          created_at: string | null
+          desired_outcome: string | null
+          id: string | null
+          kind: string | null
+          score: number | null
+          status: string | null
+          status_note: string | null
+          title: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          client_id?: string | null
+          confidence?: string | null
+          core_problem?: string | null
+          created_at?: string | null
+          desired_outcome?: string | null
+          id?: string | null
+          kind?: never
+          score?: never
+          status?: string | null
+          status_note?: string | null
+          title?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          client_id?: string | null
+          confidence?: string | null
+          core_problem?: string | null
+          created_at?: string | null
+          desired_outcome?: string | null
+          id?: string | null
+          kind?: never
+          score?: never
+          status?: string | null
+          status_note?: string | null
+          title?: string | null
+        }
+        Relationships: []
+      }
       opportunity_readiness: {
         Row: {
           awareness_stages: number | null
@@ -24066,6 +24201,51 @@ export type Database = {
             referencedColumns: ["client_id"]
           },
         ]
+      }
+      rejected_assets_archive: {
+        Row: {
+          archived_at: string | null
+          brief_id: string | null
+          client_id: string | null
+          content_format: string | null
+          created_at: string | null
+          id: string | null
+          kind: string | null
+          purpose: string | null
+          rejection_note: string | null
+          reviews: number | null
+          status: string | null
+          title: string | null
+        }
+        Insert: {
+          archived_at?: never
+          brief_id?: string | null
+          client_id?: string | null
+          content_format?: string | null
+          created_at?: string | null
+          id?: string | null
+          kind?: string | null
+          purpose?: string | null
+          rejection_note?: never
+          reviews?: never
+          status?: string | null
+          title?: never
+        }
+        Update: {
+          archived_at?: never
+          brief_id?: string | null
+          client_id?: string | null
+          content_format?: string | null
+          created_at?: string | null
+          id?: string | null
+          kind?: string | null
+          purpose?: string | null
+          rejection_note?: never
+          reviews?: never
+          status?: string | null
+          title?: never
+        }
+        Relationships: []
       }
       sales_agents_archive: {
         Row: {

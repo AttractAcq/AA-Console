@@ -284,8 +284,8 @@ const legacyClientNavGroups: NavNode[] = [
       },
       {
         // Last in Delivery, because it is where work goes when it is no
-        // longer work. The other three domains get their own tabs here as
-        // they are brought over.
+        // longer work. Migration 312 brought the remaining domains over, which
+        // is what the note here used to anticipate.
         id: "archive",
         label: "Archive",
         path: "archive",
@@ -295,6 +295,12 @@ const legacyClientNavGroups: NavNode[] = [
           { id: "pages", label: "Pages" },
           { id: "campaigns", label: "Campaigns" },
           { id: "sales-agents", label: "Sales Agents" },
+          { id: "opportunities", label: "Opportunities" },
+          { id: "models", label: "Models" },
+          { id: "lead-magnets", label: "Lead Magnets" },
+          // Last, and not an archive stamp: anything turned down in review
+          // lands here with its reason, so the what-worked trend is visible.
+          { id: "rejected", label: "Rejected Creative" },
         ],
       },
     ],

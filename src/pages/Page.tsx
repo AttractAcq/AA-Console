@@ -238,6 +238,10 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     pages: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.pages!} />,
     campaigns: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.campaigns!} />,
     "sales-agents": () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS["sales-agents"]!} />,
+    opportunities: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.opportunities!} />,
+    models: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.models!} />,
+    "lead-magnets": () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS["lead-magnets"]!} />,
+    rejected: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.rejected!} />,
   },
 };
 
