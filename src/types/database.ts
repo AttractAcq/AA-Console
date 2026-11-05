@@ -4205,6 +4205,10 @@ export type Database = {
           organic_content_count: number
           paid_content_count: number
           paid_platform: string | null
+          plan_approved_at: string | null
+          plan_approved_by: string | null
+          plan_approved_fingerprint: string | null
+          plan_review_note: string | null
           runs_organic: boolean
           runs_paid: boolean
           starts_on: string | null
@@ -4256,6 +4260,10 @@ export type Database = {
           organic_content_count?: number
           paid_content_count?: number
           paid_platform?: string | null
+          plan_approved_at?: string | null
+          plan_approved_by?: string | null
+          plan_approved_fingerprint?: string | null
+          plan_review_note?: string | null
           runs_organic?: boolean
           runs_paid?: boolean
           starts_on?: string | null
@@ -4307,6 +4315,10 @@ export type Database = {
           organic_content_count?: number
           paid_content_count?: number
           paid_platform?: string | null
+          plan_approved_at?: string | null
+          plan_approved_by?: string | null
+          plan_approved_fingerprint?: string | null
+          plan_review_note?: string | null
           runs_organic?: boolean
           runs_paid?: boolean
           starts_on?: string | null
@@ -4483,6 +4495,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "service_offer_versions"
             referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "client_campaigns_plan_approved_by_fkey"
+            columns: ["plan_approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -24922,6 +24941,10 @@ export type Database = {
       }
       approve_recruitment_brief: {
         Args: { p_brief_id: string }
+        Returns: undefined
+      }
+      approve_campaign_plan_v6: {
+        Args: { p_campaign_id: string; p_note?: string }
         Returns: undefined
       }
       approve_recruitment_brief_from_inbox_v6: {

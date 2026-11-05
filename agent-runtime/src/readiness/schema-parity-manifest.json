@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "3ce57b8998ebadaac26fb0783b1178f797d02c5df61ef4399c6cc87cbf406557",
-  "generatedTypesSha256": "6dba62f4b57174ac22c0470ebd5c4c0c188e7e86fef8a4afa5faa5909fff3006",
-  "generatedSchemaBodySha256": "b4edeefabd0bf2e3ab04bcefd04c3dd5db0ffe9b0ae143ba401c5a533bdad8aa",
+  "migrationSourceDigest": "dc0c8c39aef1d711d27f2967b8570570106e38518ec922cf15397487b318db58",
+  "generatedTypesSha256": "e85b7a2a2035ae3fb8f5d34c19188bc6cb5479d854d99d0cfa174532b37dc8ce",
+  "generatedSchemaBodySha256": "542d8adae2ea9755b956fa2e38f4fca97786693d49b540d2a365bd56fd30c97b",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2278,6 +2278,13 @@
       "filename": "20261105000000_308_a_both_campaign_plans_each_route_s_volume.sql",
       "sha256": "30ec658fcf47011f3d4f666661dad6de5269ffb1130ecf8f7762b9411f0def29",
       "trimmedMd5": "d79ddd70bfd93c8666f0861ffd830f4d"
+    },
+    {
+      "version": "20261105010000",
+      "name": "309_a_plan_is_reviewed_before_the_agents_run",
+      "filename": "20261105010000_309_a_plan_is_reviewed_before_the_agents_run.sql",
+      "sha256": "63e4119680ef18f75531926bcb6b9b5bb96f62f62ab7640202174c26dc1dbcf4",
+      "trimmedMd5": "5a799cd5f3f0cb418a91441b736b42b7"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -58,6 +58,9 @@ const planned = (over: Record<string, unknown> = {}) => ({
   kpi_metric: "consultations booked",
   kpi_target: 40,
   content_count: 2,
+  plan_approved_at: null,
+  plan_approved_fingerprint: null,
+  plan_review_note: null,
   needs_landing_page: true,
   needs_sales_agent: true,
   built_at: "2026-09-09T10:00:00Z",
@@ -949,4 +952,68 @@ describe("acting on a campaign from the list", () => {
       p_name: "Winter full-arch push · New route",
     }));
   });
+});
+
+describe("the plan review gate", () => {
+  it("says a planned campaign has not been reviewed", async () => {
+    // save_campaign_plan_* sets built_at itself, so before migration 309 the
+    // planner marked its own work approved and nothing stood between a
+    // model's plan and the pages and agents it causes.
+    show([planned()]);
+    expect(await screen.findByText("This plan has not been reviewed")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Nothing is built from a plan until a person has read it/),
+    ).toBeInTheDocument();
+  });
+
+  it("approves the plan by id, and records an optional note", async () => {
+    const prompt = vi.spyOn(window, "prompt").mockReturnValue("Budget matches what we agreed.");
+    rpc.mockResolvedValue({ data: null, error: null });
+    show([planned()]);
+    await userEvent.click(await screen.findByRole("button", { name: "Approve this plan" }));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("approve_campaign_plan_v6", {
+        p_campaign_id: "camp-1",
+        p_note: "Budget matches what we agreed.",
+      }),
+    );
+    prompt.mockRestore();
+  });
+
+  it("sends no note when none is given", async () => {
+    const prompt = vi.spyOn(window, "prompt").mockReturnValue("   ");
+    rpc.mockResolvedValue({ data: null, error: null });
+    show([planned()]);
+    await userEvent.click(await screen.findByRole("button", { name: "Approve this plan" }));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith("approve_campaign_plan_v6", { p_campaign_id: "camp-1" }),
+    );
+    prompt.mockRestore();
+  });
+
+  it("shows an approved plan as approved, with its note", async () => {
+    show([planned({
+      plan_approved_at: "2026-11-05T09:00:00Z",
+      plan_approved_fingerprint: "abc",
+      plan_review_note: "Budget matches what we agreed.",
+    })]);
+    expect(await screen.findByText("Plan approved")).toBeInTheDocument();
+    expect(screen.getByText(/Budget matches what we agreed\./)).toBeInTheDocument();
+    // Re-approvable, because correcting a plan withdraws its approval and the
+    // corrected plan has to be read again.
+    expect(screen.getByRole("button", { name: "Approve again" })).toBeInTheDocument();
+  });
+
+  // Not tested here: that a refusal renders. The approval uses the panel's
+  // existing setProblem path, shared with provision and launch, and proving a
+  // mechanism I did not write was costing more than it was worth. What the
+  // refusals SAY is covered where they are raised -- the PGlite test asserts
+  // "has not been reviewed" and "changed after it was approved" against real
+  // Postgres.
+  it("offers nothing to review on a campaign with no plan", async () => {
+    show([planned({ built_at: null, objective: null })]);
+    await screen.findByText("Winter full-arch push");
+    expect(screen.queryByText("This plan has not been reviewed")).not.toBeInTheDocument();
+  });
+
 });

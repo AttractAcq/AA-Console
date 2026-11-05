@@ -326,7 +326,33 @@ be absent, and absent is the honest answer from an agent.
    larger than the plan) and the function enforces exactness in one statement.
    The first version of 308 could not have saved a plan at all.
 4. **Plan review gate** — correctable in the Inbox or in the campaign before the
-   agent runs.
+   agent runs. **Done** (item 7 in Alex's numbering), as migration 309.
+
+   **"Before the agent runs" is `provision_campaign`.** It refused only when
+   there was no plan at all, and then wrote a landing page row, wrote a sales
+   agent row, and enqueued both jobs. And the plan it ran from was approved by
+   nobody: `save_campaign_plan_only` and `save_campaign_plan_with_ideas` set
+   `built_at` themselves, so the planner marked its own work approved — the
+   prompt even calls such a row an "EXISTING APPROVED CAMPAIGN PLAN".
+
+   **An approval has to name the plan it approved.** A flag would not be a
+   gate: the notes ask for a plan that is *correctable*, and a bare
+   `plan_approved_at` would let the corrected plan provision on a decision made
+   about different text. So the approval records a fingerprint of the planned
+   fields, and `provision_campaign` refuses when the current fingerprint
+   differs. Correcting a plan therefore un-approves it, which is exactly the
+   behaviour the notes describe.
+
+   That is the idiom the rest of the system already uses — an offer approval
+   names the hash of the bytes, the approval spine carries an `artifact_hash` —
+   applied to a plan.
+
+   The fingerprint covers only the planned fields. A campaign that launches or
+   gets an external id has not been replanned, and re-approving for that would
+   train people to click past the gate.
+
+   `approve_campaign_plan_v6` has **no service_role branch**: the whole point
+   is that a machine does not approve its own plan.
 5. **The single multi-step sweep** — one run driving every asset to
    ready-to-distribute by calling the factories, each process individually.
 
