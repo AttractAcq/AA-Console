@@ -313,7 +313,32 @@ be absent, and absent is the honest answer from an agent.
 
 6. **Website Studio** — five tabs collapse to a Sites table plus build buttons
    for landing pages and offer pages; agent builders; autonomous under the
-   campaign worker; publish to GitHub after approval.
+   campaign worker; publish to GitHub after approval. **Mostly done** (item 9
+   in Alex's numbering). Four tabs now, Sites leading, with build buttons on
+   it.
+
+   **The agent builders already existed**, which is worth knowing before
+   anybody budgets for them: `PageBuilderPanel` creates the `client_pages` row
+   and enqueues the `landing_page` agent, and has since v1.
+
+   So the build buttons **link** to the builders rather than repeating them. A
+   button here that created a page and queued the agent would be a second
+   write path for one act — the same duplication this module lost a whole tab
+   for, when **Results** turned out to be Attribution OS's reporting panel
+   reached by a different route. One write path, and Sites is the way in.
+
+   **Publish survived on purpose.** It is not the publish button on a site
+   row: it is the board of what happened to each campaign page decision, and
+   it carries a state nothing else does — *published, and nobody has tested
+   the form yet* — which has the same commit, the same URL and the same
+   screenshot as working. That belongs in the Sites detail eventually, not in
+   a row action.
+
+   **Still owed:** autonomous operation when called by the campaign worker.
+   Deliberately left with the sweep rather than guessed at here, because the
+   sweep is the thing that would call these builders. Building it from this
+   end first would mean designing a caller that does not exist yet and
+   rewriting the interface when it does.
 7. **Lead Magnet Studio** — one page, table plus a build button. Download only,
    no distribution. Opt-ins dropped. **Done.** Four tabs became one page on
    `IndexDetail`. Build was the table twice, so its button became the page's

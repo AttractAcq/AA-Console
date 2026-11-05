@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Panel } from "../../components/Panel";
@@ -47,6 +47,9 @@ const STATE_TONE: Record<string, string> = {
 
 export function SitesPanel() {
   const { clientId } = useParams<{ clientId: string }>();
+  // The tab bar reads this, so the build buttons move the module to its
+  // builder rather than opening a second one here.
+  const [, setSearchParams] = useSearchParams();
   const [repos, setRepos] = useState<SiteRepo[]>([]);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [pages, setPages] = useState<PageRow[]>([]);
@@ -146,9 +149,30 @@ export function SitesPanel() {
             Where AA publishes this client's pages, and which agents are live on them.
           </p>
         </div>
-        <Button icon={Plus} onClick={() => setCreateOpen(true)} disabled={blocker !== null}>
-          Create Website Repo
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {/* The build buttons phase 3 item 9 asks for. They LINK to the
+              builders rather than repeating them: PageBuilderPanel already
+              creates the client_pages row and enqueues the landing_page
+              agent, and a second button doing the same thing would be a
+              second write path for one act -- the duplication this module
+              just lost a tab for. So Sites becomes the way in, and the
+              builder stays the only thing that builds. */}
+          <Button
+            onClick={() => setSearchParams({ tab: "landing-pages" })}
+            className="bg-muted text-foreground hover:bg-muted"
+          >
+            Build a landing page
+          </Button>
+          <Button
+            onClick={() => setSearchParams({ tab: "offer-pages" })}
+            className="bg-muted text-foreground hover:bg-muted"
+          >
+            Build an offer page
+          </Button>
+          <Button icon={Plus} onClick={() => setCreateOpen(true)} disabled={blocker !== null}>
+            Create Website Repo
+          </Button>
+        </div>
       </div>
 
       {/* A disabled button with no stated reason is the most annoying thing a
