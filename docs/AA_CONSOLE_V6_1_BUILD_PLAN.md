@@ -356,6 +356,63 @@ be absent, and absent is the honest answer from an agent.
 5. **The single multi-step sweep** — one run driving every asset to
    ready-to-distribute by calling the factories, each process individually.
 
+   **The engine already exists and is live.** This is the fourth item in a row
+   where the mechanism was built and the wiring was not, and it is the most
+   consequential: the plan treated this as "the heart of it", and building a
+   second orchestrator beside a working one would have been the worst mistake
+   available in this phase.
+
+   | | |
+   |---|---|
+   | `create_workflow_run(...)` | creates a run, and **already takes a `campaign_id`** |
+   | `add_workflow_agent_step(...)` | a step with `dependencies text[]`, an `agent_key`, and `input_from_step_key` to chain one step's output into the next |
+   | `reconcile_workflow_runs(p_limit)` | the driver, **running every 15 seconds** in the runtime (`src/v5/reconcile.ts`) |
+   | `enqueue_workflow_step_job(...)` | queues a step's agent job — `agent_jobs` stays the only execution queue |
+   | `accept_workflow_step(...)` | records a step's artifact and its QA evidence |
+   | `seal_workflow_run`, `workflow_run_outcomes` | completion and reporting |
+
+   That is the sweep the notes describe, component for component: one run,
+   each process individually, each calling a factory by `agent_key`, driven on
+   a loop. It carries real data — 10 runs, 140 steps.
+
+   **So item 8 is a composer, not an engine**: a function that, given an
+   approved campaign plan, creates a run and adds the steps the plan implies —
+   the landing page, the sales agent, the content pieces per route — with the
+   dependencies between them. Plus the retirement question for the `v5/`
+   label, since the engine is not v5-specific in anything but its directory.
+
+   It must refuse an unapproved plan, which is why 2.7 landed first: the gate
+   exists for the sweep to respect, rather than the sweep being built and then
+   gated.
+
+   **What is concrete.** `workflow_runs_kind_check` permits only
+   `daily_content_package` and `client_launch_package`, so the composer's
+   migration has to extend it with a `campaign_sweep` kind. All 10 live runs
+   are `daily_content_package` at `v5.daily.1`.
+
+   **The open design question, which should not be guessed at.** The sweep's
+   relationship to `provision_campaign`. That function already creates the
+   landing page and the sales agent and enqueues their agents, so a sweep that
+   adds the same two steps duplicates it — and this phase has already removed
+   three duplications of exactly that shape. Either:
+
+   - the sweep **subsumes** it, covering the build artifacts and the content
+     pieces as one step graph, and `provision_campaign` becomes the sweep's
+     first steps rather than a separate act; or
+   - the sweep covers **only** what `provision_campaign` does not — the
+     content pieces per route, using 308's split — and the two run side by
+     side with a clear boundary.
+
+   The first is cleaner and matches "one run driving every asset". The second
+   is smaller and does not touch a working path. It also depends on what the
+   content chain actually is: the daily-package pipeline already chains brief,
+   copy, creative and QA steps, and the sweep should reuse that chain rather
+   than restate it.
+
+   Settling that needs a read of the daily-package step graph, and it is the
+   kind of decision worth making deliberately rather than at the end of a long
+   session. Recorded here so the next pass starts from it.
+
 ## Phase 3 — the factories the sweep calls
 
 6. **Website Studio** — five tabs collapse to a Sites table plus build buttons
