@@ -464,7 +464,11 @@ export const v6ModuleNodes: NavNode[] = [
     ] },
   { id: "meta-ads-studio", label: "Meta Ads Studio", path: "meta-ads-studio", icon: Megaphone,
     capability: "expanding", tabs: [
-      { id: "build", label: "Build" }, { id: "campaigns", label: "Campaign Builds" },
+      // Read-only, which is the whole of item 14: "deliberately less than
+      // today: the build and management moved to a human paid-ads operator."
+      // Build and Campaign Builds are archived -- see
+      // docs/V6_1_ARCHIVED_SURFACES.md. An unknown ?tab= falls back to the
+      // first tab here, so a bookmarked link still lands somewhere useful.
       { id: "paid", label: "Paid Distribution" }, { id: "reporting", label: "Paid Reporting" },
     ] },
   { id: "google-profile", label: "Google Profile", path: "google-profile", icon: Globe,

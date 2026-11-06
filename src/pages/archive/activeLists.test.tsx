@@ -114,7 +114,7 @@ describe("the active lists exclude archived work", () => {
 
   it("Market Opportunities asks only for opportunities that are not archived", async () => {
     // Migration 312 made these archivable.
-    show(<MarketOpportunitiesPanel />);
+    show(<MarketOpportunitiesPanel view="discover" />);
     await waitFor(() => {
       const opps = calls.find((c) => c.table === "market_opportunities");
       expect(opps?.filters).toContain("is:archived_at=null");

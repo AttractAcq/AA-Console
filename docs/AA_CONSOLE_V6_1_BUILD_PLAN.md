@@ -734,6 +734,45 @@ be absent, and absent is the honest answer from an agent.
 13. **Organic Content Distribution** — Destinations (Facebook, Instagram) plus a
     Distribution Log. The Engine tab retires into the Dashboard switch panel.
 
+### Phase 4's verdict: out of scope for v6.1, on Alex's decision
+
+**Zero of 34 approval classes has a verified executor.**
+`approval_class_coverage_versions_v6` tracks source, decision and executor per
+class. Five sources and six decisions are verified. Executors: **none**. Every
+class reads `missing` or `blocked`, each with its own stated reason.
+
+Items 11, 12 and 13 *are* executors — they write to Facebook, Instagram, Google
+and ten proof destinations. So they are not blocked on effort or on a missing
+UI; they are blocked on an attestation layer that exists for nothing yet, which
+is the containment migrations 293 and 295 installed deliberately.
+
+Corroborating, rather than inferred: the ten proof destinations already exist as
+rows, and `proof_placements`, `proof_placement_events` and
+`organic_publication_packages_v6` all hold **zero**. The spine has never fired.
+
+Asked directly on 6 November, Alex's decision was to **treat items 11–13 as out
+of scope for v6.1** rather than half-build into the security containment. What
+each would need, so this is costed rather than vague:
+
+| item | class(es) | what is actually missing |
+| --- | --- | --- |
+| 11, organic worker | `engine_slot` | Rights provenance, a source-owned AAL2 exact outgoing decision, and provider prewrite attestation. Its Inbox card carries an unconditional `preview_blocker` so it can never present as decidable. |
+| 11, paid bundle | `campaign_action`, `campaign_budget_profile` | Executor rechecks beyond Google Ads JSON and page HTML previews; the generic action scope does not attest the source budget or field payload. |
+| 11, page publish | `page_deploy` | Source and decision are verified; the deploy executor has not attested the same version. The closest of all of them. |
+| 11, lead magnet | `lead_magnet` | File bytes and delivery words need source-owned exact evidence. |
+| 12, proof distribution | `proof_placement`, `proof_rights`, `proof_artifact`, `proof_delivery` | Placement, rights and destination are not bridged at all; no source-owned rights request or decision RPC exists. |
+| 13, organic distribution | `engine_slot` again | As item 11's organic worker. |
+
+**Item 10 is partly tractable and partly not**, and was also left per that
+decision. The unified panel decides four of nine routes. The real gap is that
+`client_media_assets` — 110 rows, the only approval queue that has ever actually
+been used — has no route at all. But `ordinary_media`'s blocker reads *"No
+durable request epoch or trusted media-byte snapshot"*, and **0 of 110 assets
+carry a content hash** while all 110 have a `storage_path`: a byte snapshot
+means hashing stored objects. Separately, retiring the `engine-inbox` tab needs
+`engine_slot`'s decision in the spine, so the four-into-one unification cannot
+complete even with the media route built.
+
 ### 10a. The approval routes, mapped
 
 The notes called the approval routes "specifically unknown", and the plan made
@@ -820,9 +859,44 @@ stay contained and visible.
 
 14. **Google Ads Studio** and **Meta Ads Studio** — downgraded to read-only API
     views with per-campaign data on click. Deliberately less than today: the
-    build and management moved to a human paid-ads operator.
+    build and management moved to a human paid-ads operator. **Done**, and
+    smaller than it reads.
+
+    **Google Ads Studio needed no change**: all three tabs already perform zero
+    writes. Removing informational read-only views would have cut capability for
+    no reason.
+
+    **Meta Ads Studio lost two tabs.** *Build* was `MetaBuildApprovalPanel` —
+    the board that authorises creating real campaign, ad set, creative and ad
+    objects on a live Meta account. That is an executor, and executors are out
+    of v6.1's scope (see the Phase 4 note below). *Campaign Builds* rendered
+    `CampaignExecutionPanel`, the same component Campaign Factory renders: a
+    second route into one panel, which is the duplication this phase has now
+    removed four times.
+
+    Checked before removing either: `CampaignActionApprovalsPanel` reads
+    `campaign_action_approvals` generically and decides any `action_key`, so a
+    `meta_ad_build` approval is still decided in the Approval Inbox; and the
+    build sheet still lives in Campaign Factory's Meta activation section, which
+    already links there. See `docs/V6_1_ARCHIVED_SURFACES.md` §Phase 5.14.
 15. **Google Profile** and **Meta Profile** — what has gone out, plus live paid
-    campaign data for that channel.
+    campaign data for that channel. **Already built, with honest empty states.**
+
+    `metrics_daily` is empty against **37** attempted `metrics_pulls`, so there
+    is no connected ad account and no paid data to show. Alex's call was to ship
+    honest empty states rather than wait — and they were already there:
+
+    - `MetaProfilePanel`: *"Connect Instagram or Facebook on the Integrations page"*
+    - `PaidReportingPanel`: *"No paid metrics ingested for this period. Connect a Meta integration in Account → Integrations and turn on the daily sync."*
+    - `GoogleAdsStudioPanel`: *"No paid Google campaign yet — create one in Campaign Factory"*
+    - `PaidPanel` (via `DistributionBoard`): the paid Schedule button is already
+      disabled and the route blocker shown in full
+
+    `GoogleProfilePanel`'s three write paths were deliberately left: they are
+    the review-reply flow, and `google_review_reply` is the one approval class
+    with both source and decision verified. Removing a working, approval-gated
+    surface in the name of "read-only" would have been the wrong reading of
+    item 14, which is about paid build and management.
 16. **Archive** — add market opportunities, the intelligence and strategy
     models, and lead magnets. Rejected assets land here with their rejection
     note, so the what-worked trend becomes visible. **Done**, as migration 312.
