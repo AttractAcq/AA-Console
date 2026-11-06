@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "migrationSourceDigest": "ef434cda81020ca925384ae841a93d8a28263fa80332e8cfff48cf6ad0b157a4",
-  "generatedTypesSha256": "f2075ffdce00cc38ce33c185d8288f9fe0f2a85025c89feb6a43994271a65c13",
-  "generatedSchemaBodySha256": "2f850ada5ec19937d174ec6bab17ecd18d842d0c5a67712fa938db55e4b838bd",
+  "generatedTypesSha256": "214762c31ac844f52278f193339183364170d392d51be66a62930b1989b83a54",
+  "generatedSchemaBodySha256": "cad21151b74806f130333c122bfcfdda17d64b2dddfc7ed9bd0677f8ba9b8d68",
   "localMigrations": [
     {
       "version": "20260903104450",
