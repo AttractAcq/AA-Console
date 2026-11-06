@@ -187,6 +187,11 @@ export const deployCampaignPage: ActionHandler = async (sb, config, action) => {
     pageId,
   );
 
+  // Two hashes, because they are two different facts. renderedSha is the
+  // approved source, which the recorder now checks against the snapshot rather
+  // than believing. publishedSha256 is what actually went into the commit, and
+  // differs whenever the sales agent widget was injected at publish time --
+  // the one script a published page may carry.
   const renderedSha = createHash("sha256").update(page.html, "utf8").digest("hex");
   const { data: publicationId, error: recordError } = await sb.rpc(
     "record_campaign_page_published_v6",
@@ -195,6 +200,7 @@ export const deployCampaignPage: ActionHandler = async (sb, config, action) => {
       p_published_url: published.url,
       p_commit_sha: published.commit,
       p_rendered_sha256: renderedSha,
+      p_published_sha256: published.publishedSha256,
     } as never,
   );
   if (recordError) {

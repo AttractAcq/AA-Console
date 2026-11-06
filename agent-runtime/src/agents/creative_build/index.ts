@@ -58,6 +58,41 @@ import {
 } from "./frameRemake.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
+import { compositionNote, frameVerdict, measureComposition } from "./screen.js";
+
+/**
+ * Record what a freshly rendered image actually is: a picture, or a text card
+ * with imagery around it.
+ *
+ * Recorded, never enforced. `conceptProblem` already refuses a concept that
+ * ASKS for typography; this measures what came back, because an audit of
+ * production found renders that satisfy every concept rule truthfully and
+ * still deliver a card. Whether a card is right is a brand decision, so this
+ * puts a number in the job's events and leaves it there.
+ *
+ * Measurement failure is swallowed on purpose: an image that cannot be
+ * measured is not a bad image, and losing a paid render to a decoding quirk
+ * would be a worse bug than the one this watches for.
+ */
+async function noteComposition(
+  sb: SupabaseClient,
+  jobId: string,
+  bytes: Buffer,
+  label: string,
+): Promise<void> {
+  try {
+    const measured = await measureComposition(bytes);
+    await appendEvent(sb, jobId, `${label}: ${compositionNote(measured)}`,
+      frameVerdict(measured) === "card_led" ? "warn" : "info",
+      {
+        creative_stage: "render",
+        flat_light_fraction: Number(measured.flatLightFraction.toFixed(4)),
+        composition: frameVerdict(measured),
+      });
+  } catch {
+    // Deliberately silent: see above.
+  }
+}
 import { placeLogo } from "./logo.js";
 import { brandConceptBlock, brandRenderBlock, loadBrandProfile, type BrandProfile } from "./brand.js";
 import { openingStillsRoute, withOpeningShotFields } from "./openingStills.js";
@@ -887,6 +922,7 @@ Call ${submitTool.name} once when you are done.`;
         quality: renderQuality,
         reference: null,
       });
+      await noteComposition(sb, job.id, out.bytes, `frame ${replacement.position}`);
       newPath = pathFor(replacement.position, out.extension);
       const { error: upErr } = await sb.storage
         .from(BUCKET)
@@ -1035,6 +1071,7 @@ Call ${submitTool.name} once when you are done.`;
             reference: visualReference,
             model: openingShots ? config.reelImageModel : undefined,
           });
+          await noteComposition(sb, job.id, out.bytes, `frame ${frame.position}`);
           if (openingShots) {
             const vertical = await toReelFrame(out.bytes);
             if (frame.position === 1) {
@@ -1154,6 +1191,7 @@ Call ${submitTool.name} once when you are done.`;
       quality: renderQuality,
       reference,
     });
+    await noteComposition(sb, job.id, image.bytes, "render");
   } catch (error) {
     if (error instanceof RenderError) {
       // The concept survives a render failure on purpose: it is the
