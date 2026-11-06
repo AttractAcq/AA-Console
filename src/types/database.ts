@@ -20613,34 +20613,6 @@ export type Database = {
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
           },
-          {
-            foreignKeyName: "client_agent_records_edited_by_fkey"
-            columns: ["edited_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_agent_records_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "agent_jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_agent_records_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "held_jobs"
-            referencedColumns: ["job_id"]
-          },
-          {
-            foreignKeyName: "client_agent_records_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "metrics_pulls"
-            referencedColumns: ["job_id"]
-          },
         ]
       }
       agent_runtime_status: {
@@ -23261,27 +23233,6 @@ export type Database = {
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
           },
-          {
-            foreignKeyName: "lead_magnets_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_magnets_offer_version_id_client_id_fkey"
-            columns: ["offer_version_id", "client_id"]
-            isOneToOne: false
-            referencedRelation: "offer_claim_evidence"
-            referencedColumns: ["offer_version_id", "client_id"]
-          },
-          {
-            foreignKeyName: "lead_magnets_offer_version_id_client_id_fkey"
-            columns: ["offer_version_id", "client_id"]
-            isOneToOne: false
-            referencedRelation: "service_offer_versions"
-            referencedColumns: ["id", "client_id"]
-          },
         ]
       }
       lead_pipeline_counts: {
@@ -23923,6 +23874,80 @@ export type Database = {
         }
         Relationships: []
       }
+      opportunities_archive: {
+        Row: {
+          archived_at: string | null
+          client_id: string | null
+          confidence: string | null
+          core_problem: string | null
+          created_at: string | null
+          desired_outcome: string | null
+          id: string | null
+          kind: string | null
+          score: number | null
+          status: string | null
+          status_note: string | null
+          title: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          client_id?: string | null
+          confidence?: never
+          core_problem?: string | null
+          created_at?: string | null
+          desired_outcome?: string | null
+          id?: string | null
+          kind?: never
+          score?: never
+          status?: never
+          status_note?: string | null
+          title?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          client_id?: string | null
+          confidence?: never
+          core_problem?: string | null
+          created_at?: string | null
+          desired_outcome?: string | null
+          id?: string | null
+          kind?: never
+          score?: never
+          status?: never
+          status_note?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       opportunity_campaign_plan: {
         Row: {
           asset_direction: string | null
@@ -24027,108 +24052,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "customer_lifecycle_templates"
             referencedColumns: ["code"]
-          },
-        ]
-      }
-      opportunities_archive: {
-        Row: {
-          archived_at: string | null
-          client_id: string | null
-          confidence: string | null
-          core_problem: string | null
-          created_at: string | null
-          desired_outcome: string | null
-          id: string | null
-          kind: string | null
-          score: number | null
-          status: string | null
-          status_note: string | null
-          title: string | null
-        }
-        Insert: {
-          archived_at?: string | null
-          client_id?: string | null
-          confidence?: string | null
-          core_problem?: string | null
-          created_at?: string | null
-          desired_outcome?: string | null
-          id?: string | null
-          kind?: never
-          score?: never
-          status?: string | null
-          status_note?: string | null
-          title?: string | null
-        }
-        Update: {
-          archived_at?: string | null
-          client_id?: string | null
-          confidence?: string | null
-          core_problem?: string | null
-          created_at?: string | null
-          desired_outcome?: string | null
-          id?: string | null
-          kind?: never
-          score?: never
-          status?: string | null
-          status_note?: string | null
-          title?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "market_opportunities_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "booking_readiness"
-            referencedColumns: ["client_id"]
-          },
-          {
-            foreignKeyName: "market_opportunities_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "client_creative_authority"
-            referencedColumns: ["client_id"]
-          },
-          {
-            foreignKeyName: "market_opportunities_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "market_opportunities_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "engine_readiness"
-            referencedColumns: ["client_id"]
-          },
-          {
-            foreignKeyName: "market_opportunities_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "market_opportunities_proposed_by_job_id_fkey"
-            columns: ["proposed_by_job_id"]
-            isOneToOne: false
-            referencedRelation: "agent_jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "market_opportunities_proposed_by_job_id_fkey"
-            columns: ["proposed_by_job_id"]
-            isOneToOne: false
-            referencedRelation: "held_jobs"
-            referencedColumns: ["job_id"]
-          },
-          {
-            foreignKeyName: "market_opportunities_proposed_by_job_id_fkey"
-            columns: ["proposed_by_job_id"]
-            isOneToOne: false
-            referencedRelation: "metrics_pulls"
-            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -24774,7 +24697,7 @@ export type Database = {
           created_at: string | null
           id: string | null
           kind: string | null
-          purpose: string | null
+          purpose: Database["public"]["Enums"]["content_purpose"] | null
           rejection_note: string | null
           reviews: number | null
           status: string | null
@@ -24784,28 +24707,28 @@ export type Database = {
           archived_at?: never
           brief_id?: string | null
           client_id?: string | null
-          content_format?: string | null
+          content_format?: never
           created_at?: string | null
           id?: string | null
-          kind?: string | null
-          purpose?: string | null
+          kind?: never
+          purpose?: Database["public"]["Enums"]["content_purpose"] | null
           rejection_note?: never
           reviews?: never
-          status?: string | null
+          status?: never
           title?: never
         }
         Update: {
           archived_at?: never
           brief_id?: string | null
           client_id?: string | null
-          content_format?: string | null
+          content_format?: never
           created_at?: string | null
           id?: string | null
-          kind?: string | null
-          purpose?: string | null
+          kind?: never
+          purpose?: Database["public"]["Enums"]["content_purpose"] | null
           rejection_note?: never
           reviews?: never
-          status?: string | null
+          status?: never
           title?: never
         }
         Relationships: [
@@ -24857,83 +24780,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
-          },
-          {
-            foreignKeyName: "client_media_assets_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "team_members"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_media_assets_source_asset_id_fkey"
-            columns: ["source_asset_id"]
-            isOneToOne: false
-            referencedRelation: "approval_inbox"
-            referencedColumns: ["asset_id"]
-          },
-          {
-            foreignKeyName: "client_media_assets_source_asset_id_fkey"
-            columns: ["source_asset_id"]
-            isOneToOne: false
-            referencedRelation: "approval_queue_slots"
-            referencedColumns: ["asset_id"]
-          },
-          {
-            foreignKeyName: "client_media_assets_source_asset_id_fkey"
-            columns: ["source_asset_id"]
-            isOneToOne: false
-            referencedRelation: "approvals_queue"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_media_assets_source_asset_id_fkey"
-            columns: ["source_asset_id"]
-            isOneToOne: false
-            referencedRelation: "client_media_assets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_media_assets_source_asset_id_fkey"
-            columns: ["source_asset_id"]
-            isOneToOne: false
-            referencedRelation: "content_attribution"
-            referencedColumns: ["asset_id"]
-          },
-          {
-            foreignKeyName: "client_media_assets_source_asset_id_fkey"
-            columns: ["source_asset_id"]
-            isOneToOne: false
-            referencedRelation: "meta_profile_presence"
-            referencedColumns: ["asset_id"]
-          },
-          {
-            foreignKeyName: "client_media_assets_source_asset_id_fkey"
-            columns: ["source_asset_id"]
-            isOneToOne: false
-            referencedRelation: "publish_due"
-            referencedColumns: ["asset_id"]
-          },
-          {
-            foreignKeyName: "client_media_assets_source_asset_id_fkey"
-            columns: ["source_asset_id"]
-            isOneToOne: false
-            referencedRelation: "rejected_assets_archive"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_media_assets_source_asset_id_fkey"
-            columns: ["source_asset_id"]
-            isOneToOne: false
-            referencedRelation: "work_submissions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_media_assets_uploaded_by_fkey"
-            columns: ["uploaded_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -30672,6 +30518,7 @@ export type Database = {
           p_status: Database["public"]["Enums"]["opportunity_status"]
         }
         Returns: {
+          archived_at: string | null
           buying_situation: string
           client_id: string
           confidence: Database["public"]["Enums"]["opportunity_confidence"]
