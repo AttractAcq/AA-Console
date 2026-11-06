@@ -452,7 +452,7 @@ be absent, and absent is the honest answer from an agent.
 
 ## Phase 3 — the factories the sweep calls
 
-**Items 6, 7 and 8 complete.** In all three, most of what the plan budgeted for already existed. Item 9's two named defects are both now enforced in code — the image one at the brief, the video one at the clip — and what remains of it is creative judgement on real generations plus one decision about the automated retry route. See item 9.
+**Items 6, 7 and 8 complete.** In all three, most of what the plan budgeted for already existed. Item 9's two named defects are both enforced in code — the image one at the brief, the video one at the clip — and the renders have now been reviewed (see item 9): the image defect had migrated into composition, so a post-render screen measures it. What remains is one product decision about a client's house style, and one about the automated retry route.
 
 6. **Website Studio** — five tabs collapse to a Sites table plus build buttons
    for landing pages and offer pages; agent builders; autonomous under the
@@ -669,14 +669,49 @@ be absent, and absent is the honest answer from an agent.
       because both have a background and a treatment. The model found the
       nearest safe thing that satisfies every rule.
 
-      **This is a judgement, not a defect, which is why it is not coded
-      against.** Sometimes a photographed worksheet is exactly right -- a lead
-      magnet genuinely is a document, and a post about scheduling may well want
-      a calendar. 48% is a keyword match, not 48% wrong. But the SHIFT is the
-      signal, and whether it is acceptable at that rate is Alex's call on real
-      output, not something to encode on a hunch. Writing a rule against paper
-      would be the third iteration of the same mistake: forbid the safe answer,
-      and the model finds the next safest one.
+      **THE RENDERS WERE THEN LOOKED AT, AND THIS WHOLE READING WAS WRONG.**
+
+      Everything above is inferred from concept TEXT. Once a credential made
+      the private media bucket reachable, the renders themselves could be
+      examined -- and they overturn it.
+
+      Thirteen renders from that client, across all four treatments: every one
+      is a dense typography card with imagery as a border, a backdrop or a prop
+      beside it. **Including the ones the keyword test called clean.** The
+      typography card never went away; it learned to bring a photograph. Each
+      satisfies `conceptProblem` truthfully -- there IS a background, the
+      treatment IS photographic -- because the defect lives in the composition,
+      which no concept-stage validator can see.
+
+      So both numbers above measured the wrong thing. 18% to zero counted
+      concepts that stopped SAYING typography. 13% to 48% counted a symptom:
+      the control group is equally text-dominated, so paper was never the
+      distinguishing feature.
+
+      **And it is not a model defect.** A second client's output -- same
+      validator, same period -- is image-led: a real scene filling the frame
+      with type over it, the way an ad works. 88 of 108 images are the one
+      client, which is why the aggregate looked systemic. Something in that
+      client's inputs steers it to cards.
+
+      **What was built instead of another prohibition.** A post-render screen
+      (`creative_build/screen.ts`) measuring the fraction of the frame that is
+      flat, light card stock. Production separates totally: image-led at 0.0%,
+      0.0%, 0.3% against card-led at 21.8% to 46.3%, two orders of magnitude
+      with no overlap. The thresholds sit in that gap and the real figures are
+      pinned by test.
+
+      It RECORDS, it does not refuse. A worksheet lead magnet genuinely is a
+      document, and discarding paid renders on a two-client calibration would
+      be the same mistake one layer down -- forbid the safe answer and the model
+      finds the next safest one, which is precisely how the cards came about.
+      Its known limitation, that a deliberately empty bright frame reads as
+      card, has its own test rather than waiting to be rediscovered as a bug.
+
+      **What is left is one product decision, not an engineering task**: whether
+      the card-led house style is what that client should be getting. Every
+      render now carries its number, so the question has evidence attached
+      rather than needing another audit.
 
       So what remains is the judgement the notes meant by "repetition, not
       architecture" -- and it now has a specific question attached rather than
