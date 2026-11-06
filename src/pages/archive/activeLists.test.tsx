@@ -26,7 +26,17 @@ vi.mock("../../lib/supabase", () => {
     chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
     return chain;
   };
-  return { supabase: { from: (table: string) => makeChain(table), rpc: vi.fn() } };
+  // RecordWorkspace subscribes to job changes; these panels are being rendered
+  // only to see which filters they send, so realtime is a stub.
+  const channel = { on: () => channel, subscribe: () => channel };
+  return {
+    supabase: {
+      from: (table: string) => makeChain(table),
+      rpc: vi.fn(),
+      channel: () => channel,
+      removeChannel: vi.fn(),
+    },
+  };
 });
 
 vi.mock("../../lib/options", async (orig) => ({
@@ -45,6 +55,8 @@ const { BriefsPanel } = await import("../ideation/BriefsPanel");
 const { PageBuilderPanel } = await import("../conversion/PageBuilderPanel");
 const { CampaignExecutionPanel } = await import("../campaigns/CampaignExecutionPanel");
 const { SalesOverviewPanel } = await import("../sales/SalesOverviewPanel");
+const { MarketOpportunitiesPanel } = await import("../opportunities/MarketOpportunitiesPanel");
+const { RecordWorkspace } = await import("../../components/records/RecordWorkspace");
 
 const show = (ui: React.ReactNode) =>
   render(
@@ -97,6 +109,27 @@ describe("the active lists exclude archived work", () => {
     await waitFor(() => {
       const agents = calls.find((c) => c.table === "client_sales_agents");
       expect(agents?.filters).toContain("is:archived_at=null");
+    });
+  });
+
+  it("Market Opportunities asks only for opportunities that are not archived", async () => {
+    // Migration 312 made these archivable.
+    show(<MarketOpportunitiesPanel view="discover" />);
+    await waitFor(() => {
+      const opps = calls.find((c) => c.table === "market_opportunities");
+      expect(opps?.filters).toContain("is:archived_at=null");
+    });
+  });
+
+  it("the model workspaces ask only for records that are not archived", async () => {
+    // One table holds every intelligence and strategy domain -- 359 records in
+    // production -- so a missing filter here is exactly the "300 rows long
+    // again" failure this file was written for, and it would hit every domain
+    // at once rather than one page.
+    show(<RecordWorkspace domain="money_model" />);
+    await waitFor(() => {
+      const records = calls.find((c) => c.table === "client_agent_records");
+      expect(records?.filters).toContain("is:archived_at=null");
     });
   });
 });

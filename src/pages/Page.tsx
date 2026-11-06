@@ -3,7 +3,6 @@ import { LeadMagnetStudioPanel } from "./lead-magnet/LeadMagnetStudioPanel";
 import { LeadCapturePanel } from "./sales/LeadCapturePanel";
 import { CampaignPagePublishPanel } from "./sites/CampaignPagePublishPanel";
 import { OfferStudioPanel } from "./offer/OfferStudioPanel";
-import { MetaBuildApprovalPanel } from "./campaigns/MetaBuildApprovalPanel";
 import { GoogleProfilePanel } from "./google-profile/GoogleProfilePanel";
 import { GoogleAdsStudioPanel } from "./google-ads/GoogleAdsStudioPanel";
 import { MetaProfilePanel } from "./distribution/MetaProfilePanel";
@@ -144,8 +143,9 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     engine: () => <EnginePanel />,
   },
   "meta-ads-studio": {
-    build: () => <MetaBuildApprovalPanel />,
-    campaigns: () => <CampaignExecutionPanel />,
+    // Two read-only views. Build and Campaign Builds are archived: the first
+    // authorised creating real Meta objects, which is an executor and out of
+    // v6.1's scope, and the second rendered Campaign Factory's own panel.
     paid: () => <PaidPanel />,
     reporting: () => <PaidReportingPanel />,
   },
@@ -238,6 +238,10 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     pages: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.pages!} />,
     campaigns: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.campaigns!} />,
     "sales-agents": () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS["sales-agents"]!} />,
+    opportunities: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.opportunities!} />,
+    models: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.models!} />,
+    "lead-magnets": () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS["lead-magnets"]!} />,
+    rejected: () => <SimpleArchivePanel domain={ARCHIVE_DOMAINS.rejected!} />,
   },
 };
 

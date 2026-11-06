@@ -26,7 +26,13 @@ export function ArchiveAction({
   onError,
 }: {
   /** The table holding the record. Each has an admin-all policy. */
-  table: "client_pages" | "client_campaigns" | "client_sales_agents";
+  table:
+    | "client_pages"
+    | "client_campaigns"
+    | "client_sales_agents"
+    | "market_opportunities"
+    | "client_agent_records"
+    | "lead_magnets";
   id: string;
   archived: boolean;
   /** What to call it in the confirmation, e.g. "campaign". */

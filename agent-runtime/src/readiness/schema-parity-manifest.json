@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "28e02767126270492726a0ffff9a0cf2d4b5713d11fd92b1724de16478cd096b",
-  "generatedTypesSha256": "7f2fb6b142075361dda06c788018b0ce965f35fa6e94c7492b820897c0cd27f7",
-  "generatedSchemaBodySha256": "bc0631dee3ca468857f249890334002e706f94b48fd34d10c563ad0276f24af2",
+  "migrationSourceDigest": "ef434cda81020ca925384ae841a93d8a28263fa80332e8cfff48cf6ad0b157a4",
+  "generatedTypesSha256": "b2f1621c7d1b6435c1c6d446d4cf96299d7384dd3557c6bdf0d2e97366b65a1d",
+  "generatedSchemaBodySha256": "b557377a609779117a6aaf73b04ef3386757e05b57c26edb5221c4e55aab3adb",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2299,6 +2299,13 @@
       "filename": "20261105030000_311_a_clip_with_no_shot_in_it_is_recoverable.sql",
       "sha256": "81417ba9bc9971ca6e3185cc1a7232c505412921c562509d8ddd25901235281a",
       "trimmedMd5": "2c0d883bbe1d02d0e8407f701048f1fa"
+    },
+    {
+      "version": "20261105040000",
+      "name": "312_the_archive_takes_the_remaining_domains",
+      "filename": "20261105040000_312_the_archive_takes_the_remaining_domains.sql",
+      "sha256": "d9aede052cde5d2494ea118e949058dc8fe364c7c2610bdb6770082215fd7d24",
+      "trimmedMd5": "7790f9753087c5d8c703f18cd8cf65e0"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -284,8 +284,8 @@ const legacyClientNavGroups: NavNode[] = [
       },
       {
         // Last in Delivery, because it is where work goes when it is no
-        // longer work. The other three domains get their own tabs here as
-        // they are brought over.
+        // longer work. Migration 312 brought the remaining domains over, which
+        // is what the note here used to anticipate.
         id: "archive",
         label: "Archive",
         path: "archive",
@@ -295,6 +295,12 @@ const legacyClientNavGroups: NavNode[] = [
           { id: "pages", label: "Pages" },
           { id: "campaigns", label: "Campaigns" },
           { id: "sales-agents", label: "Sales Agents" },
+          { id: "opportunities", label: "Opportunities" },
+          { id: "models", label: "Models" },
+          { id: "lead-magnets", label: "Lead Magnets" },
+          // Last, and not an archive stamp: anything turned down in review
+          // lands here with its reason, so the what-worked trend is visible.
+          { id: "rejected", label: "Rejected Creative" },
         ],
       },
     ],
@@ -458,7 +464,11 @@ export const v6ModuleNodes: NavNode[] = [
     ] },
   { id: "meta-ads-studio", label: "Meta Ads Studio", path: "meta-ads-studio", icon: Megaphone,
     capability: "expanding", tabs: [
-      { id: "build", label: "Build" }, { id: "campaigns", label: "Campaign Builds" },
+      // Read-only, which is the whole of item 14: "deliberately less than
+      // today: the build and management moved to a human paid-ads operator."
+      // Build and Campaign Builds are archived -- see
+      // docs/V6_1_ARCHIVED_SURFACES.md. An unknown ?tab= falls back to the
+      // first tab here, so a bookmarked link still lands somewhere useful.
       { id: "paid", label: "Paid Distribution" }, { id: "reporting", label: "Paid Reporting" },
     ] },
   { id: "google-profile", label: "Google Profile", path: "google-profile", icon: Globe,

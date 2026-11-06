@@ -7,6 +7,11 @@ repository_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repository_dir"
 command -v node >/dev/null || { echo 'Missing required program: node' >&2; exit 1; }
 node scripts/schema-migration-order.mjs
+# How much of the generated-types diff reaches the log. Large enough that a
+# migration adding a view still prints in full; the remainder is counted rather
+# than dropped in silence.
+TYPES_DIFF_LOG_LINES="${TYPES_DIFF_LOG_LINES:-4000}"
+
 for program in supabase docker psql diff; do
   command -v "$program" >/dev/null || { echo "Missing required program: $program" >&2; exit 1; }
 done
@@ -171,7 +176,19 @@ node -e 'const fs = require("node:fs"); const path = process.argv[1]; const raw 
   "$evidence_dir/database.generated.ts"
 diff -u src/types/database.ts "$evidence_dir/database.generated.ts" \
   >"$evidence_dir/database-types.diff" || {
-    head -200 "$evidence_dir/database-types.diff" >&2
+    # The whole point of this diff is that it can be applied verbatim: these
+    # types are hand-maintained, and the replay is the only thing that knows
+    # what the generator would produce. A cap of 200 lines silently truncated
+    # any diff that added a view -- every FK pointing at the view's base table
+    # gains a relationship entry, so one new view runs to hundreds of lines --
+    # and nothing in the log said it had been cut. The full diff is in the
+    # evidence artifact, but that is not reachable from every environment.
+    diff_lines="$(wc -l <"$evidence_dir/database-types.diff")"
+    head -"$TYPES_DIFF_LOG_LINES" "$evidence_dir/database-types.diff" >&2
+    if [ "$diff_lines" -gt "$TYPES_DIFF_LOG_LINES" ]; then
+      echo "... $((diff_lines - TYPES_DIFF_LOG_LINES)) more diff line(s) withheld;" \
+           "full diff in the schema-replay evidence artifact (database-types.diff)." >&2
+    fi
     echo 'Generated database types differ from src/types/database.ts.' >&2
     exit 1
   }

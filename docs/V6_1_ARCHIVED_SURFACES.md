@@ -84,6 +84,40 @@ Sales OS now opens on **Agents**, per the notes' "Agents as the main table
 page". The first tab is the one a module opens on, so the order is the claim
 about what the module is for.
 
+## Archived in v6.1, Phase 5.14 — Meta Ads Studio's write surfaces
+
+The notes downgrade both Ads Studios to "read-only API views with per-campaign
+data on click", and say why: *"Deliberately less than today: the build and
+management moved to a human paid-ads operator."*
+
+**Google Ads Studio needed no change.** All three of its tabs already perform
+zero writes, so they are read-only views of build state already. Removing
+informational views would have cut capability for no reason.
+
+**Meta Ads Studio lost two tabs.**
+
+| tab | was | why it went |
+| --- | --- | --- |
+| Build | `MetaBuildApprovalPanel` | It is the board that authorises creating real campaign, ad set, creative and ad objects on a live Meta account — an executor, and executors are out of v6.1's scope. Its own doc comment says it "adds the decision that lifts the refusal". |
+| Campaign Builds | `CampaignExecutionPanel` | The same component Campaign Factory renders. A second route into one panel is the duplication this phase has removed four times. |
+
+**Nothing was orphaned, which was checked before removing either.**
+`CampaignActionApprovalsPanel` reads `campaign_action_approvals` generically and
+decides any `action_key` through `decide_campaign_action_approval_v6`, so a
+`meta_ad_build` approval is still decided in the Approval Inbox. The build sheet
+and approved-creative preparation still live in Campaign Factory's own Meta
+activation section, which already links to that inbox tab.
+
+**The panels still compile and are still tested.** Only the routes in are gone,
+which is this document's usual bargain: an unknown `?tab=` falls back to the
+first tab, so a bookmarked `meta-ads-studio?tab=build` lands on Paid
+Distribution rather than a blank page.
+
+**What would bring Build back:** a verified executor for `campaign_action`. The
+coverage ledger has it as `missing` — "Only Google Ads JSON and page HTML
+previews are proved; other action keys and executor rechecks remain incomplete"
+— and `CampaignExecutionPanel` still hardcodes `externalActionsAvailable={false}`.
+
 ## What replaces them
 
 Neither Proof Distribution tab leaves a gap. The notes ask for that module to

@@ -92,6 +92,10 @@ export async function fetchOpportunities(clientId: string): Promise<Opportunity[
   const { data, error } = await supabase.from("market_opportunities")
     .select("*")
     .eq("client_id", clientId)
+    // Archived opportunities live in the Archive (migration 312). Without this
+    // the working list carries everything ever shelved, which is the failure
+    // the archive exists to prevent.
+    .is("archived_at", null)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as Opportunity[];

@@ -1082,6 +1082,13 @@ export type Database = {
             foreignKeyName: "brief_dispatches_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -1662,6 +1669,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "campaign_artifacts_asset_id_fkey"
@@ -2985,6 +2999,7 @@ export type Database = {
       }
       client_agent_records: {
         Row: {
+          archived_at: string | null
           body: string | null
           client_id: string
           created_at: string
@@ -3002,6 +3017,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           body?: string | null
           client_id: string
           created_at?: string
@@ -3019,6 +3035,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           body?: string | null
           client_id?: string
           created_at?: string
@@ -3373,6 +3390,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_asset_reviews_asset_id_fkey"
@@ -4005,6 +4029,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
+            columns: ["derived_from_asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
@@ -5649,6 +5680,13 @@ export type Database = {
             foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -6020,6 +6058,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_leads_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_leads_source_asset_id_fkey"
@@ -6560,6 +6605,13 @@ export type Database = {
             foreignKeyName: "client_media_assets_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -6673,6 +6725,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_frames_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_media_frames_asset_id_fkey"
@@ -7196,6 +7255,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_pages_reference_asset_id_fkey"
+            columns: ["reference_asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_pages_reference_asset_id_fkey"
@@ -8483,6 +8549,13 @@ export type Database = {
             foreignKeyName: "content_slots_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_slots_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -8758,6 +8831,13 @@ export type Database = {
             foreignKeyName: "creative_generations_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_generations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -8942,6 +9022,13 @@ export type Database = {
             foreignKeyName: "creative_renders_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_renders_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -9095,6 +9182,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "daily_package_items_asset_id_fkey"
@@ -9295,6 +9389,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
+            columns: ["reserve_asset_id"]
+            isOneToOne: true
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
@@ -11069,6 +11170,13 @@ export type Database = {
             foreignKeyName: "job_assignments_asset_client_fk"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_client_fk"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id", "client_id"]
           },
@@ -11120,6 +11228,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_assignments_asset_id_fkey"
@@ -11232,6 +11347,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_assignments_source_asset_id_fkey"
@@ -11918,6 +12040,13 @@ export type Database = {
             referencedRelation: "lead_magnets"
             referencedColumns: ["id", "client_id"]
           },
+          {
+            foreignKeyName: "lead_magnet_versions_magnet_id_client_id_fkey"
+            columns: ["magnet_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "lead_magnets_archive"
+            referencedColumns: ["id", "client_id"]
+          },
         ]
       }
       lead_magnets: {
@@ -12361,6 +12490,7 @@ export type Database = {
       }
       market_opportunities: {
         Row: {
+          archived_at: string | null
           buying_situation: string
           client_id: string
           confidence: Database["public"]["Enums"]["opportunity_confidence"]
@@ -12383,6 +12513,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           buying_situation: string
           client_id: string
           confidence?: Database["public"]["Enums"]["opportunity_confidence"]
@@ -12405,6 +12536,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           buying_situation?: string
           client_id?: string
           confidence?: Database["public"]["Enums"]["opportunity_confidence"]
@@ -13465,6 +13597,13 @@ export type Database = {
             foreignKeyName: "motion_design_attachments_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: true
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -14135,6 +14274,13 @@ export type Database = {
             foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunities_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_readiness"
             referencedColumns: ["opportunity_id"]
           },
@@ -14243,6 +14389,13 @@ export type Database = {
             foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunities_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_readiness"
             referencedColumns: ["opportunity_id"]
           },
@@ -14345,6 +14498,13 @@ export type Database = {
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
           },
           {
@@ -14497,6 +14657,13 @@ export type Database = {
             foreignKeyName: "opportunity_links_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunities_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_readiness"
             referencedColumns: ["opportunity_id"]
           },
@@ -14506,6 +14673,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunity_template_readiness"
             referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "agent_models_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "opportunity_links_record_id_fkey"
@@ -14585,6 +14759,13 @@ export type Database = {
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
           },
           {
@@ -14704,6 +14885,13 @@ export type Database = {
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
           },
           {
@@ -14846,6 +15034,13 @@ export type Database = {
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
           },
           {
@@ -15403,6 +15598,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "post_copy_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "post_copy_asset_id_fkey"
@@ -16710,6 +16912,13 @@ export type Database = {
             foreignKeyName: "proof_placements_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -17043,6 +17252,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "proof_production_requests_source_asset_id_fkey"
@@ -17427,6 +17643,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
@@ -17988,6 +18211,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
@@ -18630,6 +18860,13 @@ export type Database = {
             foreignKeyName: "video_approval_signoffs_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -18728,6 +18965,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_client_approval_requests_asset_id_fkey"
@@ -18868,6 +19112,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_render_candidates_asset_id_fkey"
@@ -19107,6 +19358,13 @@ export type Database = {
             foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
             columns: ["output_asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -19158,6 +19416,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
@@ -19278,6 +19543,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
@@ -19429,6 +19701,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
@@ -19675,6 +19954,13 @@ export type Database = {
             foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
             columns: ["output_asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -19726,6 +20012,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
@@ -19992,6 +20285,13 @@ export type Database = {
             foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -20244,6 +20544,77 @@ export type Database = {
       }
     }
     Views: {
+      agent_models_archive: {
+        Row: {
+          archived_at: string | null
+          client_id: string | null
+          created_at: string | null
+          edited_at: string | null
+          id: string | null
+          item_key: string | null
+          kind: string | null
+          period: string | null
+          status: string | null
+          title: string | null
+          words: number | null
+        }
+        Insert: {
+          archived_at?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          edited_at?: string | null
+          id?: string | null
+          item_key?: string | null
+          kind?: never
+          period?: string | null
+          status?: never
+          title?: never
+          words?: never
+        }
+        Update: {
+          archived_at?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          edited_at?: string | null
+          id?: string | null
+          item_key?: string | null
+          kind?: never
+          period?: string | null
+          status?: never
+          title?: never
+          words?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_agent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       agent_runtime_status: {
         Row: {
           active_jobs: number | null
@@ -20604,6 +20975,13 @@ export type Database = {
             foreignKeyName: "job_assignments_asset_client_fk"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_client_fk"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id", "client_id"]
           },
@@ -20655,6 +21033,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_assignments_asset_id_fkey"
@@ -20792,6 +21177,13 @@ export type Database = {
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
           },
           {
@@ -21705,6 +22097,13 @@ export type Database = {
             foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
             columns: ["derived_from_asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
+            columns: ["derived_from_asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -21815,6 +22214,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_asset_reviews_asset_id_fkey"
@@ -21960,6 +22366,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
@@ -22702,6 +23115,126 @@ export type Database = {
           },
         ]
       }
+      lead_magnets_archive: {
+        Row: {
+          archived_at: string | null
+          audience: string | null
+          campaign_id: string | null
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          kind: string | null
+          objective: string | null
+          status: string | null
+          title: string | null
+          versions: number | null
+        }
+        Insert: {
+          archived_at?: string | null
+          audience?: string | null
+          campaign_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          kind?: never
+          objective?: string | null
+          status?: never
+          title?: string | null
+          versions?: never
+        }
+        Update: {
+          archived_at?: string | null
+          audience?: string | null
+          campaign_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          kind?: never
+          objective?: string | null
+          status?: never
+          title?: string | null
+          versions?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_magnets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_magnets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       lead_pipeline_counts: {
         Row: {
           client_id: string | null
@@ -23341,6 +23874,80 @@ export type Database = {
         }
         Relationships: []
       }
+      opportunities_archive: {
+        Row: {
+          archived_at: string | null
+          client_id: string | null
+          confidence: string | null
+          core_problem: string | null
+          created_at: string | null
+          desired_outcome: string | null
+          id: string | null
+          kind: string | null
+          score: number | null
+          status: string | null
+          status_note: string | null
+          title: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          client_id?: string | null
+          confidence?: never
+          core_problem?: string | null
+          created_at?: string | null
+          desired_outcome?: string | null
+          id?: string | null
+          kind?: never
+          score?: never
+          status?: never
+          status_note?: string | null
+          title?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          client_id?: string | null
+          confidence?: never
+          core_problem?: string | null
+          created_at?: string | null
+          desired_outcome?: string | null
+          id?: string | null
+          kind?: never
+          score?: never
+          status?: never
+          status_note?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       opportunity_campaign_plan: {
         Row: {
           asset_direction: string | null
@@ -23402,6 +24009,13 @@ export type Database = {
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
           },
           {
@@ -23837,6 +24451,13 @@ export type Database = {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
           },
@@ -24060,6 +24681,101 @@ export type Database = {
           },
           {
             foreignKeyName: "scheduled_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      rejected_assets_archive: {
+        Row: {
+          archived_at: string | null
+          brief_id: string | null
+          client_id: string | null
+          content_format: string | null
+          created_at: string | null
+          id: string | null
+          kind: string | null
+          purpose: Database["public"]["Enums"]["content_purpose"] | null
+          rejection_note: string | null
+          reviews: number | null
+          status: string | null
+          title: string | null
+        }
+        Insert: {
+          archived_at?: never
+          brief_id?: string | null
+          client_id?: string | null
+          content_format?: never
+          created_at?: string | null
+          id?: string | null
+          kind?: never
+          purpose?: Database["public"]["Enums"]["content_purpose"] | null
+          rejection_note?: never
+          reviews?: never
+          status?: never
+          title?: never
+        }
+        Update: {
+          archived_at?: never
+          brief_id?: string | null
+          client_id?: string | null
+          content_format?: never
+          created_at?: string | null
+          id?: string | null
+          kind?: never
+          purpose?: Database["public"]["Enums"]["content_purpose"] | null
+          rejection_note?: never
+          reviews?: never
+          status?: never
+          title?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "engine_readiness"
@@ -29802,6 +30518,7 @@ export type Database = {
           p_status: Database["public"]["Enums"]["opportunity_status"]
         }
         Returns: {
+          archived_at: string | null
           buying_situation: string
           client_id: string
           confidence: Database["public"]["Enums"]["opportunity_confidence"]
