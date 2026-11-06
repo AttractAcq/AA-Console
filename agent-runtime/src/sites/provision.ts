@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 // Provisioning a site, and publishing a page onto it.
 //
 // This is the part Phase 10 exists for: AA creating the repository and putting
@@ -204,6 +205,15 @@ export interface PublishResult {
   commit: string;
   /** False when the page was already live as exactly these bytes. */
   changed: boolean;
+  /**
+   * sha256 of the bytes actually committed.
+   *
+   * Not the same as the hash of the page's stored HTML whenever the sales
+   * agent widget was injected, which is why the caller cannot compute it from
+   * what it read. A page_deploy approval attests the artefact, and this is the
+   * artefact.
+   */
+  publishedSha256: string;
 }
 
 /**
@@ -252,6 +262,7 @@ export async function publishPage(
   try {
     const token = (await mintInstallationToken(app, record.installationId, fetchImpl)).token;
     const html = await htmlToPublish(store, site, pageId, page.html);
+    const publishedSha256 = createHash("sha256").update(html, "utf8").digest("hex");
     const commit = await commitFiles(
       token, repo.owner, repo.repo, repo.defaultBranch,
       [{ path, content: html }],
@@ -266,7 +277,7 @@ export async function publishPage(
 
     const url = publicUrl(repo.pagesUrl, path);
     await store.markPublished(pageId, { commit: commit.commit, url, at: now() });
-    return { url, commit: commit.commit, changed: commit.changed };
+    return { url, commit: commit.commit, changed: commit.changed, publishedSha256 };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Publishing failed.";
     await store.markPublishFailed(pageId, message);

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "ef434cda81020ca925384ae841a93d8a28263fa80332e8cfff48cf6ad0b157a4",
-  "generatedTypesSha256": "b2f1621c7d1b6435c1c6d446d4cf96299d7384dd3557c6bdf0d2e97366b65a1d",
-  "generatedSchemaBodySha256": "b557377a609779117a6aaf73b04ef3386757e05b57c26edb5221c4e55aab3adb",
+  "migrationSourceDigest": "f5bc0a2fb5ed2124f8d9d965d8e0404af295981e6d300d89ae666ecb7f93694c",
+  "generatedTypesSha256": "bfc368675323ad55fbd70d5edcfbf02c7cc77abe08b4780f211023874cf129e5",
+  "generatedSchemaBodySha256": "d5932cc5ca89161f181ef2c6005e0b1c9d80acfa04f146e85455dae2c400a223",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2306,6 +2306,13 @@
       "filename": "20261105040000_312_the_archive_takes_the_remaining_domains.sql",
       "sha256": "d9aede052cde5d2494ea118e949058dc8fe364c7c2610bdb6770082215fd7d24",
       "trimmedMd5": "7790f9753087c5d8c703f18cd8cf65e0"
+    },
+    {
+      "version": "20261106000000",
+      "name": "313_the_deploy_executor_attests_what_went_live",
+      "filename": "20261106000000_313_the_deploy_executor_attests_what_went_live.sql",
+      "sha256": "3a87179a130fdface3ff71309ffc601141a3320bb4a1070dc6500445b2b25e0a",
+      "trimmedMd5": "10ac5aa1ad673ace70a0f65add2818b8"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

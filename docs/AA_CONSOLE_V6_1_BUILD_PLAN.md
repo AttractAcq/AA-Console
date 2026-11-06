@@ -758,10 +758,48 @@ each would need, so this is costed rather than vague:
 | --- | --- | --- |
 | 11, organic worker | `engine_slot` | Rights provenance, a source-owned AAL2 exact outgoing decision, and provider prewrite attestation. Its Inbox card carries an unconditional `preview_blocker` so it can never present as decidable. |
 | 11, paid bundle | `campaign_action`, `campaign_budget_profile` | Executor rechecks beyond Google Ads JSON and page HTML previews; the generic action scope does not attest the source budget or field payload. |
-| 11, page publish | `page_deploy` | Source and decision are verified; the deploy executor has not attested the same version. The closest of all of them. |
+| 11, page publish | `page_deploy` | ~~Source and decision are verified; the deploy executor has not attested the same version.~~ **Done, migration 313 — see below.** |
 | 11, lead magnet | `lead_magnet` | File bytes and delivery words need source-owned exact evidence. |
 | 12, proof distribution | `proof_placement`, `proof_rights`, `proof_artifact`, `proof_delivery` | Placement, rights and destination are not bridged at all; no source-owned rights request or decision RPC exists. |
 | 13, organic distribution | `engine_slot` again | As item 11's organic worker. |
+
+**page_deploy's executor is now verified, and it was the only one in reach.**
+Of thirty-four classes it was the one whose executor needed no connected
+provider account: publishing is a commit to a repository AA already owns.
+
+237 had done most of it, and done it well.
+`assert_page_publish_by_approval_v6` refuses unless the approval is a
+`page_deploy`, is approved, has a snapshot for this page, is not superseded by
+a later campaign package, and unless sha256 of the page's current HTML still
+equals what a person read. 212's general gate refuses a v6 campaign page
+outright, so that is the only way in.
+
+**The gap was one step further on, and it was real.** The runtime publishes
+`htmlToPublish(page.html)`, which *injects the sales agent widget* when the page
+has a deployment — the one script a published page may carry, added at publish
+time precisely so the stored HTML can stay script-free. So for any page with a
+sales agent, the bytes committed are not the bytes approved. The executor
+recorded `sha256(page.html)` regardless, and
+`record_campaign_page_published_v6` took that hash on trust without once
+comparing it to the snapshot it had already loaded.
+
+A record of the source is a record of what the executor **read**, not of what it
+**put on the internet**, and the difference is exactly where an unreviewed
+script would hide. That is what "has not attested the same version" meant.
+
+**313 closes it**: `campaign_page_publications.published_sha256` holds the bytes
+actually committed, `publishPage` returns that hash so the caller cannot compute
+it from what it read, and the recorder now verifies the approved hash against
+the snapshot and refuses a publication that cannot say what it committed.
+
+**A bug caught in the writing, worth recording.** Adding a defaulted parameter
+to a function makes an **overload**, not a replacement. The four-argument
+`record_campaign_page_published_v6` would have survived beside the new one,
+still callable, still carrying none of the checks — so a caller that kept
+passing four arguments would have kept the old behaviour exactly. 313 drops the
+old signature, and a test asserts only one function of that name remains. This
+is the third `create or replace` trap on this branch, after 310's parameter
+defaults and 311's reproduced body.
 
 **Item 10 is partly tractable and partly not**, and was also left per that
 decision. The unified panel decides four of nine routes. The real gap is that
