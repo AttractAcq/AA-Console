@@ -23,6 +23,7 @@ describe("current Intelligence context", () => {
     const query = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
       upsert: vi.fn(),
       then: (resolve: (value: unknown) => void) => resolve({
         data: [{ item_key: "question-universe", edited_at: null, archived_at: "2026-11-01T00:00:00Z" }],
@@ -35,6 +36,25 @@ describe("current Intelligence context", () => {
       templates: [{ item_key: "question-universe", item_type: "section", title: "Questions", description: "", display_order: 1 }],
       sections: { "question-universe": "What will this cost?" },
     })).rejects.toThrow(/archived/);
+    expect(query.is).toHaveBeenCalledWith("period", null);
     expect(query.upsert).not.toHaveBeenCalled();
+  });
+
+  it("scopes human edits and archive checks to the campaign intelligence period", async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      upsert: vi.fn().mockResolvedValue({ error: null }),
+      then: (resolve: (value: unknown) => void) => resolve({ data: [], error: null }),
+    };
+    const sb = { from: vi.fn().mockReturnValue(query) } as unknown as SupabaseClient;
+    const result = await persistRecords(sb, {
+      clientId: "client-1", domain: "campaign_intelligence", jobId: "job-2", period: "2026-Q2",
+      templates: [{ item_key: "decision", item_type: "section", title: "Decision", description: "", display_order: 1 }],
+      sections: { decision: "Demand exceeds supply." },
+    });
+    expect(query.eq).toHaveBeenCalledWith("period", "2026-Q2");
+    expect(result.written).toBe(1);
   });
 });

@@ -257,11 +257,16 @@ export async function persistRecords(
 ): Promise<PersistResult> {
   const { clientId, domain, jobId, templates, sections, period = null } = args;
 
-  const { data: existing, error: existingError } = await sb
+  const existingQuery = sb
     .from("client_agent_records")
     .select("item_key, edited_at, archived_at")
     .eq("client_id", clientId)
     .eq("domain", domain);
+  // Campaign Intelligence has successive periods. An archived Q1 record must
+  // not block Q2, nor should a Q1 human edit suppress a Q2 answer.
+  const { data: existing, error: existingError } = await (
+    period === null ? existingQuery.is("period", null) : existingQuery.eq("period", period)
+  );
   if (existingError) throw new Error(`Failed to read existing records: ${existingError.message}`);
   if ((existing ?? []).some((record) => record.archived_at !== null &&
       templates.some((template) => template.item_key === record.item_key))) {
