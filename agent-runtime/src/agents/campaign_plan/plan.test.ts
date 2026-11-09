@@ -10,12 +10,32 @@ import {
   normaliseChannels,
   planProblem,
   planRouteProblem,
+  plannedPieces,
   routeVolumes,
   planSummary,
   resolveNeeds,
   MAX_CONTENT,
   type CampaignPlan,
 } from "./plan.js";
+
+describe("approved content mix", () => {
+  const organic = { acquisition_route: "organic", media_type: "image", content_format: "carousel" };
+  const paid = { acquisition_route: "paid", media_type: "video", content_format: "reel" };
+
+  it("keeps each reviewed slot's order, route and production shape", () => {
+    expect(plannedPieces([paid, organic], 2, 1, 1)).toEqual([paid, organic]);
+  });
+
+  it("refuses a missing or misrouted mix before a plan can be saved", () => {
+    expect(() => plannedPieces(null, 2, 1, 1)).toThrow(/exactly 2/);
+    expect(() => plannedPieces([organic, organic], 2, 1, 1)).toThrow(/match/);
+  });
+
+  it("refuses media and format combinations that cannot be built", () => {
+    expect(() => plannedPieces([{ ...paid, media_type: "image" }], 1, 0, 1)).toThrow(/format/);
+    expect(() => plannedPieces([{ ...organic, content_format: "reel" }], 1, 1, 0)).toThrow(/format/);
+  });
+});
 
 describe("v6 campaign route validation", () => {
   it("keeps organic campaigns out of ad channels", () => {

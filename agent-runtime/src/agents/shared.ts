@@ -100,6 +100,7 @@ export async function loadUpstreamRecords(
     .select("domain, item_key, title, body")
     .eq("client_id", clientId)
     .in("domain", domains)
+    .is("archived_at", null)
     .order("domain")
     .order("display_order");
   if (error) throw new Error(`Failed to load upstream records: ${error.message}`);
@@ -258,10 +259,14 @@ export async function persistRecords(
 
   const { data: existing, error: existingError } = await sb
     .from("client_agent_records")
-    .select("item_key, edited_at")
+    .select("item_key, edited_at, archived_at")
     .eq("client_id", clientId)
     .eq("domain", domain);
   if (existingError) throw new Error(`Failed to read existing records: ${existingError.message}`);
+  if ((existing ?? []).some((record) => record.archived_at !== null &&
+      templates.some((template) => template.item_key === record.item_key))) {
+    throw new Error("An Intelligence record in this domain is archived. Restore or replace it explicitly before rerunning the agent.");
+  }
 
   const humanEdited = new Set(
     (existing ?? []).filter((r) => r.edited_at !== null).map((r) => r.item_key as string),

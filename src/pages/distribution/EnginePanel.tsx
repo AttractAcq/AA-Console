@@ -72,7 +72,7 @@ type DueRow = {
 type PlatformRow = { platform: Platform; posts_per_week: number; active: boolean };
 type WindowRow = { id: string; weekday: number; starts_at: string; ends_at: string };
 
-export function EnginePanel() {
+export function EnginePanel({ settingsOnly = false, onChanged }: { settingsOnly?: boolean; onChanged?: () => void }) {
   const { clientId } = useParams<{ clientId: string }>();
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   // Held as strings so a half-typed figure does not become 0, and so the
@@ -146,6 +146,7 @@ export function EnginePanel() {
     }
     setNote(said);
     await refresh();
+    onChanged?.();
   }
 
   if (!clientId) return <p className="text-sm text-muted-foreground">Pick a client first.</p>;
@@ -156,7 +157,7 @@ export function EnginePanel() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-lg border border-border p-4">
+      {!settingsOnly && <section className="rounded-lg border border-border p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-card-foreground">
@@ -190,7 +191,7 @@ export function EnginePanel() {
             Fix “{readiness?.readiness ?? "Not configured"}” before the engine can be switched on.
           </p>
         ) : null}
-      </section>
+      </section>}
 
       {/* The three gates engine_tick reads that nothing used to be able to
           set. Migration 282 added the first two writers; the third was in the
@@ -301,8 +302,8 @@ export function EnginePanel() {
                 {
                   p_enabled: !(readiness?.engine_running ?? false),
                   p_note: readiness?.engine_running
-                    ? "Switched off from the Engine screen."
-                    : "Switched on from the Engine screen.",
+                    ? "Switched off from Dashboard engine settings."
+                    : "Switched on from Dashboard engine settings.",
                 },
                 readiness?.engine_running
                   ? "The engine is off for every client."

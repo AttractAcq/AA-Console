@@ -41,7 +41,7 @@ import { loadConfig } from "./config.js";
 import { serviceClient } from "./db.js";
 import { startWorker, type WorkerHandle } from "./worker.js";
 import { startHeartbeat } from "./heartbeat.js";
-import { startWorkflowReconciler } from "./v5/reconcile.js";
+import { startWorkflowReconciler } from "./workflows/reconcile.js";
 import { registeredAgentKeys } from "./orchestration/dispatch.js";
 import { handleMasterChat } from "./master/route.js";
 import { handleBriefDraft } from "./briefs/draft-route.js";

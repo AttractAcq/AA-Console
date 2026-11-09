@@ -368,7 +368,7 @@ be absent, and absent is the honest answer from an agent.
    |---|---|
    | `create_workflow_run(...)` | creates a run, and **already takes a `campaign_id`** |
    | `add_workflow_agent_step(...)` | a step with `dependencies text[]`, an `agent_key`, and `input_from_step_key` to chain one step's output into the next |
-   | `reconcile_workflow_runs(p_limit)` | the driver, **running every 15 seconds** in the runtime (`src/v5/reconcile.ts`) |
+   | `reconcile_workflow_runs(p_limit)` | the driver, **running every 15 seconds** in the runtime (`src/workflows/reconcile.ts`) |
    | `enqueue_workflow_step_job(...)` | queues a step's agent job — `agent_jobs` stays the only execution queue |
    | `accept_workflow_step(...)` | records a step's artifact and its QA evidence |
    | `seal_workflow_run`, `workflow_run_outcomes` | completion and reporting |
@@ -546,12 +546,15 @@ be absent, and absent is the honest answer from an agent.
 9. **Content Production tuning** — the two named defects: video generation, and
    the text inside image content. Repetition, not architecture.
 
-   **The image defect is enforced in code.** `concept.ts` diagnosed it — *"the
-   safest output was the wrong deliverable"*, a model reaching for a typography
-   card whenever it was unsure — and `conceptProblem` now *refuses* a concept
-   with no background or a typography-only treatment. That is a validator, not
-   prompt wording, which is the distinction that matters: a prompt is a request
-   and a validator is a guarantee. Nothing further is owed here.
+   **Image output after Phase B.** `conceptProblem` rejects explicitly
+   typography-only concepts, but production renders showed that a concept can
+   satisfy that rule and still make a typography card. Alex chose an image-led
+   default for Harbour Dental and AA paid Meta statics, with cards only when a
+   brief asks for one. The runtime now reads the brief's `visual_direction`.
+   The pixel screen records light and dark fractions separately; dark
+   photographs and dark cards overlap, so flatness does not prove either.
+   See `V6_1_PHASE_B_CREATIVE_SCREEN_2026-11-09.md` for the measured fixtures,
+   the almost-empty-frame refusal and the remaining 66-frame review.
 
    **The video defect had a real, unguarded gap, and its measurable half is now
    closed.** I had written this item off as needing only creative judgement.
@@ -605,7 +608,7 @@ be absent, and absent is the honest answer from an agent.
       It did not: production holds 108 image concepts and 99 stored clips
       already paid for, and auditing those costs nothing.
 
-      **The image defect is measured, and the fix is demonstrably working.**
+      **The concept declarations improved, but that measure did not establish render quality.**
       `creative_generations.concept` records what the model actually chose.
       Judged against `conceptProblem`'s own criteria:
 
@@ -627,7 +630,7 @@ be absent, and absent is the honest answer from an agent.
       defective would have been badly wrong.
 
       **The video defect's catastrophic form is not present.** All 99 stored
-      clips were written before 310's screen existed, so none was ever
+      clips were written before 311's screen existed, so none was ever
       inspected. Their sizes: smallest 1.4 MB, p05 1.85 MB, median 5.65 MB,
       largest 11.5 MB, **none under 50 KB**. An all-black or all-still clip is
       almost entirely inter-frame redundancy and compresses to a tiny fraction
@@ -694,30 +697,13 @@ be absent, and absent is the honest answer from an agent.
       client, which is why the aggregate looked systemic. Something in that
       client's inputs steers it to cards.
 
-      **What was built instead of another prohibition.** A post-render screen
-      (`creative_build/screen.ts`) measuring the fraction of the frame that is
-      flat, light card stock. Production separates totally: image-led at 0.0%,
-      0.0%, 0.3% against card-led at 21.8% to 46.3%, two orders of magnitude
-      with no overlap. The thresholds sit in that gap and the real figures are
-      pinned by test.
-
-      It RECORDS, it does not refuse. A worksheet lead magnet genuinely is a
-      document, and discarding paid renders on a two-client calibration would
-      be the same mistake one layer down -- forbid the safe answer and the model
-      finds the next safest one, which is precisely how the cards came about.
-      Its known limitation, that a deliberately empty bright frame reads as
-      card, has its own test rather than waiting to be rediscovered as a bug.
-
-      **What is left is one product decision, not an engineering task**: whether
-      the card-led house style is what that client should be getting. Every
-      render now carries its number, so the question has evidence attached
-      rather than needing another audit.
-
-      So what remains is the judgement the notes meant by "repetition, not
-      architecture" -- and it now has a specific question attached rather than
-      "look at some output": is a photographed document the right deliverable
-      half the time, and if not, is the fix a better brief rather than another
-      prohibition? The audit says this is tuning, not firefighting.
+      **Phase B superseded that calibration.** The three alleged image-led
+      controls were dark typography cards. The original light-card thresholds
+      were observational, not a valid classification of all cards. The repaired
+      screen records both light and dark flatness, warns on ambiguous dark
+      frames and refuses only the narrowly measured almost-empty bright frame.
+      The image-led product default and the remaining sample review are
+      recorded in `V6_1_PHASE_B_CREATIVE_SCREEN_2026-11-09.md`.
    2. ~~*One decision.*~~ **Built, as migration 311.** A probe-refused frame
       lands in the same shape as a provider-failed one — `clip_path` null, job
       paused, evidence recorded — but with a different blocker message, so
@@ -767,19 +753,18 @@ be absent, and absent is the honest answer from an agent.
 12. **Proof Distribution** — ten destinations as individual connect-modules,
     plus a Distribution Log table of what went where and when.
 13. **Organic Content Distribution** — Destinations (Facebook, Instagram) plus a
-    Distribution Log. The Engine tab retires into the Dashboard switch panel.
+    Distribution Log. The Engine tab retires into the Dashboard switch panel, with cadence controls in an expandable section.
 
 ### Phase 4's verdict: out of scope for v6.1, on Alex's decision
 
-**Zero of 34 approval classes has a verified executor.**
+**One of 34 approval classes now has a verified executor (`page_deploy`, migration 313).**
 `approval_class_coverage_versions_v6` tracks source, decision and executor per
-class. Five sources and six decisions are verified. Executors: **none**. Every
-class reads `missing` or `blocked`, each with its own stated reason.
+class. Five sources and six decisions are verified. Executors were **none at the time of this Phase 4 review**. Migration 313 subsequently verified `page_deploy`; the other 33 classes remain `missing` or `blocked` with stated reasons.
 
 Items 11, 12 and 13 *are* executors — they write to Facebook, Instagram, Google
 and ten proof destinations. So they are not blocked on effort or on a missing
 UI; they are blocked on an attestation layer that exists for nothing yet, which
-is the containment migrations 293 and 295 installed deliberately.
+is the containment migrations 293 and 295 installed deliberately. The page deploy exception is recorded below.
 
 Corroborating, rather than inferred: the ten proof destinations already exist as
 rows, and `proof_placements`, `proof_placement_events` and
@@ -1027,16 +1012,8 @@ stay contained and visible.
 
 ## Open questions
 
-1. **Proof Production's six capture methods.** Each is independently
-   activatable and autonomous to ready-to-distribute. Unclear whether proof
-   production feeds campaigns or runs purely on its own cadence, which decides
-   whether it belongs in Phase 3 beside the other factories or stands alone.
-2. **Intelligence OS quality gate.** The notes ask for repetition testing with
-   the answers scanned for false information. That is a quality exercise rather
-   than a build, and it gates everything downstream because all business
-   context originates there. Phase 0 task with a real output-quality gate, or
-   run alongside?
-3. **Approval route mapping** before Phase 2 rather than during Phase 4.
+1. **Proof Production's six capture methods — decided.** Each runs on its own cadence. Campaigns consume approved proof; they do not trigger capture. The artifact and human approval handoff for each method are specified in `V6_1_PHASE_C_PROOF_PRODUCTION_2026-11-09.md`.
+2. **Intelligence OS quality gate.** Repetition testing and false-claim review remain the Phase C output-quality gate, specified in `V6_1_PHASE_C_INTELLIGENCE_QUALITY_GATE_2026-11-09.md`. It awaits representative outputs and their source context. Approval route mapping is already complete in section 10a.
 
 ## Carried over from v6
 

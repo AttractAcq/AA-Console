@@ -195,6 +195,7 @@ Purchase trigger: ${o.purchase_trigger ?? "—"}`;
       .select("title, body")
       .eq("client_id", job.client_id)
       .eq("domain", "offer_strategy")
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(10);
     if (error) throw new Error(`Offer strategy lookup failed: ${error.message}`);

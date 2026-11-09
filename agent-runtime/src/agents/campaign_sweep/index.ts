@@ -39,6 +39,8 @@ import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
 import { appendEvent } from "../../queue.js";
 import { platformFor, sweepSteps } from "./plan.js";
+import { plannedPieces } from "../campaign_plan/plan.js";
+import { platformAllowsFormat } from "../../content/format.js";
 
 /** How long a sweep's run has to finish before the engine calls it overdue. */
 const DEADLINE_HOURS = 72;
@@ -76,7 +78,7 @@ export async function runCampaignSweepJob(
 
   const { data: campaign, error: campaignError } = await sb
     .from("client_campaigns")
-    .select("id, client_id, name, acquisition_mode, channels, content_count, organic_content_count, paid_content_count")
+    .select("id, client_id, name, acquisition_mode, channels, content_count, organic_content_count, paid_content_count, content_pieces")
     .eq("id", job.input_id)
     .maybeSingle();
   if (campaignError) throw new Error(`Campaign lookup failed: ${campaignError.message}`);
@@ -86,7 +88,7 @@ export async function runCampaignSweepJob(
   const c = campaign as {
     id: string; client_id: string; name: string; acquisition_mode: string;
     channels: string[] | null; content_count: number;
-    organic_content_count: number; paid_content_count: number;
+    organic_content_count: number; paid_content_count: number; content_pieces: unknown;
   };
   if (c.client_id !== job.client_id) {
     return { ok: false, retryable: false, failureMessage: "That campaign belongs to another client." };
@@ -107,9 +109,20 @@ export async function runCampaignSweepJob(
   // 308's columns are nought for legacy by design.
   const organicCount = c.acquisition_mode === "legacy" ? c.content_count : c.organic_content_count;
   const paidCount = c.acquisition_mode === "legacy" ? 0 : c.paid_content_count;
+  let pieces;
+  try {
+    pieces = c.acquisition_mode === "legacy"
+      ? Array.from({ length: c.content_count }, () => ({ acquisition_route: "organic" as const, media_type: "image" as const, content_format: "single" as const }))
+      : plannedPieces(c.content_pieces, c.content_count, organicCount, paidCount);
+  } catch (error) {
+    return { ok: false, retryable: false, failureMessage: (error as Error).message };
+  }
+  if (pieces.some((piece) => !platformAllowsFormat(platform, piece.content_format))) {
+    return { ok: false, retryable: false,
+      failureMessage: `This plan includes a format ${platform} cannot publish. Review its piece mix.` };
+  }
   const steps = sweepSteps({
-    organicCount,
-    paidCount,
+    pieces,
     platform,
     campaignId: c.id,
   });
@@ -133,12 +146,13 @@ export async function runCampaignSweepJob(
   const { data: run, error: runError } = await sb.rpc("create_workflow_run", {
     p_client_id: c.client_id,
     p_kind: "campaign_sweep",
-    p_workflow_version: "v6.sweep.1",
+    p_workflow_version: "v6.sweep.2",
     p_idempotency_key: job.id,
     p_input_snapshot: {
       campaign_id: c.id,
       organic_content_count: organicCount,
       paid_content_count: paidCount,
+      content_pieces: pieces,
       target_platform: platform,
     },
     p_deadline_at: new Date(Date.now() + DEADLINE_HOURS * 3_600_000).toISOString(),

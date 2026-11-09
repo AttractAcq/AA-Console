@@ -8,6 +8,7 @@ import { RunAgentModal } from "../../components/agents/RunAgentModal";
 import { supabase } from "../../lib/supabase";
 import { MasterAIChatDialog } from "../../components/masterai/MasterAIChatDialog";
 import { ClientSwitchPanel } from "../../components/switches/ClientSwitchPanel";
+import { EnginePanel } from "../distribution/EnginePanel";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { totalSpend, unresolvedFailures } from "../../lib/jobHistory";
@@ -52,6 +53,9 @@ export function ClientDashboardPanel() {
   const [masterOpen, setMasterOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [switchRevision, setSwitchRevision] = useState(0);
+  const [settingsRevision, setSettingsRevision] = useState(0);
+  const [cadenceOpen, setCadenceOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -98,7 +102,18 @@ export function ClientDashboardPanel() {
         </p>
       )}
 
-      {clientId && <ClientSwitchPanel clientId={clientId} />}
+      {clientId && <ClientSwitchPanel key={`switches-${switchRevision}`} clientId={clientId} onChanged={() => setSettingsRevision((n) => n + 1)} />}
+
+      {clientId && (
+        <details className="rounded-lg border border-border bg-card p-4" onToggle={(event) => setCadenceOpen(event.currentTarget.open)}>
+          <summary className="cursor-pointer text-sm font-medium text-card-foreground">
+            Content engine cadence settings
+          </summary>
+          {cadenceOpen && <div className="mt-4">
+            <EnginePanel key={`settings-${settingsRevision}`} settingsOnly onChanged={() => setSwitchRevision((n) => n + 1)} />
+          </div>}
+        </details>
+      )}
 
       <Panel title="Agent spend"><p className="text-2xl font-semibold text-card-foreground">${spend.toFixed(2)}</p></Panel>
 

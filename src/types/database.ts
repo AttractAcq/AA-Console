@@ -4208,6 +4208,7 @@ export type Database = {
           client_id: string
           cloned_from_campaign_id: string | null
           content_count: number
+          content_pieces: Json | null
           content_ideas_generated_at: string | null
           conversion_event: string | null
           core_message: string | null
@@ -4263,6 +4264,7 @@ export type Database = {
           client_id: string
           cloned_from_campaign_id?: string | null
           content_count?: number
+          content_pieces?: Json | null
           content_ideas_generated_at?: string | null
           conversion_event?: string | null
           core_message?: string | null
@@ -4318,6 +4320,7 @@ export type Database = {
           client_id?: string
           cloned_from_campaign_id?: string | null
           content_count?: number
+          content_pieces?: Json | null
           content_ideas_generated_at?: string | null
           conversion_event?: string | null
           core_message?: string | null
@@ -30171,6 +30174,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_campaign_content_pieces_v6: {
+        Args: { p_campaign_id: string; p_pieces: Json }
+        Returns: undefined
       }
       set_campaign_route_volumes_v6: {
         Args: { p_campaign_id: string; p_organic: number; p_paid: number }
