@@ -6,48 +6,56 @@ environments coordinate briefs, security review and release gates.
 
 ---
 
-## 1. Where the release stands RIGHT NOW
+## 1. Where the release stands — verified 9 November 2026
 
 | | state |
 |---|---|
 | **#338** (migration 313, page_deploy executor + composition screen) | **merged** as `a1568f0` |
-| **Migration 313** | **NOT APPLIED** to production |
-| **Production** | 329 applied, head `20261105040000` (i.e. 312) |
-| **Release receipt** | commit `afb4525` on `feat/close-delivery-gaps-a2m3ld`, **held** |
+| **Migration 313** | **APPLIED** by Alex with `supabase db push --linked` |
+| **Production** | live identity head `20261106000000`; runtime `a1568f0`, gateway `e3447ab` |
+| **Release receipt** | on draft PR #339, **not merged or deployed** |
 
-### The one action outstanding
+### Apply and readback evidence
 
 ```
 cd "/Users/alex/Desktop/Current/Attract Acquisition/aa-console-fresh" \
   && git pull origin main && supabase db push --linked
 ```
 
-`supabase db push --linked` from the repo is the **only sanctioned apply path**.
+Alex's terminal output showed the CLI selecting and applying only migration 313,
+then `Finished supabase db push`. A fresh read-only
+`supabase migration list --linked` showed local and remote aligned through
+`20261106000000`. The live
+`/release/identities` endpoint independently reported complete observations,
+the same migration head, runtime SHA `a1568f0ad8f2a8e53a994291e2817f72c76831b7`
+and gateway SHA `e3447aba23b2af6081c526fe5b8fd12225decdc9` at
+2026-11-09 18:35 UTC.
+
+`supabase db push --linked` from the repo remains the **only sanctioned apply path**.
 Never run `supabase migration repair --status reverted`.
 
-The apply cannot be done from a cloud session: the Supabase MCP tools require the
+The apply was not done from a cloud session: the Supabase MCP tools require the
 migration SQL to be retyped into a tool argument (`apply_migration` also stamps its
 own timestamp version, which would record 313 as `20261109…` and break the sequence
 gate). `db push` reads the file from disk and writes the ledger's `statements` array
 faithfully.
 
-### After the apply
+### Remaining release work
 
-`afb4525` is built and locally verified but deliberately unpushed, because
-`assert-live-release-identities` probes live production and would correctly block the
-deploy while production sits at 329. It changes:
+PR #339 already contains the prepared receipt. It changes:
 
 - `supabase/verification/released-migration-version.txt` → `20261106000000`
 - `scripts/production-recovery-preflight.mjs` → count `330`, marker `20261106000000`
 - `scripts/production-recovery-preflight.check.mjs` → same two values
 - `supabase/verification/browser-release-components.json` → `migrationHead`
-  `20261106000000`, `runtimeSha` `a1568f0…` (**repin required**, `agent-runtime/` changed)
+  `20261106000000`, `runtimeSha` `a1568f0…` (**repinned**, `agent-runtime/` changed)
 
 `gatewaySha` stays `e3447ab…` — `aa-mcp-gateway/` is clean.
 
-Verified locally before holding: migration-order `pendingCount 0`; require-released-schema
-matching; preflight self-tests 17/17; release-identity self-tests 4/4; both component
-pins clean against `a1568f0`.
+Verified locally before the apply: migration-order `pendingCount 0`;
+require-released-schema matching; preflight self-tests 17/17; release-identity
+self-tests 4/4; both component pins clean against `a1568f0`. Review current-head
+CI and release identities before taking the PR through Alex's release gate.
 
 **Pin check is `git diff --quiet <pin> HEAD -- agent-runtime/`** — ANY change in that
 directory stales the pin, including a test file or a regenerated manifest. "No source
@@ -124,7 +132,7 @@ them. A blank-frame check is unambiguous and cheap and does not need a product d
 
 ### 3.4 Ordering constraint
 
-Any change under `agent-runtime/` stales `runtimeSha` in the held receipt `afb4525`.
+Any change under `agent-runtime/` stales `runtimeSha` in the receipt on draft PR #339.
 **The screen fix must land as a separate PR after 313's release**, not before.
 
 ---
