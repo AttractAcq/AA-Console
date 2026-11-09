@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "runtimeSha": "1e4432f92521b061a60a032bd86d8f98fe609634",
+  "runtimeSha": "a1568f0ad8f2a8e53a994291e2817f72c76831b7",
   "gatewaySha": "e3447aba23b2af6081c526fe5b8fd12225decdc9",
-  "migrationHead": "20261105040000"
+  "migrationHead": "20261106000000"
 }
