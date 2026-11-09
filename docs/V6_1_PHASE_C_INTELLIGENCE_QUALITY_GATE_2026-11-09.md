@@ -36,4 +36,4 @@ A local historical export informed the prompt corrections. It predates the curre
 
 ## Evidence status
 
-The representative production or sanitized output records and their source context are not in this checkout. No repetition score or false-claim rate is claimed yet. Record the twelve trial IDs, source snapshots, claim classifications, discrepancies and reviewer decision here before closing this gate.
+The representative production or sanitized output records and their source context are not in this checkout. No repetition score or false-claim rate is claimed yet. Keep the twelve trial IDs, source snapshots, claim classifications, discrepancies and reviewer decision in an approved private evidence location. Before closing this gate, record only a non-sensitive evidence reference, aggregate results, material failures and the review decision here. Do not paste client source material or client-specific derived findings into this public repository or its PR body.
