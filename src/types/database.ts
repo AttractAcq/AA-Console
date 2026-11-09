@@ -2615,6 +2615,7 @@ export type Database = {
           probe_status: string | null
           probed_at: string | null
           published_at: string
+          published_sha256: string | null
           published_url: string
           rendered_sha256: string
           revision_id: string
@@ -2630,6 +2631,7 @@ export type Database = {
           probe_status?: string | null
           probed_at?: string | null
           published_at?: string
+          published_sha256?: string | null
           published_url: string
           rendered_sha256: string
           revision_id: string
@@ -2645,6 +2647,7 @@ export type Database = {
           probe_status?: string | null
           probed_at?: string | null
           published_at?: string
+          published_sha256?: string | null
           published_url?: string
           rendered_sha256?: string
           revision_id?: string
@@ -28776,6 +28779,7 @@ export type Database = {
         Args: {
           p_approval_id: string
           p_commit_sha: string
+          p_published_sha256?: string
           p_published_url: string
           p_rendered_sha256: string
         }

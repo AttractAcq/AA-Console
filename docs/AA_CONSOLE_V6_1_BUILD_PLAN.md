@@ -452,7 +452,7 @@ be absent, and absent is the honest answer from an agent.
 
 ## Phase 3 — the factories the sweep calls
 
-**Items 6, 7 and 8 complete.** In all three, most of what the plan budgeted for already existed. Item 9's two named defects are both now enforced in code — the image one at the brief, the video one at the clip — and what remains of it is creative judgement on real generations plus one decision about the automated retry route. See item 9.
+**Items 6, 7 and 8 complete.** In all three, most of what the plan budgeted for already existed. Item 9's two named defects are both enforced in code — the image one at the brief, the video one at the clip — and the renders have now been reviewed (see item 9): the image defect had migrated into composition, so a post-render screen measures it. What remains is one product decision about a client's house style, and one about the automated retry route.
 
 6. **Website Studio** — five tabs collapse to a Sites table plus build buttons
    for landing pages and offer pages; agent builders; autonomous under the
@@ -669,14 +669,49 @@ be absent, and absent is the honest answer from an agent.
       because both have a background and a treatment. The model found the
       nearest safe thing that satisfies every rule.
 
-      **This is a judgement, not a defect, which is why it is not coded
-      against.** Sometimes a photographed worksheet is exactly right -- a lead
-      magnet genuinely is a document, and a post about scheduling may well want
-      a calendar. 48% is a keyword match, not 48% wrong. But the SHIFT is the
-      signal, and whether it is acceptable at that rate is Alex's call on real
-      output, not something to encode on a hunch. Writing a rule against paper
-      would be the third iteration of the same mistake: forbid the safe answer,
-      and the model finds the next safest one.
+      **THE RENDERS WERE THEN LOOKED AT, AND THIS WHOLE READING WAS WRONG.**
+
+      Everything above is inferred from concept TEXT. Once a credential made
+      the private media bucket reachable, the renders themselves could be
+      examined -- and they overturn it.
+
+      Thirteen renders from that client, across all four treatments: every one
+      is a dense typography card with imagery as a border, a backdrop or a prop
+      beside it. **Including the ones the keyword test called clean.** The
+      typography card never went away; it learned to bring a photograph. Each
+      satisfies `conceptProblem` truthfully -- there IS a background, the
+      treatment IS photographic -- because the defect lives in the composition,
+      which no concept-stage validator can see.
+
+      So both numbers above measured the wrong thing. 18% to zero counted
+      concepts that stopped SAYING typography. 13% to 48% counted a symptom:
+      the control group is equally text-dominated, so paper was never the
+      distinguishing feature.
+
+      **And it is not a model defect.** A second client's output -- same
+      validator, same period -- is image-led: a real scene filling the frame
+      with type over it, the way an ad works. 88 of 108 images are the one
+      client, which is why the aggregate looked systemic. Something in that
+      client's inputs steers it to cards.
+
+      **What was built instead of another prohibition.** A post-render screen
+      (`creative_build/screen.ts`) measuring the fraction of the frame that is
+      flat, light card stock. Production separates totally: image-led at 0.0%,
+      0.0%, 0.3% against card-led at 21.8% to 46.3%, two orders of magnitude
+      with no overlap. The thresholds sit in that gap and the real figures are
+      pinned by test.
+
+      It RECORDS, it does not refuse. A worksheet lead magnet genuinely is a
+      document, and discarding paid renders on a two-client calibration would
+      be the same mistake one layer down -- forbid the safe answer and the model
+      finds the next safest one, which is precisely how the cards came about.
+      Its known limitation, that a deliberately empty bright frame reads as
+      card, has its own test rather than waiting to be rediscovered as a bug.
+
+      **What is left is one product decision, not an engineering task**: whether
+      the card-led house style is what that client should be getting. Every
+      render now carries its number, so the question has evidence attached
+      rather than needing another audit.
 
       So what remains is the judgement the notes meant by "repetition, not
       architecture" -- and it now has a specific question attached rather than
@@ -758,10 +793,48 @@ each would need, so this is costed rather than vague:
 | --- | --- | --- |
 | 11, organic worker | `engine_slot` | Rights provenance, a source-owned AAL2 exact outgoing decision, and provider prewrite attestation. Its Inbox card carries an unconditional `preview_blocker` so it can never present as decidable. |
 | 11, paid bundle | `campaign_action`, `campaign_budget_profile` | Executor rechecks beyond Google Ads JSON and page HTML previews; the generic action scope does not attest the source budget or field payload. |
-| 11, page publish | `page_deploy` | Source and decision are verified; the deploy executor has not attested the same version. The closest of all of them. |
+| 11, page publish | `page_deploy` | ~~Source and decision are verified; the deploy executor has not attested the same version.~~ **Done, migration 313 — see below.** |
 | 11, lead magnet | `lead_magnet` | File bytes and delivery words need source-owned exact evidence. |
 | 12, proof distribution | `proof_placement`, `proof_rights`, `proof_artifact`, `proof_delivery` | Placement, rights and destination are not bridged at all; no source-owned rights request or decision RPC exists. |
 | 13, organic distribution | `engine_slot` again | As item 11's organic worker. |
+
+**page_deploy's executor is now verified, and it was the only one in reach.**
+Of thirty-four classes it was the one whose executor needed no connected
+provider account: publishing is a commit to a repository AA already owns.
+
+237 had done most of it, and done it well.
+`assert_page_publish_by_approval_v6` refuses unless the approval is a
+`page_deploy`, is approved, has a snapshot for this page, is not superseded by
+a later campaign package, and unless sha256 of the page's current HTML still
+equals what a person read. 212's general gate refuses a v6 campaign page
+outright, so that is the only way in.
+
+**The gap was one step further on, and it was real.** The runtime publishes
+`htmlToPublish(page.html)`, which *injects the sales agent widget* when the page
+has a deployment — the one script a published page may carry, added at publish
+time precisely so the stored HTML can stay script-free. So for any page with a
+sales agent, the bytes committed are not the bytes approved. The executor
+recorded `sha256(page.html)` regardless, and
+`record_campaign_page_published_v6` took that hash on trust without once
+comparing it to the snapshot it had already loaded.
+
+A record of the source is a record of what the executor **read**, not of what it
+**put on the internet**, and the difference is exactly where an unreviewed
+script would hide. That is what "has not attested the same version" meant.
+
+**313 closes it**: `campaign_page_publications.published_sha256` holds the bytes
+actually committed, `publishPage` returns that hash so the caller cannot compute
+it from what it read, and the recorder now verifies the approved hash against
+the snapshot and refuses a publication that cannot say what it committed.
+
+**A bug caught in the writing, worth recording.** Adding a defaulted parameter
+to a function makes an **overload**, not a replacement. The four-argument
+`record_campaign_page_published_v6` would have survived beside the new one,
+still callable, still carrying none of the checks — so a caller that kept
+passing four arguments would have kept the old behaviour exactly. 313 drops the
+old signature, and a test asserts only one function of that name remains. This
+is the third `create or replace` trap on this branch, after 310's parameter
+defaults and 311's reproduced body.
 
 **Item 10 is partly tractable and partly not**, and was also left per that
 decision. The unified panel decides four of nine routes. The real gap is that
