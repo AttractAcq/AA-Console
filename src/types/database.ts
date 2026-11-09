@@ -4208,8 +4208,8 @@ export type Database = {
           client_id: string
           cloned_from_campaign_id: string | null
           content_count: number
-          content_pieces: Json | null
           content_ideas_generated_at: string | null
+          content_pieces: Json | null
           conversion_event: string | null
           core_message: string | null
           created_at: string
@@ -4264,8 +4264,8 @@ export type Database = {
           client_id: string
           cloned_from_campaign_id?: string | null
           content_count?: number
-          content_pieces?: Json | null
           content_ideas_generated_at?: string | null
+          content_pieces?: Json | null
           conversion_event?: string | null
           core_message?: string | null
           created_at?: string
@@ -4320,8 +4320,8 @@ export type Database = {
           client_id?: string
           cloned_from_campaign_id?: string | null
           content_count?: number
-          content_pieces?: Json | null
           content_ideas_generated_at?: string | null
+          content_pieces?: Json | null
           conversion_event?: string | null
           core_message?: string | null
           created_at?: string
@@ -25953,6 +25953,12 @@ export type Database = {
         }
         Returns: Json
       }
+      campaign_content_pieces_valid: {
+        Args: {
+          p_campaign: Database["public"]["Tables"]["client_campaigns"]["Row"]
+        }
+        Returns: boolean
+      }
       campaign_plan_fingerprint: {
         Args: {
           p_campaign: Database["public"]["Tables"]["client_campaigns"]["Row"]
@@ -26554,6 +26560,7 @@ export type Database = {
           cloned_from_campaign_id: string | null
           content_count: number
           content_ideas_generated_at: string | null
+          content_pieces: Json | null
           conversion_event: string | null
           core_message: string | null
           created_at: string
@@ -29920,12 +29927,12 @@ export type Database = {
         Args: {
           p_campaign_id: string
           p_client_id: string
+          p_ideas: Json
           p_job_id: string
-          p_plan: Json
-          p_ideas: Json | null
           p_organic: number
           p_paid: number
           p_pieces: Json
+          p_plan: Json
         }
         Returns: undefined
       }
