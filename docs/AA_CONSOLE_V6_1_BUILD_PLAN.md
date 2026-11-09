@@ -1026,7 +1026,9 @@ Recorded in `V6_MERGE_ARCHIVE_RECORD.md` and still open:
 - the `if:` guard on `production-release-approval.yml`, which currently reports
   red on every pull request, folded into the same pass as the
   `verify-github-release-candidate` workflow-file guard
-- the fourteen-file stale migration-number doc sweep
+- the stale migration-number doc sweep was completed on 1 November 2026;
+  see `V6_MERGE_ARCHIVE_RECORD.md` for the corrected files and the dated
+  blueprint exception
 - leaked-password protection is disabled in Supabase Auth
 
 ## A process note worth keeping
