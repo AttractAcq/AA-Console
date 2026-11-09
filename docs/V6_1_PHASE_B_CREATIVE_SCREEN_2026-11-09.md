@@ -14,6 +14,8 @@ The original screen counted only flat light blocks. Its three claimed “image-l
 
 The 15–70% dark band contains both cards and photographs. In the reviewed contact sheets, a V2 dark text card had about 57% flat dark area, while genuine dark object photographs reached 66–83%. A single dark cutoff cannot truthfully assign `card_led`. The repaired screen records light and dark fractions separately and uses `dark_review` as an observational warning from 15% dark flatness. It says explicitly that a dark photograph can measure the same way. No dark render is refused on this signal. Bright card detection remains observational and its note no longer claims that flatness proves a card.
 
+The regression test now measures eight small PNG fixtures downscaled from the opened production pixels. Their source suffixes and human labels are recorded beside the fixtures. The paired dark card and dark photograph at about 32% flat-dark area make the overlap executable evidence rather than a claim based only on numeric mocks.
+
 ## Almost-empty frame
 
 The opened production story frame `.../cc3a2f22-f425-486e-890e-637a55b877e0/01.png` is essentially white with a sliver of a green object at the left: 97.45% flat light area, mean luminance 241.1. Frame `06.png` of the same story has a clear row of eight objects despite 84.61% flat light area and mean luminance 231.0. The guard uses at least 95% flat light **and** mean luminance at least 235. It stops a matching render before storage and returns a nonretryable job failure so an automatic retry cannot repeatedly buy the same blank output. The operator can rebuild the frame. This deliberately narrow criterion is not a general aesthetic test.

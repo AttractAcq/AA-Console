@@ -11,6 +11,36 @@ const frame = (light: number, dark: number, mean = 100): FrameComposition => ({
 });
 
 describe("production-calibrated composition screen", () => {
+  it("measures labelled production pixels across dark cards and photographs", async () => {
+    // These 96x144 PNGs are downscaled from visually reviewed production
+    // renders. The two ~32% examples prove dark flatness does not separate
+    // a typography card from a photograph with words over it.
+    const sample = (name: string) => measureComposition(new URL(`./fixtures/${name}.png`, import.meta.url).pathname);
+    const [photo19, photo32, card32, card57, photo83] = await Promise.all([
+      sample("dark-photo-19"), sample("dark-photo-32"),
+      sample("dark-card-32"), sample("dark-card-57"), sample("dark-photo-83"),
+    ]);
+    expect(photo19.flatDarkFraction).toBeGreaterThan(DARK_REVIEW_AT);
+    expect(card32.flatDarkFraction).toBeGreaterThan(DARK_REVIEW_AT);
+    expect(photo32.flatDarkFraction).toBeGreaterThan(DARK_REVIEW_AT);
+    expect(card57.flatDarkFraction).toBeGreaterThan(card32.flatDarkFraction);
+    expect(photo83.flatDarkFraction).toBeGreaterThan(card57.flatDarkFraction);
+    for (const measured of [photo19, photo32, card32, card57, photo83]) {
+      expect(frameVerdict(measured)).toBe("dark_review");
+    }
+  });
+
+  it("distinguishes the opened near-blank frame from visible light objects", async () => {
+    const sample = (name: string) => measureComposition(new URL(`./fixtures/${name}.png`, import.meta.url).pathname);
+    const [blank, objects, card] = await Promise.all([
+      sample("near-blank"), sample("light-objects"), sample("light-card"),
+    ]);
+    expect(isNearlyBlank(blank)).toBe(true);
+    expect(isNearlyBlank(objects)).toBe(false);
+    expect(isNearlyBlank(card)).toBe(false);
+    expect(frameVerdict(card)).toBe("card_led");
+  });
+
   it("raises dark card candidates missed by the light-only screen", () => {
     // A reviewed V2 typography frame has 57% flat dark area and no light stock.
     const darkCard = frame(0, .57, 75);
