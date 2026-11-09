@@ -4,7 +4,7 @@ This branch prepares Phase C; it does not authorize or perform a release. `AGENT
 
 ## Prepared changes
 
-- Migration 314 stores ordered `content_pieces` and includes them in the approved plan fingerprint. A human cannot approve a new v6 plan without a valid route, media type and format for every piece. A changed mix makes the old approval stale.
+- Migration 314 stores ordered `content_pieces` and includes them in the approved plan fingerprint. The plan, route volumes and piece mix commit in one RPC, including after worker retries. A human cannot approve a new v6 plan without a valid route, media type and format for every piece. A changed mix makes the old approval stale.
 - The planner writes the mix; the sweep passes each slot's approved route and shape into ideation. Existing legacy campaigns retain their historical single-image sweep behavior. Google-only campaigns still have no post-platform destination for this sweep and remain explicitly blocked by `platformFor`.
 - Dashboard switches retain the per-client engine switch. An expandable Dashboard section now carries the cadence, platform, budget, timezone and system controls; the duplicate Distribution Engine tab is removed. The Engine approval inbox remains.
 - The workflow reconciler directory is named `workflows/`. Intelligence readers exclude archived records, and agent reruns refuse to silently rewrite archived template records.

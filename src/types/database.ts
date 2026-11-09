@@ -29916,6 +29916,19 @@ export type Database = {
         }
         Returns: undefined
       }
+      save_campaign_plan_v6: {
+        Args: {
+          p_campaign_id: string
+          p_client_id: string
+          p_job_id: string
+          p_plan: Json
+          p_ideas: Json | null
+          p_organic: number
+          p_paid: number
+          p_pieces: Json
+        }
+        Returns: undefined
+      }
       save_campaign_plan_with_ideas: {
         Args: {
           p_campaign_id: string

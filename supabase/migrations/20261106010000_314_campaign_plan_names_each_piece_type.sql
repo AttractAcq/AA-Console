@@ -68,6 +68,50 @@ end $$;
 revoke all on function public.set_campaign_content_pieces_v6(uuid, jsonb) from public, anon, authenticated;
 grant execute on function public.set_campaign_content_pieces_v6(uuid, jsonb) to service_role;
 
+-- Save, route split and piece mix are one transaction. The legacy plan writers
+-- set built_at; a worker crash between separate RPCs would otherwise let its
+-- recovery path finalize a built plan with no approved mix.
+create or replace function public.save_campaign_plan_v6(
+  p_campaign_id uuid,
+  p_client_id uuid,
+  p_job_id uuid,
+  p_plan jsonb,
+  p_ideas jsonb,
+  p_organic integer,
+  p_paid integer,
+  p_pieces jsonb
+) returns void
+language plpgsql security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  c public.client_campaigns%rowtype;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'Only the agent runtime may save a v6 campaign plan.' using errcode = '42501';
+  end if;
+  select * into c from public.client_campaigns
+   where id = p_campaign_id and client_id = p_client_id for update;
+  if c.id is null then
+    raise exception 'That campaign no longer exists.' using errcode = 'P0001';
+  end if;
+  if c.built_at is not null then
+    raise exception 'This campaign already has a plan; a revision needs its own campaign.' using errcode = 'P0001';
+  end if;
+  if p_ideas is null then
+    perform public.save_campaign_plan_only(p_campaign_id, p_client_id, p_job_id, p_plan);
+  else
+    perform public.save_campaign_plan_with_ideas(p_campaign_id, p_client_id, p_job_id, p_plan, p_ideas);
+  end if;
+  perform public.set_campaign_route_volumes_v6(p_campaign_id, p_organic, p_paid);
+  perform public.set_campaign_content_pieces_v6(p_campaign_id, p_pieces);
+end $$;
+
+revoke all on function public.save_campaign_plan_v6(uuid, uuid, uuid, jsonb, jsonb, integer, integer, jsonb)
+  from public, anon, authenticated;
+grant execute on function public.save_campaign_plan_v6(uuid, uuid, uuid, jsonb, jsonb, integer, integer, jsonb)
+  to service_role;
+
 -- Migration 309's fingerprint, with the reviewed piece list included.
 create or replace function public.campaign_plan_fingerprint(
   p_campaign public.client_campaigns

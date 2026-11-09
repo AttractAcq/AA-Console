@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "5a018d22f8c8f5ea9c0c73588db9d7eafdc844e0145ec258e2e877dfde51dc72",
-  "generatedTypesSha256": "19115021aa2b5d6562f6841bb792ed2b39c71b2692aa893ca536dca6ffeca758",
-  "generatedSchemaBodySha256": "a8897cb9a3a96b040ab465ac09b5f5a259f4bdd7a78b205ecca039983b0018e0",
+  "migrationSourceDigest": "9480026bd216c0489da99189e3c25847bdf0f2404ee1688bf909e58904948d33",
+  "generatedTypesSha256": "051f18c37071e726bc8c130c7374b6691778a46dba7ddfff8e820b9144c94a9b",
+  "generatedSchemaBodySha256": "e224da60e472bf67e01766501c40763eb523b675a4423de08077cad81733aa00",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2318,8 +2318,8 @@
       "version": "20261106010000",
       "name": "314_campaign_plan_names_each_piece_type",
       "filename": "20261106010000_314_campaign_plan_names_each_piece_type.sql",
-      "sha256": "21564210d559a04be4b2fc5e9634f837baaa070525b42b822ea9ab938470a05a",
-      "trimmedMd5": "2cc78953254813c5dacc1f9d70edd824"
+      "sha256": "0c6a7c6b0d24365fbc48297cbec531dd1c46100890ceca1514a7002d329adcd5",
+      "trimmedMd5": "808606d0dd80d527f391b31bbcff1ac0"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

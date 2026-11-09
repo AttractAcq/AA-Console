@@ -536,8 +536,8 @@ Call ${submitTool.name} once when you are done.`;
     }
   }
 
+  let ideas: ReturnType<typeof campaignIdeas> | null = null;
   if (includeIdeas) {
-    let ideas;
     try {
       ideas = campaignIdeas(result.submitted.ideas, plan.content_count, pillars.map((p) => p.id));
       if (pieces && ideas.some((idea, index) => idea.media_type !== pieces[index]?.media_type ||
@@ -547,7 +547,27 @@ Call ${submitTool.name} once when you are done.`;
     } catch (error) {
       return { ok: false, retryable: true, failureMessage: (error as Error).message, usage };
     }
-    // One transaction commits the plan and its exact idea batch, or neither.
+  }
+
+  if (isV6 && !campaign.built_at) {
+    if (!volumes || "error" in volumes || !pieces) {
+      throw new Error("A new v6 plan needs route volumes and reviewed piece types before it can be saved.");
+    }
+    // The plan writer sets built_at. Save it, its route volumes and its reviewed
+    // mix in one RPC, so crash recovery never sees a half-written v6 plan.
+    const { error } = await sb.rpc("save_campaign_plan_v6", {
+      p_campaign_id: campaign.id,
+      p_client_id: job.client_id,
+      p_job_id: job.id,
+      p_plan: plan,
+      p_ideas: ideas,
+      p_organic: volumes.organic,
+      p_paid: volumes.paid,
+      p_pieces: pieces,
+    });
+    if (error) throw new Error(`Failed to write the complete v6 campaign plan: ${error.message}`);
+  } else if (ideas) {
+    // Legacy and existing-plan idea batches keep their original writer.
     const { error } = await sb.rpc("save_campaign_plan_with_ideas", {
       p_campaign_id: campaign.id,
       p_client_id: job.client_id,
@@ -564,25 +584,6 @@ Call ${submitTool.name} once when you are done.`;
       p_plan: plan,
     });
     if (error) throw new Error(`Failed to write campaign plan: ${error.message}`);
-  }
-
-  // After the save: content_count has to exist before it can be divided, and
-  // set_campaign_route_volumes_v6 checks the split against the stored total.
-  if (!campaign.built_at && volumes && !("error" in volumes)) {
-    const { error } = await sb.rpc("set_campaign_route_volumes_v6", {
-      p_campaign_id: campaign.id,
-      p_organic: volumes.organic,
-      p_paid: volumes.paid,
-    });
-    if (error) throw new Error(`Failed to record the route volumes: ${error.message}`);
-  }
-
-  if (!campaign.built_at && pieces) {
-    const { error } = await sb.rpc("set_campaign_content_pieces_v6", {
-      p_campaign_id: campaign.id,
-      p_pieces: pieces,
-    });
-    if (error) throw new Error(`Failed to record the planned piece types: ${error.message}`);
   }
 
   if (isV6) {
