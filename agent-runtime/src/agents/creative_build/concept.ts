@@ -42,6 +42,15 @@ const DECLARES_NO_IMAGERY = [
 /** Enough words to be a description rather than a gesture at one. */
 const MIN_BACKGROUND = 25;
 
+/** Only explicit instructions commission a typography card. A mere mention of
+ * type or a short headline does not override the image-led default. */
+export function briefRequestsCard(brief: {
+  title?: string | null; body?: string | null; visual_direction?: string | null;
+}): boolean {
+  const instruction = [brief.title, brief.body, brief.visual_direction].filter(Boolean).join("\n");
+  return /\b(type[- ]only|typography[- ]only|typographic card|quote (card|graphic)|text[- ]only (card|graphic)|no imagery of any kind)\b/i.test(instruction);
+}
+
 /**
  * Why this concept would not produce an image, or null.
  *
@@ -49,7 +58,7 @@ const MIN_BACKGROUND = 25;
  * which is cheaper than a person discovering a text card in the approval queue
  * and sending the whole brief back.
  */
-export function conceptProblem(concept: Record<string, unknown>): string | null {
+export function conceptProblem(concept: Record<string, unknown>, allowCard = false): string | null {
   const text = (key: string) => {
     const raw = concept[key];
     return typeof raw === "string" ? raw.trim() : "";
@@ -62,7 +71,7 @@ export function conceptProblem(concept: Record<string, unknown>): string | null 
   if (!background) {
     return "The concept describes no background. An image post has to show something behind the words.";
   }
-  if (background.length < MIN_BACKGROUND) {
+  if (!allowCard && background.length < MIN_BACKGROUND) {
     return "The background is too thin to render. Describe the setting or scene, not a colour.";
   }
 
@@ -71,6 +80,7 @@ export function conceptProblem(concept: Record<string, unknown>): string | null 
     return `"${treatment || "nothing"}" is not a way of making an image. Choose one of: ${TREATMENTS.join(", ")}.`;
   }
 
+  if (allowCard) return null;
   for (const pattern of DECLARES_NO_IMAGERY) {
     if (pattern.test(subject) || pattern.test(background)) {
       return "This concept rules out imagery, which makes it a text post. Describe what the picture actually shows — a person, a place, an object, a scene.";

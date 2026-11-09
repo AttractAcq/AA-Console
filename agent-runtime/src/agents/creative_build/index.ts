@@ -31,7 +31,7 @@ import { estimateCostUsd } from "../../usage/cost.js";
 import { PRIVATE_OBJECT_CACHE_CONTROL_SECONDS } from "../../storage/signed-url-policy.js";
 import { renderContext, renderUpstream } from "../shared.js";
 import { loadConceptContext } from "./context.js";
-import { remakeBlock, conceptProblem, recruitmentConceptProblem, TREATMENTS } from "./concept.js";
+import { remakeBlock, conceptProblem, recruitmentConceptProblem, briefRequestsCard, TREATMENTS } from "./concept.js";
 import {
   framePrompt,
   renderFrames,
@@ -58,40 +58,34 @@ import {
 } from "./frameRemake.js";
 import type { BusinessContext } from "../shared.js";
 import { RenderError, estimateImageCostUsd, renderImage, type ReferenceImage } from "./render.js";
-import { compositionNote, frameVerdict, measureComposition } from "./screen.js";
+import { compositionNote, frameVerdict, isNearlyBlank, measureComposition } from "./screen.js";
 
-/**
- * Record what a freshly rendered image actually is: a picture, or a text card
- * with imagery around it.
- *
- * Recorded, never enforced. `conceptProblem` already refuses a concept that
- * ASKS for typography; this measures what came back, because an audit of
- * production found renders that satisfy every concept rule truthfully and
- * still deliver a card. Whether a card is right is a brand decision, so this
- * puts a number in the job's events and leaves it there.
- *
- * Measurement failure is swallowed on purpose: an image that cannot be
- * measured is not a bad image, and losing a paid render to a decoding quirk
- * would be a worse bug than the one this watches for.
- */
+/** Review ambiguous compositions; prevent an almost-empty frame being filed. */
 async function noteComposition(
   sb: SupabaseClient,
   jobId: string,
   bytes: Buffer,
   label: string,
 ): Promise<void> {
+  let measured;
   try {
-    const measured = await measureComposition(bytes);
-    await appendEvent(sb, jobId, `${label}: ${compositionNote(measured)}`,
-      frameVerdict(measured) === "card_led" ? "warn" : "info",
-      {
-        creative_stage: "render",
-        flat_light_fraction: Number(measured.flatLightFraction.toFixed(4)),
-        composition: frameVerdict(measured),
-      });
+    measured = await measureComposition(bytes);
   } catch {
-    // Deliberately silent: see above.
+    // A decoder quirk should not lose an otherwise usable paid render.
+    return;
   }
+  const blank = isNearlyBlank(measured);
+  await appendEvent(sb, jobId, `${label}: ${compositionNote(measured)}`,
+    blank || frameVerdict(measured) === "card_led" || frameVerdict(measured) === "dark_review" ? "warn" : "info",
+    {
+      creative_stage: "render",
+      flat_light_fraction: Number(measured.flatLightFraction.toFixed(4)),
+      flat_dark_fraction: Number(measured.flatDarkFraction.toFixed(4)),
+      mean_luminance: Number(measured.meanLuminance.toFixed(1)),
+      composition: frameVerdict(measured),
+      nearly_blank: blank,
+    }).catch(() => {});
+  if (blank) throw new RenderError("The generated frame is nearly blank. Rebuild this frame.", false);
 }
 import { placeLogo } from "./logo.js";
 import { brandConceptBlock, brandRenderBlock, loadBrandProfile, type BrandProfile } from "./brand.js";
@@ -105,6 +99,7 @@ interface BriefRow {
   client_id: string;
   title: string;
   body: string | null;
+  visual_direction: string | null;
   media_type: "image" | "text" | "video";
   brief_ref: string | null;
   /** 'client' or 'recruitment'. A hiring ad is a different deliverable. */
@@ -138,16 +133,16 @@ export const IMAGE_CONCEPT_TOOL = {
       headline: { type: "string", description: "The largest words on the asset. Empty string if it carries no text." },
       subhead: { type: "string", description: "Supporting line, or an empty string." },
       call_to_action: { type: "string", description: "The action asked for, or an empty string." },
-      subject: { type: "string", description: "Who or what is literally in frame. A depicted subject — a person, a place, an object, a scene. Not a document, a card or a block of type." },
+      subject: { type: "string", description: "Who or what is literally in frame: normally a person, place, object or scene. A card surface only when the approved brief explicitly requests a typography card." },
       background: {
         type: "string",
         description:
-          "What fills the frame behind and around any text: the setting, scene or texture. Describe a real place or environment drawn from the ICP, the location or the topic. A flat colour, a gradient or blank paper is not a background.",
+          "What fills the frame behind and around any text: normally a real setting or scene drawn from the ICP or topic. A flat card surface is allowed only when the approved brief explicitly requests a typography card.",
       },
       visual_treatment: {
         type: "string",
         enum: [...TREATMENTS],
-        description: "How the imagery is made. There is deliberately no typography-only option: a post with no imagery is a text post, not an image post.",
+        description: "How the imagery is made. Use textured_graphic for a typography card only when the approved brief explicitly requests one.",
       },
       composition: { type: "string", description: "Layout, crop, where the text sits over the imagery, where the eye goes first." },
       art_direction: { type: "string", description: "Palette, lighting, mood, texture, photographic or graphic treatment." },
@@ -207,8 +202,8 @@ export function framesConceptTool(format: string, ask: FrameAsk = NO_FRAME_ASK) 
               headline: { type: "string", description: "The largest words on this frame. Empty string if it carries no text." },
               subhead: { type: "string", description: "Supporting line on this frame, or an empty string." },
               call_to_action: { type: "string", description: "The action asked for. Usually empty except on the last frame." },
-              subject: { type: "string", description: "Who or what is literally in this frame. A depicted subject, not a block of type." },
-              background: { type: "string", description: "What fills the frame behind the text. A real place or environment, not a flat colour." },
+              subject: { type: "string", description: "Who or what is literally in this frame. Normally a depicted subject; a card only if the approved brief explicitly requests one." },
+              background: { type: "string", description: "What fills the frame behind the text. Normally a real setting; a card surface only if explicitly commissioned." },
               visual_treatment: { type: "string", enum: [...TREATMENTS], description: "How this frame's imagery is made. The same across the set unless there is a reason." },
               composition: { type: "string", description: "Layout and crop for this frame." },
               art_direction: { type: "string", description: "Palette, lighting, texture. Consistent across the set: these run together." },
@@ -282,12 +277,12 @@ You are given an approved brief and the client's own intelligence. You decide wh
 WHAT YOU ARE DOING
 A brief states what the business needs. A renderer needs to be told what to make. Your job is that translation, and it is the whole reason this step exists — an image model handed a business brief produces a stock photo of the industry, because that is all it was given.
 
-THIS IS AN IMAGE, SO IT MUST CONTAIN AN IMAGE
-The frame has to show something: a person, a place, an object, a scene — photographed, illustrated or rendered. Text sits ON that imagery, it does not replace it.
+IMAGE-LED BY DEFAULT
+For a static image, show a real scene, photograph, object or place. Set the brief's words over that image. A paid Meta static should have a visual subject even when its headline is strong.
 
-A typeset document, a quote card, a page of terms, a headline on a flat brand colour: those are text posts. They go out through the text route, which exists for exactly that. If you produce one here the asset is wrong no matter how well it is set, because what was asked for was a picture.
+A typography card is appropriate only when the approved brief explicitly requests one. In that case honour the brief and use the textured_graphic treatment, describing the card's actual surface and layout in subject and background. Otherwise text sits ON imagery; it does not replace it.
 
-Draw the imagery from something real in the material you were given — where the buyer is, what their problem physically looks like, the place the work happens, the object at the centre of it. The ICP and the location are the two richest sources and are usually ignored.
+For image-led briefs, draw the imagery from something real in the material you were given — where the buyer is, what their problem physically looks like, the place the work happens, the object at the centre of it. The ICP and the location are the two richest sources and are usually ignored.
 
 RULES
 - Be specific and literal about what is in frame. "Professional imagery" is not a concept. "A dentist in her forties, mid-conversation with a patient, natural window light from camera left" is.
@@ -346,6 +341,10 @@ function composePrompt(
 
   return [
     `Create a finished, production-ready marketing image.`,
+    briefRequestsCard(brief)
+      ? `The approved brief explicitly calls for a typography card. Render that deliberate type layout; use no incidental photograph.`
+      : `Make this image-led: show the real scene or subject as the main visual, with any words over it. Do not let a text panel replace the image.`,
+    ...(brief.visual_direction ? [`Approved visual direction: ${brief.visual_direction}`] : []),
     ``,
     `SUBJECT`,
     s("subject"),
@@ -509,13 +508,14 @@ export async function runCreativeBuildJob(
 
   const { data: brief, error: briefError } = await sb
     .from("client_briefs")
-    .select("id, client_id, title, body, media_type, brief_ref, purpose, recruitment_role, content_format, format_code, frame_count, frame_plan")
+    .select("id, client_id, title, body, visual_direction, media_type, brief_ref, purpose, recruitment_role, content_format, format_code, frame_count, frame_plan")
     .eq("id", generation.brief_id)
     .maybeSingle();
   if (briefError) throw new Error(`Could not load the brief: ${briefError.message}`);
   if (!brief) return { ok: false, retryable: false, failureMessage: "That brief no longer exists." };
 
   const typed = brief as BriefRow;
+  const cardRequested = briefRequestsCard(typed);
   // A Phase 1 reel's opening stills are an image generation on a video brief.
   // Every other video still stops here. Carousel, story and single never
   // match, because their briefs are not video.
@@ -709,6 +709,10 @@ ${typed.title}
 
 ${typed.body ?? "(no detail beyond the title)"}
 
+VISUAL DIRECTION
+${typed.visual_direction ?? "Image-led by default: a real scene or photograph with the words over it."}
+${cardRequested ? "This brief explicitly requests a typography card. Follow that request." : "No typography card was requested. Make the image itself carry the idea."}
+
 BUSINESS CONTEXT
 ${renderContext(context as BusinessContext | null)}
 
@@ -799,7 +803,7 @@ Call ${submitTool.name} once when you are done.`;
     // at the same point, for the same price.
     const [replacement] = normaliseFrames([{ ...(concept.frame as object), position: remake.position }]);
     const problem = replacement
-      ? conceptProblem(replacement as unknown as Record<string, unknown>)
+      ? conceptProblem(replacement as unknown as Record<string, unknown>, cardRequested)
       : "The model returned no replacement frame.";
     if (problem) {
       await fail(problem);
@@ -808,13 +812,13 @@ Call ${submitTool.name} once when you are done.`;
     plannedFrames = [replacement as FrameConcept];
   } else if (isFramed) {
     plannedFrames = normaliseFrames(concept.frames);
-    const problem = framesConceptProblem(plannedFrames, conceptProblem, requiredFrameCount(frameAsk));
+    const problem = framesConceptProblem(plannedFrames, (frame) => conceptProblem(frame, cardRequested), requiredFrameCount(frameAsk));
     if (problem) {
       await fail(problem);
       return { ok: false, retryable: true, failureMessage: problem, usage };
     }
   } else if (isImage) {
-    const problem = conceptProblem(concept);
+    const problem = conceptProblem(concept, cardRequested);
     if (problem) {
       await fail(problem);
       return { ok: false, retryable: true, failureMessage: problem, usage };
@@ -952,7 +956,7 @@ Call ${submitTool.name} once when you are done.`;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await fail(message);
-      return { ok: false, retryable: true, failureMessage: message, usage };
+      return { ok: false, retryable: error instanceof RenderError ? error.retryable : true, failureMessage: message, usage };
     }
 
     const carried = framesToCarry(sourceFrames, remake.position).map((frame) => ({
@@ -1096,10 +1100,10 @@ Call ${submitTool.name} once when you are done.`;
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      // Retryable: the frames already stored survive, and the next attempt
-      // starts from the one that failed.
+      // Stored frames survive a retry. A nearly blank frame instead stops for
+      // an operator decision, so repeated paid calls cannot hide the defect.
       await fail(message);
-      return { ok: false, retryable: true, failureMessage: message, usage };
+      return { ok: false, retryable: error instanceof RenderError ? error.retryable : true, failureMessage: message, usage };
     }
 
     const filedFormat = openingShots ? "reel" : typed.content_format;

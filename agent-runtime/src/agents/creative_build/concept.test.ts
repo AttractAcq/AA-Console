@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { unsupportedStrictKeywords, missingStrictRequired } from "../../tools/schema.js";
 import { IMAGE_CONCEPT_TOOL, TEXT_CONCEPT_TOOL } from "./index.js";
-import { remakeBlock, conceptProblem, recruitmentConceptProblem, TREATMENTS } from "./concept.js";
+import { remakeBlock, conceptProblem, recruitmentConceptProblem, briefRequestsCard, TREATMENTS } from "./concept.js";
 
 const good = (over: Record<string, unknown> = {}) => ({
   headline: "CHEWING IS NOT A COSMETIC PROBLEM",
@@ -35,6 +35,25 @@ describe("a concept that will produce an image", () => {
     expect(
       conceptProblem(good({ avoid: "No photography of clinics, no illustration, no people in scrubs." })),
     ).toBeNull();
+  });
+});
+
+describe("the approved brief's visual target", () => {
+  it("defaults to a scene even when text or a headline is mentioned", () => {
+    expect(briefRequestsCard({ title: "Paid Meta static", body: "Use a short headline over a dental photograph." })).toBe(false);
+    expect(briefRequestsCard({ title: "A card on the table", body: "Show the patient at home." })).toBe(false);
+  });
+
+  it("honours an explicit type-only instruction", () => {
+    const brief = { title: "Quote Graphic", visual_direction: "Type only. Flat matte colour field, no imagery of any kind." };
+    expect(briefRequestsCard(brief)).toBe(true);
+    const card = good({
+      subject: "A quote card built entirely from typography and hairline rules, no imagery.",
+      background: "Flat #142B23.",
+      visual_treatment: "textured_graphic",
+    });
+    expect(conceptProblem(card)).not.toBeNull();
+    expect(conceptProblem(card, briefRequestsCard(brief))).toBeNull();
   });
 });
 
