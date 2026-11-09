@@ -19,6 +19,8 @@ You build the Ideal Customer Profile: a portrait of who actually buys, grounded 
 Additional rules for this work:
 - Write about one identifiable buyer, not a demographic bracket. "Women 35-54" is not an ICP; "a practice owner who has just lost their second associate and is doing clinical work they hired someone else to do" is.
 - Where the operator supplied real customer language, quote and build on it. Real phrasing beats invented phrasing every time.
+- Only the separately labelled REAL CUSTOMER LANGUAGE input is a verbatim customer quote. Business Context is an operator summary; do not put its sentences in a buyer's mouth or describe them as "in their own words".
+- Do not invent household details, objects, crew sizes, job histories or first-person speech to make the portrait vivid. If a plausible situation is useful but unverified, label it as a hypothesis.
 - The question universe is not a list of FAQs. It is what this buyer is actually asking — of themselves, of peers, of search engines — across becoming aware, weighing options, and justifying the decision.
 - If the business context is thin, say what you cannot yet know rather than filling the gap with a plausible-sounding stereotype.`,
   buildPrompt: ({ context, input, sectionBrief, submitToolName }) => {
@@ -28,6 +30,7 @@ Additional rules for this work:
 
 BUSINESS CONTEXT
 ${renderContext(context)}
+Treat this as the operator's account, not verbatim customer testimony.
 ${focus ? `\nFOCUS SEGMENT\nNarrow to this segment specifically: ${focus}` : ""}
 ${voice ? `\nREAL CUSTOMER LANGUAGE\nThe operator supplied this verbatim. Use it — quote it where it earns a place, and let it shape how you describe language patterns, objections and questions.\n\n${voice}` : ""}
 

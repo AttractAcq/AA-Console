@@ -30,6 +30,10 @@ For each answer, mark every material claim **supported**, **inference clearly la
 
 The shared upstream loader and the direct Intelligence readers in opportunity discovery, evaluation, strategy, offer compilation and creative context did not filter `archived_at`. They now select only active records. A rerun refuses to overwrite an archived template record silently; the operator must restore or replace it explicitly. The rerun check is scoped to the requested period so an archived Q1 record cannot block Q2 or suppress its fresh answer. This is a code-path fix, not evidence that the output-quality exercise has passed.
 
+## Historical sample boundary
+
+A local historical export informed the prompt corrections. It predates the current runtime, and its client-specific findings are not part of this repository's review evidence. The current-agent repetition and source-backed claim audit remain open.
+
 ## Evidence status
 
 The representative production or sanitized output records and their source context are not in this checkout. No repetition score or false-claim rate is claimed yet. Record the twelve trial IDs, source snapshots, claim classifications, discrepancies and reviewer decision here before closing this gate.
