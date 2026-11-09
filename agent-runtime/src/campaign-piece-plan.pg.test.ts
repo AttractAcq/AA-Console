@@ -98,3 +98,17 @@ it("rolls back a built plan when its route and piece mix disagree", async () => 
   const result = await db.query<{ built_at: string | null }>("select built_at from client_campaigns where id=$1", [second]);
   expect(result.rows[0]?.built_at).toBeNull();
 });
+
+it("commits an idea batch with its approved mix and refuses a competing planner", async () => {
+  const third = "33333333-3333-4333-8333-333333333333";
+  await db.query("insert into client_campaigns(id,client_id,acquisition_mode,content_count,organic_content_count,paid_content_count) values ($1,$1,'organic',1,1,0)", [third]);
+  const mix = JSON.stringify([{ acquisition_route: "organic", media_type: "video", content_format: "reel" }]);
+  const args = [third, third, third, JSON.stringify({ content_count: 1 }), JSON.stringify([{ title: "Idea" }]), 1, 0, mix];
+  await db.query("select save_campaign_plan_v6($1,$2,$3,$4::jsonb,$5::jsonb,$6,$7,$8::jsonb)", args);
+  const saved = await db.query<{ built: boolean; mix: unknown }>(
+    "select built_at is not null as built, content_pieces as mix from client_campaigns where id=$1", [third]);
+  expect(saved.rows[0]?.built).toBe(true);
+  expect(saved.rows[0]?.mix).toEqual(JSON.parse(mix));
+  await expect(db.query("select save_campaign_plan_v6($1,$2,$3,$4::jsonb,$5::jsonb,$6,$7,$8::jsonb)", args))
+    .rejects.toThrow(/already has a plan/);
+});
