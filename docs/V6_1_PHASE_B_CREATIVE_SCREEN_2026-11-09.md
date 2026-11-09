@@ -6,6 +6,8 @@ Harbour Dental's image briefs and AA's paid Meta statics are **image-led by defa
 
 The production data does not reliably mark “paid Meta” as a separate route: AA's static briefs have a mix of null and Instagram `target_platform` values, while `acquisition_route` is unpopulated in the inspected idea rows. The image-led default therefore applies to static image briefs generally, and an explicit card instruction remains the exception. Any future paid-only rule needs a typed source field.
 
+Six Harbour render PNGs were opened: five are card-dominant (two have a photograph confined to the upper part) and one is a photograph-led scene. The linked asset readback shows only three of those paths filed: a card pending review, a photo rejected, and another card approved. The decision above guides future generation; it does not undo the human approval. One unfiled raw render visibly carries a different practice name and phone number. That identity defect is separate from the composition screen and should be checked before any reuse of the old render.
+
 ## Pixel calibration
 
 The original screen counted only flat light blocks. Its three claimed “image-led controls” were dark typography cards. A local audit measured 161 production PNGs, including all 47 AA V2 renders, and visually reviewed 63 frames with at least 15% flat dark area and under 10% flat light area. These are real generated frames, not synthetic control images.
