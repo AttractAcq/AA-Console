@@ -17,11 +17,21 @@ export function buildIcpPrompt({ context, input, sectionBrief, submitToolName }:
   const quoteSource = typeof input.verified_quote_source === "string" ? input.verified_quote_source.trim() : "";
   const quoteDate = typeof input.verified_quote_date === "string" ? input.verified_quote_date.trim() : "";
   const unverifiedQuotes = quotes && (!quoteSource || !quoteDate) ? quotes : "";
+  // Revenue, AA's own channel plan and AA's sales workflow describe the
+  // provider, not the intended buyer. They repeatedly invite the model to
+  // invent buyer deal status, media habits and decision speed.
+  const buyerContext = context && {
+    ...context,
+    current_marketing: null,
+    sales_process: null,
+    current_revenue: null,
+    target_revenue: null,
+  };
   return `Build the ICP for this business.
 
 BUSINESS CONTEXT
-${renderContext(context)}
-Treat this as the operator's account, not verbatim customer testimony. In particular, an ideal_customer field describes the business's intended buyer hypothesis; it is not observed customer research. Marketing plans and sales process fields describe intended actions, not measured buyer behavior.
+${renderContext(buyerContext)}
+Treat this as the operator's account, not verbatim customer testimony. In particular, an ideal_customer field describes the business's intended buyer hypothesis; it is not observed customer research. Provider plans describe intended actions, not measured buyer behavior.
 ${focus ? `\nFOCUS SEGMENT\nNarrow to this segment specifically: ${focus}` : ""}
 ${notes || unverifiedQuotes ? `\nCUSTOMER LANGUAGE NOTES\nThese may be paraphrased call notes or summaries. Use them to identify themes, but never quote or attribute their wording as exact customer speech.\n\n${[notes, unverifiedQuotes].filter(Boolean).join("\n\n")}` : ""}
 ${quotes && quoteSource && quoteDate ? `\nVERIFIED VERBATIM CUSTOMER QUOTES\nThe operator identified these as exact customer words with source context. Quote only the exact words supplied, preserve their attribution, and do not invent surrounding details.\nSource: ${quoteSource}\nDate: ${quoteDate}\nExact words:\n${quotes}` : ""}

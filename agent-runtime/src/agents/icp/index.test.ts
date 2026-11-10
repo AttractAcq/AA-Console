@@ -43,6 +43,31 @@ describe("ICP customer-language provenance", () => {
     expect(prompt).not.toContain("VERIFIED VERBATIM CUSTOMER QUOTES\n");
   });
 
+  it("keeps provider revenue, marketing and sales process out of buyer evidence", () => {
+    const prompt = buildIcpPrompt({
+      ...base,
+      context: {
+        business_overview: "Makes a useful service.",
+        ideal_customer: "Owner operator.",
+        main_offer: "Monthly service.",
+        competitors: null,
+        brand_voice: null,
+        proof_testimonials: null,
+        current_marketing: "FACEBOOK_PROVIDER_PLAN_SENTINEL",
+        sales_process: "PROVIDER_SALES_PROCESS_SENTINEL",
+        current_revenue: "R0_PROVIDER_REVENUE_SENTINEL",
+        target_revenue: "PROVIDER_TARGET_SENTINEL",
+      },
+      input: {},
+    });
+    expect(prompt).toContain("Owner operator.");
+    expect(prompt).toContain("Monthly service.");
+    expect(prompt).not.toContain("FACEBOOK_PROVIDER_PLAN_SENTINEL");
+    expect(prompt).not.toContain("PROVIDER_SALES_PROCESS_SENTINEL");
+    expect(prompt).not.toContain("R0_PROVIDER_REVENUE_SENTINEL");
+    expect(prompt).not.toContain("PROVIDER_TARGET_SENTINEL");
+  });
+
   it("keeps explicitly verified quotes in their own attributed section", () => {
     const prompt = buildIcpPrompt({
       ...base,
