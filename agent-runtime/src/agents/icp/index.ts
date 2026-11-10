@@ -29,7 +29,7 @@ ${quotes && quoteSource && quoteDate ? `\nVERIFIED VERBATIM CUSTOMER QUOTES\nThe
 SECTIONS TO PRODUCE
 ${sectionBrief}
 
-Write each section in 60–120 words unless the supplied evidence genuinely requires more. For each section, name only the supplied target hypothesis, what is unknown, and one useful validation question or measurement. A short, accurate answer is better than filling a template with plausible buyer details.
+Write each section in 60–120 words unless the supplied evidence genuinely requires more. Use three labelled parts in each section: "Source (field name and operator hypothesis)", "Unknown", and "Validate". The Source part may only paraphrase content explicitly present in the named Business Context or input field; do not add a plausible implication. The Unknown part must state missing facts without implying their absence. The Validate part gives one useful question or measurement without an invented sample-size threshold. A short, accurate answer is better than filling a template with plausible buyer details.
 
 Call ${submitToolName} once when you are done.`;
 }
@@ -50,6 +50,7 @@ Additional rules for this work:
 - Do not invent a precise lead-time, sales-cycle length, customer sample size or validation threshold (such as "two to four weeks" or "ten calls") unless the source supplies it. Suggest what to measure without promising that an arbitrary sample will settle the question.
 - A named competitor is not evidence that the target buyer uses or has encountered it. An offer price and crew count do not establish buyer turnover, management layers, buying authority or affordability. Do not put these unsupported implications under "known" or "supplied".
 - Examples of invalid leaps: "two crews means a foreman runs the other crew"; "the agency names a marketplace, so this buyer uses it"; "a 1 October launch was planned, so the agency launched". State the unknown instead.
+- Other invalid leaps: "no client results" does not establish whether a client has run the loop; "burned by marketing" does not mean the prior spend produced nothing; a capture day or on-camera brand rep does not establish that the owner personally appears on camera. Do not turn these into objections or proof claims.
 - Do not state an internal feeling, motivation or trust response as a fact about the buyer. If useful, mark it as a question to validate in customer interviews.
 - The question universe contains candidate questions to validate across awareness, comparison and decision stages. Do not call them actual buyer questions or near-verbatim customer language without a sourced transcript.
 - Separate three levels in every section: supplied business plan or target hypothesis, verified customer observation (if any), and inference to test. Label material inferences where they appear, not only in a later disclaimer.
