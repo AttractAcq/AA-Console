@@ -18,6 +18,7 @@ export interface Template {
 }
 
 export interface BusinessContext {
+  updated_at?: string | null;
   business_overview: string | null;
   ideal_customer: string | null;
   main_offer: string | null;
@@ -51,7 +52,7 @@ export async function loadDomainContext(
       ? sb
           .from("client_business_context")
           .select(
-            "business_overview, ideal_customer, main_offer, competitors, brand_voice, proof_testimonials, current_marketing, sales_process, current_revenue, target_revenue",
+            "updated_at, business_overview, ideal_customer, main_offer, competitors, brand_voice, proof_testimonials, current_marketing, sales_process, current_revenue, target_revenue",
           )
           .eq("client_id", job.client_id)
           .maybeSingle()
@@ -127,10 +128,11 @@ export function renderUpstream(records: UpstreamRecord[]): string {
 export function renderContext(context: BusinessContext | null): string {
   if (!context) return "(no business context has been captured for this client yet)";
   const labels: Array<[keyof BusinessContext, string]> = [
+    ["updated_at", "Business context last updated (historical source date)"],
     ["business_overview", "Business overview"],
-    ["ideal_customer", "Ideal customer"],
+    ["ideal_customer", "Intended target customer (operator hypothesis, not observed buyer research)"],
     ["main_offer", "Main offer"],
-    ["competitors", "Competitors named by the client"],
+    ["competitors", "Competitors in the operator's analysis (not evidence that buyers use them)"],
     ["brand_voice", "Brand voice and what never to say"],
     ["proof_testimonials", "Proof and testimonials"],
     ["current_marketing", "Current marketing"],
