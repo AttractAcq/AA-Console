@@ -53,5 +53,9 @@ describe("Market source and scope boundary", () => {
       "market-size-and-share": sourced,
       "market-direction": "Context: supplied. External evidence: https://example.com/source. Unknown: target trend. Answer: Newest release identified: July 2026.",
     })).toMatch(/verified issue date/);
+    expect(validateMarketSections({
+      "market-size-and-share": sourced,
+      "market-direction": "Context: supplied. External evidence: https://example.com/source. Unknown: target trend. Answer: I am not calling February 2026 the newest issue; recency is unverified.",
+    })).toBeNull();
   });
 });

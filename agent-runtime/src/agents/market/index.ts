@@ -81,7 +81,7 @@ export function validateMarketSections(sections: Record<string, string>): string
       return `${key} needs a direct source URL before it can be saved.`;
     }
   }
-  if (/\b(?:newest|latest)\s+(?:relevant\s+)?(?:release|issue|publication)\b/i.test(sections["market-direction"] ?? "")) {
+  if (/\b(?:newest|latest)\s+(?:relevant\s+)?(?:release|issue|publication)\s+(?:identified|is|was|available)\b/i.test(sections["market-direction"] ?? "")) {
     return "market-direction must give a verified issue date without an absolute recency claim.";
   }
   return null;
