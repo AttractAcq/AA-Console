@@ -16,6 +16,7 @@ You research the market this business operates in, for the agency's strategists.
 EVIDENCE RULES — these are absolute:
 - Use only public, lawfully accessible material. Never invent a market size, growth rate, or statistic. A sourced range beats a confident number you made up.
 - Every external figure carries its geography, period, units and a direct working source URL in the section where it appears. Publisher names or report titles without URLs are not citations. If you cannot retrieve an official or other primary source page for a figure, omit the figure rather than rely on a search snippet, press summary or remembered rule. Do not copy web-search citation markers as if they were URLs.
+- Do not call a release the newest, latest or current unless you have checked the publisher's publication index as of the research date. A release page found by search does not prove there is no later issue. Give the issue date you verified, and say that recency is unverified if the index cannot be checked.
 - Distinguish the total market from the reachable market from the media-reachable audience. Conflating them is the most common and most expensive error in this work.
 - Do not turn illustrative worker counts, arbitrary trade shares or generic marketing-budget ratios into a claimed count of affordable buyers. If the reachable denominator is unknown, say so; calculate the client count needed from the stated revenue and price, but leave percentage market share unknown.
 - Never predict a platform audience estimate without actually running that targeting query. Never infer growth in each named trade from building-plan data for the wider alterations category.
@@ -34,7 +35,7 @@ CONSTRAINT DIAGNOSIS:
 const SECTION_QUESTIONS: Record<string, string> = {
   "market-definition": "Define the stated service category, buyer hypothesis, geography and adjacent alternatives. Separate sourced boundaries from unverified delivery radius, buyer authority and asset ownership.",
   "market-size-and-share": "Give current, directly linked primary-source category indicators with geography, period and units. If a reachable buyer count is unavailable, say so. Treat an unqualified target-revenue period as unknown and show only labelled conditional arithmetic; leave percentage share unknown without a matching denominator.",
-  "market-direction": "Find the newest relevant primary release first. State what its geography and measured category cover. If only older or broader indicators are available, leave current direction for the target trades unknown rather than extrapolating.",
+  "market-direction": "Check the primary publisher's publication index for the most recent issue available on the research date, then read the relevant release itself. State the verified issue date, geography and measured category. If the index or recent issue cannot be read, say which issue was retrieved without calling it the newest; leave present direction for the target trades unknown rather than extrapolating.",
   "constraint-diagnosis": "Give the best time-bounded diagnosis from the supplied operating evidence. If current pipeline and throughput are missing, say the current binding constraint is undetermined and specify the measurements needed; do not prescribe spend or hiring.",
   "commercial-structure": "Describe the documented offer and money flow, plus directly sourced competing models. Keep buyer paying authority, asset ownership, margins and preferred channels unknown without evidence. Name legal or tax topics for qualified review without stating rules or thresholds.",
 };
@@ -57,7 +58,7 @@ ${geography ? `\nGEOGRAPHY\nFocus on: ${geography}` : ""}
 SECTIONS TO PRODUCE — each section's description is the question it must answer
 ${sectionBrief}
 
-First find the newest official or other primary release for the stated geography and category. Use no more than two external indicators per section. A direct URL must identify each indicator. If the newest relevant source is old or broad, say that the present target-segment direction is unknown.
+First check the official or other primary publisher's dated publication index, then open the relevant issue. Use no more than two external indicators per section. A direct URL must identify each indicator. Report the date of the issue you actually read. If the index or newer issue is unavailable, do not imply the retrieved issue is the newest; present target-segment direction remains unknown when only old or broad evidence is available.
 
 Write 100–220 words per section. Use labelled parts "Context (field and historical date)", "External evidence (primary URL, geography, period, units)", "Unknown", and "Answer". Do not turn an Unknown into an Answer. The Answer may be "undetermined" when the source does not establish the requested conclusion. Put conditional arithmetic under Answer with its assumption stated. Omit unrelated claims, including tax rules, buyer payment preferences, asset ownership beyond the ad account, and capacity estimates from a calendar.
 
@@ -79,6 +80,9 @@ export function validateMarketSections(sections: Record<string, string>): string
     if (!/https?:\/\/\S+/i.test(sections[key] ?? "")) {
       return `${key} needs a direct source URL before it can be saved.`;
     }
+  }
+  if (/\b(?:newest|latest)\s+(?:relevant\s+)?(?:release|issue|publication)\b/i.test(sections["market-direction"] ?? "")) {
+    return "market-direction must give a verified issue date without an absolute recency claim.";
   }
   return null;
 }

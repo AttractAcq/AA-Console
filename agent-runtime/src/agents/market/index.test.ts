@@ -30,6 +30,7 @@ describe("Market source and scope boundary", () => {
     expect(prompt).not.toContain("PROVIDER_PROOF_SENTINEL");
     expect(MARKET_SYSTEM).toContain("A revenue target without a stated period is ambiguous");
     expect(MARKET_SYSTEM).toContain("direct working source URL");
+    expect(MARKET_SYSTEM).toContain("publisher's publication index");
     expect(MARKET_SYSTEM).toContain("Do not state tax or legal thresholds");
     expect(MARKET_SYSTEM).toContain("current binding constraint is undetermined");
   });
@@ -48,5 +49,9 @@ describe("Market source and scope boundary", () => {
       "market-size-and-share": sourced,
       "market-direction": sourced,
     })).toBeNull();
+    expect(validateMarketSections({
+      "market-size-and-share": sourced,
+      "market-direction": "Context: supplied. External evidence: https://example.com/source. Unknown: target trend. Answer: Newest release identified: July 2026.",
+    })).toMatch(/verified issue date/);
   });
 });
