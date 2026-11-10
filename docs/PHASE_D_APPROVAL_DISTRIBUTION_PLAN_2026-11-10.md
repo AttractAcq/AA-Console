@@ -2,6 +2,8 @@
 
 Status: development plan, 10 November 2026. Phase D is a later release. It is stacked after draft Phase C because its first schema migration must follow 314. Nothing in this plan authorizes a production migration, Railway deployment, or release merge.
 
+Development progress: migration 315 creates a private `approval-review-media` bucket whose objects cannot be updated or deleted, even by service role, plus an append-only, client-scoped inventory of runtime byte captures. The table checks client/asset ownership and that the referenced frozen object exists. Three isolated database tests cover immutability, malformed evidence and scoped access. This is storage groundwork only: no reviewable asset is registered, no byte digest is yet produced by the runtime, and no approval button or executor uses this table.
+
 ## First usable slice: one decision surface
 
 The unified Approval Inbox currently mirrors nine source routes. The media review queue is the only queue with production decision history, but `client_media_assets` is absent from the canonical ledger. Engine slots are mirrored as blocked cards while `EngineInboxPanel` owns their decisions. Moving either set of buttons without preserving its source checks would create a second, weaker approval route.
