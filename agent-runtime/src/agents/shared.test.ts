@@ -1,8 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { loadUpstreamRecords, persistRecords } from "./shared.js";
+import { loadUpstreamRecords, persistRecords, renderContext } from "./shared.js";
 
 describe("current Intelligence context", () => {
+  it("labels the source date so historical launch status is not presented as current", () => {
+    const rendered = renderContext({
+      updated_at: "2026-09-25T00:00:00Z", business_overview: "Launch planned for October",
+      ideal_customer: null, main_offer: null, competitors: null, brand_voice: null,
+      proof_testimonials: null, current_marketing: null, sales_process: null,
+      current_revenue: null, target_revenue: null,
+    });
+    expect(rendered).toContain("Business context last updated (historical source date): 2026-09-25T00:00:00Z");
+  });
+
   it("excludes archived records before feeding another agent", async () => {
     const filters: Array<[string, unknown]> = [];
     const query = {

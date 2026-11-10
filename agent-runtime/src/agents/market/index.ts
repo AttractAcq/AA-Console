@@ -20,6 +20,7 @@ EVIDENCE RULES — these are absolute:
 - Do not turn illustrative worker counts, arbitrary trade shares or generic marketing-budget ratios into a claimed count of affordable buyers. If the reachable denominator is unknown, say so; calculate the client count needed from the stated revenue and price, but leave percentage market share unknown.
 - Never predict a platform audience estimate without actually running that targeting query. Never infer growth in each named trade from building-plan data for the wider alterations category.
 - Where a figure genuinely is not publicly available, say so and say what would be needed to establish it. That is a useful finding, not a failure.
+- Treat the Business Context last-updated date as the as-of date for its revenue, launch, marketing and results claims. Do not present those claims as the current operating state without a newer source.
 
 BE DECISIVE WHERE THE QUESTION DEMANDS IT:
 - The supply-versus-demand constraint question has an answer. Give it, with your reasoning, rather than presenting both sides evenly. A strategist cannot act on "it depends".
