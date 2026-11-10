@@ -30,10 +30,12 @@ For each answer, mark every material claim **supported**, **inference clearly la
 
 The shared upstream loader and the direct Intelligence readers in opportunity discovery, evaluation, strategy, offer compilation and creative context did not filter `archived_at`. They now select only active records. A rerun refuses to overwrite an archived template record silently; the operator must restore or replace it explicitly. The rerun check is scoped to the requested period so an archived Q1 record cannot block Q2 or suppress its fresh answer. This is a code-path fix, not evidence that the output-quality exercise has passed.
 
+The legacy ICP form accepted call notes and summaries in `voice_of_customer`, while the prompt labelled the whole field as verbatim customer speech. A read-only production input confirmed that this mismatch is real. The prompt now treats the legacy field as notes that may inform themes but cannot be quoted; the form has a separate verified-verbatim field for exact words with source and date. This fixes the source label, not the output-quality result.
+
 ## Historical sample boundary
 
 A local historical export informed the prompt corrections. It predates the current runtime, and its client-specific findings are not part of this repository's review evidence. The current-agent repetition and source-backed claim audit remain open.
 
 ## Evidence status
 
-The representative production or sanitized output records and their source context are not in this checkout. No repetition score or false-claim rate is claimed yet. Keep the twelve trial IDs, source snapshots, claim classifications, discrepancies and reviewer decision in an approved private evidence location. Before closing this gate, record only a non-sensitive evidence reference, aggregate results, material failures and the review decision here. Do not paste client source material or client-specific derived findings into this public repository or its PR body.
+An approved read-only inventory on 10 November found two contrasting candidate context snapshots with one historical ICP and one historical Market output set each. Those runs predate the current prompt and are not independent repetitions. A verified verbatim customer-language source is still needed for the detailed-context trial. No repetition score or current false-claim rate is claimed yet. Keep the twelve trial IDs, source snapshots, claim classifications, discrepancies and reviewer decision in an approved private evidence location. Before closing this gate, record only a non-sensitive evidence reference, aggregate results, material failures and the review decision here. Do not paste client source material or client-specific derived findings into this public repository or its PR body.

@@ -6,15 +6,10 @@
 // facts. A model recalling them from training is guessing, which is the
 // exact failure the evidence rules below exist to prevent.
 
-import { createRecordAgent, HOUSE_RULES } from "../factory.js";
+import { createRecordAgent, HOUSE_RULES, type PromptArgs } from "../factory.js";
 import { renderContext } from "../shared.js";
 
-export const runMarketJob = createRecordAgent({
-  domain: "market",
-  enableWebSearch: true,
-  maxSearches: 15,
-
-  system: `${HOUSE_RULES}
+export const MARKET_SYSTEM = `${HOUSE_RULES}
 
 You research the market this business operates in, for the agency's strategists.
 
@@ -29,11 +24,11 @@ EVIDENCE RULES — these are absolute:
 BE DECISIVE WHERE THE QUESTION DEMANDS IT:
 - The supply-versus-demand constraint question has an answer. Give it, with your reasoning, rather than presenting both sides evenly. A strategist cannot act on "it depends".
 - A decisive constraint answer still names its assumptions. Do not assert that delivery capacity cannot bind without staff, throughput and pipeline evidence; say which constraint is most likely on the available facts and what would overturn that conclusion.
-- The share-needed calculation should be arithmetic a human can check: state the reachable market, the client's target revenue, the average transaction value you are assuming, and therefore the share required.`,
+- The share-needed calculation should be arithmetic a human can check: state the reachable market, the client's target revenue, the average transaction value you are assuming, and therefore the share required.`;
 
-  buildPrompt: ({ context, input, sectionBrief, submitToolName }) => {
-    const geography = typeof input.geography === "string" ? input.geography.trim() : "";
-    return `Research the market for this business.
+export function buildMarketPrompt({ context, input, sectionBrief, submitToolName }: PromptArgs): string {
+  const geography = typeof input.geography === "string" ? input.geography.trim() : "";
+  return `Research the market for this business.
 
 BUSINESS CONTEXT
 ${renderContext(context)}
@@ -43,7 +38,14 @@ SECTIONS TO PRODUCE — each section's description is the question it must answe
 ${sectionBrief}
 
 Call ${submitToolName} once when you are done.`;
-  },
+}
+
+export const runMarketJob = createRecordAgent({
+  domain: "market",
+  enableWebSearch: true,
+  maxSearches: 15,
+  system: MARKET_SYSTEM,
+  buildPrompt: buildMarketPrompt,
 
   describeStart: (input) =>
     typeof input.geography === "string" && input.geography.trim()

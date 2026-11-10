@@ -173,7 +173,8 @@ describe("form draft isolation", () => {
     ["contact:c", "email"], ["onboarding:contact:c", "phone"], ["lead:c", "name"],
     ["member-contract-profile:m", "tax_id"], ["billing:c", "monthly_amount"],
     ["finance-entry", "amount"], ["spend:c", "description"],
-    ["agent:icp:c", "voice_of_customer"], ["business-context:c", "proof_testimonials"],
+    ["agent:icp:c", "voice_of_customer"], ["agent:icp:c", "verified_customer_quotes"],
+    ["agent:icp:c", "verified_quote_source"], ["business-context:c", "proof_testimonials"],
     ["ad-copy:a", "ad_link_url"], ["recruitment-brief:writer", "apply_url"],
     ["brand:c", "custom_css"], ["unknown-form:c", "name"],
   ])("denies the private field %s / %s", (key, name) => {
