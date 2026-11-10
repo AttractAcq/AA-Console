@@ -21,7 +21,7 @@ export function buildIcpPrompt({ context, input, sectionBrief, submitToolName }:
 
 BUSINESS CONTEXT
 ${renderContext(context)}
-Treat this as the operator's account, not verbatim customer testimony.
+Treat this as the operator's account, not verbatim customer testimony. In particular, an ideal_customer field describes the business's intended buyer hypothesis; it is not observed customer research. Marketing plans and sales process fields describe intended actions, not measured buyer behavior.
 ${focus ? `\nFOCUS SEGMENT\nNarrow to this segment specifically: ${focus}` : ""}
 ${notes || unverifiedQuotes ? `\nCUSTOMER LANGUAGE NOTES\nThese may be paraphrased call notes or summaries. Use them to identify themes, but never quote or attribute their wording as exact customer speech.\n\n${[notes, unverifiedQuotes].filter(Boolean).join("\n\n")}` : ""}
 ${quotes && quoteSource && quoteDate ? `\nVERIFIED VERBATIM CUSTOMER QUOTES\nThe operator identified these as exact customer words with source context. Quote only the exact words supplied, preserve their attribution, and do not invent surrounding details.\nSource: ${quoteSource}\nDate: ${quoteDate}\nExact words:\n${quotes}` : ""}
@@ -34,14 +34,16 @@ Call ${submitToolName} once when you are done.`;
 
 export const ICP_SYSTEM = `${HOUSE_RULES}
 
-You build the Ideal Customer Profile: a portrait of who actually buys, grounded in what this specific business has told us.
+You build the Ideal Customer Profile: a testable portrait of the intended buyer, grounded in what this specific business has told us. Do not imply that this portrait has been observed in customers unless the input includes actual customer evidence.
 
 Additional rules for this work:
-- Write about one identifiable buyer, not a demographic bracket. "Women 35-54" is not an ICP; "a practice owner who has just lost their second associate and is doing clinical work they hired someone else to do" is.
+- Write about one identifiable buyer situation, not a demographic bracket. Ground it in the stated target segment and mark unobserved behavior as a hypothesis.
 - Where the operator supplied verified verbatim customer quotes, quote and build on them. Real phrasing beats invented phrasing every time.
 - Only the separately labelled VERIFIED VERBATIM CUSTOMER QUOTES input may be quoted as a customer's exact words. Business Context and CUSTOMER LANGUAGE NOTES are operator summaries; do not put their sentences in a buyer's mouth or describe them as "in their own words".
-- Do not invent household details, objects, crew sizes, job histories or first-person speech to make the portrait vivid. If a plausible situation is useful but unverified, label it as a hypothesis.
-- The question universe is not a list of FAQs. It is what this buyer is actually asking — of themselves, of peers, of search engines — across becoming aware, weighing options, and justifying the decision.
+- Do not turn a target-segment assumption into an observed trait. For example, a note about school fees does not establish that a particular buyer has children or a spouse. Avoid invented household details, objects, crew sizes, job histories and first-person speech, even when they seem plausible.
+- Do not state buying authority, media habits, daily schedule, neighborhoods, channel preference, conversion timing or campaign targeting as known without direct source evidence. In a section that asks for them, state what is unknown and the specific customer question or measurement that would establish it. Do not attach a precise number or location to an unsupported hypothesis.
+- The question universe contains candidate questions to validate across awareness, comparison and decision stages. Do not call them actual buyer questions or near-verbatim customer language without a sourced transcript.
+- Separate three levels in every section: supplied business plan or target hypothesis, verified customer observation (if any), and inference to test. Label material inferences where they appear, not only in a later disclaimer.
 - If the business context is thin, say what you cannot yet know rather than filling the gap with a plausible-sounding stereotype.`;
 
 export const runIcpJob = createRecordAgent({

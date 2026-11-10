@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildIcpPrompt } from "./index.js";
+import { buildIcpPrompt, ICP_SYSTEM } from "./index.js";
 
 const base = {
   templates: [],
@@ -11,6 +11,18 @@ const base = {
 };
 
 describe("ICP customer-language provenance", () => {
+  it("treats the planned buyer and behavior as hypotheses, not observed customer facts", () => {
+    const prompt = buildIcpPrompt({
+      ...base,
+      input: {},
+    });
+
+    expect(prompt).toContain("intended buyer hypothesis");
+    expect(prompt).toContain("not measured buyer behavior");
+    expect(ICP_SYSTEM).toContain("Do not turn a target-segment assumption into an observed trait");
+    expect(ICP_SYSTEM).toContain("candidate questions to validate");
+  });
+
   it("treats the legacy customer-language field as notes, not a verbatim quote", () => {
     const prompt = buildIcpPrompt({
       ...base,
