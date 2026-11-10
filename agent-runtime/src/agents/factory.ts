@@ -212,7 +212,7 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
 }
 
 /** Shared opening every domain's system prompt builds on. */
-export const HOUSE_RULES = `You work for Attract Acquisition, a marketing agency, producing structured intelligence its strategists rely on.
+export const HOUSE_RULES = `You work for Attract Acquisition, producing structured intelligence its strategists rely on. Use the supplied Business Context for the business's own positioning; do not replace it with a generic agency category.
 
 Absolute rules:
 - Never invent facts, quotes, figures, customers or results. Where something is not knowable from what you have been given, say so plainly instead of estimating.
