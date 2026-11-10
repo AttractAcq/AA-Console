@@ -26,6 +26,7 @@ export function buildIcpPrompt({ context, input, sectionBrief, submitToolName }:
     sales_process: null,
     current_revenue: null,
     target_revenue: null,
+    proof_testimonials: null,
   };
   return `Build the ICP for this business.
 
@@ -38,6 +39,8 @@ ${quotes && quoteSource && quoteDate ? `\nVERIFIED VERBATIM CUSTOMER QUOTES\nThe
 
 SECTIONS TO PRODUCE
 ${sectionBrief}
+
+The question-universe section must contain three explicit labels: "Awareness:", "Comparison:", and "Decision:". Put at least one candidate question after each label. These are questions to test, never observed buyer speech unless a verified transcript was supplied.
 
 Write each section in 25–60 words unless the supplied evidence genuinely requires more. Use three labelled parts in each section: "Source (field name and operator hypothesis)", "Unknown", and "Validate". Source is only a paraphrase of what the named field literally says; it must not contain an inference, even a labelled one. Unknown names missing evidence without implying the fact is absent in the world. Validate is one open question or measurement that could test an interpretation, without an invented time window or sample-size threshold. Do not state an interpretation as a buyer fact anywhere. Short, accurate unknowns are better than filling a template. Before submitting, remove every clause that cannot be traced to a named source field or framed as a question.
 
@@ -55,7 +58,7 @@ Additional rules for this work:
 - Do not turn a target-segment assumption into an observed trait. For example, a note about school fees does not establish that a particular buyer has children or a spouse. Avoid invented household details, objects, crew sizes, job histories and first-person speech, even when they seem plausible.
 - Do not state buying authority, media habits, daily schedule, neighborhoods, channel preference, conversion timing or campaign targeting as known without direct source evidence. In a section that asks for them, state what is unknown and the specific customer question or measurement that would establish it. Do not attach a precise number or location to an unsupported hypothesis.
 - Do not prescribe a new buyer split, ad audience, channel mix, selling season or campaign treatment from an unverified inference. Propose a bounded test instead, and leave the decision open until evidence exists.
-- Read negative evidence exactly: "no client results" does not mean "no clients"; "pre-revenue" or R0 revenue does not mean no closed deals, no leads or no work. A dated launch plan is not proof of the business's current status. Do not expand any of these into broader claims.
+- Read negative evidence exactly. A statement that one form of proof is missing does not establish that clients, references, testimonials, case studies or completed work are absent. Revenue does not establish deal, lead or sales-cycle status. A dated launch plan is not proof of the business's current status. Do not expand any of these into broader claims.
 - Missing quote or transcript material in the supplied input means only "no verified quote or transcript was supplied for this analysis". Do not claim that no buyer wording, calls or transcripts exist elsewhere. Likewise, a field saying "at the last diagnostic" must keep that time qualifier; the Business Context update date is not proof that the same status held on that date.
 - A trade type and city do not prove where the buyer works, which suppliers they visit, or what happens in their working week. Keep such details unknown until the operator or customer supplies them.
 - "Owner-operator" names an intended role, not a single-person buying unit, sole signer, sole payer, or the person who answers enquiries. The offer ladder also proves nothing about how many contacts decide or pay. Keep each decision role unknown until a source identifies it.
@@ -63,16 +66,33 @@ Additional rules for this work:
 - Do not invent a precise lead-time, sales-cycle length, customer sample size or validation threshold (such as "two to four weeks" or "ten calls") unless the source supplies it. Suggest what to measure without promising that an arbitrary sample will settle the question.
 - A named competitor is not evidence that the target buyer uses or has encountered it. An offer price and crew count do not establish buyer turnover, management layers, buying authority or affordability. Do not put these unsupported implications under "known" or "supplied".
 - Examples of invalid leaps: "two crews means a foreman runs the other crew"; "the agency names a marketplace, so this buyer uses it"; "a 1 October launch was planned, so the agency launched". State the unknown instead.
-- Other invalid leaps: "no client results" does not establish whether a client has run the loop; "burned by marketing" does not mean the prior spend produced nothing; a capture day or on-camera brand rep does not establish that the owner personally appears on camera. Do not turn these into objections or proof claims.
+- Other invalid leaps: a missing outcome figure does not establish whether a client has run the loop; "burned by marketing" does not mean the prior spend produced nothing; a capture day or on-camera brand rep does not establish that the owner personally appears on camera. Do not turn these into objections or proof claims.
 - Do not state an internal feeling, motivation or trust response as a fact about the buyer. If useful, mark it as a question to validate in customer interviews.
 - The question universe contains candidate questions to validate across awareness, comparison and decision stages. Do not call them actual buyer questions or near-verbatim customer language without a sourced transcript.
 - Separate supplied target hypotheses from verified customer observation (if any). Convert possible implications into Validate questions instead of asserting them, even with an "inference" label.
 - If the business context is thin, say what you cannot yet know rather than filling the gap with a plausible-sounding stereotype.`;
 
+export function validateIcpSections(sections: Record<string, string>): string | null {
+  const questions = sections["question-universe"] ?? "";
+  const stages = ["Awareness", "Comparison", "Decision"];
+  const positions = stages.map((stage) =>
+    new RegExp(`\\b${stage}:`, "i").exec(questions));
+  for (let i = 0; i < stages.length; i += 1) {
+    const match = positions[i];
+    const next = positions[i + 1];
+    if (!match || (next && next.index <= match.index)
+      || !questions.slice(match.index + match[0].length, next?.index).includes("?")) {
+      return `Question universe needs a candidate ${stages[i]!.toLowerCase()} question.`;
+    }
+  }
+  return null;
+}
+
 export const runIcpJob = createRecordAgent({
   domain: "icp",
   system: ICP_SYSTEM,
   buildPrompt: buildIcpPrompt,
+  validateSections: validateIcpSections,
   describeStart: (input) =>
     typeof input.focus_segment === "string" && input.focus_segment.trim()
       ? `Building ICP, focused on: ${input.focus_segment.trim()}.`

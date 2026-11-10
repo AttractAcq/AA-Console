@@ -49,6 +49,8 @@ export interface RecordAgentConfig {
   upstreamDomains?: string[];
   /** Return an error message to fail non-retryably before spending a token. */
   validate?: (input: Record<string, unknown>) => string | null;
+  /** Reject a domain-specific incomplete answer before it reaches records. */
+  validateSections?: (sections: Record<string, string>) => string | null;
   /** Campaign Intelligence is the one domain whose records carry a period. */
   resolvePeriod?: (input: Record<string, unknown>) => string | null;
   /** Opening line for the job event log. */
@@ -186,6 +188,11 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
         failureMessage: `Model returned empty or placeholder content for: ${placeholders.join(", ")}.`,
         usage,
       };
+    }
+
+    const sectionError = config.validateSections?.(sections);
+    if (sectionError) {
+      return { ok: false, retryable: true, failureMessage: sectionError, usage };
     }
 
     const { written, preserved } = await persistRecords(sb, {
