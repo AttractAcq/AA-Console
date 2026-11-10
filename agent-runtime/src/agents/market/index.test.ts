@@ -38,6 +38,7 @@ describe("Market source and scope boundary", () => {
     expect(MARKET_SYSTEM).toContain("Keep separately dated fields separate");
     expect(MARKET_SYSTEM).toContain("Target buyer geography is not a delivery or service boundary");
     expect(MARKET_SYSTEM).toContain("Do not turn a same-day contract and deposit after a yes into a \"first call\" commitment");
+    expect(MARKET_SYSTEM).toContain("A forthcoming issue date printed inside an older release is a schedule");
   });
 
   it("requires fetched, matched evidence and honest unknowns before persistence", () => {
@@ -74,6 +75,15 @@ describe("Market source and scope boundary", () => {
       "market-size-and-share": sourced,
       "market-direction": "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: absence here does not mean no public source exists. Answer: direction unknown.",
     })).toBeNull();
+    expect(validateMarketSections({
+      "market-size-and-share": sourced,
+      "market-direction": "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: later issues exist. Answer: direction unknown.",
+    })).toMatch(/cannot infer later publication/);
+    expect(validateMarketSections({
+      "market-size-and-share": sourced,
+      "market-direction": sourced,
+      "constraint-diagnosis": "Context: date of that diagnostic is absent; no pipeline was noted. External evidence: none verified. Evidence limit: no external measure used. Unknown: current count. Answer: the dated source showed no recorded pipeline.",
+    })).toMatch(/attaches an undated pipeline note/);
     expect(validateMarketSections({
       "market-size-and-share": sourced,
       "market-direction": sourced,
