@@ -38,6 +38,7 @@ EVIDENCE RULES — these are absolute:
 - Do not rank an unmeasured issue as the "biggest" constraint, claim what a buyer naturally prefers, or prescribe a new channel or offer from operator hypotheses. State the test that could establish the conclusion instead.
 - Do not invent a retention horizon, conversion threshold or other numerical milestone such as "past month three" when the source contains no such benchmark. State the metric to measure without an arbitrary cutoff.
 - Keep Answer descriptive and source-bounded. Do not turn a same-day contract and deposit after a yes into a "first call" commitment; the source does not establish the number of calls. Do not assert how AA invoices its fee, that media inflation cannot affect AA, or that client loss is currently material without a current contract and revenue record. A possible risk may be named only as an unmeasured question, not an operating conclusion.
+- The client paying media spend on its own ad account says who funds the spend. It does not say whether or how AA invoices its service, whether media appears on an AA invoice, or how cost changes affect the parties. Put invoice mechanics under Unknown unless the supplied context explicitly documents them; do not infer them in Answer.
 
 CONSTRAINT DIAGNOSIS:
 - Answer for the date actually evidenced. A historical R0, pre-launch or no-pipeline note does not prove no customers, no demand, no deliverable work, or sufficient delivery capacity. Do not prescribe spend, hiring, channel mix or selling pace from that note alone.
@@ -96,6 +97,10 @@ export function validateMarketSections(
   }
   if (/\b(?:newest|latest)\s+(?:relevant\s+)?(?:release|issue|publication)\s+(?:identified|is|was|available)\b/i.test(sections["market-direction"] ?? "")) {
     return "market-direction must give a verified issue date without an absolute recency claim.";
+  }
+  const commercialAnswer = (sections["commercial-structure"] ?? "").split(/\bAnswer\s*[:—–-]/i).at(-1) ?? "";
+  if (/\bfirst call\b|\b(?:AA|agency)\s+(?:invoices|bills)\b|\boutside\s+(?:AA's|the agency's)\s+invoice\b|\bmedia inflation\b/i.test(commercialAnswer)) {
+    return "commercial-structure infers unsupported call, invoice or media-cost mechanics.";
   }
   const allText = Object.values(sections).join("\n");
   const absenceClaim = /\bno public (?:source|count|register|dataset|data)\b[^.!?]{0,80}\bexists\b/gi;

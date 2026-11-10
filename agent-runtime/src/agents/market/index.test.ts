@@ -75,6 +75,11 @@ describe("Market source and scope boundary", () => {
       "market-direction": "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: absence here does not mean no public source exists. Answer: direction unknown.",
     })).toBeNull();
     expect(validateMarketSections({
+      "market-size-and-share": sourced,
+      "market-direction": sourced,
+      "commercial-structure": sourced.replace("Answer: undetermined", "Answer: media cost sits outside AA's invoice."),
+    })).toMatch(/unsupported call, invoice or media-cost mechanics/);
+    expect(validateMarketSections({
       "market-size-and-share": "Context: supplied. External evidence: none verified. Unknown: buyer count. Answer: undetermined.",
       "market-direction": sourced,
     })).toMatch(/Evidence limit/);

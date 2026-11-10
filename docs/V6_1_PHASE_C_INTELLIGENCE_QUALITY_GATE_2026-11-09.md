@@ -71,3 +71,5 @@ The next smoke left the unsupported market measures unknown, but a negative-evid
 The latest smoke passed the automated save validator, but manual review rejected widened target geography, merged historical qualifiers and an arbitrary retention horizon. The prompt now keeps these answer-level claims tied to the supplied source. This is a failed baseline, not the first passing repetition.
 
 Another smoke matched fetched primary text but failed manual review of commercial inferences: it assumed a first-call commitment and unsupported invoice and revenue-risk mechanics. The prompt now keeps Answer descriptive and source-bounded. A negated source-nonexistence phrase that tripped the validator was corrected and tested. The quality set remains unstarted.
+
+The next smoke passed the code gate and corrected the first-call claim, but still inferred invoice mechanics from client-paid media spend. The prompt now states that client payment does not establish AA's invoicing, and the save validator rejects those unsupported commercial assertions. It remains a failed baseline; zero repetitions have passed the full manual gate.
