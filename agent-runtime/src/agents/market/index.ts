@@ -26,6 +26,7 @@ EVIDENCE RULES — these are absolute:
 - Where a figure is not found in this research pass, say so and say what would be needed to establish it. That is a useful finding, not a failure.
 - A limited search cannot prove that a public buyer count or competitor source does not exist. Say "not found in this research pass" and identify where to look next; do not assert nonexistence.
 - Building plans passed measure approvals, not realized construction work or end-customer demand. Label them an adjacent activity proxy; never call their value market size or demand for this agency's service.
+- Buildings completed are reported completions, not approvals. They can measure realized construction activity in the publisher's covered area, but neither approvals nor completions establish demand for this agency's service or direction in each target trade.
 - Treat the Business Context last-updated date as the as-of date for its revenue, launch, marketing and results claims. A phrase such as "at the last diagnostic" keeps that narrower time qualifier; the update date does not prove the status held then or now. Do not present historical state as current without a newer source.
 - Keep separately dated fields separate in the output. In particular, a revenue or pre-launch field as of the context update must not be placed inside an "at the last founder diagnostic" clause when only the no-pipeline or no-content note carries that diagnostic qualifier. If the diagnostic date is absent, say so rather than assigning the context update date to it.
 - A revenue target without a stated period is ambiguous. Do not call it monthly, annual or recurring as a fact. You may show conditional arithmetic for an explicitly labelled monthly scenario, but keep the target period and resulting actual client count unknown until the operator confirms them. Show the price assumption and arithmetic.
@@ -92,7 +93,11 @@ export function validateMarketSections(
   if (/\b(?:newest|latest)\s+(?:relevant\s+)?(?:release|issue|publication)\s+(?:identified|is|was|available)\b/i.test(sections["market-direction"] ?? "")) {
     return "market-direction must give a verified issue date without an absolute recency claim.";
   }
-  if (/\bno public (?:source|count|register|dataset|data)\b[^.!?]{0,80}\bexists\b/i.test(Object.values(sections).join("\n"))) {
+  const allText = Object.values(sections).join("\n");
+  const absenceClaim = /\bno public (?:source|count|register|dataset|data)\b[^.!?]{0,80}\bexists\b/gi;
+  for (const match of allText.matchAll(absenceClaim)) {
+    const prefix = allText.slice(Math.max(0, (match.index ?? 0) - 80), match.index).split(/[.!?\n]/).at(-1) ?? "";
+    if (/(?:not proof that|cannot (?:establish|conclude|say) that|does not (?:show|mean|prove) that)\s*$/i.test(prefix)) continue;
     return "A research pass cannot establish that a public source does not exist.";
   }
   return verifyMarketSourceClaims(sections, fetchedSources);
