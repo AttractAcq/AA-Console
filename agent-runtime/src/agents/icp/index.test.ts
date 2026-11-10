@@ -19,7 +19,7 @@ describe("ICP customer-language provenance", () => {
 
     expect(prompt).toContain("intended buyer hypothesis");
     expect(prompt).toContain("not measured buyer behavior");
-    expect(prompt).toContain("35–70 words");
+    expect(prompt).toContain("25–60 words");
     expect(prompt).toContain('"Source (field name and operator hypothesis)", "Unknown", and "Validate"');
     expect(ICP_SYSTEM).toContain("Do not turn a target-segment assumption into an observed trait");
     expect(ICP_SYSTEM).toContain("candidate questions to validate");
@@ -27,6 +27,8 @@ describe("ICP customer-language provenance", () => {
     expect(ICP_SYSTEM).toContain("R0 revenue does not mean no closed deals");
     expect(ICP_SYSTEM).toContain("no verified quote or transcript was supplied for this analysis");
     expect(ICP_SYSTEM).toContain("A trade type and city do not prove where the buyer works");
+    expect(ICP_SYSTEM).toContain("not a single-person buying unit");
+    expect(ICP_SYSTEM).toContain("Convert possible implications into Validate questions");
     expect(ICP_SYSTEM).toContain("Do not prescribe a new buyer split");
     expect(ICP_SYSTEM).toContain("A named competitor is not evidence that the target buyer uses");
     expect(ICP_SYSTEM).toContain('"no client results" does not establish whether a client has run the loop');
