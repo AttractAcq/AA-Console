@@ -58,6 +58,15 @@ describe("Market primary-source fact verification", () => {
     }, [pdf])).toMatch(/outside a matched primary-source quote/);
   });
 
+  it("does not read the end of larger as a rand amount in source scope", () => {
+    const quote = "Additions and alterations decreased by 15,5% in January 2026 compared with January 2025.";
+    const scoped = section(quote).replace(
+      "Scope: South Africa; January 2026 versus January 2025; percent.",
+      "Scope: South Africa, larger municipalities; Jan–Feb 2026 versus Jan–Feb 2025; R'000, building plans passed; % change.",
+    );
+    expect(verifyMarketSourceClaims({ "market-size-and-share": unknown, "market-direction": scoped }, [source])).toBeNull();
+  });
+
   it("allows honest unknowns without a fetched source", () => {
     expect(verifyMarketSourceClaims({ "market-size-and-share": unknown, "market-direction": unknown }, [])).toBeNull();
     expect(verifyMarketSourceClaims({ "market-size-and-share": unknown, "market-direction": unknown.replace("undetermined", "growing") }, []))

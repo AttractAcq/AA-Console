@@ -34,6 +34,8 @@ describe("Market source and scope boundary", () => {
     expect(MARKET_SYSTEM).toContain("Building plans passed measure approvals");
     expect(MARKET_SYSTEM).toContain("Do not state tax or legal thresholds");
     expect(MARKET_SYSTEM).toContain("current binding constraint is undetermined");
+    expect(MARKET_SYSTEM).toContain("Keep separately dated fields separate");
+    expect(MARKET_SYSTEM).toContain("Target buyer geography is not a delivery or service boundary");
   });
 
   it("requires fetched, matched evidence and honest unknowns before persistence", () => {

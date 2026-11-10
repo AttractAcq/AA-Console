@@ -28,7 +28,7 @@ function answerPart(body: string): string {
   return start < 0 ? "" : body.slice(start + 6).replace(/^\s*[:—–-]\s*/, "").trim();
 }
 
-const FIGURE = /(?:[−-]?\d[\d,. ]*\s*%|(?:R|USD|\$|€|£)\s*[\d,. ]+|\b\d[\d,. ]*\s*(?:million|billion|thousand|businesses|firms|people|plans|jobs|units|square metres|m²)\b)/i;
+const FIGURE = /(?:[−-]?\d[\d,. ]*\s*%|(?:R|USD|\$|€|£)\s*\d[\d,. ]*|\b\d[\d,. ]*\s*(?:million|billion|thousand|businesses|firms|people|plans|jobs|units|square metres|m²)\b)/i;
 const MARKET_SCALE_FIGURE = /(?:\b\d[\d,. ]*\s*(?:million|billion|thousand|businesses|firms|people|plans|jobs|square metres|m²)\b|(?:R|USD|\$|€|£)\s*\d[\d,. ]*\s*(?:million|billion|thousand))/i;
 
 /** A linked URL is a candidate. Only a fetched primary document with an exact quote is evidence. */
