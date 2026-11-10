@@ -92,15 +92,11 @@ describe("Phase D frozen approval media", () => {
       .rejects.toThrow(/append only/i);
   });
 
-  it("allows only scoped reads to authenticated users and no direct insertion", async () => {
-    await db.query("select set_config('test.client_id',$1,false)", [CLIENT]);
+  it("keeps the capture inventory server-only until a source-owned review path exists", async () => {
     await db.exec("set role authenticated");
     try {
-      const own = await db.query("select id from public.media_approval_byte_snapshots_v6");
-      expect(own.rows).toHaveLength(1);
-      await db.query("select set_config('test.client_id',$1,false)", [OTHER]);
-      const other = await db.query("select id from public.media_approval_byte_snapshots_v6");
-      expect(other.rows).toHaveLength(0);
+      await expect(db.query("select id from public.media_approval_byte_snapshots_v6"))
+        .rejects.toThrow(/permission denied/i);
       await expect(db.exec(`insert into public.media_approval_byte_snapshots_v6
         (client_id,asset_id,source_path,source_snapshot,frozen_path,frozen_object_id,byte_sha256,byte_count)
         values ('${CLIENT}','${ASSET}','${CLIENT}/source.png','{"path":"source"}',

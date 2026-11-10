@@ -2,7 +2,7 @@
 
 Status: development plan, 10 November 2026. Phase D is a later release. It is stacked after draft Phase C because its first schema migration must follow 314. Nothing in this plan authorizes a production migration, Railway deployment, or release merge.
 
-Development progress: migration 315 creates a private `approval-review-media` bucket whose objects cannot be updated or deleted, even by service role, plus an append-only, client-scoped inventory of runtime byte captures. The table checks client/asset ownership and that the referenced frozen object exists. Three isolated database tests cover immutability, malformed evidence and scoped access. This is storage groundwork only: no reviewable asset is registered, no byte digest is yet produced by the runtime, and no approval button or executor uses this table.
+Development progress: migration 315 creates a private `approval-review-media` bucket whose objects cannot be updated or deleted, even by service role, plus an append-only, client-scoped inventory of runtime byte captures. The table checks client/asset ownership and that the referenced frozen object exists. The inventory is server-only until a source-owned reader applies the correct approval seat checks. Three isolated database tests cover immutability, malformed evidence and access denial. This is storage groundwork only: no reviewable asset is registered, no byte digest is yet produced by the runtime, and no approval button or executor uses this table.
 
 ## First usable slice: one decision surface
 

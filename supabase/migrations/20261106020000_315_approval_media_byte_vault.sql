@@ -108,14 +108,11 @@ create trigger media_approval_byte_snapshots_v6_no_truncate
   before truncate on public.media_approval_byte_snapshots_v6
   for each statement execute function public.reject_approval_ledger_mutation_v6();
 alter table public.media_approval_byte_snapshots_v6 enable row level security;
-create policy media_approval_byte_snapshots_v6_scoped_read
-  on public.media_approval_byte_snapshots_v6 for select to authenticated
-  using (public.can_access_client(client_id));
+-- No browser read path exists yet. A later source adapter may add one with
+-- the same owner-seat checks as its canonical approval entry.
 revoke all on public.media_approval_byte_snapshots_v6
   from public, anon, authenticated, service_role;
-grant select on public.media_approval_byte_snapshots_v6
-  to authenticated, service_role;
-grant insert on public.media_approval_byte_snapshots_v6 to service_role;
+grant select, insert on public.media_approval_byte_snapshots_v6 to service_role;
 
 comment on table public.media_approval_byte_snapshots_v6 is
   'Append-only inventory of trusted runtime byte captures. The vault alone does not authorize a media decision or external distribution.';
