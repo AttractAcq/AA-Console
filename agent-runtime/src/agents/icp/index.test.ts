@@ -19,10 +19,12 @@ describe("ICP customer-language provenance", () => {
 
     expect(prompt).toContain("intended buyer hypothesis");
     expect(prompt).toContain("not measured buyer behavior");
+    expect(prompt).toContain("60–120 words");
     expect(ICP_SYSTEM).toContain("Do not turn a target-segment assumption into an observed trait");
     expect(ICP_SYSTEM).toContain("candidate questions to validate");
     expect(ICP_SYSTEM).toContain('"no client results" does not mean "no clients"');
     expect(ICP_SYSTEM).toContain("Do not prescribe a new buyer split");
+    expect(ICP_SYSTEM).toContain("A named competitor is not evidence that the target buyer uses");
   });
 
   it("treats the legacy customer-language field as notes, not a verbatim quote", () => {

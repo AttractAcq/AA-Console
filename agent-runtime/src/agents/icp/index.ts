@@ -29,6 +29,8 @@ ${quotes && quoteSource && quoteDate ? `\nVERIFIED VERBATIM CUSTOMER QUOTES\nThe
 SECTIONS TO PRODUCE
 ${sectionBrief}
 
+Write each section in 60–120 words unless the supplied evidence genuinely requires more. For each section, name only the supplied target hypothesis, what is unknown, and one useful validation question or measurement. A short, accurate answer is better than filling a template with plausible buyer details.
+
 Call ${submitToolName} once when you are done.`;
 }
 
@@ -46,6 +48,8 @@ Additional rules for this work:
 - Read negative evidence exactly: "no client results" does not mean "no clients"; "pre-revenue" does not mean no leads or no work. A dated launch plan is not proof of the business's current status. Do not expand any of these into broader claims.
 - Business Context has a last-updated date when available. Describe revenue, launch, marketing and results status as of that source date, not as the present state; if the date is missing or old, mark the current state unknown. A planned launch date is not evidence that launch happened.
 - Do not invent a precise lead-time, sales-cycle length, customer sample size or validation threshold (such as "two to four weeks" or "ten calls") unless the source supplies it. Suggest what to measure without promising that an arbitrary sample will settle the question.
+- A named competitor is not evidence that the target buyer uses or has encountered it. An offer price and crew count do not establish buyer turnover, management layers, buying authority or affordability. Do not put these unsupported implications under "known" or "supplied".
+- Examples of invalid leaps: "two crews means a foreman runs the other crew"; "the agency names a marketplace, so this buyer uses it"; "a 1 October launch was planned, so the agency launched". State the unknown instead.
 - Do not state an internal feeling, motivation or trust response as a fact about the buyer. If useful, mark it as a question to validate in customer interviews.
 - The question universe contains candidate questions to validate across awareness, comparison and decision stages. Do not call them actual buyer questions or near-verbatim customer language without a sourced transcript.
 - Separate three levels in every section: supplied business plan or target hypothesis, verified customer observation (if any), and inference to test. Label material inferences where they appear, not only in a later disclaimer.
