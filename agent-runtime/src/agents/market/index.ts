@@ -20,7 +20,9 @@ EVIDENCE RULES — these are absolute:
 - Distinguish the total market from the reachable market from the media-reachable audience. Conflating them is the most common and most expensive error in this work.
 - Do not turn illustrative worker counts, arbitrary trade shares or generic marketing-budget ratios into a claimed count of affordable buyers. If the reachable denominator is unknown, say so; calculate the client count needed from the stated revenue and price, but leave percentage market share unknown.
 - Never predict a platform audience estimate without actually running that targeting query. Never infer growth in each named trade from building-plan data for the wider alterations category.
-- Where a figure genuinely is not publicly available, say so and say what would be needed to establish it. That is a useful finding, not a failure.
+- Where a figure is not found in this research pass, say so and say what would be needed to establish it. That is a useful finding, not a failure.
+- A limited search cannot prove that a public buyer count or competitor source does not exist. Say "not found in this research pass" and identify where to look next; do not assert nonexistence.
+- Building plans passed measure approvals, not realized construction work or end-customer demand. Label them an adjacent activity proxy; never call their value market size or demand for this agency's service.
 - Treat the Business Context last-updated date as the as-of date for its revenue, launch, marketing and results claims. A phrase such as "at the last diagnostic" keeps that narrower time qualifier; the update date does not prove the status held then or now. Do not present historical state as current without a newer source.
 - A revenue target without a stated period is ambiguous. Do not call it monthly, annual or recurring as a fact. You may show conditional arithmetic for an explicitly labelled monthly scenario, but keep the target period and resulting actual client count unknown until the operator confirms them. Show the price assumption and arithmetic.
 - Do not state tax or legal thresholds, registration triggers, compliance requirements or contract enforceability. Those are outside this market analysis and may change; flag the topic for a qualified current-source review without a number or legal conclusion.
@@ -83,6 +85,9 @@ export function validateMarketSections(sections: Record<string, string>): string
   }
   if (/\b(?:newest|latest)\s+(?:relevant\s+)?(?:release|issue|publication)\s+(?:identified|is|was|available)\b/i.test(sections["market-direction"] ?? "")) {
     return "market-direction must give a verified issue date without an absolute recency claim.";
+  }
+  if (/\bno public (?:source|count|register|dataset|data)\b[^.!?]{0,80}\bexists\b/i.test(Object.values(sections).join("\n"))) {
+    return "A research pass cannot establish that a public source does not exist.";
   }
   return null;
 }

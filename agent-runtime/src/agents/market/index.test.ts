@@ -31,6 +31,7 @@ describe("Market source and scope boundary", () => {
     expect(MARKET_SYSTEM).toContain("A revenue target without a stated period is ambiguous");
     expect(MARKET_SYSTEM).toContain("direct working source URL");
     expect(MARKET_SYSTEM).toContain("publisher's publication index");
+    expect(MARKET_SYSTEM).toContain("Building plans passed measure approvals");
     expect(MARKET_SYSTEM).toContain("Do not state tax or legal thresholds");
     expect(MARKET_SYSTEM).toContain("current binding constraint is undetermined");
   });
@@ -57,5 +58,9 @@ describe("Market source and scope boundary", () => {
       "market-size-and-share": sourced,
       "market-direction": "Context: supplied. External evidence: https://example.com/source. Unknown: target trend. Answer: I am not calling February 2026 the newest issue; recency is unverified.",
     })).toBeNull();
+    expect(validateMarketSections({
+      "market-size-and-share": "Context: supplied. External evidence: https://example.com/source. Unknown: No public count exists for this buyer segment. Answer: share unknown.",
+      "market-direction": sourced,
+    })).toMatch(/cannot establish/);
   });
 });
