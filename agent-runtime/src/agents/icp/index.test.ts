@@ -25,6 +25,7 @@ describe("ICP customer-language provenance", () => {
     expect(ICP_SYSTEM).toContain("candidate questions to validate");
     expect(ICP_SYSTEM).toContain('"no client results" does not mean "no clients"');
     expect(ICP_SYSTEM).toContain("R0 revenue does not mean no closed deals");
+    expect(ICP_SYSTEM).toContain("no verified quote or transcript was supplied for this analysis");
     expect(ICP_SYSTEM).toContain("A trade type and city do not prove where the buyer works");
     expect(ICP_SYSTEM).toContain("Do not prescribe a new buyer split");
     expect(ICP_SYSTEM).toContain("A named competitor is not evidence that the target buyer uses");
