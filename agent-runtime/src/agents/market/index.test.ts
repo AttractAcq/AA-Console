@@ -29,41 +29,41 @@ describe("Market source and scope boundary", () => {
     expect(prompt).not.toContain("PROVIDER_VOICE_SENTINEL");
     expect(prompt).not.toContain("PROVIDER_PROOF_SENTINEL");
     expect(MARKET_SYSTEM).toContain("A revenue target without a stated period is ambiguous");
-    expect(MARKET_SYSTEM).toContain("direct working source URL");
+    expect(MARKET_SYSTEM).toContain("direct working primary-source URL");
     expect(MARKET_SYSTEM).toContain("publisher's publication index");
     expect(MARKET_SYSTEM).toContain("Building plans passed measure approvals");
     expect(MARKET_SYSTEM).toContain("Do not state tax or legal thresholds");
     expect(MARKET_SYSTEM).toContain("current binding constraint is undetermined");
   });
 
-  it("blocks an unlinked size or direction answer before persistence", () => {
-    const sourced = "Context: supplied. External evidence: https://example.com/source. Evidence limit: category activity, not buyer count. Unknown: buyer count. Answer: undetermined.";
+  it("requires fetched, matched evidence and honest unknowns before persistence", () => {
+    const sourced = "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: buyer count. Answer: undetermined.";
     expect(validateMarketSections({
       "market-size-and-share": "Context: supplied. External evidence: publisher name. Evidence limit: category activity. Unknown: buyer count. Answer: undetermined.",
       "market-direction": sourced,
-    })).toMatch(/market-size-and-share/);
+    })).toMatch(/Source, Quote and Scope/);
     expect(validateMarketSections({
       "market-size-and-share": sourced,
       "market-direction": "Context: supplied. External evidence: publisher name. Evidence limit: category activity. Unknown: direction. Answer: undetermined.",
-    })).toMatch(/market-direction/);
+    })).toMatch(/Source, Quote and Scope/);
     expect(validateMarketSections({
       "market-size-and-share": sourced,
       "market-direction": sourced,
     })).toBeNull();
     expect(validateMarketSections({
       "market-size-and-share": sourced,
-      "market-direction": "Context: supplied. External evidence: https://example.com/source. Evidence limit: category activity. Unknown: target trend. Answer: Newest release identified: July 2026.",
+      "market-direction": "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: target trend. Answer: Newest release identified: July 2026.",
     })).toMatch(/verified issue date/);
     expect(validateMarketSections({
       "market-size-and-share": sourced,
-      "market-direction": "Context: supplied. External evidence: https://example.com/source. Evidence limit: category activity. Unknown: target trend. Answer: I am not calling February 2026 the newest issue; recency is unverified.",
+      "market-direction": "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: target trend. Answer: Direction unknown. I am not calling February 2026 the newest issue; recency is unverified.",
     })).toBeNull();
     expect(validateMarketSections({
-      "market-size-and-share": "Context: supplied. External evidence: https://example.com/source. Evidence limit: category activity. Unknown: No public count exists for this buyer segment. Answer: share unknown.",
+      "market-size-and-share": "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: No public count exists for this buyer segment. Answer: share unknown.",
       "market-direction": sourced,
     })).toMatch(/cannot establish/);
     expect(validateMarketSections({
-      "market-size-and-share": "Context: supplied. External evidence: https://example.com/source. Unknown: buyer count. Answer: undetermined.",
+      "market-size-and-share": "Context: supplied. External evidence: none verified. Unknown: buyer count. Answer: undetermined.",
       "market-direction": sourced,
     })).toMatch(/Evidence limit/);
   });

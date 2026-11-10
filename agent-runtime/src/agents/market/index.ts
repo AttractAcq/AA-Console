@@ -8,14 +8,17 @@
 
 import { createRecordAgent, HOUSE_RULES, type PromptArgs } from "../factory.js";
 import { renderContext } from "../shared.js";
+import type { FetchedSource } from "../../tools/source-text.js";
+import { verifyMarketSourceClaims } from "./source-verification.js";
 
 export const MARKET_SYSTEM = `${HOUSE_RULES}
 
 You research the market this business operates in, for the agency's strategists.
+"External evidence: none verified" is a required evidence-status value when source fetching or quote matching fails; it is not a placeholder.
 
 EVIDENCE RULES — these are absolute:
 - Use only public, lawfully accessible material. Never invent a market size, growth rate, or statistic. A sourced range beats a confident number you made up.
-- Every external figure carries its geography, period, units and a direct working source URL in the section where it appears. Publisher names or report titles without URLs are not citations. If you cannot retrieve an official or other primary source page for a figure, omit the figure rather than rely on a search snippet, press summary or remembered rule. Do not copy web-search citation markers as if they were URLs.
+- Every external figure carries its geography, period, units and a direct working primary-source URL in the section where it appears. Publisher names or report titles without URLs are not citations. Use web_fetch to retrieve each direct primary source and copy the exact statement or table row with its number into Quote. The runtime compares that quote to the fetched document before saving. If web_fetch cannot retrieve the source, omit its figure; a search snippet, press summary, remembered rule or citation marker cannot substitute.
 - Do not call a release the newest, latest or current unless you have checked the publisher's publication index as of the research date. A release page found by search does not prove there is no later issue. Give the issue date you verified, and say that recency is unverified if the index cannot be checked.
 - Distinguish the total market from the reachable market from the media-reachable audience. Conflating them is the most common and most expensive error in this work.
 - Do not turn illustrative worker counts, arbitrary trade shares or generic marketing-budget ratios into a claimed count of affordable buyers. If the reachable denominator is unknown, say so; calculate the client count needed from the stated revenue and price, but leave percentage market share unknown.
@@ -60,14 +63,20 @@ ${geography ? `\nGEOGRAPHY\nFocus on: ${geography}` : ""}
 SECTIONS TO PRODUCE — each section's description is the question it must answer
 ${sectionBrief}
 
-First check the official or other primary publisher's dated publication index, then open the relevant issue. Use no more than two external indicators per section. A direct URL must identify each indicator. Report the date of the issue you actually read. If the index or newer issue is unavailable, do not imply the retrieved issue is the newest; present target-segment direction remains unknown when only old or broad evidence is available.
+First check the primary publisher's dated publication index, then use web_fetch on the direct issue or primary page before quoting any figure. Use no more than two external indicators per section. If the source cannot be fetched, do not use its numbers; put candidate URLs under Unknown for later review. If the index or newer issue is unavailable, do not imply the retrieved issue is the newest; present target-segment direction remains unknown when only old or broad evidence is available.
 
-Write 100–220 words per section. Use labelled parts "Context (field and historical date)", "External evidence (primary URL, geography, period, units)", "Evidence limit", "Unknown", and "Answer". For each market-size or direction indicator, Evidence limit must name the thing the source actually measures and the target-market claim it cannot establish. Keep a plan approval separate from realized work, buyer demand and agency spend. If no external source was used, write "External evidence: none" and "Evidence limit: no external measure used". Do not turn an Unknown into an Answer. The Answer may be "undetermined" when the source does not establish the requested conclusion. Put conditional arithmetic under Answer with its assumption stated. Omit unrelated claims, including tax rules, buyer payment preferences, asset ownership beyond the ad account, and capacity estimates from a calendar.
+Write 100–220 words per section. Use labelled parts "Context (field and historical date)", "External evidence", "Evidence limit", "Unknown", and "Answer". External evidence must be exactly "none verified" or one three-line block per source, with no other lines:
+Source: https://primary-source-url
+Quote: "An exact contiguous sentence or table row copied from web_fetch, including the figure and its measured category"
+Scope: geography; measured period and comparison period; units
+For each market-size or direction indicator, Evidence limit must name the thing the source actually measures and the target-market claim it cannot establish. Keep a plan approval separate from realized work, buyer demand and agency spend. Do not put an external figure outside a verified Quote; Answer may repeat a quoted percentage only from that section. If no source was fetched, write "External evidence: none verified" and "Evidence limit: no external measure used" and leave market size or direction unknown. Do not turn an Unknown into an Answer. Put conditional arithmetic under Answer with its assumption stated. Omit unrelated claims, including tax rules, buyer payment preferences, asset ownership beyond the ad account, and capacity estimates from a calendar.
 
 Call ${submitToolName} once when you are done.`;
 }
 
-export function validateMarketSections(sections: Record<string, string>): string | null {
+export function validateMarketSections(
+  sections: Record<string, string>, fetchedSources: FetchedSource[] = [],
+): string | null {
   for (const [key, body] of Object.entries(sections)) {
     for (const label of ["Context", "External evidence", "Evidence limit", "Unknown", "Answer"]) {
       if (!body.toLowerCase().includes(label.toLowerCase())) {
@@ -78,27 +87,25 @@ export function validateMarketSections(sections: Record<string, string>): string
       return `${key} is too long to audit as a sourced market conclusion.`;
     }
   }
-  for (const key of ["market-size-and-share", "market-direction"]) {
-    if (!/https?:\/\/\S+/i.test(sections[key] ?? "")) {
-      return `${key} needs a direct source URL before it can be saved.`;
-    }
-  }
   if (/\b(?:newest|latest)\s+(?:relevant\s+)?(?:release|issue|publication)\s+(?:identified|is|was|available)\b/i.test(sections["market-direction"] ?? "")) {
     return "market-direction must give a verified issue date without an absolute recency claim.";
   }
   if (/\bno public (?:source|count|register|dataset|data)\b[^.!?]{0,80}\bexists\b/i.test(Object.values(sections).join("\n"))) {
     return "A research pass cannot establish that a public source does not exist.";
   }
-  return null;
+  return verifyMarketSourceClaims(sections, fetchedSources);
 }
 
 export const runMarketJob = createRecordAgent({
   domain: "market",
   enableWebSearch: true,
+  enableWebFetch: true,
   maxSearches: 15,
+  maxFetches: 8,
   system: MARKET_SYSTEM,
   buildPrompt: buildMarketPrompt,
   validateSections: validateMarketSections,
+  sectionValidationRetryable: false,
 
   describeStart: (input) =>
     typeof input.geography === "string" && input.geography.trim()

@@ -15,6 +15,7 @@ import { logger } from "../logging/logger.js";
 import { estimateCostUsd, type TokenUsage } from "../usage/cost.js";
 
 import { unsupportedStrictKeywords } from "./schema.js";
+import { inspectedFetchedSource, type FetchedSource } from "./source-text.js";
 
 export interface SubmitToolSpec {
   name: string;
@@ -37,8 +38,10 @@ export interface AgentLoopOptions {
   prompt: string;
   submitTool: SubmitToolSpec;
   enableWebSearch: boolean;
+  enableWebFetch?: boolean;
   maxTurns?: number;
   maxSearches?: number;
+  maxFetches?: number;
   onProgress?: (note: string) => void;
 }
 
@@ -46,6 +49,7 @@ export interface AgentLoopResult {
   submitted: Record<string, unknown>;
   usage: TokenUsage & { costUsd: number };
   turns: number;
+  fetchedSources: FetchedSource[];
 }
 
 /** Thrown for anything the caller may want to classify as retryable. */
@@ -119,6 +123,8 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     enableWebSearch,
     maxTurns = 12,
     maxSearches = 12,
+    enableWebFetch = false,
+    maxFetches = 8,
     onProgress,
     deadlineAt,
   } = options;
@@ -159,6 +165,14 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       max_uses: maxSearches,
     } as unknown as Anthropic.Messages.ToolUnion);
   }
+  if (enableWebFetch) {
+    tools.unshift({
+      type: "web_fetch_20260209",
+      name: "web_fetch",
+      max_uses: maxFetches,
+      max_content_tokens: 12_000,
+    } as unknown as Anthropic.Messages.ToolUnion);
+  }
 
   const messages: Anthropic.Messages.MessageParam[] = [{ role: "user", content: prompt }];
   const totals: TokenUsage = {
@@ -168,6 +182,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     cacheWriteTokens: 0,
     webSearches: 0,
   };
+  const fetchedSources = new Map<string, FetchedSource>();
 
   const usageWithCost = () => ({ ...totals, costUsd: estimateCostUsd(model, totals) });
   const startedAt = Date.now();
@@ -228,6 +243,12 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       outputTokens: response.usage.output_tokens,
     });
 
+    for (const block of response.content) {
+      if (block.type !== "web_fetch_tool_result") continue;
+      const fetched = await inspectedFetchedSource(block);
+      if (fetched) fetchedSources.set(fetched.url, fetched);
+    }
+
     // A policy decline is not something a retry fixes.
     if (response.stop_reason === "refusal") {
       throw new ProviderError(
@@ -246,6 +267,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
         submitted: submitCall.input as Record<string, unknown>,
         usage: usageWithCost(),
         turns: turn,
+        fetchedSources: [...fetchedSources.values()],
       };
     }
 

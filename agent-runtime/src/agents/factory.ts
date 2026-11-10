@@ -13,6 +13,7 @@ import type { JobResult, JobRunner } from "../orchestration/dispatch.js";
 import type { AgentJobRow } from "../queue.js";
 import { appendEvent } from "../queue.js";
 import { ProviderError, runAgentLoop } from "../tools/anthropic.js";
+import type { FetchedSource } from "../tools/source-text.js";
 import {
   buildSubmitTool,
   findPlaceholders,
@@ -44,13 +45,17 @@ export interface RecordAgentConfig {
   system: string;
   buildPrompt: (args: PromptArgs) => string;
   enableWebSearch?: boolean;
+  enableWebFetch?: boolean;
   maxSearches?: number;
+  maxFetches?: number;
   /** Domains whose records this agent synthesises from. */
   upstreamDomains?: string[];
   /** Return an error message to fail non-retryably before spending a token. */
   validate?: (input: Record<string, unknown>) => string | null;
   /** Reject a domain-specific incomplete answer before it reaches records. */
-  validateSections?: (sections: Record<string, string>) => string | null;
+  validateSections?: (sections: Record<string, string>, fetchedSources: FetchedSource[]) => string | null;
+  /** A failed source audit should stop rather than spend another model attempt. */
+  sectionValidationRetryable?: boolean;
   /** Campaign Intelligence is the one domain whose records carry a period. */
   resolvePeriod?: (input: Record<string, unknown>) => string | null;
   /** Opening line for the job event log. */
@@ -139,7 +144,9 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
         prompt,
         submitTool,
         enableWebSearch: config.enableWebSearch ?? false,
+        enableWebFetch: config.enableWebFetch ?? false,
         maxSearches: config.maxSearches ?? 12,
+        maxFetches: config.maxFetches ?? 8,
         onProgress: (note) => void appendEvent(sb, job.id, note),
       });
     } catch (error) {
@@ -190,9 +197,9 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
       };
     }
 
-    const sectionError = config.validateSections?.(sections);
+    const sectionError = config.validateSections?.(sections, result.fetchedSources);
     if (sectionError) {
-      return { ok: false, retryable: true, failureMessage: sectionError, usage };
+      return { ok: false, retryable: config.sectionValidationRetryable ?? true, failureMessage: sectionError, usage };
     }
 
     const { written, preserved } = await persistRecords(sb, {
