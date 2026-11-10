@@ -49,6 +49,15 @@ describe("Market primary-source fact verification", () => {
     }, [])).toMatch(/buyer-count figure outside a matched primary-source quote/);
   });
 
+  it("rejects a percentage inferred from a PDF table row that omits the percent sign", () => {
+    const row = "Additions and alterations 4 377 280 3 935 297 -441 983 -10,1";
+    const pdf = { ...source, text: row };
+    expect(verifyMarketSourceClaims({
+      "market-size-and-share": unknown,
+      "market-direction": section(row, "The category fell 10,1%.")
+    }, [pdf])).toMatch(/outside a matched primary-source quote/);
+  });
+
   it("allows honest unknowns without a fetched source", () => {
     expect(verifyMarketSourceClaims({ "market-size-and-share": unknown, "market-direction": unknown }, [])).toBeNull();
     expect(verifyMarketSourceClaims({ "market-size-and-share": unknown, "market-direction": unknown.replace("undetermined", "growing") }, []))
