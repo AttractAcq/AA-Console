@@ -62,14 +62,14 @@ ${sectionBrief}
 
 First check the official or other primary publisher's dated publication index, then open the relevant issue. Use no more than two external indicators per section. A direct URL must identify each indicator. Report the date of the issue you actually read. If the index or newer issue is unavailable, do not imply the retrieved issue is the newest; present target-segment direction remains unknown when only old or broad evidence is available.
 
-Write 100–220 words per section. Use labelled parts "Context (field and historical date)", "External evidence (primary URL, geography, period, units)", "Unknown", and "Answer". Do not turn an Unknown into an Answer. The Answer may be "undetermined" when the source does not establish the requested conclusion. Put conditional arithmetic under Answer with its assumption stated. Omit unrelated claims, including tax rules, buyer payment preferences, asset ownership beyond the ad account, and capacity estimates from a calendar.
+Write 100–220 words per section. Use labelled parts "Context (field and historical date)", "External evidence (primary URL, geography, period, units)", "Evidence limit", "Unknown", and "Answer". For each market-size or direction indicator, Evidence limit must name the thing the source actually measures and the target-market claim it cannot establish. Keep a plan approval separate from realized work, buyer demand and agency spend. If no external source was used, write "External evidence: none" and "Evidence limit: no external measure used". Do not turn an Unknown into an Answer. The Answer may be "undetermined" when the source does not establish the requested conclusion. Put conditional arithmetic under Answer with its assumption stated. Omit unrelated claims, including tax rules, buyer payment preferences, asset ownership beyond the ad account, and capacity estimates from a calendar.
 
 Call ${submitToolName} once when you are done.`;
 }
 
 export function validateMarketSections(sections: Record<string, string>): string | null {
   for (const [key, body] of Object.entries(sections)) {
-    for (const label of ["Context", "External evidence", "Unknown", "Answer"]) {
+    for (const label of ["Context", "External evidence", "Evidence limit", "Unknown", "Answer"]) {
       if (!body.toLowerCase().includes(label.toLowerCase())) {
         return `${key} needs a ${label} part before it can be saved.`;
       }

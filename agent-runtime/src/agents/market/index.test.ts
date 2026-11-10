@@ -37,14 +37,14 @@ describe("Market source and scope boundary", () => {
   });
 
   it("blocks an unlinked size or direction answer before persistence", () => {
-    const sourced = "Context: supplied. External evidence: https://example.com/source. Unknown: buyer count. Answer: undetermined.";
+    const sourced = "Context: supplied. External evidence: https://example.com/source. Evidence limit: category activity, not buyer count. Unknown: buyer count. Answer: undetermined.";
     expect(validateMarketSections({
-      "market-size-and-share": "Context: supplied. External evidence: publisher name. Unknown: buyer count. Answer: undetermined.",
+      "market-size-and-share": "Context: supplied. External evidence: publisher name. Evidence limit: category activity. Unknown: buyer count. Answer: undetermined.",
       "market-direction": sourced,
     })).toMatch(/market-size-and-share/);
     expect(validateMarketSections({
       "market-size-and-share": sourced,
-      "market-direction": "Context: supplied. External evidence: publisher name. Unknown: direction. Answer: undetermined.",
+      "market-direction": "Context: supplied. External evidence: publisher name. Evidence limit: category activity. Unknown: direction. Answer: undetermined.",
     })).toMatch(/market-direction/);
     expect(validateMarketSections({
       "market-size-and-share": sourced,
@@ -52,15 +52,19 @@ describe("Market source and scope boundary", () => {
     })).toBeNull();
     expect(validateMarketSections({
       "market-size-and-share": sourced,
-      "market-direction": "Context: supplied. External evidence: https://example.com/source. Unknown: target trend. Answer: Newest release identified: July 2026.",
+      "market-direction": "Context: supplied. External evidence: https://example.com/source. Evidence limit: category activity. Unknown: target trend. Answer: Newest release identified: July 2026.",
     })).toMatch(/verified issue date/);
     expect(validateMarketSections({
       "market-size-and-share": sourced,
-      "market-direction": "Context: supplied. External evidence: https://example.com/source. Unknown: target trend. Answer: I am not calling February 2026 the newest issue; recency is unverified.",
+      "market-direction": "Context: supplied. External evidence: https://example.com/source. Evidence limit: category activity. Unknown: target trend. Answer: I am not calling February 2026 the newest issue; recency is unverified.",
     })).toBeNull();
     expect(validateMarketSections({
-      "market-size-and-share": "Context: supplied. External evidence: https://example.com/source. Unknown: No public count exists for this buyer segment. Answer: share unknown.",
+      "market-size-and-share": "Context: supplied. External evidence: https://example.com/source. Evidence limit: category activity. Unknown: No public count exists for this buyer segment. Answer: share unknown.",
       "market-direction": sourced,
     })).toMatch(/cannot establish/);
+    expect(validateMarketSections({
+      "market-size-and-share": "Context: supplied. External evidence: https://example.com/source. Unknown: buyer count. Answer: undetermined.",
+      "market-direction": sourced,
+    })).toMatch(/Evidence limit/);
   });
 });

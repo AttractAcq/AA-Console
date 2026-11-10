@@ -19,3 +19,7 @@ This branch prepares Phase C; it does not authorize or perform a release. `AGENT
 5. Merge the receipt only after exact-head CI and separate Chief of Staff approval. Verify Pages deployment, served bundle SHA and public live identities.
 
 The Intelligence repetition and false-claim review remains a Phase C completion gate. This branch must stay draft until that evidence is reviewed or the release scope is expressly changed.
+
+## Read-only production preflight
+
+At 2026-11-10 13:42 UTC, an exact-count read of production `client_campaigns` found **0 v6 campaigns, 0 built v6 plans and 0 approved v6 plans**. Migration 314 therefore had no existing v6 approval fingerprint to stale at that snapshot. Recheck counts immediately before apply; this is a time-bounded observation, not authorization to merge or migrate. The linked migration ledger was not read in this worktree because it is not linked to the production project.
