@@ -86,6 +86,14 @@ describe("the job deadline", () => {
     expect(out.submitted).toEqual({ ok: true });
   });
 
+  it("treats a terminated response stream as a retryable transport failure", async () => {
+    streamMock.mockReturnValue({ finalMessage: async () => { throw new Error("terminated"); } });
+    const err = await runAgentLoop(base).catch((error) => error);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect((err as ProviderError).retryable).toBe(true);
+    expect((err as ProviderError).message).toBe("terminated");
+  });
+
   // A request must not be able to start just inside the deadline and then run
   // for a full provider timeout beyond it.
   it("caps the request signal at whatever time is left, not the full timeout", async () => {

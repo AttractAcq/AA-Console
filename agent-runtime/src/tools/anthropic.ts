@@ -65,7 +65,7 @@ export class ProviderError extends Error {
   }
 }
 
-function classify(error: unknown): { message: string; retryable: boolean } {
+export function classifyProviderError(error: unknown): { message: string; retryable: boolean } {
   if (error instanceof Anthropic.APIError) {
     const status = error.status ?? 0;
     // 4xx other than 429 means we sent something wrong — retrying sends
@@ -82,7 +82,7 @@ function classify(error: unknown): { message: string; retryable: boolean } {
     return { message: "The model call was cut off by the job's deadline.", retryable: true };
   }
   const message = error instanceof Error ? error.message : String(error);
-  return { message, retryable: /timeout|timed out|econnreset|socket|abort/i.test(message) };
+  return { message, retryable: /timeout|timed out|econnreset|socket|abort|terminated|stream ended without/i.test(message) };
 }
 
 type Blocks = Anthropic.Messages.ContentBlockParam[];
@@ -224,7 +224,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       );
       response = await stream.finalMessage();
     } catch (error) {
-      const { message, retryable } = classify(error);
+      const { message, retryable } = classifyProviderError(error);
       throw new ProviderError(message, retryable, usageWithCost());
     }
 
