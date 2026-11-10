@@ -37,6 +37,7 @@ describe("Market source and scope boundary", () => {
     expect(MARKET_SYSTEM).toContain("current binding constraint is undetermined");
     expect(MARKET_SYSTEM).toContain("Keep separately dated fields separate");
     expect(MARKET_SYSTEM).toContain("Target buyer geography is not a delivery or service boundary");
+    expect(MARKET_SYSTEM).toContain("Do not turn a same-day contract and deposit after a yes into a \"first call\" commitment");
   });
 
   it("requires fetched, matched evidence and honest unknowns before persistence", () => {
@@ -68,6 +69,10 @@ describe("Market source and scope boundary", () => {
     expect(validateMarketSections({
       "market-size-and-share": "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: not found in this pass, not proof that no public source exists. Answer: share unknown.",
       "market-direction": sourced,
+    })).toBeNull();
+    expect(validateMarketSections({
+      "market-size-and-share": sourced,
+      "market-direction": "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: absence here does not mean no public source exists. Answer: direction unknown.",
     })).toBeNull();
     expect(validateMarketSections({
       "market-size-and-share": "Context: supplied. External evidence: none verified. Unknown: buyer count. Answer: undetermined.",

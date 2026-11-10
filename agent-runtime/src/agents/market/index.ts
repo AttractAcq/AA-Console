@@ -37,6 +37,7 @@ EVIDENCE RULES — these are absolute:
 - Preserve the exact target geography. Cape Town targeting does not establish a Western Cape-wide buyer segment. Do not widen a city target to its province in Answer.
 - Do not rank an unmeasured issue as the "biggest" constraint, claim what a buyer naturally prefers, or prescribe a new channel or offer from operator hypotheses. State the test that could establish the conclusion instead.
 - Do not invent a retention horizon, conversion threshold or other numerical milestone such as "past month three" when the source contains no such benchmark. State the metric to measure without an arbitrary cutoff.
+- Keep Answer descriptive and source-bounded. Do not turn a same-day contract and deposit after a yes into a "first call" commitment; the source does not establish the number of calls. Do not assert how AA invoices its fee, that media inflation cannot affect AA, or that client loss is currently material without a current contract and revenue record. A possible risk may be named only as an unmeasured question, not an operating conclusion.
 
 CONSTRAINT DIAGNOSIS:
 - Answer for the date actually evidenced. A historical R0, pre-launch or no-pipeline note does not prove no customers, no demand, no deliverable work, or sufficient delivery capacity. Do not prescribe spend, hiring, channel mix or selling pace from that note alone.
@@ -48,7 +49,7 @@ const SECTION_QUESTIONS: Record<string, string> = {
   "market-size-and-share": "Give current, directly linked primary-source category indicators with geography, period and units. If a reachable buyer count is not found in this pass, say so without claiming that no denominator exists anywhere. Treat an unqualified target-revenue period as unknown and show only labelled conditional arithmetic; leave percentage share unknown without a matching denominator.",
   "market-direction": "Check the primary publisher's publication index for the most recent issue available on the research date, then read the relevant release itself. State the verified issue date, geography and measured category. If the index or recent issue cannot be read, say which issue was retrieved without calling it the newest; leave present direction for the target trades unknown rather than extrapolating.",
   "constraint-diagnosis": "Give the best time-bounded diagnosis from the supplied operating evidence. Keep the context update and any undated founder diagnostic separate in both Context and Answer. If current pipeline and throughput are missing, say the current binding constraint is undetermined and specify the measurements needed; do not prescribe spend or hiring.",
-  "commercial-structure": "Describe the documented offer and money flow, plus directly sourced competing models. Keep buyer paying authority, asset ownership, margins and preferred channels unknown without evidence. Name legal or tax topics for qualified review without stating rules or thresholds.",
+  "commercial-structure": "Describe the documented offer and money flow, plus directly sourced competing models. Keep the documented same-day step separate from any unsupported claim that it happens on a first call; do not infer invoice mechanics, revenue concentration or client-loss impact. Keep buyer paying authority, asset ownership, margins and preferred channels unknown without evidence. Name legal or tax topics for qualified review without stating rules or thresholds.",
 };
 
 export function buildMarketPrompt({ context, input, templates, submitToolName }: PromptArgs): string {
@@ -100,7 +101,7 @@ export function validateMarketSections(
   const absenceClaim = /\bno public (?:source|count|register|dataset|data)\b[^.!?]{0,80}\bexists\b/gi;
   for (const match of allText.matchAll(absenceClaim)) {
     const prefix = allText.slice(Math.max(0, (match.index ?? 0) - 80), match.index).split(/[.!?\n]/).at(-1) ?? "";
-    if (/(?:not proof that|cannot (?:establish|conclude|say) that|does not (?:show|mean|prove) that)\s*$/i.test(prefix)) continue;
+    if (/(?:not proof that|cannot (?:establish|conclude|say) that|does not (?:show|mean|prove)(?: that)?)\s*$/i.test(prefix)) continue;
     return "A research pass cannot establish that a public source does not exist.";
   }
   return verifyMarketSourceClaims(sections, fetchedSources);

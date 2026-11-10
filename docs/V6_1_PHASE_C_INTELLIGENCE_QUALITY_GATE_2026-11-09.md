@@ -69,3 +69,5 @@ The following smoke corrected those time and geography claims but again quoted a
 The next smoke left the unsupported market measures unknown, but a negative-evidence phrase was misread by the validator and manual review found an imprecise distinction between plans passed and buildings completed. The validator now permits a negated source-nonexistence statement, and the prompt distinguishes approvals from reported completions. The private output remains a failed baseline.
 
 The latest smoke passed the automated save validator, but manual review rejected widened target geography, merged historical qualifiers and an arbitrary retention horizon. The prompt now keeps these answer-level claims tied to the supplied source. This is a failed baseline, not the first passing repetition.
+
+Another smoke matched fetched primary text but failed manual review of commercial inferences: it assumed a first-call commitment and unsupported invoice and revenue-risk mechanics. The prompt now keeps Answer descriptive and source-bounded. A negated source-nonexistence phrase that tripped the validator was corrected and tested. The quality set remains unstarted.
