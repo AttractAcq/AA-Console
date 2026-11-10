@@ -67,11 +67,11 @@ ${sectionBrief}
 
 First check the primary publisher's dated publication index, then use web_fetch on the direct issue or primary page before quoting any figure. Use no more than two external indicators per section. If the source cannot be fetched, do not use its numbers; put candidate URLs under Unknown for later review. If the index or newer issue is unavailable, do not imply the retrieved issue is the newest; present target-segment direction remains unknown when only old or broad evidence is available.
 
-Write 100–220 words per section where possible, and never exceed 350 words including source quotes. Use labelled parts "Context (field and historical date)", "External evidence", "Evidence limit", "Unknown", and "Answer". External evidence must be exactly "none verified" or one three-line block per source, with no other lines:
+Write 100–220 words per section where possible, and never exceed 400 words including source quotes. Use labelled parts "Context (field and historical date)", "External evidence", "Evidence limit", "Unknown", and "Answer". External evidence must be exactly "none verified" or one three-line block per source, with no other lines:
 Source: https://primary-source-url
 Quote: "An exact contiguous sentence or table row copied from web_fetch, including the figure and its measured category"
 Scope: geography; measured period and comparison period; units
-For each market-size or direction indicator, Evidence limit must name the thing the source actually measures and the target-market claim it cannot establish. Keep a plan approval separate from realized work, buyer demand and agency spend. Do not put an external figure outside a verified Quote; Answer may repeat a quoted percentage only from that section. If no source was fetched, write "External evidence: none verified" and "Evidence limit: no external measure used" and leave market size or direction unknown. Do not turn an Unknown into an Answer. Put conditional arithmetic under Answer with its assumption stated. Omit unrelated claims, including tax rules, buyer payment preferences, asset ownership beyond the ad account, and capacity estimates from a calendar.
+For each market-size or direction indicator, Evidence limit must name the thing the source actually measures and the target-market claim it cannot establish. Keep a plan approval separate from realized work, buyer demand and agency spend. Quote a self-contained explanatory source sentence with its figure; a bare PDF table row without column labels is not enough to establish period, unit or rate and will be rejected. Do not put an external figure outside a verified Quote; Answer may repeat a quoted percentage only from that section, and only when the exact quote itself contains the percent sign. If no source was fetched, write "External evidence: none verified" and "Evidence limit: no external measure used" and leave market size or direction unknown. Do not turn an Unknown into an Answer. Put conditional arithmetic under Answer with its assumption stated. Omit unrelated claims, including tax rules, buyer payment preferences, asset ownership beyond the ad account, and capacity estimates from a calendar.
 
 Call ${submitToolName} once when you are done.`;
 }
@@ -85,7 +85,7 @@ export function validateMarketSections(
         return `${key} needs a ${label} part before it can be saved.`;
       }
     }
-    if (body.trim().split(/\s+/).length > 360) {
+    if (body.trim().split(/\s+/).length > 420) {
       return `${key} is too long to audit as a sourced market conclusion.`;
     }
   }

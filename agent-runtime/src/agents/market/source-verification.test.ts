@@ -55,7 +55,7 @@ describe("Market primary-source fact verification", () => {
     expect(verifyMarketSourceClaims({
       "market-size-and-share": unknown,
       "market-direction": section(row, "The category fell 10,1%.")
-    }, [pdf])).toMatch(/outside a matched primary-source quote/);
+    }, [pdf])).toMatch(/unlabelled numeric table row/);
   });
 
   it("does not read the end of larger as a rand amount in source scope", () => {

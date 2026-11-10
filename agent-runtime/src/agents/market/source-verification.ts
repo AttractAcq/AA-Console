@@ -64,6 +64,13 @@ export function verifyMarketSourceClaims(
       if (!normalizedText(source.text).includes(normalizedText(quote))) {
         return `${key} quotes text that does not match the fetched primary source: ${url}`;
       }
+      // A PDF table row without its column headers is exact text but does not
+      // establish which number is the rate, period or unit.
+      const numbers = quote.match(/[−-]?\d[\d,.]*/g) ?? [];
+      const words = quote.match(/\b[A-Za-z]{3,}\b/g) ?? [];
+      if (numbers.length >= 4 && words.length < 10) {
+        return `${key} quotes an unlabelled numeric table row; use a self-contained source sentence instead.`;
+      }
       sectionQuotes.push(quote);
       allQuotes.push(quote);
       if (FIGURE.test(scope)) return `${key} has an external figure in Scope outside the matched quote.`;
