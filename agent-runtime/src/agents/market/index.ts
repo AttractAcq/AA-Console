@@ -23,30 +23,58 @@ EVIDENCE RULES — these are absolute:
 - Treat the Business Context last-updated date as the as-of date for its revenue, launch, marketing and results claims. A phrase such as "at the last diagnostic" keeps that narrower time qualifier; the update date does not prove the status held then or now. Do not present historical state as current without a newer source.
 - A revenue target without a stated period is ambiguous. Do not call it monthly, annual or recurring as a fact. You may show conditional arithmetic for an explicitly labelled monthly scenario, but keep the target period and resulting actual client count unknown until the operator confirms them. Show the price assumption and arithmetic.
 - Do not state tax or legal thresholds, registration triggers, compliance requirements or contract enforceability. Those are outside this market analysis and may change; flag the topic for a qualified current-source review without a number or legal conclusion.
+- "Owner-operator" does not establish who decides, signs, pays, or which budget is used. A client-owned ad account does not establish ownership of the profile, pages, audience or leads, and does not remove every media-related risk. A monthly capture day does not establish a service radius or available production capacity. Do not infer any of these as commercial facts.
+- Do not rank an unmeasured issue as the "biggest" constraint, claim what a buyer naturally prefers, or prescribe a new channel or offer from operator hypotheses. State the test that could establish the conclusion instead.
 
 CONSTRAINT DIAGNOSIS:
 - Answer for the date actually evidenced. A historical R0, pre-launch or no-pipeline note does not prove no customers, no demand, no deliverable work, or sufficient delivery capacity. Do not prescribe spend, hiring, channel mix or selling pace from that note alone.
 - If staff, throughput and current pipeline evidence are absent, say the current binding constraint is undetermined. You may identify acquisition as the more plausible historical bottleneck if the dated source supports it, but label that as provisional and name the exact measurements that would change it. Do not estimate capture-day capacity from calendar days alone.
 - The share-needed calculation should be arithmetic a human can check. Use the stated target revenue and an explicitly sourced or labelled price assumption to calculate clients needed. Calculate percentage share only if a credible reachable buyer count for the same geography and period is available; otherwise say that share is unknown. Do not invent a denominator to complete the formula.`;
 
-export function buildMarketPrompt({ context, input, sectionBrief, submitToolName }: PromptArgs): string {
+const SECTION_QUESTIONS: Record<string, string> = {
+  "market-definition": "Define the stated service category, buyer hypothesis, geography and adjacent alternatives. Separate sourced boundaries from unverified delivery radius, buyer authority and asset ownership.",
+  "market-size-and-share": "Give current, directly linked primary-source category indicators with geography, period and units. If a reachable buyer count is unavailable, say so. Treat an unqualified target-revenue period as unknown and show only labelled conditional arithmetic; leave percentage share unknown without a matching denominator.",
+  "market-direction": "Find the newest relevant primary release first. State what its geography and measured category cover. If only older or broader indicators are available, leave current direction for the target trades unknown rather than extrapolating.",
+  "constraint-diagnosis": "Give the best time-bounded diagnosis from the supplied operating evidence. If current pipeline and throughput are missing, say the current binding constraint is undetermined and specify the measurements needed; do not prescribe spend or hiring.",
+  "commercial-structure": "Describe the documented offer and money flow, plus directly sourced competing models. Keep buyer paying authority, asset ownership, margins and preferred channels unknown without evidence. Name legal or tax topics for qualified review without stating rules or thresholds.",
+};
+
+export function buildMarketPrompt({ context, input, templates, submitToolName }: PromptArgs): string {
   const geography = typeof input.geography === "string" ? input.geography.trim() : "";
+  const marketContext = context && { ...context, brand_voice: null, proof_testimonials: null };
+  const sectionBrief = templates.map((template) =>
+    `- ${template.item_key}: ${template.title} — ${SECTION_QUESTIONS[template.item_key] ?? template.description ?? "Answer only from verified evidence; state what remains unknown."}`,
+  ).join("\n");
   return `Research the market for this business.
 
 RESEARCH DATE
 ${new Date().toISOString().slice(0, 10)}. Verify current public facts as of this date; the Business Context may be historical.
 
 BUSINESS CONTEXT
-${renderContext(context)}
+${renderContext(marketContext)}
 ${geography ? `\nGEOGRAPHY\nFocus on: ${geography}` : ""}
 
 SECTIONS TO PRODUCE — each section's description is the question it must answer
 ${sectionBrief}
 
+First find the newest official or other primary release for the stated geography and category. Use no more than two external indicators per section. A direct URL must identify each indicator. If the newest relevant source is old or broad, say that the present target-segment direction is unknown.
+
+Write 100–220 words per section. Use labelled parts "Context (field and historical date)", "External evidence (primary URL, geography, period, units)", "Unknown", and "Answer". Do not turn an Unknown into an Answer. The Answer may be "undetermined" when the source does not establish the requested conclusion. Put conditional arithmetic under Answer with its assumption stated. Omit unrelated claims, including tax rules, buyer payment preferences, asset ownership beyond the ad account, and capacity estimates from a calendar.
+
 Call ${submitToolName} once when you are done.`;
 }
 
 export function validateMarketSections(sections: Record<string, string>): string | null {
+  for (const [key, body] of Object.entries(sections)) {
+    for (const label of ["Context", "External evidence", "Unknown", "Answer"]) {
+      if (!body.toLowerCase().includes(label.toLowerCase())) {
+        return `${key} needs a ${label} part before it can be saved.`;
+      }
+    }
+    if (body.trim().split(/\s+/).length > 260) {
+      return `${key} is too long to audit as a sourced market conclusion.`;
+    }
+  }
   for (const key of ["market-size-and-share", "market-direction"]) {
     if (!/https?:\/\/\S+/i.test(sections[key] ?? "")) {
       return `${key} needs a direct source URL before it can be saved.`;
