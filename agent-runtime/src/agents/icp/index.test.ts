@@ -28,13 +28,15 @@ describe("ICP customer-language provenance", () => {
       input: {
         voice_of_customer: "Caller summary: scheduling was confusing.",
         verified_customer_quotes: "I could not find a time that worked.",
-        verified_quote_source: "Call transcript, 2026-10-01",
+        verified_quote_source: "Call transcript",
+        verified_quote_date: "2026-10-01",
       },
     });
 
     expect(prompt).toContain("CUSTOMER LANGUAGE NOTES");
     expect(prompt).toContain("VERIFIED VERBATIM CUSTOMER QUOTES");
-    expect(prompt).toContain("Source and date: Call transcript, 2026-10-01");
+    expect(prompt).toContain("Source: Call transcript");
+    expect(prompt).toContain("Date: 2026-10-01");
     expect(prompt).toContain("Exact words:\nI could not find a time that worked.");
     expect(prompt.indexOf("CUSTOMER LANGUAGE NOTES")).toBeLessThan(
       prompt.indexOf("VERIFIED VERBATIM CUSTOMER QUOTES"),
@@ -45,6 +47,16 @@ describe("ICP customer-language provenance", () => {
     const prompt = buildIcpPrompt({
       ...base,
       input: { verified_customer_quotes: "This might be an exact quote." },
+    });
+
+    expect(prompt).toContain("CUSTOMER LANGUAGE NOTES");
+    expect(prompt).not.toContain("VERIFIED VERBATIM CUSTOMER QUOTES\n");
+  });
+
+  it("downgrades a quote without a date to unquotable notes", () => {
+    const prompt = buildIcpPrompt({
+      ...base,
+      input: { verified_customer_quotes: "This might be an exact quote.", verified_quote_source: "Call transcript" },
     });
 
     expect(prompt).toContain("CUSTOMER LANGUAGE NOTES");

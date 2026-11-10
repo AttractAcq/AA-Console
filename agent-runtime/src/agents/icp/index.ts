@@ -15,7 +15,8 @@ export function buildIcpPrompt({ context, input, sectionBrief, submitToolName }:
   const notes = typeof input.voice_of_customer === "string" ? input.voice_of_customer.trim() : "";
   const quotes = typeof input.verified_customer_quotes === "string" ? input.verified_customer_quotes.trim() : "";
   const quoteSource = typeof input.verified_quote_source === "string" ? input.verified_quote_source.trim() : "";
-  const unverifiedQuotes = quotes && !quoteSource ? quotes : "";
+  const quoteDate = typeof input.verified_quote_date === "string" ? input.verified_quote_date.trim() : "";
+  const unverifiedQuotes = quotes && (!quoteSource || !quoteDate) ? quotes : "";
   return `Build the ICP for this business.
 
 BUSINESS CONTEXT
@@ -23,7 +24,7 @@ ${renderContext(context)}
 Treat this as the operator's account, not verbatim customer testimony.
 ${focus ? `\nFOCUS SEGMENT\nNarrow to this segment specifically: ${focus}` : ""}
 ${notes || unverifiedQuotes ? `\nCUSTOMER LANGUAGE NOTES\nThese may be paraphrased call notes or summaries. Use them to identify themes, but never quote or attribute their wording as exact customer speech.\n\n${[notes, unverifiedQuotes].filter(Boolean).join("\n\n")}` : ""}
-${quotes && quoteSource ? `\nVERIFIED VERBATIM CUSTOMER QUOTES\nThe operator identified these as exact customer words with source context. Quote only the exact words supplied, preserve their attribution, and do not invent surrounding details.\nSource and date: ${quoteSource}\nExact words:\n${quotes}` : ""}
+${quotes && quoteSource && quoteDate ? `\nVERIFIED VERBATIM CUSTOMER QUOTES\nThe operator identified these as exact customer words with source context. Quote only the exact words supplied, preserve their attribution, and do not invent surrounding details.\nSource: ${quoteSource}\nDate: ${quoteDate}\nExact words:\n${quotes}` : ""}
 
 SECTIONS TO PRODUCE
 ${sectionBrief}

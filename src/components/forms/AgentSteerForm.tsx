@@ -84,10 +84,16 @@ export const AGENT_FORMS: Record<RecordDomain, AgentFormConfig> = {
       },
       {
         name: "verified_quote_source",
-        label: "Quote source and date",
+        label: "Quote source",
         kind: "text",
-        placeholder: "Interview transcript, 10 Nov 2026",
-        hint: "Required when you provide a verbatim quote, so the agent can retain its provenance.",
+        placeholder: "Interview transcript or review URL",
+        hint: "Required when you provide a verbatim quote.",
+      },
+      {
+        name: "verified_quote_date",
+        label: "Quote date",
+        kind: "date",
+        hint: "Required when you provide a verbatim quote.",
       },
     ],
   },
@@ -239,7 +245,8 @@ export async function submitAgentRun(
   values: FormValues,
 ): Promise<string> {
   const config = AGENT_FORMS[domain];
-  if (domain === "icp" && str(values.verified_customer_quotes) && !str(values.verified_quote_source)) {
+  if (domain === "icp" && str(values.verified_customer_quotes)
+    && (!str(values.verified_quote_source) || !str(values.verified_quote_date))) {
     throw new Error("Add the quote source and date before running the ICP agent.");
   }
   const payload = config.toPayload
