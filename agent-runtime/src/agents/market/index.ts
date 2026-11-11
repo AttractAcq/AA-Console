@@ -75,7 +75,7 @@ ${sectionBrief}
 
 First check the primary publisher's dated publication index, then use web_fetch on the direct issue or primary page before quoting any figure. Use no more than two external indicators per section. If the source cannot be fetched, do not use its numbers; put candidate URLs under Unknown for later review. If the index or newer issue is unavailable, do not imply the retrieved issue is the newest; present target-segment direction remains unknown when only old or broad evidence is available.
 
-Write 100–220 words per section where possible, and never exceed 400 words including source quotes. Use labelled parts "Context (field and historical date)", "External evidence", "Evidence limit", "Unknown", and "Answer". External evidence must be exactly "none verified" or one three-line block per source, with no other lines:
+Write 150–350 words per section where possible, and never exceed 450 words including source quotes. Use labelled parts "Context (field and historical date)", "External evidence", "Evidence limit", "Unknown", and "Answer". External evidence must be exactly "none verified" or one three-line block per source, with no other lines:
 Source: https://primary-source-url
 Quote: "An exact contiguous sentence or table row copied from web_fetch, including the figure and its measured category"
 Scope: geography; measured period and comparison period; units
@@ -93,7 +93,7 @@ export function validateMarketSections(
         return `${key} needs a ${label} part before it can be saved.`;
       }
     }
-    if (body.trim().split(/\s+/).length > 420) {
+    if (body.trim().split(/\s+/).length > 500) {
       return `${key} is too long to audit as a sourced market conclusion.`;
     }
   }
