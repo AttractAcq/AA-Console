@@ -258,6 +258,7 @@ export async function runOpportunityDiscoveryJob(
     .select("id, domain, title, body")
     .eq("client_id", job.client_id)
     .in("domain", ["market", "icp", "association", "competitor"])
+    .is("archived_at", null)
     .order("created_at", { ascending: true })
     .limit(40);
   if (recordsError) throw new Error(`Intelligence lookup failed: ${recordsError.message}`);

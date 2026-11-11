@@ -84,6 +84,21 @@ describe("the job deadline", () => {
   it("still works with no deadline given", async () => {
     const out = await runAgentLoop(base);
     expect(out.submitted).toEqual({ ok: true });
+    expect(ctorMock).toHaveBeenCalledWith(expect.objectContaining({ maxRetries: 2 }));
+  });
+
+  it("lets a private trial disable SDK retries without changing production defaults", async () => {
+    const out = await runAgentLoop({ ...base, sdkMaxRetries: 0 });
+    expect(out.submitted).toEqual({ ok: true });
+    expect(ctorMock).toHaveBeenCalledWith(expect.objectContaining({ maxRetries: 0 }));
+  });
+
+  it("treats a terminated response stream as a retryable transport failure", async () => {
+    streamMock.mockReturnValue({ finalMessage: async () => { throw new Error("terminated"); } });
+    const err = await runAgentLoop(base).catch((error) => error);
+    expect(err).toBeInstanceOf(ProviderError);
+    expect((err as ProviderError).retryable).toBe(true);
+    expect((err as ProviderError).message).toBe("terminated");
   });
 
   // A request must not be able to start just inside the deadline and then run

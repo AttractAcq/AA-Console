@@ -80,7 +80,7 @@ const SWITCHES: SwitchRow[] = [
     off: "No client runs, whatever its own switch says.",
     caveat: "This one is not per-client. While it is off, every client is stopped at once.",
     value: (s) => s.engineRunning,
-    readOnly: { because: "Changed on the Engine screen, which is where it applies to every client." },
+    readOnly: { because: "Changed in the expandable content engine settings below. It applies to every client." },
   },
   {
     key: "engine",
@@ -164,7 +164,7 @@ const SWITCHES: SwitchRow[] = [
   },
 ];
 
-export function ClientSwitchPanel({ clientId }: { clientId: string }) {
+export function ClientSwitchPanel({ clientId, onChanged }: { clientId: string; onChanged?: () => void }) {
   const [state, setState] = useState<SwitchState>({
     settings: null,
     engineRunning: false,
@@ -214,6 +214,7 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
     }
     setNote(`${row.label} is now ${next ? "on" : "off"}.`);
     await refresh();
+    onChanged?.();
   }
 
   if (loading) return <Panel title="Switches"><p className="text-sm text-muted-foreground">Loading…</p></Panel>;

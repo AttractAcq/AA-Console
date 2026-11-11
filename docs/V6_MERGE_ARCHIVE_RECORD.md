@@ -174,13 +174,9 @@ docs/security/B005-sales-entitlement-boundary.md
 docs/security/organic-publication-authority.md
 ```
 
-Two caveats for whoever does it. `AA_CONSOLE_100_BUILD_BLUEPRINT.md` holds a
-**dated snapshot** (30 October) whose numbers were correct when written; that
-section is a historical record and should be left as it reads, or marked as of
-its date, rather than renumbered. And `production-recovery-preflight.md` still
-describes a 296-migration baseline through `20261030160000`, which predates 280
-entirely — it needs repinning to the 301 baseline at 318 migrations, not just a
-number swap.
+The blueprint's 30 October snapshot remains dated rather than renumbered.
+`production-recovery-preflight.md` was repinned to the 301 baseline at 318
+migrations. These are completed exceptions to the prose renumbering rule above.
 
 A future renumber should grep for `migration \d{3}` in prose as well as
 filenames.

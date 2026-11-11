@@ -18,6 +18,7 @@ export interface Template {
 }
 
 export interface BusinessContext {
+  updated_at?: string | null;
   business_overview: string | null;
   ideal_customer: string | null;
   main_offer: string | null;
@@ -51,7 +52,7 @@ export async function loadDomainContext(
       ? sb
           .from("client_business_context")
           .select(
-            "business_overview, ideal_customer, main_offer, competitors, brand_voice, proof_testimonials, current_marketing, sales_process, current_revenue, target_revenue",
+            "updated_at, business_overview, ideal_customer, main_offer, competitors, brand_voice, proof_testimonials, current_marketing, sales_process, current_revenue, target_revenue",
           )
           .eq("client_id", job.client_id)
           .maybeSingle()
@@ -100,6 +101,7 @@ export async function loadUpstreamRecords(
     .select("domain, item_key, title, body")
     .eq("client_id", clientId)
     .in("domain", domains)
+    .is("archived_at", null)
     .order("domain")
     .order("display_order");
   if (error) throw new Error(`Failed to load upstream records: ${error.message}`);
@@ -126,10 +128,11 @@ export function renderUpstream(records: UpstreamRecord[]): string {
 export function renderContext(context: BusinessContext | null): string {
   if (!context) return "(no business context has been captured for this client yet)";
   const labels: Array<[keyof BusinessContext, string]> = [
+    ["updated_at", "Business context last updated (historical source date)"],
     ["business_overview", "Business overview"],
-    ["ideal_customer", "Ideal customer"],
+    ["ideal_customer", "Intended target customer (operator hypothesis, not observed buyer research)"],
     ["main_offer", "Main offer"],
-    ["competitors", "Competitors named by the client"],
+    ["competitors", "Competitors in the operator's analysis (not evidence that buyers use them)"],
     ["brand_voice", "Brand voice and what never to say"],
     ["proof_testimonials", "Proof and testimonials"],
     ["current_marketing", "Current marketing"],
@@ -256,12 +259,21 @@ export async function persistRecords(
 ): Promise<PersistResult> {
   const { clientId, domain, jobId, templates, sections, period = null } = args;
 
-  const { data: existing, error: existingError } = await sb
+  const existingQuery = sb
     .from("client_agent_records")
-    .select("item_key, edited_at")
+    .select("item_key, edited_at, archived_at")
     .eq("client_id", clientId)
     .eq("domain", domain);
+  // Campaign Intelligence has successive periods. An archived Q1 record must
+  // not block Q2, nor should a Q1 human edit suppress a Q2 answer.
+  const { data: existing, error: existingError } = await (
+    period === null ? existingQuery.is("period", null) : existingQuery.eq("period", period)
+  );
   if (existingError) throw new Error(`Failed to read existing records: ${existingError.message}`);
+  if ((existing ?? []).some((record) => record.archived_at !== null &&
+      templates.some((template) => template.item_key === record.item_key))) {
+    throw new Error("An Intelligence record in this domain is archived. Restore or replace it explicitly before rerunning the agent.");
+  }
 
   const humanEdited = new Set(
     (existing ?? []).filter((r) => r.edited_at !== null).map((r) => r.item_key as string),

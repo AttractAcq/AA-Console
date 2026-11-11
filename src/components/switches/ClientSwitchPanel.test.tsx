@@ -117,7 +117,7 @@ describe("every switch in one place", () => {
     render(<ClientSwitchPanel clientId="c1" />);
     expect(await screen.findByText("Content engine, system-wide")).toBeInTheDocument();
     expect(screen.queryByLabelText(/Content engine, system-wide/)).toBeNull();
-    expect(screen.getByText(/Changed on the Engine screen/)).toBeInTheDocument();
+    expect(screen.getByText(/expandable content engine settings below/)).toBeInTheDocument();
   });
 
   it("never writes the system-wide singleton from the client dashboard", async () => {

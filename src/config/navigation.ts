@@ -219,7 +219,6 @@ const legacyClientNavGroups: NavNode[] = [
           { id: "distribution-assets", label: "Assets" },
           { id: "organic", label: "Organic" },
           { id: "paid", label: "Paid" },
-          { id: "engine", label: "Engine" },
         ],
       },
       {
@@ -455,7 +454,6 @@ export const v6ModuleNodes: NavNode[] = [
     capability: "expanding", tabs: [
       { id: "distribution-assets", label: "Assets" },
       { id: "organic", label: "Organic Calendar" },
-      { id: "engine", label: "Engine" },
     ] },
   { id: "google-ads-studio", label: "Google Ads Studio", path: "google-ads-studio", icon: Megaphone,
     capability: "expanding", tabs: [

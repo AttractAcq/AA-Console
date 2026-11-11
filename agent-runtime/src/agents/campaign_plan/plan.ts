@@ -1,5 +1,5 @@
 import { derivedNeeds, type CampaignTemplate } from "../../campaigns/templates.js";
-import { platformAllowsFormat, PLATFORM_FORMATS } from "../../content/format.js";
+import { formatFitsMedia, platformAllowsFormat, PLATFORM_FORMATS } from "../../content/format.js";
 
 // What a campaign plan has to contain before anything is built from it.
 //
@@ -231,6 +231,36 @@ export interface CampaignIdea {
   pillar_id: string | null;
   /** The production shape, including video reels. */
   content_format: "single" | "carousel" | "story" | "reel";
+}
+
+export type PlannedPiece = {
+  acquisition_route: "organic" | "paid";
+  media_type: "image" | "text" | "video";
+  content_format: "single" | "carousel" | "story" | "reel";
+};
+
+/** The reviewed shape of every v6 piece, in the order the sweep will build it. */
+export function plannedPieces(raw: unknown, count: number, organic: number, paid: number): PlannedPiece[] {
+  if (!Array.isArray(raw) || raw.length !== count) {
+    throw new Error(`The plan needs a type and route for exactly ${count} pieces.`);
+  }
+  const pieces = raw.map((value, index) => {
+    const item = value as Record<string, unknown> | null;
+    const route = item?.acquisition_route;
+    const media = item?.media_type;
+    const format = item?.content_format;
+    if (route !== "organic" && route !== "paid") throw new Error(`Piece ${index + 1} needs an organic or paid route.`);
+    if (media !== "image" && media !== "text" && media !== "video") throw new Error(`Piece ${index + 1} needs a supported media type.`);
+    if (typeof format !== "string" || !formatFitsMedia(format, media)) {
+      throw new Error(`Piece ${index + 1} has a format that does not fit its media type.`);
+    }
+    return { acquisition_route: route, media_type: media, content_format: format as PlannedPiece["content_format"] } as PlannedPiece;
+  });
+  if (pieces.filter((piece) => piece.acquisition_route === "organic").length !== organic ||
+      pieces.filter((piece) => piece.acquisition_route === "paid").length !== paid) {
+    throw new Error(`The piece routes must match the plan's ${organic} organic and ${paid} paid volumes.`);
+  }
+  return pieces;
 }
 
 /** Reject incomplete batches rather than silently saving fewer ideas than promised. */

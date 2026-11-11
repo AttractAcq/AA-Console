@@ -15,6 +15,7 @@ import { logger } from "../logging/logger.js";
 import { estimateCostUsd, type TokenUsage } from "../usage/cost.js";
 
 import { unsupportedStrictKeywords } from "./schema.js";
+import { inspectedFetchedSource, type FetchedSource } from "./source-text.js";
 
 export interface SubmitToolSpec {
   name: string;
@@ -26,6 +27,8 @@ export interface AgentLoopOptions {
   apiKey: string;
   /** Per-request timeout. Defaults to ten minutes if a caller omits it. */
   timeoutMs?: number;
+  /** SDK connection/HTTP retries. Defaults to two; private cost-bounded trials can disable them. */
+  sdkMaxRetries?: number;
   /**
    * Wall-clock moment (epoch ms) this job must be finished by. Distinct from
    * timeoutMs, which bounds one HTTP request: with retries and a multi-turn
@@ -37,8 +40,10 @@ export interface AgentLoopOptions {
   prompt: string;
   submitTool: SubmitToolSpec;
   enableWebSearch: boolean;
+  enableWebFetch?: boolean;
   maxTurns?: number;
   maxSearches?: number;
+  maxFetches?: number;
   onProgress?: (note: string) => void;
 }
 
@@ -46,6 +51,7 @@ export interface AgentLoopResult {
   submitted: Record<string, unknown>;
   usage: TokenUsage & { costUsd: number };
   turns: number;
+  fetchedSources: FetchedSource[];
 }
 
 /** Thrown for anything the caller may want to classify as retryable. */
@@ -61,16 +67,16 @@ export class ProviderError extends Error {
   }
 }
 
-function classify(error: unknown): { message: string; retryable: boolean } {
+export function classifyProviderError(error: unknown): { message: string; retryable: boolean } {
+  if (error instanceof Anthropic.APIConnectionError) {
+    return { message: `Connection error: ${error.message}`, retryable: true };
+  }
   if (error instanceof Anthropic.APIError) {
     const status = error.status ?? 0;
     // 4xx other than 429 means we sent something wrong — retrying sends
     // exactly the same thing, so it will fail identically.
-    const retryable = status === 429 || status >= 500 || status === 408;
+    const retryable = status === 0 || status === 429 || status >= 500 || status === 408;
     return { message: `Anthropic ${status}: ${error.message}`, retryable };
-  }
-  if (error instanceof Anthropic.APIConnectionError) {
-    return { message: `Connection error: ${error.message}`, retryable: true };
   }
   // An abort here is this runtime's own deadline firing, not the provider
   // failing. Saying so stops it reading as an Anthropic outage in the logs.
@@ -78,7 +84,7 @@ function classify(error: unknown): { message: string; retryable: boolean } {
     return { message: "The model call was cut off by the job's deadline.", retryable: true };
   }
   const message = error instanceof Error ? error.message : String(error);
-  return { message, retryable: /timeout|timed out|econnreset|socket|abort/i.test(message) };
+  return { message, retryable: /timeout|timed out|econnreset|socket|abort|terminated|stream ended without/i.test(message) };
 }
 
 type Blocks = Anthropic.Messages.ContentBlockParam[];
@@ -119,6 +125,8 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     enableWebSearch,
     maxTurns = 12,
     maxSearches = 12,
+    enableWebFetch = false,
+    maxFetches = 8,
     onProgress,
     deadlineAt,
   } = options;
@@ -128,7 +136,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   // the expiry that is supposed to recover a wedged job never fires. This is
   // the bound that makes the call eventually fail instead.
   const timeoutMs = options.timeoutMs ?? 600_000;
-  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: timeoutMs });
+  const client = new Anthropic({ apiKey, maxRetries: options.sdkMaxRetries ?? 2, timeout: timeoutMs });
 
   // Checked before the request, because the API's refusal names a keyword and
   // not the agent that carries it — and because retrying sends exactly the
@@ -159,6 +167,14 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       max_uses: maxSearches,
     } as unknown as Anthropic.Messages.ToolUnion);
   }
+  if (enableWebFetch) {
+    tools.unshift({
+      type: "web_fetch_20260209",
+      name: "web_fetch",
+      max_uses: maxFetches,
+      max_content_tokens: 12_000,
+    } as unknown as Anthropic.Messages.ToolUnion);
+  }
 
   const messages: Anthropic.Messages.MessageParam[] = [{ role: "user", content: prompt }];
   const totals: TokenUsage = {
@@ -168,6 +184,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     cacheWriteTokens: 0,
     webSearches: 0,
   };
+  const fetchedSources = new Map<string, FetchedSource>();
 
   const usageWithCost = () => ({ ...totals, costUsd: estimateCostUsd(model, totals) });
   const startedAt = Date.now();
@@ -209,7 +226,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       );
       response = await stream.finalMessage();
     } catch (error) {
-      const { message, retryable } = classify(error);
+      const { message, retryable } = classifyProviderError(error);
       throw new ProviderError(message, retryable, usageWithCost());
     }
 
@@ -227,6 +244,12 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
     });
+
+    for (const block of response.content) {
+      if (block.type !== "web_fetch_tool_result") continue;
+      const fetched = await inspectedFetchedSource(block);
+      if (fetched) fetchedSources.set(fetched.url, fetched);
+    }
 
     // A policy decline is not something a retry fixes.
     if (response.stop_reason === "refusal") {
@@ -246,6 +269,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
         submitted: submitCall.input as Record<string, unknown>,
         usage: usageWithCost(),
         turns: turn,
+        fetchedSources: [...fetchedSources.values()],
       };
     }
 

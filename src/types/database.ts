@@ -4209,6 +4209,7 @@ export type Database = {
           cloned_from_campaign_id: string | null
           content_count: number
           content_ideas_generated_at: string | null
+          content_pieces: Json | null
           conversion_event: string | null
           core_message: string | null
           created_at: string
@@ -4264,6 +4265,7 @@ export type Database = {
           cloned_from_campaign_id?: string | null
           content_count?: number
           content_ideas_generated_at?: string | null
+          content_pieces?: Json | null
           conversion_event?: string | null
           core_message?: string | null
           created_at?: string
@@ -4319,6 +4321,7 @@ export type Database = {
           cloned_from_campaign_id?: string | null
           content_count?: number
           content_ideas_generated_at?: string | null
+          content_pieces?: Json | null
           conversion_event?: string | null
           core_message?: string | null
           created_at?: string
@@ -25950,6 +25953,12 @@ export type Database = {
         }
         Returns: Json
       }
+      campaign_content_pieces_valid: {
+        Args: {
+          p_campaign: Database["public"]["Tables"]["client_campaigns"]["Row"]
+        }
+        Returns: boolean
+      }
       campaign_plan_fingerprint: {
         Args: {
           p_campaign: Database["public"]["Tables"]["client_campaigns"]["Row"]
@@ -26551,6 +26560,7 @@ export type Database = {
           cloned_from_campaign_id: string | null
           content_count: number
           content_ideas_generated_at: string | null
+          content_pieces: Json | null
           conversion_event: string | null
           core_message: string | null
           created_at: string
@@ -29913,6 +29923,19 @@ export type Database = {
         }
         Returns: undefined
       }
+      save_campaign_plan_v6: {
+        Args: {
+          p_campaign_id: string
+          p_client_id: string
+          p_ideas: Json
+          p_job_id: string
+          p_organic: number
+          p_paid: number
+          p_pieces: Json
+          p_plan: Json
+        }
+        Returns: undefined
+      }
       save_campaign_plan_with_ideas: {
         Args: {
           p_campaign_id: string
@@ -30171,6 +30194,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_campaign_content_pieces_v6: {
+        Args: { p_campaign_id: string; p_pieces: Json }
+        Returns: undefined
       }
       set_campaign_route_volumes_v6: {
         Args: { p_campaign_id: string; p_organic: number; p_paid: number }

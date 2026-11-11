@@ -13,6 +13,7 @@ import type { JobResult, JobRunner } from "../orchestration/dispatch.js";
 import type { AgentJobRow } from "../queue.js";
 import { appendEvent } from "../queue.js";
 import { ProviderError, runAgentLoop } from "../tools/anthropic.js";
+import type { FetchedSource } from "../tools/source-text.js";
 import {
   buildSubmitTool,
   findPlaceholders,
@@ -44,11 +45,19 @@ export interface RecordAgentConfig {
   system: string;
   buildPrompt: (args: PromptArgs) => string;
   enableWebSearch?: boolean;
+  enableWebFetch?: boolean;
   maxSearches?: number;
+  maxFetches?: number;
   /** Domains whose records this agent synthesises from. */
   upstreamDomains?: string[];
   /** Return an error message to fail non-retryably before spending a token. */
   validate?: (input: Record<string, unknown>) => string | null;
+  /** Reject a domain-specific incomplete answer before it reaches records. */
+  validateSections?: (
+    sections: Record<string, string>, fetchedSources: FetchedSource[], context: BusinessContext | null,
+  ) => string | null;
+  /** A failed source audit should stop rather than spend another model attempt. */
+  sectionValidationRetryable?: boolean;
   /** Campaign Intelligence is the one domain whose records carry a period. */
   resolvePeriod?: (input: Record<string, unknown>) => string | null;
   /** Opening line for the job event log. */
@@ -137,7 +146,9 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
         prompt,
         submitTool,
         enableWebSearch: config.enableWebSearch ?? false,
+        enableWebFetch: config.enableWebFetch ?? false,
         maxSearches: config.maxSearches ?? 12,
+        maxFetches: config.maxFetches ?? 8,
         onProgress: (note) => void appendEvent(sb, job.id, note),
       });
     } catch (error) {
@@ -188,6 +199,11 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
       };
     }
 
+    const sectionError = config.validateSections?.(sections, result.fetchedSources, context);
+    if (sectionError) {
+      return { ok: false, retryable: config.sectionValidationRetryable ?? true, failureMessage: sectionError, usage };
+    }
+
     const { written, preserved } = await persistRecords(sb, {
       clientId: job.client_id,
       domain: config.domain,
@@ -212,7 +228,7 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
 }
 
 /** Shared opening every domain's system prompt builds on. */
-export const HOUSE_RULES = `You work for Attract Acquisition, a marketing agency, producing structured intelligence its strategists rely on.
+export const HOUSE_RULES = `You work for Attract Acquisition, producing structured intelligence its strategists rely on. Use the supplied Business Context for the business's own positioning; do not replace it with a generic agency category.
 
 Absolute rules:
 - Never invent facts, quotes, figures, customers or results. Where something is not knowable from what you have been given, say so plainly instead of estimating.

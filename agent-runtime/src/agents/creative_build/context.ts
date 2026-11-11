@@ -59,7 +59,8 @@ export async function loadConceptContext(
     .select("domain, item_key, title, body")
     .eq("client_id", clientId)
     .in("domain", CONCEPT_DOMAINS)
-    .in("item_key", keys);
+    .in("item_key", keys)
+    .is("archived_at", null);
   if (error) throw new Error(`Could not load creative context: ${error.message}`);
 
   const rows = (data ?? []) as UpstreamRecord[];

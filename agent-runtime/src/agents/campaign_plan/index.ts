@@ -12,6 +12,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { anthropicKeyForAgent, type RuntimeConfig } from "../../config.js";
 import { templateFor } from "../../campaigns/templates.js";
+import { platformAllowsFormat } from "../../content/format.js";
+import { platformFor } from "../campaign_sweep/plan.js";
 import type { AgentRow } from "../../orchestration/registry.js";
 import type { JobResult } from "../../orchestration/dispatch.js";
 import type { AgentJobRow } from "../../queue.js";
@@ -27,6 +29,7 @@ import {
   normaliseChannels,
   planProblem,
   planRouteProblem,
+  plannedPieces,
   routeVolumes,
   planSummary,
   resolveNeeds,
@@ -51,7 +54,7 @@ import {
  * running — which lands in somebody else's calendar share with nothing to
  * flag it. Same discipline as proof_ref on a brief.
  */
-export function submitToolFor(pillars: readonly { id: string; name: string }[] = [], includeIdeas = true) {
+export function submitToolFor(pillars: readonly { id: string; name: string }[] = [], includeIdeas = true, isV6 = false) {
   const ids = pillars.map((p) => p.id);
   return {
   name: "submit_campaign_plan",
@@ -77,6 +80,20 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
         type: "number",
         description: `How many distinct pieces of content this campaign needs. 0 if none. At most ${MAX_CONTENT}.`,
       },
+      ...(isV6 ? { content_pieces: {
+        type: "array",
+        description: "Exactly one ordered slot per content piece. Decide each slot's route, media type and format before plan approval; do not supply titles or concepts here. The route counts must match the organic and paid totals.",
+        items: {
+          type: "object",
+          properties: {
+            acquisition_route: { type: "string", enum: ["organic", "paid"] },
+            media_type: { type: "string", enum: ["image", "text", "video"] },
+            content_format: { type: "string", enum: ["single", "carousel", "story", "reel"] },
+          },
+          required: ["acquisition_route", "media_type", "content_format"],
+          additionalProperties: false,
+        },
+      }} : {}),
       ...(includeIdeas ? { ideas: {
         type: "array",
         // No maxItems, and no maxLength on the title: the API rejects both on
@@ -135,7 +152,7 @@ export function submitToolFor(pillars: readonly { id: string; name: string }[] =
     },
     required: [
       "objective", "audience", "offer_summary", "core_message", "channels",
-      "kpi_metric", "content_count", ...(includeIdeas ? ["ideas"] : []), "needs_landing_page", "needs_sales_agent", "reasoning",
+      "kpi_metric", "content_count", ...(isV6 ? ["content_pieces"] : []), ...(includeIdeas ? ["ideas"] : []), "needs_landing_page", "needs_sales_agent", "reasoning",
     ],
     additionalProperties: false,
   },
@@ -329,7 +346,7 @@ export async function runCampaignPlanJob(
   // the submit tool, so a piece cannot be filed under a pillar the campaign
   // is not running.
   const includeIdeas = campaign.built_at != null || campaign.ideate_on_plan !== false;
-  const submitTool = submitToolFor(pillars, includeIdeas);
+  const submitTool = submitToolFor(pillars, includeIdeas, isV6);
   const routeInstruction = campaign.acquisition_mode === "organic"
     ? "This is an ORGANIC campaign. Plan organic distribution only. No advertising, paid search, boosts or ad spend."
     : campaign.acquisition_mode === "paid" && campaign.paid_platform === "meta"
@@ -358,6 +375,7 @@ WHAT MAKES A PLAN GOOD
 
 ABSOLUTE RULES
 - ${routeInstruction}
+- ${isV6 ? "For every content piece, choose an ordered slot with its acquisition route, media type and format. The slots must match content_count and each route's volume. A reel is video; a carousel is images. Do not default all pieces to single images unless the campaign genuinely calls for that mix." : "Preserve the legacy campaign's existing production shape."}
 - Never invent a budget, a price, a date or a target you have no basis for. Omitting a number is honest; inventing one becomes a commitment somebody else has to meet.
 - Take the audience from the ICP. ${approvedOffer ? "Use only the exact approved campaign offer version below. The broader offer strategy is context and cannot override its promise, price, claims or exclusions." : "Take the offer from the offer strategy. Do not invent it."}
 - ${includeIdeas
@@ -382,8 +400,8 @@ ${pillars.map((p) => `**${p.name}** (${p.id})
 
 Assign every idea to one of these pillars by its id. An idea that would be better in a pillar this campaign is not running is the wrong idea for this campaign — write a different one rather than stretching a pillar to fit it. Spread the ideas across the pillars rather than filling one and touching the others once.
 ` : ""}
-${campaign.built_at ? `EXISTING APPROVED CAMPAIGN PLAN — preserve these decisions. Generate exactly ${campaign.content_count} ideas for it; do not replan it.
-${JSON.stringify({ objective: campaign.objective, audience: campaign.audience, offer_summary: campaign.offer_summary, core_message: campaign.core_message, channels: campaign.channels, starts_on: campaign.starts_on, ends_on: campaign.ends_on, kpi_metric: campaign.kpi_metric, content_count: campaign.content_count })}` : ""}
+${campaign.built_at ? `EXISTING APPROVED CAMPAIGN PLAN — preserve these decisions. Generate exactly ${campaign.content_count} ideas for it; do not replan it. Each idea must match the media type and format of its corresponding ordered content_pieces slot.
+${JSON.stringify({ objective: campaign.objective, audience: campaign.audience, offer_summary: campaign.offer_summary, core_message: campaign.core_message, channels: campaign.channels, starts_on: campaign.starts_on, ends_on: campaign.ends_on, kpi_metric: campaign.kpi_metric, content_count: campaign.content_count, content_pieces: campaign.content_pieces })}` : ""}
 
 BUSINESS CONTEXT
 ${renderContext(context as BusinessContext | null)}
@@ -496,19 +514,60 @@ Call ${submitTool.name} once when you are done.`;
   // reject the setter afterwards.
   const volumes = campaign.acquisition_mode === "legacy"
     ? null
-    : routeVolumes(campaign.acquisition_mode, plan.content_count, result.submitted);
+    : campaign.built_at
+      ? { organic: campaign.organic_content_count, paid: campaign.paid_content_count }
+      : routeVolumes(campaign.acquisition_mode, plan.content_count, result.submitted);
   if (volumes && "error" in volumes) {
     return { ok: false, retryable: true, failureMessage: volumes.error, usage };
   }
 
-  if (includeIdeas) {
-    let ideas;
+  let pieces: ReturnType<typeof plannedPieces> | null = null;
+  if (isV6 && volumes && !("error" in volumes)) {
     try {
-      ideas = campaignIdeas(result.submitted.ideas, plan.content_count, pillars.map((p) => p.id));
+      pieces = plannedPieces(campaign.built_at ? campaign.content_pieces : result.submitted.content_pieces,
+        plan.content_count, volumes.organic, volumes.paid);
     } catch (error) {
       return { ok: false, retryable: true, failureMessage: (error as Error).message, usage };
     }
-    // One transaction commits the plan and its exact idea batch, or neither.
+    const postPlatform = platformFor(plan.channels);
+    if (postPlatform && pieces.some((piece) => !platformAllowsFormat(postPlatform, piece.content_format))) {
+      return { ok: false, retryable: true,
+        failureMessage: `The planned piece mix includes a format ${postPlatform} cannot publish.`, usage };
+    }
+  }
+
+  let ideas: ReturnType<typeof campaignIdeas> | null = null;
+  if (includeIdeas) {
+    try {
+      ideas = campaignIdeas(result.submitted.ideas, plan.content_count, pillars.map((p) => p.id));
+      if (pieces && ideas.some((idea, index) => idea.media_type !== pieces[index]?.media_type ||
+          idea.content_format !== pieces[index]?.content_format)) {
+        throw new Error("The proposed ideas must use each approved slot's media type and format in order.");
+      }
+    } catch (error) {
+      return { ok: false, retryable: true, failureMessage: (error as Error).message, usage };
+    }
+  }
+
+  if (isV6 && !campaign.built_at) {
+    if (!volumes || "error" in volumes || !pieces) {
+      throw new Error("A new v6 plan needs route volumes and reviewed piece types before it can be saved.");
+    }
+    // The plan writer sets built_at. Save it, its route volumes and its reviewed
+    // mix in one RPC, so crash recovery never sees a half-written v6 plan.
+    const { error } = await sb.rpc("save_campaign_plan_v6", {
+      p_campaign_id: campaign.id,
+      p_client_id: job.client_id,
+      p_job_id: job.id,
+      p_plan: plan,
+      p_ideas: ideas,
+      p_organic: volumes.organic,
+      p_paid: volumes.paid,
+      p_pieces: pieces,
+    });
+    if (error) throw new Error(`Failed to write the complete v6 campaign plan: ${error.message}`);
+  } else if (ideas) {
+    // Legacy and existing-plan idea batches keep their original writer.
     const { error } = await sb.rpc("save_campaign_plan_with_ideas", {
       p_campaign_id: campaign.id,
       p_client_id: job.client_id,
@@ -525,17 +584,6 @@ Call ${submitTool.name} once when you are done.`;
       p_plan: plan,
     });
     if (error) throw new Error(`Failed to write campaign plan: ${error.message}`);
-  }
-
-  // After the save: content_count has to exist before it can be divided, and
-  // set_campaign_route_volumes_v6 checks the split against the stored total.
-  if (volumes && !("error" in volumes)) {
-    const { error } = await sb.rpc("set_campaign_route_volumes_v6", {
-      p_campaign_id: campaign.id,
-      p_organic: volumes.organic,
-      p_paid: volumes.paid,
-    });
-    if (error) throw new Error(`Failed to record the route volumes: ${error.message}`);
   }
 
   if (isV6) {

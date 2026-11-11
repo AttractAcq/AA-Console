@@ -6,7 +6,7 @@ import { OfferStudioPanel } from "./offer/OfferStudioPanel";
 import { GoogleProfilePanel } from "./google-profile/GoogleProfilePanel";
 import { GoogleAdsStudioPanel } from "./google-ads/GoogleAdsStudioPanel";
 import { MetaProfilePanel } from "./distribution/MetaProfilePanel";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { ClientDashboardPanel } from "./dashboard/ClientDashboardPanel";
@@ -42,7 +42,6 @@ import { CampaignActionApprovalsPanel } from "./approvals/CampaignActionApproval
 import { UnifiedApprovalInboxPanel } from "./approvals/UnifiedApprovalInboxPanel";
 import { OrganicPanel } from "./distribution/OrganicPanel";
 import { AssetsPanel } from "./distribution/AssetsPanel";
-import { EnginePanel } from "./distribution/EnginePanel";
 import { PaidPanel } from "./distribution/PaidPanel";
 import { PageBuilderPanel } from "./conversion/PageBuilderPanel";
 import { SalesOverviewPanel } from "./sales/SalesOverviewPanel";
@@ -140,7 +139,6 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
   "content-distribution": {
     "distribution-assets": () => <AssetsPanel />,
     organic: () => <OrganicPanel />,
-    engine: () => <EnginePanel />,
   },
   "meta-ads-studio": {
     // Two read-only views. Build and Campaign Builds are archived: the first
@@ -321,6 +319,10 @@ export function Page({ node }: { node: NavNode }) {
     } finally {
       setExporting(false);
     }
+  }
+
+  if (node.id === "content-distribution" && requestedTab === "engine" && clientId) {
+    return <Navigate to={`/clients/${clientId}/delivery/dashboard`} replace />;
   }
 
   return (

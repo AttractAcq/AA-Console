@@ -286,6 +286,7 @@ export async function runOpportunityStrategiseJob(
     .select("domain, title, body")
     .eq("client_id", job.client_id)
     .in("domain", ["market", "icp", "association", "competitor", "brand_strategy", "offer_strategy"])
+    .is("archived_at", null)
     .order("created_at", { ascending: true })
     .limit(40);
   const evidence = (records ?? []).map(

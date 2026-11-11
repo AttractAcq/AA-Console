@@ -9,7 +9,7 @@
 const PLATFORMS = ["facebook", "instagram", "tiktok", "linkedin", "youtube"] as const;
 export type Platform = (typeof PLATFORMS)[number];
 
-export type Route = "organic" | "paid";
+import type { PlannedPiece } from "../campaign_plan/plan.js";
 
 export type SweepStep = {
   stepKey: string;
@@ -58,31 +58,18 @@ export function platformFor(channels: readonly string[] | null): Platform | null
  * written knowing what the earlier ones already said, so a campaign gets
  * genuinely distinct pieces instead of several models' first instinct.
  *
- * WHAT THIS DOES NOT DECIDE
- *
- * The notes ask the planner for "organic volume and type, paid volume and
- * type". Migration 308 gave it volume per route. TYPE is still owed: nothing
- * in the plan says whether a given piece is a reel, a carousel or a single
- * image. So every piece here is composed as a single image, which is the
- * conservative shape, and the mix remains a planner decision rather than
- * something a composer invents. A composer choosing the creative mix would be
- * making a product decision in the wrong place.
+ * The planner's reviewed slots decide route, media and format. This composer
+ * preserves their order and does not infer a creative mix.
  */
 export function sweepSteps(args: {
-  organicCount: number;
-  paidCount: number;
+  pieces: readonly PlannedPiece[];
   platform: Platform;
   campaignId: string;
 }): SweepStep[] {
-  const routes: Route[] = [
-    ...Array.from({ length: args.organicCount }, () => "organic" as Route),
-    ...Array.from({ length: args.paidCount }, () => "paid" as Route),
-  ];
-
   const steps: SweepStep[] = [];
   let previousIdeaKey: string | null = null;
 
-  routes.forEach((route, index) => {
+  args.pieces.forEach((piece, index) => {
     const n = index + 1;
     const ideaKey = `piece${n}_idea`;
     const briefKey = `piece${n}_brief`;
@@ -100,11 +87,11 @@ export function sweepSteps(args: {
         idea_count: 1,
         campaign_id: args.campaignId,
         target_platform: args.platform,
-        media_type: "image",
-        content_format: "single",
+        media_type: piece.media_type,
+        content_format: piece.content_format,
         // Which half of a both-route campaign this piece serves. Migration 302
         // put acquisition_route on client_ideas for exactly this.
-        acquisition_route: route,
+        acquisition_route: piece.acquisition_route,
       },
     });
 
