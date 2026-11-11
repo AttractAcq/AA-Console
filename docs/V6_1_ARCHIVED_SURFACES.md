@@ -73,6 +73,10 @@ Worth keeping as a process note: a surface named in two places with two
 different fates is not a detail to resolve by inference. It is one question,
 and asking it cost a sentence.
 
+Alex's 11 November client-view order puts Motion Design under Secondary Flow.
+That later instruction restores the route to its existing Brief, Scenes and
+Renders panels; the 4 November archive decision above remains historical.
+
 ## Archived in v6.1, Phase 3.9 and 3.11
 
 | Surface | Where the code still is | Why |

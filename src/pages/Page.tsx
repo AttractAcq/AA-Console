@@ -6,6 +6,8 @@ import { OfferStudioPanel } from "./offer/OfferStudioPanel";
 import { GoogleProfilePanel } from "./google-profile/GoogleProfilePanel";
 import { GoogleAdsStudioPanel } from "./google-ads/GoogleAdsStudioPanel";
 import { MetaProfilePanel } from "./distribution/MetaProfilePanel";
+import { MotionDesignPanel } from "./motion/MotionDesignPanel";
+import { MotionScenesPanel } from "./motion/MotionScenesPanel";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -179,6 +181,11 @@ const nodeTabPanels: Record<string, Record<string, () => ReactNode>> = {
     reviews: () => <GoogleProfilePanel tab="reviews" />,
     posts: () => <GoogleProfilePanel tab="posts" />,
     metrics: () => <GoogleProfilePanel tab="metrics" />,
+  },
+  "motion-design": {
+    brief: () => <MotionDesignPanel />,
+    scenes: () => <MotionScenesPanel tab="scenes" />,
+    renders: () => <MotionScenesPanel tab="renders" />,
   },
   "lead-magnet-studio": {
     magnets: () => <LeadMagnetStudioPanel />,

@@ -1,22 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { clientNavGroups, legacyDeliveryNodes, legacyDeliveryRedirects, v6ModuleNodes } from "./navigation";
+import { clientDeliverySections, clientNavGroups, legacyDeliveryNodes, legacyDeliveryRedirects, v6ModuleNodes } from "./navigation";
 
 describe("client delivery navigation", () => {
   it("shows every acquisition module as its own Delivery page with the agreed utilities", () => {
     expect(clientNavGroups[0]?.children?.map((node) => node.label)).toEqual([
-      // Market Opportunities sits between intelligence and campaigns: it is
-      // the commercial reason a campaign should exist.
-      "Dashboard", "Approval Inbox", "Intelligence OS", "Market Opportunities", "Campaign Factory",
-      "Proof Production Factory", "Content Production Factory", "Proof Distribution",
-      "Organic Content Distribution", "Google Ads Studio", "Meta Ads Studio", "Google Profile",
-      "Meta Profile", "Offer Studio", "Website Studio", "Lead Magnet Studio",
-      // Motion Design is archived, on Alex's decision of 4 November. Only the
-      // route in is gone; its panels still compile. See
-      // docs/V6_1_ARCHIVED_SURFACES.md.
-      "Sales OS", "Attribution OS", "Archive",
+      "Dashboard", "Approval Inbox", "Intelligence OS",
+      "Market Opportunities", "Offer Studio", "Campaign Factory", "Content Production Factory",
+      "Organic Content Distribution", "Meta Ads Studio", "Meta Profile",
+      "Google Ads Studio", "Google Studio",
+      "Proof Production Factory", "Proof Distribution",
+      "Website Studio", "Sales OS", "Lead Magnet Studio", "Motion Design",
+      "Attribution OS", "Archive",
+    ]);
+    expect(clientDeliverySections.map((section) => section.label ?? null)).toEqual([
+      null, "Primary Flow", "Meta", "Google", "Proof", "Secondary Flow", null,
+    ]);
+    expect(clientDeliverySections.map((section) => section.children.map((node) => node.label))).toEqual([
+      ["Dashboard", "Approval Inbox", "Intelligence OS"],
+      ["Market Opportunities", "Offer Studio", "Campaign Factory", "Content Production Factory"],
+      ["Organic Content Distribution", "Meta Ads Studio", "Meta Profile"],
+      ["Google Ads Studio", "Google Studio"],
+      ["Proof Production Factory", "Proof Distribution"],
+      ["Website Studio", "Sales OS", "Lead Magnet Studio", "Motion Design"],
+      ["Attribution OS", "Archive"],
     ]);
     expect(v6ModuleNodes).toHaveLength(16);
-    expect(new Set(clientNavGroups[0]?.children?.map((node) => node.path)).size).toBe(19);
+    expect(new Set(clientNavGroups[0]?.children?.map((node) => node.path)).size).toBe(20);
+    expect(clientNavGroups[0]?.children?.find((node) => node.id === "motion-design")?.tabs?.map((tab) => tab.id))
+      .toEqual(["brief", "scenes", "renders"]);
     // v1 is archived, so no page offers a version to choose between. The
     // ten that did are now simply the page, and Intelligence OS keeps the
     // only `?view=` there is: two halves of one module, not two versions.

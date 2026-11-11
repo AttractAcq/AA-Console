@@ -402,7 +402,7 @@ export const legacyDeliveryRedirects: Record<string, string> = {
   economics: "attribution-os?tab=economics",
 };
 
-/** Every acquisition component is a distinct Delivery page, in product order. */
+/** Delivery page definitions; clientDeliverySections sets their sidebar order. */
 export const v6ModuleNodes: NavNode[] = [
   { id: "intelligence-os", label: "Intelligence OS", path: "intelligence-os", icon: Brain, capability: "expanding",
     sidebarViews: [{ id: "intelligence", label: "Intelligence" }, { id: "strategy", label: "Strategy" }],
@@ -471,7 +471,7 @@ export const v6ModuleNodes: NavNode[] = [
       // first tab here, so a bookmarked link still lands somewhere useful.
       { id: "paid", label: "Paid Distribution" }, { id: "reporting", label: "Paid Reporting" },
     ] },
-  { id: "google-profile", label: "Google Profile", path: "google-profile", icon: Globe,
+  { id: "google-profile", label: "Google Studio", path: "google-profile", icon: Globe,
     capability: "expanding", tabs: [
       { id: "location", label: "Location" }, { id: "reviews", label: "Reviews" },
       { id: "posts", label: "Posts" }, { id: "metrics", label: "Metrics" },
@@ -546,9 +546,11 @@ export const v6ModuleNodes: NavNode[] = [
 ];
 
 const legacyUtility = (path: string) => legacyClientNavGroups[0]!.children!.find((node) => node.path === path)!;
+const moduleNode = (id: string) => v6ModuleNodes.find((node) => node.id === id)!;
 
-export const clientNavGroups: NavNode[] = [
-  { id: "delivery", label: "Delivery", path: "delivery", children: [
+/** Sidebar presentation order; routes still use the flat clientNavGroups list. */
+export const clientDeliverySections: { id: string; label?: string; children: NavNode[] }[] = [
+  { id: "entry", children: [
     legacyUtility("dashboard"),
     { id: "approval-inbox", label: "Approval Inbox", path: "approval-inbox", icon: CheckSquare,
       capability: "expanding", tabs: [
@@ -556,15 +558,34 @@ export const clientNavGroups: NavNode[] = [
         { id: "campaign-actions", label: "Campaign actions" },
         { id: "unified", label: "Unified" },
       ] },
-    ...v6ModuleNodes,
-    // Motion Design is archived, on Alex's decision of 4 November resolving the
-    // contradiction between his notes ("can be left alone for now as I believe
-    // we will discontinue it") and his phase 0 list, which named it among the
-    // surfaces to archive-and-document. Only the route in is gone:
-    // MotionScenesPanel and MotionDesignPanel still compile, and the code
-    // cleanup waits for v6.2 with the rest. See docs/V6_1_ARCHIVED_SURFACES.md.
-    legacyUtility("archive"),
+    moduleNode("intelligence-os"),
   ] },
+  { id: "primary", label: "Primary Flow", children: [
+    moduleNode("market-opportunities"), moduleNode("offer-studio"),
+    moduleNode("campaign-factory"), moduleNode("content-production-factory"),
+  ] },
+  { id: "meta", label: "Meta", children: [
+    moduleNode("content-distribution"), moduleNode("meta-ads-studio"), moduleNode("meta-profile"),
+  ] },
+  { id: "google", label: "Google", children: [
+    moduleNode("google-ads-studio"), moduleNode("google-profile"),
+  ] },
+  { id: "proof", label: "Proof", children: [
+    moduleNode("proof-production-factory"), moduleNode("proof-distribution"),
+  ] },
+  { id: "secondary", label: "Secondary Flow", children: [
+    moduleNode("website-studio"), moduleNode("sales-os"), moduleNode("lead-magnet-studio"),
+    { ...legacyUtility("motion-design"), capability: "expanding", tabs: [
+      { id: "brief", label: "Brief" }, { id: "scenes", label: "Scenes" },
+      { id: "renders", label: "Renders" },
+    ] },
+  ] },
+  { id: "end", children: [moduleNode("attribution-os"), legacyUtility("archive")] },
+];
+
+export const clientNavGroups: NavNode[] = [
+  { id: "delivery", label: "Delivery", path: "delivery",
+    children: clientDeliverySections.flatMap((section) => section.children) },
   ...legacyClientNavGroups.slice(1),
 ];
 
