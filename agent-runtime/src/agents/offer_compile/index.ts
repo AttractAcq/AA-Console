@@ -128,7 +128,7 @@ export function validateOffer(submitted: unknown): CompiledOffer | { error: stri
   return { serviceName, audience, promise, inclusions, exclusions };
 }
 
-const submitTool = {
+export const submitTool = {
   name: "submit_offer",
   description: "Submit the compiled offer. Price and claims are deliberately not asked for.",
   inputSchema: {
@@ -141,6 +141,7 @@ const submitTool = {
       exclusions: { type: "array", items: { type: "string" }, description: "What is explicitly not. At least one." },
     },
     required: ["service_name", "audience", "promise", "inclusions", "exclusions"],
+    additionalProperties: false,
   },
 };
 

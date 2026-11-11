@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { requestedOffer, validateOffer } from "./index.js";
+import { requestedOffer, submitTool, validateOffer } from "./index.js";
 
 /**
  * Two things worth pinning here.
@@ -20,6 +20,13 @@ const good = () => ({
   promise: "A garage you can train in, without losing the storage you need",
   inclusions: ["Insulation and damp-proofing", "Rubber flooring", "Lighting and power"],
   exclusions: ["Gym equipment", "Planning permission where required"],
+});
+
+it("uses a strict Anthropic object schema for compiled offers", () => {
+  expect(submitTool.inputSchema.additionalProperties).toBe(false);
+  expect(submitTool.inputSchema.required).toEqual([
+    "service_name", "audience", "promise", "inclusions", "exclusions",
+  ]);
 });
 
 describe("reading what the job asked for", () => {
