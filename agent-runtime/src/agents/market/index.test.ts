@@ -39,6 +39,7 @@ describe("Market source and scope boundary", () => {
     expect(MARKET_SYSTEM).toContain("Target buyer geography is not a delivery or service boundary");
     expect(MARKET_SYSTEM).toContain("Do not turn a same-day contract and deposit after a yes into a \"first call\" commitment");
     expect(MARKET_SYSTEM).toContain("A forthcoming issue date printed inside an older release is a schedule");
+    expect(MARKET_SYSTEM).toContain("Do not claim that target-trade work does or does not require a building plan");
   });
 
   it("requires fetched, matched evidence and honest unknowns before persistence", () => {
@@ -89,6 +90,15 @@ describe("Market source and scope boundary", () => {
       "market-direction": sourced,
       "commercial-structure": sourced.replace("Answer: undetermined", "Answer: media cost sits outside AA's invoice."),
     })).toMatch(/unsupported call, invoice or media-cost mechanics/);
+    expect(validateMarketSections({
+      "market-size-and-share": sourced,
+      "market-direction": sourced.replace("Answer: undetermined", "Answer: much of the target work needs no building plan."),
+    })).toMatch(/unverified planning-permit applicability/);
+    expect(validateMarketSections({
+      "market-size-and-share": sourced,
+      "market-direction": sourced,
+      "commercial-structure": sourced.replace("Answer: undetermined", "Answer: media pass-through is the model."),
+    })).toMatch(/calls client-paid media a pass-through/);
     expect(validateMarketSections({
       "market-size-and-share": "Context: supplied. External evidence: none verified. Unknown: buyer count. Answer: undetermined.",
       "market-direction": sourced,

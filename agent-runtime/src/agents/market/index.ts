@@ -28,6 +28,7 @@ EVIDENCE RULES — these are absolute:
 - A limited search cannot prove that a public buyer count or competitor source does not exist. Say "not found in this research pass" and identify where to look next; do not assert nonexistence.
 - Building plans passed measure approvals, not realized construction work or end-customer demand. Label them an adjacent activity proxy; never call their value market size or demand for this agency's service.
 - Buildings completed are reported completions, not approvals. They can measure realized construction activity in the publisher's covered area, but neither approvals nor completions establish demand for this agency's service or direction in each target trade.
+- Do not claim that target-trade work does or does not require a building plan unless a fetched primary planning rule supports that exact trade and jurisdiction. The broad category and geography mismatch is enough to limit the proxy without guessing permit applicability.
 - Treat the Business Context last-updated date as the as-of date for its revenue, launch, marketing and results claims. A phrase such as "at the last diagnostic" keeps that narrower time qualifier; the update date does not prove the status held then or now. Do not present historical state as current without a newer source.
 - Keep separately dated fields separate in the output. In particular, a revenue or pre-launch field as of the context update must not be placed inside an "at the last founder diagnostic" clause when only the no-pipeline or no-content note carries that diagnostic qualifier. If the diagnostic date is absent, say so rather than assigning the context update date to it.
 - Apply that same separation in Answer, not just Context: never call an undated diagnostic note part of a "dated pre-launch state" or attach it to the context update date by summary. Refer to the pre-launch revenue and the diagnostic pipeline note as separate historical observations.
@@ -41,6 +42,7 @@ EVIDENCE RULES — these are absolute:
 - Do not invent a retention horizon, conversion threshold or other numerical milestone such as "past month three" when the source contains no such benchmark. State the metric to measure without an arbitrary cutoff.
 - Keep Answer descriptive and source-bounded. Do not turn a same-day contract and deposit after a yes into a "first call" commitment; the source does not establish the number of calls. Do not assert how AA invoices its fee, that media inflation cannot affect AA, or that client loss is currently material without a current contract and revenue record. A possible risk may be named only as an unmeasured question, not an operating conclusion.
 - The client paying media spend on its own ad account says who funds the spend. It does not say whether or how AA invoices its service, whether media appears on an AA invoice, or how cost changes affect the parties. Put invoice mechanics under Unknown unless the supplied context explicitly documents them; do not infer them in Answer.
+- Do not call client-paid media a pass-through or discuss pass-through tax treatment when the supplied context says the client pays the platform on its own account. Name the topic as agency fees versus client-paid media for qualified review.
 
 CONSTRAINT DIAGNOSIS:
 - Answer for the date actually evidenced. A historical R0, pre-launch or no-pipeline note does not prove no customers, no demand, no deliverable work, or sufficient delivery capacity. Do not prescribe spend, hiring, channel mix or selling pace from that note alone.
@@ -112,6 +114,12 @@ export function validateMarketSections(
   const commercialAnswer = (sections["commercial-structure"] ?? "").split(/\bAnswer\s*[:—–-]/i).at(-1) ?? "";
   if (/\bfirst call\b|\b(?:AA|agency)\s+(?:invoices|bills)\b|\boutside\s+(?:AA's|the agency's)\s+invoice\b|\bmedia inflation\b/i.test(commercialAnswer)) {
     return "commercial-structure infers unsupported call, invoice or media-cost mechanics.";
+  }
+  if (/\bpass-through\b/i.test(sections["commercial-structure"] ?? "")) {
+    return "commercial-structure calls client-paid media a pass-through without a documented flow through AA.";
+  }
+  if (/\b(?:much|most|some)\b[^.!?\n]{0,80}\b(?:work|jobs)\b[^.!?\n]{0,30}\b(?:needs?|requires?)\s+no\s+(?:building\s+)?plan\b/i.test(sections["market-direction"] ?? "")) {
+    return "market-direction asserts unverified planning-permit applicability for the target trades.";
   }
   const allText = Object.values(sections).join("\n");
   const absenceClaim = /\bno public (?:source|count|register|dataset|data)\b[^.!?]{0,80}\bexists\b/gi;
