@@ -24,24 +24,16 @@ describe("Market source and scope boundary", () => {
       submitToolName: "submit_analysis", extra: "",
     });
     expect(prompt).toContain("Target revenue: R100 000");
-    expect(prompt).toContain("current binding constraint is undetermined");
+    expect(prompt).toContain("current binding constraint undetermined");
     expect(prompt).not.toContain("Be decisive rather than balanced");
     expect(prompt).not.toContain("PROVIDER_VOICE_SENTINEL");
     expect(prompt).not.toContain("PROVIDER_PROOF_SENTINEL");
-    expect(MARKET_SYSTEM).toContain("A revenue target without a stated period is ambiguous");
-    expect(MARKET_SYSTEM).toContain("direct working primary-source URL");
-    expect(MARKET_SYSTEM).toContain("publisher's publication index");
-    expect(MARKET_SYSTEM).toContain("Building plans passed measure approvals");
-    expect(MARKET_SYSTEM).toContain("Buildings completed are reported completions, not approvals");
-    expect(MARKET_SYSTEM).toContain("Do not state tax or legal thresholds");
+    expect(MARKET_SYSTEM).toContain("EXTERNAL SOURCE CONTRACT");
+    expect(MARKET_SYSTEM).toContain("BUSINESS CONTEXT CONTRACT");
+    expect(MARKET_SYSTEM).toContain("copy one exact, self-contained source sentence");
+    expect(MARKET_SYSTEM).toContain("The context update does not date an embedded founder diagnostic");
     expect(MARKET_SYSTEM).toContain("current binding constraint is undetermined");
-    expect(MARKET_SYSTEM).toContain("Keep separately dated fields separate");
-    expect(MARKET_SYSTEM).toContain("Target buyer geography is not a delivery or service boundary");
-    expect(MARKET_SYSTEM).toContain("Do not turn a same-day contract and deposit after a yes into a \"first call\" commitment");
-    expect(MARKET_SYSTEM).toContain("A forthcoming issue date printed inside an older release is a schedule");
-    expect(MARKET_SYSTEM).toContain("Do not claim that target-trade work does or does not require a building plan");
-    expect(MARKET_SYSTEM).toContain("does not establish that it has no monthly fee");
-    expect(MARKET_SYSTEM).toContain("not proof that such a record does not exist today");
+    expect(prompt).toContain("Use no more than one external indicator in market-size-and-share");
   });
 
   it("requires fetched, matched evidence and honest unknowns before persistence", () => {
