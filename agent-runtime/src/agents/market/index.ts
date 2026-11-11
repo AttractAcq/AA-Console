@@ -43,6 +43,7 @@ EVIDENCE RULES — these are absolute:
 - Keep Answer descriptive and source-bounded. Do not turn a same-day contract and deposit after a yes into a "first call" commitment; the source does not establish the number of calls. Do not assert how AA invoices its fee, that media inflation cannot affect AA, or that client loss is currently material without a current contract and revenue record. A possible risk may be named only as an unmeasured question, not an operating conclusion.
 - The client paying media spend on its own ad account says who funds the spend. It does not say whether or how AA invoices its service, whether media appears on an AA invoice, or how cost changes affect the parties. Put invoice mechanics under Unknown unless the supplied context explicitly documents them; do not infer them in Answer.
 - Do not call client-paid media a pass-through or discuss pass-through tax treatment when the supplied context says the client pays the platform on its own account. Name the topic as agency fees versus client-paid media for qualified review.
+- A marketplace saying sellers pay when they contact a customer does not establish that it has no monthly fee, subscription, credit bundle or other charge. Do not turn a single pricing sentence into an exclusive comparison such as "rather than per month". Leave the full competing price structure unknown until its current primary terms explicitly state it.
 
 CONSTRAINT DIAGNOSIS:
 - Answer for the date actually evidenced. A historical R0, pre-launch or no-pipeline note does not prove no customers, no demand, no deliverable work, or sufficient delivery capacity. Do not prescribe spend, hiring, channel mix or selling pace from that note alone.
@@ -117,6 +118,10 @@ export function validateMarketSections(
   }
   if (/\bpass-through\b/i.test(sections["commercial-structure"] ?? "")) {
     return "commercial-structure calls client-paid media a pass-through without a documented flow through AA.";
+  }
+  if (/\b(?:rather than|instead of)\s+(?:per month|a monthly|monthly)\b|\b(?:no monthly fee|no subscription)\b/i.test(commercialAnswer)
+    && !/^Quote:.*\b(?:no monthly fee|no subscription|without a monthly fee)\b/im.test(sections["commercial-structure"] ?? "")) {
+    return "commercial-structure infers the absence of monthly competitor fees without a matched source statement.";
   }
   if (/\b(?:much|most|some)\b[^.!?\n]{0,80}\b(?:work|jobs)\b[^.!?\n]{0,30}\b(?:needs?|requires?)\s+no\s+(?:building\s+)?plan\b/i.test(sections["market-direction"] ?? "")) {
     return "market-direction asserts unverified planning-permit applicability for the target trades.";
