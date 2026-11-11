@@ -67,7 +67,9 @@ export function verifyMarketSourceClaims(
       // establish which number is the rate, period or unit.
       const numbers = quote.match(/[−-]?\d[\d,.]*/g) ?? [];
       const words = quote.match(/\b[A-Za-z]{3,}\b/g) ?? [];
-      if (numbers.length >= 4 && words.length < 10) {
+      const completeSentence = /[.!?]$/.test(quote)
+        && /\b(?:is|was|were|rose|fell|jumped|increased|decreased|declined|stood|reached|reported|recorded)\b/i.test(quote);
+      if (numbers.length >= 4 && words.length < 10 && !completeSentence) {
         return `${key} quotes an unlabelled numeric table row; use a self-contained source sentence instead.`;
       }
       sectionQuotes.push(quote);

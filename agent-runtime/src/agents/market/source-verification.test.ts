@@ -64,6 +64,20 @@ describe("Market primary-source fact verification", () => {
       "market-size-and-share": unknown,
       "market-direction": section(row, "The category fell 10,1%.")
     }, [pdf])).toMatch(/unlabelled numeric table row/);
+    expect(verifyMarketSourceClaims({
+      "market-size-and-share": unknown,
+      "market-direction": section(`${row}.`, "The category fell 10,1%.")
+    }, [{ ...pdf, text: `${row}.` }])).toMatch(/unlabelled numeric table row/);
+  });
+
+  it("accepts a short complete source sentence containing four numbers", () => {
+    const quote = "Annual consumer inflation jumped to 5,0% in June 2026 from 4,5% in May 2026.";
+    const official = { ...source, text: quote };
+    const body = section(quote).replace(
+      "Scope: South Africa; January 2026 versus January 2025; percent.",
+      "Scope: South Africa; June 2026 versus May 2026; annual consumer price inflation, percent.",
+    );
+    expect(verifyMarketSourceClaims({ "market-size-and-share": unknown, "market-direction": body }, [official])).toBeNull();
   });
 
   it("does not read the end of larger as a rand amount in source scope", () => {
