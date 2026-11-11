@@ -37,7 +37,6 @@ export function verifyMarketSourceClaims(
 ): string | null {
   const fetched = new Map(fetchedSources.map((source) => [sourceKey(source.url), source]));
   const quotesBySection = new Map<string, string[]>();
-  const allQuotes: string[] = [];
 
   for (const [key, body] of Object.entries(sections)) {
     const evidence = sectionPart(body, "External evidence", "Evidence limit");
@@ -72,23 +71,26 @@ export function verifyMarketSourceClaims(
         return `${key} quotes an unlabelled numeric table row; use a self-contained source sentence instead.`;
       }
       sectionQuotes.push(quote);
-      allQuotes.push(quote);
       if (FIGURE.test(scope)) return `${key} has an external figure in Scope outside the matched quote.`;
     }
     quotesBySection.set(key, sectionQuotes);
   }
 
-  const allQuotedPercentages = allQuotes.flatMap((quote) => quote.match(/[−-]?\d[\d,. ]*\s*%/g) ?? []);
-  const outsideQuotes = Object.values(sections).join("\n")
-    .replace(/https?:\/\/\S+/g, "")
-    .replace(/["“][^"”]+["”]/g, (quoted) => allQuotes.some((item) =>
-      quoted.includes(item)) ? "" : quoted);
-  const unquotedPercentages = outsideQuotes.match(/[−-]?\d[\d,. ]*\s*%/g) ?? [];
-  if (unquotedPercentages.some((value) => !allQuotedPercentages.some((quoted) =>
-    normalizedText(quoted) === normalizedText(value)))) {
-    return "Market includes a percentage outside a matched primary-source quote.";
+  const outsideQuotes: string[] = [];
+  for (const [key, body] of Object.entries(sections)) {
+    const sectionQuotes = quotesBySection.get(key) ?? [];
+    const quotedPercentages = sectionQuotes.flatMap((quote) => quote.match(/[−-]?\d[\d,. ]*\s*%/g) ?? []);
+    const sectionProse = body.replace(/https?:\/\/\S+/g, "")
+      .replace(/["“][^"”]+["”]/g, (quoted) => sectionQuotes.some((quote) =>
+        quoted.includes(quote)) ? "" : quoted);
+    outsideQuotes.push(sectionProse);
+    const unquotedPercentages = sectionProse.match(/[−-]?\d[\d,. ]*\s*%/g) ?? [];
+    if (unquotedPercentages.some((value) => !quotedPercentages.some((quoted) =>
+      normalizedText(quoted) === normalizedText(value)))) {
+      return `${key} includes a percentage outside its own matched primary-source quote.`;
+    }
   }
-  if (MARKET_SCALE_FIGURE.test(outsideQuotes)) {
+  if (MARKET_SCALE_FIGURE.test(outsideQuotes.join("\n"))) {
     return "Market includes a scale or buyer-count figure outside a matched primary-source quote.";
   }
 

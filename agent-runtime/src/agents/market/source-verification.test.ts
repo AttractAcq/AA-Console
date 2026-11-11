@@ -38,15 +38,23 @@ describe("Market primary-source fact verification", () => {
     expect(verifyMarketSourceClaims({ "market-size-and-share": unknown, "market-direction": section(quote) }, []))
       .toMatch(/could not fetch and inspect/);
     expect(verifyMarketSourceClaims({ "market-size-and-share": unknown, "market-direction": section(quote, "The target trades fell 3,2%.") }, [source]))
-      .toMatch(/outside a matched primary-source quote/);
+      .toMatch(/outside its own matched primary-source quote/);
     expect(verifyMarketSourceClaims({
       "market-size-and-share": unknown.replace("Unknown: target demand", "Unknown: whether a 3,2% decrease applies"),
       "market-direction": unknown,
-    }, [])).toMatch(/percentage outside a matched primary-source quote/);
+    }, [])).toMatch(/percentage outside its own matched primary-source quote/);
     expect(verifyMarketSourceClaims({
       "market-size-and-share": unknown.replace("Answer: undetermined", "Answer: share unknown, with 50,000 businesses reachable."),
       "market-direction": unknown,
     }, [])).toMatch(/buyer-count figure outside a matched primary-source quote/);
+  });
+
+  it("does not borrow a percentage quote from another section", () => {
+    const quote = "Additions and alterations decreased by 15,5% in January 2026 compared with January 2025.";
+    expect(verifyMarketSourceClaims({
+      "market-size-and-share": unknown.replace("Unknown: target demand", "Unknown: whether the trade fell 15,5%"),
+      "market-direction": section(quote),
+    }, [source])).toMatch(/market-size-and-share includes a percentage outside its own matched primary-source quote/);
   });
 
   it("rejects a percentage inferred from a PDF table row that omits the percent sign", () => {
