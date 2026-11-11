@@ -7,7 +7,7 @@
 // exact failure the evidence rules below exist to prevent.
 
 import { createRecordAgent, HOUSE_RULES, type PromptArgs } from "../factory.js";
-import { renderContext } from "../shared.js";
+import { renderContext, type BusinessContext } from "../shared.js";
 import type { FetchedSource } from "../../tools/source-text.js";
 import { verifyMarketSourceClaims } from "./source-verification.js";
 
@@ -68,7 +68,7 @@ Call ${submitToolName} once when you are done.`;
 }
 
 export function validateMarketSections(
-  sections: Record<string, string>, fetchedSources: FetchedSource[] = [],
+  sections: Record<string, string>, fetchedSources: FetchedSource[] = [], context: BusinessContext | null = null,
 ): string | null {
   for (const [key, body] of Object.entries(sections)) {
     for (const label of ["Context", "External evidence", "Evidence limit", "Unknown", "Answer"]) {
@@ -95,6 +95,21 @@ export function validateMarketSections(
   if (diagnosticUndated && /\bdated\b[^.!?\n]{0,140}\bno (?:recorded )?pipeline\b/i.test(constraintAnswer)) {
     return "constraint-diagnosis attaches an undated pipeline note to dated context.";
   }
+  const sizeAnswer = (sections["market-size-and-share"] ?? "").split(/\bAnswer\s*[:—–-]/i).at(-1) ?? "";
+  if (/\b(?:monthly recurring revenue|MRR)\b/i.test(sizeAnswer)) {
+    const oneOffOffers = [...(context?.main_offer ?? "").matchAll(
+      /\b([A-Z][A-Za-z&'/-]*(?:\s+[A-Za-z][A-Za-z&'/-]*){0,5})\s*,?\s*(?:R|USD|US\$|\$|€|£)\s*\d[\d,. ]*\s*(?:once[- ]off|one[- ]off|one[- ]time)\b/g,
+    )].map((match) => match[1] ?? "");
+    const sentences = sizeAnswer.split(/[.!?;\n]/);
+    if (oneOffOffers.some((offer) => {
+      const offerPattern = new RegExp(`\\b${offer.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+      return sentences.some((sentence) => offerPattern.test(sentence)
+        && /\b(?:monthly recurring revenue|MRR)\b/i.test(sentence)
+        && !/\b(?:excluded? from|not included in)\s+(?:monthly recurring revenue|MRR)\b/i.test(sentence));
+    })) {
+      return "market-size-and-share counts a one-off offer as monthly recurring revenue.";
+    }
+  }
   const commercialAnswer = (sections["commercial-structure"] ?? "").split(/\bAnswer\s*[:—–-]/i).at(-1) ?? "";
   if (/\bfirst call\b|\b(?:AA|agency)\s+(?:invoices|bills)\b|\boutside\s+(?:AA's|the agency's)\s+invoice\b|\bmedia inflation\b/i.test(commercialAnswer)) {
     return "commercial-structure infers unsupported call, invoice or media-cost mechanics.";
@@ -120,7 +135,7 @@ export function validateMarketSections(
   for (const match of allText.matchAll(absenceClaim)) {
     const prefix = allText.slice(Math.max(0, (match.index ?? 0) - 80), match.index).split(/[.!?\n]/).at(-1) ?? "";
     if (/(?:not proof that|cannot (?:establish|conclude|say) that|does not (?:show|mean|prove)(?: that)?)\s*$/i.test(prefix)) continue;
-    return "A research pass cannot establish that a public source does not exist.";
+    return "A research pass cannot establish that a source, count or denominator does not exist.";
   }
   return verifyMarketSourceClaims(sections, fetchedSources);
 }

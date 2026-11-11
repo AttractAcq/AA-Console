@@ -53,7 +53,9 @@ export interface RecordAgentConfig {
   /** Return an error message to fail non-retryably before spending a token. */
   validate?: (input: Record<string, unknown>) => string | null;
   /** Reject a domain-specific incomplete answer before it reaches records. */
-  validateSections?: (sections: Record<string, string>, fetchedSources: FetchedSource[]) => string | null;
+  validateSections?: (
+    sections: Record<string, string>, fetchedSources: FetchedSource[], context: BusinessContext | null,
+  ) => string | null;
   /** A failed source audit should stop rather than spend another model attempt. */
   sectionValidationRetryable?: boolean;
   /** Campaign Intelligence is the one domain whose records carry a period. */
@@ -197,7 +199,7 @@ export function createRecordAgent(config: RecordAgentConfig): JobRunner {
       };
     }
 
-    const sectionError = config.validateSections?.(sections, result.fetchedSources);
+    const sectionError = config.validateSections?.(sections, result.fetchedSources, context);
     if (sectionError) {
       return { ok: false, retryable: config.sectionValidationRetryable ?? true, failureMessage: sectionError, usage };
     }

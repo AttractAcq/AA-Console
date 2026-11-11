@@ -118,4 +118,25 @@ describe("Market source and scope boundary", () => {
       "market-direction": sourced,
     })).toMatch(/Evidence limit/);
   });
+
+  it("checks recurring-revenue arithmetic against a client's one-off offer", () => {
+    const context = {
+      business_overview: null, ideal_customer: null,
+      main_offer: "Proof Sprint, R7,500 once-off: one turn. Proof Brand, R32,500 per month: the monthly loop.",
+      competitors: null, brand_voice: null, proof_testimonials: null,
+      current_marketing: null, sales_process: null, current_revenue: null, target_revenue: null,
+    };
+    const direction = "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: direction. Answer: direction unknown.";
+    const size = "Context: Proof Sprint is R7,500 once-off. External evidence: none verified. Evidence limit: no external measure used. Unknown: market share. Answer: Share unknown. Conditional monthly recurring revenue: 14 × Proof Sprint = R105,000.";
+    expect(validateMarketSections({ "market-size-and-share": size, "market-direction": direction }, [], context))
+      .toMatch(/one-off offer as monthly recurring revenue/);
+    expect(validateMarketSections({
+      "market-size-and-share": size.replace("14 × Proof Sprint = R105,000", "Proof Sprint is once-off and excluded from MRR"),
+      "market-direction": direction,
+    }, [], context)).toBeNull();
+    expect(validateMarketSections({
+      "market-size-and-share": size.replace("Share unknown.", "Share unknown; once-off sales need separate accounting."),
+      "market-direction": direction,
+    }, [], context)).toMatch(/one-off offer as monthly recurring revenue/);
+  });
 });
