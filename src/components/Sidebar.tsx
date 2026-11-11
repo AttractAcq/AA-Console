@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { ArrowLeft, ChevronDown, Moon, PanelLeftClose, PanelLeftOpen, Sun } from "lucide-react";
-import { agencyNav, clientNavGroups } from "../config/navigation";
+import { agencyNav, clientDeliverySections, clientNavGroups } from "../config/navigation";
 import { getMemberSections, teamCategoryLabels } from "../data/team";
 import type { TeamCategory } from "../data/team";
 import { agentSections } from "../data/agents";
@@ -152,7 +152,12 @@ function ClientSidebarContent({
               </button>
               {isExpanded && (
                 <div className="mt-0.5 space-y-0.5 pl-2">
-                  {group.children?.map((child) => {
+                  {(group.id === "delivery" ? clientDeliverySections
+                    : [{ id: group.id, children: group.children ?? [] }]).map((section) => <div key={section.id}>
+                    {"label" in section && section.label &&
+                      <h3 className="px-2.5 pb-1 pt-3 text-xs font-semibold text-muted-foreground">{section.label}</h3>}
+                    <div className={cn("space-y-0.5", "label" in section && section.label && "pl-2")}>
+                    {section.children.map((child) => {
                     const Icon = child.icon;
                     const path = `/clients/${clientId}/${group.path}/${child.path}`;
                     if (child.sidebarViews) {
@@ -195,7 +200,9 @@ function ClientSidebarContent({
                         {child.label}
                       </NavLink>
                     );
-                  })}
+                    })}
+                    </div>
+                  </div>)}
                 </div>
               )}
             </div>
