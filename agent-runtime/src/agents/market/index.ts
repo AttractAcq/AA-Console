@@ -24,7 +24,7 @@ EXTERNAL SOURCE CONTRACT
 BUSINESS CONTEXT CONTRACT
 - Date each field by its own source. The context update does not date an embedded founder diagnostic. Separate historical revenue, launch and pipeline observations in Context and Answer. Missing current records are "not supplied", not proven nonexistent.
 - Treat operator descriptions of buyers, competitors and seasonality as hypotheses. A target city is not a delivery radius or a province-wide segment. "Owner-operator" does not establish the signer, payer or budget. A client-funded ad account does not establish ownership of pages, profiles, audiences or leads, how AA invoices, or media-cost effects.
-- A revenue target without a period stays unknown. You may show labelled one-month arithmetic from stated prices, but cannot claim actual clients or share without a matching reachable-buyer denominator. If current pipeline and delivery throughput are missing, the current binding constraint is undetermined; a historical diagnosis may be labelled provisional.
+- A revenue target without a period stays unknown. You may show labelled one-month arithmetic from stated prices, but keep one-off revenue separate from monthly recurring revenue and do not claim actual clients or share without a matching reachable-buyer denominator. If current pipeline and delivery throughput are missing, the current binding constraint is undetermined; a historical diagnosis may be labelled provisional.
 - Do not invent capacity, retention cutoffs, conversion thresholds, invoice milestones or causal commercial risks. State the measurement needed instead. Do not state tax or legal thresholds or enforceability; flag the topic for qualified current-source review.
 
 OUTPUT CONTRACT
@@ -62,7 +62,7 @@ Keep each section near 150–250 words, including its quote. Use these five labe
 Source: https://primary-source-url
 Quote: "One exact self-contained sentence copied from web_fetch, including the measured category and figure"
 Scope: geography; measured period and comparison period; units
-Evidence limit must state what the source measures and what it cannot establish about this buyer market. Keep Answer to one or two bounded sentences; put source gaps in Unknown. If no source was fetched, write "External evidence: none verified" and "Evidence limit: no external measure used". Do not put an external number outside its matched Quote, except Answer may repeat a percentage from that same section's quote. Put conditional arithmetic under Answer with its assumption.
+Evidence limit must state what the source measures and what it cannot establish about this buyer market. Keep Answer to one or two bounded sentences; put source gaps in Unknown. If no source was fetched, write "External evidence: none verified" and "Evidence limit: no external measure used". Do not put an external number outside its matched Quote, except Answer may repeat a percentage from that same section's quote. Put conditional arithmetic under Answer with its assumption, and label one-off revenue separately from recurring revenue.
 
 Call ${submitToolName} once when you are done.`;
 }
@@ -116,7 +116,7 @@ export function validateMarketSections(
     return "market-direction asserts unverified planning-permit applicability for the target trades.";
   }
   const allText = Object.values(sections).join("\n");
-  const absenceClaim = /\bno public (?:source|count|register|dataset|data)\b[^.!?]{0,80}\bexists\b/gi;
+  const absenceClaim = /\bno (?:public |reachable[- ]buyer |matching |verified )?(?:source|count|register|dataset|data|denominator)\b[^.!?]{0,80}\bexists\b/gi;
   for (const match of allText.matchAll(absenceClaim)) {
     const prefix = allText.slice(Math.max(0, (match.index ?? 0) - 80), match.index).split(/[.!?\n]/).at(-1) ?? "";
     if (/(?:not proof that|cannot (?:establish|conclude|say) that|does not (?:show|mean|prove)(?: that)?)\s*$/i.test(prefix)) continue;

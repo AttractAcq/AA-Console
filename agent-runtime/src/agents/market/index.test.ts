@@ -33,7 +33,9 @@ describe("Market source and scope boundary", () => {
     expect(MARKET_SYSTEM).toContain("copy one exact, self-contained source sentence");
     expect(MARKET_SYSTEM).toContain("The context update does not date an embedded founder diagnostic");
     expect(MARKET_SYSTEM).toContain("current binding constraint is undetermined");
+    expect(MARKET_SYSTEM).toContain("keep one-off revenue separate from monthly recurring revenue");
     expect(prompt).toContain("Use no more than one external indicator in market-size-and-share");
+    expect(prompt).toContain("label one-off revenue separately from recurring revenue");
   });
 
   it("requires fetched, matched evidence and honest unknowns before persistence", () => {
@@ -60,6 +62,10 @@ describe("Market source and scope boundary", () => {
     })).toBeNull();
     expect(validateMarketSections({
       "market-size-and-share": "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: No public count exists for this buyer segment. Answer: share unknown.",
+      "market-direction": sourced,
+    })).toMatch(/cannot establish/);
+    expect(validateMarketSections({
+      "market-size-and-share": "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: No reachable-buyer denominator exists for this market. Answer: share unknown.",
       "market-direction": sourced,
     })).toMatch(/cannot establish/);
     expect(validateMarketSections({
