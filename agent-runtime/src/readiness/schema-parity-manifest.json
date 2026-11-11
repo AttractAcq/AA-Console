@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "2cd5d7898dd1b60c05c739f650eea286539f400bb8460b83df3be8363073c40c",
-  "generatedTypesSha256": "bfc368675323ad55fbd70d5edcfbf02c7cc77abe08b4780f211023874cf129e5",
-  "generatedSchemaBodySha256": "d5932cc5ca89161f181ef2c6005e0b1c9d80acfa04f146e85455dae2c400a223",
+  "migrationSourceDigest": "335251b626cdec58b0f42493fc1a7cd9353e8ccedf6c371182af15fd9ae526ae",
+  "generatedTypesSha256": "300b55b346d7fe4e133b0131713a1734537a452a8a45085f92fe743a45407d15",
+  "generatedSchemaBodySha256": "1492e0093afc62548cf24ffa6d22816a28ec5aaa192deaf84489a15ce9ce6c89",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2320,6 +2320,13 @@
       "filename": "20261111010000_314_offer_studio_new_offer_permission.sql",
       "sha256": "83f869c0650963f536a766c9696ab5ab85e7da3a8356aab22765f07300899308",
       "trimmedMd5": "e6ea6c9d8e6c623489cdc23210266a4a"
+    },
+    {
+      "version": "20261111020000",
+      "name": "315_compile_offer_and_version_atomically",
+      "filename": "20261111020000_315_compile_offer_and_version_atomically.sql",
+      "sha256": "286a476a4b546bb13474ed5647c4c25a0b85e824e764517b39a875e1aaade01e",
+      "trimmedMd5": "4bef29e86f327d3b3e0413657cb1fd9e"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

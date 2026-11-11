@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { requestedOffer, submitTool, validateOffer } from "./index.js";
+import { compiledOfferArgs, requestedOffer, submitTool, validateOffer } from "./index.js";
 
 /**
  * Two things worth pinning here.
@@ -27,6 +27,25 @@ it("uses a strict Anthropic object schema for compiled offers", () => {
   expect(submitTool.inputSchema.required).toEqual([
     "service_name", "audience", "promise", "inclusions", "exclusions",
   ]);
+});
+
+it("passes the complete RPC signature and keeps unverified economics empty", () => {
+  const checked = validateOffer(good());
+  if ("error" in checked) throw new Error(checked.error);
+  expect(compiledOfferArgs("client-1", "secondary", "job-1", checked)).toEqual({
+    p_client_id: "client-1",
+    p_kind: "secondary",
+    p_service_name: checked.serviceName,
+    p_audience: checked.audience,
+    p_promise: checked.promise,
+    p_inclusions: checked.inclusions,
+    p_exclusions: checked.exclusions,
+    p_price_amount: null,
+    p_currency: null,
+    p_delivery_cost_estimate: null,
+    p_claims: [],
+    p_idempotency_key: "job-1:1",
+  });
 });
 
 describe("reading what the job asked for", () => {
