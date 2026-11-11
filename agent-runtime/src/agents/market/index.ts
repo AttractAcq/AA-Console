@@ -33,6 +33,7 @@ EVIDENCE RULES — these are absolute:
 - Keep separately dated fields separate in the output. In particular, a revenue or pre-launch field as of the context update must not be placed inside an "at the last founder diagnostic" clause when only the no-pipeline or no-content note carries that diagnostic qualifier. If the diagnostic date is absent, say so rather than assigning the context update date to it.
 - Apply that same separation in Answer, not just Context: never call an undated diagnostic note part of a "dated pre-launch state" or attach it to the context update date by summary. Refer to the pre-launch revenue and the diagnostic pipeline note as separate historical observations.
 - In Answer, do not say a dated source showed no pipeline when the no-pipeline note came from a diagnostic without its own date. The pre-launch revenue field cannot date that diagnostic by implication.
+- An absent current contract, invoice or revenue record in the supplied material is a source gap, not proof that such a record does not exist today. Say "not supplied" or "not found in this pass", never "no current record exists".
 - A revenue target without a stated period is ambiguous. Do not call it monthly, annual or recurring as a fact. You may show conditional arithmetic for an explicitly labelled monthly scenario, but keep the target period and resulting actual client count unknown until the operator confirms them. Show the price assumption and arithmetic.
 - Do not state tax or legal thresholds, registration triggers, compliance requirements or contract enforceability. Those are outside this market analysis and may change; flag the topic for a qualified current-source review without a number or legal conclusion.
 - "Owner-operator" does not establish who decides, signs, pays, or which budget is used. A client-owned ad account does not establish ownership of the profile, pages, audience or leads, and does not remove every media-related risk. A monthly capture day does not establish a service radius or available production capacity. Do not infer any of these as commercial facts.
@@ -42,6 +43,7 @@ EVIDENCE RULES — these are absolute:
 - Do not invent a retention horizon, conversion threshold or other numerical milestone such as "past month three" when the source contains no such benchmark. State the metric to measure without an arbitrary cutoff.
 - Keep Answer descriptive and source-bounded. Do not turn a same-day contract and deposit after a yes into a "first call" commitment; the source does not establish the number of calls. Do not assert how AA invoices its fee, that media inflation cannot affect AA, or that client loss is currently material without a current contract and revenue record. A possible risk may be named only as an unmeasured question, not an operating conclusion.
 - The client paying media spend on its own ad account says who funds the spend. It does not say whether or how AA invoices its service, whether media appears on an AA invoice, or how cost changes affect the parties. Put invoice mechanics under Unknown unless the supplied context explicitly documents them; do not infer them in Answer.
+- Do not prescribe an invoice-based conversion metric such as "time to first monthly invoice" when fee invoicing is unknown. Measure the documented step instead: a signed monthly agreement or a live client at the monthly tier.
 - Do not call client-paid media a pass-through or discuss pass-through tax treatment when the supplied context says the client pays the platform on its own account. Name the topic as agency fees versus client-paid media for qualified review.
 - A marketplace saying sellers pay when they contact a customer does not establish that it has no monthly fee, subscription, credit bundle or other charge. Do not turn a single pricing sentence into an exclusive comparison such as "rather than per month". Leave the full competing price structure unknown until its current primary terms explicitly state it.
 
@@ -103,7 +105,10 @@ export function validateMarketSections(
   if (/\b(?:newest|latest)\s+(?:relevant\s+)?(?:release|issue|publication)\s+(?:identified|is|was|available)\b/i.test(sections["market-direction"] ?? "")) {
     return "market-direction must give a verified issue date without an absolute recency claim.";
   }
-  if (/\b(?:later|newer)\s+(?:issues|releases|publications)\s+(?:exist|were published)\b/i.test(sections["market-direction"] ?? "")) {
+  const direction = sections["market-direction"] ?? "";
+  for (const match of direction.matchAll(/\b(?:later|newer)\s+(?:issues|releases|publications)\s+(?:exist|were published)\b/gi)) {
+    const prefix = direction.slice(Math.max(0, (match.index ?? 0) - 60), match.index).split(/[.!?\n]/).at(-1) ?? "";
+    if (/(?:do not claim|cannot (?:confirm|establish)|not proof that)\s*$/i.test(prefix)) continue;
     return "market-direction cannot infer later publication from a release schedule.";
   }
   const constraint = sections["constraint-diagnosis"] ?? "";
@@ -115,6 +120,12 @@ export function validateMarketSections(
   const commercialAnswer = (sections["commercial-structure"] ?? "").split(/\bAnswer\s*[:—–-]/i).at(-1) ?? "";
   if (/\bfirst call\b|\b(?:AA|agency)\s+(?:invoices|bills)\b|\boutside\s+(?:AA's|the agency's)\s+invoice\b|\bmedia inflation\b/i.test(commercialAnswer)) {
     return "commercial-structure infers unsupported call, invoice or media-cost mechanics.";
+  }
+  if (/\bfirst monthly invoice\b/i.test(commercialAnswer)) {
+    return "commercial-structure assumes a monthly invoice despite undocumented fee billing.";
+  }
+  if (/\bno current (?:contract|invoice|revenue) records? exists?\b/i.test(Object.values(sections).join("\n"))) {
+    return "Market treats a missing current record in the supplied material as proven nonexistence.";
   }
   if (/\bpass-through\b/i.test(sections["commercial-structure"] ?? "")) {
     return "commercial-structure calls client-paid media a pass-through without a documented flow through AA.";

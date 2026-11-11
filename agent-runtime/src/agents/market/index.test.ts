@@ -41,6 +41,7 @@ describe("Market source and scope boundary", () => {
     expect(MARKET_SYSTEM).toContain("A forthcoming issue date printed inside an older release is a schedule");
     expect(MARKET_SYSTEM).toContain("Do not claim that target-trade work does or does not require a building plan");
     expect(MARKET_SYSTEM).toContain("does not establish that it has no monthly fee");
+    expect(MARKET_SYSTEM).toContain("not proof that such a record does not exist today");
   });
 
   it("requires fetched, matched evidence and honest unknowns before persistence", () => {
@@ -83,6 +84,10 @@ describe("Market source and scope boundary", () => {
     })).toMatch(/cannot infer later publication/);
     expect(validateMarketSections({
       "market-size-and-share": sourced,
+      "market-direction": "Context: supplied. External evidence: none verified. Evidence limit: no external measure used. Unknown: I do not claim later issues exist. Answer: direction unknown.",
+    })).toBeNull();
+    expect(validateMarketSections({
+      "market-size-and-share": sourced,
       "market-direction": sourced,
       "constraint-diagnosis": "Context: date of that diagnostic is absent; no pipeline was noted. External evidence: none verified. Evidence limit: no external measure used. Unknown: current count. Answer: the dated source showed no recorded pipeline.",
     })).toMatch(/attaches an undated pipeline note/);
@@ -105,6 +110,11 @@ describe("Market source and scope boundary", () => {
       "market-direction": sourced,
       "commercial-structure": sourced.replace("Answer: undetermined", "Answer: the marketplace charges per contact rather than per month."),
     })).toMatch(/absence of monthly competitor fees/);
+    expect(validateMarketSections({
+      "market-size-and-share": sourced,
+      "market-direction": sourced,
+      "commercial-structure": sourced.replace("Answer: undetermined", "Answer: measure time to first monthly invoice."),
+    })).toMatch(/assumes a monthly invoice/);
     expect(validateMarketSections({
       "market-size-and-share": "Context: supplied. External evidence: none verified. Unknown: buyer count. Answer: undetermined.",
       "market-direction": sourced,
