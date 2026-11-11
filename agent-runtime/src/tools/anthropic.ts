@@ -66,15 +66,15 @@ export class ProviderError extends Error {
 }
 
 export function classifyProviderError(error: unknown): { message: string; retryable: boolean } {
+  if (error instanceof Anthropic.APIConnectionError) {
+    return { message: `Connection error: ${error.message}`, retryable: true };
+  }
   if (error instanceof Anthropic.APIError) {
     const status = error.status ?? 0;
     // 4xx other than 429 means we sent something wrong — retrying sends
     // exactly the same thing, so it will fail identically.
-    const retryable = status === 429 || status >= 500 || status === 408;
+    const retryable = status === 0 || status === 429 || status >= 500 || status === 408;
     return { message: `Anthropic ${status}: ${error.message}`, retryable };
-  }
-  if (error instanceof Anthropic.APIConnectionError) {
-    return { message: `Connection error: ${error.message}`, retryable: true };
   }
   // An abort here is this runtime's own deadline firing, not the provider
   // failing. Saying so stops it reading as an Anthropic outage in the logs.
