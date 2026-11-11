@@ -27,6 +27,8 @@ export interface AgentLoopOptions {
   apiKey: string;
   /** Per-request timeout. Defaults to ten minutes if a caller omits it. */
   timeoutMs?: number;
+  /** SDK connection/HTTP retries. Defaults to two; private cost-bounded trials can disable them. */
+  sdkMaxRetries?: number;
   /**
    * Wall-clock moment (epoch ms) this job must be finished by. Distinct from
    * timeoutMs, which bounds one HTTP request: with retries and a multi-turn
@@ -134,7 +136,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
   // the expiry that is supposed to recover a wedged job never fires. This is
   // the bound that makes the call eventually fail instead.
   const timeoutMs = options.timeoutMs ?? 600_000;
-  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: timeoutMs });
+  const client = new Anthropic({ apiKey, maxRetries: options.sdkMaxRetries ?? 2, timeout: timeoutMs });
 
   // Checked before the request, because the API's refusal names a keyword and
   // not the agent that carries it — and because retrying sends exactly the
