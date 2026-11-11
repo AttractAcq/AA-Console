@@ -441,6 +441,8 @@ it("atomically compiles a secondary offer, replays once, and rolls back invalid 
   const offer = await db.query<{ kind: string }>("select kind from service_offers where id=$1",
     [first.rows[0]!.version.offer_id]);
   expect(offer.rows[0]!.kind).toBe("secondary");
+  await expect(db.query(sql, [clientA, "main", ...args.slice(2)]))
+    .rejects.toThrow(/different offer kind/);
   await expect(db.query(sql, [...args.slice(0, 4), "A different promise", ...args.slice(5)]))
     .rejects.toThrow(/different offer version/);
 

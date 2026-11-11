@@ -12,6 +12,7 @@ set timezone = 'UTC'
 as $$
 declare
   v_offer_id uuid;
+  v_existing_kind text;
   v_version public.service_offer_versions%rowtype;
 begin
   if auth.role() is distinct from 'service_role' then
@@ -26,8 +27,14 @@ begin
   -- two offer rows. A failed version write rolls back the offer insert too.
   perform pg_advisory_xact_lock(hashtextextended(
     p_client_id::text || ':offer:' || btrim(p_idempotency_key), 0));
-  if exists (select 1 from public.service_offer_versions
-      where client_id = p_client_id and idempotency_key = btrim(p_idempotency_key)) then
+  select o.kind into v_existing_kind
+    from public.service_offer_versions v
+    join public.service_offers o on o.id = v.offer_id and o.client_id = v.client_id
+    where v.client_id = p_client_id and v.idempotency_key = btrim(p_idempotency_key);
+  if found then
+    if v_existing_kind <> p_kind then
+      raise exception 'Idempotency key already belongs to a different offer kind.';
+    end if;
     return public.create_service_offer_version_v6(
       p_client_id, p_service_name, p_audience, p_promise,
       p_inclusions, p_exclusions, p_price_amount, p_currency,
