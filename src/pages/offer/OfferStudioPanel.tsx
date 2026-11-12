@@ -55,6 +55,7 @@ export function OfferStudioPanel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [pendingCompiles, setPendingCompiles] = useState<Array<{ id: string; kind: "main" | "secondary" }>>([]);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -87,6 +88,41 @@ export function OfferStudioPanel() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (pendingCompiles.length === 0) return;
+    let active = true;
+    let checking = false;
+    const check = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const { data, error: jobError } = await supabase.from("agent_jobs")
+          .select("id,status,terminal,error")
+          .in("id", pendingCompiles.map((job) => job.id));
+        if (!active) return;
+        if (jobError) {
+          setError(`Could not check the compiler: ${jobError.message}`);
+          return;
+        }
+        const finished = (data ?? []).filter((job) =>
+          job.status === "completed" || (job.status === "failed" && job.terminal));
+        if (finished.length === 0) return;
+        const completed = finished.filter((job) => job.status === "completed");
+        const failed = finished.filter((job) => job.status === "failed");
+        if (completed.length > 0) await refresh();
+        if (!active) return;
+        if (completed.length > 0) setNotice(`${completed.length} offer compile ${completed.length === 1 ? "finished" : "jobs finished"}. Review the draft version before signing off.`);
+        if (failed.length > 0) setError(failed.map((job) => `Offer compile failed: ${job.error ?? "No reason was recorded."}`).join(" "));
+        setPendingCompiles((current) => current.filter((job) => !finished.some((done) => done.id === job.id)));
+      } finally {
+        checking = false;
+      }
+    };
+    void check();
+    const timer = setInterval(() => void check(), 5000);
+    return () => { active = false; clearInterval(timer); };
+  }, [pendingCompiles, refresh]);
 
   async function create(kind: "main" | "secondary") {
     if (!clientId) return;
@@ -124,7 +160,7 @@ export function OfferStudioPanel() {
     if (!clientId) return;
     setBusy(`compile-${kind}`);
     setError(null);
-    const { error: rpcError } = await supabase.rpc("request_offer_compile_v6", {
+    const { data: jobId, error: rpcError } = await supabase.rpc("request_offer_compile_v6", {
       p_client_id: clientId,
       p_kind: kind,
       p_source: "strategy",
@@ -136,8 +172,9 @@ export function OfferStudioPanel() {
       setError(rpcError.message);
       return;
     }
-    setNotice(`Queued. The compiler is drafting a ${kind} offer from the offer strategy.`);
     await refresh();
+    setNotice(`Queued. The compiler is drafting a ${kind} offer from the offer strategy.`);
+    if (jobId) setPendingCompiles((current) => [...current, { id: jobId, kind }]);
   }
 
   const versionsFor = (offer: Offer) => versions.filter((version) => version.offer_id === offer.id);

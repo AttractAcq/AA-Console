@@ -164,6 +164,11 @@ beforeAll(async () => {
   await db.exec(pagePublishBoundaryMigration);
   const pageApprovalMigration = await readFile(new URL("../../supabase/migrations/20261016060000_213_v6_page_approval_snapshot.sql", import.meta.url), "utf8");
   await db.exec(pageApprovalMigration);
+  const offerKindMigration = await readFile(new URL("../../supabase/migrations/20261102010000_303_a_main_offer_and_a_secondary_offer.sql", import.meta.url), "utf8");
+  await db.exec(offerKindMigration);
+  await db.exec("create function lock_down_definer_functions() returns void language plpgsql as $$ begin end $$");
+  const atomicOfferMigration = await readFile(new URL("../../supabase/migrations/20261111020000_315_compile_offer_and_version_atomically.sql", import.meta.url), "utf8");
+  await db.exec(atomicOfferMigration);
   await db.exec(`
     insert into clients(id) values ('${clientA}'), ('${clientB}');
     insert into client_campaigns(id,client_id,name,brief,meta_campaign_id,approved_at)
@@ -424,6 +429,38 @@ it("reuses the exact intelligence input on a planner retry and links it to the p
   await expect(db.query("select attach_campaign_manifest_intelligence_v6($1,$2)",
     [manifest.rows[0]!.manifest.id, fresh.rows[0]!.snapshot.id]))
     .rejects.toThrow(/already uses another/);
+});
+
+it("atomically compiles a secondary offer, replays once, and rolls back invalid versions", async () => {
+  const args = [clientA, "secondary", "Priority audit", "Owners", "A documented plan",
+    ["Review"], ["Implementation"], null, null, null, "[]", "atomic-offer-1"];
+  const sql = "select to_jsonb(create_compiled_service_offer_v6($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12)) as version";
+  const first = await db.query<{ version: { id: string; offer_id: string } }>(sql, args);
+  const replay = await db.query<{ version: { id: string; offer_id: string } }>(sql, args);
+  expect(replay.rows[0]!.version).toEqual(first.rows[0]!.version);
+  const offer = await db.query<{ kind: string }>("select kind from service_offers where id=$1",
+    [first.rows[0]!.version.offer_id]);
+  expect(offer.rows[0]!.kind).toBe("secondary");
+  await expect(db.query(sql, [clientA, "main", ...args.slice(2)]))
+    .rejects.toThrow(/different offer kind/);
+  await expect(db.query(sql, [...args.slice(0, 4), "A different promise", ...args.slice(5)]))
+    .rejects.toThrow(/different offer version/);
+
+  const before = await db.query<{ count: number }>("select count(*)::int as count from service_offers");
+  await expect(db.query(sql, [clientA, "main", "Invalid draft", "Owners", " ",
+    ["Review"], ["Implementation"], null, null, null, "[]", "atomic-offer-bad"]))
+    .rejects.toThrow(/A service, audience, promise/);
+  const after = await db.query<{ count: number }>("select count(*)::int as count from service_offers");
+  expect(after.rows[0]!.count).toBe(before.rows[0]!.count);
+
+  await db.exec("select set_config('request.jwt.claim.role','authenticated',false)");
+  try {
+    await expect(db.query(sql, [clientA, "main", "Forbidden", "Owners", "A plan",
+      ["Review"], ["Implementation"], null, null, null, "[]", "atomic-offer-forbidden"]))
+      .rejects.toThrow(/Only the internal service/);
+  } finally {
+    await db.exec("select set_config('request.jwt.claim.role','service_role',false)");
+  }
 });
 
 it("versions service offers and requires cleared proof before a human signs quantified claims", async () => {

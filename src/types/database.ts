@@ -26625,6 +26625,45 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_compiled_service_offer_v6: {
+        Args: {
+          p_audience: string
+          p_claims: Json
+          p_client_id: string
+          p_currency: string
+          p_delivery_cost_estimate: number
+          p_exclusions: string[]
+          p_idempotency_key: string
+          p_inclusions: string[]
+          p_kind: string
+          p_price_amount: number
+          p_promise: string
+          p_service_name: string
+        }
+        Returns: {
+          audience: string
+          claims: Json
+          client_id: string
+          content_hash: string
+          created_at: string
+          currency: string | null
+          delivery_cost_estimate: number | null
+          exclusions: string[]
+          id: string
+          idempotency_key: string
+          inclusions: string[]
+          offer_id: string
+          price_amount: number | null
+          promise: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "service_offer_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_console_user: {
         Args: {
           p_category?: Database["public"]["Enums"]["team_category"]

@@ -42,13 +42,14 @@ const drift = (over: Record<string, unknown> = {}) => ({
 });
 
 function database(data: {
-  offers?: unknown[]; versions?: unknown[]; signoffs?: unknown[]; drift?: unknown[];
+  offers?: unknown[]; versions?: unknown[]; signoffs?: unknown[]; drift?: unknown[]; jobs?: unknown[];
 }) {
   const byTable: Record<string, unknown[]> = {
     service_offers: data.offers ?? [],
     service_offer_versions: data.versions ?? [],
     service_offer_signoffs: data.signoffs ?? [],
     offer_version_drift: data.drift ?? [],
+    agent_jobs: data.jobs ?? [],
   };
   // The panel chains select -> eq -> order for some tables and select -> eq for
   // others, so the chain is a thenable rather than having one terminal method:
@@ -59,6 +60,7 @@ function database(data: {
     Object.assign(chain, {
       select: () => chain,
       eq: () => chain,
+      in: () => chain,
       order: () => chain,
       insert: insert.mockResolvedValue({ error: null }),
       then: (resolve: (value: typeof result) => unknown) => Promise.resolve(resolve(result)),
@@ -203,6 +205,23 @@ describe("the detail", () => {
 });
 
 describe("compiling an offer instead of writing one", () => {
+  it("shows a completed compile and asks for draft review", async () => {
+    database({ offers: [], jobs: [{ id: "job-1", status: "completed", terminal: true, error: null }] });
+    rpc.mockResolvedValueOnce({ data: "job-1", error: null });
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Compile a main offer" }));
+    expect(await screen.findByRole("status")).toHaveTextContent(/Review the draft version/);
+    expect(from).toHaveBeenCalledWith("agent_jobs");
+  });
+
+  it("shows a terminal compile failure instead of leaving Queued on screen", async () => {
+    database({ offers: [], jobs: [{ id: "job-2", status: "failed", terminal: true, error: "Version writer refused the draft." }] });
+    rpc.mockResolvedValueOnce({ data: "job-2", error: null });
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: "Compile a secondary offer" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Version writer refused the draft/);
+  });
+
   it("asks the compiler for a main or a secondary offer", async () => {
     // The notes: "agent compiles from Offer Strategy or from the micro-niche".
     // Only the strategy source is offered here; the micro-niche one needs an

@@ -59,6 +59,23 @@ export type CompiledOffer = {
   exclusions: string[];
 };
 
+export function compiledOfferArgs(clientId: string, kind: OfferKind, jobId: string, offer: CompiledOffer) {
+  return {
+    p_client_id: clientId,
+    p_kind: kind,
+    p_service_name: offer.serviceName,
+    p_audience: offer.audience,
+    p_promise: offer.promise,
+    p_inclusions: offer.inclusions,
+    p_exclusions: offer.exclusions,
+    p_price_amount: null,
+    p_currency: null,
+    p_delivery_cost_estimate: null,
+    p_claims: [],
+    p_idempotency_key: `${jobId}:1`,
+  };
+}
+
 /** What the job was asked for. Read defensively: a job row can come from a cron
  *  or the gateway, so neither value is trusted to be present or sane. */
 export function requestedOffer(
@@ -282,32 +299,19 @@ ${existingLines.length > 0 ? `\nWHAT THIS BUSINESS ALREADY SELLS\n${existingLine
     return { ok: false, retryable: false, failureMessage: `${checked.error} Nothing was saved.`, usage };
   }
 
-  // The offer row carries `kind`, which migration 303 added and
-  // create_service_offer_version_v6 does not take. Same insert the console's
-  // two buttons perform, with a name the agent chose rather than a placeholder.
-  const { data: offer, error: offerError } = await sb
-    .from("service_offers")
-    .insert({ client_id: job.client_id, kind, service_name: checked.serviceName })
-    .select("id")
-    .single();
-  if (offerError) throw new Error(`Could not create the offer: ${offerError.message}`);
-  const offerId = (offer as { id: string }).id;
-
-  // Price and currency are both omitted: the RPC requires them to be both set
-  // or both null, and null is the honest answer from an agent.
-  const { error: versionError } = await sb.rpc("create_service_offer_version_v6", {
-    p_client_id: job.client_id,
-    p_service_name: checked.serviceName,
-    p_audience: checked.audience,
-    p_promise: checked.promise,
-    p_inclusions: checked.inclusions,
-    p_exclusions: checked.exclusions,
-    p_claims: [],
-    // The job id, so a retried run versions nothing twice.
-    p_idempotency_key: `${job.id}:1`,
-    p_offer_id: offerId,
-  });
-  if (versionError) throw new Error(`Could not draft the offer version: ${versionError.message}`);
+  // The RPC writes the offer and its version atomically. Pass every argument:
+  // PostgREST resolves functions by the complete named-argument signature.
+  // Price, cost and claims remain unset because the source does not prove them.
+  const { error: versionError } = await sb.rpc(
+    "create_compiled_service_offer_v6",
+    compiledOfferArgs(job.client_id, kind, job.id, checked),
+  );
+  if (versionError) return {
+    ok: false,
+    retryable: false,
+    failureMessage: `Could not draft the offer version: ${versionError.message}`,
+    usage,
+  };
 
   await appendEvent(
     sb,
