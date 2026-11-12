@@ -229,11 +229,14 @@ after the AAL2 Inbox decision. If the approved packet is unchanged, the
 15-minute attestation window is renewed without another human decision. A
 green result is still only a snapshot.
 
-**Activation remains held.** The current main protection requires the four
-CI jobs with `strict: true` and `enforce_admins: true`, but does not require
-`Approved production release (trusted)`. The repository's Actions secrets
-currently contain only the public browser build settings; there is no
-`AA_RELEASE_SUPABASE_SERVICE_ROLE_KEY`. Before making the check mandatory,
+**Activation remains held.** On 2026-11-12, the workflow was disabled in
+GitHub Actions because its automatic `pull_request_target` runs failed on
+ordinary PRs without an AAL2 release request and generated repeated failure
+notifications. The source file remains for review. Main protection still
+requires the four CI jobs with `strict: true` and `enforce_admins: true`, but
+does not require `Approved production release (trusted)`. The repository's
+Actions secrets do not contain `AA_RELEASE_SUPABASE_SERVICE_ROLE_KEY`. Before
+re-enabling this workflow or making the check mandatory,
 review custody and scope for that server credential (prefer a dedicated
 release verifier identity limited to the proof-refresh RPC and reads), confirm GitHub's `pull_request_target`
 event policy permits this trusted workflow, install the credential, test a

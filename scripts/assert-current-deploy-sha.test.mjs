@@ -8,6 +8,7 @@ import test from 'node:test'
 
 const script = resolve(fileURLToPath(new URL('.', import.meta.url)), 'assert-current-deploy-sha.sh')
 const schemaGate = resolve(fileURLToPath(new URL('.', import.meta.url)), 'require-released-schema.mjs')
+const schemaReadiness = resolve(fileURLToPath(new URL('.', import.meta.url)), 'pages-schema-publish-readiness.mjs')
 
 function run(cmd, args, cwd) {
   const result = spawnSync(cmd, args, { cwd, encoding: 'utf8' })
@@ -71,11 +72,23 @@ test('Pages schema gate rejects an unreleased migration and accepts its advanced
     const pending = spawnSync(process.execPath, [schemaGate], { cwd: root, encoding: 'utf8' })
     assert.equal(pending.status, 1)
     assert.match(pending.stderr, /1 tracked migration/)
+    const held = spawnSync(process.execPath, [schemaReadiness], { cwd: root, encoding: 'utf8' })
+    assert.equal(held.status, 0, held.stderr)
+    assert.equal(held.stdout.trim(), 'publish=false')
 
     writeFileSync(marker, '20261025235000\n')
     const released = spawnSync(process.execPath, [schemaGate], { cwd: root, encoding: 'utf8' })
     assert.equal(released.status, 0, released.stderr)
     assert.match(released.stdout, /marker matches tracked head/)
+    const ready = spawnSync(process.execPath, [schemaReadiness], { cwd: root, encoding: 'utf8' })
+    assert.equal(ready.status, 0, ready.stderr)
+    assert.equal(ready.stdout.trim(), 'publish=true')
+
+    writeFileSync(marker, '20261025233000\n')
+    writeFileSync(join(migrations, '20261025235500_262_skips_dependency.sql'), '-- invalid\n')
+    const invalid = spawnSync(process.execPath, [schemaReadiness], { cwd: root, encoding: 'utf8' })
+    assert.equal(invalid.status, 1)
+    assert.match(invalid.stderr, /Expected migration 261/)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
