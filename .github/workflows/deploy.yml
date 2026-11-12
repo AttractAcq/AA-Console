@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  release-readiness:
     # workflow_run is privileged. PR runs, forks, and failed/incomplete CI
     # never check out code or receive the Pages/secret-bearing job context.
     if: >-
@@ -29,6 +29,31 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.schema.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Require the tested SHA to be current main
+        env:
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: bash scripts/assert-current-deploy-sha.sh "$TESTED_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Classify a pending schema receipt as an expected hold
+        id: schema
+        run: node scripts/pages-schema-publish-readiness.mjs >> "$GITHUB_OUTPUT"
+
+  build-and-deploy:
+    needs: release-readiness
+    if: needs['release-readiness'].result == 'success' && needs['release-readiness'].outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
