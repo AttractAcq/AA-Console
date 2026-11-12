@@ -12870,6 +12870,137 @@ export type Database = {
           },
         ]
       }
+      media_approval_byte_snapshots_v6: {
+        Row: {
+          asset_id: string
+          byte_count: number
+          byte_sha256: string
+          captured_at: string
+          client_id: string
+          frozen_object_id: string
+          frozen_path: string
+          id: string
+          source_path: string
+          source_snapshot: Json
+        }
+        Insert: {
+          asset_id: string
+          byte_count: number
+          byte_sha256: string
+          captured_at?: string
+          client_id: string
+          frozen_object_id: string
+          frozen_path: string
+          id?: string
+          source_path: string
+          source_snapshot: Json
+        }
+        Update: {
+          asset_id?: string
+          byte_count?: number
+          byte_sha256?: string
+          captured_at?: string
+          client_id?: string
+          frozen_object_id?: string
+          frozen_path?: string
+          id?: string
+          source_path?: string
+          source_snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_approval_byte_snapshots_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       message_channels: {
         Row: {
           can_initiate: boolean
