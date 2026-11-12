@@ -47,7 +47,7 @@ export function trackedHistory(root = sourceRoot) {
   const marker = readFileSync(join(root, 'supabase/verification/released-migration-version.txt'), 'utf8').trim()
   const migrations = readdirSync(join(root, 'supabase/migrations'))
     .filter((name) => /^\d{14}_.+\.sql$/.test(name) && name.slice(0, 14) <= marker).sort()
-  if (migrations.length !== 331 || marker !== '20261111010000' ||
+  if (migrations.length !== 332 || marker !== '20261111020000' ||
       !migrations.at(-1)?.startsWith(`${marker}_`)) {
     fail('Current production recovery baseline changed; review and repin before use')
   }
