@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "24a3761d82f40cb388c34636a254a38db0109eeed88c6240356c7d187a6036c7",
-  "generatedTypesSha256": "898c16bcadca12ac795c927b0c858058714a1b02af2d57bd78bec18526b0b657",
-  "generatedSchemaBodySha256": "645b3a3bce3e06180363abb3408ff4b0ecea2226e88bdae2784bbcb0e11dc7ee",
+  "migrationSourceDigest": "09506042d244eb0622c24a28ea6b6c996b854f32650e098be558f5b24aeffe4f",
+  "generatedTypesSha256": "b3826f51728e549d5549970a42fb521f31fdb685aad1e8317b56b51bbbc22877",
+  "generatedSchemaBodySha256": "5bc9e1fede93a69c761f2317cc4478c840dd0e47d12bb104b73dff6a9d27b73d",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2808,8 +2808,8 @@
       "version": "20261116200000",
       "name": "384_proof_delivery_inbox",
       "filename": "20261116200000_384_proof_delivery_inbox.sql",
-      "sha256": "cf8a8d0b47800b9008cdfcb3d6d4ce6cc04ca6811ba32d03c9033acf3b747fdf",
-      "trimmedMd5": "d059ab4f35b069cd1f361493af44ffa7"
+      "sha256": "a16111a4c661ca112f63f3043d6a347dd9a98fffebcf75c7e2a9433fe0d2fe16",
+      "trimmedMd5": "d1a9c78d21b333d63f5cbd575226bf63"
     },
     {
       "version": "20261116210000",
@@ -2824,6 +2824,27 @@
       "filename": "20261116220000_386_proof_delivery_coverage.sql",
       "sha256": "d5869da8eda4fd83430c1b9f23e73d1da005e38014b5b42b814bf0747cead25c",
       "trimmedMd5": "1929331addefba98e0a4cad9a211479f"
+    },
+    {
+      "version": "20261116230000",
+      "name": "387_meta_profile_change_inbox",
+      "filename": "20261116230000_387_meta_profile_change_inbox.sql",
+      "sha256": "f46db8de2d27db6f5b36bd66162ca5711bb3d440acbdbbe45ef3f2f2b8f2b3f1",
+      "trimmedMd5": "3163b7e3d1079b01f2f7832bdbe5b01f"
+    },
+    {
+      "version": "20261117000000",
+      "name": "388_meta_profile_inbox_view",
+      "filename": "20261117000000_388_meta_profile_inbox_view.sql",
+      "sha256": "f5954b40b4434bd60da4ecccecc05c4a847b5ce7628b0d02cff7b4508ccc895e",
+      "trimmedMd5": "6e49b20a0eb70b797047c5373c3eb57f"
+    },
+    {
+      "version": "20261117010000",
+      "name": "389_meta_profile_change_coverage",
+      "filename": "20261117010000_389_meta_profile_change_coverage.sql",
+      "sha256": "af1a61f92e3ba9adbb08fd863580a4ae861ff4075688393a742d9ab9dbc6e68d",
+      "trimmedMd5": "352f5b12bb6a1ad43e2ca711e56b4035"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

@@ -56,6 +56,10 @@ begin
  exception when check_violation then null; end;
  second_id := public.request_proof_delivery_review_v6(delivery);
  if second_id=request_id then raise exception 'Changed recipient reused old request'; end if;
+ update public.proof_request_deliveries set recipient='customer@example.invalid' where id=delivery;
+ if public.proof_delivery_source_state_v6(request_id)<>'superseded' then
+  raise exception 'Old proof delivery epoch revived after recipient reverted'; end if;
+ update public.proof_request_deliveries set recipient='other@example.invalid' where id=delivery;
  select id into review_id from public.proof_delivery_reviews_v6 where canonical_request_id=second_id;
  perform public.decide_proof_delivery_inbox_v6(review_id,second_id,true);
  if (select status from public.approval_inbox_v6 where id=second_id)<>'approved'

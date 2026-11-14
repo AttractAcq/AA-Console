@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
@@ -20,7 +20,7 @@ type Presence = Database["public"]["Views"]["meta_profile_presence"]["Row"];
 // the proposal fields used by this screen until the database is scrubbed.
 type ProfileChange = Pick<
   Database["public"]["Tables"]["meta_profile_changes"]["Row"],
-  "id" | "platform" | "field" | "current_value" | "proposed_value" | "offer_version_id" | "status" | "created_at"
+  "id" | "platform" | "field" | "current_value" | "proposed_value" | "offer_version_id" | "status" | "approved_request_id" | "created_at"
 >;
 
 type Tab = "identities" | "profile" | "presence";
@@ -65,6 +65,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
   const [changes, setChanges] = useState<ProfileChange[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reviewBusy, setReviewBusy] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -84,7 +85,7 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           .limit(100),
         supabase
           .from("meta_profile_changes")
-          .select("id,platform,field,current_value,proposed_value,offer_version_id,status,created_at")
+          .select("id,platform,field,current_value,proposed_value,offer_version_id,status,approved_request_id,created_at")
           .eq("client_id", clientId)
           .order("created_at", { ascending: false }),
       ]);
@@ -105,6 +106,20 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  async function requestReview(changeId: string) {
+    setReviewBusy(changeId);
+    setError(null);
+    try {
+      const result = await supabase.rpc("request_meta_profile_review_v6", { p_change_id: changeId });
+      if (result.error) throw result.error;
+      await refresh();
+    } catch {
+      setError("Could not open the exact Meta profile proposal for Inbox review.");
+    } finally {
+      setReviewBusy(null);
+    }
+  }
 
   const broken = identities.filter((identity) => recordedIdentityAlert(identity)).length;
 
@@ -189,18 +204,21 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="font-semibold">Proposed changes</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              What the profile says now, beside what we would make it say. Direct decisions are
-              held until each exact proposal is bound to the unified Approval Inbox with AAL2
-              approval. This runtime also has no Meta profile-write adapter, so no field change
-              can be applied from this page.
+              What the profile says now, beside what we would make it say. Request review of the
+              exact proposal in Approval Inbox. This runtime has no Meta profile-write adapter,
+              so approval does not apply a field change.
             </p>
             <p role="status" className="mt-2 text-sm text-destructive">{PROFILE_FIELD_PATCH_HOLD}</p>
+            {clientId && <Link className="mt-2 inline-block text-sm underline"
+              to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>
+              Open Approval Inbox
+            </Link>}
           </div>
           {changes.length === 0 && !loading ? (
             <EmptyState label="No profile change has been proposed" />
           ) : (
             <DataTable
-              columns={["Field", "Says now", "Would say", "State"]}
+              columns={["Field", "Says now", "Would say", "State", "Review"]}
               emptyLabel={loading ? "Loading…" : "Nothing proposed"}
               rows={changes.map((change) => [
                 <span key="f">
@@ -231,9 +249,19 @@ export function MetaProfilePanel({ tab }: { tab: Tab }) {
                   {change.status}
                   {change.status === "approved" && (
                     <span className="block text-xs text-muted-foreground">
-                      held for Inbox binding and an adapter; no field PATCH
+                      {change.approved_request_id
+                        ? "Exact Inbox decision; provider write held"
+                        : "Pre-Inbox approval; provider write held"}
                     </span>
                   )}
+                </span>,
+                <span key="review">
+                  {change.status === "drafted" && <button type="button"
+                    className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                    disabled={reviewBusy !== null}
+                    onClick={() => void requestReview(change.id)}>
+                    Request Inbox review
+                  </button>}
                 </span>,
               ])}
             />

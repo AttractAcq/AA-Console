@@ -304,6 +304,26 @@ const readyProofDelivery = {
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
 };
 
+const metaProfileReviewId = "22222222-2222-4222-8222-222222222222";
+const metaProfileToken = "23232323-2323-4232-8232-232323232323";
+const metaProfileHash = "d".repeat(64);
+const readyMetaProfileChange = {
+  ...request, id: "meta-profile-inbox-1", source_system: "aa_console",
+  source_kind: "meta_profile_change", source_id: metaProfileReviewId,
+  source_version: `${metaProfileHash}:${metaProfileToken}`,
+  artifact_hash: metaProfileHash, title: "Review instagram profile bio",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: "meta_profile:instagram:bio", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", change_id: "change-1", request_token: metaProfileToken,
+    platform: "instagram", field: "bio", current_value: "Old bio",
+    proposed_value: "New bio", consequence: "Proposal only" },
+  scope: { client_id: "client-1", change_id: "change-1",
+    review_id: metaProfileReviewId, request_token: metaProfileToken,
+    content_hash: metaProfileHash, effect: "meta_profile_proposal_only" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
 const engineTime = "2026-11-20T09:00:00+00:00";
@@ -737,6 +757,18 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_proof_delivery_inbox_v6", {
       p_review_id: proofDeliveryReviewId, p_request_id: readyProofDelivery.id,
+      p_approved: true,
+    }));
+  });
+
+  it("routes an exact Meta profile proposal through its owning Inbox RPC", async () => {
+    requests = [readyMetaProfileChange];
+    show();
+    const card = await screen.findByRole("article", { name: readyMetaProfileChange.title });
+    expect(within(card).getByText(/New bio/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_meta_profile_inbox_v6", {
+      p_review_id: metaProfileReviewId, p_request_id: readyMetaProfileChange.id,
       p_approved: true,
     }));
   });

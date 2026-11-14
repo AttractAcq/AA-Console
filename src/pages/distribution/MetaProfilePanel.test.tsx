@@ -1,4 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -13,7 +15,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { from, rpc, select } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), select: vi.fn() }));
 vi.mock("../../lib/supabase", () => ({ supabase: { from, rpc } }));
-vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: "client-1" }) }));
+vi.mock("react-router-dom", () => ({
+  useParams: () => ({ clientId: "client-1" }),
+  Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
+}));
 
 import { MetaProfilePanel } from "./MetaProfilePanel";
 
@@ -28,7 +33,8 @@ const change = (over: Record<string, unknown> = {}) => ({
   id: "chg-1", client_id: "client-1", platform: "instagram", field: "bio",
   current_value: "Home improvements Portsmouth", proposed_value: "Garage conversions, dry in four days",
   offer_version_id: "ver-3", reason: null, status: "drafted",
-  approved_by: null, approved_at: null, rejection_reason: null, applied_at: null,
+  approved_by: null, approved_at: null, approved_request_id: null,
+  rejection_reason: null, applied_at: null,
   external_ref: null, last_error: null, created_by: null,
   created_at: "2026-10-24T09:00:00Z", updated_at: "2026-10-24T09:00:00Z", ...over,
 });
@@ -171,7 +177,7 @@ describe("proposed changes", () => {
     expect(await screen.findByText("Garage conversions, dry in four days")).toBeInTheDocument();
     expect(select).toHaveBeenCalledWith(
       "meta_profile_changes",
-      "id,platform,field,current_value,proposed_value,offer_version_id,status,created_at",
+      "id,platform,field,current_value,proposed_value,offer_version_id,status,approved_request_id,created_at",
     );
     expect(document.body.textContent).not.toContain(marker);
   });
@@ -189,7 +195,7 @@ describe("proposed changes", () => {
     render(<MetaProfilePanel tab="profile" />);
     // The older decision cannot authorize the provider write; the runtime
     // hold is visible even where the profile has a recorded approval.
-    expect(await screen.findByText("held for Inbox binding and an adapter; no field PATCH")).toBeInTheDocument();
+    expect(await screen.findByText("Pre-Inbox approval; provider write held")).toBeInTheDocument();
     expect(screen.getByText(/exact-version AAL2 Approval Inbox decision/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
@@ -198,10 +204,19 @@ describe("proposed changes", () => {
     database({ changes: [change()] });
     render(<MetaProfilePanel tab="profile" />);
     expect(await screen.findByText("Garage conversions, dry in four days")).toBeInTheDocument();
-    expect(screen.getByText(/Direct decisions are/)).toBeInTheDocument();
+    expect(screen.getByText(/Request review of the/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("requests an exact Inbox review for a draft proposal", async () => {
+    database({ changes: [change()] });
+    render(<MetaProfilePanel tab="profile" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Request Inbox review" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_meta_profile_review_v6", {
+      p_change_id: "chg-1",
+    }));
   });
 });
 

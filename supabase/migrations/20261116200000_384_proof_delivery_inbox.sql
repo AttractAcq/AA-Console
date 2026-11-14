@@ -56,6 +56,9 @@ begin
  select * into q from public.proof_delivery_reviews_v6 where id=r.source_id::uuid
   and canonical_request_id=r.id and client_id=r.client_id;
  if q.id is null then return 'cancelled'; end if;
+ if exists(select 1 from public.proof_delivery_reviews_v6 newer
+  where newer.delivery_id=q.delivery_id and newer.review_epoch>q.review_epoch)
+  then return 'superseded'; end if;
  select * into d from public.proof_request_deliveries where id=q.delivery_id and client_id=q.client_id;
  if d.id is null then return 'cancelled'; end if;
  select * into l from public.proof_capture_links where id=d.link_id and client_id=d.client_id and config_id=d.config_id;

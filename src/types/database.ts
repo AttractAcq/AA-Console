@@ -14739,6 +14739,8 @@ export type Database = {
           applied_at: string | null
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           attempts: number
           claimed_at: string | null
           client_id: string
@@ -14762,6 +14764,8 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           attempts?: number
           claimed_at?: string | null
           client_id: string
@@ -14785,6 +14789,8 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           attempts?: number
           claimed_at?: string | null
           client_id?: string
@@ -14810,6 +14816,20 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_changes_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_changes_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
           {
@@ -14860,6 +14880,89 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "service_offer_versions"
             referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      meta_profile_review_requests_v6: {
+        Row: {
+          canonical_request_id: string | null
+          change_id: string
+          client_id: string
+          created_at: string
+          id: string
+          request_token: string
+          review_epoch: number
+          source_hash: string
+        }
+        Insert: {
+          canonical_request_id?: string | null
+          change_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          request_token?: string
+          review_epoch?: never
+          source_hash?: string
+        }
+        Update: {
+          canonical_request_id?: string | null
+          change_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_token?: string
+          review_epoch?: never
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -30612,6 +30715,8 @@ export type Database = {
           applied_at: string | null
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           attempts: number
           claimed_at: string | null
           client_id: string
@@ -30637,6 +30742,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      decide_meta_profile_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
       }
       decide_production_release_candidate_v6: {
         Args: {
@@ -32059,6 +32173,28 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: string
       }
+      meta_profile_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["meta_profile_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      meta_profile_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["meta_profile_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      meta_profile_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["meta_profile_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      meta_profile_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       metrics_period_summary: {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: Json
@@ -33248,6 +33384,10 @@ export type Database = {
       request_meta_build: { Args: { p_campaign_id: string }; Returns: string }
       request_meta_build_sheet: {
         Args: { p_campaign_id: string }
+        Returns: string
+      }
+      request_meta_profile_review_v6: {
+        Args: { p_change_id: string }
         Returns: string
       }
       request_metrics_backfill: {
