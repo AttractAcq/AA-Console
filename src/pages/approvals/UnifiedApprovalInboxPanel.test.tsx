@@ -411,6 +411,32 @@ const readyNurtureSequence = {
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
 };
 
+const videoReviewId = "33333333-3333-4333-8333-333333333333";
+const videoReviewerId = "34343434-3434-4434-8434-343434343434";
+const videoToken = "35353535-3535-4535-8535-353535353535";
+const videoHash = "c".repeat(64);
+const videoFileHash = "b".repeat(64);
+const readyVideoSeat = {
+  ...request, id: "video-seat-inbox-1", source_system: "aa_console",
+  source_kind: "video_seat", source_id: videoReviewId,
+  source_version: `${videoHash}:${videoToken}`, artifact_hash: videoHash,
+  title: "Sign video as owner: Exact cut", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "video_seat:owner:asset-1", account_ref: null, budget: null,
+  owner_role: `video_owner:${videoReviewerId}`,
+  preview: { client_id: "client-1", asset_id: "asset-1", request_token: videoToken,
+    approval_role: "owner", assigned_reviewer: videoReviewerId,
+    asset: { title: "Exact cut", media_type: "video", edit_stage: "review_ready",
+      render_path: "client-1/render.mp4", file_sha256: videoFileHash,
+      usage_rights: "agency_owned" },
+    storage: { bucket: "client-media", object_id: "storage-object-1", version: "v1" } },
+  scope: { client_id: "client-1", asset_id: "asset-1", review_id: videoReviewId,
+    approval_role: "owner", assigned_reviewer: videoReviewerId,
+    request_token: videoToken, content_hash: videoHash,
+    effect: "rendered_video_seat_signoff" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=assets",
+};
+
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
 const engineTime = "2026-11-20T09:00:00+00:00";
@@ -904,6 +930,24 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_nurture_sequence_inbox_v6", {
       p_review_id: sequenceReviewId, p_request_id: readyNurtureSequence.id,
+      p_approved: true,
+    }));
+  });
+
+  it("requires exact rendered-video download before its assigned seat decision", async () => {
+    requests = [readyVideoSeat];
+    show();
+    const card = await screen.findByRole("article", { name: readyVideoSeat.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
+      "client-1/render.mp4", videoFileHash));
+    await waitFor(() => expect(approve).toBeEnabled());
+    await userEvent.click(approve);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_video_seat_inbox_v6", {
+      p_review_id: videoReviewId, p_request_id: readyVideoSeat.id,
       p_approved: true,
     }));
   });

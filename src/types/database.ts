@@ -21905,6 +21905,8 @@ export type Database = {
       video_approval_signoffs: {
         Row: {
           approval_role: string
+          approved_content_hash: string | null
+          approved_request_id: string | null
           asset_id: string
           render_path: string
           signed_at: string
@@ -21912,6 +21914,8 @@ export type Database = {
         }
         Insert: {
           approval_role: string
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           asset_id: string
           render_path: string
           signed_at?: string
@@ -21919,12 +21923,28 @@ export type Database = {
         }
         Update: {
           approval_role?: string
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           asset_id?: string
           render_path?: string
           signed_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "video_approval_signoffs_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "video_approval_signoffs_asset_id_fkey"
             columns: ["asset_id"]
@@ -22931,6 +22951,211 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "work_submissions"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_seat_review_requests_v6: {
+        Row: {
+          approval_role: string
+          asset_id: string
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          approval_role: string
+          asset_id: string
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          approval_role?: string
+          asset_id?: string
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approval_queue_slots"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "approvals_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "client_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "meta_profile_presence"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "ordinary_media_current_status_v6"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "publish_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "rejected_assets_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "work_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_seat_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -31513,6 +31738,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_video_seat_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decline_assignment: {
         Args: { p_assignment_id: string; p_reason: string }
         Returns: {
@@ -34300,6 +34534,10 @@ export type Database = {
         Args: { p_asset_id: string; p_direction?: string }
         Returns: string
       }
+      request_video_seat_review_v6: {
+        Args: { p_asset_id: string; p_role: string }
+        Returns: string
+      }
       require_opportunity_proof_v6: {
         Args: { p_opportunity_id: string; p_requirement: string }
         Returns: string
@@ -35650,6 +35888,36 @@ export type Database = {
       video_client_approval_email_state: {
         Args: { p_asset_id: string }
         Returns: Json
+      }
+      video_seat_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["video_seat_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      video_seat_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["video_seat_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      video_seat_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["video_seat_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      video_seat_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      video_seat_reviewer_v6: {
+        Args: { p_asset_id: string; p_role: string }
+        Returns: string
+      }
+      video_signoff_current_v6: {
+        Args: { p_asset_id: string; p_role: string }
+        Returns: boolean
       }
       weighted_sequence: { Args: { p_weights: Json }; Returns: string[] }
       workflow_run_outcomes: { Args: { p_run_id: string }; Returns: Json }

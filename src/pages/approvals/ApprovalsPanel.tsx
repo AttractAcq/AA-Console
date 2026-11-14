@@ -221,7 +221,7 @@ export function ApprovalsPanel() {
                   >
                     <Eye className="h-4 w-4" aria-hidden="true" />
                   </button>
-                  {asset.media_type === "video" ? <VideoApprovalRoute assetId={asset.id}
+                  {asset.media_type === "video" ? <VideoApprovalRoute clientId={clientId!} assetId={asset.id}
                     onFinalApprove={() => review(asset, "approved")} /> : <button
                     type="button"
                     disabled={busyId === asset.id}

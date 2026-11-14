@@ -11,7 +11,7 @@ import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "campaign_action", "client_sales_entitlement", "engine_slot",
-  "google_profile_change", "google_review_reply", "lead_magnet", "message_template", "meta_profile_change", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer",
+  "google_profile_change", "google_review_reply", "lead_magnet", "message_template", "meta_profile_change", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -630,6 +630,39 @@ function isNurtureSequenceReady(request: UnifiedApprovalRequest, clientId: strin
     && request.owner_role === "admin_or_active_client_manager";
 }
 
+function isVideoSeatReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "video_seat"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  if (!preview.asset || typeof preview.asset !== "object" || Array.isArray(preview.asset)
+    || !preview.storage || typeof preview.storage !== "object" || Array.isArray(preview.storage)) return false;
+  const asset = preview.asset as Record<string, unknown>;
+  const storage = preview.storage as Record<string, unknown>;
+  const hash = request.artifact_hash;
+  return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
+    && typeof preview.request_token === "string" && !!preview.request_token
+    && request.source_version === `${hash}:${preview.request_token}`
+    && preview.client_id === clientId && typeof preview.asset_id === "string"
+    && ["owner", "manager", "client"].includes(String(preview.approval_role))
+    && typeof preview.assigned_reviewer === "string" && !!preview.assigned_reviewer
+    && asset.media_type === "video" && asset.edit_stage === "review_ready"
+    && typeof asset.render_path === "string" && !!asset.render_path
+    && typeof asset.file_sha256 === "string" && /^[0-9a-f]{64}$/.test(asset.file_sha256)
+    && typeof asset.usage_rights === "string" && !!asset.usage_rights
+    && storage.bucket === "client-media" && typeof storage.object_id === "string"
+    && scope.client_id === clientId && scope.asset_id === preview.asset_id
+    && scope.review_id === request.source_id && scope.request_token === preview.request_token
+    && scope.content_hash === hash && scope.effect === "rendered_video_seat_signoff"
+    && scope.approval_role === preview.approval_role
+    && scope.assigned_reviewer === preview.assigned_reviewer
+    && request.destination === `video_seat:${preview.approval_role}:${preview.asset_id}`
+    && request.owner_role === `video_${preview.approval_role}:${preview.assigned_reviewer}`;
+}
+
 function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   if (request.source_system !== "aa_console" || request.source_kind !== "engine_slot"
     || request.client_id !== clientId || request.status !== "pending"
@@ -686,7 +719,8 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isGoogleProfileChangeReady(request, clientId)
     || isOpportunityActivationReady(request, clientId)
     || isMessageTemplateReady(request, clientId)
-    || isNurtureSequenceReady(request, clientId);
+    || isNurtureSequenceReady(request, clientId)
+    || isVideoSeatReady(request, clientId);
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
@@ -708,7 +742,8 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isGoogleProfileChangeReady(request, clientId)
     || isOpportunityActivationReady(request, clientId)
     || isMessageTemplateReady(request, clientId)
-    || isNurtureSequenceReady(request, clientId);
+    || isNurtureSequenceReady(request, clientId)
+    || isVideoSeatReady(request, clientId);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
@@ -780,7 +815,7 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
     && typeof proofRightsPreview.verified_storage_sha256 === "string"
     && typeof proofRightsPreview.verified_file_bytes === "number";
   const creativePreview = (request.source_kind === "ordinary_media"
-    || request.source_kind === "engine_slot") && request.preview
+    || request.source_kind === "engine_slot" || request.source_kind === "video_seat") && request.preview
     && typeof request.preview === "object" && !Array.isArray(request.preview)
     ? request.preview as Record<string, unknown> : null;
   const creativePacket = creativePreview?.exact_package && typeof creativePreview.exact_package === "object"
@@ -790,8 +825,10 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
   const creativeAsset = creativeSource && typeof creativeSource === "object"
     && !Array.isArray(creativeSource)
     ? creativeSource as Record<string, unknown> : null;
+  const creativePath = creativeAsset && (request.source_kind === "video_seat"
+    ? creativeAsset.render_path : creativeAsset.storage_path);
   const creativeDownloadable = !!creativeAsset
-    && typeof creativeAsset.storage_path === "string"
+    && typeof creativePath === "string" && !!creativePath
     && typeof creativeAsset.file_sha256 === "string";
   const canReject = !salesManagerCard && isRejectionReady(request, clientId);
   const canApprove = !salesManagerCard && isApprovalReady(request, clientId);
@@ -804,7 +841,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
               ? "Sales agent public use" : request.source_kind === "opportunity_approve"
                 ? "Market opportunity" : request.source_kind === "proof_rights"
                   ? "Proof usage rights" : request.source_kind === "proof_placement"
-                    ? "Proof placement" : request.source_kind === "nurture_sequence"
+                    ? "Proof placement" : request.source_kind === "video_seat"
+                      ? "Video seat" : request.source_kind === "nurture_sequence"
                       ? "Nurture sequence" : request.source_kind === "message_template"
                       ? "Message template" : request.source_kind === "proof_artifact"
                       ? "Proof artifact" : request.source_kind === "ordinary_media"
@@ -923,7 +961,7 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
         <p className="mb-2 text-xs text-muted-foreground">Download and inspect the exact creative file to unlock approval.</p>
         <button type="button" className="rounded-lg border border-border px-4 py-2 text-sm"
           onClick={() => void downloadVerifiedCreativeFile(
-            creativeAsset.storage_path as string,
+            creativePath as string,
             creativeAsset.file_sha256 as string,
           ).then(() => { setDownloadedCreativeHash(`${request.id}:${request.artifact_hash}`); setDownloadError(null); })
             .catch((cause: unknown) => setDownloadError(
@@ -1253,6 +1291,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             })
         : request.source_kind === "nurture_sequence"
           ? await supabase.rpc("decide_nurture_sequence_inbox_v6", {
+              p_review_id: request.source_id, p_request_id: request.id,
+              p_approved: decision === "approved",
+              ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+            })
+        : request.source_kind === "video_seat"
+          ? await supabase.rpc("decide_video_seat_inbox_v6", {
               p_review_id: request.source_id, p_request_id: request.id,
               p_approved: decision === "approved",
               ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),

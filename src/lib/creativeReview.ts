@@ -23,6 +23,18 @@ export async function requestEngineSlotReview(
   return data;
 }
 
+/** Verify the finished render, then create the assigned seat's exact Inbox card. */
+export async function requestVideoSeatReview(
+  clientId: string, assetId: string, role: "owner" | "manager" | "client",
+): Promise<string> {
+  await callRuntime<{ assetId: string }>("/admin/creative/attest-asset", { clientId, assetId });
+  const { data, error } = await supabase.rpc("request_video_seat_review_v6", {
+    p_asset_id: assetId, p_role: role,
+  });
+  if (error || !data) throw new Error(error?.message ?? "Could not request video signoff.");
+  return data;
+}
+
 /** The reviewer downloads and checks the same file digest shown on the card. */
 export async function downloadVerifiedCreativeFile(
   storagePath: string, expectedSha256: string,

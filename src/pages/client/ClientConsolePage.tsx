@@ -155,7 +155,7 @@ export function ClientConsolePage() {
                 {videoUrls.get(asset.render_path ?? asset.storage_path) && <video controls preload="metadata"
                   className="max-h-52 max-w-xs rounded-md" aria-label={`Review ${asset.title ?? "video"}`}
                   src={videoUrls.get(asset.render_path ?? asset.storage_path)} />}
-                <VideoApprovalRoute assetId={asset.id} onFinalApprove={() => approve(asset)} />
+                <VideoApprovalRoute clientId={clientId!} assetId={asset.id} onFinalApprove={() => approve(asset)} />
               </div> : <button
                 key={asset.id}
                 type="button"

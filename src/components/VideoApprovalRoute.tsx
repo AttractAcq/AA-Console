@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { requestVideoSeatReview } from "../lib/creativeReview";
 
 type Account = { id: string; name: string };
 type State = {
@@ -16,7 +18,8 @@ type State = {
 };
 
 /** Human sign-offs for a finished video, shared by agency and client queues. */
-export function VideoApprovalRoute({ assetId, onFinalApprove }: {
+export function VideoApprovalRoute({ clientId, assetId, onFinalApprove }: {
+  clientId: string;
   assetId: string;
   onFinalApprove: () => void | Promise<void>;
 }) {
@@ -24,10 +27,10 @@ export function VideoApprovalRoute({ assetId, onFinalApprove }: {
   const [admins, setAdmins] = useState<Account[]>([]);
   const [ownerChoice, setOwnerChoice] = useState("");
   const [clientChoice, setClientChoice] = useState("");
-  const [declineReason, setDeclineReason] = useState("");
   const [notification, setNotification] = useState<{ status: string | null; error: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reviewRequested, setReviewRequested] = useState(false);
 
   const refresh = useCallback(async () => {
     const result = await supabase.rpc("video_approval_state", { p_asset_id: assetId });
@@ -57,18 +60,23 @@ export function VideoApprovalRoute({ assetId, onFinalApprove }: {
   async function act(action:
     | { kind: "owner"; userId: string }
     | { kind: "sign"; role: "owner" | "manager" | "client" }
-    | { kind: "client"; userId: string }
-    | { kind: "decline"; reason: string }) {
+    | { kind: "client"; userId: string }) {
     setBusy(true);
     setError(null);
+    if (action.kind === "sign") {
+      try {
+        await requestVideoSeatReview(clientId, assetId, action.role);
+        setReviewRequested(true);
+        await refresh();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Could not request video review.");
+      } finally { setBusy(false); }
+      return;
+    }
     const result = action.kind === "owner"
       ? await supabase.rpc("set_content_approval_owner", { p_user_id: action.userId })
-      : action.kind === "sign"
-        ? await supabase.rpc("sign_video_approval", { p_asset_id: assetId, p_role: action.role })
-        : action.kind === "client" ? await supabase.rpc("request_video_client_approval", {
+      : await supabase.rpc("request_video_client_approval", {
           p_asset_id: assetId, p_client_user_id: action.userId,
-        }) : await supabase.rpc("decline_video_client_approval", {
-          p_asset_id: assetId, p_reason: action.reason,
         });
     const failure = result.error;
     setBusy(false);
@@ -91,6 +99,10 @@ export function VideoApprovalRoute({ assetId, onFinalApprove }: {
       {state.client_user_id ? ` · Client: ${state.client_rejection_reason ? "changes requested" : state.client_approved ? "approved" : "waiting"}` : ""}
     </p>
     {state.client_rejection_reason && <p className="text-destructive">Client requested changes: {state.client_rejection_reason}</p>}
+    {reviewRequested && <p role="status" className="text-primary">
+      Exact rendered-video review requested. <Link className="underline"
+        to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>Open Unified Inbox</Link>
+    </p>}
     {notification?.status && <p className="text-muted-foreground">
       Client email: {notification.status === "skipped" ? "request is in their dashboard; email not sent"
         : notification.status === "failed" ? "delivery failed"
@@ -110,22 +122,14 @@ export function VideoApprovalRoute({ assetId, onFinalApprove }: {
     <div className="flex flex-wrap gap-2">
       {current === state.owner_user_id && !state.owner_approved && <button type="button" disabled={busy}
         onClick={() => void act({ kind: "sign", role: "owner" })}
-        className="rounded border border-border px-2 py-1 disabled:opacity-50">Sign as owner</button>}
+        className="rounded border border-border px-2 py-1 disabled:opacity-50">Request owner signoff</button>}
       {current === state.manager_user_id && !state.manager_approved && <button type="button" disabled={busy}
         onClick={() => void act({ kind: "sign", role: "manager" })}
-        className="rounded border border-border px-2 py-1 disabled:opacity-50">Sign as SMM</button>}
+        className="rounded border border-border px-2 py-1 disabled:opacity-50">Request SMM signoff</button>}
       {current === state.client_user_id && !state.client_approved && !state.client_rejection_reason && <button type="button" disabled={busy}
         onClick={() => void act({ kind: "sign", role: "client" })}
-        className="rounded border border-border px-2 py-1 disabled:opacity-50">Sign as client</button>}
+        className="rounded border border-border px-2 py-1 disabled:opacity-50">Request client signoff review</button>}
     </div>
-    {current === state.client_user_id && !state.client_approved && !state.client_rejection_reason &&
-      <div className="flex flex-wrap gap-2">
-        <input aria-label="Changes needed" value={declineReason} onChange={(e) => setDeclineReason(e.target.value)}
-          placeholder="What needs changing?" className="rounded border border-input bg-background px-2 py-1" />
-        <button type="button" disabled={busy || !declineReason.trim()}
-          onClick={() => void act({ kind: "decline", reason: declineReason.trim() })}
-          className="rounded border border-border px-2 py-1 disabled:opacity-50">Request changes</button>
-      </div>}
     {current === state.manager_user_id && (!state.client_user_id || state.client_rejection_reason) && state.client_accounts.length > 0 &&
       <div className="flex flex-wrap gap-2">
         <select aria-label="Client approver" value={clientChoice} onChange={(e) => setClientChoice(e.target.value)}
