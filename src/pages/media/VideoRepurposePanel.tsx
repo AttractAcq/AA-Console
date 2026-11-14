@@ -101,7 +101,7 @@ export function VideoRepurposePanel({ clientId, employeeMode = false }: {
     });
     setBusy(false);
     if (result.error) { setError(result.error.message); return; }
-    setNotice(stage === "brief" ? "Derivative brief queued. Review it in Briefs before Create."
+    setNotice(stage === "brief" ? "Drafts enter exact review in Approval Inbox; approved ideas queue a brief. Check Ideation or Briefs for the current state."
       : "Draft derivative idea created. Continue in Ideation, then Brief and Create.");
     void refresh();
   }

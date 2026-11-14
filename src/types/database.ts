@@ -5664,6 +5664,8 @@ export type Database = {
       client_ideas: {
         Row: {
           acquisition_route: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           body: string | null
           campaign_id: string | null
@@ -5689,6 +5691,8 @@ export type Database = {
         }
         Insert: {
           acquisition_route?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -5714,6 +5718,8 @@ export type Database = {
         }
         Update: {
           acquisition_route?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           body?: string | null
           campaign_id?: string | null
@@ -5738,6 +5744,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_ideas_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_ideas_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_ideas_campaign_client_fkey"
             columns: ["campaign_id", "client_id"]
@@ -12532,6 +12552,96 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "google_profile_due"
             referencedColumns: ["location_id"]
+          },
+        ]
+      }
+      human_idea_review_requests_v6: {
+        Row: {
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          idea_id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          idea_id: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          idea_id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "human_idea_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "client_ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "human_idea_review_requests_v6_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["idea_id"]
           },
         ]
       }
@@ -30326,6 +30436,10 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: boolean
       }
+      brief_job_selection_current_v6: {
+        Args: { p_job_id: string }
+        Returns: boolean
+      }
       brief_video_repurpose_candidate: {
         Args: {
           p_candidate_index: number
@@ -31654,6 +31768,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_human_idea_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decide_lead_magnet_approval_v6: {
         Args: { p_approval_id: string; p_approved: boolean; p_reason?: string }
         Returns: {
@@ -32283,6 +32406,32 @@ export type Database = {
       has_client_sales_entitlement: {
         Args: { p_client_id: string }
         Returns: boolean
+      }
+      human_idea_approval_current_v6: {
+        Args: { p_idea_id: string }
+        Returns: boolean
+      }
+      human_idea_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["human_idea_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      human_idea_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["human_idea_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      human_idea_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["human_idea_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      human_idea_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
       }
       intake_video_for_edit: {
         Args: {
@@ -34528,6 +34677,10 @@ export type Database = {
       }
       request_google_profile_review_v6: {
         Args: { p_change_id: string }
+        Returns: string
+      }
+      request_human_idea_review_v6: {
+        Args: { p_idea_id: string }
         Returns: string
       }
       request_human_video_edit: {

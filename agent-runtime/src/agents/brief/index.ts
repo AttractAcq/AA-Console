@@ -43,6 +43,17 @@ export async function runBriefJob(
     };
   }
 
+  const selectionGate = async (): Promise<JobResult | null> => {
+    const { data, error } = await sb.rpc("brief_job_selection_current_v6", { p_job_id: job.id });
+    if (error) return { ok: false, retryable: true,
+      failureMessage: `Could not verify current idea selection: ${error.message}` };
+    if (data !== true) return { ok: false, retryable: false,
+      failureMessage: "The idea selection changed or lacks an exact human, policy, bot or cleared-proof decision." };
+    return null;
+  };
+  const initialSelectionBlock = await selectionGate();
+  if (initialSelectionBlock) return initialSelectionBlock;
+
   // The engine points this job at a slot, not at an idea: the slot is what
   // the tick knows about, and the idea is whatever the selector chose for it.
   // A person pressing the button still points it straight at an idea.
@@ -302,6 +313,8 @@ Call ${submitTool.name} once when you are done.`;
     };
   }
 
+  const finalSelectionBlock = await selectionGate();
+  if (finalSelectionBlock) return { ...finalSelectionBlock, usage };
   const { error } = await sb.from("client_briefs").insert({
     client_id: job.client_id,
     source_idea_id: idea.id,

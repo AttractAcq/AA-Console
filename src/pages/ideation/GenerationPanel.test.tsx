@@ -43,7 +43,7 @@ beforeEach(() => {
   positions.mockReturnValue({ data: [{ campaign_position: 1 }, { campaign_position: 2 }], error: null });
   insert.mockResolvedValue({ error: null });
   single.mockResolvedValue({ data: { id: "draft-1" }, error: null });
-  rpc.mockResolvedValue({ error: null });
+  rpc.mockResolvedValue({ data: "request-1", error: null });
   loadContentPillars.mockResolvedValue([{ value: "pil-1", label: "Honest proof · 25% of the calendar" }]);
   order.mockResolvedValue({ data: ["draft", "approved", "briefed", "rejected"].map((status, i) => ({ id: `${status}-${i + 1}`, title: status + " idea", source: "manual", media_type: "image", status })) });
 });
@@ -164,40 +164,36 @@ async function choose(row: string, action: string) {
 }
 const closeMenu = () => fireEvent.keyDown(document, { key: "Escape" });
 
-it("scopes manual approval to the selected draft and client, then refreshes", async () => {
+it("requests exact review for the selected draft, then refreshes", async () => {
   render(<GenerationPanel />);
-  await choose("draft idea", "Approve");
-  expect(await screen.findByText("Idea approved.")).toBeInTheDocument();
-  expect(update).toHaveBeenCalledWith({ status: "approved" });
-  expect(eq.mock.calls).toEqual(expect.arrayContaining([["id", "draft-1"], ["client_id", "client-1"], ["status", "draft"]]));
-  expect(rpc).not.toHaveBeenCalled();
+  await choose("draft idea", "Request idea review");
+  expect(await screen.findByText("Exact idea review requested in Approval Inbox.")).toBeInTheDocument();
+  expect(rpc).toHaveBeenCalledWith("request_human_idea_review_v6", { p_idea_id: "draft-1" });
+  expect(update).not.toHaveBeenCalled();
   expect(order).toHaveBeenCalledTimes(2);
 });
-it.each([
-  ["Brief", "approved idea", "approved-2", "Brief queued."],
-  ["Approve & brief", "draft idea", "draft-1", "Approved."],
-])("%s uses the unchanged RPC", async (name, row, id, notice) => {
+it("queues a brief only for an approved idea", async () => {
   render(<GenerationPanel />);
-  await choose(row, name);
-  expect(rpc).toHaveBeenCalledWith("approve_idea_and_generate_brief", { p_idea_id: id });
-  expect(await screen.findByText(new RegExp(notice))).toBeInTheDocument();
+  await choose("approved idea", "Brief");
+  expect(rpc).toHaveBeenCalledWith("approve_idea_and_generate_brief", { p_idea_id: "approved-2" });
+  expect(await screen.findByText(/Brief queued/)).toBeInTheDocument();
   expect(update).not.toHaveBeenCalled();
 });
-it("disables actions while approving and recovers on a stale-row error", async () => {
+it("disables actions while requesting and recovers on a stale-row error", async () => {
   let finish!: (value: unknown) => void;
-  single.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  rpc.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
   render(<GenerationPanel />);
-  await choose("draft idea", "Approve");
+  await choose("draft idea", "Request idea review");
   // Choosing closes the menu, so the trigger is where the row says it is
   // working — and every item inside it is disabled while that is true.
   const trigger = screen.getByRole("button", { name: "Actions for draft idea" });
   expect(trigger).toHaveTextContent("Working…");
-  expect((await openMenu("draft idea")).getByRole("menuitem", { name: "Approving…" })).toBeDisabled();
+  expect((await openMenu("draft idea")).getByRole("menuitem", { name: "Requesting…" })).toBeDisabled();
   closeMenu();
   finish({ data: null, error: { message: "No draft row found" } });
   expect(await screen.findByText("No draft row found")).toHaveClass("text-destructive");
   await waitFor(() => expect(trigger).toHaveTextContent("Actions"));
-  expect(screen.queryByText("Idea approved.")).not.toBeInTheDocument();
+  expect(screen.queryByText("Exact idea review requested in Approval Inbox.")).not.toBeInTheDocument();
 });
 it("still offers delete for completed or rejected ideas, but not approve or brief", async () => {
   render(<GenerationPanel />);
@@ -205,12 +201,12 @@ it("still offers delete for completed or rejected ideas, but not approve or brie
   // Draft and approved still get approve/brief. Briefed and rejected only
   // get the things that are true of any row: archive and delete.
   const draft = await openMenu("draft idea");
-  expect(draft.getByRole("menuitem", { name: "Approve" })).toBeInTheDocument();
-  expect(draft.getByRole("menuitem", { name: "Approve & brief" })).toBeInTheDocument();
+  expect(draft.getByRole("menuitem", { name: "Request idea review" })).toBeInTheDocument();
+  expect(draft.queryByRole("menuitem", { name: "Brief" })).not.toBeInTheDocument();
   closeMenu();
   const approved = await openMenu("approved idea");
   expect(approved.getByRole("menuitem", { name: "Brief" })).toBeInTheDocument();
-  expect(approved.queryByRole("menuitem", { name: "Approve" })).not.toBeInTheDocument();
+  expect(approved.queryByRole("menuitem", { name: "Request idea review" })).not.toBeInTheDocument();
   closeMenu();
   for (const row of ["briefed idea", "rejected idea"]) {
     const menu = await openMenu(row);

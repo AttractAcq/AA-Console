@@ -459,6 +459,27 @@ const readyMotionRender = {
   owning_path: "/clients/client-1/delivery/motion-design?tab=renders",
 };
 
+const ideaReviewId = "38383838-3838-4838-8838-383838383838";
+const ideaToken = "39393939-3939-4939-8939-393939393939";
+const ideaHash = "f".repeat(64);
+const readyCampaignIdea = {
+  ...request, id: "idea-inbox-1", source_system: "aa_console",
+  source_kind: "campaign_idea", source_id: ideaReviewId,
+  source_version: `${ideaHash}:${ideaToken}`, artifact_hash: ideaHash,
+  title: "Select idea: A useful buying trigger", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "internal:brief:idea:idea-1", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", idea_id: "idea-1", request_token: ideaToken,
+    selection_route: "human", idea: { id: "idea-1", client_id: "client-1",
+      title: "A useful buying trigger", body: "Exact idea direction" },
+    campaign: null, proof: null },
+  scope: { client_id: "client-1", idea_id: "idea-1", review_id: ideaReviewId,
+    request_token: ideaToken, content_hash: ideaHash,
+    effect: "human_idea_selection_for_brief" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
 const engineTime = "2026-11-20T09:00:00+00:00";
@@ -988,6 +1009,17 @@ describe("unified approval inbox", () => {
     await userEvent.click(approve);
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_motion_render_inbox_v6", {
       p_review_id: motionReviewId, p_request_id: readyMotionRender.id, p_approved: true,
+    }));
+  });
+
+  it("routes an exact human idea selection through the Inbox", async () => {
+    requests = [readyCampaignIdea];
+    show();
+    const card = await screen.findByRole("article", { name: readyCampaignIdea.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_human_idea_inbox_v6", {
+      p_review_id: ideaReviewId, p_request_id: readyCampaignIdea.id,
+      p_approved: true,
     }));
   });
 

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "4c4b1e5d1a1a994d6292033f47a826dfd17bf3d0dfd86582b5489c2cfb435e82",
-  "generatedTypesSha256": "ed2b77a39f70108f451b46dffe162f57acf6bb660a8c29d8846170a2c9f95fcb",
-  "generatedSchemaBodySha256": "f02ad17a6436a687b6d23902309e87c3b4095eb9ebec760cf6d66cbf0bdd2f9e",
+  "migrationSourceDigest": "ee7494f1e93a6c945ca1eff3bce9e5faa260ce2b104f462c8b507472c4dd3f60",
+  "generatedTypesSha256": "1ace6a4fb18b2bde307071cbaaaec52c1436d1b012c018cc499463880964d953",
+  "generatedSchemaBodySha256": "163440cba148657de262635981bf49dcbceae3e0cf1ab8f832f50c5adf9380cb",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3027,6 +3027,55 @@
       "filename": "20261118030000_415_motion_render_coverage.sql",
       "sha256": "45c7ea6e026eb87e7d22c06ea9de0a3bf081f713fd2a18c57d1d23513501c363",
       "trimmedMd5": "0df557b52f478377d94c67b927d150b5"
+    },
+    {
+      "version": "20261118040000",
+      "name": "416_human_idea_selection_inbox",
+      "filename": "20261118040000_416_human_idea_selection_inbox.sql",
+      "sha256": "34b8b990ec6d5322c6321d3017256da91e94949ac54ad3e201ac5e5d3c8935f2",
+      "trimmedMd5": "98cbdfa08291865dad7040b0f7db86ac"
+    },
+    {
+      "version": "20261118050000",
+      "name": "417_human_idea_inbox_view",
+      "filename": "20261118050000_417_human_idea_inbox_view.sql",
+      "sha256": "e7f9d4ebdfe9c4cdc650290e4bcb628d6f7edf6dc193e9fc601087a73e098996",
+      "trimmedMd5": "1871e31dc802fd4cc2d6701ef3eeaaf2"
+    },
+    {
+      "version": "20261118060000",
+      "name": "418_human_idea_decision_boundary",
+      "filename": "20261118060000_418_human_idea_decision_boundary.sql",
+      "sha256": "9c0c767950a3497fb7a384fe0b712216b6c2e4dc16f019a5d30b891023917b1b",
+      "trimmedMd5": "c07a4a3d0752de17b1301e7d0e039783"
+    },
+    {
+      "version": "20261118070000",
+      "name": "419_video_repurpose_idea_review",
+      "filename": "20261118070000_419_video_repurpose_idea_review.sql",
+      "sha256": "aae219ff92a6e572dfd19829b298c24e2f83b2d5a8ed514a5b9e1ed780490755",
+      "trimmedMd5": "3229efb9919304688b62023add582c57"
+    },
+    {
+      "version": "20261118080000",
+      "name": "420_brief_job_selection_gate",
+      "filename": "20261118080000_420_brief_job_selection_gate.sql",
+      "sha256": "09270591d6ef40adbf093bce185405a16339f31737a70f3927358f5e1a55370a",
+      "trimmedMd5": "eea5525f02a9259c6a8d628118c22730"
+    },
+    {
+      "version": "20261118090000",
+      "name": "421_human_idea_coverage",
+      "filename": "20261118090000_421_human_idea_coverage.sql",
+      "sha256": "1dcea970fb41416107711a449de95baabc5ba241b3edd47c1d4f1bb9a64e9a28",
+      "trimmedMd5": "898cc5142e53cc91bbbe1e5d0bec81ca"
+    },
+    {
+      "version": "20261118100000",
+      "name": "422_brief_output_current_gate",
+      "filename": "20261118100000_422_brief_output_current_gate.sql",
+      "sha256": "66464f9e7617fe1845cd8ef8c3b6505d439fbee573c60272ea9e03d6fcd84e8b",
+      "trimmedMd5": "0c07a4154c7a72ed6436fd01dfcca9fd"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
