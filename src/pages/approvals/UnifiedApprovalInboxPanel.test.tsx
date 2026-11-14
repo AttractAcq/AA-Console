@@ -121,6 +121,24 @@ const readySalesRevoke = {
   scope: { ...readySales.scope, action: "revoke" },
 };
 
+const offerVersionId = "33333333-3333-4333-8333-333333333333";
+const offerId = "44444444-4444-4444-8444-444444444444";
+const offerHash = "e".repeat(64);
+const readyOffer = {
+  ...request, id: "offer-inbox-1", source_system: "aa_console", source_kind: "service_offer",
+  source_id: offerVersionId, source_version: offerHash, artifact_hash: offerHash,
+  title: "Service offer: Consulting · version 1", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", destination: "campaign_factory:offer_version",
+  account_ref: null, budget: null, owner_role: "admin_or_active_client_manager",
+  preview: { offer_id: offerId, offer_version_id: offerVersionId, client_id: "client-1",
+    version: 1, service_name: "Consulting", audience: "Owners", promise: "Clear plan",
+    inclusions: ["Workshop"], exclusions: ["No guarantee"], price_amount: 1000,
+    currency: "EUR", delivery_cost_estimate: 200, claims: [] },
+  scope: { client_id: "client-1", offer_id: offerId, offer_version_id: offerVersionId,
+    version: 1, content_hash: offerHash },
+  owning_path: `/clients/client-1/delivery/offer-studio?tab=versions&offer=${offerId}`,
+};
+
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
@@ -422,6 +440,53 @@ describe("unified approval inbox", () => {
     }));
     await waitFor(() => expect(screen.getByText("Decision history (1)")).toBeInTheDocument());
     expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("reviews the exact offer in the unified inbox and calls its owning AAL2 signoff", async () => {
+    const user = userEvent.setup();
+    requests = [readyOffer];
+    show();
+    const card = await screen.findByRole("article", { name: readyOffer.title });
+    expect(within(card).getByText("Service offer decision")).toBeInTheDocument();
+    expect(within(card).getByText(/Clear plan/)).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_service_offer_version_v6", {
+      p_version_id: offerVersionId,
+    }));
+  });
+
+  it("rejects an offer with a reason", async () => {
+    const user = userEvent.setup();
+    requests = [readyOffer];
+    show();
+    const card = await screen.findByRole("article", { name: readyOffer.title });
+    await user.type(within(card).getByRole("textbox", { name: "Reason to reject" }), "Claim unsupported");
+    await user.click(within(card).getByRole("button", { name: "Reject with reason" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("reject_service_offer_version_v6", {
+      p_version_id: offerVersionId, p_reason: "Claim unsupported",
+    }));
+  });
+
+  it("does not decide an offer when its exact inbox scope changes before the click", async () => {
+    const user = userEvent.setup();
+    requests = [readyOffer];
+    freshRequest = { ...readyOffer, scope: { ...readyOffer.scope, version: 2 } };
+    show();
+    const card = await screen.findByRole("article", { name: readyOffer.title });
+    await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/exact request changed/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("keeps a held offer approval unavailable while allowing a reasoned rejection", async () => {
+    const user = userEvent.setup();
+    requests = [{ ...readyOffer, status: "source_held", source_state: "source_held" }];
+    show();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "all");
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
+    const card = await screen.findByRole("article", { name: readyOffer.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Reject with reason" })).toBeDisabled();
   });
 
   it("requires a reason and fresh AAL2 for campaign rejection", async () => {

@@ -25690,6 +25690,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reject_service_offer_version_v6: {
+        Args: { p_version_id: string; p_reason: string }
+        Returns: string
+      }
       approve_slot: {
         Args: { p_note?: string; p_slot_id: string }
         Returns: {

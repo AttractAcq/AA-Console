@@ -8,7 +8,7 @@ import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "campaign_action", "client_sales_entitlement", "engine_slot",
-  "google_review_reply", "recruitment_brief",
+  "google_review_reply", "recruitment_brief", "service_offer",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -218,17 +218,47 @@ function isSalesEntitlementApprovalReady(request: UnifiedApprovalRequest, client
     && request.status === "pending" && request.source_state === "pending" && !isExpired(request);
 }
 
+function isServiceOfferRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "service_offer"
+    || request.client_id !== clientId || !["pending", "expired", "source_held"].includes(request.status)
+    || !["pending", "source_held"].includes(request.source_state ?? "")
+    || previewMissing(request) || request.source_version !== request.artifact_hash
+    || !request.artifact_hash || !/^[0-9a-f]{64}$/.test(request.artifact_hash)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  return preview.offer_version_id === request.source_id
+    && preview.client_id === clientId && scope.offer_version_id === request.source_id
+    && scope.client_id === clientId && scope.offer_id === preview.offer_id
+    && scope.version === preview.version && scope.content_hash === request.artifact_hash
+    && request.destination === "campaign_factory:offer_version"
+    && request.owner_role === "admin_or_active_client_manager"
+    && typeof preview.service_name === "string" && !!preview.service_name.trim()
+    && typeof preview.audience === "string" && !!preview.audience.trim()
+    && typeof preview.promise === "string" && !!preview.promise.trim()
+    && Array.isArray(preview.inclusions) && Array.isArray(preview.exclusions)
+    && Array.isArray(preview.claims);
+}
+
+function isServiceOfferApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  return isServiceOfferRejectionReady(request, clientId)
+    && request.status === "pending" && request.source_state === "pending" && !isExpired(request);
+}
+
 function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignRejectionReady(request, clientId)
     || isGoogleReplyRejectionReady(request, clientId)
-    || isSalesEntitlementRejectionReady(request, clientId);
+    || isSalesEntitlementRejectionReady(request, clientId)
+    || isServiceOfferRejectionReady(request, clientId);
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignApprovalReady(request, clientId)
     || isGoogleReplyApprovalReady(request, clientId)
     || isRecruitmentBriefApprovalReady(request, clientId)
-    || isSalesEntitlementApprovalReady(request, clientId);
+    || isSalesEntitlementApprovalReady(request, clientId)
+    || isServiceOfferApprovalReady(request, clientId);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
@@ -293,7 +323,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
   const decisionLabel = request.source_kind === "google_review_reply"
     ? "Google review reply" : request.source_kind === "recruitment_brief"
       ? "Recruitment brief" : request.source_kind === "client_sales_entitlement"
-        ? "Sales access" : "Campaign action";
+        ? "Sales access" : request.source_kind === "service_offer"
+          ? "Service offer" : "Campaign action";
 
   return (
     <article className="rounded-xl border border-border bg-card p-5" aria-labelledby={`approval-${request.id}`}>
@@ -580,6 +611,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             p_approve: decision === "approved",
             p_note: decision === "rejected" ? reason!.trim() : "Approved from unified Approval Inbox",
           })
+        : request.source_kind === "service_offer"
+          ? decision === "approved"
+            ? await supabase.rpc("approve_service_offer_version_v6", { p_version_id: request.source_id })
+            : await supabase.rpc("reject_service_offer_version_v6", {
+              p_version_id: request.source_id, p_reason: reason!.trim(),
+            })
         : request.source_kind === "campaign_action"
           ? await supabase.rpc("decide_campaign_action_approval_v6", {
           p_request_id: request.source_id,
@@ -646,8 +683,8 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             : manager ? "Canonical requests for clients currently assigned to you appear here. "
               : "Canonical requests and decision history appear here as source adapters are connected. "}
           {manager
-            ? "Complete campaign action and Google review reply requests can be decided here through their owning functions."
-            : "Complete campaign action, Google review reply, recruitment brief and sales access requests can be decided here through their owning functions."}
+            ? "Complete campaign action, Google review reply and service offer requests can be decided here through their owning functions."
+            : "Complete campaign action, Google review reply, recruitment brief, sales access and service offer requests can be decided here through their owning functions."}
           {manager ? " Other requests remain read-only. " : " Other requests link to their owning source. "}
           Coverage is incomplete: work not yet mirrored here remains in its owning queue.
           Pending here reflects the canonical ledger; each owning source is checked again before a decision.
