@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "4c9035b9fad49e9c2b7f94ca3a609911454fc53d05ce9c3269202e83dda1fc0a",
-  "generatedTypesSha256": "2eb0879cd67783fb2b4ca8ebad79bbec800bfb0d50519f0bb00ee4c21f9a68c1",
-  "generatedSchemaBodySha256": "74c4e4f6733c311e28d29a3b2b25f0cd590ec634a0c965c51481b9cb20d3ecb5",
+  "migrationSourceDigest": "368b968356f531884fe1e8cdf949b218b0f6194ea92c93cbf48bc234c3044ea9",
+  "generatedTypesSha256": "370b55231d96d1cfaba11955e7f2b52f9270b5936ca26143c5e5c9554345f088",
+  "generatedSchemaBodySha256": "b46bc9089d04226f587338abb3f53ce81829a4d60ad62f0b5f04830c0900988b",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2642,6 +2642,41 @@
       "filename": "20261115200000_360_proof_media_rights_coverage.sql",
       "sha256": "6a5901134ba0dda484e6a4b256b5414100c6c56062cf83c2d99e6be1d9f12e39",
       "trimmedMd5": "c5b9d6b98c3dc5c8a468aab690ebf54f"
+    },
+    {
+      "version": "20261115210000",
+      "name": "361_proof_artifact_inbox_source",
+      "filename": "20261115210000_361_proof_artifact_inbox_source.sql",
+      "sha256": "dea771ba80a077ac3a0ef84483a1022033eda5fec0d36ca2b384b8728d7750c1",
+      "trimmedMd5": "3fda312089c883b0d07fd13487fb1d60"
+    },
+    {
+      "version": "20261115220000",
+      "name": "362_proof_artifact_inbox_view",
+      "filename": "20261115220000_362_proof_artifact_inbox_view.sql",
+      "sha256": "b755768f7f6b0a1bf7da65ca195e9a7510469c55a4e545cbe553617c92ed7e08",
+      "trimmedMd5": "664ac20800c17a72edb64d058b81083d"
+    },
+    {
+      "version": "20261115230000",
+      "name": "363_proof_artifact_inbox_decision",
+      "filename": "20261115230000_363_proof_artifact_inbox_decision.sql",
+      "sha256": "3df2874ca3338a17575405b01fb4a5739a14db5e7c59383f8dc86e964b38174e",
+      "trimmedMd5": "862df871dd07dff3467b9ca20ee7ec6a"
+    },
+    {
+      "version": "20261116000000",
+      "name": "364_proof_artifact_placement_gate",
+      "filename": "20261116000000_364_proof_artifact_placement_gate.sql",
+      "sha256": "5c3b308fdb74dd3838fb2c0ec04682207dd541eab267ee6bf4a0d8e24577a944",
+      "trimmedMd5": "72de30a51b86e1e3a62d142987a79952"
+    },
+    {
+      "version": "20261116010000",
+      "name": "365_proof_artifact_coverage",
+      "filename": "20261116010000_365_proof_artifact_coverage.sql",
+      "sha256": "15d25aba9e178d093495b6f61e4cd238b3936a386ded87c51d2732566758d2cd",
+      "trimmedMd5": "8cc38cfe5d0f0c4d0a9ded03d063d8e8"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

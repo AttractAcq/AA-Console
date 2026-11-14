@@ -17371,22 +17371,108 @@ export type Database = {
         }
         Relationships: []
       }
+      proof_artifact_review_requests_v6: {
+        Row: {
+          artifact_hash: string | null
+          artifact_version_id: string
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_token: string
+        }
+        Insert: {
+          artifact_hash?: string | null
+          artifact_version_id: string
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_token?: string
+        }
+        Update: {
+          artifact_hash?: string | null
+          artifact_version_id?: string
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_artifact_version_id_fkey"
+            columns: ["artifact_version_id"]
+            isOneToOne: false
+            referencedRelation: "proof_artifact_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       proof_artifact_signoffs: {
         Row: {
           approved_at: string
           approved_by: string
+          approved_content_hash: string | null
+          approved_request_id: string | null
           artifact_version_id: string
           client_id: string
         }
         Insert: {
           approved_at?: string
           approved_by: string
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           artifact_version_id: string
           client_id: string
         }
         Update: {
           approved_at?: string
           approved_by?: string
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           artifact_version_id?: string
           client_id?: string
         }
@@ -17396,6 +17482,20 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_signoffs_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_artifact_signoffs_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
           {
@@ -27587,11 +27687,30 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      approve_proof_artifact_inbox_v6: {
+        Args: { p_request_id: string; p_review_id: string }
+        Returns: {
+          approved_at: string
+          approved_by: string
+          approved_content_hash: string | null
+          approved_request_id: string | null
+          artifact_version_id: string
+          client_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "proof_artifact_signoffs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       approve_proof_artifact_v6: {
         Args: { p_artifact_version_id: string }
         Returns: {
           approved_at: string
           approved_by: string
+          approved_content_hash: string | null
+          approved_request_id: string | null
           artifact_version_id: string
           client_id: string
         }
@@ -30852,6 +30971,32 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: string
       }
+      proof_artifact_review_hash_v6: {
+        Args: {
+          p_review: Database["public"]["Tables"]["proof_artifact_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      proof_artifact_review_preview_v6: {
+        Args: {
+          p_review: Database["public"]["Tables"]["proof_artifact_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      proof_artifact_review_scope_v6: {
+        Args: {
+          p_review: Database["public"]["Tables"]["proof_artifact_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      proof_artifact_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      proof_artifact_signoff_current_v6: {
+        Args: { p_artifact_version_id: string }
+        Returns: boolean
+      }
       proof_placement_effect_allowed_v6: {
         Args: { p_placement_id: string }
         Returns: boolean
@@ -31563,6 +31708,10 @@ export type Database = {
         Args: { p_proposal_id: string; p_reason: string }
         Returns: undefined
       }
+      reject_proof_artifact_inbox_v6: {
+        Args: { p_reason: string; p_request_id: string; p_review_id: string }
+        Returns: string
+      }
       reject_proof_rights_v6: {
         Args: {
           p_canonical_id: string
@@ -31869,6 +32018,10 @@ export type Database = {
       }
       request_opportunity_strategy_v6: {
         Args: { p_client_id: string; p_opportunity_id: string }
+        Returns: string
+      }
+      request_proof_artifact_signoff_v6: {
+        Args: { p_artifact_version_id: string }
         Returns: string
       }
       request_proof_artifact_v6: {

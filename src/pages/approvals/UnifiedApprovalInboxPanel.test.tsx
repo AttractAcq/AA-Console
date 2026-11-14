@@ -233,6 +233,31 @@ const readyProofPlacement = {
   owning_path: "/clients/client-1/delivery/proof-distribution?tab=placements",
 };
 
+const artifactReviewId = "12121212-1212-4212-8212-121212121212";
+const artifactVersionId = "13131313-1313-4313-8313-131313131313";
+const artifactToken = "14141414-1414-4414-8414-141414141414";
+const artifactHash = "7".repeat(64);
+const readyProofArtifact = {
+  ...request, id: "proof-artifact-inbox-1", source_system: "aa_console",
+  source_kind: "proof_artifact", source_id: artifactReviewId,
+  source_version: `${artifactHash}:${artifactToken}`,
+  artifact_hash: artifactHash, title: "Sign off proof artifact: local_proof_snippet v1",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: `proof_bank:artifact:${artifactVersionId}`, account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", artifact_version_id: artifactVersionId,
+    request_token: artifactToken,
+    artifact: { id: artifactVersionId, client_id: "client-1", source_proof_id: proofId,
+      content: "Customer result with supported evidence", supported_claim: "Delivered on time",
+      evidence_excerpt: "Signed handover" },
+    source_proof: { id: proofId, client_id: "client-1", usage_rights: "approved",
+      approved_rights_request_id: proofRightsId, body: "Customer result" } },
+  scope: { client_id: "client-1", review_id: artifactReviewId,
+    artifact_version_id: artifactVersionId, request_token: artifactToken,
+    content_hash: artifactHash, effect: "source_and_claim_signoff" },
+  owning_path: "/clients/client-1/delivery/proof-production-factory?tab=artifacts",
+};
+
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
@@ -619,6 +644,18 @@ describe("unified approval inbox", () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_proof_placement_inbox_v6", {
       p_approval_id: placementApprovalId, p_request_id: readyProofPlacement.id,
       p_approved: true,
+    }));
+  });
+
+  it("signs off the exact proof artifact and source through the owning AAL2 RPC", async () => {
+    requests = [readyProofArtifact];
+    show();
+    const card = await screen.findByRole("article", { name: readyProofArtifact.title });
+    expect(within(card).getByText("Proof artifact decision")).toBeInTheDocument();
+    expect(within(card).getByText(/Customer result with supported evidence/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_proof_artifact_inbox_v6", {
+      p_review_id: artifactReviewId, p_request_id: readyProofArtifact.id,
     }));
   });
 
