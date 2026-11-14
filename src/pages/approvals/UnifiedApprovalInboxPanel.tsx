@@ -4,13 +4,14 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { downloadVerifiedMagnetFile } from "../../lib/leadMagnets";
 import { downloadVerifiedProofFile } from "../../lib/proofRights";
+import { downloadVerifiedCreativeFile } from "../../lib/creativeReview";
 import type { Database } from "../../types/database";
 import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "campaign_action", "client_sales_entitlement", "engine_slot",
-  "google_review_reply", "lead_magnet", "opportunity_approve", "proof_artifact", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer",
+  "google_review_reply", "lead_magnet", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -442,6 +443,36 @@ function isProofArtifactReady(request: UnifiedApprovalRequest, clientId: string)
     && request.owner_role === "admin_or_active_client_manager";
 }
 
+function isOrdinaryMediaReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "ordinary_media"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  if (!preview.asset || typeof preview.asset !== "object" || Array.isArray(preview.asset)
+    || !preview.storage || typeof preview.storage !== "object" || Array.isArray(preview.storage)) return false;
+  const asset = preview.asset as Record<string, unknown>;
+  const storage = preview.storage as Record<string, unknown>;
+  const hash = request.artifact_hash;
+  return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
+    && typeof preview.request_token === "string" && !!preview.request_token
+    && request.source_version === `${hash}:${preview.request_token}`
+    && preview.client_id === clientId && preview.asset_id === asset.id
+    && asset.client_id === clientId && (asset.media_type === "image" || asset.media_type === "text")
+    && asset.content_format === "single" && typeof asset.storage_path === "string"
+    && !!asset.storage_path && typeof asset.file_sha256 === "string"
+    && /^[0-9a-f]{64}$/.test(asset.file_sha256)
+    && typeof asset.usage_rights === "string" && !!asset.usage_rights
+    && storage.bucket === "client-media" && typeof storage.object_id === "string"
+    && scope.client_id === clientId && scope.asset_id === asset.id
+    && scope.review_id === request.source_id && scope.request_token === preview.request_token
+    && scope.content_hash === hash && scope.effect === "creative_source_signoff"
+    && request.destination === `creative_source:${asset.id}`
+    && request.owner_role === "admin_or_active_client_manager";
+}
+
 function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignRejectionReady(request, clientId)
     || isGoogleReplyRejectionReady(request, clientId)
@@ -452,7 +483,8 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isOpportunityRejectionReady(request, clientId)
     || isProofRightsRejectionReady(request, clientId)
     || isProofPlacementReady(request, clientId)
-    || isProofArtifactReady(request, clientId);
+    || isProofArtifactReady(request, clientId)
+    || isOrdinaryMediaReady(request, clientId);
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
@@ -466,7 +498,8 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isOpportunityApprovalReady(request, clientId)
     || isProofRightsApprovalReady(request, clientId)
     || isProofPlacementReady(request, clientId)
-    || isProofArtifactReady(request, clientId);
+    || isProofArtifactReady(request, clientId)
+    || isOrdinaryMediaReady(request, clientId);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
@@ -519,6 +552,7 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
   const [rejectionReason, setRejectionReason] = useState("");
   const [downloadedMagnetHash, setDownloadedMagnetHash] = useState<string | null>(null);
   const [downloadedProofHash, setDownloadedProofHash] = useState<string | null>(null);
+  const [downloadedCreativeHash, setDownloadedCreativeHash] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const location = useLocation();
   const blocker = previewMissing(request);
@@ -536,6 +570,15 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
     && typeof proofRightsPreview.verified_storage_path === "string"
     && typeof proofRightsPreview.verified_storage_sha256 === "string"
     && typeof proofRightsPreview.verified_file_bytes === "number";
+  const creativePreview = request.source_kind === "ordinary_media" && request.preview
+    && typeof request.preview === "object" && !Array.isArray(request.preview)
+    ? request.preview as Record<string, unknown> : null;
+  const creativeAsset = creativePreview?.asset && typeof creativePreview.asset === "object"
+    && !Array.isArray(creativePreview.asset)
+    ? creativePreview.asset as Record<string, unknown> : null;
+  const creativeDownloadable = !!creativeAsset
+    && typeof creativeAsset.storage_path === "string"
+    && typeof creativeAsset.file_sha256 === "string";
   const canReject = !salesManagerCard && isRejectionReady(request, clientId);
   const canApprove = !salesManagerCard && isApprovalReady(request, clientId);
   const decisionLabel = request.source_kind === "google_review_reply"
@@ -548,7 +591,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
                 ? "Market opportunity" : request.source_kind === "proof_rights"
                   ? "Proof usage rights" : request.source_kind === "proof_placement"
                     ? "Proof placement" : request.source_kind === "proof_artifact"
-                      ? "Proof artifact" : "Campaign action";
+                      ? "Proof artifact" : request.source_kind === "ordinary_media"
+                        ? "Creative source" : "Campaign action";
   const magnetPreview = request.source_kind === "lead_magnet" && request.preview
     && typeof request.preview === "object" && !Array.isArray(request.preview)
     ? request.preview as Record<string, unknown> : null;
@@ -658,6 +702,23 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
         {downloadError && <p role="alert" className="mt-2 text-xs text-destructive">{downloadError}</p>}
       </div>}
 
+      {creativeDownloadable && <div className="mt-4">
+        <p className="mb-2 text-xs text-muted-foreground">Download and inspect the exact creative file to unlock approval.</p>
+        <button type="button" className="rounded-lg border border-border px-4 py-2 text-sm"
+          onClick={() => void downloadVerifiedCreativeFile(
+            creativeAsset.storage_path as string,
+            creativeAsset.file_sha256 as string,
+          ).then(() => { setDownloadedCreativeHash(`${request.id}:${request.artifact_hash}`); setDownloadError(null); })
+            .catch((cause: unknown) => setDownloadError(
+              cause instanceof Error ? cause.message : "Could not verify the creative file."))}>
+          Download and verify creative file
+        </button>
+        {downloadedCreativeHash === `${request.id}:${request.artifact_hash}` && <p role="status" className="mt-2 text-xs">
+          The downloaded creative matched the byte hash on this card. Review its content before approval.
+        </p>}
+        {downloadError && <p role="alert" className="mt-2 text-xs text-destructive">{downloadError}</p>}
+      </div>}
+
       {html && (
         <details className="mt-4">
           <summary className="cursor-pointer text-sm font-medium">Visual page preview</summary>
@@ -700,7 +761,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
           <div className="flex flex-wrap gap-2">
             {canApprove && <button type="button" disabled={busy || aal !== "aal2"
               || (request.source_kind === "lead_magnet" && downloadedMagnetHash !== request.artifact_hash)
-              || (proofMediaDownloadable && downloadedProofHash !== `${request.id}:${request.artifact_hash}`)}
+              || (proofMediaDownloadable && downloadedProofHash !== `${request.id}:${request.artifact_hash}`)
+              || (creativeDownloadable && downloadedCreativeHash !== `${request.id}:${request.artifact_hash}`)}
               onClick={() => void onDecide(request, "approved")}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
               Approve exact version
@@ -930,6 +992,15 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
                 p_review_id: request.source_id, p_request_id: request.id,
               })
             : await supabase.rpc("reject_proof_artifact_inbox_v6", {
+                p_review_id: request.source_id, p_request_id: request.id,
+                p_reason: reason!.trim(),
+              })
+        : request.source_kind === "ordinary_media"
+          ? decision === "approved"
+            ? await supabase.rpc("approve_ordinary_media_inbox_v6", {
+                p_review_id: request.source_id, p_request_id: request.id,
+              })
+            : await supabase.rpc("reject_ordinary_media_inbox_v6", {
                 p_review_id: request.source_id, p_request_id: request.id,
                 p_reason: reason!.trim(),
               })

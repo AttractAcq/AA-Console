@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { AuthError, requireAdminOrClientManager } from "../master/auth.js";
+import { AuthError } from "../master/auth.js";
 import { readJsonBody, UUID } from "../mcp/http.js";
 
 type Identity = {
@@ -24,6 +24,29 @@ function validIdentity(value: unknown, clientId: string, assetId: string): value
     && typeof v.object_updated_at === "string" && !!v.object_updated_at;
 }
 
+async function requireCreativeRequester(
+  sb: SupabaseClient, authorization: string | string[] | undefined, clientId: string,
+): Promise<void> {
+  const raw = Array.isArray(authorization) ? authorization[0] : authorization;
+  const token = /^Bearer\s+(.+)$/i.exec(raw?.trim() ?? "")?.[1]?.trim();
+  if (!token) throw new AuthError("Missing valid Bearer token.");
+  const { data, error } = await sb.auth.getUser(token);
+  if (error || !data?.user) throw new AuthError("That session is not valid. Sign in again.");
+  const userId = data.user.id;
+  const [profile, manager, member] = await Promise.all([
+    sb.from("profiles").select("role").eq("id", userId).maybeSingle(),
+    sb.rpc("active_video_approval_manager", { p_client_id: clientId }),
+    sb.from("client_users").select("user_id").eq("client_id", clientId)
+      .eq("user_id", userId).maybeSingle(),
+  ]);
+  if (profile.error || manager.error || member.error) {
+    throw new AuthError("Could not verify your client access.", 503);
+  }
+  if (profile.data?.role !== "admin" && manager.data !== userId && !member.data) {
+    throw new AuthError("Only this client's reviewer or account can request creative review.", 403);
+  }
+}
+
 export async function handleCreativeAssetAttestation(
   req: IncomingMessage,
   res: ServerResponse,
@@ -43,7 +66,7 @@ export async function handleCreativeAssetAttestation(
     return json(400, { ok: false, error: "A client and asset are required." });
   }
   try {
-    await requireAdminOrClientManager(sb, req.headers.authorization, clientId);
+    await requireCreativeRequester(sb, req.headers.authorization, clientId);
   } catch (cause) {
     return json(cause instanceof AuthError ? cause.status : 401, {
       ok: false, error: cause instanceof AuthError ? cause.message : "Not permitted.",

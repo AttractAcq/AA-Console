@@ -32,7 +32,7 @@ async function call(sb: SupabaseClient) {
   return { code, payload };
 }
 
-function database(options: { identityClient?: string; secondVersion?: string; role?: string } = {}) {
+function database(options: { identityClient?: string; secondVersion?: string; role?: string; clientMember?: boolean } = {}) {
   let identities = 0;
   const rpc = vi.fn(async (name: string) => {
     if (name === "creative_storage_identity_v6") {
@@ -42,10 +42,12 @@ function database(options: { identityClient?: string; secondVersion?: string; ro
     }
     return { data: name === "attest_creative_storage_bytes_v6" ? ASSET : null, error: null };
   });
-  const from = vi.fn(() => {
+  const from = vi.fn((table: string) => {
     const chain: Record<string, unknown> = {};
     Object.assign(chain, { select: () => chain, eq: () => chain,
-      maybeSingle: async () => ({ data: { role: options.role ?? "admin" }, error: null }) });
+      maybeSingle: async () => ({ data: table === "client_users"
+        ? options.clientMember ? { user_id: ACTOR } : null
+        : { role: options.role ?? "admin" }, error: null }) });
     return chain;
   });
   const sb = {
@@ -87,5 +89,10 @@ describe("trusted creative byte attestation", () => {
     const { sb, rpc } = database({ role: "client" });
     expect((await call(sb)).code).toBe(403);
     expect(rpc).not.toHaveBeenCalledWith("creative_storage_identity_v6", expect.anything());
+  });
+
+  it("lets a linked client account request byte verification for its own asset", async () => {
+    const { sb } = database({ role: "client", clientMember: true });
+    expect((await call(sb)).code).toBe(200);
   });
 });

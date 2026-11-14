@@ -12,6 +12,7 @@ import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { formatLabel } from "../../lib/contentFormat";
 import { cn } from "../../lib/cn";
 import { RegenerateAction } from "../../components/RegenerateAction";
+import { requestOrdinaryMediaReview } from "../../lib/creativeReview";
 
 type Idea = Database["public"]["Tables"]["client_ideas"]["Row"];
 type Brief = Database["public"]["Tables"]["client_briefs"]["Row"];
@@ -134,6 +135,21 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
     }
   }
 
+  const hasOrdinaryInboxRoute = (asset: CampaignAsset) =>
+    (asset.media_type === "image" || asset.media_type === "text")
+      && asset.content_format === "single" && !asset.render_path;
+  const requestCreativeReview = async (asset: CampaignAsset) => {
+    if (!hasOrdinaryInboxRoute(asset)) {
+      const result = await supabase.rpc("review_media_asset", {
+        p_asset_id: asset.id, p_decision: "approved",
+      });
+      if (result.error) throw result.error;
+      return { error: null };
+    }
+    await requestOrdinaryMediaReview(clientId, asset.id);
+    return { error: null };
+  };
+
   /**
    * Remove one campaign content piece: the idea and the briefs/assets made
    * from it. Never the parent campaign, and never a sibling idea.
@@ -214,7 +230,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
         </button>
       </>}
       {asset.review_status === "pending" && <>
-        <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("review_media_asset", { p_asset_id: asset.id, p_decision: "approved" }), "Asset approved. Ready to distribute.", { id: asset.id, action: "approve" })}>Approve asset</button>
+        <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => requestCreativeReview(asset), hasOrdinaryInboxRoute(asset) ? "Exact asset review requested in Unified Approval Inbox." : "Asset approved through its existing specialist route.", { id: asset.id, action: "approve" })}>{hasOrdinaryInboxRoute(asset) ? "Request asset review" : "Approve asset"}</button>
         <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => { setRejecting(asset); setReason(""); }}>Reject asset</button>
       </>}
     </div>
@@ -229,7 +245,7 @@ export function CampaignContentPanel({ clientId, campaignId, contentCount, built
 
   const v2AssetActions = (asset: CampaignAsset) => <div className="flex flex-wrap gap-2">
     {asset.review_status === "pending" && <>
-      <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => supabase.rpc("review_media_asset", { p_asset_id: asset.id, p_decision: "approved" }), "Asset approved. Ready to distribute.", { id: asset.id, action: "approve" })}>Approve</button>
+      <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => void act(() => requestCreativeReview(asset), hasOrdinaryInboxRoute(asset) ? "Exact asset review requested in Unified Approval Inbox." : "Asset approved through its existing specialist route.", { id: asset.id, action: "approve" })}>{hasOrdinaryInboxRoute(asset) ? "Request review" : "Approve"}</button>
       <button type="button" className={buttonClass} disabled={busy !== null} onClick={() => { setRejecting(asset); setReason(""); }}>Reject</button>
     </>}
     {asset.review_status === "approved" && asset.media_type === "image" && asset.content_format !== "carousel" && <button type="button" className={buttonClass} onClick={() => setCopying(asset)}>{hasAdCopy(asset) ? "Edit ad copy" : "Write ad copy"}</button>}

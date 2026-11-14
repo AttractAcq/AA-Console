@@ -3,10 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, getAAL, downloadVerifiedProofFile } = vi.hoisted(() => ({
+const { from, rpc, getAAL, downloadVerifiedProofFile, downloadVerifiedCreativeFile } = vi.hoisted(() => ({
   from: vi.fn(), rpc: vi.fn(), getAAL: vi.fn(), downloadVerifiedProofFile: vi.fn(),
+  downloadVerifiedCreativeFile: vi.fn(),
 }));
 vi.mock("../../lib/proofRights", () => ({ downloadVerifiedProofFile }));
+vi.mock("../../lib/creativeReview", () => ({ downloadVerifiedCreativeFile }));
 vi.mock("../../lib/supabase", () => ({ supabase: {
   from, rpc, auth: { mfa: { getAuthenticatorAssuranceLevel: getAAL } },
 } }));
@@ -256,6 +258,28 @@ const readyProofArtifact = {
     artifact_version_id: artifactVersionId, request_token: artifactToken,
     content_hash: artifactHash, effect: "source_and_claim_signoff" },
   owning_path: "/clients/client-1/delivery/proof-production-factory?tab=artifacts",
+};
+
+const mediaReviewId = "15151515-1515-4515-8515-151515151515";
+const mediaAssetId = "16161616-1616-4616-8616-161616161616";
+const mediaToken = "17171717-1717-4717-8717-171717171717";
+const mediaHash = "8".repeat(64);
+const mediaFileHash = "9".repeat(64);
+const readyOrdinaryMedia = {
+  ...request, id: "ordinary-media-inbox-1", source_system: "aa_console",
+  source_kind: "ordinary_media", source_id: mediaReviewId,
+  source_version: `${mediaHash}:${mediaToken}`, artifact_hash: mediaHash,
+  title: "Review creative: Client image", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", destination: `creative_source:${mediaAssetId}`,
+  account_ref: null, budget: null, owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", asset_id: mediaAssetId, request_token: mediaToken,
+    asset: { id: mediaAssetId, client_id: "client-1", title: "Client image",
+      media_type: "image", content_format: "single", storage_path: "client-1/image.png",
+      file_sha256: mediaFileHash, usage_rights: "agency_owned" },
+    storage: { bucket: "client-media", object_id: "storage-object-1", version: "v1" } },
+  scope: { client_id: "client-1", asset_id: mediaAssetId, review_id: mediaReviewId,
+    request_token: mediaToken, content_hash: mediaHash, effect: "creative_source_signoff" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=assets",
 };
 
 function wireDatabase() {
@@ -656,6 +680,24 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_proof_artifact_inbox_v6", {
       p_review_id: artifactReviewId, p_request_id: readyProofArtifact.id,
+    }));
+  });
+
+  it("unlocks ordinary creative approval only after downloading the exact stored file", async () => {
+    requests = [readyOrdinaryMedia];
+    show();
+    const card = await screen.findByRole("article", { name: readyOrdinaryMedia.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
+      "client-1/image.png", mediaFileHash,
+    ));
+    await waitFor(() => expect(approve).toBeEnabled());
+    await userEvent.click(approve);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_ordinary_media_inbox_v6", {
+      p_review_id: mediaReviewId, p_request_id: readyOrdinaryMedia.id,
     }));
   });
 
