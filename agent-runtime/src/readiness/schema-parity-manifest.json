@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "05284f8d6828ef201ac1aba900bc79c2e6c3896233743b2480325e2af78100fe",
-  "generatedTypesSha256": "370b55231d96d1cfaba11955e7f2b52f9270b5936ca26143c5e5c9554345f088",
-  "generatedSchemaBodySha256": "b46bc9089d04226f587338abb3f53ce81829a4d60ad62f0b5f04830c0900988b",
+  "migrationSourceDigest": "f79fdd1ec7a1f69c49de307f962b92efee4642c70bbe5de379bc556fed721749",
+  "generatedTypesSha256": "540b19e3017674a94042f06b57a2c245e138170eef0f3cbbc434cd0f26242194",
+  "generatedSchemaBodySha256": "7fee79625655ba906ff5f0742910acbcc8c56e9a79a70bf32712a657f9a2df51",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2684,6 +2684,13 @@
       "filename": "20261116020000_366_proof_placement_due_current_artifact.sql",
       "sha256": "0ebfc7ff147743a2c4f6ab54b0f52dfc0dd252f838a5b34b108ee23ac7a58d2e",
       "trimmedMd5": "36fc29cd01389543fe3785a5a0818387"
+    },
+    {
+      "version": "20261116030000",
+      "name": "367_creative_storage_attestation",
+      "filename": "20261116030000_367_creative_storage_attestation.sql",
+      "sha256": "9eba6263ea304846f20df53aab9888ef24d3501fc449a96316b8e386b93c32c6",
+      "trimmedMd5": "c9d3a09a878d423f27449f58e4da1c47"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

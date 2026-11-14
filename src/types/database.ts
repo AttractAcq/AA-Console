@@ -27939,6 +27939,18 @@ export type Database = {
         Args: { p_brief_id?: string; p_project_id: string }
         Returns: string
       }
+      attest_creative_storage_bytes_v6: {
+        Args: {
+          p_asset_id: string
+          p_file_bytes: number
+          p_object_id: string
+          p_object_updated_at: string
+          p_object_version: string
+          p_sha256: string
+          p_storage_path: string
+        }
+        Returns: string
+      }
       attest_lead_magnet_bytes_v6: {
         Args: { p_approval_id: string; p_file_bytes: number; p_sha256: string }
         Returns: string
@@ -29243,6 +29255,10 @@ export type Database = {
       creative_seat_of: {
         Args: { p_client_id: string; p_user_id: string }
         Returns: string
+      }
+      creative_storage_identity_v6: {
+        Args: { p_asset_id: string }
+        Returns: Json
       }
       current_member_id: { Args: never; Returns: string }
       current_role_of: {
