@@ -94,7 +94,7 @@ begin
     raise exception 'Only an admin or the active client manager may change this.' using errcode = '42501';
   end if;
   if p_enabled then
-    raise exception 'Campaign action executor is held until atomic handler-ownership claim is installed.' using errcode = 'P0001';
+    raise exception 'Campaign action executor is held pending runtime integration and live validation.' using errcode = 'P0001';
   end if;
 
   insert into public.client_engine_settings (client_id, campaign_actions_enabled)

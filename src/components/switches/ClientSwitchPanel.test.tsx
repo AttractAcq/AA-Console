@@ -103,7 +103,7 @@ describe("every switch in one place", () => {
     // Publishing needs a deployment variable the browser cannot set.
     expect(await screen.findByText(/PUBLISH_ENABLED must also be on/)).toBeInTheDocument();
     // And campaign actions are held in the runtime regardless of this switch.
-    expect(screen.getByText(/produces a visible job failure rather than an execution/)).toBeInTheDocument();
+    expect(screen.getByText(/produce a visible job failure rather than an execution/)).toBeInTheDocument();
   });
 
   it("holds campaign action activation even if a client setting is off", async () => {

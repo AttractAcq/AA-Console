@@ -120,7 +120,7 @@ export function CampaignActionApprovalsPanel() {
 
       <p role="status" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
         Generic campaign action claims are held before the worker reads or claims an approval.
-        The current database claim cannot atomically limit work to actions this runtime handles.
+        The new owned database claim is awaiting runtime integration and validation.
         A client switch or approval does not release this hold.
       </p>
 
