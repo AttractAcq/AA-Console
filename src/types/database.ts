@@ -9729,6 +9729,88 @@ export type Database = {
           },
         ]
       }
+      creative_requirement_reviews_v6: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          required: boolean
+          source_hash: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          required: boolean
+          source_hash?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          required?: boolean
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_requirement_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       daily_package_items: {
         Row: {
           asset_id: string | null
@@ -31850,6 +31932,28 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      creative_requirement_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["creative_requirement_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      creative_requirement_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["creative_requirement_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      creative_requirement_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["creative_requirement_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      creative_requirement_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       creative_seat_of: {
         Args: { p_client_id: string; p_user_id: string }
         Returns: string
@@ -31952,6 +32056,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      decide_creative_requirement_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
       }
       decide_engine_slot_inbox_v6: {
         Args: {
@@ -35006,6 +35119,10 @@ export type Database = {
           p_target_role: string
           p_verification_id: string
         }
+        Returns: string
+      }
+      request_creative_requirement_v6: {
+        Args: { p_client_id: string; p_required: boolean }
         Returns: string
       }
       request_engine_slot_exact_review_v6: {

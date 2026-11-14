@@ -82,12 +82,14 @@ describe("the creative seats", () => {
     expect(screen.getByText(/Rejections are never blocked/)).toBeTruthy();
   });
 
-  it("turns the requirement on through the one call that does it", async () => {
+  it("requests a review without claiming the requirement is already on", async () => {
     render(<CreativeAuthorityStrip />);
     await userEvent.click(
-      await screen.findByRole("button", { name: "Require a creative director" }),
+      await screen.findByRole("button", { name: "Request creative director requirement" }),
     );
     await waitFor(() => expect(setCreativeDirectorRequired).toHaveBeenCalledWith("c1", true));
+    expect(screen.getByRole("status")).toHaveTextContent("current approval rule remains in force");
+    expect(screen.queryByText("Creative director sign-off required")).not.toBeInTheDocument();
   });
 
   it("surfaces the view's problem sentence when a required seat is empty", async () => {

@@ -560,6 +560,26 @@ const readyIntegrationGrant = {
     enable_daily_ingest: true, effect: "grant_client_provider_credential_use" },
   owning_path: "/clients/client-1/account/integrations",
 };
+const creativeReviewId = "48484848-4848-4848-8848-484848484848";
+const creativeToken = "49494949-4949-4949-8949-494949494949";
+const creativeHash = "1".repeat(64);
+const readyCreativeRequirement = {
+  ...request, id: "creative-requirement-inbox-1", source_system: "aa_console",
+  source_kind: "creative_requirement", source_id: creativeReviewId,
+  source_version: `${creativeHash}:${creativeToken}`, artifact_hash: creativeHash,
+  title: "Require creative director sign-off", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "client:creative_authority:client-1", account_ref: null,
+  budget: null, owner_role: "admin",
+  preview: { client_id: "client-1", request_token: creativeToken,
+    action: "change_creative_approval_requirement", current_required: false,
+    proposed_required: true, current_creative_director: "director-1",
+    current_smm: "smm-1" },
+  scope: { client_id: "client-1", review_id: creativeReviewId,
+    request_token: creativeToken, content_hash: creativeHash,
+    proposed_required: true, effect: "change_creative_approval_authority" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
 
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
@@ -1154,6 +1174,17 @@ describe("unified approval inbox", () => {
     show();
     const mismatched = await screen.findByRole("article", { name: readyIntegrationGrant.title });
     expect(within(mismatched).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("routes an exact creative authority change through the Inbox", async () => {
+    requests = [readyCreativeRequirement];
+    show();
+    const card = await screen.findByRole("article", { name: readyCreativeRequirement.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_creative_requirement_v6", {
+      p_review_id: creativeReviewId, p_request_id: readyCreativeRequirement.id,
+      p_approved: true,
+    }));
   });
 
   it("unlocks ordinary creative approval only after downloading the exact stored file", async () => {

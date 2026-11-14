@@ -18,15 +18,15 @@ import {
  * every other screen refers to is in fact the assigned SMM, and which seat
  * each recent decision was made from.
  *
- * The requirement toggle is deliberately plain and deliberately explains
- * itself: turning it on changes who may approve creative for a real client,
- * and a switch that quietly narrows permissions is worse than no switch.
+ * The requirement control requests a separate approval. It never reports
+ * the authority as changed until the source view reads back the decision.
  */
 export function CreativeAuthorityStrip() {
   const { clientId } = useParams<{ clientId: string }>();
   const [authority, setAuthority] = useState<CreativeAuthority | null>(null);
   const [decisions, setDecisions] = useState<CreativeDecision[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -56,7 +56,9 @@ export function CreativeAuthorityStrip() {
       await setCreativeDirectorRequired(clientId, !authority.creative_director_required);
       await refresh();
       setError(null);
+      setNotice("Creative authority review requested. The current approval rule remains in force until an AAL2 admin decides it in the Approval Inbox.");
     } catch (cause) {
+      setNotice(null);
       setError(cause instanceof Error ? cause.message : "Could not change the requirement.");
     } finally {
       setBusy(false);
@@ -80,6 +82,7 @@ export function CreativeAuthorityStrip() {
       </div>
 
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
 
       <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
         <div>
@@ -109,7 +112,7 @@ export function CreativeAuthorityStrip() {
 
       <div className="flex flex-wrap gap-2">
         <Button disabled={busy} onClick={() => void toggle()}>
-          {required ? "Stop requiring a creative director" : "Require a creative director"}
+          {required ? "Request removal of creative director requirement" : "Request creative director requirement"}
         </Button>
         <Button onClick={() => setOpen((v) => !v)}>
           {open ? "Hide decisions" : "Recent decisions"}
