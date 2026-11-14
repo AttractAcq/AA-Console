@@ -1089,6 +1089,13 @@ export type Database = {
             foreignKeyName: "brief_dispatches_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brief_dispatches_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -1917,6 +1924,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "campaign_artifacts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "campaign_artifacts_asset_id_fkey"
@@ -3736,6 +3750,13 @@ export type Database = {
             foreignKeyName: "client_asset_reviews_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -4377,6 +4398,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
+            columns: ["derived_from_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
@@ -6035,6 +6063,13 @@ export type Database = {
             foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_launch_asset_checks_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -6420,6 +6455,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_leads_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_leads_source_asset_id_fkey"
@@ -6977,6 +7019,13 @@ export type Database = {
             foreignKeyName: "client_media_assets_source_asset_id_fkey"
             columns: ["source_asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -7104,6 +7153,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_media_frames_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_media_frames_asset_id_fkey"
@@ -7641,6 +7697,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_pages_reference_asset_id_fkey"
+            columns: ["reference_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_pages_reference_asset_id_fkey"
@@ -8985,6 +9048,13 @@ export type Database = {
             foreignKeyName: "content_slots_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_slots_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -9274,6 +9344,13 @@ export type Database = {
             foreignKeyName: "creative_generations_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_generations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -9472,6 +9549,13 @@ export type Database = {
             foreignKeyName: "creative_renders_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_renders_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -9639,6 +9723,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "daily_package_items_asset_id_fkey"
@@ -9853,6 +9944,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
+            columns: ["reserve_asset_id"]
+            isOneToOne: true
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "daily_package_recoveries_reserve_asset_id_fkey"
@@ -12493,6 +12591,13 @@ export type Database = {
             foreignKeyName: "job_assignments_asset_client_fk"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_client_fk"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id", "client_id"]
           },
@@ -12558,6 +12663,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_assignments_asset_id_fkey"
@@ -12684,6 +12796,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_assignments_source_asset_id_fkey"
@@ -14967,6 +15086,13 @@ export type Database = {
             foreignKeyName: "motion_design_attachments_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: true
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_design_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -16564,6 +16690,13 @@ export type Database = {
             foreignKeyName: "ordinary_media_review_requests_v6_asset_id_client_id_fkey"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id", "client_id"]
           },
@@ -16629,6 +16762,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "ordinary_media_review_requests_v6_asset_id_fkey"
@@ -16767,6 +16907,13 @@ export type Database = {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_client_id_fkey"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_client_id_fkey"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id", "client_id"]
           },
@@ -16832,6 +16979,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "ordinary_media_signoffs_v6_asset_id_fkey"
@@ -17398,6 +17552,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "post_copy_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "post_copy_asset_id_fkey"
@@ -18839,6 +19000,13 @@ export type Database = {
             foreignKeyName: "proof_placements_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -19186,6 +19354,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "proof_production_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "proof_production_requests_source_asset_id_fkey"
@@ -19868,6 +20043,13 @@ export type Database = {
             foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recruitment_meta_campaign_ads_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -20438,6 +20620,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
@@ -21094,6 +21283,13 @@ export type Database = {
             foreignKeyName: "video_approval_signoffs_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_approval_signoffs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -21206,6 +21402,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_client_approval_requests_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_client_approval_requests_asset_id_fkey"
@@ -21360,6 +21563,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_render_candidates_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_render_candidates_asset_id_fkey"
@@ -21613,6 +21823,13 @@ export type Database = {
             foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
             columns: ["output_asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -21678,6 +21895,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_repurpose_clip_requests_source_asset_id_fkey"
@@ -21812,6 +22036,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_repurpose_derivatives_source_asset_id_fkey"
@@ -21977,6 +22208,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_repurpose_requests_source_asset_id_fkey"
@@ -22237,6 +22475,13 @@ export type Database = {
             foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
             columns: ["output_asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -22302,6 +22547,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "video_source_edit_requests_source_asset_id_fkey"
@@ -22577,6 +22829,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
+            columns: ["source_asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "workflow_reel_source_rebuilds_source_asset_id_fkey"
@@ -23279,6 +23538,13 @@ export type Database = {
             foreignKeyName: "job_assignments_asset_client_fk"
             columns: ["asset_id", "client_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_client_fk"
+            columns: ["asset_id", "client_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id", "client_id"]
           },
@@ -23344,6 +23610,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_assignments_asset_id_fkey"
@@ -24422,6 +24695,13 @@ export type Database = {
             foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
             columns: ["derived_from_asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_briefs_derived_from_asset_id_fkey"
+            columns: ["derived_from_asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -24546,6 +24826,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "client_asset_reviews_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "client_asset_reviews_asset_id_fkey"
@@ -24913,6 +25200,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "publish_due"
             referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
@@ -27109,6 +27403,13 @@ export type Database = {
             foreignKeyName: "scheduled_posts_asset_id_fkey"
             columns: ["asset_id"]
             isOneToOne: false
+            referencedRelation: "recruitment_media_ready_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
             referencedRelation: "rejected_assets_archive"
             referencedColumns: ["id"]
           },
@@ -27339,6 +27640,86 @@ export type Database = {
           },
           {
             foreignKeyName: "scheduled_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      recruitment_media_ready_v6: {
+        Row: {
+          brief_id: string | null
+          client_id: string | null
+          content_format: Database["public"]["Enums"]["content_format"] | null
+          id: string | null
+          media_type: Database["public"]["Enums"]["media_type"] | null
+          storage_path: string | null
+          title: string | null
+        }
+        Insert: {
+          brief_id?: string | null
+          client_id?: string | null
+          content_format?: Database["public"]["Enums"]["content_format"] | null
+          id?: string | null
+          media_type?: Database["public"]["Enums"]["media_type"] | null
+          storage_path?: string | null
+          title?: string | null
+        }
+        Update: {
+          brief_id?: string | null
+          client_id?: string | null
+          content_format?: Database["public"]["Enums"]["content_format"] | null
+          id?: string | null
+          media_type?: Database["public"]["Enums"]["media_type"] | null
+          storage_path?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "client_briefs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_archive"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "content_attribution"
+            referencedColumns: ["brief_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_media_assets_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "engine_readiness"
@@ -32357,6 +32738,10 @@ export type Database = {
         }
       }
       recover_lead: { Args: { p_lead_id: string }; Returns: undefined }
+      recruitment_brief_signoff_current_v6: {
+        Args: { p_brief_id: string }
+        Returns: boolean
+      }
       recruitment_brief_snapshot_hash_v6: {
         Args: { p_brief: Database["public"]["Tables"]["client_briefs"]["Row"] }
         Returns: string
@@ -32364,6 +32749,10 @@ export type Database = {
       recruitment_brief_snapshot_v6: {
         Args: { p_brief: Database["public"]["Tables"]["client_briefs"]["Row"] }
         Returns: Json
+      }
+      recruitment_media_current_v6: {
+        Args: { p_asset_id: string }
+        Returns: boolean
       }
       recruitment_meta_build_snapshot_v6: {
         Args: { p_campaign_id: string }
