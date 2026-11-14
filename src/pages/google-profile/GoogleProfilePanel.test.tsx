@@ -61,7 +61,8 @@ const change = (over: Record<string, unknown> = {}) => ({
 
 function database(options: {
   locations?: unknown[]; due?: unknown[]; reviews?: unknown[];
-  replies?: unknown[]; replyOutcomes?: unknown[]; placements?: unknown[]; changes?: unknown[];
+  replies?: unknown[]; replyOutcomes?: unknown[]; replyJobs?: unknown[];
+  placements?: unknown[]; changes?: unknown[];
 } = {}) {
   from.mockImplementation((table: string) => {
     const payload = () => {
@@ -72,6 +73,7 @@ function database(options: {
         case "google_reviews": return options.reviews ?? [review()];
         case "google_review_replies": return options.replies ?? [];
         case "google_reply_execution_overview_v6": return options.replyOutcomes ?? [];
+        case "agent_jobs": return options.replyJobs ?? [];
         default: return options.placements ?? [];
       }
     };
@@ -405,6 +407,17 @@ describe("reviews", () => {
     });
     render(<GoogleProfilePanel tab="reviews" />);
     expect(await screen.findByText("Provider outcome uncertain — reconcile before retrying"))
+      .toBeInTheDocument();
+  });
+
+  it("shows a held send job before any provider attempt exists", async () => {
+    database({
+      replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "approved" }],
+      replyJobs: [{ id: "job-1", input_id: "reply-1", status: "paused",
+        error: "Google review replies are held by GOOGLE_REVIEW_REPLY_ENABLED." }],
+    });
+    render(<GoogleProfilePanel tab="reviews" />);
+    expect(await screen.findByText(/Send held — Google review replies are held/))
       .toBeInTheDocument();
   });
 });

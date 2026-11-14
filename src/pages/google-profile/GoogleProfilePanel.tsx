@@ -18,6 +18,8 @@ type ProfileChange = Pick<Database["public"]["Tables"]["google_profile_changes"]
 type Review = Database["public"]["Tables"]["google_reviews"]["Row"];
 type Reply = Database["public"]["Tables"]["google_review_replies"]["Row"];
 type ReplyOutcome = Database["public"]["Views"]["google_reply_execution_overview_v6"]["Row"];
+type ReplyJob = Pick<Database["public"]["Tables"]["agent_jobs"]["Row"],
+  "id" | "input_id" | "status" | "error">;
 type Placement = Database["public"]["Tables"]["proof_placements"]["Row"];
 
 type Tab = "location" | "reviews" | "posts" | "metrics";
@@ -54,6 +56,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
   const [reviews, setReviews] = useState<Review[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [replyOutcomes, setReplyOutcomes] = useState<ReplyOutcome[]>([]);
+  const [replyJobs, setReplyJobs] = useState<ReplyJob[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -75,7 +78,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
       return;
     }
     try {
-      const [locs, board, proposed, revs, reps, outcomes, place] = await Promise.all([
+      const [locs, board, proposed, revs, reps, outcomes, jobs, place] = await Promise.all([
         supabase
           .from("client_google_locations")
           .select("*")
@@ -93,6 +96,9 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .limit(100),
         supabase.from("google_review_replies").select("*").eq("client_id", clientId),
         supabase.from("google_reply_execution_overview_v6").select("*").eq("client_id", clientId),
+        supabase.from("agent_jobs").select("id,input_id,status,error")
+          .eq("client_id", clientId).eq("agent_key", "google_reply_sender")
+          .eq("input_table", "google_review_replies"),
         supabase
           .from("proof_placements")
           .select("*")
@@ -100,7 +106,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .eq("destination_key", "google_business_profile")
           .order("created_at", { ascending: false }),
       ]);
-      for (const result of [locs, board, proposed, revs, reps, outcomes, place]) {
+      for (const result of [locs, board, proposed, revs, reps, outcomes, jobs, place]) {
         if (result.error) throw new Error(result.error.message);
       }
       if (!isCurrent()) return;
@@ -110,6 +116,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
       setReviews(revs.data ?? []);
       setReplies(reps.data ?? []);
       setReplyOutcomes(outcomes.data ?? []);
+      setReplyJobs(jobs.data ?? []);
       setPlacements(place.data ?? []);
       setError(null);
     } catch (cause) {
@@ -350,6 +357,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
             rows={reviews.map((r) => {
               const reply = replyFor(r.id);
               const outcome = replyOutcomes.find((x) => x.reply_id === reply?.id);
+              const sendJob = replyJobs.find((x) => x.input_id === reply?.id);
               return [
                 <span key="r">
                   {r.author_name ?? "A Google reviewer"}
@@ -379,6 +387,12 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                           ? "Send refused — inspect outcome"
                           : outcome?.status === "reserved"
                             ? "Send reserved — no provider write yet"
+                            : sendJob?.status === "paused"
+                              ? `Send held — ${sendJob.error ?? "inspect the job"}`
+                              : sendJob?.status === "failed"
+                                ? `Send job failed — ${sendJob.error ?? "inspect the job"}`
+                                : sendJob
+                                  ? `Send requested — ${sendJob.status.replace(/_/g, " ")}`
                             : reply.status === "approved"
                               ? "Approved — not sent"
                               : reply.status.replace(/_/g, " ")}
