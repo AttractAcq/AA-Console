@@ -11839,6 +11839,152 @@ export type Database = {
         }
         Relationships: []
       }
+      gateway_tool_execution_receipts_v6: {
+        Row: {
+          approval_id: string
+          canonical_request_id: string
+          claimed_at: string
+          execution_key: string
+          finished_at: string | null
+          result_hash: string | null
+          status: string
+        }
+        Insert: {
+          approval_id: string
+          canonical_request_id: string
+          claimed_at?: string
+          execution_key: string
+          finished_at?: string | null
+          result_hash?: string | null
+          status: string
+        }
+        Update: {
+          approval_id?: string
+          canonical_request_id?: string
+          claimed_at?: string
+          execution_key?: string
+          finished_at?: string | null
+          result_hash?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_tool_execution_receipts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "gateway_tool_reviews_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_execution_receipts_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_execution_receipts_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gateway_tool_reviews_v6: {
+        Row: {
+          bot_id: string
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          payload: Json
+          payload_hash: string
+          request_token: string
+          risk: string
+          source_hash: string
+          summary: string
+          token_id: string
+          tool: string
+        }
+        Insert: {
+          bot_id: string
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          expires_at: string
+          id: string
+          payload: Json
+          payload_hash: string
+          request_token?: string
+          risk: string
+          source_hash?: string
+          summary: string
+          token_id: string
+          tool: string
+        }
+        Update: {
+          bot_id?: string
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          payload?: Json
+          payload_hash?: string
+          request_token?: string
+          risk?: string
+          source_hash?: string
+          summary?: string
+          token_id?: string
+          tool?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       github_app_installations: {
         Row: {
           account_login: string
@@ -30753,6 +30899,14 @@ export type Database = {
         }
         Returns: string
       }
+      attest_gateway_tool_review_v6: {
+        Args: {
+          p_approval_id: string
+          p_payload_hash: string
+          p_token_id: string
+        }
+        Returns: Json
+      }
       attest_lead_magnet_bytes_v6: {
         Args: { p_approval_id: string; p_file_bytes: number; p_sha256: string }
         Returns: string
@@ -31231,6 +31385,15 @@ export type Database = {
           package_day: string
           reason: string
         }[]
+      }
+      claim_gateway_tool_execution_v6: {
+        Args: {
+          p_approval_id: string
+          p_execution_key: string
+          p_payload_hash: string
+          p_token_id: string
+        }
+        Returns: Json
       }
       claim_lead_magnet_deliveries: {
         Args: { p_limit?: number }
@@ -32272,6 +32435,15 @@ export type Database = {
         }
         Returns: string
       }
+      decide_gateway_tool_review_v6: {
+        Args: {
+          p_approval_id: string
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: string
+      }
       decide_global_engine_activation_v6: {
         Args: {
           p_approved: boolean
@@ -32960,6 +33132,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      finish_gateway_tool_execution_v6: {
+        Args: {
+          p_approval_id: string
+          p_execution_key: string
+          p_result_hash: string
+          p_status: string
+        }
+        Returns: Json
+      }
       format_fits_media: {
         Args: {
           p_format: Database["public"]["Enums"]["content_format"]
@@ -32968,6 +33149,32 @@ export type Database = {
         Returns: boolean
       }
       frame_plan_is_usable: { Args: { p_plan: string[] }; Returns: boolean }
+      gateway_tool_execution_state_v6: {
+        Args: { p_approval_id: string }
+        Returns: Json
+      }
+      gateway_tool_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["gateway_tool_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      gateway_tool_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["gateway_tool_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      gateway_tool_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["gateway_tool_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      gateway_tool_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       generate_recruitment_ad: {
         Args: { p_brief_id: string; p_quality?: string; p_size?: string }
         Returns: Json
@@ -35046,6 +35253,10 @@ export type Database = {
       register_delivery_asset_bytes_v6: {
         Args: { p_asset_id: string; p_sha256: string; p_storage_path: string }
         Returns: string
+      }
+      register_gateway_tool_review_v6: {
+        Args: { p_packet: Json }
+        Returns: Json
       }
       register_lead_magnet_inbox_v6: {
         Args: {

@@ -37,6 +37,7 @@ import { handleMcpAttribution } from "./mcp/attribution-route.js";
 import { handleMcpBrand } from "./mcp/brand-route.js";
 import { handleMcpSites } from "./mcp/sites-mcp-route.js";
 import { handleMcpAuth } from "./mcp/auth-route.js";
+import { handleMcpGatewayApproval } from "./mcp/gateway-approval-route.js";
 import {
   handlePublicSales,
   isPublicSalesRequest,
@@ -204,6 +205,10 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
   }
   if (req.url?.startsWith("/internal/mcp/auth/")) {
     void handleMcpAuth(req, res, sb, config.mcpServiceSecret);
+    return;
+  }
+  if (req.url?.startsWith("/internal/mcp/gateway-approval/")) {
+    void handleMcpGatewayApproval(req, res, sb, config.mcpServiceSecret);
     return;
   }
 

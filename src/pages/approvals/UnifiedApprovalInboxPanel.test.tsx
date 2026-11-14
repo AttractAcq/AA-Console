@@ -617,6 +617,28 @@ const readyClientAuthorityAssignment = {
     effect: "change_client_approval_seat" },
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
 };
+const gatewayApprovalId = "54545454-5454-4454-8454-545454545454";
+const gatewayToken = "55555555-5555-4555-8555-555555555555";
+const gatewayHash = "4".repeat(64);
+const readyGatewayTool = {
+  ...request, id: "gateway-tool-inbox-1", source_system: "aa_console",
+  source_kind: "gateway_tool", source_id: gatewayApprovalId,
+  source_version: `${gatewayHash}:${gatewayToken}`, artifact_hash: gatewayHash,
+  title: "Gateway tool: workflow.create_approval", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "gateway:bot_production:workflow.create_approval", account_ref: null,
+  budget: null, owner_role: "admin",
+  preview: { gateway_approval_id: gatewayApprovalId, client_id: "client-1",
+    bot_id: "bot_production", token_id: "token-1", tool: "workflow.create_approval",
+    risk: "MEDIUM", summary: "Review production plan", structured_payload: { client_id: "client-1" },
+    payload_hash: "a".repeat(64), request_token: gatewayToken,
+    consequence: "Informational gateway ticket only; no AA action" },
+  scope: { client_id: "client-1", gateway_approval_id: gatewayApprovalId,
+    bot_id: "bot_production", token_id: "token-1", tool: "workflow.create_approval",
+    payload_hash: "a".repeat(64), content_hash: gatewayHash, request_token: gatewayToken,
+    effect: "allow_one_gateway_tool_execution" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
 
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
@@ -1252,6 +1274,25 @@ describe("unified approval inbox", () => {
       destination: "client:approval_seat:client-1:member-2" }];
     show();
     const card = await screen.findByRole("article", { name: readyClientAuthorityAssignment.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("decides an exact gateway tool only through its canonical Inbox card", async () => {
+    requests = [readyGatewayTool];
+    show();
+    const card = await screen.findByRole("article", { name: readyGatewayTool.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_gateway_tool_review_v6", {
+      p_approval_id: gatewayApprovalId, p_request_id: readyGatewayTool.id,
+      p_approved: true,
+    }));
+  });
+
+  it("holds a gateway card whose destination tool changed", async () => {
+    requests = [{ ...readyGatewayTool,
+      destination: "gateway:bot_production:workflow.create_task" }];
+    show();
+    const card = await screen.findByRole("article", { name: readyGatewayTool.title });
     expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
   });
 

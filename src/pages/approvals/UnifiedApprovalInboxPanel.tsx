@@ -11,7 +11,7 @@ import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "activation_switch", "campaign_action", "campaign_idea", "client_authority_assignment", "client_sales_entitlement", "creative_requirement", "engine_slot",
-  "global_engine_activation", "global_video_owner", "google_profile_change", "google_review_reply", "integration_grant", "lead_magnet", "message_template", "meta_profile_change", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
+  "gateway_tool", "global_engine_activation", "global_video_owner", "google_profile_change", "google_review_reply", "integration_grant", "lead_magnet", "message_template", "meta_profile_change", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -892,6 +892,34 @@ function isClientAuthorityAssignmentReady(request: UnifiedApprovalRequest, clien
     && request.owner_role === "admin";
 }
 
+function isGatewayToolReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "gateway_tool"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const hash = request.artifact_hash;
+  return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
+    && request.source_version === `${hash}:${preview.request_token}`
+    && request.source_id === preview.gateway_approval_id
+    && preview.client_id === clientId
+    && typeof preview.bot_id === "string" && /^bot_[a-z0-9_]+$/.test(preview.bot_id)
+    && typeof preview.tool === "string" && /^[a-z0-9_]+(\.[a-z0-9_]+)+$/.test(preview.tool)
+    && typeof preview.token_id === "string" && !!preview.token_id
+    && typeof preview.payload_hash === "string" && /^[0-9a-f]{64}$/.test(preview.payload_hash)
+    && !!preview.structured_payload && typeof preview.structured_payload === "object"
+    && !Array.isArray(preview.structured_payload)
+    && scope.client_id === clientId && scope.gateway_approval_id === request.source_id
+    && scope.bot_id === preview.bot_id && scope.token_id === preview.token_id
+    && scope.tool === preview.tool && scope.payload_hash === preview.payload_hash
+    && scope.content_hash === hash && scope.request_token === preview.request_token
+    && scope.effect === "allow_one_gateway_tool_execution"
+    && request.destination === `gateway:${preview.bot_id}:${preview.tool}`
+    && request.owner_role === "admin";
+}
+
 function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   if (request.source_system !== "aa_console" || request.source_kind !== "engine_slot"
     || request.client_id !== clientId || request.status !== "pending"
@@ -956,6 +984,7 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isIntegrationGrantReady(request, clientId)
     || isCreativeRequirementReady(request, clientId)
     || isClientAuthorityAssignmentReady(request, clientId)
+    || isGatewayToolReady(request, clientId)
     || isGlobalEngineActivationReady(request)
     || isGlobalVideoOwnerReady(request);
 }
@@ -987,6 +1016,7 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isIntegrationGrantReady(request, clientId)
     || isCreativeRequirementReady(request, clientId)
     || isClientAuthorityAssignmentReady(request, clientId)
+    || isGatewayToolReady(request, clientId)
     || isGlobalEngineActivationReady(request)
     || isGlobalVideoOwnerReady(request);
 }
@@ -1096,7 +1126,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
                     ? "System Engine activation" : request.source_kind === "global_video_owner"
                       ? "Global video owner" : request.source_kind === "creative_requirement"
                       ? "Creative authority" : request.source_kind === "client_authority_assignment"
-                      ? "Client approval seat" : request.source_kind === "integration_grant"
+                      ? "Client approval seat" : request.source_kind === "gateway_tool"
+                      ? "Gateway tool" : request.source_kind === "integration_grant"
                       ? "Integration access" : request.source_kind === "activation_switch"
                       ? "Automation activation" : request.source_kind === "campaign_idea"
                       ? "Idea selection" : request.source_kind === "motion_render"
@@ -1588,6 +1619,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         : request.source_kind === "client_authority_assignment"
           ? await supabase.rpc("decide_client_authority_assignment_v6", {
               p_review_id: request.source_id, p_request_id: request.id,
+              p_approved: decision === "approved",
+              ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+            })
+        : request.source_kind === "gateway_tool"
+          ? await supabase.rpc("decide_gateway_tool_review_v6", {
+              p_approval_id: request.source_id, p_request_id: request.id,
               p_approved: decision === "approved",
               ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
             })

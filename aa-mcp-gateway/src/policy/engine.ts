@@ -5,6 +5,7 @@ import { allowed } from "./permissions.js";
 import { Store } from "../audit/store.js";
 import { WorkflowService } from "../domains/workflow/service.js";
 import { ContentService } from "../domains/content/service.js";
+import type { CanonicalApprovalBridge } from "../approvals/canonical-bridge.js";
 const canonical = (v: any): string =>
   JSON.stringify(
     v && typeof v === "object" && !Array.isArray(v)
@@ -29,6 +30,7 @@ export class ActionEngine {
     readonly tools: Tool[],
     private adapter: Adapter,
     readonly discoverStubs = false,
+    readonly approvalBridge?: CanonicalApprovalBridge,
   ) {}
   discover(identity: Identity) {
     return this.tools.filter(
@@ -215,6 +217,44 @@ export class ActionEngine {
             request_id,
             message: "Idempotency key conflicts with prior input.",
           });
+        if (this.approvalBridge && !approvedId && existing.result) {
+          const prior = JSON.parse(String(existing.result)) as Result;
+          const held = prior.approval_id
+            ? this.store.getApproval(prior.approval_id) : undefined;
+          if (prior.status === "approval_required" && held?.status === "pending"
+            && held.requested_by_bot === identity.bot && held.tool === name
+            && held.request_token_id === approvalTokenId
+            && canonical(held.structured_payload) === canonical(input)) {
+            receiptKey = key;
+            executionId = createHash("sha256").update(key).digest("hex");
+            return finish({ ...prior, request_id });
+          }
+          if (prior.status === "indeterminate" && held?.status === "registration_pending"
+            && held.requested_by_bot === identity.bot && held.tool === name
+            && canonical(held.structured_payload) === canonical(input)) {
+            receiptKey = key;
+            executionId = createHash("sha256").update(key).digest("hex");
+            if (!approvalTokenId || held.request_token_id !== approvalTokenId)
+              return finish({ status: "rejected", capability: name, request_id,
+                message: "Bot token changed; start a new approval request." });
+            try {
+              const registered = await this.approvalBridge.register({
+                approval_id: held.approval_id, client_id: String(input.client_id),
+                bot_id: identity.bot, token_id: approvalTokenId,
+                tool: name, risk: held.risk_level, summary: String(held.summary),
+                payload: input, expires_at: held.expires_at,
+              });
+              held.canonical_request_id = registered.canonical_request_id;
+              held.canonical_payload_hash = registered.payload_hash;
+              held.status = "pending";
+              this.store.approval(held);
+              return finish({ status: "approval_required", capability: name,
+                request_id, approval_id: held.approval_id });
+            } catch {
+              return finish({ ...prior, request_id });
+            }
+          }
+        }
         if (
           tool.domain !== "admin" &&
           tool.domain !== "engineering" &&
@@ -275,6 +315,7 @@ export class ActionEngine {
           approved.requested_by_bot !== identity.bot ||
           (approved.request_token_id ?? null) !== (approvalTokenId ?? null) ||
           approved.tool !== name ||
+          approved.risk_level !== tool.risk ||
           canonical(approved.structured_payload) !== canonical(input) ||
           Date.parse(approved.expires_at) <= Date.now())
       )
@@ -284,9 +325,23 @@ export class ActionEngine {
           request_id,
           message: "Approval is invalid or expired.",
         });
+      if (approvedId && this.approvalBridge) {
+        try {
+          if (!approved.canonical_request_id || !approvalTokenId
+            || !approved.canonical_payload_hash
+            || !await this.approvalBridge.attest(approvedId, approvalTokenId,
+              approved.canonical_payload_hash, approved.canonical_request_id)) {
+            return finish({ status: "rejected", capability: name, request_id,
+              message: "Current canonical approval is required." });
+          }
+        } catch {
+          return finish({ status: "indeterminate", capability: name, request_id,
+            message: "Canonical approval could not be attested; no action executed." });
+        }
+      }
       if (!approved) {
         const approval_id = randomUUID();
-        this.store.approval({
+        const approval = {
           approval_id,
           requested_by_bot: identity.bot,
           request_token_id: approvalTokenId ?? null,
@@ -305,7 +360,28 @@ export class ActionEngine {
           approved_at: null,
           rejection_reason: null,
           execution_status: "not_started",
-        });
+        };
+        if (this.approvalBridge) {
+          if (!approvalTokenId) return finish({ status: "rejected", capability: name, request_id,
+            message: "A current AA bot token is required for canonical approval." });
+          try {
+            const canonical = await this.approvalBridge.register({
+              approval_id, client_id: String(input.client_id), bot_id: identity.bot,
+              token_id: approvalTokenId, tool: name, risk: tool.risk,
+              summary: String(approval.summary), payload: input,
+              expires_at: approval.expires_at,
+            });
+            Object.assign(approval, { canonical_request_id: canonical.canonical_request_id,
+              canonical_payload_hash: canonical.payload_hash });
+          } catch {
+            approval.status = "registration_pending";
+            this.store.approval(approval);
+            return finish({ status: "indeterminate", capability: name, request_id,
+              approval_id,
+              message: "Canonical registration is uncertain; retry this exact tool request to reconcile it." });
+          }
+        }
+        this.store.approval(approval);
         return finish({
           status: "approval_required",
           capability: name,
@@ -354,6 +430,7 @@ export class ActionEngine {
     decision: "approved" | "rejected",
     reason?: string,
   ) {
+    if (this.approvalBridge) throw new Error("canonical_decision_required");
     return this.store.transaction(() => {
       const a = this.store.getApproval(id);
       if (!a || a.status !== "pending") throw new Error("invalid_transition");
@@ -385,32 +462,67 @@ export class ActionEngine {
     id: string,
     identities: Identity[],
     approvalTokenId?: string,
-  ) {
+  ): Promise<Result> {
     const a = this.store.getApproval(id);
     const identity = identities.find((i) => i.bot === a?.requested_by_bot);
     const tool = this.tools.find((t) => t.name === a?.tool);
     if (
       !a ||
-      a.status !== "approved" ||
+      (this.approvalBridge ? !["pending", "approved"].includes(a.status) : a.status !== "approved") ||
       a.execution_status !== "not_started" ||
       !identity ||
       (a.request_token_id ?? null) !== (approvalTokenId ?? null) ||
       !tool ||
+      a.risk_level !== tool.risk ||
       !allowed(identity, tool) ||
       !identity.clients.includes(String(a.client_id))
     )
       throw new Error("invalid_transition");
+    if (this.approvalBridge) {
+      if (!approvalTokenId || !a.canonical_request_id || !a.canonical_payload_hash
+        || !await this.approvalBridge.attest(id, approvalTokenId, a.canonical_payload_hash,
+          a.canonical_request_id))
+        throw new Error("canonical_decision_required");
+      const executionKey = randomUUID();
+      if (!await this.approvalBridge.claim(id, approvalTokenId,
+        a.canonical_payload_hash, executionKey))
+        throw new Error("canonical_execution_claimed");
+      a.canonical_execution_key = executionKey;
+      a.status = "approved";
+      a.approved_by = "canonical_inbox";
+      a.approved_at = new Date().toISOString();
+      this.store.approval(a);
+    }
     // Synchronous reservation prevents concurrent reviewers from executing the same action.
     a.execution_status = "executing";
     this.store.approval(a);
-    const result = await this.call(
-      identity,
-      a.tool,
-      a.structured_payload,
-      randomUUID(),
-      id,
-      approvalTokenId,
-    );
+    let result: Result;
+    try {
+      result = await this.call(
+        identity,
+        a.tool,
+        a.structured_payload,
+        randomUUID(),
+        id,
+        approvalTokenId,
+      );
+    } catch {
+      result = { status: "indeterminate", capability: a.tool, request_id: randomUUID(),
+        message: "Gateway execution outcome is unknown; reconcile before another action." };
+    }
+    if (this.approvalBridge) {
+      const resultHash = createHash("sha256").update(JSON.stringify(result)).digest("hex");
+      try {
+        await this.approvalBridge.finish(id, a.canonical_execution_key, result.status,
+          resultHash);
+      } catch {
+        a.execution_status = "indeterminate";
+        a.status = "failed";
+        this.store.approval(a);
+        return { status: "indeterminate", capability: a.tool, request_id: result.request_id,
+          message: "Canonical outcome recording failed; reconcile before another action." };
+      }
+    }
     a.execution_status = result.status;
     a.status = ["completed", "accepted"].includes(result.status)
       ? "executed"

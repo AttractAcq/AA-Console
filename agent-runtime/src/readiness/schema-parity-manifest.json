@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "331f33dc3a2b897b6a5dadeac79df2a51acff9c5694ad287ac61a275dbb7b0b2",
-  "generatedTypesSha256": "9802e6d573c1e0ba05f118a62fd1df03021ca6fcb855d450cc007dbc6308c6ef",
-  "generatedSchemaBodySha256": "4dafaa2c939bf4c86d0892e8864d4f95462b42ad8ad20c3246cdcb74f54fe22d",
+  "migrationSourceDigest": "332faa75c32230f0a47e227f69f4e6c7fc02a3ad7eda32d18e0576f148a0abb0",
+  "generatedTypesSha256": "e0da133e37cbe8ed0dad10584a26b656c06145320ac9f27c13667deeb78f6275",
+  "generatedSchemaBodySha256": "a712652bf7436800bea6bbf3350ad357da0bed82f96780b7706b8bfd81e2136d",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3244,6 +3244,41 @@
       "filename": "20261119100000_446_client_authority_assignment_coverage.sql",
       "sha256": "be0dd63cdef053498840b9c61323e76a1393dff819dca9497a8079607aa3c8ba",
       "trimmedMd5": "7967dca6bd6f8aa1bd9eb731df5754d7"
+    },
+    {
+      "version": "20261119110000",
+      "name": "447_gateway_tool_review_source",
+      "filename": "20261119110000_447_gateway_tool_review_source.sql",
+      "sha256": "8871914f518719731840352ca5207d43bc28294f07414a752861c14bc8544ed0",
+      "trimmedMd5": "e413f7c202d34fcbcfe4d164cde6518e"
+    },
+    {
+      "version": "20261119120000",
+      "name": "448_gateway_tool_inbox_view",
+      "filename": "20261119120000_448_gateway_tool_inbox_view.sql",
+      "sha256": "33d4bd66f7302107191d95a7315c49625a1a95208c46987f72b954e1a49e230e",
+      "trimmedMd5": "94cd808a06814da7896e39533fd1531e"
+    },
+    {
+      "version": "20261119130000",
+      "name": "449_gateway_tool_coverage",
+      "filename": "20261119130000_449_gateway_tool_coverage.sql",
+      "sha256": "06813ac77a20021ea0089f35dfe4747497575ecdec672b5b3b9e692e54b232a2",
+      "trimmedMd5": "5b24977316e39b0ee38097d974d8f71e"
+    },
+    {
+      "version": "20261119140000",
+      "name": "450_gateway_execution_receipts",
+      "filename": "20261119140000_450_gateway_execution_receipts.sql",
+      "sha256": "ec3ba94a16d68c47958985c01835d51ee1769ec08e1559870c81b3452a8b21ea",
+      "trimmedMd5": "9f8fdea6e676b6a087a0eee25d92f003"
+    },
+    {
+      "version": "20261119150000",
+      "name": "451_gateway_receipt_coverage",
+      "filename": "20261119150000_451_gateway_receipt_coverage.sql",
+      "sha256": "e8a3fd824a96eee0960651cbea40bc89e6df20069e863b2521be831206182921",
+      "trimmedMd5": "b58c7709cccbfcf76d731f01c10fdeb5"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
