@@ -241,6 +241,11 @@ test("safe read, safe write, pending approval and activity are real control acti
   });
   assert.equal(list.status, "completed");
   assert.equal((list.data!.approvals as any[]).length, 1);
+  engine.decide(r.approval_id!, "human_alex", "approved");
+  const informational = await engine.executeApproval(r.approval_id!, [identity]);
+  assert.equal(informational.status, "completed");
+  assert.equal(informational.data?.decision, "informational_only");
+  assert.equal(informational.data?.execution, "no_downstream_action");
   assert.equal(
     (
       await engine.call(identity, "workflow.get_activity", {
