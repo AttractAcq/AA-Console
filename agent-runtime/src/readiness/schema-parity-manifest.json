@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "cf0ae8bd1545e4826bfffddb08a790e26eb5f15b5e3f1901c0684b31f5349cde",
-  "generatedTypesSha256": "3bd057fe00973b391579a858ea49c74d6b1fd9d3fbc32b686046484d11bd4169",
-  "generatedSchemaBodySha256": "497fb980d812a28147cb96c4f6f8d4480803bb9d7b07788021ef3784fb63dc24",
+  "migrationSourceDigest": "56f9077fa63c05a80de7f314c5f96171c27083bf74c7c6af334cc7ed97048c80",
+  "generatedTypesSha256": "a8c6dc8710514f9a11f952c568641c310a0d19cfde71163674efc7a2df6df3a9",
+  "generatedSchemaBodySha256": "61254a98f29d3bec1af473f2319b75673a9e11b29c923c2a37c3d61f64ffb9ce",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3202,6 +3202,27 @@
       "filename": "20261119040000_440_creative_authority_coverage.sql",
       "sha256": "624b29f8e91ad44aaf3319cc9057e30bd23bc7e41cd0729715205a4a25a2b4f1",
       "trimmedMd5": "9ac434feda21899b801d72dc3d0aa8d9"
+    },
+    {
+      "version": "20261119050000",
+      "name": "441_global_video_owner_review",
+      "filename": "20261119050000_441_global_video_owner_review.sql",
+      "sha256": "9bb53d7cb5bb24aca6e56728de40c48a20c1419ae5e16cd1c47aab914913010a",
+      "trimmedMd5": "dcd3c0c5d746042e7c46b43d785c20a7"
+    },
+    {
+      "version": "20261119060000",
+      "name": "442_global_video_owner_inbox_view",
+      "filename": "20261119060000_442_global_video_owner_inbox_view.sql",
+      "sha256": "66bc0ba90a316ca1ed14c5302e508b1f5f35165366cf92f2f846c9d4fcdde3a8",
+      "trimmedMd5": "8a5299376b5533ab3a16e2fba39416d7"
+    },
+    {
+      "version": "20261119070000",
+      "name": "443_global_owner_coverage",
+      "filename": "20261119070000_443_global_owner_coverage.sql",
+      "sha256": "7d19f927d5407f75705beaf16436badcc0787169e88b7c52f4f1bc2619fc9241",
+      "trimmedMd5": "7cf1c46b19a39caff24aac1b35db6f74"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

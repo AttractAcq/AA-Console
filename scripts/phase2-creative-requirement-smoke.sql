@@ -77,8 +77,8 @@ begin
  insert into public.team_members(id,user_id,category,name,initials)
  values('ffffffff-ffff-4fff-8fff-ffffffffffff',
   'cccccccc-cccc-4ccc-8ccc-cccccccccccc','creative_director','Second director','SD');
- insert into public.client_assignments(member_id,client_id)
- values('ffffffff-ffff-4fff-8fff-ffffffffffff',cid);
+ insert into public.client_assignments(member_id,client_id,created_at)
+ values('ffffffff-ffff-4fff-8fff-ffffffffffff',cid,now()+interval '1 second');
  update public.profiles set role='admin' where id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
  perform set_config('request.jwt.claim.sub','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',true);
  perform set_config('request.jwt.claims',

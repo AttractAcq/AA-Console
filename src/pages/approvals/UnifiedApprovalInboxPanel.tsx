@@ -11,7 +11,7 @@ import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "activation_switch", "campaign_action", "campaign_idea", "client_sales_entitlement", "creative_requirement", "engine_slot",
-  "global_engine_activation", "google_profile_change", "google_review_reply", "integration_grant", "lead_magnet", "message_template", "meta_profile_change", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
+  "global_engine_activation", "global_video_owner", "google_profile_change", "google_review_reply", "integration_grant", "lead_magnet", "message_template", "meta_profile_change", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -91,7 +91,7 @@ function clientSourcePath(path: string | null, clientId: string): string | null 
 }
 
 function sourcePathForRequest(request: UnifiedApprovalRequest, clientId: string): string | null {
-  if (request.source_system === "aa_console" && request.source_kind === "global_engine_activation"
+  if (request.source_system === "aa_console" && ["global_engine_activation", "global_video_owner"].includes(request.source_kind)
     && request.client_id === null && request.owner_role === "admin"
     && request.owning_path === "/approvals") return "/approvals";
   if (request.client_id !== clientId) return null;
@@ -789,6 +789,28 @@ function isGlobalEngineActivationReady(request: UnifiedApprovalRequest): boolean
     && request.destination === "system:content_engine" && request.owner_role === "admin";
 }
 
+function isGlobalVideoOwnerReady(request: UnifiedApprovalRequest): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "global_video_owner"
+    || request.client_id !== null || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const hash = request.artifact_hash;
+  return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
+    && request.source_version === `${hash}:${preview.request_token}`
+    && preview.action === "assign_global_video_approval_owner"
+    && typeof preview.proposed_owner === "string" && !!preview.proposed_owner
+    && preview.proposed_owner_role === "admin"
+    && preview.current_owner !== preview.proposed_owner
+    && scope.review_id === request.source_id && scope.request_token === preview.request_token
+    && scope.content_hash === hash && scope.proposed_owner === preview.proposed_owner
+    && scope.effect === "change_global_video_approval_owner"
+    && request.destination === "agency:video_approval_owner"
+    && request.owner_role === "admin" && request.owning_path === "/approvals";
+}
+
 function isIntegrationGrantReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   if (request.source_system !== "aa_console" || request.source_kind !== "integration_grant"
     || request.client_id !== clientId || request.status !== "pending"
@@ -908,7 +930,8 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isClientSwitchActivationReady(request, clientId)
     || isIntegrationGrantReady(request, clientId)
     || isCreativeRequirementReady(request, clientId)
-    || isGlobalEngineActivationReady(request);
+    || isGlobalEngineActivationReady(request)
+    || isGlobalVideoOwnerReady(request);
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
@@ -937,7 +960,8 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isClientSwitchActivationReady(request, clientId)
     || isIntegrationGrantReady(request, clientId)
     || isCreativeRequirementReady(request, clientId)
-    || isGlobalEngineActivationReady(request);
+    || isGlobalEngineActivationReady(request)
+    || isGlobalVideoOwnerReady(request);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
@@ -1042,7 +1066,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
                 ? "Market opportunity" : request.source_kind === "proof_rights"
                   ? "Proof usage rights" : request.source_kind === "proof_placement"
                     ? "Proof placement" : request.source_kind === "global_engine_activation"
-                    ? "System Engine activation" : request.source_kind === "creative_requirement"
+                    ? "System Engine activation" : request.source_kind === "global_video_owner"
+                      ? "Global video owner" : request.source_kind === "creative_requirement"
                       ? "Creative authority" : request.source_kind === "integration_grant"
                       ? "Integration access" : request.source_kind === "activation_switch"
                       ? "Automation activation" : request.source_kind === "campaign_idea"
@@ -1354,7 +1379,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) {
     const targetClientId = multiClient ? request.client_id : clientId;
     const agencyWide = multiClient && !manager && request.client_id === null
-      && request.source_kind === "global_engine_activation";
+      && ["global_engine_activation", "global_video_owner"].includes(request.source_kind);
     const scopeId = targetClientId ?? "";
     if ((!targetClientId && !agencyWide)
       || (manager && request.source_kind === "client_sales_entitlement")
@@ -1510,6 +1535,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             })
         : request.source_kind === "global_engine_activation"
           ? await supabase.rpc("decide_global_engine_activation_v6", {
+              p_review_id: request.source_id, p_request_id: request.id,
+              p_approved: decision === "approved",
+              ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+            })
+        : request.source_kind === "global_video_owner"
+          ? await supabase.rpc("decide_global_video_owner_v6", {
               p_review_id: request.source_id, p_request_id: request.id,
               p_approved: decision === "approved",
               ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),

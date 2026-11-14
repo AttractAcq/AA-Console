@@ -11847,6 +11847,64 @@ export type Database = {
           },
         ]
       }
+      global_video_owner_reviews_v6: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          created_at: string
+          id: string
+          proposed_owner: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          created_at?: string
+          id?: string
+          proposed_owner: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          created_at?: string
+          id?: string
+          proposed_owner?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "global_video_owner_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "global_video_owner_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "global_video_owner_reviews_v6_proposed_owner_fkey"
+            columns: ["proposed_owner"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_ads_build_sheets: {
         Row: {
           campaign_id: string
@@ -32084,6 +32142,15 @@ export type Database = {
         }
         Returns: string
       }
+      decide_global_video_owner_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decide_google_profile_inbox_v6: {
         Args: {
           p_approved: boolean
@@ -32785,6 +32852,28 @@ export type Database = {
         Returns: Json
       }
       global_engine_activation_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      global_video_owner_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["global_video_owner_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      global_video_owner_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["global_video_owner_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      global_video_owner_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["global_video_owner_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      global_video_owner_source_state_v6: {
         Args: { p_request_id: string }
         Returns: string
       }
@@ -35130,6 +35219,10 @@ export type Database = {
         Returns: string
       }
       request_global_engine_activation_v6: { Args: never; Returns: string }
+      request_global_video_owner_v6: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
       request_google_profile_review_v6: {
         Args: { p_change_id: string }
         Returns: string

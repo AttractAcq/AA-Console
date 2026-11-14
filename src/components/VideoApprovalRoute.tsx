@@ -31,6 +31,7 @@ export function VideoApprovalRoute({ clientId, assetId, onFinalApprove }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reviewRequested, setReviewRequested] = useState(false);
+  const [ownerReviewRequested, setOwnerReviewRequested] = useState(false);
 
   const refresh = useCallback(async () => {
     const result = await supabase.rpc("video_approval_state", { p_asset_id: assetId });
@@ -74,13 +75,14 @@ export function VideoApprovalRoute({ clientId, assetId, onFinalApprove }: {
       return;
     }
     const result = action.kind === "owner"
-      ? await supabase.rpc("set_content_approval_owner", { p_user_id: action.userId })
+      ? await supabase.rpc("request_global_video_owner_v6", { p_user_id: action.userId })
       : await supabase.rpc("request_video_client_approval", {
           p_asset_id: assetId, p_client_user_id: action.userId,
         });
     const failure = result.error;
     setBusy(false);
     if (failure) { setError(failure.message); return; }
+    if (action.kind === "owner") setOwnerReviewRequested(true);
     await refresh();
   }
 
@@ -103,6 +105,9 @@ export function VideoApprovalRoute({ clientId, assetId, onFinalApprove }: {
       Exact rendered-video review requested. <Link className="underline"
         to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>Open Unified Inbox</Link>
     </p>}
+    {ownerReviewRequested && <p role="status" className="text-primary">
+      Global video owner change requested. The current owner remains in place until another AAL2 admin decides it in the <Link className="underline" to="/approvals">agency Approval Inbox</Link>.
+    </p>}
     {notification?.status && <p className="text-muted-foreground">
       Client email: {notification.status === "skipped" ? "request is in their dashboard; email not sent"
         : notification.status === "failed" ? "delivery failed"
@@ -117,7 +122,7 @@ export function VideoApprovalRoute({ clientId, assetId, onFinalApprove }: {
       </select>
       <button type="button" disabled={busy || !ownerChoice || ownerChoice === state.owner_user_id}
         onClick={() => void act({ kind: "owner", userId: ownerChoice })}
-        className="rounded border border-border px-2 py-1 disabled:opacity-50">Save owner</button>
+        className="rounded border border-border px-2 py-1 disabled:opacity-50">Request owner change</button>
     </div>}
     <div className="flex flex-wrap gap-2">
       {current === state.owner_user_id && !state.owner_approved && <button type="button" disabled={busy}

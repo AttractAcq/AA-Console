@@ -17,8 +17,12 @@ insert into public.team_members(id,user_id,category,name,initials)
 values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','smm','Fixture SMM','FS');
 insert into public.client_assignments(member_id,client_id)
 values ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+-- This fixture exercises video seats, not owner governance. Seed its prior
+-- owner as legacy state; the separate owner fixture tests the new guard.
+alter table public.content_approval_settings disable trigger global_video_owner_guard_v6;
 insert into public.content_approval_settings(singleton,owner_user_id)
 values (true,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+alter table public.content_approval_settings enable trigger global_video_owner_guard_v6;
 insert into public.client_media_assets(id,client_id,media_type,title,storage_path,
  render_path,content_format,usage_rights)
 values ('ffffffff-ffff-4fff-8fff-ffffffffffff','dddddddd-dddd-4ddd-8ddd-dddddddddddd',

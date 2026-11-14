@@ -33,7 +33,7 @@ it("requires the assigned owner sign-off before final approval appears", async (
   expect(requestVideoSeatReview).toHaveBeenCalledWith("client-1", "video-1", "owner");
 });
 
-it("lets an admin change the configured owner account", async () => {
+it("requests a separate agency review before changing the owner account", async () => {
   rpc.mockImplementation((name: string) => Promise.resolve(name === "video_approval_state"
     ? { data: { owner_user_id: "old", manager_user_id: "smm", client_user_id: null,
       owner_approved: false, manager_approved: false, client_approved: false,
@@ -49,8 +49,9 @@ it("lets an admin change the configured owner account", async () => {
   render(<MemoryRouter><VideoApprovalRoute clientId="client-1" assetId="video-1"
     onFinalApprove={vi.fn()} /></MemoryRouter>);
   await userEvent.setup().selectOptions(await screen.findByRole("combobox", { name: "Owner account" }), "new");
-  await userEvent.setup().click(screen.getByRole("button", { name: "Save owner" }));
-  expect(rpc).toHaveBeenCalledWith("set_content_approval_owner", { p_user_id: "new" });
+  await userEvent.setup().click(screen.getByRole("button", { name: "Request owner change" }));
+  expect(rpc).toHaveBeenCalledWith("request_global_video_owner_v6", { p_user_id: "new" });
+  expect(screen.getByRole("status")).toHaveTextContent("current owner remains in place");
 });
 
 it("shows the SMM when the client request is in-app but email was skipped", async () => {

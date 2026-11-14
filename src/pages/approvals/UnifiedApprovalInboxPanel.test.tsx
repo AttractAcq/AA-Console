@@ -538,6 +538,23 @@ const readyGlobalEngineActivation = {
     request_token: globalToken, content_hash: globalHash,
     client_scope: "all individually enabled clients until manually disabled" },
 };
+const globalOwnerReviewId = "50505050-5050-4050-8050-505050505050";
+const globalOwnerToken = "51515151-5151-4151-8151-515151515151";
+const globalOwnerHash = "2".repeat(64);
+const readyGlobalVideoOwner = {
+  ...request, id: "global-owner-inbox-1", client_id: null,
+  source_system: "aa_console", source_kind: "global_video_owner",
+  source_id: globalOwnerReviewId, source_version: `${globalOwnerHash}:${globalOwnerToken}`,
+  artifact_hash: globalOwnerHash, title: "Assign global video approval owner",
+  status: "pending", source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  preview_blocker: null, destination: "agency:video_approval_owner", account_ref: null,
+  budget: null, owner_role: "admin", owning_path: "/approvals",
+  preview: { action: "assign_global_video_approval_owner", request_token: globalOwnerToken,
+    current_owner: "admin-old", proposed_owner: "admin-new", proposed_owner_role: "admin" },
+  scope: { effect: "change_global_video_approval_owner", review_id: globalOwnerReviewId,
+    request_token: globalOwnerToken, content_hash: globalOwnerHash,
+    proposed_owner: "admin-new" },
+};
 
 const integrationReviewId = "45454545-4545-4545-8545-454545454545";
 const integrationId = "46464646-4646-4646-8646-464646464646";
@@ -1153,6 +1170,18 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_global_engine_activation_v6", {
       p_review_id: globalReviewId, p_request_id: readyGlobalEngineActivation.id,
+      p_approved: true,
+    }));
+    expect(clientEqValues).toEqual([]);
+  });
+
+  it("decides an agency-wide video owner card without inventing a client ID", async () => {
+    requests = [readyGlobalVideoOwner];
+    show("global");
+    const card = await screen.findByRole("article", { name: readyGlobalVideoOwner.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_global_video_owner_v6", {
+      p_review_id: globalOwnerReviewId, p_request_id: readyGlobalVideoOwner.id,
       p_approved: true,
     }));
     expect(clientEqValues).toEqual([]);
