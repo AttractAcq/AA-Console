@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "2db0bd650a0c625b98b25c0895c6f0803430c8b014ff252939139378d6804c2c",
-  "generatedTypesSha256": "40ff319c794377b0968a53328b26016cf2e1477754711e5573305d43901ab516",
-  "generatedSchemaBodySha256": "3cae640dbe8708ea5fa1840d6563c6618f81f8417bdb720510284808dca9e707",
+  "migrationSourceDigest": "bf03496d43b853c77906bb7cc617c3152d6159fd50db1e4a3b0247bbfd59b0e6",
+  "generatedTypesSha256": "dabf4442c0ecd6335c128962bceba389870f0f9bd161557fb218f925f1b4a45c",
+  "generatedSchemaBodySha256": "29bc445a12bc8be7345697aef47ee5bc9cb5e45681328caa06f5677e2c153e6f",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3307,6 +3307,13 @@
       "filename": "20261119190000_455_recruitment_brief_production_gate.sql",
       "sha256": "cf74f3e87a7779d35e6cc9ce141413ccb63daa1c4082f4151a4af00306946d42",
       "trimmedMd5": "9e9ae846166a11d6b8795e012aa57ea4"
+    },
+    {
+      "version": "20261119200000",
+      "name": "456_google_reply_prewrite",
+      "filename": "20261119200000_456_google_reply_prewrite.sql",
+      "sha256": "91e05c717b889342d79a24df14b95a117a28f62c3be086af4defcfb7793d6f6d",
+      "trimmedMd5": "f3131572748d5d71fdf42d676daf9d12"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

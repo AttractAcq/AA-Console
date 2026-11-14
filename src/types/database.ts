@@ -5682,6 +5682,7 @@ export type Database = {
       client_google_locations: {
         Row: {
           address: string | null
+          approval_epoch_v6: number
           client_id: string
           created_at: string
           created_by: string | null
@@ -5699,6 +5700,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          approval_epoch_v6?: number
           client_id: string
           created_at?: string
           created_by?: string | null
@@ -5716,6 +5718,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          approval_epoch_v6?: number
           client_id?: string
           created_at?: string
           created_by?: string | null
@@ -12856,6 +12859,52 @@ export type Database = {
           },
         ]
       }
+      google_reply_context_bindings_v6: {
+        Row: {
+          approval_request_id: string
+          bound_at: string
+          location_epoch: number
+          reply_id: string
+          review_epoch: number
+        }
+        Insert: {
+          approval_request_id: string
+          bound_at?: string
+          location_epoch: number
+          reply_id: string
+          review_epoch: number
+        }
+        Update: {
+          approval_request_id?: string
+          bound_at?: string
+          location_epoch?: number
+          reply_id?: string
+          review_epoch?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_reply_context_bindings_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_context_bindings_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_context_bindings_v6_reply_id_fkey"
+            columns: ["reply_id"]
+            isOneToOne: true
+            referencedRelation: "google_review_replies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_review_replies: {
         Row: {
           approved_at: string | null
@@ -12992,6 +13041,7 @@ export type Database = {
       }
       google_reviews: {
         Row: {
+          approval_epoch_v6: number
           author_name: string | null
           captured_proof_id: string | null
           client_id: string
@@ -13007,6 +13057,7 @@ export type Database = {
           star_rating: number | null
         }
         Insert: {
+          approval_epoch_v6?: number
           author_name?: string | null
           captured_proof_id?: string | null
           client_id: string
@@ -13022,6 +13073,7 @@ export type Database = {
           star_rating?: number | null
         }
         Update: {
+          approval_epoch_v6?: number
           author_name?: string | null
           captured_proof_id?: string | null
           client_id?: string
@@ -33352,6 +33404,10 @@ export type Database = {
           p_reply: Database["public"]["Tables"]["google_review_replies"]["Row"]
         }
         Returns: Json
+      }
+      google_reply_prewrite_current_v6: {
+        Args: { p_reply_id: string }
+        Returns: boolean
       }
       has_client_sales_entitlement: {
         Args: { p_client_id: string }
