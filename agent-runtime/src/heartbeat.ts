@@ -9,10 +9,19 @@ import type { RuntimeConfig } from "./config.js";
 import { logger } from "./logging/logger.js";
 import { deployedCommitSha } from "./readiness/version.js";
 import { GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD } from "./campaigns/actions/preclaim-hold.js";
+import { HANDLERS } from "./campaigns/actions/executor.js";
+
+const ACTION_MODULES: Record<string, string> = {
+  proof_publish: "proof_distribution",
+  page_deploy: "website_studio",
+  lead_message: "sales_os",
+  budget_change: "meta_ads_studio",
+};
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
 export interface HeartbeatHandle {
+  workerId: string;
   stop: () => void;
 }
 
@@ -28,6 +37,9 @@ export function startHeartbeat(
 ): HeartbeatHandle {
   const workerId = makeHeartbeatWorkerId();
   const version = deployedCommitSha();
+  const handlers = Object.fromEntries(Object.keys(HANDLERS)
+    .map((key) => [key, ACTION_MODULES[key]])
+    .filter((entry): entry is [string, string] => typeof entry[1] === "string"));
 
   async function tick(): Promise<void> {
     try {
@@ -57,6 +69,7 @@ export function startHeartbeat(
             leadMagnetDelivery: config.leadMagnetDeliveryEnabled,
           },
           holds: { campaignActions: GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD },
+          handlers,
         },
       });
       if (error) logger.error("heartbeat_write_failed", { error: error.message });
@@ -70,5 +83,5 @@ export function startHeartbeat(
   void tick();
   const interval = setInterval(() => void tick(), HEARTBEAT_INTERVAL_MS);
   interval.unref();
-  return { stop: () => clearInterval(interval) };
+  return { workerId, stop: () => clearInterval(interval) };
 }
