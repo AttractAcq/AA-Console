@@ -93,8 +93,8 @@ begin
       for share;
     if v_request.id is null or v_request.expires_at is null
        or v_request.expires_at <= now() then continue; end if;
-    select status, preview_blocker, artifact_hash, destination, scope
-      into v_inbox from public.approval_inbox_v6 where id = v_request.id;
+    select i.status, i.preview_blocker, i.artifact_hash, i.destination, i.scope
+      into v_inbox from public.approval_inbox_v6 i where i.id = v_request.id;
     if v_inbox.status is distinct from 'approved'
        or v_inbox.preview_blocker is not null
        or v_inbox.artifact_hash is distinct from v_approval.artifact_version_hash
