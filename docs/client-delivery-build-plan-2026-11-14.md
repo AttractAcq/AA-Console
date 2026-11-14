@@ -2,7 +2,7 @@
 
 **Prepared:** 14 November 2026
 **Scope:** Every client Delivery page from Dashboard through Archive, plus the shared contracts that make those pages work together.
-**Basis:** Alex's 31 October operating notes, the 12 November read-only review, the 14 November gap inventory, and GitHub `main` at `a8a179c8d80ebf6bb8741f935bb5ec14809a27f6` (12 November). The local checkout used to save this plan is older than that commit and has an incomplete `.git/HEAD`; refresh it before implementation.
+**Basis:** Alex's 31 October operating notes, the 12 November read-only review, the 14 November gap inventory, and GitHub `main` at `a8a179c8d80ebf6bb8741f935bb5ec14809a27f6` (12 November). The original plan was saved from an older checkout; implementation now runs in a refreshed, isolated local worktree on `feat/client-delivery-phase2-controls`. Deployed identity still requires verification before release.
 **Evidence rule:** A rendered page, saved row, queued job, approval, external action, and measured outcome are different states. Mark each state complete only with its own evidence.
 
 ## Outcome and non-negotiable contracts
