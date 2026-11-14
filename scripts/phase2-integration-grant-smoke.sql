@@ -79,5 +79,16 @@ begin
   update public.client_integrations set ingest_enabled=true where id=integration_id;
   raise exception 'Old grant re-enabled ingest';
  exception when insufficient_privilege then null; end;
+ update public.client_integrations set meta_page_id='123456' where id=integration_id;
+ if (select status from public.client_integrations where id=integration_id)<>'pending_grant'
+  or (select ingest_enabled from public.client_integrations where id=integration_id)
+  or public.integration_secret(cid,'meta') is not null then
+  raise exception 'Changing the approved account scope kept credential use live'; end if;
+ request_id:=public.request_integration_grant_v6(integration_id,false);
+ select id into review_id from public.integration_grant_reviews_v6 where canonical_request_id=request_id;
+ perform public.decide_integration_grant_v6(review_id,request_id,true);
+ if public.integration_secret(cid,'meta')<>'fixture-secret'
+  or (select ingest_enabled from public.client_integrations where id=integration_id) then
+  raise exception 'New exact scope grant did not restore read-only access'; end if;
 end $checks$;
 rollback;

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "65f574f5c58cbde1c0b79a995711e4b33b0273499892c1b6135fd2d5ad1922d1",
+  "migrationSourceDigest": "0d0345ccaa4f5ad64b922cd1be3c92a264d927170602c17a8f5f19eb6620850a",
   "generatedTypesSha256": "1f55e86aede8dfbd0db032253d0b113e521e328bc8788bb07e9874ec2c946687",
   "generatedSchemaBodySha256": "02810860fc797e5ff5d511fb4db67c0e8c7a64849913226e7baec47662f32d39",
   "localMigrations": [
@@ -3167,6 +3167,20 @@
       "filename": "20261118230000_435_integration_grant_coverage.sql",
       "sha256": "0493d0012ed02da4681da500742ac6bed7a40196d40b7e493afba9e8d1906b0a",
       "trimmedMd5": "e01f39f46adb2cfd91d6fba6498789f4"
+    },
+    {
+      "version": "20261119000000",
+      "name": "436_integration_scope_change_revokes_grant",
+      "filename": "20261119000000_436_integration_scope_change_revokes_grant.sql",
+      "sha256": "8d9c7c7c7d2cbcfeb435acffa5a04ad0eb5dc725bb9c9b1083520766972466c3",
+      "trimmedMd5": "46f0d8c6f93a4fbb72b7450580a5852f"
+    },
+    {
+      "version": "20261119010000",
+      "name": "437_integration_scope_coverage",
+      "filename": "20261119010000_437_integration_scope_coverage.sql",
+      "sha256": "860a04399a9a3dbc38f3941c6d05fefd303cd209c89a481c06a099e465804949",
+      "trimmedMd5": "bed7a9d0943e0212b5bd75e3b73b9cea"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

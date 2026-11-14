@@ -461,7 +461,7 @@ export function IntegrationsPanel() {
           setAdSettings((prev) => prev === adSettings ? null : prev);
         }}
         title="Meta ad settings"
-        intro="What building ads in Meta needs beyond the credential. Ads are always built paused; launching happens in Ads Manager."
+        intro="What building ads in Meta needs beyond the credential. Changing the Page or Pixel pauses credential use until a new access review. Ads are built paused; launching happens in Ads Manager."
         fields={META_AD_FIELDS}
         initialValues={adSettingsValues}
         submitLabel="Save"
