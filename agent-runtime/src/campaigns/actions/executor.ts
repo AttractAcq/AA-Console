@@ -79,16 +79,21 @@ export type ActionHandler = (
   action: ClaimedAction,
 ) => Promise<ActionOutcome>;
 
-/** Refuse an outward effect if its exact approval or worker attestation changed after claim. */
-export async function assertActionPrewrite(
-  sb: SupabaseClient, config: RuntimeConfig, action: ClaimedAction,
-): Promise<void> {
+function ownedIdentity(config: RuntimeConfig): { workerId: string; buildSha: string } {
   const workerId = config.campaignActionWorkerId;
   const buildSha = deployedCommitSha();
   if (!config.campaignActionsEnabled || !config.campaignActionOwnedClaimEnabled
     || !workerId || !buildSha) {
     throw new ActionError("The campaign action worker is not attested for a prewrite check.");
   }
+  return { workerId, buildSha };
+}
+
+/** Refuse an outward effect if its exact approval or worker attestation changed after claim. */
+export async function assertActionPrewrite(
+  sb: SupabaseClient, config: RuntimeConfig, action: ClaimedAction,
+): Promise<void> {
+  const { workerId, buildSha } = ownedIdentity(config);
   const { error } = await sb.rpc("assert_campaign_action_prewrite_v6", {
     p_execution_id: action.execution_id,
     p_worker_id: workerId,
@@ -112,11 +117,14 @@ export async function assertActionPrewrite(
  * seeing rather than a quiet success with a zero in it.
  */
 export const releaseProofPlacements: ActionHandler = async (sb, config, action) => {
-  await assertActionPrewrite(sb, config, action);
-  const { data, error } = await sb.rpc("release_campaign_proof_placements", {
+  const { workerId, buildSha } = ownedIdentity(config);
+  const { data, error } = await sb.rpc("release_campaign_proof_placements_owned_v6", {
     p_execution_id: action.execution_id,
+    p_worker_id: workerId,
+    p_build_sha: buildSha,
   } as never);
-  if (error) throw new ActionError(`Could not release the placements: ${error.message}`, true);
+  if (error) throw new ActionError(`Could not release the placements: ${error.message}`,
+    error.code === "40001" || error.code === "40P01");
 
   const outcome = (data ?? {}) as { released?: number; skipped?: unknown[] };
   const released = Number(outcome.released ?? 0);
@@ -155,11 +163,14 @@ export const releaseProofPlacements: ActionHandler = async (sb, config, action) 
  * sweep runs then something changed and a person should see why.
  */
 export const enrolCampaignLeads: ActionHandler = async (sb, config, action) => {
-  await assertActionPrewrite(sb, config, action);
-  const { data, error } = await sb.rpc("enrol_campaign_leads_in_sequence_v6", {
+  const { workerId, buildSha } = ownedIdentity(config);
+  const { data, error } = await sb.rpc("enrol_campaign_leads_owned_v6", {
     p_execution_id: action.execution_id,
+    p_worker_id: workerId,
+    p_build_sha: buildSha,
   } as never);
-  if (error) throw new ActionError(`Could not enrol the leads: ${error.message}`, true);
+  if (error) throw new ActionError(`Could not enrol the leads: ${error.message}`,
+    error.code === "40001" || error.code === "40P01");
 
   const outcome = (data ?? {}) as {
     enrolled?: number; skipped?: unknown[]; sequence_name?: string;

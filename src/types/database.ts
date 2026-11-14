@@ -29062,6 +29062,14 @@ export type Database = {
         Args: { p_execution_id: string }
         Returns: Json
       }
+      enrol_campaign_leads_owned_v6: {
+        Args: {
+          p_build_sha: string
+          p_execution_id: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
       enroll_due_leads_v6: { Args: { p_limit?: number }; Returns: number }
       enroll_lead_in_sequence_v6: {
         Args: { p_lead_id: string; p_sequence_id: string }
@@ -30868,6 +30876,14 @@ export type Database = {
       }
       release_campaign_proof_placements: {
         Args: { p_execution_id: string }
+        Returns: Json
+      }
+      release_campaign_proof_placements_owned_v6: {
+        Args: {
+          p_build_sha: string
+          p_execution_id: string
+          p_worker_id: string
+        }
         Returns: Json
       }
       release_proof_to_sales_agent_v6: {

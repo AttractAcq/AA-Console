@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "71140b09459480e61dd30df9887f7bf48aa86756d653e0b5f40904a168799985",
-  "generatedTypesSha256": "e5781978e7553c5fc89a93cd0bec3e0a24fb36090c2eea30b2b175b5870171fa",
-  "generatedSchemaBodySha256": "43853abc20f345c03d5a56fa46208565ad68c8fba06d15b0e7abbaa00761b0f7",
+  "migrationSourceDigest": "3d3d60d3225cdc56fcf89c44b2a349700692033ba8c5cc2608f63e8207f15ce5",
+  "generatedTypesSha256": "8410ba277e726470add86f1151221912182fdd68e81d1ad166c7b41169267ecd",
+  "generatedSchemaBodySha256": "3efe8248ce1e717ff8bfb2d3cf7d586b253fa555e2737c9d08c3ef50f621f87f",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2453,6 +2453,13 @@
       "filename": "20261114170000_333_service_offer_signoff_guard.sql",
       "sha256": "0426df1c6cf34d1f2c1e17c40db46bb798c1b5f84bdbdd969b87f78688dca31f",
       "trimmedMd5": "9d6837ebd70131e55de4296788eba0a3"
+    },
+    {
+      "version": "20261114180000",
+      "name": "334_owned_internal_campaign_actions",
+      "filename": "20261114180000_334_owned_internal_campaign_actions.sql",
+      "sha256": "9a16c67e590850caf4ccbc2962f176adf6b4fd9b57d820b2bf5d22ffad97f374",
+      "trimmedMd5": "5860cc78736080bc84a3464b23b4a0b0"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

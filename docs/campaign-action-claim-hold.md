@@ -14,6 +14,8 @@ The runtime now has an opt-in owned-claim path. When the flag is true, it report
 
 Migrations 331–332 add a reasoned AAL2 revocation as an append-only source record and canonical Inbox event. The owning queue displays the withdrawal and the owned claim refuses it. Revoking an approval after an action executed blocks future use but cannot undo an external effect; a separate provider retraction and receipt are still required.
 
+Migration 334 closes the direct service-role calls to proof release and lead enrolment. Their owned wrappers perform the claim, Inbox, switch and handler prewrite check in the same database transaction as the internal effect. The runtime calls only those wrappers. A serialization or deadlock failure may retry; an authorization or unknown failure is recorded for review.
+
 ## Release gate still open
 
 The opt-in flag must remain false in deployed environments until the full Phase 2 gate is met: review the handler and SQL contract together, verify schema parity and a full deployed SHA, attest the four registry rows to that build, exercise concurrency and fail-closed cases in the target environment, and observe one approved external test action with an actual provider receipt. An approval receipt and an attempted execution are separate facts. A provider timeout with an unknown outcome requires reconciliation before another write.

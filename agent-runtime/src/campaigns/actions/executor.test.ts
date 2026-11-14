@@ -137,12 +137,10 @@ describe("owned campaign action claim path", () => {
         data: options.claim ?? [ACTION],
         error: options.claimError ? { message: options.claimError } : null,
       };
-      if (name === "release_campaign_proof_placements") return {
+      if (name === "release_campaign_proof_placements_owned_v6") return {
         data: { released: options.releaseCount ?? 1, skipped: [] },
-        error: options.releaseError ? { message: options.releaseError } : null,
-      };
-      if (name === "assert_campaign_action_prewrite_v6") return {
-        data: null, error: options.prewriteError ? { message: options.prewriteError } : null,
+        error: options.prewriteError ? { message: options.prewriteError, code: "23514" }
+          : options.releaseError ? { message: options.releaseError, code: "40001" } : null,
       };
       return { data: null, error: null };
     });
@@ -170,11 +168,10 @@ describe("owned campaign action claim path", () => {
       p_execution_id: ACTION.execution_id,
       p_result: expect.objectContaining({ released: 1 }),
     }));
-    expect(rpc).toHaveBeenCalledWith("assert_campaign_action_prewrite_v6", {
+    expect(rpc).toHaveBeenCalledWith("release_campaign_proof_placements_owned_v6", {
       p_execution_id: ACTION.execution_id,
       p_worker_id: owned.campaignActionWorkerId,
       p_build_sha: SHA,
-      p_action_key: "proof_publish",
     });
     expect(rpc).not.toHaveBeenCalledWith("record_campaign_action_failure", expect.anything());
     expect(events.some((event) => String(event.description).includes("completed"))).toBe(true);
@@ -222,7 +219,7 @@ describe("owned campaign action claim path", () => {
       ok: false, retryable: true,
       failureMessage: expect.stringContaining("registry not attested"),
     });
-    expect(rpc).not.toHaveBeenCalledWith("release_campaign_proof_placements", expect.anything());
+    expect(rpc).not.toHaveBeenCalledWith("release_campaign_proof_placements_owned_v6", expect.anything());
   });
 });
 
@@ -241,20 +238,21 @@ describe("dormant handler bodies", () => {
   it("releases only the exact claimed proof execution and preserves skips", async () => {
     const skipped = [{ placement_id: "pl-9", reason: "Payload changed after approval." }];
     const rpc = vi.fn(async (name: string) => ({
-      data: name === "release_campaign_proof_placements" ? { released: 2, skipped } : null,
+      data: name === "release_campaign_proof_placements_owned_v6" ? { released: 2, skipped } : null,
       error: null,
     }));
     const outcome = await releaseProofPlacements({ rpc } as unknown as SupabaseClient, attested(), ACTION);
-    expect(rpc).toHaveBeenCalledWith("release_campaign_proof_placements", {
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("release_campaign_proof_placements_owned_v6", {
       p_execution_id: ACTION.execution_id,
+      p_worker_id: owned.campaignActionWorkerId,
+      p_build_sha: SHA,
     });
-    expect(rpc.mock.calls[0]?.[0]).toBe("assert_campaign_action_prewrite_v6");
     expect(outcome.result).toEqual({ released: 2, skipped });
   });
 
   it("does not call an empty proof release a success", async () => {
     const rpc = vi.fn(async (name: string) => ({
-      data: name === "release_campaign_proof_placements"
+      data: name === "release_campaign_proof_placements_owned_v6"
         ? { released: 0, skipped: [{ reason: "The placement is retracted." }] } : null,
       error: null,
     }));
@@ -267,29 +265,31 @@ describe("dormant handler bodies", () => {
 
   it("keeps a failed proof-release transaction retryable", async () => {
     const rpc = vi.fn(async (name: string) => ({ data: null,
-      error: name === "release_campaign_proof_placements" ? { message: "serialization failure" } : null }));
+      error: name === "release_campaign_proof_placements_owned_v6"
+        ? { message: "serialization failure", code: "40001" } : null }));
     await expect(releaseProofPlacements({ rpc } as unknown as SupabaseClient, attested(), ACTION))
       .rejects.toMatchObject({ retryable: true });
   });
 
   it("enrols only the exact claimed lead-message execution", async () => {
     const rpc = vi.fn(async (name: string) => ({
-      data: name === "enrol_campaign_leads_in_sequence_v6"
+      data: name === "enrol_campaign_leads_owned_v6"
         ? { enrolled: 4, skipped: [], sequence_name: "Objections" } : null, error: null,
     }));
     const outcome = await enrolCampaignLeads({ rpc } as unknown as SupabaseClient, attested(), {
       ...ACTION, action_key: "lead_message",
     });
-    expect(rpc).toHaveBeenCalledWith("enrol_campaign_leads_in_sequence_v6", {
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("enrol_campaign_leads_owned_v6", {
       p_execution_id: ACTION.execution_id,
+      p_worker_id: owned.campaignActionWorkerId,
+      p_build_sha: SHA,
     });
-    expect(rpc.mock.calls[0]?.[0]).toBe("assert_campaign_action_prewrite_v6");
     expect(outcome.result).toMatchObject({ enrolled: 4, sequence: "Objections" });
   });
 
   it("treats a zero-recipient enrolment as a nonretryable failure", async () => {
     const rpc = vi.fn(async (name: string) => ({
-      data: name === "enrol_campaign_leads_in_sequence_v6"
+      data: name === "enrol_campaign_leads_owned_v6"
         ? { enrolled: 0, skipped: [{ reason: "Unsubscribed." }] } : null, error: null,
     }));
     await expect(enrolCampaignLeads({ rpc } as unknown as SupabaseClient, attested(), {

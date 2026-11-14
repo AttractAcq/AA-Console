@@ -31,7 +31,7 @@ begin
   v_action := public.request_campaign_action_approval_v6(
     'dddddddd-dddd-4ddd-8ddd-dddddddddddd','claim-one','proof_publish',
     'proof:approved_placements',repeat('b',64),
-    '{"placements":[{"placement_id":"synthetic","payload_hash":"bbbb"}]}'::jsonb);
+    '{"placements":[{"placement_id":"11111111-1111-4111-8111-111111111111","payload_hash":"bbbb"}]}'::jsonb);
   select * into v_request from public.approval_requests_v6
     where source_kind = 'campaign_action' and source_id = v_action.id::text;
   if not found then raise exception 'Source request was not mirrored'; end if;
@@ -79,7 +79,13 @@ declare v_worker text := 'agent-runtime:1:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   v_page_execution uuid;
   v_revoke public.campaign_action_approvals%rowtype;
   v_revoke_request public.approval_requests_v6%rowtype;
+  v_release jsonb;
 begin
+  if has_function_privilege('service_role',
+    'public.release_campaign_proof_placements(uuid)','execute')
+    or has_function_privilege('service_role',
+      'public.enrol_campaign_leads_in_sequence_v6(uuid)','execute') then
+    raise exception 'Service role can bypass the owned internal action wrappers'; end if;
   if exists (select 1 from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1))
     then raise exception 'Claim passed a disabled client switch'; end if;
   perform set_config('request.jwt.claim.role','authenticated',true);
@@ -113,12 +119,25 @@ begin
     raise exception 'The first attempt has no started receipt'; end if;
   perform public.assert_campaign_action_prewrite_v6(
     v_claim.execution_id,v_worker,v_sha,'proof_publish');
+  v_release := public.release_campaign_proof_placements_owned_v6(
+    v_claim.execution_id,v_worker,v_sha);
+  if v_release->>'released' <> '0' then
+    raise exception 'Synthetic proof fixture unexpectedly released a placement'; end if;
+  begin
+    perform public.enrol_campaign_leads_owned_v6(v_claim.execution_id,v_worker,v_sha);
+    raise exception 'Lead wrapper accepted a proof execution';
+  exception when check_violation then null; end;
   update public.client_engine_settings set campaign_actions_enabled = false
     where client_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   begin
     perform public.assert_campaign_action_prewrite_v6(
       v_claim.execution_id,v_worker,v_sha,'proof_publish');
     raise exception 'Prewrite passed after the client switch turned off';
+  exception when check_violation then null; end;
+  begin
+    perform public.release_campaign_proof_placements_owned_v6(
+      v_claim.execution_id,v_worker,v_sha);
+    raise exception 'Owned proof effect passed after the client switch turned off';
   exception when check_violation then null; end;
   update public.client_engine_settings set campaign_actions_enabled = true
     where client_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
