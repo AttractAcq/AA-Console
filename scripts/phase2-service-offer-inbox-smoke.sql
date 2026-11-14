@@ -41,6 +41,11 @@ begin
     perform public.approve_service_offer_version_v6(v_first.id);
     raise exception 'AAL1 approved an offer';
   exception when insufficient_privilege then null; end;
+  begin
+    insert into public.service_offer_signoffs(offer_version_id,client_id,approved_by)
+      values (v_first.id,v_first.client_id,auth.uid());
+    raise exception 'AAL1 inserted a direct offer signoff';
+  exception when insufficient_privilege then null; end;
 
   v_second := public.create_service_offer_version_v6(
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Consulting','Owners','Revised plan',
@@ -65,6 +70,19 @@ begin
   perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
   perform set_config('request.jwt.claims',
     '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  begin
+    insert into public.service_offer_signoffs(offer_version_id,client_id,approved_by)
+      values (v_second.id,v_second.client_id,auth.uid());
+    raise exception 'Direct signoff passed without an Inbox decision';
+  exception when check_violation then null; end;
+  begin
+    insert into public.client_campaigns(client_id,name,brief,acquisition_mode,
+      runs_organic,runs_paid,offer_version_id)
+    values (v_second.client_id,'Unapproved offer campaign','Fixture','organic',true,false,v_second.id);
+    raise exception 'Campaign used an offer without the exact signoff';
+  exception when raise_exception then
+    if sqlerrm = 'Campaign used an offer without the exact signoff' then raise; end if;
+  end;
   perform public.approve_service_offer_version_v6(v_second.id);
   if not exists (select 1 from public.service_offer_signoffs
     where offer_version_id = v_second.id and approved_by = auth.uid())
@@ -73,6 +91,9 @@ begin
       where r.source_id = v_second.id::text and d.decision = 'approved'
         and d.actor_aal = 'aal2') then
     raise exception 'Signoff and canonical AAL2 decision diverged'; end if;
+  insert into public.client_campaigns(client_id,name,brief,acquisition_mode,
+    runs_organic,runs_paid,offer_version_id)
+  values (v_second.client_id,'Approved offer campaign','Fixture','organic',true,false,v_second.id);
   begin
     perform public.approve_service_offer_version_v6(v_second.id);
     raise exception 'Duplicate signoff succeeded';
