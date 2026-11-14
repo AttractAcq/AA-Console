@@ -78,6 +78,7 @@ export function startHeartbeat(
           controls: {
             publish: config.publishEnabled,
             proofPublish: config.proofPublishEnabled,
+            googleReviewReply: config.googleReviewReplyEnabled,
             campaignActions: config.campaignActionsEnabled,
             outboundMessaging: config.outboundMessagingEnabled,
             leadMagnetDelivery: config.leadMagnetDeliveryEnabled,

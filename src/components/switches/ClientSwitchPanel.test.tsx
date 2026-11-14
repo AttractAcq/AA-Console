@@ -83,6 +83,8 @@ describe("every switch in one place", () => {
     expect(await screen.findByText("Content engine, this client")).toBeInTheDocument();
     expect(screen.getByText(/No client runs, whatever its own switch says/)).toBeInTheDocument();
     expect(screen.getByText(/Approved posts sit on the calendar/)).toBeInTheDocument();
+    expect(screen.getByText("Google review reply sender, system-wide")).toBeInTheDocument();
+    expect(screen.getByText(/Google review reply jobs remain held/)).toBeInTheDocument();
   });
 
   it("owns the lead magnet delivery switch, which Lead Magnet Studio no longer duplicates", async () => {
@@ -202,7 +204,7 @@ describe("every switch in one place", () => {
   it("will not offer to flip something that has not been set up", async () => {
     // No booking rules recorded, which is a different state from switched off.
     render(<ClientSwitchPanel clientId="c1" />);
-    expect(await screen.findByText("not set up")).toBeInTheDocument();
+    expect((await screen.findAllByText("not set up")).length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Switch on Let prospects book a call")).toBeDisabled();
   });
 

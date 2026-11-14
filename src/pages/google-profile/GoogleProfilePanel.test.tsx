@@ -391,6 +391,11 @@ describe("reviews", () => {
     }] });
     render(<GoogleProfilePanel tab="reviews" />);
     expect(await screen.findByText("Approved — not sent")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Actions for / }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Request approved reply send" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_google_reply_send_v6", {
+      p_reply_id: "reply-1",
+    }));
   });
 
   it("shows an uncertain provider attempt as requiring reconciliation", async () => {

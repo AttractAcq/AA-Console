@@ -70,6 +70,8 @@ export interface RuntimeConfig {
    * per-destination flag and the human placement decision are the others.
    */
   proofPublishEnabled: boolean;
+  /** Separate release for Google review replies; off unless explicitly enabled. */
+  googleReviewReplyEnabled: boolean;
   /**
    * Whether this runtime may perform campaign actions a person has approved.
    * Off unless set, and the first of four: the client flag,
@@ -320,6 +322,8 @@ export function loadConfig(): RuntimeConfig {
     // another, and one variable covering all three would make them one
     // decision.
     proofPublishEnabled: (optionalEnv("PROOF_PUBLISH_ENABLED") ?? "false").toLowerCase() === "true",
+    googleReviewReplyEnabled:
+      (optionalEnv("GOOGLE_REVIEW_REPLY_ENABLED") ?? "false").toLowerCase() === "true",
     campaignActionsEnabled:
       (optionalEnv("CAMPAIGN_ACTIONS_ENABLED") ?? "false").toLowerCase() === "true",
     campaignActionOwnedClaimEnabled:

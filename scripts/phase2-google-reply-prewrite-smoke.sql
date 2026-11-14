@@ -22,7 +22,7 @@ select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claims',
  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
 do $decision$
-declare r public.approval_requests_v6%rowtype;
+declare r public.approval_requests_v6%rowtype; v_job uuid;
 begin
  select * into r from public.approval_requests_v6
   where source_kind='google_review_reply'
@@ -32,6 +32,19 @@ begin
   raise exception 'Human role passed service-only prewrite'; end if;
  perform public.decide_google_review_reply_from_inbox_v6(
   'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',r.source_version,r.artifact_hash,true,null);
+ perform set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
+ begin
+  perform public.request_google_reply_send_v6('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+  raise exception 'AAL1 queued a Google reply send';
+ exception when insufficient_privilege then null; end;
+ perform set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+ v_job:=public.request_google_reply_send_v6('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+ if v_job is null or public.request_google_reply_send_v6('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')<>v_job
+  or not exists(select 1 from public.agent_jobs where id=v_job
+    and agent_key='google_reply_sender' and input_id='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')
+  then raise exception 'Exact Google reply did not queue one owned job'; end if;
 end $decision$;
 select set_config('request.jwt.claim.role','service_role',true);
 do $checks$

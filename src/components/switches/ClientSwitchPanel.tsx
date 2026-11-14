@@ -72,6 +72,7 @@ type RuntimeControls = {
 const RUNTIME_KEYS: Record<string, string> = {
   publishing: "publish",
   proof_publishing: "proofPublish",
+  google_review_reply_runtime: "googleReviewReply",
   campaign_actions: "campaignActions",
   outbound_messaging: "outboundMessaging",
   lead_magnet_delivery: "leadMagnetDelivery",
@@ -189,6 +190,16 @@ const SWITCHES: SwitchRow[] = [
     caveat: "Only Google Business Profile has transport in the runtime today; the other destinations are recorded as unsupported.",
     value: (s) => s.settings?.proof_publishing_enabled ?? null,
     write: (next) => ({ fn: "set_proof_publishing_enabled", args: { p_enabled: next } }),
+  },
+  {
+    key: "google_review_reply_runtime",
+    label: "Google review reply sender, system-wide",
+    on: "An exact approved reply can be requested for this client's verified Google location.",
+    off: "Google review reply jobs remain held; approval alone does not send a reply.",
+    caveat: "Each reply also needs a usable credential, exact AAL2 decision and one-shot provider readback.",
+    value: (s) => s.runtime?.state === "observed"
+      ? s.runtime.controls?.googleReviewReply === true : null,
+    readOnly: { because: "This is a runtime deployment switch; it cannot be changed from a client page." },
   },
   {
     key: "campaign_actions",

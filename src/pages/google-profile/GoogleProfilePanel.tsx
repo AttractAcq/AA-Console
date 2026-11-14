@@ -341,7 +341,8 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           <p className="text-sm text-muted-foreground">
             Capturing a review brings its author, its url and its date with it, and it arrives in
             the Proof Bank uncleared — a public review is not a blanket permission to republish
-            it.
+            it. An approved reply needs a separate send request; the runtime may hold it until its
+            Google credential and release switch are ready.
           </p>
           <DataTable
             columns={["Review", "Rating", "When", "Proof", "Reply", "Actions"]}
@@ -413,6 +414,21 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                       : []),
                     ...(!reply && !r.gone_at
                       ? [{ label: "Draft a reply", onSelect: () => openReply(r) }]
+                      : []),
+                    ...(reply?.status === "approved" && !outcome && !r.gone_at
+                      ? [{
+                          label: "Request approved reply send",
+                          onSelect: () => void act(
+                            r.id,
+                            async () => {
+                              const { error: rpcError } = await supabase.rpc(
+                                "request_google_reply_send_v6", { p_reply_id: reply.id },
+                              );
+                              if (rpcError) throw new Error(rpcError.message);
+                            },
+                            "Reply send requested. Check the recorded outcome; approval alone does not prove delivery.",
+                          ),
+                        }]
                       : []),
                   ]}
                 />,
