@@ -14,15 +14,15 @@ insert into public.clients (id, name, initials)
 values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Phase 2 test', 'P2');
 insert into public.scheduled_posts (
   client_id, scheduled_for, scheduled_at, publication_status, publish_attempts,
-  publish_claimed_at, published_at, external_id)
+  publish_claimed_at, published_at, external_id, updated_at)
 values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', current_date - 1,
   now() - interval '1 day', 'published', 1, now() - interval '1 day',
-  now() - interval '1 day', 'meta-receipt-1');
+  now() - interval '1 day', 'meta-receipt-1', now() - interval '1 day');
 insert into public.scheduled_posts (
   client_id, scheduled_for, scheduled_at, publication_status, publish_attempts,
-  publish_claimed_at)
+  publish_claimed_at, updated_at)
 values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', current_date,
-  now(), 'failed', 1, now());
+  now(), 'failed', 1, now(), now());
 
 select set_config('request.jwt.claim.sub', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);

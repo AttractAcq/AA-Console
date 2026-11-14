@@ -397,8 +397,9 @@ export function IntegrationsPanel() {
       {rows.some((r) => SYNCS[r.provider]) && (
         <p className="mt-3 text-xs text-muted-foreground">
           Daily sync runs at 03:15 UTC and re-pulls the last 7 days, because these numbers keep
-          moving for about a week after the fact. Turning it off stops the schedule; you can still
-          pull a window by hand below.
+          moving for about a week after the fact. Replacing a credential turns daily sync off and
+          clears its old health check. Turning sync off stops the schedule; you can still pull a
+          window by hand below.
         </p>
       )}
 
