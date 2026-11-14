@@ -17808,6 +17808,7 @@ export type Database = {
       proof_placement_approvals: {
         Row: {
           campaign_action_approval_id: string | null
+          canonical_request_id: string | null
           client_id: string
           decided_at: string | null
           decided_by: string | null
@@ -17816,6 +17817,7 @@ export type Database = {
           payload_hash: string
           placement_id: string
           rejection_reason: string | null
+          request_token: string | null
           requested_at: string
           requested_by: string | null
           scope: Json
@@ -17823,6 +17825,7 @@ export type Database = {
         }
         Insert: {
           campaign_action_approval_id?: string | null
+          canonical_request_id?: string | null
           client_id: string
           decided_at?: string | null
           decided_by?: string | null
@@ -17831,6 +17834,7 @@ export type Database = {
           payload_hash: string
           placement_id: string
           rejection_reason?: string | null
+          request_token?: string | null
           requested_at?: string
           requested_by?: string | null
           scope: Json
@@ -17838,6 +17842,7 @@ export type Database = {
         }
         Update: {
           campaign_action_approval_id?: string | null
+          canonical_request_id?: string | null
           client_id?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -17846,6 +17851,7 @@ export type Database = {
           payload_hash?: string
           placement_id?: string
           rejection_reason?: string | null
+          request_token?: string | null
           requested_at?: string
           requested_by?: string | null
           scope?: Json
@@ -17886,6 +17892,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "meta_build_due"
             referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_placement_approvals_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "proof_placement_approvals_client_id_fkey"
@@ -29271,6 +29291,50 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_proof_placement_inbox_v6: {
+        Args: {
+          p_approval_id: string
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: {
+          approval_id: string | null
+          artifact_version_id: string | null
+          asset_id: string | null
+          attempts: number
+          bound_revision_id: string | null
+          bound_version_hash: string | null
+          campaign_id: string | null
+          claimed_at: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          destination_key: string
+          external_id: string | null
+          external_url: string | null
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lease_until: string | null
+          payload_hash: string
+          placed_at: string | null
+          placed_by: string | null
+          production_request_id: string | null
+          proof_id: string | null
+          retracted_at: string | null
+          source_proof_id: string
+          status: string
+          updated_at: string
+          verified_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "proof_placements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       decide_video_render_candidate: {
         Args: {
           p_candidate_id: string
@@ -29769,6 +29833,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      mark_proof_placement_placed_inbox_v6: {
+        Args: { p_external_url: string; p_placement_id: string }
+        Returns: undefined
       }
       mark_proof_placement_placed_v6: {
         Args: { p_external_url: string; p_placement_id: string }
@@ -30689,6 +30757,11 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: string
       }
+      proof_placement_effect_allowed_v6: {
+        Args: { p_placement_id: string }
+        Returns: boolean
+      }
+      proof_placement_hash_v6: { Args: { p_id: string }; Returns: string }
       proof_placement_payload_hash_v6: {
         Args: {
           p_artifact_version_id: string
@@ -30696,6 +30769,12 @@ export type Database = {
           p_destination_key: string
           p_proof_id: string
         }
+        Returns: string
+      }
+      proof_placement_preview_v6: { Args: { p_id: string }; Returns: Json }
+      proof_placement_scope_v6: { Args: { p_id: string }; Returns: Json }
+      proof_placement_source_state_v6: {
+        Args: { p_request_id: string }
         Returns: string
       }
       proof_rights_hash_v6: {
@@ -31721,6 +31800,10 @@ export type Database = {
       }
       request_proof_placement_approval_v6: {
         Args: { p_placement_id: string; p_scope?: Json }
+        Returns: string
+      }
+      request_proof_placement_inbox_v6: {
+        Args: { p_placement_id: string }
         Returns: string
       }
       request_proof_production_v2: {

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "13d5e84813a395e49f9e64a5c188e945ea680f5a0f05597b72c72861c7c8369c",
-  "generatedTypesSha256": "1b79e91cef2afaff9039cee8517a26ef4425f953e0fca1a957b24dc5df12c9fa",
-  "generatedSchemaBodySha256": "095a26d40e62a52595d6de7c711ebc9fa6dd0b5cdf2d3974ba645558ea473217",
+  "migrationSourceDigest": "020dedb78c623d84cb5c02c29900a7e731329b9dce540fa0374653f41b9b7219",
+  "generatedTypesSha256": "20c31ece67ae3b7ce55952846926abf8e8da3b302bb5cbe32862d92390d529a4",
+  "generatedSchemaBodySha256": "92c6e07fb842c33e33cf980944ca5b8adef8c912b54225b2e1a4341418e8eac5",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2579,6 +2579,41 @@
       "filename": "20261115110000_351_proof_rights_coverage.sql",
       "sha256": "5304481d24215485fa040268edddf305f3690d160f2d2ca3790851163328b971",
       "trimmedMd5": "0d5ac8052581f43169bb24f645159d28"
+    },
+    {
+      "version": "20261115120000",
+      "name": "352_standalone_proof_placement_inbox",
+      "filename": "20261115120000_352_standalone_proof_placement_inbox.sql",
+      "sha256": "e301a381abcf8ad3d04c169e36fc1a64692563b69af3069aa4bc929d7bc34ad1",
+      "trimmedMd5": "6367c265e6deb10e60d7106f45c56c12"
+    },
+    {
+      "version": "20261115130000",
+      "name": "353_standalone_proof_placement_inbox_view",
+      "filename": "20261115130000_353_standalone_proof_placement_inbox_view.sql",
+      "sha256": "afe254ce684e953c50aaa78f5039f6bda9a1a0faf5efc96009a92141e1551b86",
+      "trimmedMd5": "a8d15f0780c51710abc6c9922bcbc6a4"
+    },
+    {
+      "version": "20261115140000",
+      "name": "354_proof_placement_coverage",
+      "filename": "20261115140000_354_proof_placement_coverage.sql",
+      "sha256": "f0a3cba7dd4dd5d4b3d31427826fd9ab94812ea71d3a3ffb7b78e1033dd82841",
+      "trimmedMd5": "0bfd4a68df8f7d53e9234fdfa0ccb51a"
+    },
+    {
+      "version": "20261115150000",
+      "name": "355_proof_placement_prewrite_gate",
+      "filename": "20261115150000_355_proof_placement_prewrite_gate.sql",
+      "sha256": "f9ce79d06b2a184379fdb79a5f7be01f03df399167c7bad3f4462dd0bdbc0c69",
+      "trimmedMd5": "4d44dd1261eb769d36f6a6c0aba78707"
+    },
+    {
+      "version": "20261115160000",
+      "name": "356_proof_placement_due_inbox_gate",
+      "filename": "20261115160000_356_proof_placement_due_inbox_gate.sql",
+      "sha256": "46d21238813236278637dae2e32037552eae108430e4dc952cf96229221bcde3",
+      "trimmedMd5": "3b790b3bc13e32a40fec69e1554b0a8c"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

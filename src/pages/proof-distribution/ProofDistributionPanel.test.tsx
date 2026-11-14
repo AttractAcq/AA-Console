@@ -16,6 +16,7 @@ import { ProofDistributionPanel } from "./ProofDistributionPanel";
 
 const rpc = vi.fn();
 const requestProofPublish = vi.fn();
+const navigate = vi.fn();
 
 const DESTINATIONS = [
   {
@@ -64,7 +65,7 @@ const from = vi.fn((table: string) => {
   return chain;
 });
 
-vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: "c1" }) }));
+vi.mock("react-router-dom", () => ({ useParams: () => ({ clientId: "c1" }), useNavigate: () => navigate }));
 vi.mock("../../lib/supabase", () => ({
   supabase: {
     from: (...a: unknown[]) => from(...(a as [string])),
@@ -159,8 +160,17 @@ describe("placements", () => {
     await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Ask for approval" }));
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("request_proof_placement_approval_v6", { p_placement_id: "pl1" }),
+      expect(rpc).toHaveBeenCalledWith("request_proof_placement_inbox_v6", { p_placement_id: "pl1" }),
     );
+  });
+
+  it("routes a pending placement to its exact Inbox decision", async () => {
+    state.placements = [placement({ status: "awaiting_approval", approval_id: "approval-1" })];
+    render(<ProofDistributionPanel tab="placements" />);
+    await userEvent.click(await screen.findByRole("button", { name: /^Actions for / }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Review in Approval Inbox" }));
+    expect(navigate).toHaveBeenCalledWith("/clients/c1/delivery/approval-inbox?tab=unified");
+    expect(rpc).not.toHaveBeenCalledWith("decide_proof_placement_approval_v6", expect.anything());
   });
 });
 

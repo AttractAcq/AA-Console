@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { DataTable } from "../../components/DataTable";
 import { ActionMenu } from "../../components/ActionMenu";
@@ -10,7 +10,7 @@ import { requestProofPublish } from "../../lib/campaignActions";
 import { supabase } from "../../lib/supabase";
 import {
   LIVE_STATUSES, MODE_HINT,
-  createPlacement, decideApproval, fetchClientDestinations, fetchDestinations,
+  createPlacement, fetchClientDestinations, fetchDestinations,
   fetchPlacementDue, fetchPlacements, markPlacedByHand, recordRetracted,
   requestApproval, setDestinationEnabled, setProofPublishingEnabled,
   fetchProofSurfaceCoverage,
@@ -288,6 +288,7 @@ function PlacementsTab({
   loading: boolean;
   onAct: (key: string, work: () => Promise<void>, said: string) => Promise<void>;
 }) {
+  const navigate = useNavigate();
   const modeOf = (key: string) => destinations.find((d) => d.destination_key === key)?.mode;
   const labelOf = (key: string) => destinations.find((d) => d.destination_key === key)?.label ?? key;
 
@@ -365,22 +366,8 @@ function PlacementsTab({
               ...(placement.status === "awaiting_approval" && placement.approval_id
                 ? [
                     {
-                      label: "Approve this placement",
-                      onSelect: () =>
-                        void onAct(placement.id, () => decideApproval(placement.approval_id!, true), "Approved."),
-                    },
-                    {
-                      label: "Reject it",
-                      onSelect: () => {
-                        const why = window.prompt("Why is this not going out?");
-                        if (why?.trim()) {
-                          void onAct(
-                            placement.id,
-                            () => decideApproval(placement.approval_id!, false, why.trim()),
-                            "Rejected.",
-                          );
-                        }
-                      },
+                      label: "Review in Approval Inbox",
+                      onSelect: () => navigate(`/clients/${placement.client_id}/delivery/approval-inbox?tab=unified`),
                     },
                   ]
                 : []),

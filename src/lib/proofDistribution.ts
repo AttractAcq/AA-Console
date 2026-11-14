@@ -171,25 +171,14 @@ export async function createPlacement(args: {
 }
 
 export async function requestApproval(placementId: string): Promise<void> {
-  const { error } = await supabase.rpc("request_proof_placement_approval_v6", {
+  const { error } = await supabase.rpc("request_proof_placement_inbox_v6", {
     p_placement_id: placementId,
   });
   if (error) throw new Error(error.message);
 }
 
-export async function decideApproval(
-  approvalId: string, approved: boolean, reason?: string,
-): Promise<void> {
-  const { error } = await supabase.rpc("decide_proof_placement_approval_v6", {
-    p_approval_id: approvalId,
-    p_approved: approved,
-    ...(reason ? { p_reason: reason } : {}),
-  });
-  if (error) throw new Error(error.message);
-}
-
 export async function markPlacedByHand(placementId: string, url: string): Promise<void> {
-  const { error } = await supabase.rpc("mark_proof_placement_placed_v6", {
+  const { error } = await supabase.rpc("mark_proof_placement_placed_inbox_v6", {
     p_placement_id: placementId, p_external_url: url,
   });
   if (error) throw new Error(error.message);

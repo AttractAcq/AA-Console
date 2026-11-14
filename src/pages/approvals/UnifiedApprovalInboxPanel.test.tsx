@@ -205,6 +205,31 @@ const readyProofRights = {
   owning_path: `/clients/client-1/delivery/proof-production-factory?proof=${proofId}`,
 };
 
+const placementApprovalId = "dddd1111-dddd-4111-8111-dddddddd1111";
+const placementId = "eeee1111-eeee-4111-8111-eeeeeeee1111";
+const placementToken = "ffff1111-ffff-4111-8111-ffffffff1111";
+const placementHash = "4".repeat(64);
+const readyProofPlacement = {
+  ...request, id: "proof-placement-inbox-1", source_system: "aa_console",
+  source_kind: "proof_placement", source_id: placementApprovalId,
+  source_version: `${placementHash}:${placementToken}`,
+  artifact_hash: placementHash, title: "Place proof at third_party_directory",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: `proof_distribution:third_party_directory:${placementId}`,
+  account_ref: null, budget: null, owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", approval_id: placementApprovalId,
+    placement_id: placementId, request_token: placementToken,
+    destination_key: "third_party_directory", placement_payload_hash: "5".repeat(64),
+    source_proof: { id: proofId, media_type: "text", storage_path: null,
+      body: "Customer result", usage_rights: "approved" },
+    payload_proof: { id: proofId, body: "Customer result" }, artifact: null, media: null },
+  scope: { client_id: "client-1", approval_id: placementApprovalId,
+    placement_id: placementId, request_token: placementToken,
+    destination_key: "third_party_directory", content_hash: placementHash,
+    effect: "release_for_placement" },
+  owning_path: "/clients/client-1/delivery/proof-distribution?tab=placements",
+};
+
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
@@ -553,6 +578,18 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_proof_rights_v6", {
       p_rights_request_id: proofRightsId, p_canonical_id: readyProofRights.id,
+    }));
+  });
+
+  it("releases standalone text proof for placement through its owning AAL2 RPC", async () => {
+    requests = [readyProofPlacement];
+    show();
+    const card = await screen.findByRole("article", { name: readyProofPlacement.title });
+    expect(within(card).getByText("Proof placement decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_proof_placement_inbox_v6", {
+      p_approval_id: placementApprovalId, p_request_id: readyProofPlacement.id,
+      p_approved: true,
     }));
   });
 
