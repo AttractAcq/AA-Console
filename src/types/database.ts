@@ -12896,6 +12896,7 @@ export type Database = {
           decided_at: string | null
           decided_by: string | null
           id: string
+          inbox_enforced_v6: boolean
           magnet_version_id: string
           payload_hash: string
           rejection_reason: string | null
@@ -12911,6 +12912,7 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           id?: string
+          inbox_enforced_v6?: boolean
           magnet_version_id: string
           payload_hash: string
           rejection_reason?: string | null
@@ -12926,6 +12928,7 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           id?: string
+          inbox_enforced_v6?: boolean
           magnet_version_id?: string
           payload_hash?: string
           rejection_reason?: string | null
@@ -27230,6 +27233,10 @@ export type Database = {
         Args: { p_brief_id?: string; p_project_id: string }
         Returns: string
       }
+      attest_lead_magnet_bytes_v6: {
+        Args: { p_approval_id: string; p_file_bytes: number; p_sha256: string }
+        Returns: string
+      }
       attest_video_sound_asset: {
         Args: {
           p_client_id: string
@@ -28688,6 +28695,7 @@ export type Database = {
           decided_at: string | null
           decided_by: string | null
           id: string
+          inbox_enforced_v6: boolean
           magnet_version_id: string
           payload_hash: string
           rejection_reason: string | null
@@ -29207,8 +29215,24 @@ export type Database = {
         Args: { p_email: string; p_phone: string }
         Returns: string
       }
+      lead_magnet_inbox_preview_v6: {
+        Args: {
+          p_approval: Database["public"]["Tables"]["lead_magnet_approvals"]["Row"]
+        }
+        Returns: Json
+      }
+      lead_magnet_inbox_scope_v6: {
+        Args: {
+          p_approval: Database["public"]["Tables"]["lead_magnet_approvals"]["Row"]
+        }
+        Returns: Json
+      }
       lead_magnet_payload_hash_v6: {
         Args: { p_version_id: string }
+        Returns: string
+      }
+      lead_magnet_source_state_v6: {
+        Args: { p_request_id: string }
         Returns: string
       }
       lead_stage_rank: {
@@ -30815,6 +30839,12 @@ export type Database = {
       }
       register_delivery_asset_bytes_v6: {
         Args: { p_asset_id: string; p_sha256: string; p_storage_path: string }
+        Returns: string
+      }
+      register_lead_magnet_inbox_v6: {
+        Args: {
+          p_approval: Database["public"]["Tables"]["lead_magnet_approvals"]["Row"]
+        }
         Returns: string
       }
       register_organic_publication_package_v6: {

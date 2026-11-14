@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import { supabase } from "../../lib/supabase";
+import { downloadVerifiedMagnetFile } from "../../lib/leadMagnets";
 import type { Database } from "../../types/database";
 import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "campaign_action", "client_sales_entitlement", "engine_slot",
-  "google_review_reply", "recruitment_brief", "service_offer",
+  "google_review_reply", "lead_magnet", "recruitment_brief", "service_offer",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -246,11 +247,39 @@ function isServiceOfferApprovalReady(request: UnifiedApprovalRequest, clientId: 
     && request.status === "pending" && request.source_state === "pending" && !isExpired(request);
 }
 
+function isLeadMagnetApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "lead_magnet"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || request.source_version !== request.artifact_hash
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  return typeof request.artifact_hash === "string" && /^[0-9a-f]{64}$/.test(request.artifact_hash)
+    && preview.approval_id === request.source_id && preview.client_id === clientId
+    && scope.approval_id === request.source_id && scope.client_id === clientId
+    && scope.magnet_version_id === preview.magnet_version_id
+    && scope.content_sha256 === preview.content_sha256
+    && scope.payload_hash === request.artifact_hash
+    && preview.verified_content_sha256 === preview.content_sha256
+    && preview.verified_file_bytes === preview.file_bytes
+    && typeof preview.verified_at === "string"
+    && typeof preview.storage_path === "string" && !!preview.storage_path
+    && typeof preview.content_sha256 === "string" && /^[0-9a-f]{64}$/.test(preview.content_sha256)
+    && typeof preview.file_bytes === "number" && preview.file_bytes > 0
+    && request.destination === `lead_magnet:${preview.delivery_channel}`
+    && scope.delivery_channel === preview.delivery_channel
+    && scope.recipient_scope === "consented_opt_ins"
+    && request.owner_role === "admin_or_active_client_manager";
+}
+
 function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignRejectionReady(request, clientId)
     || isGoogleReplyRejectionReady(request, clientId)
     || isSalesEntitlementRejectionReady(request, clientId)
-    || isServiceOfferRejectionReady(request, clientId);
+    || isServiceOfferRejectionReady(request, clientId)
+    || isLeadMagnetApprovalReady(request, clientId);
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
@@ -258,7 +287,8 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isGoogleReplyApprovalReady(request, clientId)
     || isRecruitmentBriefApprovalReady(request, clientId)
     || isSalesEntitlementApprovalReady(request, clientId)
-    || isServiceOfferApprovalReady(request, clientId);
+    || isServiceOfferApprovalReady(request, clientId)
+    || isLeadMagnetApprovalReady(request, clientId);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
@@ -309,6 +339,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
   onDecide: (request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) => Promise<void>;
 }) {
   const [rejectionReason, setRejectionReason] = useState("");
+  const [downloadedMagnetHash, setDownloadedMagnetHash] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const location = useLocation();
   const blocker = previewMissing(request);
   const sourcePath = manager ? null : sourcePathForRequest(request, clientId);
@@ -324,7 +356,15 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
     ? "Google review reply" : request.source_kind === "recruitment_brief"
       ? "Recruitment brief" : request.source_kind === "client_sales_entitlement"
         ? "Sales access" : request.source_kind === "service_offer"
-          ? "Service offer" : "Campaign action";
+          ? "Service offer" : request.source_kind === "lead_magnet"
+            ? "Lead magnet" : "Campaign action";
+  const magnetPreview = request.source_kind === "lead_magnet" && request.preview
+    && typeof request.preview === "object" && !Array.isArray(request.preview)
+    ? request.preview as Record<string, unknown> : null;
+  const magnetDownloadable = magnetPreview
+    && typeof magnetPreview.storage_path === "string"
+    && typeof magnetPreview.content_sha256 === "string"
+    && typeof magnetPreview.file_bytes === "number";
 
   return (
     <article className="rounded-xl border border-border bg-card p-5" aria-labelledby={`approval-${request.id}`}>
@@ -392,6 +432,23 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
         </div>
       </div>
 
+      {magnetDownloadable && <div className="mt-4">
+        <button type="button" className="rounded-lg border border-border px-4 py-2 text-sm"
+          onClick={() => void downloadVerifiedMagnetFile(
+            magnetPreview.storage_path as string,
+            magnetPreview.content_sha256 as string,
+            magnetPreview.file_bytes as number,
+          ).then(() => { setDownloadedMagnetHash(request.artifact_hash); setDownloadError(null); })
+            .catch((cause: unknown) => setDownloadError(
+              cause instanceof Error ? cause.message : "Could not verify the file."))}>
+          Download and verify exact file
+        </button>
+        {downloadedMagnetHash === request.artifact_hash && <p role="status" className="mt-2 text-xs">
+          The downloaded file matched the bytes and hash on this card. Review its content before approval.
+        </p>}
+        {downloadError && <p role="alert" className="mt-2 text-xs text-destructive">{downloadError}</p>}
+      </div>}
+
       {html && (
         <details className="mt-4">
           <summary className="cursor-pointer text-sm font-medium">Visual page preview</summary>
@@ -432,7 +489,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
             <Link to="/security/mfa" state={{ returnTo: `${location.pathname}${location.search}` }} className="underline">Open account security</Link>
           </p>}
           <div className="flex flex-wrap gap-2">
-            {canApprove && <button type="button" disabled={busy || aal !== "aal2"}
+            {canApprove && <button type="button" disabled={busy || aal !== "aal2"
+              || (request.source_kind === "lead_magnet" && downloadedMagnetHash !== request.artifact_hash)}
               onClick={() => void onDecide(request, "approved")}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
               Approve exact version
@@ -617,6 +675,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             : await supabase.rpc("reject_service_offer_version_v6", {
               p_version_id: request.source_id, p_reason: reason!.trim(),
             })
+        : request.source_kind === "lead_magnet"
+          ? await supabase.rpc("decide_lead_magnet_approval_v6", {
+            p_approval_id: request.source_id,
+            p_approved: decision === "approved",
+            ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+          })
         : request.source_kind === "campaign_action"
           ? await supabase.rpc("decide_campaign_action_approval_v6", {
           p_request_id: request.source_id,

@@ -64,6 +64,7 @@ const search = { value: "" };
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ clientId: "client-1" }),
   useSearchParams: () => [new URLSearchParams(search.value), vi.fn()],
+  Link: ({ to, children }: { to: string; children: string }) => <a href={to}>{children}</a>,
 }));
 
 import { LeadMagnetStudioPanel } from "./LeadMagnetStudioPanel";
@@ -158,6 +159,15 @@ describe("which version is live", () => {
 });
 
 describe("the one decision", () => {
+  it("routes new exact-file approvals to the unified Inbox", async () => {
+    openRow();
+    fetchApprovals.mockResolvedValue([approval({ inbox_enforced_v6: true })]);
+    render(<LeadMagnetStudioPanel />);
+    const link = await screen.findByRole("link", { name: "Review in Approval Inbox" });
+    expect(link).toHaveAttribute("href", "/clients/client-1/delivery/approval-inbox?tab=unified");
+    expect(screen.queryByRole("button", { name: "Approve this file and route" })).not.toBeInTheDocument();
+  });
+
   it("shows the file, the hash and the route a person is agreeing to", async () => {
     openRow();
     fetchApprovals.mockResolvedValue([approval()]);

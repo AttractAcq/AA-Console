@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { uploadThen } from "./options";
 import type { Database } from "../types/database";
+import { callRuntime } from "./callRuntime";
 
 export type { CaptureDue, CaptureEndpoint, LeadSubmission } from "./leadCapture";
 
@@ -184,6 +185,33 @@ export async function requestApproval(versionId: string): Promise<void> {
     p_version_id: versionId,
   });
   if (error) throw new Error(error.message);
+}
+
+export async function attestApprovalFile(clientId: string, approvalId: string): Promise<void> {
+  await callRuntime("/admin/lead-magnets/attest", { clientId, approvalId });
+}
+
+/** Download the reviewed bytes, checking them against the recorded version. */
+export async function downloadVerifiedMagnetFile(
+  storagePath: string, expectedSha256: string, expectedBytes: number,
+): Promise<void> {
+  const { data, error } = await supabase.storage.from(MAGNET_BUCKET).download(storagePath);
+  if (error || !data) throw new Error(error?.message ?? "Could not download the magnet file.");
+  const buffer = await data.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  const actualSha256 = [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  if (actualSha256 !== expectedSha256 || buffer.byteLength !== expectedBytes) {
+    throw new Error("Stored file bytes differ from the exact version under review.");
+  }
+  const url = URL.createObjectURL(new Blob([buffer], { type: data.type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = storagePath.split("/").at(-1) || "lead-magnet";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export async function decideApproval(

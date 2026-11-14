@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
@@ -10,7 +10,7 @@ import { dayOrDash } from "../../lib/contentRecords";
 import { supabase } from "../../lib/supabase";
 import {
   CHANNEL_HINT, MAGNET_FORMATS,
-  addVersion, createMagnet, decideApproval, fetchApprovals,
+  addVersion, attestApprovalFile, createMagnet, decideApproval, downloadVerifiedMagnetFile, fetchApprovals,
   fetchDeliveriesDue, fetchMagnets,
   fetchVersions, requestApproval, revokeApproval,
   type LeadMagnet, type LeadMagnetApproval,
@@ -258,6 +258,7 @@ export function LeadMagnetStudioPanel() {
         }}
         detail={(magnet) => (
           <MagnetDetail
+            clientId={clientId!}
             magnet={magnet}
             versions={versionsOf(magnet.id)}
             due={dueFor(magnet.id)}
@@ -378,9 +379,10 @@ export function LeadMagnetStudioPanel() {
  * are both shown next to the buttons that approve them.
  */
 function MagnetDetail({
-  magnet, versions, due, liveApproval, pendingApproval, campaignName,
+  clientId, magnet, versions, due, liveApproval, pendingApproval, campaignName,
   busy, loading, onNewVersion, onAct,
 }: {
+  clientId: string;
   magnet: LeadMagnet;
   versions: LeadMagnetVersion[];
   due: LeadMagnetDue[];
@@ -432,7 +434,10 @@ function MagnetDetail({
                       live ? "text-brand-strong" : pending ? "text-amber-600" : "text-muted-foreground"
                     }
                   >
-                    {live ? `approved ${dayOrDash(live.decided_at)}` : pending ? "awaiting approval" : "not asked"}
+                    {live ? `approved ${dayOrDash(live.decided_at)}${
+                      (live as LeadMagnetApproval & { inbox_enforced_v6?: boolean }).inbox_enforced_v6
+                        ? "" : " · legacy approval"
+                    }` : pending ? "awaiting approval" : "not asked"}
                   </span>
                 </div>
 
@@ -468,12 +473,31 @@ function MagnetDetail({
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
                         disabled={busy === pending.id}
-                        onClick={() =>
-                          void onAct(pending.id, () => decideApproval(pending.id, true), "Approved.")
-                        }
+                        onClick={() => void onAct(pending.id,
+                          () => downloadVerifiedMagnetFile(version.storage_path,
+                            version.content_sha256, version.file_bytes),
+                          "Downloaded the exact stored file for review.")}
                       >
-                        Approve this file and route
+                        Download and verify file
                       </Button>
+                      <Button
+                        disabled={busy === pending.id}
+                        onClick={() => void onAct(pending.id,
+                          () => attestApprovalFile(clientId, pending.id),
+                          "Stored file verified. Review the exact request in Approval Inbox.")}
+                      >
+                        Verify stored bytes
+                      </Button>
+                      {(pending as LeadMagnetApproval & { inbox_enforced_v6?: boolean }).inbox_enforced_v6
+                        ? <Link className="rounded-lg border border-border px-4 py-2 text-sm underline"
+                            to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>
+                            Review in Approval Inbox
+                          </Link>
+                        : <Button
+                            disabled={busy === pending.id}
+                            onClick={() => void onAct(pending.id,
+                              () => decideApproval(pending.id, true), "Approved.")}
+                          >Approve this file and route</Button>}
                       <Button
                         disabled={busy === pending.id}
                         onClick={() => {

@@ -91,9 +91,9 @@ function dependency(state: SwitchState, key: string): string | null {
   if (key === "engine" && !state.engineRunning) return "System-wide content engine is off.";
   if (key === "engine" && (!state.runtime || !("budgetCap" in state.runtime))) return "Current month spend cap has not been verified.";
   if (key === "engine" && state.runtime?.budgetCap == null) return "No spend cap is set for this month.";
-  if (key === "engine" && state.runtime.budgetCap <= 0) return "This month's spend cap is zero.";
-  if (key === "engine" && state.runtime.state !== "observed") return state.runtime.reason ?? "Runtime state has not been verified.";
-  if (key === "engine" && state.runtime.workerEnabled !== true) return "Agent runtime worker is off or unreported.";
+  if (key === "engine" && state.runtime?.budgetCap != null && state.runtime.budgetCap <= 0) return "This month's spend cap is zero.";
+  if (key === "engine" && state.runtime?.state !== "observed") return state.runtime?.reason ?? "Runtime state has not been verified.";
+  if (key === "engine" && state.runtime?.workerEnabled !== true) return "Agent runtime worker is off or unreported.";
   if (key === "auto_approve_ideas" || key === "auto_approve_briefs") {
     if (!state.settings?.enabled) return "This client's content engine is off.";
     const engineBlocker = dependency(state, "engine");

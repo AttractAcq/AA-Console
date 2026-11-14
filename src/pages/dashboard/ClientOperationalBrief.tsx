@@ -46,7 +46,7 @@ export function ClientOperationalBrief({ clientId, spend, failedRuns, activeRuns
       pendingApprovals: pending.error ? null : pending.count,
       heldActionCount: held.error ? null : held.count,
       heldActions: actionRows?.filter((row) => row.execution_status !== "executed")
-        .map((row) => ({ action_key: row.action_key,
+        .map((row) => ({ action_key: row.action_key ?? "unknown",
           blocker: row.blocker ?? "Generic campaign-action claims are held in the runtime before execution." })) ?? null,
       failedActions: failed.error ? null : failed.count,
       executedActions: executed.error ? null : executed.count,

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "3d3d60d3225cdc56fcf89c44b2a349700692033ba8c5cc2608f63e8207f15ce5",
-  "generatedTypesSha256": "8410ba277e726470add86f1151221912182fdd68e81d1ad166c7b41169267ecd",
-  "generatedSchemaBodySha256": "3efe8248ce1e717ff8bfb2d3cf7d586b253fa555e2737c9d08c3ef50f621f87f",
+  "migrationSourceDigest": "e848c7303236366d38ff1183199ba1bf9abf2b061868259b4baa9d0b14f0d538",
+  "generatedTypesSha256": "966a236665e8b74be4e6e7fa89ab980ceb10bc18e4714dc3444f8dd0f5bc9e10",
+  "generatedSchemaBodySha256": "1d686358e97850d1b84f79689948200786660cdf349ed14d01c515ad7f2c3294",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2460,6 +2460,41 @@
       "filename": "20261114180000_334_owned_internal_campaign_actions.sql",
       "sha256": "9a16c67e590850caf4ccbc2962f176adf6b4fd9b57d820b2bf5d22ffad97f374",
       "trimmedMd5": "5860cc78736080bc84a3464b23b4a0b0"
+    },
+    {
+      "version": "20261114190000",
+      "name": "335_lead_magnet_inbox_source",
+      "filename": "20261114190000_335_lead_magnet_inbox_source.sql",
+      "sha256": "7df90aae7a7d46c2ca410ea575b9c2a53e4794a0b1bc74ef52cb73e7644fcf69",
+      "trimmedMd5": "7eb60d94f16f9c48a61f84d2c9aae962"
+    },
+    {
+      "version": "20261114200000",
+      "name": "336_lead_magnet_inbox_view",
+      "filename": "20261114200000_336_lead_magnet_inbox_view.sql",
+      "sha256": "f7d591b92e8f96fab5d25d9d7e365a7007042a3d45033df95a4ec3a70b17befe",
+      "trimmedMd5": "efc73fb20773e3fb91d724f0b5108763"
+    },
+    {
+      "version": "20261114210000",
+      "name": "337_lead_magnet_decision_guard",
+      "filename": "20261114210000_337_lead_magnet_decision_guard.sql",
+      "sha256": "524912e214eb2164709b7ae7c04e0351a56141aea693093aadff26344392c652",
+      "trimmedMd5": "4adf3ec16d6ecefd51e0add4bd3c78b0"
+    },
+    {
+      "version": "20261114220000",
+      "name": "338_lead_magnet_due_inbox_gate",
+      "filename": "20261114220000_338_lead_magnet_due_inbox_gate.sql",
+      "sha256": "588600f9926aa21287460b7568cd3eb90d84bdee60559fe32d19c6290a7c42a2",
+      "trimmedMd5": "714b09022f8054f9e6fba82f9ed87cea"
+    },
+    {
+      "version": "20261114230000",
+      "name": "339_lead_magnet_coverage",
+      "filename": "20261114230000_339_lead_magnet_coverage.sql",
+      "sha256": "305a5dc82d9702cc4ce3e43922860e8dd18d3067106894dbb7b31f36dd234731",
+      "trimmedMd5": "5da52843b1959f996f030540ae7a118e"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
