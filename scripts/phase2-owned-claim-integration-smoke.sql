@@ -73,6 +73,8 @@ declare v_worker text := 'agent-runtime:1:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   v_sha text := repeat('c',40);
   v_handlers jsonb := '{"proof_publish":"proof_distribution"}'::jsonb;
   v_claim record;
+  v_page public.campaign_action_approvals%rowtype;
+  v_page_execution uuid;
 begin
   if exists (select 1 from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1))
     then raise exception 'Claim passed a disabled client switch'; end if;
@@ -89,9 +91,48 @@ begin
     raise exception 'Owned claim did not bind the reviewed action'; end if;
   if exists (select 1 from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1))
     then raise exception 'Duplicate in-flight claim succeeded'; end if;
+  if not exists (select 1 from public.campaign_action_attempts_v6 a
+    where a.execution_id = v_claim.execution_id and a.attempt_number = 1
+      and a.status = 'executing' and a.legacy_inferred = false) then
+    raise exception 'The first attempt has no started receipt'; end if;
+  perform public.record_campaign_action_failure(v_claim.execution_id,
+    'Synthetic retryable provider timeout',true);
+  select * into v_claim from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1);
+  if v_claim.attempt <> 2 or not exists (
+    select 1 from public.campaign_action_attempts_v6 a
+    where a.execution_id = v_claim.execution_id and a.attempt_number = 1
+      and a.status = 'failed' and a.error = 'Synthetic retryable provider timeout')
+    then raise exception 'Retry lost the first attempt outcome'; end if;
   perform public.record_campaign_action_executed(v_claim.execution_id,
     'synthetic-external-id',null,'{"fixture":true}'::jsonb);
+  if not exists (select 1 from public.campaign_action_attempts_v6 a
+    where a.execution_id = v_claim.execution_id and a.attempt_number = 2
+      and a.status = 'executed' and a.external_id = 'synthetic-external-id')
+    then raise exception 'Second attempt has no observed result receipt'; end if;
   if exists (select 1 from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1))
     then raise exception 'Executed action was claimed again'; end if;
+
+  -- An external action cannot be recorded as done without a provider ref.
+  -- This deliberately inserts a synthetic lifecycle row to isolate the
+  -- receipt invariant from the separate page publishing prerequisites.
+  v_page := public.request_campaign_action_approval_v6(
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddd','receipt-only','page_deploy',
+    'https://fixture.example/page',repeat('d',64),'{"page_id":"synthetic"}'::jsonb);
+  insert into public.campaign_action_executions
+    (approval_id,client_id,campaign_id,action_key,artifact_version_hash,
+      manifest_id,status,attempts,claimed_at)
+  values (v_page.id,v_page.client_id,v_page.campaign_id,v_page.action_key,
+    v_page.artifact_version_hash,v_page.manifest_id,'executing',1,now())
+  returning id into v_page_execution;
+  begin
+    perform public.record_campaign_action_executed(v_page_execution,null,null,null);
+    raise exception 'External action was recorded without a provider reference';
+  exception when check_violation then null; end;
+  perform public.record_campaign_action_executed(v_page_execution,
+    repeat('e',40),'https://fixture.example/page','{"fixture":true}'::jsonb);
+  if not exists (select 1 from public.campaign_action_attempts_v6 a
+    where a.execution_id = v_page_execution and a.status = 'executed'
+      and a.external_url = 'https://fixture.example/page') then
+    raise exception 'External outcome has no observed reference receipt'; end if;
 end $checks$;
 rollback;

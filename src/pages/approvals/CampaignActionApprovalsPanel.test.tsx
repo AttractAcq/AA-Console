@@ -43,6 +43,7 @@ function database(
     due?: unknown[];
     actionsOn?: boolean;
     snapshots?: unknown[];
+    attempts?: unknown[];
   } = {},
 ) {
   let records = options.pending ?? [pending];
@@ -67,6 +68,11 @@ function database(
     }
     if (table === "campaign_page_approval_snapshots") {
       return { select: () => ({ in: async () => ({ data: options.snapshots ?? [], error: null }) }) };
+    }
+    if (table === "campaign_action_attempts_v6") {
+      const query = { in: () => query,
+        order: async () => ({ data: options.attempts ?? [], error: null }) };
+      return { select: () => query };
     }
     const query = {
       select: () => query,
@@ -134,6 +140,24 @@ it("says what became of an action after it was approved", async () => {
     "href",
     "https://directory.test/listing/99",
   );
+});
+
+it("shows a failed attempt and the later provider receipt separately", async () => {
+  database({ due: [{ ...done, attempts: 2 }], attempts: [
+    { execution_id: "execution-1", attempt_number: 1, status: "failed",
+      started_at: "2026-11-14T08:00:00Z", finished_at: "2026-11-14T08:01:00Z",
+      external_id: null, external_url: null, error: "Provider timeout", legacy_inferred: false },
+    { execution_id: "execution-1", attempt_number: 2, status: "executed",
+      started_at: "2026-11-14T08:05:00Z", finished_at: "2026-11-14T08:06:00Z",
+      external_id: "ext-99", external_url: "https://directory.test/listing/99",
+      error: null, legacy_inferred: false },
+  ] });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByText("Execution attempts")).toBeInTheDocument();
+  expect(screen.getByText(/Attempt 1: failed/)).toBeInTheDocument();
+  expect(screen.getByText("Provider timeout")).toBeInTheDocument();
+  expect(screen.getByText(/Attempt 2: executed/)).toBeInTheDocument();
+  expect(screen.getAllByRole("link", { name: "ext-99" })).toHaveLength(2);
 });
 
 it("shows the reason an approved action has not happened, and does not call it done", async () => {

@@ -11,12 +11,18 @@ import {
 
 type Approval = Database["public"]["Tables"]["campaign_action_approvals"]["Row"];
 type PageSnapshot = Database["public"]["Tables"]["campaign_page_approval_snapshots"]["Row"];
+type ActionAttempt = {
+  execution_id: string; attempt_number: number; status: string;
+  started_at: string; finished_at: string | null; external_id: string | null;
+  external_url: string | null; error: string | null; legacy_inferred: boolean;
+};
 
 export function CampaignActionApprovalsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [requests, setRequests] = useState<Approval[]>([]);
   const [pageSnapshots, setPageSnapshots] = useState<Record<string, PageSnapshot>>({});
   const [decided, setDecided] = useState<CampaignActionDue[]>([]);
+  const [attemptsByExecution, setAttemptsByExecution] = useState<Record<string, ActionAttempt[]> | null>({});
   const [actionsOn, setActionsOn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -28,6 +34,7 @@ export function CampaignActionApprovalsPanel() {
       setRequests([]);
       setPageSnapshots({});
       setDecided([]);
+      setAttemptsByExecution({});
       setLoading(false);
       return;
     }
@@ -42,7 +49,24 @@ export function CampaignActionApprovalsPanel() {
       ]);
       setDecided(due);
       setActionsOn(on);
+      const executionIds = due.map((action) => action.execution_id).filter((id): id is string => Boolean(id));
+      if (executionIds.length === 0) {
+        setAttemptsByExecution({});
+      } else {
+        const { data: attemptRows, error: attemptError } = await supabase
+          .from("campaign_action_attempts_v6" as never)
+          .select("execution_id,attempt_number,status,started_at,finished_at,external_id,external_url,error,legacy_inferred")
+          .in("execution_id", executionIds)
+          .order("attempt_number", { ascending: true });
+        if (attemptError) throw new Error(`Attempt receipts could not be read: ${attemptError.message}`);
+        const grouped: Record<string, ActionAttempt[]> = {};
+        for (const row of (attemptRows ?? []) as ActionAttempt[]) {
+          (grouped[row.execution_id] ??= []).push(row);
+        }
+        setAttemptsByExecution(grouped);
+      }
     } catch (cause) {
+      setAttemptsByExecution(null);
       setError(cause instanceof Error ? cause.message : "Could not read what happened to approved actions.");
     }
     const { data, error: queryError } = await supabase
@@ -265,6 +289,30 @@ export function CampaignActionApprovalsPanel() {
                     </div>
                   )}
                 </dl>
+                {action.execution_id && (
+                  <div className="mt-3 border-t border-border pt-3 text-xs">
+                    <p className="font-medium">Execution attempts</p>
+                    {attemptsByExecution === null ? <p className="mt-1 text-destructive">Attempt receipts unavailable.</p>
+                      : (attemptsByExecution[action.execution_id] ?? []).length === 0
+                        ? <p className="mt-1 text-muted-foreground">No per-attempt receipt is recorded. Earlier aggregate history may be incomplete.</p>
+                        : <ol className="mt-2 space-y-2">
+                          {attemptsByExecution[action.execution_id].map((attempt) => (
+                            <li key={attempt.attempt_number} className="rounded-md bg-muted p-2">
+                              Attempt {attempt.attempt_number}: {attempt.status.replaceAll("_", " ")}
+                              {attempt.legacy_inferred ? " · inferred from older execution record" : ""}
+                              {` · started ${new Date(attempt.started_at).toLocaleString()}`}
+                              {attempt.finished_at ? ` · finished ${new Date(attempt.finished_at).toLocaleString()}` : ""}
+                              {(attempt.external_id || attempt.external_url) && <span className="block break-all font-mono">
+                                Provider reference: {attempt.external_url
+                                  ? <a className="underline" href={attempt.external_url} target="_blank" rel="noreferrer">{attempt.external_id ?? attempt.external_url}</a>
+                                  : attempt.external_id}
+                              </span>}
+                              {attempt.error && <span className="block text-destructive">{attempt.error}</span>}
+                            </li>
+                          ))}
+                        </ol>}
+                  </div>
+                )}
               </article>
             ))}
           </div>
