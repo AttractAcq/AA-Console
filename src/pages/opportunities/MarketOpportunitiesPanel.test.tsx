@@ -21,6 +21,7 @@ const {
   createCampaignFromOpportunity,
   fetchOpportunities,
   fetchReadiness,
+  fetchOpportunityApprovalStates,
   enqueueAgentJob,
   fetchStageTemplates,
   setStageTemplate,
@@ -34,6 +35,7 @@ const {
   createCampaignFromOpportunity: vi.fn(),
   fetchOpportunities: vi.fn(),
   fetchReadiness: vi.fn(),
+  fetchOpportunityApprovalStates: vi.fn(),
   enqueueAgentJob: vi.fn(),
   fetchStageTemplates: vi.fn(),
   setStageTemplate: vi.fn(),
@@ -55,6 +57,7 @@ vi.mock("../../lib/opportunities", async () => {
     createCampaignFromOpportunity,
     fetchOpportunities,
     fetchReadiness,
+    fetchOpportunityApprovalStates,
     fetchScoreFactors: async () => [
       { factor: "economic_value", weight: 0.2, label: "Economic value" },
     ],
@@ -115,12 +118,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   fetchOpportunities.mockResolvedValue([opportunity()]);
   fetchReadiness.mockResolvedValue(readiness());
+  fetchOpportunityApprovalStates.mockResolvedValue(new Map([["opp-1", "current"]]));
   createCampaignFromOpportunity.mockResolvedValue({ id: "camp-1", name: "Garage-to-Gym Conversion" });
   fetchOpenProposals.mockResolvedValue([]);
   acceptScoreProposal.mockResolvedValue(undefined);
   rejectProposal.mockResolvedValue(undefined);
   requestEvaluation.mockResolvedValue(undefined);
   requestStrategy.mockResolvedValue(undefined);
+  rpc.mockResolvedValue({ data: "approval-1", error: null });
 });
 
 /** What the Evaluate agent writes: factors, their reasoning, and the case. */
@@ -172,10 +177,26 @@ describe("where the hand-off is offered", () => {
   it("does not offer it before anybody has approved the opportunity", async () => {
     fetchOpportunities.mockResolvedValue([opportunity({ status: "validated" })]);
     await openActions();
-    // Approve is the act that is available at this point, and it is a
-    // different one.
-    expect(await screen.findByRole("menuitem", { name: "Approve" })).toBeInTheDocument();
+    // This opens review; it does not approve the opportunity itself.
+    expect(await screen.findByRole("menuitem", { name: "Request approval" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Create a campaign" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer campaign creation for a legacy or stale approval", async () => {
+    fetchOpportunityApprovalStates.mockResolvedValue(new Map([["opp-1", "legacy"]]));
+    await openActions();
+    expect(screen.queryByRole("menuitem", { name: "Create a campaign" })).not.toBeInTheDocument();
+    expect(screen.getByText(/legacy approval/)).toBeInTheDocument();
+  });
+
+  it("requests exact Inbox review instead of changing status directly", async () => {
+    fetchOpportunities.mockResolvedValue([opportunity({ status: "validated" })]);
+    await openActions();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Request approval" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_opportunity_approval_v6", {
+      p_opportunity_id: "opp-1",
+    }));
+    expect(await screen.findByText(/Sent to Approval Inbox/)).toBeInTheDocument();
   });
 
   it("keeps offering it once campaigns are already running against it", async () => {
@@ -420,10 +441,10 @@ describe("the Discover table carries the whole progression", () => {
     expect(await screen.findByRole("menuitem", { name: "Create a campaign" })).toBeInTheDocument();
   });
 
-  it("offers Approve from the table for a validated opportunity", async () => {
+  it("offers exact approval review from the table for a validated opportunity", async () => {
     fetchOpportunities.mockResolvedValue([opportunity({ status: "validated" })]);
     await openDiscoverActions();
-    expect(await screen.findByRole("menuitem", { name: "Approve" })).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Request approval" })).toBeInTheDocument();
   });
 
   it("offers the next step for each stage, and only that step", async () => {

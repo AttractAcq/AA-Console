@@ -15,8 +15,8 @@ import {
   createCampaignFromOpportunity,
   acceptScoreProposal, fetchOpenProposals, rejectProposal,
   requestEvaluation, requestStrategy,
-  fetchOpportunities, fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
-  fetchStageTemplates, setStageTemplate,
+  fetchOpportunities, fetchOpportunityApprovalStates, fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
+  fetchStageTemplates, setStageTemplate, requestOpportunityApproval,
   setAttributes, setAwarenessStage, setConfidence, setFields, setStatus,
   type Opportunity, type OpportunityConfidence, type OpportunityProposal,
   type Readiness, type ScoreFactor,
@@ -52,6 +52,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
 
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [readiness, setReadiness] = useState<ReadonlyMap<string, Readiness>>(new Map());
+  const [approvalStates, setApprovalStates] = useState<ReadonlyMap<string, string>>(new Map());
   const [factors, setFactors] = useState<ScoreFactor[]>([]);
   const [proposals, setProposals] = useState<OpportunityProposal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,11 +69,12 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
       return;
     }
     try {
-      const [list, ready, scoring, open] = await Promise.all([
-        fetchOpportunities(clientId), fetchReadiness(clientId), fetchScoreFactors(),
+      const [list, approvals, ready, scoring, open] = await Promise.all([
+        fetchOpportunities(clientId), fetchOpportunityApprovalStates(clientId), fetchReadiness(clientId), fetchScoreFactors(),
         fetchOpenProposals(clientId),
       ]);
       setOpportunities(list);
+      setApprovalStates(approvals);
       setReadiness(ready);
       setFactors(scoring);
       setProposals(open);
@@ -137,6 +139,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
           clientId={clientId}
           opportunities={opportunities}
           readiness={readiness}
+          approvalStates={approvalStates}
           loading={loading}
           busy={busy}
           discovering={discovering}
@@ -177,6 +180,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
         <ActivateView
           opportunities={opportunities}
           readiness={readiness}
+          approvalStates={approvalStates}
           clientId={clientId}
           busy={busy}
           onSelect={select}
@@ -469,10 +473,11 @@ function ProposalsPanel({
 }
 
 function opportunityActions({
-  opportunity: o, readiness: r, clientId, onSelect, onAct, onBuild,
+  opportunity: o, readiness: r, approvalState, clientId, onSelect, onAct, onBuild,
 }: {
   opportunity: Opportunity;
   readiness: Readiness | undefined;
+  approvalState: string | undefined;
   clientId: string | undefined;
   onSelect: (id: string) => void;
   onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
@@ -487,11 +492,13 @@ function opportunityActions({
       : []),
     ...(o.status === "validated" && !r?.blocker
       ? [{
-          label: "Approve",
-          onSelect: () => void onAct(o.id, () => setStatus(o.id, "approved"), "Approved."),
+          label: "Request approval",
+          onSelect: () => void onAct(o.id, () => requestOpportunityApproval(o.id),
+            "Sent to Approval Inbox for exact-state review."),
         }]
       : []),
-    ...(["approved", "active", "learning", "scaling"].includes(o.status) && !r?.blocker
+    ...(["approved", "active", "learning", "scaling"].includes(o.status)
+      && approvalState === "current" && !r?.blocker
       ? [{ label: "Create a campaign", onSelect: () => onBuild(o) }]
       : []),
     ...(o.status === "approved"
@@ -556,12 +563,13 @@ function opportunityActions({
 }
 
 function DiscoverView({
-  clientId, opportunities, readiness, loading, busy, discovering, onDiscover, onSelect, onAct,
+  clientId, opportunities, readiness, approvalStates, loading, busy, discovering, onDiscover, onSelect, onAct,
   onBuild,
 }: {
   clientId: string | undefined;
   opportunities: Opportunity[];
   readiness: ReadonlyMap<string, Readiness>;
+  approvalStates: ReadonlyMap<string, string>;
   loading: boolean;
   busy: string | null;
   discovering: boolean;
@@ -598,7 +606,8 @@ function DiscoverView({
           >
             {o.name}
           </button>,
-          <span key="s" className="capitalize">{o.status}</span>,
+          <span key="s" className="capitalize">{o.status}{["legacy", "stale"].includes(approvalStates.get(o.id) ?? "")
+            ? ` · ${approvalStates.get(o.id)} approval` : ""}</span>,
           <span key="m">{o.micro_market}</span>,
           <span key="t">{o.purchase_trigger ?? "—"}</span>,
           <ConfidenceTag key="c" confidence={o.confidence} />,
@@ -611,6 +620,7 @@ function DiscoverView({
             items={opportunityActions({
               opportunity: o,
               readiness: readiness.get(o.id),
+              approvalState: approvalStates.get(o.id),
               clientId,
               onSelect,
               onAct,
@@ -974,10 +984,11 @@ function StrategizeView({
 }
 
 function ActivateView({
-  opportunities, readiness, clientId, busy, onSelect, onAct, onBuild,
+  opportunities, readiness, approvalStates, clientId, busy, onSelect, onAct, onBuild,
 }: {
   opportunities: Opportunity[];
   readiness: ReadonlyMap<string, Readiness>;
+  approvalStates: ReadonlyMap<string, string>;
   clientId: string | undefined;
   busy: string | null;
   onSelect: (id: string) => void;
@@ -997,17 +1008,25 @@ function ActivateView({
         emptyLabel="Nothing to activate yet"
         rows={live.map((o) => {
           const r = readiness.get(o.id);
+          const approvalState = approvalStates.get(o.id);
+          const approvalBlocker = approvalState === "legacy"
+            ? "Pre-Inbox approval needs an exact review before a new campaign."
+            : approvalState === "stale"
+              ? "The approved opportunity changed; pause and request a new exact review."
+              : null;
+          const blocker = r?.blocker ?? approvalBlocker;
           return [
             <button key="n" type="button" onClick={() => onSelect(o.id)} className="text-left hover:underline">
               {o.name}
             </button>,
-            <span key="s">{o.status}</span>,
+            <span key="s">{o.status}{["legacy", "stale"].includes(approvalStates.get(o.id) ?? "")
+              ? ` · ${approvalStates.get(o.id)} approval` : ""}</span>,
             <span key="c">{r?.score ?? "—"}</span>,
             <span key="g" className={r && r.open_proof_gaps > 0 ? "text-destructive" : undefined}>
               {r?.open_proof_gaps ?? 0}
             </span>,
-            <span key="b" className={r?.blocker ? "text-destructive" : "text-brand-strong"}>
-              {r?.blocker ?? "Ready to approve"}
+            <span key="b" className={blocker ? "text-destructive" : "text-brand-strong"}>
+              {blocker ?? (approvalState === "current" ? "Approved for campaign planning" : "Ready to request review")}
             </span>,
             <ActionMenu
               key="a"
@@ -1016,6 +1035,7 @@ function ActivateView({
               items={opportunityActions({
                 opportunity: o,
                 readiness: r,
+                approvalState: approvalStates.get(o.id),
                 clientId,
                 onSelect,
                 onAct,

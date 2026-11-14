@@ -13691,6 +13691,9 @@ export type Database = {
       }
       market_opportunities: {
         Row: {
+          approval_request_token: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           buying_situation: string
           client_id: string
@@ -13714,6 +13717,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          approval_request_token?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           buying_situation: string
           client_id: string
@@ -13737,6 +13743,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          approval_request_token?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           buying_situation?: string
           client_id?: string
@@ -13760,6 +13769,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "market_opportunities_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "market_opportunities_client_id_fkey"
             columns: ["client_id"]
@@ -15482,6 +15505,13 @@ export type Database = {
             foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_readiness"
             referencedColumns: ["opportunity_id"]
           },
@@ -15597,6 +15627,13 @@ export type Database = {
             foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_readiness"
             referencedColumns: ["opportunity_id"]
           },
@@ -15707,6 +15744,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_events_opportunity_id_fkey"
@@ -15865,6 +15909,13 @@ export type Database = {
             foreignKeyName: "opportunity_links_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_readiness"
             referencedColumns: ["opportunity_id"]
           },
@@ -15968,6 +16019,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
@@ -16094,6 +16152,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_proposals_opportunity_id_fkey"
@@ -16243,6 +16308,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_scores_opportunity_id_fkey"
@@ -22391,6 +22463,13 @@ export type Database = {
             foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_readiness"
             referencedColumns: ["opportunity_id"]
           },
@@ -25357,6 +25436,56 @@ export type Database = {
           },
         ]
       }
+      opportunity_approval_state_v6: {
+        Row: {
+          approval_current: boolean | null
+          approval_state: string | null
+          client_id: string | null
+          opportunity_id: string | null
+        }
+        Insert: {
+          approval_current?: never
+          approval_state?: never
+          client_id?: string | null
+          opportunity_id?: string | null
+        }
+        Update: {
+          approval_current?: never
+          approval_state?: never
+          client_id?: string | null
+          opportunity_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       opportunity_campaign_plan: {
         Row: {
           asset_direction: string | null
@@ -25426,6 +25555,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
@@ -27093,6 +27229,41 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "nurture_sequences"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      approve_opportunity_v6: {
+        Args: { p_opportunity_id: string; p_request_id: string }
+        Returns: {
+          approval_request_token: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
+          archived_at: string | null
+          buying_situation: string
+          client_id: string
+          confidence: Database["public"]["Enums"]["opportunity_confidence"]
+          conversion_action: string | null
+          core_problem: string | null
+          created_at: string
+          created_by: string | null
+          desired_outcome: string | null
+          entry_awareness: string | null
+          id: string
+          idempotency_key: string
+          micro_market: string
+          name: string
+          positioning: string | null
+          proposed_by: string
+          proposed_by_job_id: string | null
+          purchase_trigger: string | null
+          status: Database["public"]["Enums"]["opportunity_status"]
+          status_note: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "market_opportunities"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -30167,10 +30338,22 @@ export type Database = {
         }[]
       }
       next_ref_number: { Args: { p_client_id: string }; Returns: string }
+      opportunity_approval_current_v6: {
+        Args: { p_id: string }
+        Returns: boolean
+      }
+      opportunity_approval_hash_v6: { Args: { p_id: string }; Returns: string }
+      opportunity_approval_preview_v6: { Args: { p_id: string }; Returns: Json }
+      opportunity_approval_scope_v6: { Args: { p_id: string }; Returns: Json }
+      opportunity_approval_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       opportunity_brief_v6: {
         Args: { p_opportunity_id: string }
         Returns: string
       }
+      opportunity_proof_ready_v6: { Args: { p_id: string }; Returns: boolean }
       organic_publication_package_candidates_v6: {
         Args: { p_limit?: number }
         Returns: {
@@ -30924,6 +31107,14 @@ export type Database = {
         }
         Returns: string
       }
+      reject_opportunity_approval_v6: {
+        Args: {
+          p_opportunity_id: string
+          p_reason: string
+          p_request_id: string
+        }
+        Returns: string
+      }
       reject_opportunity_proposal_v6: {
         Args: { p_proposal_id: string; p_reason: string }
         Returns: undefined
@@ -31210,6 +31401,10 @@ export type Database = {
           p_opportunity_id?: string
           p_source: string
         }
+        Returns: string
+      }
+      request_opportunity_approval_v6: {
+        Args: { p_opportunity_id: string }
         Returns: string
       }
       request_opportunity_discovery_v6: {
@@ -32331,6 +32526,9 @@ export type Database = {
           p_status: Database["public"]["Enums"]["opportunity_status"]
         }
         Returns: {
+          approval_request_token: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           buying_situation: string
           client_id: string

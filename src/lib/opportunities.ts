@@ -101,6 +101,15 @@ export async function fetchOpportunities(clientId: string): Promise<Opportunity[
   return (data ?? []) as unknown as Opportunity[];
 }
 
+export async function fetchOpportunityApprovalStates(clientId: string): Promise<Map<string, string>> {
+  const { data, error } = await supabase.from("opportunity_approval_state_v6")
+    .select("opportunity_id,approval_state")
+    .eq("client_id", clientId);
+  if (error) throw new Error(error.message);
+  return new Map((data ?? []).filter((row) => row.opportunity_id && row.approval_state)
+    .map((row) => [row.opportunity_id!, row.approval_state!]));
+}
+
 export async function fetchReadiness(clientId: string): Promise<Map<string, Readiness>> {
   const { data, error } = await supabase.from("opportunity_readiness")
     .select("opportunity_id, score, classification, open_proof_gaps, awareness_stages, blocker")
@@ -180,6 +189,13 @@ export async function setStatus(id: string, status: OpportunityStatus, note?: st
   const { error } = await supabase.rpc("set_opportunity_status_v6", {
     p_opportunity_id: id, p_status: status,
     ...(note ? { p_note: note } : {}),
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function requestOpportunityApproval(id: string): Promise<void> {
+  const { error } = await supabase.rpc("request_opportunity_approval_v6", {
+    p_opportunity_id: id,
   });
   if (error) throw new Error(error.message);
 }

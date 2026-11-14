@@ -161,6 +161,28 @@ const readyPublicAgent = {
   owning_path: `/clients/client-1/delivery/sales-os?agent=${publicAgentId}`,
 };
 
+const opportunityId = "77777777-7777-4777-8777-777777777777";
+const opportunityToken = "88888888-8888-4888-8888-888888888888";
+const opportunityHash = "2".repeat(64);
+const readyOpportunity = {
+  ...request, id: "opportunity-inbox-1", source_system: "aa_console",
+  source_kind: "opportunity_approve", source_id: opportunityId,
+  source_version: `${opportunityHash}:${opportunityToken}`,
+  artifact_hash: opportunityHash, title: "Approve market opportunity: Winter garage gym",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: `campaign_factory:opportunity:${opportunityId}`,
+  account_ref: null, budget: null, owner_role: "admin_or_active_client_manager",
+  preview: { opportunity_id: opportunityId, client_id: "client-1",
+    request_token: opportunityToken,
+    opportunity: { name: "Winter garage gym", micro_market: "Homeowners" },
+    score: { total: 72, classification: "test" },
+    attributes: [], awareness: [{ stage: "problem_aware", message: "Winter matters" }],
+    links: [], proof_requirements: [] },
+  scope: { opportunity_id: opportunityId, client_id: "client-1",
+    request_token: opportunityToken, content_hash: opportunityHash },
+  owning_path: `/clients/client-1/delivery/market-opportunities?opportunity=${opportunityId}`,
+};
+
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
@@ -486,6 +508,17 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_sales_agent_public_use_v6", {
       p_agent_id: publicAgentId, p_request_id: readyPublicAgent.id,
+    }));
+  });
+
+  it("decides the exact evaluated opportunity through its owning RPC", async () => {
+    requests = [readyOpportunity];
+    show();
+    const card = await screen.findByRole("article", { name: readyOpportunity.title });
+    expect(within(card).getByText("Market opportunity decision")).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_opportunity_v6", {
+      p_opportunity_id: opportunityId, p_request_id: readyOpportunity.id,
     }));
   });
 
