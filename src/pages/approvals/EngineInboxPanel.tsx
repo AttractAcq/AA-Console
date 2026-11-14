@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { Modal } from "../../components/Modal";
+import { requestEngineSlotReview } from "../../lib/creativeReview";
 import { useSignedPreviewPaths } from "../../lib/useSignedPreviewPaths";
 import { supabase } from "../../lib/supabase";
 import { cn } from "../../lib/cn";
@@ -46,6 +47,7 @@ type AssetFile = {
   render_path?: string | null;
   storage_path?: string | null;
   media_type?: string | null;
+  content_format?: string | null;
 };
 
 function findingList(label: string, findings: Finding[], tone: string) {
@@ -77,6 +79,7 @@ export function EngineInboxPanel() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [preparedSlot, setPreparedSlot] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<InboxCard | null>(null);
   const [reason, setReason] = useState("");
@@ -111,7 +114,7 @@ export function EngineInboxPanel() {
       if (assetIds.length > 0) {
         const { data: assets } = await supabase
           .from("client_media_assets")
-          .select("id, storage_path, render_path, media_type")
+          .select("id, storage_path, render_path, media_type, content_format")
           .in("id", assetIds);
         // render_path first: for a reel the cut is the thing being approved,
         // and storage_path is the opening still.
@@ -148,6 +151,21 @@ export function EngineInboxPanel() {
       return;
     }
     await refresh();
+  }
+
+  async function prepare(slotId: string, assetId: string) {
+    if (!clientId) return;
+    setBusy(slotId);
+    setError(null);
+    try {
+      await requestEngineSlotReview(clientId, slotId, assetId);
+      setPreparedSlot(slotId);
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not prepare exact Engine review.");
+    } finally {
+      setBusy(null);
+    }
   }
 
   if (loadError) {
@@ -263,12 +281,22 @@ export function EngineInboxPanel() {
               </div>
 
               <p className="mt-4 text-xs text-muted-foreground">
-                Scheduling is held until this slot has an exact media and destination review in the Unified Inbox.
+                {preparedSlot === card.slotId
+                  ? "Exact review prepared. Open the Unified tab to verify the file and decide this slot."
+                  : "Scheduling is held until this slot has an exact media and destination review in the Unified Inbox."}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button type="button" disabled
                   className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground opacity-50"
                 >Approve and schedule</button>
+                {card.assetId && card.format === "single"
+                  && assetFiles.some((file) => file.id === card.assetId
+                    && file.content_format === "single"
+                    && (file.media_type === "image" || file.media_type === "text"))
+                  && <button type="button" disabled={busy === card.slotId}
+                    onClick={() => void prepare(card.slotId, card.assetId!)}
+                    className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
+                  >Prepare exact review</button>}
                 <button
                   type="button"
                   disabled={busy === card.slotId}

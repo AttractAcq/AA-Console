@@ -46,7 +46,7 @@ begin
       'dddddddd-dddd-4ddd-8ddd-dddddddddddd','scheduled','human');
     raise exception 'Engine slot scheduled without exact Inbox decision';
   exception when check_violation then
-    if SQLERRM not like '%Review this exact Engine slot%' then raise; end if;
+    if SQLERRM not like '%exact Engine media, copy or destination%' then raise; end if;
   end;
   if (select stage::text from public.content_slots
     where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd') <> 'awaiting_approval'

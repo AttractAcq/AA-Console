@@ -473,6 +473,44 @@ function isOrdinaryMediaReady(request: UnifiedApprovalRequest, clientId: string)
     && request.owner_role === "admin_or_active_client_manager";
 }
 
+function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "engine_slot"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  if (!preview.exact_package || typeof preview.exact_package !== "object"
+    || Array.isArray(preview.exact_package)) return false;
+  const packet = preview.exact_package as Record<string, unknown>;
+  if (!packet.slot || typeof packet.slot !== "object" || Array.isArray(packet.slot)
+    || !packet.asset || typeof packet.asset !== "object" || Array.isArray(packet.asset)
+    || !packet.storage || typeof packet.storage !== "object" || Array.isArray(packet.storage)) return false;
+  const slot = packet.slot as Record<string, unknown>;
+  const asset = packet.asset as Record<string, unknown>;
+  const storage = packet.storage as Record<string, unknown>;
+  return typeof request.artifact_hash === "string"
+    && /^[0-9a-f]{64}$/.test(request.artifact_hash)
+    && request.source_version === scope.approval_entry_id
+    && request.source_id === slot.id && slot.id === scope.slot_id
+    && slot.asset_id === asset.id && asset.id === scope.asset_id
+    && slot.platform === scope.platform && slot.scheduled_at === scope.scheduled_at
+    && packet.client_id === clientId && asset.client_id === clientId
+    && scope.client_id === clientId && asset.content_format === "single"
+    && (asset.media_type === "image" || asset.media_type === "text")
+    && typeof asset.storage_path === "string" && !!asset.storage_path
+    && typeof asset.file_sha256 === "string"
+    && /^[0-9a-f]{64}$/.test(asset.file_sha256)
+    && typeof asset.usage_rights === "string" && !!asset.usage_rights
+    && storage.bucket === "client-media" && typeof storage.object_id === "string"
+    && Array.isArray(packet.post_copy) && packet.post_copy.length > 0
+    && typeof packet.account_ref === "string" && !!packet.account_ref
+    && request.account_ref === packet.account_ref
+    && request.destination === `organic:${slot.platform}`
+    && request.owner_role === "client_media_reviewer";
+}
+
 function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignRejectionReady(request, clientId)
     || isGoogleReplyRejectionReady(request, clientId)
@@ -484,6 +522,7 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isProofRightsRejectionReady(request, clientId)
     || isProofPlacementReady(request, clientId)
     || isProofArtifactReady(request, clientId)
+    || isEngineSlotReady(request, clientId)
     || isOrdinaryMediaReady(request, clientId);
 }
 
@@ -499,6 +538,7 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isProofRightsApprovalReady(request, clientId)
     || isProofPlacementReady(request, clientId)
     || isProofArtifactReady(request, clientId)
+    || isEngineSlotReady(request, clientId)
     || isOrdinaryMediaReady(request, clientId);
 }
 
@@ -570,12 +610,17 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
     && typeof proofRightsPreview.verified_storage_path === "string"
     && typeof proofRightsPreview.verified_storage_sha256 === "string"
     && typeof proofRightsPreview.verified_file_bytes === "number";
-  const creativePreview = request.source_kind === "ordinary_media" && request.preview
+  const creativePreview = (request.source_kind === "ordinary_media"
+    || request.source_kind === "engine_slot") && request.preview
     && typeof request.preview === "object" && !Array.isArray(request.preview)
     ? request.preview as Record<string, unknown> : null;
-  const creativeAsset = creativePreview?.asset && typeof creativePreview.asset === "object"
-    && !Array.isArray(creativePreview.asset)
-    ? creativePreview.asset as Record<string, unknown> : null;
+  const creativePacket = creativePreview?.exact_package && typeof creativePreview.exact_package === "object"
+    && !Array.isArray(creativePreview.exact_package)
+    ? creativePreview.exact_package as Record<string, unknown> : null;
+  const creativeSource = creativePacket?.asset ?? creativePreview?.asset;
+  const creativeAsset = creativeSource && typeof creativeSource === "object"
+    && !Array.isArray(creativeSource)
+    ? creativeSource as Record<string, unknown> : null;
   const creativeDownloadable = !!creativeAsset
     && typeof creativeAsset.storage_path === "string"
     && typeof creativeAsset.file_sha256 === "string";
@@ -592,7 +637,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
                   ? "Proof usage rights" : request.source_kind === "proof_placement"
                     ? "Proof placement" : request.source_kind === "proof_artifact"
                       ? "Proof artifact" : request.source_kind === "ordinary_media"
-                        ? "Creative source" : "Campaign action";
+                        ? "Creative source" : request.source_kind === "engine_slot"
+                          ? "Engine slot" : "Campaign action";
   const magnetPreview = request.source_kind === "lead_magnet" && request.preview
     && typeof request.preview === "object" && !Array.isArray(request.preview)
     ? request.preview as Record<string, unknown> : null;
@@ -1004,6 +1050,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
                 p_review_id: request.source_id, p_request_id: request.id,
                 p_reason: reason!.trim(),
               })
+        : request.source_kind === "engine_slot"
+          ? await supabase.rpc("decide_engine_slot_inbox_v6", {
+              p_slot_id: request.source_id, p_request_id: request.id,
+              p_approved: decision === "approved",
+              ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+            })
         : request.source_kind === "campaign_action"
           ? await supabase.rpc("decide_campaign_action_approval_v6", {
           p_request_id: request.source_id,

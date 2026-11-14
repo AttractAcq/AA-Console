@@ -282,6 +282,30 @@ const readyOrdinaryMedia = {
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=assets",
 };
 
+const engineSlotId = "18181818-1818-4818-8818-181818181818";
+const engineEntryId = "19191919-1919-4919-8919-191919191919";
+const engineTime = "2026-11-20T09:00:00+00:00";
+const readyEngineSlot = {
+  ...request, id: "engine-slot-inbox-1", source_system: "aa_console",
+  source_kind: "engine_slot", source_id: engineSlotId,
+  source_version: engineEntryId, artifact_hash: "b".repeat(64),
+  title: "Engine slot: Client image", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", destination: "organic:instagram",
+  account_ref: "17890000000000000", budget: null, owner_role: "client_media_reviewer",
+  preview: { exact_package: { client_id: "client-1",
+    slot: { id: engineSlotId, asset_id: mediaAssetId, platform: "instagram",
+      scheduled_at: engineTime, format: "single" },
+    asset: { id: mediaAssetId, client_id: "client-1", title: "Client image",
+      media_type: "image", content_format: "single", storage_path: "client-1/image.png",
+      file_sha256: mediaFileHash, usage_rights: "agency_owned" },
+    storage: { bucket: "client-media", object_id: "storage-object-1", version: "v1" },
+    post_copy: [{ platform: "instagram", caption: "Exact caption" }],
+    account_ref: "17890000000000000" } },
+  scope: { client_id: "client-1", slot_id: engineSlotId, asset_id: mediaAssetId,
+    platform: "instagram", scheduled_at: engineTime, approval_entry_id: engineEntryId },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=engine",
+};
+
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
@@ -698,6 +722,22 @@ describe("unified approval inbox", () => {
     await userEvent.click(approve);
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_ordinary_media_inbox_v6", {
       p_review_id: mediaReviewId, p_request_id: readyOrdinaryMedia.id,
+    }));
+  });
+
+  it("schedules an exact Engine slot only after the reviewer verifies its file", async () => {
+    requests = [readyEngineSlot];
+    show();
+    const card = await screen.findByRole("article", { name: readyEngineSlot.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
+      "client-1/image.png", mediaFileHash));
+    await userEvent.click(approve);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_engine_slot_inbox_v6", {
+      p_slot_id: engineSlotId, p_request_id: readyEngineSlot.id, p_approved: true,
     }));
   });
 

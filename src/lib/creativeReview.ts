@@ -11,6 +11,18 @@ export async function requestOrdinaryMediaReview(clientId: string, assetId: stri
   return data;
 }
 
+/** Attach trusted single-file bytes to an Engine slot's existing Inbox entry. */
+export async function requestEngineSlotReview(
+  clientId: string, slotId: string, assetId: string,
+): Promise<string> {
+  await callRuntime<{ assetId: string }>("/admin/creative/attest-asset", { clientId, assetId });
+  const { data, error } = await supabase.rpc("request_engine_slot_exact_review_v6", {
+    p_slot_id: slotId,
+  });
+  if (error || !data) throw new Error(error?.message ?? "Could not prepare Engine slot review.");
+  return data;
+}
+
 /** The reviewer downloads and checks the same file digest shown on the card. */
 export async function downloadVerifiedCreativeFile(
   storagePath: string, expectedSha256: string,

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "ad3f38e33ea9727f673034815470e823d9df16d775fe2ef10062a7d026c884ac",
-  "generatedTypesSha256": "136864406f670eda56866d1d3c907ab1779494baa6b1da145237017eb612de0d",
-  "generatedSchemaBodySha256": "e81710ca3af941ecca66973af51c5ddad78dfc1278a0204f8d899383e0785cc6",
+  "migrationSourceDigest": "302b4ff95e88dbd424968e5a81c0889a431be678756d3ef10d6123a2d1d2781c",
+  "generatedTypesSha256": "8e23954f819339531ea814a97889f7995feb111b11beacebe8fe244462670416",
+  "generatedSchemaBodySha256": "0d8dbd0710578884c1d1b514418a253702a0f6dc15634ad05e9e7409e756639d",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2747,6 +2747,41 @@
       "filename": "20261116110000_375_engine_slot_schedule_hold.sql",
       "sha256": "c0a6bea37060dbe064584230991fd697272307e2fbda42c113b5d469303237ad",
       "trimmedMd5": "f2d9402e6243ff5bd0672a9c388d631e"
+    },
+    {
+      "version": "20261116120000",
+      "name": "376_engine_slot_exact_evidence",
+      "filename": "20261116120000_376_engine_slot_exact_evidence.sql",
+      "sha256": "0e3ad38c580492f3b92a70ce0f534cefd970a4e46ffc62221c74ee50315414ab",
+      "trimmedMd5": "3f3221f988881134d2b57f428b7a5403"
+    },
+    {
+      "version": "20261116130000",
+      "name": "377_engine_slot_inbox_view",
+      "filename": "20261116130000_377_engine_slot_inbox_view.sql",
+      "sha256": "009298fa6139e94db9afeca64417d45dca35fe4f0d950b8e5e8efd0dc32c5d9a",
+      "trimmedMd5": "05260679965af45370ceacdbd847a706"
+    },
+    {
+      "version": "20261116140000",
+      "name": "378_engine_slot_inbox_decision",
+      "filename": "20261116140000_378_engine_slot_inbox_decision.sql",
+      "sha256": "c88825e0d1c269ff8115c7ccb418032ba69053fa500321364dc7591aaa8b2445",
+      "trimmedMd5": "c1311596d6eb509778201f18f5b601e9"
+    },
+    {
+      "version": "20261116150000",
+      "name": "379_engine_slot_coverage",
+      "filename": "20261116150000_379_engine_slot_coverage.sql",
+      "sha256": "5ad0a2d2817c3c860c240f0573c51da32014d900a701b91298195aff0d2bc183",
+      "trimmedMd5": "abe4c69815daeb27c46df9ba713a0788"
+    },
+    {
+      "version": "20261116160000",
+      "name": "380_engine_asset_signoff_guard",
+      "filename": "20261116160000_380_engine_asset_signoff_guard.sql",
+      "sha256": "cc5aae8ab7979821ba6518815239cd7337eaf5182fce39e25b2283d27cdfdf67",
+      "trimmedMd5": "b36894d6b0bb39afe0b17f519f345184"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

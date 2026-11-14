@@ -30044,6 +30044,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_engine_slot_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_slot_id: string
+        }
+        Returns: string
+      }
       decide_google_review_reply_from_inbox_v6: {
         Args: {
           p_approved: boolean
@@ -30419,6 +30428,18 @@ export type Database = {
       }
       engine_is_enabled: { Args: { p_client_id: string }; Returns: boolean }
       engine_jobs_in_flight: { Args: { p_client_id: string }; Returns: number }
+      engine_slot_exact_hash_v6: {
+        Args: { p_slot_id: string }
+        Returns: string
+      }
+      engine_slot_exact_package_v6: {
+        Args: { p_slot_id: string }
+        Returns: Json
+      }
+      engine_slot_exact_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       engine_slot_inbox_payload_v6: {
         Args: { p_event: Database["public"]["Tables"]["slot_events"]["Row"] }
         Returns: Json
@@ -32703,6 +32724,10 @@ export type Database = {
           p_target_role: string
           p_verification_id: string
         }
+        Returns: string
+      }
+      request_engine_slot_exact_review_v6: {
+        Args: { p_slot_id: string }
         Returns: string
       }
       request_human_video_edit: {
