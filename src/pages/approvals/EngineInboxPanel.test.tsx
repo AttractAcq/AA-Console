@@ -182,20 +182,11 @@ describe("what is waiting on a person", () => {
 });
 
 describe("approving", () => {
-  it("calls approve_slot, which is the only thing that also schedules the post", async () => {
-    // review_media_asset would sign the asset off and move nothing.
+  it("holds scheduling while the exact Engine Inbox review is incomplete", async () => {
     render(<EngineInboxPanel />);
-    await userEvent.click(await screen.findByRole("button", { name: /final approve/i }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_slot", { p_slot_id: "slot-1" }));
-  });
-
-  it("shows what the database said when it refused", async () => {
-    rpc.mockImplementation((fn: string) => Promise.resolve(fn === "video_approval_state"
-      ? { data: routeState, error: null }
-      : { data: null, error: { message: "That slot is qa, not waiting for approval." } }));
-    render(<EngineInboxPanel />);
-    await userEvent.click(await screen.findByRole("button", { name: /final approve/i }));
-    expect(await screen.findByText(/not waiting for approval/)).toBeInTheDocument();
+    expect(await screen.findByText(/Scheduling is held until this slot/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /approve and schedule/i })).toBeDisabled();
+    expect(rpc).not.toHaveBeenCalledWith("approve_slot", expect.anything());
   });
 });
 
