@@ -124,6 +124,7 @@ describe("every switch in one place", () => {
     state.settings = { ...SETTINGS, publishing_enabled: true };
     render(<ClientSwitchPanel clientId="c1" />);
     expect(await screen.findByText(/Effective state: held — Runtime state has not been verified/)).toBeInTheDocument();
+    expect(screen.getByText("requested on · held")).toBeInTheDocument();
     expect(screen.getAllByText(/Runtime dependency \(read only\): unverified/).length).toBeGreaterThan(0);
   });
 

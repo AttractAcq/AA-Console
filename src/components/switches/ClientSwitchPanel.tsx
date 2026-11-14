@@ -179,7 +179,7 @@ const SWITCHES: SwitchRow[] = [
   {
     key: "proof_publishing",
     label: "Place approved proof",
-    on: "Approved proof is placed on its destination.",
+    on: "Eligible approved proof placements can reach a verified supported destination.",
     off: "Proof placements wait, however they were approved.",
     caveat: "Only Google Business Profile has transport in the runtime today; the other destinations are recorded as unsupported.",
     value: (s) => s.settings?.proof_publishing_enabled ?? null,
@@ -355,7 +355,7 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
-                  {unset ? "not set up" : value ? "on" : "off"}
+                  {unset ? "not set up" : value && blocker ? "requested on · held" : value ? "on" : "off"}
                 </span>
                 {!row.readOnly && (
                 <button
