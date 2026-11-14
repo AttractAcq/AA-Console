@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "bf03496d43b853c77906bb7cc617c3152d6159fd50db1e4a3b0247bbfd59b0e6",
-  "generatedTypesSha256": "dabf4442c0ecd6335c128962bceba389870f0f9bd161557fb218f925f1b4a45c",
-  "generatedSchemaBodySha256": "29bc445a12bc8be7345697aef47ee5bc9cb5e45681328caa06f5677e2c153e6f",
+  "migrationSourceDigest": "8823bef3ef6375758c3e556bea535b6ec8e7a7f4c6d873611e162aa5271c7435",
+  "generatedTypesSha256": "f07d578f9d036148113e69354aefe06ed51ad8a4a581688d7e1c81959d4c033b",
+  "generatedSchemaBodySha256": "6c6f0766f74510e7673173071cbe41b311131a6574edd44e262fe78ca91baea6",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3314,6 +3314,13 @@
       "filename": "20261119200000_456_google_reply_prewrite.sql",
       "sha256": "91e05c717b889342d79a24df14b95a117a28f62c3be086af4defcfb7793d6f6d",
       "trimmedMd5": "f3131572748d5d71fdf42d676daf9d12"
+    },
+    {
+      "version": "20261119210000",
+      "name": "457_google_reply_attempt",
+      "filename": "20261119210000_457_google_reply_attempt.sql",
+      "sha256": "a4b4fcbeb51d3a247b5da8b2b0716723d820c815bc50ef90eb254a438f1fecad",
+      "trimmedMd5": "b5056d023ea754dcd51be0e0b570ccc3"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

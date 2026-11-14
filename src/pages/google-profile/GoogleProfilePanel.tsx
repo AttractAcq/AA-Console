@@ -17,6 +17,7 @@ type ProfileChange = Pick<Database["public"]["Tables"]["google_profile_changes"]
   "id" | "location_id" | "field" | "current_value" | "proposed_value" | "status" | "approved_request_id">;
 type Review = Database["public"]["Tables"]["google_reviews"]["Row"];
 type Reply = Database["public"]["Tables"]["google_review_replies"]["Row"];
+type ReplyOutcome = Database["public"]["Views"]["google_reply_execution_overview_v6"]["Row"];
 type Placement = Database["public"]["Tables"]["proof_placements"]["Row"];
 
 type Tab = "location" | "reviews" | "posts" | "metrics";
@@ -52,6 +53,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
   const [changes, setChanges] = useState<ProfileChange[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [replies, setReplies] = useState<Reply[]>([]);
+  const [replyOutcomes, setReplyOutcomes] = useState<ReplyOutcome[]>([]);
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -73,7 +75,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
       return;
     }
     try {
-      const [locs, board, proposed, revs, reps, place] = await Promise.all([
+      const [locs, board, proposed, revs, reps, outcomes, place] = await Promise.all([
         supabase
           .from("client_google_locations")
           .select("*")
@@ -90,6 +92,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .order("reviewed_at", { ascending: false })
           .limit(100),
         supabase.from("google_review_replies").select("*").eq("client_id", clientId),
+        supabase.from("google_reply_execution_overview_v6").select("*").eq("client_id", clientId),
         supabase
           .from("proof_placements")
           .select("*")
@@ -97,7 +100,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .eq("destination_key", "google_business_profile")
           .order("created_at", { ascending: false }),
       ]);
-      for (const result of [locs, board, proposed, revs, reps, place]) {
+      for (const result of [locs, board, proposed, revs, reps, outcomes, place]) {
         if (result.error) throw new Error(result.error.message);
       }
       if (!isCurrent()) return;
@@ -106,6 +109,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
       setChanges(proposed.data ?? []);
       setReviews(revs.data ?? []);
       setReplies(reps.data ?? []);
+      setReplyOutcomes(outcomes.data ?? []);
       setPlacements(place.data ?? []);
       setError(null);
     } catch (cause) {
@@ -344,6 +348,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
             emptyLabel={loading ? "Loading reviews…" : "No reviews have been read yet"}
             rows={reviews.map((r) => {
               const reply = replyFor(r.id);
+              const outcome = replyOutcomes.find((x) => x.reply_id === reply?.id);
               return [
                 <span key="r">
                   {r.author_name ?? "A Google reviewer"}
@@ -363,7 +368,19 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                   {r.captured_proof_id ? "captured" : "not captured"}
                 </span>,
                 <span key="y" className="text-xs">
-                  {reply ? reply.status.replace(/_/g, " ") : "none"}
+                  {!reply ? "none" : outcome?.status === "confirmed"
+                    ? `Provider readback confirmed${outcome.provider_state ? ` (${outcome.provider_state.toLowerCase()})` : ""}`
+                    : outcome?.status === "uncertain"
+                      ? "Provider outcome uncertain — reconcile before retrying"
+                      : outcome?.status === "started"
+                        ? "Provider write started — awaiting readback"
+                        : outcome?.status === "refused"
+                          ? "Send refused — inspect outcome"
+                          : outcome?.status === "reserved"
+                            ? "Send reserved — no provider write yet"
+                            : reply.status === "approved"
+                              ? "Approved — not sent"
+                              : reply.status.replace(/_/g, " ")}
                   {reply && (reply.status === "drafted" || reply.status === "awaiting_approval")
                     && clientId && (
                       <Link className="mt-1 block text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

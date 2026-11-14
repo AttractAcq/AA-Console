@@ -12905,6 +12905,113 @@ export type Database = {
           },
         ]
       }
+      google_reply_execution_attempts_v6: {
+        Row: {
+          approval_request_id: string
+          body_hash: string
+          claim_key: string
+          client_id: string
+          finished_at: string | null
+          id: string
+          location_ref: string
+          observed_body_hash: string | null
+          outcome_note: string | null
+          provider_state: string | null
+          provider_update_time: string | null
+          reply_id: string
+          reserved_at: string
+          review_ref: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          approval_request_id: string
+          body_hash: string
+          claim_key?: string
+          client_id: string
+          finished_at?: string | null
+          id?: string
+          location_ref: string
+          observed_body_hash?: string | null
+          outcome_note?: string | null
+          provider_state?: string | null
+          provider_update_time?: string | null
+          reply_id: string
+          reserved_at?: string
+          review_ref: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          approval_request_id?: string
+          body_hash?: string
+          claim_key?: string
+          client_id?: string
+          finished_at?: string | null
+          id?: string
+          location_ref?: string
+          observed_body_hash?: string | null
+          outcome_note?: string | null
+          provider_state?: string | null
+          provider_update_time?: string | null
+          reply_id?: string
+          reserved_at?: string
+          review_ref?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_reply_id_fkey"
+            columns: ["reply_id"]
+            isOneToOne: true
+            referencedRelation: "google_review_replies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_review_replies: {
         Row: {
           approved_at: string | null
@@ -27512,6 +27619,101 @@ export type Database = {
           },
         ]
       }
+      google_reply_execution_overview_v6: {
+        Row: {
+          approval_request_id: string | null
+          attempt_id: string | null
+          client_id: string | null
+          finished_at: string | null
+          observed_body_hash: string | null
+          outcome_note: string | null
+          provider_state: string | null
+          provider_update_time: string | null
+          reply_id: string | null
+          reserved_at: string | null
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          approval_request_id?: string | null
+          attempt_id?: string | null
+          client_id?: string | null
+          finished_at?: string | null
+          observed_body_hash?: string | null
+          outcome_note?: string | null
+          provider_state?: string | null
+          provider_update_time?: string | null
+          reply_id?: string | null
+          reserved_at?: string | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          approval_request_id?: string | null
+          attempt_id?: string | null
+          client_id?: string | null
+          finished_at?: string | null
+          observed_body_hash?: string | null
+          outcome_note?: string | null
+          provider_state?: string | null
+          provider_update_time?: string | null
+          reply_id?: string | null
+          reserved_at?: string | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_reply_execution_attempts_v6_reply_id_fkey"
+            columns: ["reply_id"]
+            isOneToOne: true
+            referencedRelation: "google_review_replies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       held_jobs: {
         Row: {
           agent_key: string | null
@@ -31105,6 +31307,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      begin_google_reply_write_v6: {
+        Args: { p_attempt_id: string; p_claim_key: string }
+        Returns: boolean
+      }
       bind_campaign_action_sources_v6: {
         Args: { p_request_id: string }
         Returns: undefined
@@ -31540,6 +31746,10 @@ export type Database = {
           p_payload_hash: string
           p_token_id: string
         }
+        Returns: Json
+      }
+      claim_google_reply_execution_v6: {
+        Args: { p_reply_id: string }
         Returns: Json
       }
       claim_lead_magnet_deliveries: {
@@ -33287,6 +33497,18 @@ export type Database = {
           p_status: string
         }
         Returns: Json
+      }
+      finish_google_reply_execution_v6: {
+        Args: {
+          p_attempt_id: string
+          p_claim_key: string
+          p_note?: string
+          p_observed_body_hash?: string
+          p_outcome: string
+          p_provider_state?: string
+          p_provider_update_time?: string
+        }
+        Returns: boolean
       }
       format_fits_media: {
         Args: {

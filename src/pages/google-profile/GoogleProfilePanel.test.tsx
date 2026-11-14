@@ -61,7 +61,7 @@ const change = (over: Record<string, unknown> = {}) => ({
 
 function database(options: {
   locations?: unknown[]; due?: unknown[]; reviews?: unknown[];
-  replies?: unknown[]; placements?: unknown[]; changes?: unknown[];
+  replies?: unknown[]; replyOutcomes?: unknown[]; placements?: unknown[]; changes?: unknown[];
 } = {}) {
   from.mockImplementation((table: string) => {
     const payload = () => {
@@ -71,6 +71,7 @@ function database(options: {
         case "google_profile_changes": return options.changes ?? [];
         case "google_reviews": return options.reviews ?? [review()];
         case "google_review_replies": return options.replies ?? [];
+        case "google_reply_execution_overview_v6": return options.replyOutcomes ?? [];
         default: return options.placements ?? [];
       }
     };
@@ -382,6 +383,24 @@ describe("reviews", () => {
     expect(screen.queryByRole("menuitem", { name: "Approve this reply" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Reject it" })).not.toBeInTheDocument();
     expect(rpc).not.toHaveBeenCalledWith("decide_google_review_reply_v6", expect.anything());
+  });
+
+  it("shows approval separately from a provider outcome", async () => {
+    database({ replies: [{
+      id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "approved",
+    }] });
+    render(<GoogleProfilePanel tab="reviews" />);
+    expect(await screen.findByText("Approved — not sent")).toBeInTheDocument();
+  });
+
+  it("shows an uncertain provider attempt as requiring reconciliation", async () => {
+    database({
+      replies: [{ id: "reply-1", client_id: "client-1", review_id: "rev-1", status: "approved" }],
+      replyOutcomes: [{ reply_id: "reply-1", client_id: "client-1", status: "uncertain" }],
+    });
+    render(<GoogleProfilePanel tab="reviews" />);
+    expect(await screen.findByText("Provider outcome uncertain — reconcile before retrying"))
+      .toBeInTheDocument();
   });
 });
 

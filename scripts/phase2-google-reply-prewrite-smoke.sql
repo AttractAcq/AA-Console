@@ -35,9 +35,39 @@ begin
 end $decision$;
 select set_config('request.jwt.claim.role','service_role',true);
 do $checks$
+declare a jsonb; v_id uuid; v_key uuid; v_recorded boolean; v_duplicate boolean; v_status text;
 begin
  if not public.google_reply_prewrite_current_v6('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') then
   raise exception 'Current exact reply decision was not eligible'; end if;
+ a:=public.claim_google_reply_execution_v6('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+ if a is null or a->>'exact_body'<>'Thank you'
+  or public.claim_google_reply_execution_v6('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') is not null then
+  raise exception 'Google reply did not reserve exactly one attempt'; end if;
+ v_id:=(a->>'attempt_id')::uuid; v_key:=(a->>'claim_key')::uuid;
+ if public.begin_google_reply_write_v6(v_id,gen_random_uuid())
+  or not public.begin_google_reply_write_v6(v_id,v_key)
+  or public.begin_google_reply_write_v6(v_id,v_key) then
+  raise exception 'Google reply write did not begin exactly once'; end if;
+ begin
+  perform public.finish_google_reply_execution_v6(v_id,v_key,'confirmed',repeat('0',64));
+  raise exception 'Incorrect provider bytes confirmed a Google reply';
+ exception when check_violation then null; end;
+ begin
+  perform public.finish_google_reply_execution_v6(v_id,v_key,'refused',null,null,null,'After write');
+  raise exception 'Started Google write was falsely recorded as refused';
+ exception when check_violation then null; end;
+ v_recorded:=public.finish_google_reply_execution_v6(v_id,v_key,'confirmed',a->>'body_hash',
+  '2026-11-15T00:00:00Z','PUBLISHED');
+ v_duplicate:=public.finish_google_reply_execution_v6(v_id,v_key,'confirmed',a->>'body_hash');
+ select status into v_status from public.google_reply_execution_attempts_v6 where id=v_id;
+ if not v_recorded or v_duplicate or v_status<>'confirmed' then
+  raise exception 'Exact Google readback failed: first %, second %, status %',
+    v_recorded,v_duplicate,v_status; end if;
+ perform set_config('request.jwt.claim.role','authenticated',true);
+ if (select status from public.google_reply_execution_overview_v6
+   where attempt_id=v_id) is distinct from 'confirmed' then
+   raise exception 'Client approval owner could not read the execution outcome'; end if;
+ perform set_config('request.jwt.claim.role','service_role',true);
  update public.google_reviews set comment='Changed review'
   where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
  if public.google_reply_prewrite_current_v6('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') then
