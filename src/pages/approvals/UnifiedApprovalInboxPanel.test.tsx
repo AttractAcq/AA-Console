@@ -47,6 +47,7 @@ const request = {
 
 let requests: unknown[];
 let decisions: unknown[];
+let gatewayOutcomes: unknown[];
 let requestError: { message: string } | null;
 let decisionError: { message: string } | null;
 let freshRequest: unknown | undefined;
@@ -683,7 +684,8 @@ function wireDatabase() {
         error: requestError,
       }),
       order: () => table === "approval_inbox_v6" ? query
-        : Promise.resolve({ data: decisions, error: decisionError }),
+        : Promise.resolve({ data: table === "gateway_tool_execution_overview_v6"
+          ? gatewayOutcomes : decisions, error: decisionError }),
       range: async (start: number, end: number) => {
         requestRanges.push([start, end]);
         const filtered = requests.filter((row) => filters.every(([column, value]) =>
@@ -703,6 +705,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   requests = [request];
   decisions = [];
+  gatewayOutcomes = [];
   requestError = null;
   decisionError = null;
   freshRequest = undefined;
@@ -1294,6 +1297,30 @@ describe("unified approval inbox", () => {
     show();
     const card = await screen.findByRole("article", { name: readyGatewayTool.title });
     expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("shows gateway execution outcome and revokes an approved exact card with a reason", async () => {
+    requests = [{ ...readyGatewayTool, status: "approved", source_state: "source_decided" }];
+    gatewayOutcomes = [{ approval_id: gatewayApprovalId, execution_status: "completed",
+      claimed_at: "2026-11-19T12:00:00Z", finished_at: "2026-11-19T12:01:00Z",
+      result_hash: "f".repeat(64) }];
+    show("client", `/approvals?source=${gatewayApprovalId}`);
+    const card = await screen.findByRole("article", { name: readyGatewayTool.title });
+    expect(within(card).getByText("Status: completed")).toBeInTheDocument();
+    expect(within(card).getByText(/not an external provider receipt/)).toBeInTheDocument();
+    await userEvent.type(within(card).getByRole("textbox", { name: "Reason to revoke" }), "Operator stop");
+    await userEvent.click(within(card).getByRole("button", { name: "Revoke with reason" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("revoke_gateway_tool_review_v6", {
+      p_approval_id: gatewayApprovalId, p_request_id: readyGatewayTool.id, p_reason: "Operator stop",
+    }));
+  });
+
+  it("holds revocation when an approved gateway destination changes", async () => {
+    requests = [{ ...readyGatewayTool, status: "approved", source_state: "source_decided",
+      destination: "gateway:bot_production:workflow.create_task" }];
+    show("client", `/approvals?source=${gatewayApprovalId}`);
+    const card = await screen.findByRole("article", { name: readyGatewayTool.title });
+    expect(within(card).queryByRole("button", { name: "Revoke with reason" })).not.toBeInTheDocument();
   });
 
   it("unlocks ordinary creative approval only after downloading the exact stored file", async () => {

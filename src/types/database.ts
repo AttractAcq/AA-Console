@@ -11872,6 +11872,13 @@ export type Database = {
             foreignKeyName: "gateway_tool_execution_receipts_v6_approval_id_fkey"
             columns: ["approval_id"]
             isOneToOne: true
+            referencedRelation: "gateway_tool_execution_overview_v6"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_execution_receipts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
             referencedRelation: "gateway_tool_reviews_v6"
             referencedColumns: ["id"]
           },
@@ -27215,6 +27222,61 @@ export type Database = {
         }
         Relationships: []
       }
+      gateway_tool_execution_overview_v6: {
+        Row: {
+          approval_id: string | null
+          canonical_request_id: string | null
+          claimed_at: string | null
+          client_id: string | null
+          execution_status: string | null
+          finished_at: string | null
+          result_hash: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gateway_tool_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       google_ads_build_due: {
         Row: {
           action_supported: boolean | null
@@ -36093,6 +36155,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      revoke_gateway_tool_review_v6: {
+        Args: { p_approval_id: string; p_reason: string; p_request_id: string }
+        Returns: string
       }
       revoke_lead_magnet_approval_v6: {
         Args: { p_approval_id: string; p_reason: string }

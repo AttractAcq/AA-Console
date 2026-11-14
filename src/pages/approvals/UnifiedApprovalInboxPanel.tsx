@@ -55,6 +55,14 @@ export interface UnifiedApprovalDecision {
   event_order?: number;
 }
 
+type GatewayOutcome = {
+  approval_id: string;
+  execution_status: string;
+  claimed_at: string | null;
+  finished_at: string | null;
+  result_hash: string | null;
+};
+
 function validatedRequest(row: ApprovalViewRow): UnifiedApprovalRequest {
   for (const key of ["id", "source_system", "source_kind", "source_id",
     "source_version", "title", "status", "requested_at", "requester_kind"] as const) {
@@ -892,10 +900,13 @@ function isClientAuthorityAssignmentReady(request: UnifiedApprovalRequest, clien
     && request.owner_role === "admin";
 }
 
-function isGatewayToolReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+function isGatewayToolReady(request: UnifiedApprovalRequest, clientId: string,
+  mode: "pending" | "approved" = "pending"): boolean {
+  const pending = mode === "pending";
   if (request.source_system !== "aa_console" || request.source_kind !== "gateway_tool"
-    || request.client_id !== clientId || request.status !== "pending"
-    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || request.client_id !== clientId || request.status !== mode
+    || request.source_state !== (pending ? "pending" : "source_decided")
+    || (pending && isExpired(request)) || previewMissing(request)
     || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
     || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
   const preview = request.preview as Record<string, unknown>;
@@ -918,6 +929,10 @@ function isGatewayToolReady(request: UnifiedApprovalRequest, clientId: string): 
     && scope.effect === "allow_one_gateway_tool_execution"
     && request.destination === `gateway:${preview.bot_id}:${preview.tool}`
     && request.owner_role === "admin";
+}
+
+function isGatewayToolRevocable(request: UnifiedApprovalRequest, clientId: string): boolean {
+  return isGatewayToolReady(request, clientId, "approved");
 }
 
 function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): boolean {
@@ -1059,14 +1074,15 @@ function exactHtml(preview: unknown): string | null {
   return typeof html === "string" && html.trim() ? html : null;
 }
 
-function RequestCard({ request, history, clientId, manager, aal, busy, onDecide }: {
+function RequestCard({ request, history, gatewayOutcome, clientId, manager, aal, busy, onDecide }: {
   request: UnifiedApprovalRequest;
   history: UnifiedApprovalDecision[];
+  gatewayOutcome?: GatewayOutcome;
   clientId: string;
   manager: boolean;
   aal: "aal2" | "aal1" | "unavailable";
   busy: boolean;
-  onDecide: (request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) => Promise<void>;
+  onDecide: (request: UnifiedApprovalRequest, decision: "approved" | "rejected" | "revoked", reason?: string) => Promise<void>;
 }) {
   const [rejectionReason, setRejectionReason] = useState("");
   const [downloadedMagnetHash, setDownloadedMagnetHash] = useState<string | null>(null);
@@ -1113,6 +1129,7 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
     && typeof creativeAsset.file_sha256 === "string";
   const canReject = !salesManagerCard && isRejectionReady(request, clientId);
   const canApprove = !salesManagerCard && isApprovalReady(request, clientId);
+  const canRevoke = !manager && isGatewayToolRevocable(request, clientId);
   const decisionLabel = request.source_kind === "google_review_reply"
     ? "Google review reply" : request.source_kind === "recruitment_brief"
       ? "Recruitment brief" : request.source_kind === "client_sales_entitlement"
@@ -1289,7 +1306,16 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
         )}
       </details>
 
-      {(canApprove || canReject) && (
+      {request.source_kind === "gateway_tool" && <div className="mt-4 rounded-lg border border-border p-3 text-sm">
+        <p className="font-medium">Gateway execution outcome</p>
+        <p>Status: {gatewayOutcome?.execution_status ?? "Unavailable"}</p>
+        {gatewayOutcome?.claimed_at && <p>Claimed: {dateLabel(gatewayOutcome.claimed_at)}</p>}
+        {gatewayOutcome?.finished_at && <p>Finished: {dateLabel(gatewayOutcome.finished_at)}</p>}
+        {gatewayOutcome?.result_hash && <p className="break-all">Gateway result digest: {gatewayOutcome.result_hash}</p>}
+        <p className="mt-1 text-xs text-muted-foreground">This gateway outcome is not an external provider receipt.</p>
+      </div>}
+
+      {(canApprove || canReject || canRevoke) && (
         <div className="mt-4 space-y-3 rounded-lg border border-border p-3">
           <p className="text-sm font-medium">{decisionLabel} decision</p>
           <p className="text-xs text-muted-foreground">
@@ -1312,7 +1338,7 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
               Approve exact version
             </button>}
-            {canReject && <label className="min-w-48 flex-1 text-sm">Reason to reject
+          {(canReject || canRevoke) && <label className="min-w-48 flex-1 text-sm">{canRevoke ? "Reason to revoke" : "Reason to reject"}
               <input value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)}
                 disabled={busy || aal !== "aal2"} className="mt-1 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
             </label>}
@@ -1320,6 +1346,11 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
               onClick={() => void onDecide(request, "rejected", rejectionReason.trim())}
               className="self-end rounded-lg border border-border px-4 py-2 text-sm font-medium disabled:opacity-50">
               Reject with reason
+            </button>}
+            {canRevoke && <button type="button" disabled={busy || aal !== "aal2" || !rejectionReason.trim()}
+              onClick={() => void onDecide(request, "revoked", rejectionReason.trim())}
+              className="self-end rounded-lg border border-border px-4 py-2 text-sm font-medium disabled:opacity-50">
+              Revoke with reason
             </button>}
           </div>
         </div>
@@ -1350,6 +1381,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
   const initialSource = new URLSearchParams(location.search).get("source");
   const [requests, setRequests] = useState<UnifiedApprovalRequest[]>([]);
   const [decisions, setDecisions] = useState<UnifiedApprovalDecision[]>([]);
+  const [gatewayOutcomes, setGatewayOutcomes] = useState<Record<string, GatewayOutcome>>({});
   const [statusFilter, setStatusFilter] = useState(initialSource ? "all" : "pending");
   const [clientFilter, setClientFilter] = useState<string | null>(null);
   const [kindFilter, setKindFilter] = useState<string | null>(null);
@@ -1398,6 +1430,19 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         if (decisionResult.error) throw decisionResult.error;
         decisionRows = decisionResult.data ?? [];
       }
+      const gatewayIds = rows.filter((row) => row.source_kind === "gateway_tool"
+        && row.source_id !== null).map((row) => row.source_id as string);
+      const outcomeMap: Record<string, GatewayOutcome> = {};
+      if (gatewayIds.length > 0) {
+        const gatewayResult = await supabase.from("gateway_tool_execution_overview_v6")
+          .select("approval_id,execution_status,claimed_at,finished_at,result_hash")
+          .in("approval_id", gatewayIds).order("approval_id");
+        if (gatewayResult.error) throw gatewayResult.error;
+        for (const outcome of gatewayResult.data ?? []) {
+          if (outcome.approval_id && gatewayIds.includes(outcome.approval_id))
+            outcomeMap[outcome.approval_id] = outcome as GatewayOutcome;
+        }
+      }
       if (sequence !== refreshSequence.current) return;
       try {
         const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
@@ -1409,6 +1454,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       }
       setRequests(rows);
       setDecisions(decisionRows);
+      setGatewayOutcomes(outcomeMap);
       setHasNextPage(pageRows.length > PAGE_SIZE);
       setError(null);
     } catch (cause) {
@@ -1435,7 +1481,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
     void refresh();
   }
 
-  async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) {
+  async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected" | "revoked", reason?: string) {
     const targetClientId = multiClient ? request.client_id : clientId;
     const agencyWide = multiClient && !manager && request.client_id === null
       && ["global_engine_activation", "global_video_owner"].includes(request.source_kind);
@@ -1443,9 +1489,9 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
     if ((!targetClientId && !agencyWide)
       || (manager && request.source_kind === "client_sales_entitlement")
       || (!agencyWide && request.client_id !== targetClientId)
-      || (decision === "approved"
-      ? !isApprovalReady(request, scopeId)
-      : !isRejectionReady(request, scopeId))) return;
+      || (decision === "approved" ? !isApprovalReady(request, scopeId)
+        : decision === "revoked" ? !isGatewayToolRevocable(request, scopeId)
+          : !isRejectionReady(request, scopeId))) return;
     setBusyId(request.id);
     setDecisionError(null);
     try {
@@ -1462,14 +1508,14 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         : currentQuery.eq("client_id", targetClientId!).maybeSingle());
       if (current.error) throw current.error;
       const currentRequest = current.data ? validatedRequest(current.data) : null;
-      if (!currentRequest || (decision === "approved"
-        ? !isApprovalReady(currentRequest, scopeId)
-        : !isRejectionReady(currentRequest, scopeId))
+      if (!currentRequest || (decision === "approved" ? !isApprovalReady(currentRequest, scopeId)
+        : decision === "revoked" ? !isGatewayToolRevocable(currentRequest, scopeId)
+          : !isRejectionReady(currentRequest, scopeId))
         || !sameVersion(request, currentRequest)) {
-        throw new Error("This exact request changed or is no longer pending. Review the refreshed card before deciding.");
+        throw new Error("This exact request changed or is no longer eligible. Review the refreshed card before deciding.");
       }
-      if (decision === "rejected" && !reason?.trim()) {
-        throw new Error("Enter a reason before rejecting this request.");
+      if (decision !== "approved" && !reason?.trim()) {
+        throw new Error(`Enter a reason before ${decision === "revoked" ? "revoking" : "rejecting"} this request.`);
       }
       const outcome = request.source_kind === "google_review_reply"
         ? await supabase.rpc("decide_google_review_reply_from_inbox_v6", {
@@ -1623,7 +1669,10 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
               ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
             })
         : request.source_kind === "gateway_tool"
-          ? await supabase.rpc("decide_gateway_tool_review_v6", {
+          ? decision === "revoked" ? await supabase.rpc("revoke_gateway_tool_review_v6", {
+              p_approval_id: request.source_id, p_request_id: request.id,
+              p_reason: reason!.trim(),
+            }) : await supabase.rpc("decide_gateway_tool_review_v6", {
               p_approval_id: request.source_id, p_request_id: request.id,
               p_approved: decision === "approved",
               ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
@@ -1807,6 +1856,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
                 : "No requests match these filters."}
             </p> : <div className="space-y-4">{visible.map((request) => (
               <RequestCard key={request.id} request={request} history={historyByRequest.get(request.id) ?? []}
+                gatewayOutcome={gatewayOutcomes[request.source_id]}
                 clientId={multiClient ? request.client_id ?? "" : clientId ?? ""}
                 manager={manager}
                 aal={aal} busy={busyId === request.id} onDecide={decide} />

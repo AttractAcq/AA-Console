@@ -68,6 +68,24 @@ begin
   or (public.claim_gateway_tool_execution_v6(aid,tid,ph,
    '88888888-8888-4888-8888-888888888888')->>'claimed')::boolean then
   raise exception 'Gateway outcome did not remain final'; end if;
+ perform set_config('request.jwt.claim.role','authenticated',true);
+ perform set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
+ if (select execution_status from public.gateway_tool_execution_overview_v6
+  where approval_id=aid)<>'completed' then
+  raise exception 'Admin Inbox outcome view did not show the final gateway state'; end if;
+ begin
+  perform public.revoke_gateway_tool_review_v6(aid,rid,'Withdraw tool access');
+  raise exception 'AAL1 revoked the gateway tool';
+ exception when insufficient_privilege then null; end;
+ perform set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+ perform public.revoke_gateway_tool_review_v6(aid,rid,'Withdraw tool access');
+ if (select status from public.approval_inbox_v6 where id=rid)<>'revoked'
+  then raise exception 'Revocation was not visible in the canonical Inbox'; end if;
+ perform set_config('request.jwt.claim.role','service_role',true);
+ if (public.attest_gateway_tool_review_v6(aid,tid,ph)->>'approved')::boolean
+  then raise exception 'Revoked gateway tool still attested approved'; end if;
  update mcp_internal.mcp_bot_tokens set revoked_at=now() where token_id=tid;
  update mcp_internal.mcp_bot_tokens set revoked_at=null where token_id=tid;
  if (public.attest_gateway_tool_review_v6(aid,tid,ph)->>'approved')::boolean

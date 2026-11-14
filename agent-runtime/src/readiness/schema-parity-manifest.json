@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "332faa75c32230f0a47e227f69f4e6c7fc02a3ad7eda32d18e0576f148a0abb0",
-  "generatedTypesSha256": "e0da133e37cbe8ed0dad10584a26b656c06145320ac9f27c13667deeb78f6275",
-  "generatedSchemaBodySha256": "a712652bf7436800bea6bbf3350ad357da0bed82f96780b7706b8bfd81e2136d",
+  "migrationSourceDigest": "44d83217348cf2d36d79afa4206cce244bbe82e47d5c0ee4a2b13f198d1c53b1",
+  "generatedTypesSha256": "401124dbfc4bdfb185d94f4121bd52cce4f4955a085004bca16339f7742552f0",
+  "generatedSchemaBodySha256": "bb02c7b705b566153d39edcd609bc91e993360dcec0f5c312ecffd3da771d64e",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3279,6 +3279,13 @@
       "filename": "20261119150000_451_gateway_receipt_coverage.sql",
       "sha256": "e8a3fd824a96eee0960651cbea40bc89e6df20069e863b2521be831206182921",
       "trimmedMd5": "b58c7709cccbfcf76d731f01c10fdeb5"
+    },
+    {
+      "version": "20261119160000",
+      "name": "452_gateway_outcome_and_revocation",
+      "filename": "20261119160000_452_gateway_outcome_and_revocation.sql",
+      "sha256": "ff2e5ae6190a848b8725448f7864afe46d31670a2f1149a3e370475ff884734f",
+      "trimmedMd5": "71fb013cba633d579001766fe187cb69"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
