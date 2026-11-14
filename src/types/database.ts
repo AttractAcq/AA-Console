@@ -12072,6 +12072,8 @@ export type Database = {
           applied_at: string | null
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           attempts: number
           claimed_at: string | null
           client_id: string
@@ -12094,6 +12096,8 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           attempts?: number
           claimed_at?: string | null
           client_id: string
@@ -12116,6 +12120,8 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           attempts?: number
           claimed_at?: string | null
           client_id?: string
@@ -12140,6 +12146,20 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_changes_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_changes_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
           {
@@ -12190,6 +12210,89 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "google_profile_due"
             referencedColumns: ["location_id"]
+          },
+        ]
+      }
+      google_profile_review_requests_v6: {
+        Row: {
+          canonical_request_id: string | null
+          change_id: string
+          client_id: string
+          created_at: string
+          id: string
+          request_token: string
+          review_epoch: number
+          source_hash: string
+        }
+        Insert: {
+          canonical_request_id?: string | null
+          change_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          request_token?: string
+          review_epoch?: never
+          source_hash?: string
+        }
+        Update: {
+          canonical_request_id?: string | null
+          change_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_token?: string
+          review_epoch?: never
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_profile_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_change_id_fkey"
+            columns: ["change_id"]
+            isOneToOne: false
+            referencedRelation: "google_profile_changes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_profile_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -30620,6 +30723,15 @@ export type Database = {
         }
         Returns: string
       }
+      decide_google_profile_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decide_google_review_reply_from_inbox_v6: {
         Args: {
           p_approved: boolean
@@ -31236,6 +31348,28 @@ export type Database = {
           p_sheet: Database["public"]["Tables"]["google_ads_build_sheets"]["Row"]
         }
         Returns: Json
+      }
+      google_profile_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["google_profile_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      google_profile_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["google_profile_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      google_profile_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["google_profile_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      google_profile_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
       }
       google_reply_inbox_payload_v6: {
         Args: {
@@ -33371,6 +33505,10 @@ export type Database = {
       }
       request_engine_slot_exact_review_v6: {
         Args: { p_slot_id: string }
+        Returns: string
+      }
+      request_google_profile_review_v6: {
+        Args: { p_change_id: string }
         Returns: string
       }
       request_human_video_edit: {

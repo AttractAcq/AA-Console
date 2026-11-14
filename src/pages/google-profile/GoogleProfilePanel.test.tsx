@@ -55,7 +55,7 @@ const review = (over: Record<string, unknown> = {}) => ({
 const change = (over: Record<string, unknown> = {}) => ({
   id: "change-1", client_id: "client-1", location_id: "loc-1",
   field: "description", current_value: "Old description", proposed_value: "New description",
-  status: "approved", attempts: 0, applied_at: null, last_error: null,
+  status: "approved", approved_request_id: null, attempts: 0, applied_at: null, last_error: null,
   created_at: "2026-10-24T09:00:00Z", ...over,
 });
 
@@ -181,6 +181,16 @@ describe("the location", () => {
     expect(screen.getByText("Held; no field PATCH will be claimed.")).toBeInTheDocument();
     expect(screen.getByText(/exact-version AAL2 Approval Inbox decision/)).toBeInTheDocument();
     expect(from).toHaveBeenCalledWith("google_profile_changes");
+    expect(screen.getByText("Pre-Inbox approval")).toBeInTheDocument();
+  });
+
+  it("requests exact Inbox review for a pending location proposal", async () => {
+    database({ changes: [change({ status: "drafted" })] });
+    render(<GoogleProfilePanel tab="location" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Request Inbox review" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_google_profile_review_v6", {
+      p_change_id: "change-1",
+    }));
   });
 
   it("leads with the blocker when the credential cannot see the location", async () => {

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "09506042d244eb0622c24a28ea6b6c996b854f32650e098be558f5b24aeffe4f",
-  "generatedTypesSha256": "b3826f51728e549d5549970a42fb521f31fdb685aad1e8317b56b51bbbc22877",
-  "generatedSchemaBodySha256": "5bc9e1fede93a69c761f2317cc4478c840dd0e47d12bb104b73dff6a9d27b73d",
+  "migrationSourceDigest": "69291971c486082d5acbf4690c9a6945aeb4a7ce30e940bcb458968aad681267",
+  "generatedTypesSha256": "2745aef53cced0424e72391cead91eb143f6797179542635b2e92cc8eb9f3778",
+  "generatedSchemaBodySha256": "a526665dd1e7f1399687b5f67eba90e5986ea1ebdb692564f0ed66fb96d70b54",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2845,6 +2845,27 @@
       "filename": "20261117010000_389_meta_profile_change_coverage.sql",
       "sha256": "af1a61f92e3ba9adbb08fd863580a4ae861ff4075688393a742d9ab9dbc6e68d",
       "trimmedMd5": "352f5b12bb6a1ad43e2ca711e56b4035"
+    },
+    {
+      "version": "20261117020000",
+      "name": "390_google_profile_change_inbox",
+      "filename": "20261117020000_390_google_profile_change_inbox.sql",
+      "sha256": "8aadc8a730ef9f3cd515a82758c045cc8e7a2fd926b708c2476346530467e2bb",
+      "trimmedMd5": "e24698f67a149d5d625e77e90f9052b7"
+    },
+    {
+      "version": "20261117030000",
+      "name": "391_google_profile_inbox_view",
+      "filename": "20261117030000_391_google_profile_inbox_view.sql",
+      "sha256": "b312609928f81e1d88fec5a96ea79439c282b213af85730e175c1f026bbc13da",
+      "trimmedMd5": "4ef3d0e8e2b32169e6ddc5e8eaf3d93e"
+    },
+    {
+      "version": "20261117040000",
+      "name": "392_google_profile_change_coverage",
+      "filename": "20261117040000_392_google_profile_change_coverage.sql",
+      "sha256": "baaab5bc85e3356a3a45f7d3cbf7071dce24d3f56824299c17b93c93361c4002",
+      "trimmedMd5": "12fd995a3be2f3a988879c5969449d30"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

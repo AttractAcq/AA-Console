@@ -11,7 +11,7 @@ import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "campaign_action", "client_sales_entitlement", "engine_slot",
-  "google_review_reply", "lead_magnet", "meta_profile_change", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer",
+  "google_profile_change", "google_review_reply", "lead_magnet", "meta_profile_change", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -522,6 +522,32 @@ function isMetaProfileChangeReady(request: UnifiedApprovalRequest, clientId: str
     && request.owner_role === "admin_or_active_client_manager";
 }
 
+function isGoogleProfileChangeReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "google_profile_change"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const hash = request.artifact_hash;
+  return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
+    && typeof preview.request_token === "string" && !!preview.request_token
+    && request.source_version === `${hash}:${preview.request_token}`
+    && preview.client_id === clientId && typeof preview.change_id === "string"
+    && typeof preview.location_id === "string" && !!preview.location_id
+    && typeof preview.location_ref === "string" && !!preview.location_ref
+    && typeof preview.field === "string" && !!preview.field
+    && typeof preview.proposed_value === "string" && !!preview.proposed_value
+    && scope.client_id === clientId && scope.change_id === preview.change_id
+    && scope.location_id === preview.location_id
+    && scope.review_id === request.source_id && scope.request_token === preview.request_token
+    && scope.content_hash === hash && scope.effect === "google_profile_proposal_only"
+    && request.destination === `google_profile:${preview.location_ref}:${preview.field}`
+    && request.account_ref === preview.location_ref
+    && request.owner_role === "admin_or_active_client_manager";
+}
+
 function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   if (request.source_system !== "aa_console" || request.source_kind !== "engine_slot"
     || request.client_id !== clientId || request.status !== "pending"
@@ -574,7 +600,8 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isEngineSlotReady(request, clientId)
     || isOrdinaryMediaReady(request, clientId)
     || isProofDeliveryReady(request, clientId)
-    || isMetaProfileChangeReady(request, clientId);
+    || isMetaProfileChangeReady(request, clientId)
+    || isGoogleProfileChangeReady(request, clientId);
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
@@ -592,7 +619,8 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isEngineSlotReady(request, clientId)
     || isOrdinaryMediaReady(request, clientId)
     || isProofDeliveryReady(request, clientId)
-    || isMetaProfileChangeReady(request, clientId);
+    || isMetaProfileChangeReady(request, clientId)
+    || isGoogleProfileChangeReady(request, clientId);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
@@ -1111,6 +1139,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             })
         : request.source_kind === "meta_profile_change"
           ? await supabase.rpc("decide_meta_profile_inbox_v6", {
+              p_review_id: request.source_id, p_request_id: request.id,
+              p_approved: decision === "approved",
+              ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+            })
+        : request.source_kind === "google_profile_change"
+          ? await supabase.rpc("decide_google_profile_inbox_v6", {
               p_review_id: request.source_id, p_request_id: request.id,
               p_approved: decision === "approved",
               ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),

@@ -324,6 +324,28 @@ const readyMetaProfileChange = {
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
 };
 
+const googleProfileReviewId = "24242424-2424-4242-8242-242424242424";
+const googleProfileToken = "25252525-2525-4252-8252-252525252525";
+const googleProfileHash = "e".repeat(64);
+const readyGoogleProfileChange = {
+  ...request, id: "google-profile-inbox-1", source_system: "aa_console",
+  source_kind: "google_profile_change", source_id: googleProfileReviewId,
+  source_version: `${googleProfileHash}:${googleProfileToken}`,
+  artifact_hash: googleProfileHash, title: "Review Google profile description at Test location",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: "google_profile:accounts/test/locations/one:description",
+  account_ref: "accounts/test/locations/one", budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", change_id: "change-1", request_token: googleProfileToken,
+    location_id: "location-1", location_ref: "accounts/test/locations/one",
+    location_title: "Test location", field: "description",
+    current_value: "Old description", proposed_value: "New description" },
+  scope: { client_id: "client-1", change_id: "change-1", location_id: "location-1",
+    review_id: googleProfileReviewId, request_token: googleProfileToken,
+    content_hash: googleProfileHash, effect: "google_profile_proposal_only" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
 const engineTime = "2026-11-20T09:00:00+00:00";
@@ -769,6 +791,18 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_meta_profile_inbox_v6", {
       p_review_id: metaProfileReviewId, p_request_id: readyMetaProfileChange.id,
+      p_approved: true,
+    }));
+  });
+
+  it("routes an exact Google profile proposal through its owning Inbox RPC", async () => {
+    requests = [readyGoogleProfileChange];
+    show();
+    const card = await screen.findByRole("article", { name: readyGoogleProfileChange.title });
+    expect(within(card).getByText(/New description/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_google_profile_inbox_v6", {
+      p_review_id: googleProfileReviewId, p_request_id: readyGoogleProfileChange.id,
       p_approved: true,
     }));
   });

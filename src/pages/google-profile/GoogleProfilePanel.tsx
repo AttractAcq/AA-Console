@@ -14,7 +14,7 @@ import { PROFILE_FIELD_PATCH_HOLD } from "../../../agent-runtime/src/profiles/pr
 type Location = Database["public"]["Tables"]["client_google_locations"]["Row"];
 type ProfileDue = Database["public"]["Views"]["google_profile_due"]["Row"];
 type ProfileChange = Pick<Database["public"]["Tables"]["google_profile_changes"]["Row"],
-  "id" | "location_id" | "field" | "current_value" | "proposed_value" | "status">;
+  "id" | "location_id" | "field" | "current_value" | "proposed_value" | "status" | "approved_request_id">;
 type Review = Database["public"]["Tables"]["google_reviews"]["Row"];
 type Reply = Database["public"]["Tables"]["google_review_replies"]["Row"];
 type Placement = Database["public"]["Tables"]["proof_placements"]["Row"];
@@ -81,7 +81,7 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
           .order("created_at", { ascending: false }),
         supabase.from("google_profile_due").select("*").eq("client_id", clientId),
         supabase.from("google_profile_changes")
-          .select("id,location_id,field,current_value,proposed_value,status")
+          .select("id,location_id,field,current_value,proposed_value,status,approved_request_id")
           .eq("client_id", clientId).order("created_at", { ascending: false }).limit(100),
         supabase
           .from("google_reviews")
@@ -282,12 +282,16 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
             <div>
               <h3 className="font-semibold">Recent recorded field proposals</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Approval in the older profile-change table does not authorize a provider PATCH.
-                These records need an exact Approval Inbox decision and prewrite verification.
+                Request an exact Approval Inbox decision for a pending proposal. Provider PATCH
+                remains held until its location, credential and field are verified at execution.
               </p>
+              {clientId && <Link className="mt-2 inline-block text-xs underline"
+                to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>
+                Open Approval Inbox
+              </Link>}
             </div>
             <DataTable
-              columns={["Location", "Field", "Current", "Proposed", "Record status", "Execution"]}
+              columns={["Location", "Field", "Current", "Proposed", "Record status", "Execution", "Review"]}
               emptyLabel={loading ? "Loading…" : "No profile field proposal has been recorded"}
               rows={changes.map((change) => [
                 <span key="location" className="text-xs">
@@ -296,7 +300,12 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                 <span key="field">{change.field.replace(/_/g, " ")}</span>,
                 <span key="current" className="text-xs">{change.current_value ?? "empty"}</span>,
                 <span key="proposed" className="text-xs">{change.proposed_value}</span>,
-                <span key="status">{change.status.replace(/_/g, " ")}</span>,
+                <span key="status">
+                  {change.status.replace(/_/g, " ")}
+                  {change.status === "approved" && <span className="block text-xs text-muted-foreground">
+                    {change.approved_request_id ? "Exact Inbox decision" : "Pre-Inbox approval"}
+                  </span>}
+                </span>,
                 <span key="execution" className={change.status === "applied"
                   ? "text-xs text-muted-foreground" : "text-xs text-destructive"}>
                   {change.status === "applied"
@@ -304,6 +313,18 @@ function GoogleProfileClientPanel({ clientId, tab }: { clientId?: string; tab: T
                     : change.status === "rejected"
                       ? "Rejected; no field PATCH."
                       : "Held; no field PATCH will be claimed."}
+                </span>,
+                <span key="review">
+                  {["drafted", "awaiting_approval"].includes(change.status) &&
+                    <button type="button" className="rounded border border-border px-2 py-1 text-xs disabled:opacity-50"
+                      disabled={busy !== null}
+                      onClick={() => void act(`profile-review:${change.id}`, async () => {
+                        const result = await supabase.rpc("request_google_profile_review_v6", {
+                          p_change_id: change.id,
+                        });
+                        if (result.error) throw result.error;
+                      }, "Exact profile proposal sent to Approval Inbox.")}
+                    >Request Inbox review</button>}
                 </span>,
               ])}
             />
