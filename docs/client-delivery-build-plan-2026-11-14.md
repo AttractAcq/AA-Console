@@ -138,6 +138,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Gateway outcome and revocation checkpoint, 14 November 2026:** The Unified Inbox now reads a client-scoped gateway outcome view and shows claim/final timestamps and the gateway result digest, explicitly separate from an external provider receipt. A provisioned AAL2 admin can revoke an approved exact card with a reason; an AAL1 attempt fails and revocation makes later attestation fail. The local rollback fixture, all 34 Phase 2 SQL fixtures and 86 focused Inbox tests pass. This closes the operator-visible outcome gap for gateway tools. Class 31 remains **blocked** pending a connected gateway-to-runtime-to-Inbox test, historical SQLite-card reconciliation, provider-specific prewrite checks and a real external receipt.
 
+**Gateway connected-smoke checkpoint, 14 November 2026:** `scripts/phase2-gateway-connected-smoke.mjs` exercised the gateway ActionEngine, the actual runtime HTTP route, the local Supabase service RPC and a provisioned AAL2 Inbox decision. The gateway refused execution while the canonical request was pending, then claimed and finished a single informational tool execution after approval; the Console outcome view showed `completed`. This closes the missing connected test. It creates local fixture rows and requires a local database reset afterward. Class 31 remains **blocked** pending historical SQLite-card reconciliation, provider-specific prewrite checks and an observed external provider receipt.
+
 ## Phase 3 — Intelligence, Market Opportunities, Offer Studio and proof inputs
 
 ### Intelligence OS
