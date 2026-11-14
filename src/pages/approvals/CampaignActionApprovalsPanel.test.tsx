@@ -215,4 +215,15 @@ it("reports a failed attempt's error rather than leaving it blank", async () => 
   render(<CampaignActionApprovalsPanel />);
   expect(await screen.findByText(/refused the post \(403\)/)).toBeInTheDocument();
   expect(screen.getByText(/2 attempts/)).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent("1 failed or stopped action; 0 approved actions held before an attempt.");
+  expect(screen.getByRole("link", { name: "Review blockers and attempt receipts" }))
+    .toHaveAttribute("href", "#campaign-action-outcomes");
+});
+
+it("alerts the owning queue when an approved action is held before execution", async () => {
+  database({ due: [{ ...done, execution_status: "not_attempted", execution_id: null,
+    blocker: "Client switch is off.", external_id: null, external_url: null }] });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByText("Campaign action owner attention")).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent("0 failed or stopped actions; 1 approved action held before an attempt.");
 });

@@ -29,6 +29,10 @@ export function CampaignActionApprovalsPanel() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reasonById, setReasonById] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const failedCount = decided.filter((action) =>
+    action.execution_status === "failed" || action.execution_status === "abandoned").length;
+  const heldCount = decided.filter((action) =>
+    action.execution_status === "not_attempted" && Boolean(action.blocker || runtimeHold)).length;
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -157,6 +161,15 @@ export function CampaignActionApprovalsPanel() {
           ? `Campaign action execution is held: ${runtimeHold} An approval alone does not release this hold.`
           : "The owned campaign action worker is observed and attested. Each action still requires exact approval and last-moment checks."}
       </p>
+      {!loading && (failedCount > 0 || heldCount > 0) && (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
+          <p className="font-medium">Campaign action owner attention</p>
+          <p className="mt-1">
+            {failedCount} failed or stopped action{failedCount === 1 ? "" : "s"}; {heldCount} approved action{heldCount === 1 ? "" : "s"} held before an attempt.
+          </p>
+          <a href="#campaign-action-outcomes" className="mt-2 inline-block text-primary underline">Review blockers and attempt receipts</a>
+        </div>
+      )}
 
       {/* Decisions remain here; the one client control lives on Dashboard. */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
@@ -235,7 +248,7 @@ export function CampaignActionApprovalsPanel() {
       {/* Everything already approved, and what became of it. An approval
           whose outcome nobody can see is the same problem as no approval:
           somebody clicks yes and then has to guess. */}
-      <section className="space-y-3">
+      <section id="campaign-action-outcomes" className="space-y-3">
         <div>
           <h2 className="text-lg font-semibold">After the decision</h2>
           <p className="mt-1 text-sm text-muted-foreground">
