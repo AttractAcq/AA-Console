@@ -162,6 +162,17 @@ export function EnginePanel() {
     await refresh();
   }
 
+  async function requestGlobalActivation() {
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    const { error: rpcError } = await supabase.rpc("request_global_engine_activation_v6");
+    setBusy(false);
+    if (rpcError) { setError(rpcError.message); return; }
+    setNote("Exact system-wide Engine activation review requested in the agency Approval Inbox.");
+    await refresh();
+  }
+
   if (!clientId) return <p className="text-sm text-muted-foreground">Pick a client first.</p>;
 
   const running = readiness?.enabled ?? false;
@@ -310,17 +321,13 @@ export function EnginePanel() {
             type="button"
             disabled={busy}
             onClick={() =>
-              void call(
+              !readiness?.engine_running ? void requestGlobalActivation() : void call(
                 "set_engine_running",
                 {
-                  p_enabled: !(readiness?.engine_running ?? false),
-                  p_note: readiness?.engine_running
-                    ? "Switched off from the Engine screen."
-                    : "Switched on from the Engine screen.",
+                  p_enabled: false,
+                  p_note: "Switched off from the Engine screen.",
                 },
-                readiness?.engine_running
-                  ? "The engine is off for every client."
-                  : "The engine is on for every client.",
+                "The engine is off for every client.",
               )
             }
             className={`rounded-md px-3 py-2 text-sm disabled:opacity-50 ${
@@ -329,7 +336,7 @@ export function EnginePanel() {
                 : "bg-primary text-primary-foreground"
             }`}
           >
-            {readiness?.engine_running ? "Switch off globally" : "Switch on globally"}
+            {readiness?.engine_running ? "Switch off globally" : "Request global activation"}
           </button>
         </div>
 
@@ -422,7 +429,9 @@ export function EnginePanel() {
         </p>
       ) : null}
       {note ? <p className="text-sm text-muted-foreground">{note} {note.includes("Unified Approval Inbox") &&
-        <a className="underline" href={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>Open Inbox</a>}</p> : null}
+        <a className="underline" href={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>Open Inbox</a>}
+        {note.includes("agency Approval Inbox") && <a className="underline" href="/approvals">Open agency Inbox</a>}
+      </p> : null}
 
       <section className="space-y-3 rounded-lg border border-border p-4">
         <h3 className="text-sm font-medium text-card-foreground">Platforms and cadence</h3>

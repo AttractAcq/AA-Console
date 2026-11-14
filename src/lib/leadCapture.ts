@@ -99,10 +99,11 @@ export async function createEndpoint(args: {
 }
 
 export async function setEndpointEnabled(endpointId: string, enabled: boolean): Promise<void> {
-  const { error } = await supabase.rpc("set_lead_capture_enabled_v6", {
-    p_endpoint_id: endpointId,
-    p_enabled: enabled,
-  });
+  const { error } = enabled
+    ? await supabase.rpc("request_lead_capture_activation_v6", { p_endpoint_id: endpointId })
+    : await supabase.rpc("set_lead_capture_enabled_v6", {
+        p_endpoint_id: endpointId, p_enabled: false,
+      });
   if (error) throw new Error(error.message);
 }
 

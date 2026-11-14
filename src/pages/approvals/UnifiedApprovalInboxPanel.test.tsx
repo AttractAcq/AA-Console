@@ -498,6 +498,46 @@ const readyActivationSwitch = {
     effect: "enable_client_automation_switch" },
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
 };
+const readyBookingActivation = {
+  ...readyActivationSwitch, id: "booking-inbox-1",
+  title: "Enable client automation: booking",
+  destination: "client:automation:client-1:booking",
+  preview: { client_id: "client-1", switch_key: "booking", action: "enable",
+    request_token: switchToken, settings: { client_id: "client-1", enabled: false,
+      timezone: "Europe/Monaco", slot_minutes: 30 },
+    windows: [{ day_of_week: 1, starts_at_minute: 540, ends_at_minute: 720 }] },
+  scope: { ...readyActivationSwitch.scope, switch_key: "booking" },
+};
+const leadCaptureId = "42424242-4242-4242-8242-424242424242";
+const readyLeadCaptureActivation = {
+  ...readyActivationSwitch, id: "lead-capture-inbox-1",
+  title: "Enable client automation: lead capture",
+  destination: `client:automation:client-1:lead_capture:${leadCaptureId}`,
+  preview: { client_id: "client-1", switch_key: "lead_capture", action: "enable",
+    request_token: switchToken, target_id: leadCaptureId,
+    endpoint: { id: leadCaptureId, client_id: "client-1", enabled: false,
+      token_hash: "d".repeat(64), consent_wording: "I agree to be contacted",
+      expires_at: "2030-01-01T00:00:00Z", max_submissions: 500,
+      submissions: 0, revoked_at: null } },
+  scope: { ...readyActivationSwitch.scope, switch_key: "lead_capture", target_id: leadCaptureId },
+};
+const globalReviewId = "43434343-4343-4343-8343-434343434343";
+const globalToken = "44444444-4444-4444-8444-444444444444";
+const globalHash = "e".repeat(64);
+const readyGlobalEngineActivation = {
+  ...request, id: "global-engine-inbox-1", client_id: null,
+  source_system: "aa_console", source_kind: "global_engine_activation",
+  source_id: globalReviewId, source_version: `${globalHash}:${globalToken}`,
+  artifact_hash: globalHash, title: "Enable the system-wide content Engine",
+  status: "pending", source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  preview_blocker: null, destination: "system:content_engine", account_ref: null,
+  budget: null, owner_role: "admin", owning_path: "/approvals",
+  preview: { action: "enable_system_engine", request_token: globalToken,
+    global_control: { enabled: false, note: null }, client_scope: [] },
+  scope: { effect: "enable_global_content_engine", review_id: globalReviewId,
+    request_token: globalToken, content_hash: globalHash,
+    client_scope: "all individually enabled clients until manually disabled" },
+};
 
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
@@ -1051,6 +1091,29 @@ describe("unified approval inbox", () => {
       p_review_id: switchReviewId, p_request_id: readyActivationSwitch.id,
       p_approved: true,
     }));
+  });
+
+  it.each([readyBookingActivation, readyLeadCaptureActivation])(
+    "routes exact activation for $title", async (activation) => {
+      requests = [activation];
+      show();
+      const card = await screen.findByRole("article", { name: activation.title });
+      await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+      await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_switch_activation_v6", {
+        p_review_id: switchReviewId, p_request_id: activation.id, p_approved: true,
+      }));
+    });
+
+  it("decides the exact agency-wide Engine card without inventing a client ID", async () => {
+    requests = [readyGlobalEngineActivation];
+    show("global");
+    const card = await screen.findByRole("article", { name: readyGlobalEngineActivation.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_global_engine_activation_v6", {
+      p_review_id: globalReviewId, p_request_id: readyGlobalEngineActivation.id,
+      p_approved: true,
+    }));
+    expect(clientEqValues).toEqual([]);
   });
 
   it("unlocks ordinary creative approval only after downloading the exact stored file", async () => {

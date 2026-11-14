@@ -11,7 +11,7 @@ import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "activation_switch", "campaign_action", "campaign_idea", "client_sales_entitlement", "engine_slot",
-  "google_profile_change", "google_review_reply", "lead_magnet", "message_template", "meta_profile_change", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
+  "global_engine_activation", "google_profile_change", "google_review_reply", "lead_magnet", "message_template", "meta_profile_change", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -91,6 +91,9 @@ function clientSourcePath(path: string | null, clientId: string): string | null 
 }
 
 function sourcePathForRequest(request: UnifiedApprovalRequest, clientId: string): string | null {
+  if (request.source_system === "aa_console" && request.source_kind === "global_engine_activation"
+    && request.client_id === null && request.owner_role === "admin"
+    && request.owning_path === "/approvals") return "/approvals";
   if (request.client_id !== clientId) return null;
   if (request.source_system === "aa_console"
     && request.source_kind === "recruitment_brief"
@@ -723,6 +726,7 @@ const SWITCH_COLUMNS: Record<string, string> = {
   campaign_actions: "campaign_actions_enabled",
   outbound_messaging: "outbound_messaging_enabled",
   lead_magnet_delivery: "lead_magnet_delivery_enabled",
+  booking: "enabled",
 };
 
 function isClientSwitchActivationReady(request: UnifiedApprovalRequest, clientId: string): boolean {
@@ -735,19 +739,54 @@ function isClientSwitchActivationReady(request: UnifiedApprovalRequest, clientId
   const scope = request.scope as Record<string, unknown>;
   const settings = preview.settings && typeof preview.settings === "object" && !Array.isArray(preview.settings)
     ? preview.settings as Record<string, unknown> : null;
+  const endpoint = preview.endpoint && typeof preview.endpoint === "object" && !Array.isArray(preview.endpoint)
+    ? preview.endpoint as Record<string, unknown> : null;
   const key = preview.switch_key;
   const column = typeof key === "string" ? SWITCH_COLUMNS[key] : undefined;
   const hash = request.artifact_hash;
+  const targetId = key === "lead_capture" && typeof preview.target_id === "string"
+    ? preview.target_id : null;
+  const targetReady = key === "lead_capture"
+    ? !!targetId && endpoint?.id === targetId && endpoint?.client_id === clientId
+      && endpoint.enabled === false && endpoint.revoked_at === null
+      && typeof endpoint.token_hash === "string" && /^[0-9a-f]{64}$/.test(endpoint.token_hash)
+      && typeof endpoint.consent_wording === "string" && !!endpoint.consent_wording.trim()
+      && typeof endpoint.expires_at === "string"
+      && typeof endpoint.max_submissions === "number" && typeof endpoint.submissions === "number"
+      && endpoint.submissions < endpoint.max_submissions
+    : !!column && settings?.client_id === clientId && settings[column] === false
+      && (key !== "booking" || (Array.isArray(preview.windows) && preview.windows.length > 0));
   return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
     && request.source_version === `${hash}:${preview.request_token}`
     && preview.client_id === clientId && preview.action === "enable"
-    && typeof key === "string" && !!column && settings?.client_id === clientId
-    && settings[column] === false
+    && typeof key === "string" && targetReady
     && scope.client_id === clientId && scope.switch_key === key
     && scope.review_id === request.source_id && scope.request_token === preview.request_token
+    && (targetId === null || scope.target_id === targetId)
     && scope.content_hash === hash && scope.effect === "enable_client_automation_switch"
-    && request.destination === `client:automation:${clientId}:${key}`
+    && request.destination === `client:automation:${clientId}:${key}${targetId ? `:${targetId}` : ""}`
     && request.owner_role === "admin";
+}
+
+function isGlobalEngineActivationReady(request: UnifiedApprovalRequest): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "global_engine_activation"
+    || request.client_id !== null || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const control = preview.global_control && typeof preview.global_control === "object"
+    && !Array.isArray(preview.global_control)
+    ? preview.global_control as Record<string, unknown> : null;
+  const hash = request.artifact_hash;
+  return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
+    && request.source_version === `${hash}:${preview.request_token}`
+    && preview.action === "enable_system_engine" && control?.enabled === false
+    && Array.isArray(preview.client_scope)
+    && scope.review_id === request.source_id && scope.request_token === preview.request_token
+    && scope.content_hash === hash && scope.effect === "enable_global_content_engine"
+    && request.destination === "system:content_engine" && request.owner_role === "admin";
 }
 
 function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): boolean {
@@ -810,7 +849,8 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isVideoSeatReady(request, clientId)
     || isMotionRenderReady(request, clientId)
     || isCampaignIdeaReady(request, clientId)
-    || isClientSwitchActivationReady(request, clientId);
+    || isClientSwitchActivationReady(request, clientId)
+    || isGlobalEngineActivationReady(request);
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
@@ -836,7 +876,8 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isVideoSeatReady(request, clientId)
     || isMotionRenderReady(request, clientId)
     || isCampaignIdeaReady(request, clientId)
-    || isClientSwitchActivationReady(request, clientId);
+    || isClientSwitchActivationReady(request, clientId)
+    || isGlobalEngineActivationReady(request);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
@@ -940,7 +981,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
               ? "Sales agent public use" : request.source_kind === "opportunity_approve"
                 ? "Market opportunity" : request.source_kind === "proof_rights"
                   ? "Proof usage rights" : request.source_kind === "proof_placement"
-                    ? "Proof placement" : request.source_kind === "activation_switch"
+                    ? "Proof placement" : request.source_kind === "global_engine_activation"
+                      ? "System Engine activation" : request.source_kind === "activation_switch"
                       ? "Automation activation" : request.source_kind === "campaign_idea"
                       ? "Idea selection" : request.source_kind === "motion_render"
                       ? "Motion render" : request.source_kind === "video_seat"
@@ -1249,10 +1291,15 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
 
   async function decide(request: UnifiedApprovalRequest, decision: "approved" | "rejected", reason?: string) {
     const targetClientId = multiClient ? request.client_id : clientId;
-    if (!targetClientId || (manager && request.source_kind === "client_sales_entitlement")
-      || request.client_id !== targetClientId || (decision === "approved"
-      ? !isApprovalReady(request, targetClientId)
-      : !isRejectionReady(request, targetClientId))) return;
+    const agencyWide = multiClient && !manager && request.client_id === null
+      && request.source_kind === "global_engine_activation";
+    const scopeId = targetClientId ?? "";
+    if ((!targetClientId && !agencyWide)
+      || (manager && request.source_kind === "client_sales_entitlement")
+      || (!agencyWide && request.client_id !== targetClientId)
+      || (decision === "approved"
+      ? !isApprovalReady(request, scopeId)
+      : !isRejectionReady(request, scopeId))) return;
     setBusyId(request.id);
     setDecisionError(null);
     try {
@@ -1263,13 +1310,15 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       }
       setAal("aal2");
 
-      const current = await supabase.from("approval_inbox_v6").select("*")
-        .eq("id", request.id).eq("client_id", targetClientId).maybeSingle();
+      const currentQuery = supabase.from("approval_inbox_v6").select("*").eq("id", request.id);
+      const current = await (agencyWide
+        ? currentQuery.is("client_id", null).maybeSingle()
+        : currentQuery.eq("client_id", targetClientId!).maybeSingle());
       if (current.error) throw current.error;
       const currentRequest = current.data ? validatedRequest(current.data) : null;
       if (!currentRequest || (decision === "approved"
-        ? !isApprovalReady(currentRequest, targetClientId)
-        : !isRejectionReady(currentRequest, targetClientId))
+        ? !isApprovalReady(currentRequest, scopeId)
+        : !isRejectionReady(currentRequest, scopeId))
         || !sameVersion(request, currentRequest)) {
         throw new Error("This exact request changed or is no longer pending. Review the refreshed card before deciding.");
       }
@@ -1393,6 +1442,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             })
         : request.source_kind === "nurture_sequence"
           ? await supabase.rpc("decide_nurture_sequence_inbox_v6", {
+              p_review_id: request.source_id, p_request_id: request.id,
+              p_approved: decision === "approved",
+              ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+            })
+        : request.source_kind === "global_engine_activation"
+          ? await supabase.rpc("decide_global_engine_activation_v6", {
               p_review_id: request.source_id, p_request_id: request.id,
               p_approved: decision === "approved",
               ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),

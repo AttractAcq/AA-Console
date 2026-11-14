@@ -80,7 +80,7 @@ const RUNTIME_KEYS: Record<string, string> = {
 const REVIEWED_SWITCHES = new Set([
   "engine", "auto_approve_ideas", "auto_approve_briefs", "publishing",
   "proof_publishing", "campaign_actions", "outbound_messaging",
-  "lead_magnet_delivery",
+  "lead_magnet_delivery", "booking",
 ]);
 
 function sourcePath(clientId: string, key: string): string {

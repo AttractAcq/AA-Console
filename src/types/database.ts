@@ -8593,6 +8593,7 @@ export type Database = {
           request_token: string
           source_hash: string
           switch_key: string
+          target_id: string | null
         }
         Insert: {
           applied_at?: string | null
@@ -8605,6 +8606,7 @@ export type Database = {
           request_token?: string
           source_hash?: string
           switch_key: string
+          target_id?: string | null
         }
         Update: {
           applied_at?: string | null
@@ -8617,6 +8619,7 @@ export type Database = {
           request_token?: string
           source_hash?: string
           switch_key?: string
+          target_id?: string | null
         }
         Relationships: [
           {
@@ -11711,6 +11714,54 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engine_readiness"
             referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      global_engine_activation_reviews_v6: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "global_engine_activation_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "global_engine_activation_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -31812,6 +31863,15 @@ export type Database = {
         }
         Returns: string
       }
+      decide_global_engine_activation_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decide_google_profile_inbox_v6: {
         Args: {
           p_approved: boolean
@@ -32484,6 +32544,28 @@ export type Database = {
       generate_recruitment_ad: {
         Args: { p_brief_id: string; p_quality?: string; p_size?: string }
         Returns: Json
+      }
+      global_engine_activation_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["global_engine_activation_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      global_engine_activation_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["global_engine_activation_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      global_engine_activation_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["global_engine_activation_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      global_engine_activation_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
       }
       google_ads_build_spec_v6: {
         Args: {
@@ -34769,6 +34851,10 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: string
       }
+      request_client_activation_target_v6: {
+        Args: { p_client_id: string; p_switch_key: string; p_target_id: string }
+        Returns: string
+      }
       request_client_sales_entitlement: {
         Args: { p_action: string; p_client_id: string; p_member_id: string }
         Returns: string
@@ -34796,6 +34882,7 @@ export type Database = {
         Args: { p_slot_id: string }
         Returns: string
       }
+      request_global_engine_activation_v6: { Args: never; Returns: string }
       request_google_profile_review_v6: {
         Args: { p_change_id: string }
         Returns: string
@@ -34806,6 +34893,10 @@ export type Database = {
       }
       request_human_video_edit: {
         Args: { p_asset_id: string; p_due_date?: string; p_member_id: string }
+        Returns: string
+      }
+      request_lead_capture_activation_v6: {
+        Args: { p_endpoint_id: string }
         Returns: string
       }
       request_lead_magnet_approval_v6: {

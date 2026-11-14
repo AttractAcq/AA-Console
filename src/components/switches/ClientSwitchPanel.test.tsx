@@ -213,9 +213,9 @@ describe("every switch in one place", () => {
     expect(button).toBeEnabled();
     await userEvent.click(button);
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("set_client_booking_enabled_v6", {
+      expect(rpc).toHaveBeenCalledWith("request_client_switch_activation_v6", {
         p_client_id: "c1",
-        p_enabled: true,
+        p_switch_key: "booking",
       }),
     );
   });

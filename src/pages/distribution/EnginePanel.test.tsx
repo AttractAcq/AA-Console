@@ -395,12 +395,9 @@ describe("the gates nothing could set", () => {
     render(<EnginePanel />);
 
     expect(await screen.findByText(/off for every client/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Switch on globally" }));
+    await userEvent.click(screen.getByRole("button", { name: "Request global activation" }));
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("set_engine_running", {
-        p_enabled: true,
-        p_note: expect.any(String),
-      }),
+      expect(rpc).toHaveBeenCalledWith("request_global_engine_activation_v6"),
     );
   });
 

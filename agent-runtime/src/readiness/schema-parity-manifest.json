@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "e3017522ad8f9ea9c2e42b9115c8af690cca64d9bb0384a90d10cc398eb0a45c",
-  "generatedTypesSha256": "089f91fb5e290f7f255dcd6328fbfaf7080a572bb3f325deabbac373221ea476",
-  "generatedSchemaBodySha256": "af0eb14f4555490c1203f7b38cbb695095881b0e42f756555a129dcdf44639f1",
+  "migrationSourceDigest": "c175ea1e0475a55de6590302c90e6a6efba8e32610d23385b7cac5a01b0d6c6c",
+  "generatedTypesSha256": "91fc7ede8816e9d00cdbc654da47cbf7958366294f07f0f89cb26f7d70b2b04d",
+  "generatedSchemaBodySha256": "7e39003657f5d09788d813f9e771ddecf78a7e3a77715f7d5cd47ee090f81a49",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3097,6 +3097,48 @@
       "filename": "20261118130000_425_client_switch_coverage.sql",
       "sha256": "624d7097827cd4571f850161f1758ba69ec03aaecb1654568815a34b0aaeb5ed",
       "trimmedMd5": "11975bc7785218da5ade3649b81fa632"
+    },
+    {
+      "version": "20261118140000",
+      "name": "426_booking_capture_activation_review",
+      "filename": "20261118140000_426_booking_capture_activation_review.sql",
+      "sha256": "f0ccdc0e5a2b1c99ebdf59402955a5fee8d56769e8a76526948558e3e276fdb9",
+      "trimmedMd5": "b666c7eaab3a613715305bcd183af7aa"
+    },
+    {
+      "version": "20261118150000",
+      "name": "427_aux_activation_coverage",
+      "filename": "20261118150000_427_aux_activation_coverage.sql",
+      "sha256": "09b21ee63db2081235c7c2a489e3c8ed10b53b5fb8b526bd166b67846579f8cb",
+      "trimmedMd5": "d121401ec9825088392b124847dde953"
+    },
+    {
+      "version": "20261118160000",
+      "name": "428_global_engine_activation_review",
+      "filename": "20261118160000_428_global_engine_activation_review.sql",
+      "sha256": "453332392e7498b61f85a600e36239b77720306ccbc68fcfd96de327f6728503",
+      "trimmedMd5": "09be5346908dd56ad11f61bb523c5ad8"
+    },
+    {
+      "version": "20261118170000",
+      "name": "429_global_engine_inbox_view",
+      "filename": "20261118170000_429_global_engine_inbox_view.sql",
+      "sha256": "173864bb2969182aa8a608f2fb121d1809ee4d55fab2be971adf3254bd971316",
+      "trimmedMd5": "a823f3cf001798a544e2e49f4b5c614b"
+    },
+    {
+      "version": "20261118180000",
+      "name": "430_agency_approval_lineage",
+      "filename": "20261118180000_430_agency_approval_lineage.sql",
+      "sha256": "69890427bd80b5e951c69b746d031e0a3c97b0516dbc30060bd7d57b0670774b",
+      "trimmedMd5": "237aa6bcae4fb008f3c23bc96d59ca66"
+    },
+    {
+      "version": "20261118190000",
+      "name": "431_global_activation_coverage",
+      "filename": "20261118190000_431_global_activation_coverage.sql",
+      "sha256": "8fc8856e617253eb99283c5cd95fddfe9b61dad01da54bd56910f1d523e1d582",
+      "trimmedMd5": "38da9c98464ec9932fc23d932596ae3e"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
