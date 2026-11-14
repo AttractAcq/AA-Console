@@ -45,6 +45,7 @@ function database(
     status?: number;
     body?: unknown;
     recordError?: string;
+    effectAllowed?: boolean;
   } = {},
 ) {
   const events: Record<string, unknown>[] = [];
@@ -54,6 +55,9 @@ function database(
     if (name === "claim_proof_placements") return { data: options.claimed ?? [PLACEMENT], error: null };
     if (name === "proof_placement_payload_hash_v6") {
       return { data: options.currentHash ?? HASH, error: null };
+    }
+    if (name === "proof_placement_effect_allowed_v6") {
+      return { data: options.effectAllowed ?? true, error: null };
     }
     if (name === "integration_secret") {
       return { data: "token" in options ? options.token : "a-token", error: null };
@@ -146,6 +150,9 @@ describe("the exact version, re-checked at the write", () => {
     await runProofPlacerJob(sb, on, agent, job);
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(callsTo(calls, "proof_placement_effect_allowed_v6")).toEqual([
+      { p_placement_id: "pl-1" },
+    ]);
     expect(callsTo(calls, "record_proof_placed")).toEqual([
       {
         p_placement_id: "pl-1",
@@ -153,6 +160,18 @@ describe("the exact version, re-checked at the write", () => {
         p_external_url: null,
       },
     ]);
+  });
+
+  it("holds a claimed placement when rights or exact approval change before the provider write", async () => {
+    const { sb, calls, fetchImpl } = database({ effectAllowed: false });
+    await runProofPlacerJob(sb, on, agent, job);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(callsTo(calls, "record_proof_placed")).toHaveLength(0);
+    expect(callsTo(calls, "record_proof_placement_failure")[0]).toMatchObject({
+      p_placement_id: "pl-1",
+      p_retryable: false,
+    });
   });
 
   it("refuses when the hash cannot be computed at all", async () => {
