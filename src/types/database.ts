@@ -15801,6 +15801,96 @@ export type Database = {
           },
         ]
       }
+      nurture_sequence_review_requests_v6: {
+        Row: {
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          sequence_id: string
+          source_hash: string
+        }
+        Insert: {
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          sequence_id: string
+          source_hash?: string
+        }
+        Update: {
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          sequence_id?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_sequence_due"
+            referencedColumns: ["sequence_id"]
+          },
+          {
+            foreignKeyName: "nurture_sequence_review_requests_v6_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "nurture_sequences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nurture_sequence_steps: {
         Row: {
           client_id: string
@@ -15885,6 +15975,8 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           campaign_id: string | null
           client_id: string
@@ -15902,6 +15994,8 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           campaign_id?: string | null
           client_id: string
@@ -15919,6 +16013,8 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           campaign_id?: string | null
           client_id?: string
@@ -15939,6 +16035,20 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nurture_sequences_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
           {
@@ -29364,6 +29474,8 @@ export type Database = {
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           campaign_id: string | null
           client_id: string
@@ -30815,6 +30927,8 @@ export type Database = {
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           campaign_id: string | null
           client_id: string
@@ -31236,6 +31350,15 @@ export type Database = {
         }
       }
       decide_meta_profile_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
+      decide_nurture_sequence_inbox_v6: {
         Args: {
           p_approved: boolean
           p_reason?: string
@@ -32756,6 +32879,36 @@ export type Database = {
         }[]
       }
       next_ref_number: { Args: { p_client_id: string }; Returns: string }
+      nurture_sequence_approval_current_v6: {
+        Args: { p_sequence_id: string }
+        Returns: boolean
+      }
+      nurture_sequence_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["nurture_sequence_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      nurture_sequence_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["nurture_sequence_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      nurture_sequence_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["nurture_sequence_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      nurture_sequence_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      nurture_sequence_steps_ready_v6: {
+        Args: { p_sequence_id: string }
+        Returns: boolean
+      }
       opportunity_activation_current_v6: {
         Args: { p_opportunity_id: string }
         Returns: boolean
@@ -33996,6 +34149,10 @@ export type Database = {
           p_prompt: string
           p_revision_of?: string
         }
+        Returns: string
+      }
+      request_nurture_sequence_review_v6: {
+        Args: { p_sequence_id: string }
         Returns: string
       }
       request_offer_compile_v6: {

@@ -389,6 +389,28 @@ const readyMessageTemplate = {
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
 };
 
+const sequenceReviewId = "31313131-3131-4131-8131-313131313131";
+const sequenceToken = "32323232-3232-4232-8232-323232323232";
+const sequenceHash = "d".repeat(64);
+const readyNurtureSequence = {
+  ...request, id: "sequence-inbox-1", source_system: "aa_console",
+  source_kind: "nurture_sequence", source_id: sequenceReviewId,
+  source_version: `${sequenceHash}:${sequenceToken}`, artifact_hash: sequenceHash,
+  title: "Approve nurture sequence: Guide follow-up", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "nurture_sequence:sequence-1", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", sequence_id: "sequence-1", request_token: sequenceToken,
+    name: "Guide follow-up", purpose: "magnet_follow_up", trigger_stage: "profile_visit",
+    trigger_after_hours: 24, exit_stages: ["appointment", "sale"],
+    enrolled_automatically: true, steps: [{ template_version_id: "version-1",
+      body: "Here is your guide.", approval_request_id: "message-inbox-1" }] },
+  scope: { client_id: "client-1", sequence_id: "sequence-1", review_id: sequenceReviewId,
+    request_token: sequenceToken, content_hash: sequenceHash,
+    effect: "standing_sequence_enrolment_permission" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
 const engineTime = "2026-11-20T09:00:00+00:00";
@@ -870,6 +892,18 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_message_template_inbox_v6", {
       p_review_id: messageReviewId, p_request_id: readyMessageTemplate.id,
+      p_approved: true,
+    }));
+  });
+
+  it("decides the ordered nurture steps and enrolment settings through the Inbox", async () => {
+    requests = [readyNurtureSequence];
+    show();
+    const card = await screen.findByRole("article", { name: readyNurtureSequence.title });
+    expect(within(card).getByText(/Here is your guide/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_nurture_sequence_inbox_v6", {
+      p_review_id: sequenceReviewId, p_request_id: readyNurtureSequence.id,
       p_approved: true,
     }));
   });

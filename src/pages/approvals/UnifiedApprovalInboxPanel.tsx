@@ -11,7 +11,7 @@ import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "campaign_action", "client_sales_entitlement", "engine_slot",
-  "google_profile_change", "google_review_reply", "lead_magnet", "message_template", "meta_profile_change", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer",
+  "google_profile_change", "google_review_reply", "lead_magnet", "message_template", "meta_profile_change", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -599,6 +599,37 @@ function isMessageTemplateReady(request: UnifiedApprovalRequest, clientId: strin
     && request.owner_role === "admin_or_active_client_manager";
 }
 
+function isNurtureSequenceReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "nurture_sequence"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const hash = request.artifact_hash;
+  return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
+    && typeof preview.request_token === "string" && !!preview.request_token
+    && request.source_version === `${hash}:${preview.request_token}`
+    && preview.client_id === clientId && typeof preview.sequence_id === "string"
+    && typeof preview.name === "string" && !!preview.name
+    && typeof preview.purpose === "string" && !!preview.purpose
+    && typeof preview.trigger_stage === "string" && !!preview.trigger_stage
+    && typeof preview.trigger_after_hours === "number"
+    && Array.isArray(preview.exit_stages)
+    && typeof preview.enrolled_automatically === "boolean"
+    && Array.isArray(preview.steps) && preview.steps.length > 0
+    && preview.steps.every((value) => value && typeof value === "object"
+      && typeof value.template_version_id === "string"
+      && typeof value.body === "string" && !!value.body
+      && typeof value.approval_request_id === "string" && !!value.approval_request_id)
+    && scope.client_id === clientId && scope.sequence_id === preview.sequence_id
+    && scope.review_id === request.source_id && scope.request_token === preview.request_token
+    && scope.content_hash === hash && scope.effect === "standing_sequence_enrolment_permission"
+    && request.destination === `nurture_sequence:${preview.sequence_id}`
+    && request.owner_role === "admin_or_active_client_manager";
+}
+
 function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   if (request.source_system !== "aa_console" || request.source_kind !== "engine_slot"
     || request.client_id !== clientId || request.status !== "pending"
@@ -654,7 +685,8 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isMetaProfileChangeReady(request, clientId)
     || isGoogleProfileChangeReady(request, clientId)
     || isOpportunityActivationReady(request, clientId)
-    || isMessageTemplateReady(request, clientId);
+    || isMessageTemplateReady(request, clientId)
+    || isNurtureSequenceReady(request, clientId);
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
@@ -675,7 +707,8 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isMetaProfileChangeReady(request, clientId)
     || isGoogleProfileChangeReady(request, clientId)
     || isOpportunityActivationReady(request, clientId)
-    || isMessageTemplateReady(request, clientId);
+    || isMessageTemplateReady(request, clientId)
+    || isNurtureSequenceReady(request, clientId);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
@@ -771,7 +804,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
               ? "Sales agent public use" : request.source_kind === "opportunity_approve"
                 ? "Market opportunity" : request.source_kind === "proof_rights"
                   ? "Proof usage rights" : request.source_kind === "proof_placement"
-                    ? "Proof placement" : request.source_kind === "message_template"
+                    ? "Proof placement" : request.source_kind === "nurture_sequence"
+                      ? "Nurture sequence" : request.source_kind === "message_template"
                       ? "Message template" : request.source_kind === "proof_artifact"
                       ? "Proof artifact" : request.source_kind === "ordinary_media"
                         ? "Creative source" : request.source_kind === "engine_slot"
@@ -1213,6 +1247,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             })
         : request.source_kind === "message_template"
           ? await supabase.rpc("decide_message_template_inbox_v6", {
+              p_review_id: request.source_id, p_request_id: request.id,
+              p_approved: decision === "approved",
+              ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+            })
+        : request.source_kind === "nurture_sequence"
+          ? await supabase.rpc("decide_nurture_sequence_inbox_v6", {
               p_review_id: request.source_id, p_request_id: request.id,
               p_approved: decision === "approved",
               ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "71484b49a82b6fd38fa3e4f8e8f450fa61d004fe24ac8e3efd56552f6982e95e",
-  "generatedTypesSha256": "55421b5f7e0fded59130ca509dc5fd7f8a4cd88683ab46886e8d019afa3c363b",
-  "generatedSchemaBodySha256": "87c6664602141d38f1d23adfdabd9b1860db8b315cf2dc86e6382deb345c2391",
+  "migrationSourceDigest": "79c5f2bae365419bffe691f05c7437f0ff1d72aa878512e3dc23d2a0aed425b9",
+  "generatedTypesSha256": "0eacfd1688e0e592be1a0aba8ed5319057f8ec5eaebcdc56a9d89860bb5759f4",
+  "generatedSchemaBodySha256": "c0a73f3d5adeae30e03870d44b6fbc712d7ab37b15c772ab88204221b4210a3d",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2915,6 +2915,41 @@
       "filename": "20261117110000_399_message_template_coverage.sql",
       "sha256": "37ecf8b0e01983c8c9994fbba8389be94d8417dd99215bdc0b99721c1963cf66",
       "trimmedMd5": "7f4eb919c98b28ed8f349031f438a983"
+    },
+    {
+      "version": "20261117120000",
+      "name": "400_nurture_sequence_review",
+      "filename": "20261117120000_400_nurture_sequence_review.sql",
+      "sha256": "e273aba1d3ee23b0db499f82e13de0e3a9450f79cc7a74f66d02634edf093194",
+      "trimmedMd5": "14032fd55e0da69f18814243b22cbcc1"
+    },
+    {
+      "version": "20261117130000",
+      "name": "401_nurture_sequence_current_gate",
+      "filename": "20261117130000_401_nurture_sequence_current_gate.sql",
+      "sha256": "3ba679d547f5dd1a490026785660b27bd9147ddc8c0c2dbca1ca4fa2df0b6e6c",
+      "trimmedMd5": "a1c446bb4cfb9a45ca6a1c06663d44d4"
+    },
+    {
+      "version": "20261117140000",
+      "name": "402_nurture_sequence_inbox_view",
+      "filename": "20261117140000_402_nurture_sequence_inbox_view.sql",
+      "sha256": "c00a403de12dff03c0147fe592654faf5a3e3ff10779a562230cc6824d2456fd",
+      "trimmedMd5": "9586a9551bb08089b9c5ea1624e8ea33"
+    },
+    {
+      "version": "20261117150000",
+      "name": "403_nurture_sequence_coverage",
+      "filename": "20261117150000_403_nurture_sequence_coverage.sql",
+      "sha256": "8d8545be5d776ecaea0258e834d86f803f48865a8b8c52fb75bcc3c1407ed50a",
+      "trimmedMd5": "474d52dedc3ccb3bd140e936f1779e86"
+    },
+    {
+      "version": "20261117160000",
+      "name": "404_nurture_sequence_due_current",
+      "filename": "20261117160000_404_nurture_sequence_due_current.sql",
+      "sha256": "f181e9f80447b42eb55b29da7fd13bb1f45a4cd4d35dbe473b52b1f74ce3917c",
+      "trimmedMd5": "f1c091316a27c2a829f4c8abeeed2506"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
