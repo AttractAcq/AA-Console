@@ -30906,6 +30906,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      assert_gateway_sites_prewrite_v6: {
+        Args: {
+          p_approval_id: string
+          p_bot_id: string
+          p_client_id: string
+          p_execution_key: string
+          p_provider_org: string
+          p_target: string
+          p_tool: string
+        }
+        Returns: undefined
+      }
       assert_meta_build_allowed_v6: {
         Args: { p_campaign_id: string }
         Returns: string

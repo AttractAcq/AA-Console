@@ -24,7 +24,8 @@ let server: http.Server;
 let port: number;
 beforeAll(async () => {
   server = http.createServer((req, res) => {
-    void handleMcpGatewayApproval(req, res, { rpc } as unknown as SupabaseClient, 'credential');
+    void handleMcpGatewayApproval(req, res, { rpc } as unknown as SupabaseClient,
+      'credential', 'attractacq');
   });
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
@@ -54,6 +55,22 @@ it('registers only a scoped exact gateway packet over the service hop', async ()
   const result = await send('/internal/mcp/gateway-approval/register', packet);
   expect(result).toEqual({ status: 200, body: { canonical_request_id: CANONICAL, payload_hash: HASH } });
   expect(rpc).toHaveBeenCalledWith('register_gateway_tool_review_v6', { p_packet: packet });
+});
+
+it('freezes the configured GitHub organization into a Sites review packet', async () => {
+  rpc.mockClear();
+  const packet = { approval_id: APPROVAL, client_id: CLIENT, bot_id: 'bot_marketing',
+    token_id: TOKEN, tool: 'sites.provision', risk: 'HIGH', summary: 'Provision',
+    payload: { client_id: CLIENT, repo: 'harbour', idempotency_key: 'site-review-1' },
+    expires_at: '2030-01-01T00:00:00Z' };
+  const path = '/internal/mcp/gateway-approval/register';
+  expect((await send(path, { ...packet, payload: { ...packet.payload,
+    provider_org: 'attacker-org' } })).status).toBe(400);
+  expect(rpc).not.toHaveBeenCalled();
+  expect((await send(path, packet)).status).toBe(200);
+  expect(rpc).toHaveBeenCalledWith('register_gateway_tool_review_v6', {
+    p_packet: { ...packet, payload: { ...packet.payload, provider_org: 'attractacq' } },
+  });
 });
 
 it('attests the canonical decision against approval, token and payload hash', async () => {

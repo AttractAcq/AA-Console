@@ -208,7 +208,8 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
     return;
   }
   if (req.url?.startsWith("/internal/mcp/gateway-approval/")) {
-    void handleMcpGatewayApproval(req, res, sb, config.mcpServiceSecret);
+    void handleMcpGatewayApproval(req, res, sb, config.mcpServiceSecret,
+      config.githubSitesOrg);
     return;
   }
 

@@ -611,6 +611,10 @@ export class AAApiAdapter implements Adapter {
           "x-aa-bot-id": context.bot,
           "x-request-id": context.request_id,
           "idempotency-key": context.execution_id,
+          ...(context.gatewayApproval && sitesTools.has(tool.name) ? {
+            "x-aa-gateway-approval-id": context.gatewayApproval.approvalId,
+            "x-aa-gateway-execution-key": context.gatewayApproval.executionKey,
+          } : {}),
         },
         body: JSON.stringify(
           aaBody(tool.name, parsed.data as Record<string, unknown>),

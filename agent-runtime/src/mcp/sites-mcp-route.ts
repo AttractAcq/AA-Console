@@ -18,6 +18,7 @@ import { provisionSite, publishPage, type SiteConfig } from "../sites/provision.
 import { supabaseSiteStore } from "../sites/store.js";
 
 const SITES_BOTS = new Set(["bot_marketing", "bot_sales_ops"]);
+class GatewaySitesApprovalError extends Error {}
 
 function siteConfig(config: RuntimeConfig): SiteConfig {
   return { org: config.githubSitesOrg, runtimeBase: config.publicRuntimeBase };
@@ -51,11 +52,15 @@ export async function handleMcpSites(
   if (!SITES_BOTS.has(bot)) return fail(res, "bot_forbidden");
   const requestId = header(req, "x-request-id");
   const executionId = header(req, "idempotency-key");
+  const gatewayApprovalId = header(req, "x-aa-gateway-approval-id");
+  const gatewayExecutionKey = header(req, "x-aa-gateway-execution-key");
   if (
     !requestId ||
     !ID.test(requestId) ||
     !executionId ||
     !ID.test(executionId) ||
+    !gatewayApprovalId || !UUID.test(gatewayApprovalId) ||
+    !gatewayExecutionKey || !UUID.test(gatewayExecutionKey) ||
     !/^application\/json(?:\s*;.*)?$/i.test(header(req, "content-type") ?? "")
   ) {
     return fail(res, "invalid_request");
@@ -119,6 +124,21 @@ export async function handleMcpSites(
     return fail(res, "internal_error");
   }
 
+  const assertPrewrite = async () => {
+    const { error } = await sb.rpc("assert_gateway_sites_prewrite_v6", {
+      p_approval_id: gatewayApprovalId,
+      p_execution_key: gatewayExecutionKey,
+      p_client_id: clientId,
+      p_bot_id: bot,
+      p_tool: tool,
+      p_target: provision ? repo : pageId,
+      p_provider_org: config.githubSitesOrg,
+    }).abortSignal(AbortSignal.timeout(12_000));
+    if (error) throw new GatewaySitesApprovalError("gateway_sites_approval_required");
+  };
+  try { await assertPrewrite(); }
+  catch { return fail(res, "approval_required"); }
+
   const missing = missingConfig({
     appId: config.githubAppId ?? undefined,
     privateKey: config.githubAppPrivateKey ?? undefined,
@@ -133,13 +153,17 @@ export async function handleMcpSites(
   const store = supabaseSiteStore(sb);
   const runProvision = deps.provisionSite ?? provisionSite;
   const runPublish = deps.publishPage ?? publishPage;
+  const guardedFetch: typeof fetch = async (input, init) => {
+    await assertPrewrite();
+    return fetch(input, init);
+  };
 
   try {
     if (provision) {
       const result = await runProvision(store, app, siteConfig(config), {
         clientId,
         repo: repo as string,
-      });
+      }, { fetchImpl: guardedFetch });
       return json(res, 200, {
         client_id: clientId,
         created: result.created,
@@ -149,7 +173,8 @@ export async function handleMcpSites(
         status: result.repo.status,
       });
     }
-    const result = await runPublish(store, app, siteConfig(config), pageId as string);
+    const result = await runPublish(store, app, siteConfig(config), pageId as string,
+      { fetchImpl: guardedFetch });
     return json(res, 200, {
       client_id: clientId,
       page_id: pageId,
@@ -157,7 +182,8 @@ export async function handleMcpSites(
       commit: result.commit,
       changed: result.changed,
     });
-  } catch {
-    return fail(res, "site_failed");
+  } catch (cause) {
+    return fail(res, cause instanceof GatewaySitesApprovalError
+      ? "approval_required" : "site_failed");
   }
 }

@@ -402,10 +402,15 @@ export class ActionEngine {
       executionId ??= createHash("sha256")
         .update(receiptKey ?? request_id)
         .digest("hex");
+      const currentGatewayApproval = this.approvalBridge && approvedId
+        ? this.store.getApproval(approvedId) : undefined;
       const context = {
         ...identity,
         request_id,
         execution_id: executionId,
+        ...(this.approvalBridge && approvedId && currentGatewayApproval?.canonical_execution_key
+          ? { gatewayApproval: { approvalId: approvedId,
+              executionKey: currentGatewayApproval.canonical_execution_key as string } } : {}),
       };
       let result: Omit<Result, "request_id">;
       const workflowResult = new WorkflowService(this.store).execute(

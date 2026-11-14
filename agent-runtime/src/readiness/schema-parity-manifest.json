@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "44d83217348cf2d36d79afa4206cce244bbe82e47d5c0ee4a2b13f198d1c53b1",
-  "generatedTypesSha256": "401124dbfc4bdfb185d94f4121bd52cce4f4955a085004bca16339f7742552f0",
-  "generatedSchemaBodySha256": "bb02c7b705b566153d39edcd609bc91e993360dcec0f5c312ecffd3da771d64e",
+  "migrationSourceDigest": "9c806f15e5dc9441918ce50f537f464be5a06fa011487667cd6ba8f2893bc5f1",
+  "generatedTypesSha256": "eaf4810fbdbfdaeb480b7e2c349ef75f94d4aa3571fb54ea842bad923ade40e3",
+  "generatedSchemaBodySha256": "e8876476a95651354c2c429e004aeb61ec1dda1b726e5b25b18f580166c839da",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3286,6 +3286,13 @@
       "filename": "20261119160000_452_gateway_outcome_and_revocation.sql",
       "sha256": "ff2e5ae6190a848b8725448f7864afe46d31670a2f1149a3e370475ff884734f",
       "trimmedMd5": "71fb013cba633d579001766fe187cb69"
+    },
+    {
+      "version": "20261119170000",
+      "name": "453_gateway_sites_prewrite",
+      "filename": "20261119170000_453_gateway_sites_prewrite.sql",
+      "sha256": "2b90afc7d859aa63bfabf197faa24023e8f8258d84d10315cf249eb7984bced0",
+      "trimmedMd5": "c7e84d02b84ba0bf6aeeca3b57684e58"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

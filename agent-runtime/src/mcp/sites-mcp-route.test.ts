@@ -9,6 +9,8 @@ import { publishPage } from "../sites/provision.js";
 
 const CLIENT = "11111111-1111-4111-8111-111111111111";
 const PAGE = "33333333-3333-4333-8333-333333333333";
+const GATEWAY_APPROVAL = "44444444-4444-4444-8444-444444444444";
+const GATEWAY_CLAIM = "55555555-5555-4555-8555-555555555555";
 const SECRET = "test-only-service-credential";
 
 function config(overrides: Partial<RuntimeConfig> = {}): RuntimeConfig {
@@ -45,6 +47,8 @@ async function call(
     "x-aa-bot-id": "bot_marketing",
     "x-request-id": "request-1",
     "idempotency-key": "execution-1",
+    "x-aa-gateway-approval-id": GATEWAY_APPROVAL,
+    "x-aa-gateway-execution-key": GATEWAY_CLAIM,
     "content-type": "application/json",
     ...options.headers,
   };
@@ -80,6 +84,60 @@ async function call(
 }
 
 describe("Phase 16c Sites MCP HTTP", () => {
+  it("refuses a site write without the central gateway claim identity", async () => {
+    const provisionSite = vi.fn();
+    const result = await call("provision", { client_id: CLIENT, repo: "harbour" }, {
+      headers: { "x-aa-gateway-approval-id": undefined }, provisionSite,
+    });
+    expect(result.status).toBe(400);
+    expect(provisionSite).not.toHaveBeenCalled();
+    expect(result.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a stale or mismatched central claim before GitHub", async () => {
+    const provisionSite = vi.fn();
+    const check = vi.fn((name: string) => ({ abortSignal: async () => ({
+      data: name === "mcp_sites_authorize" ? { client_id: CLIENT, authorized: true } : null,
+      error: name === "assert_gateway_sites_prewrite_v6"
+        ? { code: "42501", message: "Approval changed" } : null,
+    }) }));
+    const result = await call("provision", { client_id: CLIENT, repo: "harbour" }, {
+      authorize: check as unknown as ReturnType<typeof rpc>, provisionSite,
+    });
+    expect(result.status).toBe(409);
+    expect(result.body.error.code).toBe("approval_required");
+    expect(provisionSite).not.toHaveBeenCalled();
+    expect(check).toHaveBeenCalledWith("assert_gateway_sites_prewrite_v6", {
+      p_approval_id: GATEWAY_APPROVAL, p_execution_key: GATEWAY_CLAIM,
+      p_client_id: CLIENT, p_bot_id: "bot_marketing", p_tool: "sites.provision",
+      p_target: "harbour", p_provider_org: "attractacq",
+    });
+  });
+
+  it("rechecks the claim immediately before a GitHub request and refuses a revoked claim", async () => {
+    let checks = 0;
+    const check = vi.fn((name: string) => ({ abortSignal: async () => {
+      if (name === "assert_gateway_sites_prewrite_v6") checks++;
+      return { data: { client_id: CLIENT, authorized: true },
+        error: name === "assert_gateway_sites_prewrite_v6" && checks > 1
+          ? { code: "42501", message: "Revoked" } : null };
+    } }));
+    const externalFetch = vi.spyOn(globalThis, "fetch");
+    const provisionSite = vi.fn(async (_store, _app, _site, _request, deps) => {
+      await deps.fetchImpl("https://api.github.example.invalid/repos");
+      throw new Error("Unexpected provider call");
+    });
+    try {
+      const result = await call("provision", { client_id: CLIENT, repo: "harbour" }, {
+        authorize: check as unknown as ReturnType<typeof rpc>, provisionSite,
+      });
+      expect(result.status).toBe(409);
+      expect(result.body.error.code).toBe("approval_required");
+      expect(checks).toBe(2);
+      expect(externalFetch).not.toHaveBeenCalled();
+    } finally { externalFetch.mockRestore(); }
+  });
+
   it("engineering is forbidden before GitHub or SQL authorize", async () => {
     const provisionSite = vi.fn();
     const result = await call(

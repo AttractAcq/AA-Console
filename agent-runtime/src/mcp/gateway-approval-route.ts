@@ -17,6 +17,7 @@ function exactKeys(body: Record<string, unknown>, keys: string[]): boolean {
 export async function handleMcpGatewayApproval(
   req: IncomingMessage, res: ServerResponse, sb: SupabaseClient,
   secret: string | null | undefined,
+  siteOrg?: string | null,
 ): Promise<void> {
   if (!authenticated(req, secret)) return fail(res, 'unauthorized');
   if (req.method !== 'POST' || !/^application\/json(?:\s*;.*)?$/i.test(header(req, 'content-type') ?? '')) {
@@ -43,7 +44,13 @@ export async function handleMcpGatewayApproval(
       return fail(res, 'invalid_request');
     }
     rpc = 'register_gateway_tool_review_v6';
-    args = { p_packet: body };
+    if (body.tool === 'sites.provision' || body.tool === 'sites.publish_page') {
+      if (!siteOrg?.trim() || 'provider_org' in (body.payload as Record<string, unknown>))
+        return fail(res, 'invalid_request');
+      args = { p_packet: { ...body, payload: {
+        ...(body.payload as Record<string, unknown>), provider_org: siteOrg.trim(),
+      } } };
+    } else args = { p_packet: body };
   } else if (path === ATTEST || path === CLAIM) {
     const keys = path === CLAIM
       ? ['approval_id','token_id','payload_hash','execution_key']

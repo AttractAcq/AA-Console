@@ -43,12 +43,14 @@ async function mockAa(
   t: { after: (fn: () => Promise<void> | void) => void },
   handler: (req: { url?: string; body: any }) => { status: number; body: unknown },
 ) {
-  const received: { url?: string; method?: string; body: any }[] = [];
+  const received: { url?: string; method?: string; body: any;
+    headers: Record<string, string | string[] | undefined> }[] = [];
   const server = createServer(async (req, res) => {
     let raw = "";
     for await (const chunk of req) raw += chunk;
     const body = raw ? JSON.parse(raw) : {};
-    received.push({ url: req.url, method: req.method, body });
+    received.push({ url: req.url, method: req.method, body,
+      headers: req.headers });
     const result = handler({ url: req.url, body });
     res.writeHead(result.status, { "content-type": "application/json" });
     res.end(JSON.stringify(result.body));
@@ -233,6 +235,24 @@ test("Phase 16c: sites.provision and publish_page require approval before GitHub
   assert.equal(executed.status, "completed");
   assert.equal(received.length, 2);
   assert.equal(received[1]?.url, "/internal/mcp/sites/publish-page");
+});
+
+test("connected Sites adapter carries the central claim only on its provider route", async (t) => {
+  const { adapter, received } = await mockAa(t, ({ body }) => ({ status: 200,
+    body: { client_id: body.client_id, created: true, owner: "attractacq",
+      repo: body.repo, pages_url: null, status: "ready" } }));
+  const tool = registry.find((value) => value.name === "sites.provision")!;
+  await adapter.execute(tool, { client_id: client, repo: "harbour",
+    idempotency_key: "provider-route-1" }, {
+    ...marketing, request_id: "gateway-sites-test", execution_id: "gateway-execution-1",
+    gatewayApproval: { approvalId: "44444444-4444-4444-8444-444444444444",
+      executionKey: "55555555-5555-4555-8555-555555555555" },
+  });
+  assert.equal(received.length, 1);
+  assert.equal(received[0]?.headers["x-aa-gateway-approval-id"],
+    "44444444-4444-4444-8444-444444444444");
+  assert.equal(received[0]?.headers["x-aa-gateway-execution-key"],
+    "55555555-5555-4555-8555-555555555555");
 });
 
 test("Phase 16c: sites replay re-checks authorization after a revoked grant", async (t) => {

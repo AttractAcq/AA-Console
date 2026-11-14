@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import http from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { createClient } from '@supabase/supabase-js';
 import { Store } from '../aa-mcp-gateway/src/audit/store.ts';
@@ -12,6 +12,7 @@ import { registry } from '../aa-mcp-gateway/src/registry/tools.ts';
 import { AAApiAdapter } from '../aa-mcp-gateway/src/adapters/aa-api.ts';
 import { AaCanonicalApprovalBridge } from '../aa-mcp-gateway/src/approvals/canonical-bridge.ts';
 import { handleMcpGatewayApproval } from '../agent-runtime/src/mcp/gateway-approval-route.ts';
+import { handleMcpSites } from '../agent-runtime/src/mcp/sites-mcp-route.ts';
 
 if (process.env.AA_LOCAL_GATEWAY_SMOKE !== '1') {
   throw new Error('Set AA_LOCAL_GATEWAY_SMOKE=1 to run this local-only write test.');
@@ -45,6 +46,9 @@ function sql(source) {
 const admin = randomUUID();
 const client = randomUUID();
 const token = randomUUID();
+const marketingToken = randomUUID();
+const tokenHash = randomBytes(32).toString('hex');
+const marketingTokenHash = randomBytes(32).toString('hex');
 const secret = randomUUID();
 const adminClaims = JSON.stringify({ sub: admin, role: 'authenticated', aal: 'aal2' });
 sql(`insert into auth.users(id,instance_id,aud,role,email,encrypted_password,created_at,updated_at)
@@ -53,12 +57,25 @@ sql(`insert into auth.users(id,instance_id,aud,role,email,encrypted_password,cre
  insert into public.profiles(id,role,email) values('${admin}','admin','gateway-smoke-${admin}@example.invalid');
  insert into public.clients(id,name,initials) values('${client}','Gateway connected smoke','GS');
  insert into public.mcp_bot_clients(bot_id,client_id) values('bot_production','${client}');
+ insert into public.mcp_bot_clients(bot_id,client_id) values('bot_marketing','${client}');
  insert into mcp_internal.mcp_bot_tokens(token_id,bot_id,token_hash)
- values('${token}','bot_production',decode(repeat('a',64),'hex'));`);
+ values('${token}','bot_production',decode('${tokenHash}','hex')),
+ ('${marketingToken}','bot_marketing',decode('${marketingTokenHash}','hex'));`);
 
 const sb = createClient(apiUrl, serviceKey, { auth: { persistSession: false } });
+let siteProviderCalls = 0;
 const server = http.createServer((req, res) => {
-  void handleMcpGatewayApproval(req, res, sb, secret);
+  if (req.url?.startsWith('/internal/mcp/sites/')) {
+    void handleMcpSites(req, res, sb, secret, {
+      githubAppId: 'local-smoke', githubAppPrivateKey: 'local-smoke',
+      githubInstallationId: '1', githubSitesOrg: 'example',
+      publicRuntimeBase: 'https://example.invalid',
+    }, { provisionSite: async (_store, _app, _site, request) => {
+      siteProviderCalls++;
+      return { created: true, repo: { owner: 'example', repo: request.repo,
+        status: 'ready' }, pagesUrl: null };
+    } });
+  } else void handleMcpGatewayApproval(req, res, sb, secret, 'example');
 });
 server.listen(0, '127.0.0.1');
 await once(server, 'listening');
@@ -67,7 +84,9 @@ try {
   const address = server.address();
   assert.ok(address && typeof address === 'object');
   const bridge = new AaCanonicalApprovalBridge(`http://127.0.0.1:${address.port}/`, secret);
-  const engine = new ActionEngine(store, registry, new AAApiAdapter(), false, bridge);
+  const origin = `http://127.0.0.1:${address.port}/`;
+  const engine = new ActionEngine(store, registry,
+    new AAApiAdapter({ url: origin, token: secret }), false, bridge);
   const identity = { bot: 'bot_production', clients: [client] };
   const input = { client_id: client, idempotency_key: `gateway-smoke-${randomUUID()}`,
     summary: 'Local connected approval smoke' };
@@ -99,7 +118,40 @@ try {
     select execution_status from public.gateway_tool_execution_overview_v6
      where approval_id='${pending.approval_id}';`);
   assert.equal(outcome, 'completed');
-  console.log('Connected local gateway → runtime → Supabase → Inbox → execution smoke passed.');
+  const marketing = { bot: 'bot_marketing', clients: [client] };
+  const siteInput = { client_id: client, repo: 'gateway-smoke-site',
+    idempotency_key: `gateway-site-${randomUUID()}` };
+  const sitePending = await engine.call(marketing, 'sites.provision', siteInput,
+    undefined, undefined, marketingToken);
+  assert.equal(sitePending.status, 'approval_required');
+  const siteCard = store.getApproval(sitePending.approval_id);
+  const reviewedOrg = sql(`begin;
+    select set_config('request.jwt.claim.role','service_role',true);
+    select preview->'structured_payload'->>'provider_org'
+     from public.approval_inbox_v6 where id='${siteCard.canonical_request_id}';`);
+  assert.equal(reviewedOrg, 'example');
+  await assert.rejects(() => engine.executeApproval(sitePending.approval_id,
+    [marketing], marketingToken), /canonical_decision_required/);
+  assert.equal(siteProviderCalls, 0);
+  sql(`begin;
+    select set_config('request.jwt.claim.sub','${admin}',true);
+    select set_config('request.jwt.claim.role','authenticated',true);
+    select set_config('request.jwt.claims','${adminClaims}',true);
+    select public.decide_gateway_tool_review_v6('${sitePending.approval_id}',
+      '${siteCard.canonical_request_id}',true);
+    commit;`);
+  const siteExecuted = await engine.executeApproval(sitePending.approval_id,
+    [marketing], marketingToken);
+  assert.equal(siteExecuted.status, 'completed');
+  assert.equal(siteProviderCalls, 1);
+  const siteOutcome = sql(`begin;
+    select set_config('request.jwt.claim.sub','${admin}',true);
+    select set_config('request.jwt.claim.role','authenticated',true);
+    select set_config('request.jwt.claims','${adminClaims}',true);
+    select execution_status from public.gateway_tool_execution_overview_v6
+     where approval_id='${sitePending.approval_id}';`);
+  assert.equal(siteOutcome, 'completed');
+  console.log('Connected local gateway → runtime → Supabase → Inbox → Sites prewrite smoke passed.');
 } finally {
   store.close();
   server.close();

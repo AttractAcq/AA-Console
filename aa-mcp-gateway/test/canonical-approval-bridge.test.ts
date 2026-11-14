@@ -5,6 +5,7 @@ import { ActionEngine } from "../src/policy/engine.js";
 import { registry } from "../src/registry/tools.js";
 import { AAApiAdapter } from "../src/adapters/aa-api.js";
 import type { CanonicalApprovalBridge, GatewayApprovalPacket } from "../src/approvals/canonical-bridge.js";
+import type { Context } from "../src/shared/types.js";
 
 const client = "11111111-1111-4111-8111-111111111111";
 const token = "22222222-2222-4222-8222-222222222222";
@@ -136,5 +137,35 @@ test("connected gateway holds a legacy SQLite approval instead of advertising it
     const heldAgain = await connected.call(identity, "workflow.create_approval", input,
       undefined, undefined, token);
     assert.equal(heldAgain.status, "indeterminate");
+  } finally { store.close(); }
+});
+
+test("claimed gateway execution passes its exact identity to the Sites adapter", async () => {
+  const store = new Store(":memory:");
+  let context: Context | undefined;
+  const bridge: CanonicalApprovalBridge = {
+    async register() { return { canonical_request_id: "33333333-3333-4333-8333-333333333333",
+      payload_hash: "a".repeat(64) }; },
+    async attest() { return true; },
+    async claim() { return true; },
+    async finish() {},
+  };
+  try {
+    const engine = new ActionEngine(store, registry, {
+      async execute(tool, _input, value) {
+        assert.equal(tool.name, "sites.provision");
+        context = value;
+        return { status: "completed", capability: tool.name };
+      },
+    }, false, bridge);
+    const siteIdentity = { bot: "bot_marketing" as const, clients: [client] };
+    const pending = await engine.call(siteIdentity, "sites.provision", {
+      client_id: client, repo: "harbour", idempotency_key: "gateway-sites-claim-1",
+    }, undefined, undefined, token);
+    assert.equal(pending.status, "approval_required");
+    const result = await engine.executeApproval(pending.approval_id!, [siteIdentity], token);
+    assert.equal(result.status, "completed");
+    assert.equal(context?.gatewayApproval?.approvalId, pending.approval_id);
+    assert.match(context?.gatewayApproval?.executionKey ?? "", /^[0-9a-f-]{36}$/);
   } finally { store.close(); }
 });
