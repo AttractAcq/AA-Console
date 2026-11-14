@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "8e48ee59e3c5c0dc2539d31b192e9eefa78d437f3f7572b5aa5bed2dc164b3c2",
-  "generatedTypesSha256": "237b0ce1631a117fe4c9a877a9c29aae552a5434dcd49748cdc3462d8f17a531",
-  "generatedSchemaBodySha256": "dbb9ff184e97f5fcda856943089186c0228b6b1703bd01d2ae42bf97fb225ccb",
+  "migrationSourceDigest": "4c4b1e5d1a1a994d6292033f47a826dfd17bf3d0dfd86582b5489c2cfb435e82",
+  "generatedTypesSha256": "ed2b77a39f70108f451b46dffe162f57acf6bb660a8c29d8846170a2c9f95fcb",
+  "generatedSchemaBodySha256": "f02ad17a6436a687b6d23902309e87c3b4095eb9ebec760cf6d66cbf0bdd2f9e",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2992,6 +2992,41 @@
       "filename": "20261117220000_410_video_seat_coverage.sql",
       "sha256": "a88d65149efb60893e991b97101601bedb8c5f458a40c167fbae98dbf433ef1a",
       "trimmedMd5": "f06f019249c1ba032b15fb098f7bacc9"
+    },
+    {
+      "version": "20261117230000",
+      "name": "411_motion_render_exact_review",
+      "filename": "20261117230000_411_motion_render_exact_review.sql",
+      "sha256": "d8572919b5b19355e022c21f51a504dc4f548f75cc6965b5da5a8e9c749dbe50",
+      "trimmedMd5": "d3e0520133d964d34476638b18a80c8e"
+    },
+    {
+      "version": "20261118000000",
+      "name": "412_motion_render_inbox_view",
+      "filename": "20261118000000_412_motion_render_inbox_view.sql",
+      "sha256": "374b8aa63f54dd91b4b0cf91c3de886aa70d82bb8838d74d7195d69ec0062f9a",
+      "trimmedMd5": "624e67a62d2e201e67d04c10448931ac"
+    },
+    {
+      "version": "20261118010000",
+      "name": "413_motion_render_invalidation",
+      "filename": "20261118010000_413_motion_render_invalidation.sql",
+      "sha256": "e833b4d99de368aa33367327f4168cd8162c2835152232a3f5869321f664a823",
+      "trimmedMd5": "7e223800f68da1fd209e39d8cc5aa00e"
+    },
+    {
+      "version": "20261118020000",
+      "name": "414_motion_due_current",
+      "filename": "20261118020000_414_motion_due_current.sql",
+      "sha256": "af2078c69c8b7124ab8b620607458e4ae6bf21f245aad2e3598ca3612adf6d30",
+      "trimmedMd5": "f8c3778652fa19e7b2b2b2c6e91eb930"
+    },
+    {
+      "version": "20261118030000",
+      "name": "415_motion_render_coverage",
+      "filename": "20261118030000_415_motion_render_coverage.sql",
+      "sha256": "45c7ea6e026eb87e7d22c06ea9de0a3bf081f713fd2a18c57d1d23513501c363",
+      "trimmedMd5": "0df557b52f478377d94c67b927d150b5"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

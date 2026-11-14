@@ -35,6 +35,16 @@ export async function requestVideoSeatReview(
   return data;
 }
 
+/** Verify a motion candidate's stored MP4 before freezing its review packet. */
+export async function requestMotionRenderReview(clientId: string, candidateId: string): Promise<string> {
+  await callRuntime<{ candidateId: string }>("/admin/motion/attest-render", { clientId, candidateId });
+  const { data, error } = await supabase.rpc("request_motion_render_review_v6", {
+    p_candidate_id: candidateId,
+  });
+  if (error || !data) throw new Error(error?.message ?? "Could not request motion render review.");
+  return data;
+}
+
 /** The reviewer downloads and checks the same file digest shown on the card. */
 export async function downloadVerifiedCreativeFile(
   storagePath: string, expectedSha256: string,

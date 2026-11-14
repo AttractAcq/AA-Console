@@ -15586,6 +15586,8 @@ export type Database = {
         Row: {
           accepted_at: string | null
           accepted_by: string | null
+          accepted_content_hash: string | null
+          accepted_request_id: string | null
           attempt: number
           benchmark_note: string | null
           brand_qa: string | null
@@ -15599,12 +15601,20 @@ export type Database = {
           job_id: string | null
           poster_path: string | null
           project_id: string
+          proof_source_lost: boolean
           rejected_reason: string | null
+          render_bytes_sha256: string | null
+          render_file_bytes: number | null
+          render_object_id: string | null
+          render_object_updated_at: string | null
+          render_object_version: string | null
           render_path: string | null
         }
         Insert: {
           accepted_at?: string | null
           accepted_by?: string | null
+          accepted_content_hash?: string | null
+          accepted_request_id?: string | null
           attempt: number
           benchmark_note?: string | null
           brand_qa?: string | null
@@ -15618,12 +15628,20 @@ export type Database = {
           job_id?: string | null
           poster_path?: string | null
           project_id: string
+          proof_source_lost?: boolean
           rejected_reason?: string | null
+          render_bytes_sha256?: string | null
+          render_file_bytes?: number | null
+          render_object_id?: string | null
+          render_object_updated_at?: string | null
+          render_object_version?: string | null
           render_path?: string | null
         }
         Update: {
           accepted_at?: string | null
           accepted_by?: string | null
+          accepted_content_hash?: string | null
+          accepted_request_id?: string | null
           attempt?: number
           benchmark_note?: string | null
           brand_qa?: string | null
@@ -15637,7 +15655,13 @@ export type Database = {
           job_id?: string | null
           poster_path?: string | null
           project_id?: string
+          proof_source_lost?: boolean
           rejected_reason?: string | null
+          render_bytes_sha256?: string | null
+          render_file_bytes?: number | null
+          render_object_id?: string | null
+          render_object_updated_at?: string | null
+          render_object_version?: string | null
           render_path?: string | null
         }
         Relationships: [
@@ -15646,6 +15670,20 @@ export type Database = {
             columns: ["accepted_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_accepted_request_id_fkey"
+            columns: ["accepted_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_candidates_accepted_request_id_fkey"
+            columns: ["accepted_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
           {
@@ -15703,6 +15741,96 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "motion_design_projects"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      motion_render_review_requests_v6: {
+        Row: {
+          candidate_id: string
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          candidate_id: string
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          candidate_id?: string
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motion_render_review_requests_v6_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "motion_candidate_due"
+            referencedColumns: ["candidate_id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "motion_render_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motion_render_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -29248,6 +29376,8 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           accepted_by: string | null
+          accepted_content_hash: string | null
+          accepted_request_id: string | null
           attempt: number
           benchmark_note: string | null
           brand_qa: string | null
@@ -29261,7 +29391,13 @@ export type Database = {
           job_id: string | null
           poster_path: string | null
           project_id: string
+          proof_source_lost: boolean
           rejected_reason: string | null
+          render_bytes_sha256: string | null
+          render_file_bytes: number | null
+          render_object_id: string | null
+          render_object_updated_at: string | null
+          render_object_version: string | null
           render_path: string | null
         }
         SetofOptions: {
@@ -30029,6 +30165,18 @@ export type Database = {
       }
       attest_lead_magnet_bytes_v6: {
         Args: { p_approval_id: string; p_file_bytes: number; p_sha256: string }
+        Returns: string
+      }
+      attest_motion_render_bytes_v6: {
+        Args: {
+          p_candidate_id: string
+          p_file_bytes: number
+          p_object_id: string
+          p_object_updated_at: string
+          p_object_version: string
+          p_sha256: string
+          p_storage_path: string
+        }
         Returns: string
       }
       attest_video_sound_asset: {
@@ -31583,6 +31731,15 @@ export type Database = {
         }
         Returns: string
       }
+      decide_motion_render_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decide_nurture_sequence_inbox_v6: {
         Args: {
           p_approved: boolean
@@ -33105,6 +33262,36 @@ export type Database = {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: Json
       }
+      motion_render_acceptance_current_v6: {
+        Args: { p_candidate_id: string }
+        Returns: boolean
+      }
+      motion_render_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["motion_render_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      motion_render_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["motion_render_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      motion_render_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["motion_render_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      motion_render_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      motion_render_storage_identity_v6: {
+        Args: { p_candidate_id: string }
+        Returns: Json
+      }
       my_account_team: {
         Args: never
         Returns: {
@@ -34383,6 +34570,10 @@ export type Database = {
           p_prompt: string
           p_revision_of?: string
         }
+        Returns: string
+      }
+      request_motion_render_review_v6: {
+        Args: { p_candidate_id: string }
         Returns: string
       }
       request_nurture_sequence_review_v6: {

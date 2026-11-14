@@ -5,6 +5,7 @@ import { Button } from "../../components/Button";
 import { DataTable } from "../../components/DataTable";
 import { EmptyState } from "../../components/EmptyState";
 import { dayOrDash } from "../../lib/contentRecords";
+import { requestMotionRenderReview } from "../../lib/creativeReview";
 import { supabase } from "../../lib/supabase";
 import type { Database } from "../../types/database";
 
@@ -240,7 +241,7 @@ export function MotionScenesPanel({ tab }: { tab: Tab }) {
                     accepted ? "text-brand-strong" : ready ? "text-amber-600" : "text-destructive"
                   }
                 >
-                  {row.blocker ?? "QA passed — waiting for a person"}
+                  {row.blocker ?? "QA passed — request exact render review"}
                   {Number(row.scenes_citing_lost_proof ?? 0) > 0 && (
                     <span className="block text-xs">
                       {row.scenes_citing_lost_proof} scene
@@ -254,51 +255,20 @@ export function MotionScenesPanel({ tab }: { tab: Tab }) {
                 </span>,
                 <span key="x" className="flex gap-2">
                   {ready && row.candidate_id && (
-                    <>
                       <Button
                         disabled={busy === row.candidate_id}
                         onClick={() =>
                           void act(
                             row.candidate_id!,
                             async () => {
-                              const { error: rpcError } = await supabase.rpc(
-                                "accept_motion_candidate_v6",
-                                { p_candidate_id: row.candidate_id!, p_accepted: true },
-                              );
-                              if (rpcError) throw new Error(rpcError.message);
+                              await requestMotionRenderReview(clientId!, row.candidate_id!);
                             },
-                            "Accepted.",
+                            "Review requested in Approval Inbox.",
                           )
                         }
                       >
-                        Accept this cut
+                        Request render review
                       </Button>
-                      <Button
-                        disabled={busy === row.candidate_id}
-                        onClick={() => {
-                          const why = window.prompt("Why is this cut not good enough?");
-                          if (why?.trim()) {
-                            void act(
-                              row.candidate_id!,
-                              async () => {
-                                const { error: rpcError } = await supabase.rpc(
-                                  "accept_motion_candidate_v6",
-                                  {
-                                    p_candidate_id: row.candidate_id!,
-                                    p_accepted: false,
-                                    p_reason: why.trim(),
-                                  },
-                                );
-                                if (rpcError) throw new Error(rpcError.message);
-                              },
-                              "Rejected.",
-                            );
-                          }
-                        }}
-                      >
-                        Reject
-                      </Button>
-                    </>
                   )}
                 </span>,
               ];

@@ -437,6 +437,28 @@ const readyVideoSeat = {
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=assets",
 };
 
+const motionReviewId = "36363636-3636-4636-8636-363636363636";
+const motionToken = "37373737-3737-4737-8737-373737373737";
+const motionHash = "d".repeat(64);
+const motionFileHash = "e".repeat(64);
+const readyMotionRender = {
+  ...request, id: "motion-inbox-1", source_system: "aa_console",
+  source_kind: "motion_render", source_id: motionReviewId,
+  source_version: `${motionHash}:${motionToken}`, artifact_hash: motionHash,
+  title: "Accept motion render r1", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "motion_render:candidate-1", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", candidate_id: "candidate-1", project_id: "project-1",
+    request_token: motionToken, attempt: 1, render_path: "client-1/motion/r1.mp4",
+    render_sha256: motionFileHash, render_file_bytes: 12,
+    storage: { bucket: "client-media", object_id: "storage-object-1", version: "v1" },
+    qa: { brand: "pass", claim: "pass", proof_source_lost: false }, scenes: [] },
+  scope: { client_id: "client-1", candidate_id: "candidate-1", review_id: motionReviewId,
+    request_token: motionToken, content_hash: motionHash, effect: "motion_candidate_acceptance" },
+  owning_path: "/clients/client-1/delivery/motion-design?tab=renders",
+};
+
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
 const engineTime = "2026-11-20T09:00:00+00:00";
@@ -949,6 +971,23 @@ describe("unified approval inbox", () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_video_seat_inbox_v6", {
       p_review_id: videoReviewId, p_request_id: readyVideoSeat.id,
       p_approved: true,
+    }));
+  });
+
+  it("requires motion render download before an exact Inbox decision", async () => {
+    requests = [readyMotionRender];
+    show();
+    const card = await screen.findByRole("article", { name: readyMotionRender.title });
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedCreativeFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify creative file" }));
+    await waitFor(() => expect(downloadVerifiedCreativeFile).toHaveBeenCalledWith(
+      "client-1/motion/r1.mp4", motionFileHash));
+    await waitFor(() => expect(approve).toBeEnabled());
+    await userEvent.click(approve);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_motion_render_inbox_v6", {
+      p_review_id: motionReviewId, p_request_id: readyMotionRender.id, p_approved: true,
     }));
   });
 

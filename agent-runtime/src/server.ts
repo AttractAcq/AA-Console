@@ -4,6 +4,7 @@ import { handleCampaignActionRequest } from "./campaigns/actions/request-route.j
 import { handleLeadMagnetAttestation } from "./lead-magnets/attest-route.js";
 import { handleProofMediaRightsRequest } from "./proof-rights/request-media-route.js";
 import { handleCreativeAssetAttestation } from "./creative/attest-asset-route.js";
+import { handleMotionRenderAttestation } from "./creative/attest-motion-route.js";
 import { handlePublicLead } from "./lead-capture/public-route.js";
 import { handlePublicBooking, isBookingRequest } from "./booking/public-route.js";
 import { handleMetaWebhook, isMetaWebhookRequest } from "./dm/webhook.js";
@@ -389,6 +390,10 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
   }
   if (req.url === "/admin/creative/attest-asset") {
     void handleCreativeAssetAttestation(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/motion/attest-render") {
+    void handleMotionRenderAttestation(req, res, sb);
     return;
   }
 
