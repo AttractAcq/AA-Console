@@ -694,6 +694,19 @@ describe("unified approval inbox", () => {
     }));
   });
 
+  it("shows a stale source and blocks its exact-version approval", async () => {
+    const user = userEvent.setup();
+    requests = [{ ...readyCampaign, status: "stale",
+      preview_blocker: "A bound source changed after this exact request." }];
+    show("global");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "stale");
+    const card = await screen.findByRole("article", { name: "Build the Meta ad" });
+    expect(within(card).getByText("stale")).toBeInTheDocument();
+    expect(within(card).getByText(/A bound source changed/)).toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Approve exact version" }))
+      .not.toBeInTheDocument();
+  });
+
   it("keeps sales grants read-only for managers and malformed or superseded scopes", async () => {
     requests = [readySales];
     show("manager", "/employee/approvals");
