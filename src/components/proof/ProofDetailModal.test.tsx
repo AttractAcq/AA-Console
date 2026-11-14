@@ -6,7 +6,8 @@ import { beforeEach, expect, it, vi } from "vitest";
 import type { ProofAsset } from "../../lib/media";
 import { ProofDetailModal } from "./ProofDetailModal";
 
-const { update, rpc } = vi.hoisted(() => ({ update: vi.fn(), rpc: vi.fn() }));
+const { update, rpc, callRuntime } = vi.hoisted(() => ({ update: vi.fn(), rpc: vi.fn(), callRuntime: vi.fn() }));
+vi.mock("../../lib/callRuntime", () => ({ callRuntime }));
 vi.mock("../../lib/supabase", () => ({ supabase: {
   from: () => ({ update: (payload: unknown) => {
     update(payload);
@@ -28,6 +29,23 @@ const proof = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   update.mockClear();
   rpc.mockReset().mockResolvedValue({ data: "request-1", error: null });
+  callRuntime.mockReset().mockResolvedValue({ ok: true, approvalRequestId: "request-1" });
+});
+
+it("asks the trusted runtime to hash a stored image before rights review", async () => {
+  render(<MemoryRouter><ProofDetailModal proof={proof({ media_type: "image",
+    storage_path: "client-1/proof-1/photo.png", body: null })}
+    open onClose={vi.fn()} onSaved={vi.fn()} /></MemoryRouter>);
+  await userEvent.click(screen.getByRole("button", { name: /Request clearance/ }));
+  await userEvent.type(screen.getByLabelText("Permission basis"), "Signed photo release");
+  await userEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(callRuntime).toHaveBeenCalledWith(
+    "/admin/proof-rights/request-media", {
+      clientId: "client-1", proofId: "proof-1",
+      permissionBasis: "Signed photo release", expiresOn: null,
+    }));
+  expect(rpc).not.toHaveBeenCalled();
+  expect(update.mock.calls[0][0]).not.toHaveProperty("usage_rights");
 });
 
 it("saves source words and requests clearance without directly granting rights", async () => {

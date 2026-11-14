@@ -3,7 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { from, rpc, getAAL } = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), getAAL: vi.fn() }));
+const { from, rpc, getAAL, downloadVerifiedProofFile } = vi.hoisted(() => ({
+  from: vi.fn(), rpc: vi.fn(), getAAL: vi.fn(), downloadVerifiedProofFile: vi.fn(),
+}));
+vi.mock("../../lib/proofRights", () => ({ downloadVerifiedProofFile }));
 vi.mock("../../lib/supabase", () => ({ supabase: {
   from, rpc, auth: { mfa: { getAuthenticatorAssuranceLevel: getAAL } },
 } }));
@@ -578,6 +581,32 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_proof_rights_v6", {
       p_rights_request_id: proofRightsId, p_canonical_id: readyProofRights.id,
+    }));
+  });
+
+  it("shows a trusted stored-image digest on the rights decision", async () => {
+    requests = [{ ...readyProofRights, id: "proof-media-inbox-1",
+      preview: { ...readyProofRights.preview,
+        proof: { id: proofId, media_type: "image", storage_path: "client-1/proof/photo.png",
+          title: "Customer photo" },
+        verified_storage_sha256: "6".repeat(64), verified_file_bytes: 4096,
+        verified_storage_path: "client-1/proof/photo.png",
+        verified_storage_object_id: "77777777-7777-4777-8777-777777777777",
+        verified_storage_object_version: "v1",
+        verified_storage_object_updated_at: "2026-11-14T10:00:00Z" } }];
+    show();
+    const card = await screen.findByRole("article", { name: readyProofRights.title });
+    expect(within(card).getByText(/Customer photo/)).toBeInTheDocument();
+    const approve = within(card).getByRole("button", { name: "Approve exact version" });
+    expect(approve).toBeDisabled();
+    downloadVerifiedProofFile.mockResolvedValue(undefined);
+    await userEvent.click(within(card).getByRole("button", { name: "Download and verify proof file" }));
+    await waitFor(() => expect(downloadVerifiedProofFile).toHaveBeenCalledWith(
+      "client-1/proof/photo.png", "6".repeat(64), 4096));
+    await waitFor(() => expect(approve).toBeEnabled());
+    await userEvent.click(approve);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_proof_rights_v6", {
+      p_rights_request_id: proofRightsId, p_canonical_id: "proof-media-inbox-1",
     }));
   });
 

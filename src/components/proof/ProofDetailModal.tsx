@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { callRuntime } from "../../lib/callRuntime";
 import type { ProofAsset } from "../../lib/media";
 import { cn } from "../../lib/cn";
 
@@ -73,8 +74,9 @@ export function ProofDetailModal({
     setError(null);
     setNotice(null);
     const wantsClearance = form.usage_rights === "approved";
-    if (wantsClearance && (proof.media_type !== "text" || proof.storage_path)) {
-      setError("Stored proof needs trusted file-byte verification before rights can be cleared.");
+    if (wantsClearance && ((proof.media_type === "text" && !!proof.storage_path)
+      || (proof.media_type !== "text" && !proof.storage_path))) {
+      setError("This proof needs a valid source file before rights can be reviewed.");
       setBusy(false);
       return;
     }
@@ -109,14 +111,24 @@ export function ProofDetailModal({
     }
     if (wantsClearance && (proof.usage_rights !== "approved" || !proof.approved_rights_request_id || metadataChanged
       || basis !== proof.permission_basis || expiry !== proof.expires_on)) {
-      const { error: requestError } = await supabase.rpc("request_proof_rights_v6", {
-        p_proof_id: proof.id,
-        p_permission_basis: basis ?? "",
-        ...(expiry ? { p_expires_on: expiry } : {}),
-      });
-      if (requestError) {
+      try {
+        if (proof.media_type === "text") {
+          const { error: requestError } = await supabase.rpc("request_proof_rights_v6", {
+            p_proof_id: proof.id,
+            p_permission_basis: basis ?? "",
+            ...(expiry ? { p_expires_on: expiry } : {}),
+          });
+          if (requestError) throw requestError;
+        } else {
+          await callRuntime("/admin/proof-rights/request-media", {
+            clientId: proof.client_id, proofId: proof.id,
+            permissionBasis: basis ?? "", expiresOn: expiry,
+          });
+        }
+      } catch (requestError) {
         setBusy(false);
-        setError(requestError.message);
+        setError(requestError instanceof Error ? requestError.message
+          : (requestError as { message?: string }).message ?? "Could not request rights review.");
         onSaved();
         return;
       }

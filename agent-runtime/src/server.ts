@@ -2,6 +2,7 @@ import { handlePublicProof } from "./proof-capture/public-route.js";
 import { handleProofCaptureAdmin } from "./proof-capture/admin-route.js";
 import { handleCampaignActionRequest } from "./campaigns/actions/request-route.js";
 import { handleLeadMagnetAttestation } from "./lead-magnets/attest-route.js";
+import { handleProofMediaRightsRequest } from "./proof-rights/request-media-route.js";
 import { handlePublicLead } from "./lead-capture/public-route.js";
 import { handlePublicBooking, isBookingRequest } from "./booking/public-route.js";
 import { handleMetaWebhook, isMetaWebhookRequest } from "./dm/webhook.js";
@@ -379,6 +380,10 @@ function dispatchRequest(req: http.IncomingMessage, res: http.ServerResponse): v
   }
   if (req.url === "/admin/lead-magnets/attest") {
     void handleLeadMagnetAttestation(req, res, sb);
+    return;
+  }
+  if (req.url === "/admin/proof-rights/request-media") {
+    void handleProofMediaRightsRequest(req, res, sb);
     return;
   }
 

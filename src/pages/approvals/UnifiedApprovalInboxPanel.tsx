@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 
 import { supabase } from "../../lib/supabase";
 import { downloadVerifiedMagnetFile } from "../../lib/leadMagnets";
+import { downloadVerifiedProofFile } from "../../lib/proofRights";
 import type { Database } from "../../types/database";
 import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 
@@ -349,14 +350,22 @@ function isProofRightsRejectionReady(request: UnifiedApprovalRequest, clientId: 
   const scope = request.scope as Record<string, unknown>;
   const proof = preview.proof;
   const hash = request.artifact_hash;
+  const source = proof && typeof proof === "object" && !Array.isArray(proof)
+    ? proof as Record<string, unknown> : null;
+  const textSource = source?.media_type === "text" && source.storage_path == null;
+  const verifiedMedia = (source?.media_type === "image" || source?.media_type === "video")
+    && typeof source.storage_path === "string" && !!source.storage_path
+    && preview.verified_storage_path === source.storage_path
+    && typeof preview.verified_storage_sha256 === "string"
+    && /^[0-9a-f]{64}$/.test(preview.verified_storage_sha256)
+    && typeof preview.verified_file_bytes === "number" && preview.verified_file_bytes > 0
+    && typeof preview.verified_storage_object_id === "string"
+    && typeof preview.verified_storage_object_updated_at === "string";
   return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
     && typeof preview.request_token === "string" && !!preview.request_token
     && request.source_version === `${hash}:${preview.request_token}`
     && preview.client_id === clientId && typeof preview.proof_id === "string"
-    && !!proof && typeof proof === "object" && !Array.isArray(proof)
-    && (proof as Record<string, unknown>).id === preview.proof_id
-    && (proof as Record<string, unknown>).media_type === "text"
-    && (proof as Record<string, unknown>).storage_path == null
+    && source?.id === preview.proof_id && (textSource || verifiedMedia)
     && preview.requested_rights === "approved"
     && typeof preview.permission_basis === "string" && !!preview.permission_basis.trim()
     && scope.rights_request_id === request.source_id && scope.client_id === clientId
@@ -475,6 +484,7 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
 }) {
   const [rejectionReason, setRejectionReason] = useState("");
   const [downloadedMagnetHash, setDownloadedMagnetHash] = useState<string | null>(null);
+  const [downloadedProofHash, setDownloadedProofHash] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const location = useLocation();
   const blocker = previewMissing(request);
@@ -485,6 +495,13 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
     && !Array.isArray(request.preview)
     && (request.preview as Record<string, unknown>).action === "grant";
   const salesManagerCard = manager && request.source_kind === "client_sales_entitlement";
+  const proofRightsPreview = request.source_kind === "proof_rights" && request.preview
+    && typeof request.preview === "object" && !Array.isArray(request.preview)
+    ? request.preview as Record<string, unknown> : null;
+  const proofMediaDownloadable = !!proofRightsPreview
+    && typeof proofRightsPreview.verified_storage_path === "string"
+    && typeof proofRightsPreview.verified_storage_sha256 === "string"
+    && typeof proofRightsPreview.verified_file_bytes === "number";
   const canReject = !salesManagerCard && isRejectionReady(request, clientId);
   const canApprove = !salesManagerCard && isApprovalReady(request, clientId);
   const decisionLabel = request.source_kind === "google_review_reply"
@@ -588,6 +605,24 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
         {downloadError && <p role="alert" className="mt-2 text-xs text-destructive">{downloadError}</p>}
       </div>}
 
+      {proofMediaDownloadable && <div className="mt-4">
+        <p className="mb-2 text-xs text-muted-foreground">Download and inspect the verified file to unlock approval.</p>
+        <button type="button" className="rounded-lg border border-border px-4 py-2 text-sm"
+          onClick={() => void downloadVerifiedProofFile(
+            proofRightsPreview.verified_storage_path as string,
+            proofRightsPreview.verified_storage_sha256 as string,
+            proofRightsPreview.verified_file_bytes as number,
+          ).then(() => { setDownloadedProofHash(`${request.id}:${request.artifact_hash}`); setDownloadError(null); })
+            .catch((cause: unknown) => setDownloadError(
+              cause instanceof Error ? cause.message : "Could not verify the proof file."))}>
+          Download and verify proof file
+        </button>
+        {downloadedProofHash === `${request.id}:${request.artifact_hash}` && <p role="status" className="mt-2 text-xs">
+          The downloaded proof matched the bytes and hash on this card. Review its content before approval.
+        </p>}
+        {downloadError && <p role="alert" className="mt-2 text-xs text-destructive">{downloadError}</p>}
+      </div>}
+
       {html && (
         <details className="mt-4">
           <summary className="cursor-pointer text-sm font-medium">Visual page preview</summary>
@@ -629,7 +664,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
           </p>}
           <div className="flex flex-wrap gap-2">
             {canApprove && <button type="button" disabled={busy || aal !== "aal2"
-              || (request.source_kind === "lead_magnet" && downloadedMagnetHash !== request.artifact_hash)}
+              || (request.source_kind === "lead_magnet" && downloadedMagnetHash !== request.artifact_hash)
+              || (proofMediaDownloadable && downloadedProofHash !== `${request.id}:${request.artifact_hash}`)}
               onClick={() => void onDecide(request, "approved")}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
               Approve exact version

@@ -18824,6 +18824,12 @@ export type Database = {
           request_token: string
           requested_basis: string
           requested_expiry: string | null
+          verified_file_bytes: number | null
+          verified_storage_object_id: string | null
+          verified_storage_object_updated_at: string | null
+          verified_storage_object_version: string | null
+          verified_storage_path: string | null
+          verified_storage_sha256: string | null
         }
         Insert: {
           artifact_hash?: string | null
@@ -18835,6 +18841,12 @@ export type Database = {
           request_token?: string
           requested_basis: string
           requested_expiry?: string | null
+          verified_file_bytes?: number | null
+          verified_storage_object_id?: string | null
+          verified_storage_object_updated_at?: string | null
+          verified_storage_object_version?: string | null
+          verified_storage_path?: string | null
+          verified_storage_sha256?: string | null
         }
         Update: {
           artifact_hash?: string | null
@@ -18846,6 +18858,12 @@ export type Database = {
           request_token?: string
           requested_basis?: string
           requested_expiry?: string | null
+          verified_file_bytes?: number | null
+          verified_storage_object_id?: string | null
+          verified_storage_object_updated_at?: string | null
+          verified_storage_object_version?: string | null
+          verified_storage_path?: string | null
+          verified_storage_sha256?: string | null
         }
         Relationships: [
           {
@@ -18994,6 +19012,83 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "proof_surface_coverage"
             referencedColumns: ["proof_asset_id"]
+          },
+        ]
+      }
+      proof_rights_storage_invalidations_v6: {
+        Row: {
+          client_id: string
+          invalidated_at: string
+          proof_id: string
+          reason: string
+          rights_request_id: string
+          storage_object_id: string | null
+        }
+        Insert: {
+          client_id: string
+          invalidated_at?: string
+          proof_id: string
+          reason: string
+          rights_request_id: string
+          storage_object_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          invalidated_at?: string
+          proof_id?: string
+          reason?: string
+          rights_request_id?: string
+          storage_object_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_storage_invalidations_v6_rights_request_id_fkey"
+            columns: ["rights_request_id"]
+            isOneToOne: true
+            referencedRelation: "proof_rights_requests_v6"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -30808,6 +30903,7 @@ export type Database = {
         Args: { p: Database["public"]["Tables"]["client_proof_assets"]["Row"] }
         Returns: Json
       }
+      proof_storage_identity_v6: { Args: { p_proof_id: string }; Returns: Json }
       provision_campaign: {
         Args: { p_campaign_id: string }
         Returns: {
@@ -31795,6 +31891,20 @@ export type Database = {
           p_size?: string
           p_source_asset_id: string
           p_source_proof_id: string
+        }
+        Returns: string
+      }
+      request_proof_media_rights_v6: {
+        Args: {
+          p_actor_id: string
+          p_expires_on: string
+          p_file_bytes: number
+          p_object_id: string
+          p_object_updated_at: string
+          p_object_version: string
+          p_permission_basis: string
+          p_proof_id: string
+          p_sha256: string
         }
         Returns: string
       }

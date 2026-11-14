@@ -17,6 +17,7 @@ begin
   select * into s from public.client_proof_assets where id = p.source_proof_id
     and client_id = p.client_id;
   if a.id is null or a.status <> 'approved' or s.id is null
+    or s.media_type <> 'text'
     or a.destination_key <> p.destination_key or a.payload_hash <> p.payload_hash
     or p.payload_hash is distinct from public.proof_placement_payload_hash_v6(
       p.artifact_version_id,p.proof_id,p.asset_id,p.destination_key)

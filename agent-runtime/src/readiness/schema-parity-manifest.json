@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "020dedb78c623d84cb5c02c29900a7e731329b9dce540fa0374653f41b9b7219",
-  "generatedTypesSha256": "20c31ece67ae3b7ce55952846926abf8e8da3b302bb5cbe32862d92390d529a4",
-  "generatedSchemaBodySha256": "92c6e07fb842c33e33cf980944ca5b8adef8c912b54225b2e1a4341418e8eac5",
+  "migrationSourceDigest": "4c9035b9fad49e9c2b7f94ca3a609911454fc53d05ce9c3269202e83dda1fc0a",
+  "generatedTypesSha256": "2eb0879cd67783fb2b4ca8ebad79bbec800bfb0d50519f0bb00ee4c21f9a68c1",
+  "generatedSchemaBodySha256": "74c4e4f6733c311e28d29a3b2b25f0cd590ec634a0c965c51481b9cb20d3ecb5",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2605,8 +2605,8 @@
       "version": "20261115150000",
       "name": "355_proof_placement_prewrite_gate",
       "filename": "20261115150000_355_proof_placement_prewrite_gate.sql",
-      "sha256": "f9ce79d06b2a184379fdb79a5f7be01f03df399167c7bad3f4462dd0bdbc0c69",
-      "trimmedMd5": "4d44dd1261eb769d36f6a6c0aba78707"
+      "sha256": "204d9a990424bac6398a0f93871a8c0fe62b21c58434759359b22eec53da1bc6",
+      "trimmedMd5": "66b1073e096fbf2da8128c659750698f"
     },
     {
       "version": "20261115160000",
@@ -2614,6 +2614,34 @@
       "filename": "20261115160000_356_proof_placement_due_inbox_gate.sql",
       "sha256": "46d21238813236278637dae2e32037552eae108430e4dc952cf96229221bcde3",
       "trimmedMd5": "3b790b3bc13e32a40fec69e1554b0a8c"
+    },
+    {
+      "version": "20261115170000",
+      "name": "357_proof_media_rights_identity",
+      "filename": "20261115170000_357_proof_media_rights_identity.sql",
+      "sha256": "4021ddbe91a1e7d935c22b64b2a0c5dba0a3f9b964790351648e56c7b8410b05",
+      "trimmedMd5": "a2141859b7f9f384c1ac858cdc4a72fd"
+    },
+    {
+      "version": "20261115180000",
+      "name": "358_proof_media_rights_request",
+      "filename": "20261115180000_358_proof_media_rights_request.sql",
+      "sha256": "d61ddd31fba07adaa3ec6a5d35ab0d6eb12375cb2dff93060881a936552dffb6",
+      "trimmedMd5": "7ba4951dbe70a3115701b58d4e74e07d"
+    },
+    {
+      "version": "20261115190000",
+      "name": "359_proof_media_rights_source_state",
+      "filename": "20261115190000_359_proof_media_rights_source_state.sql",
+      "sha256": "7d8fd3a8b1d01edc5011917beaee9c7fb2ddc265733e480db7ee66fc1a9bbc78",
+      "trimmedMd5": "a8cfff21300ed1a3c4239ce566c985ed"
+    },
+    {
+      "version": "20261115200000",
+      "name": "360_proof_media_rights_coverage",
+      "filename": "20261115200000_360_proof_media_rights_coverage.sql",
+      "sha256": "6a5901134ba0dda484e6a4b256b5414100c6c56062cf83c2d99e6be1d9f12e39",
+      "trimmedMd5": "c5b9d6b98c3dc5c8a468aab690ebf54f"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
