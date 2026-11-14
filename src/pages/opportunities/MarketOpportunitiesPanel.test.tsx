@@ -22,6 +22,7 @@ const {
   fetchOpportunities,
   fetchReadiness,
   fetchOpportunityApprovalStates,
+  fetchOpportunityActivationStates,
   enqueueAgentJob,
   fetchStageTemplates,
   setStageTemplate,
@@ -36,6 +37,7 @@ const {
   fetchOpportunities: vi.fn(),
   fetchReadiness: vi.fn(),
   fetchOpportunityApprovalStates: vi.fn(),
+  fetchOpportunityActivationStates: vi.fn(),
   enqueueAgentJob: vi.fn(),
   fetchStageTemplates: vi.fn(),
   setStageTemplate: vi.fn(),
@@ -58,6 +60,7 @@ vi.mock("../../lib/opportunities", async () => {
     fetchOpportunities,
     fetchReadiness,
     fetchOpportunityApprovalStates,
+    fetchOpportunityActivationStates,
     fetchScoreFactors: async () => [
       { factor: "economic_value", weight: 0.2, label: "Economic value" },
     ],
@@ -119,6 +122,7 @@ beforeEach(() => {
   fetchOpportunities.mockResolvedValue([opportunity()]);
   fetchReadiness.mockResolvedValue(readiness());
   fetchOpportunityApprovalStates.mockResolvedValue(new Map([["opp-1", "current"]]));
+  fetchOpportunityActivationStates.mockResolvedValue(new Map([["opp-1", "current"]]));
   createCampaignFromOpportunity.mockResolvedValue({ id: "camp-1", name: "Garage-to-Gym Conversion" });
   fetchOpenProposals.mockResolvedValue([]);
   acceptScoreProposal.mockResolvedValue(undefined);
@@ -197,6 +201,17 @@ describe("where the hand-off is offered", () => {
       p_opportunity_id: "opp-1",
     }));
     expect(await screen.findByText(/Sent to Approval Inbox/)).toBeInTheDocument();
+  });
+
+  it("requests a separate activation decision for a currently approved opportunity", async () => {
+    await openActions();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Request activation" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_opportunity_activation_v6", {
+      p_opportunity_id: "opp-1",
+    }));
+    expect(rpc).not.toHaveBeenCalledWith("set_opportunity_status_v6", expect.objectContaining({
+      p_status: "active",
+    }));
   });
 
   it("keeps offering it once campaigns are already running against it", async () => {
@@ -454,6 +469,14 @@ describe("the Discover table carries the whole progression", () => {
     // Not two stages at once: scaling comes after learning, not beside it.
     expect(screen.queryByRole("menuitem", { name: "Scale it" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Mark active" })).not.toBeInTheDocument();
+  });
+
+  it("labels a legacy activation and withholds progression until a current decision exists", async () => {
+    fetchOpportunities.mockResolvedValue([opportunity({ status: "active" })]);
+    fetchOpportunityActivationStates.mockResolvedValue(new Map([["opp-1", "legacy"]]));
+    await openDiscoverActions();
+    expect(screen.getByText(/legacy activation/)).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Mark learning" })).not.toBeInTheDocument();
   });
 
   it("still withholds the hand-off while something is blocking", async () => {

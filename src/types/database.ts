@@ -14052,6 +14052,8 @@ export type Database = {
       }
       market_opportunities: {
         Row: {
+          activated_content_hash: string | null
+          activated_request_id: string | null
           approval_request_token: string | null
           approved_content_hash: string | null
           approved_request_id: string | null
@@ -14078,6 +14080,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          activated_content_hash?: string | null
+          activated_request_id?: string | null
           approval_request_token?: string | null
           approved_content_hash?: string | null
           approved_request_id?: string | null
@@ -14104,6 +14108,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          activated_content_hash?: string | null
+          activated_request_id?: string | null
           approval_request_token?: string | null
           approved_content_hash?: string | null
           approved_request_id?: string | null
@@ -14130,6 +14136,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "market_opportunities_activated_request_id_fkey"
+            columns: ["activated_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_activated_request_id_fkey"
+            columns: ["activated_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "market_opportunities_approved_request_id_fkey"
             columns: ["approved_request_id"]
@@ -15901,6 +15921,134 @@ export type Database = {
           },
         ]
       }
+      opportunity_activation_requests_v6: {
+        Row: {
+          activation_note: string | null
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          opportunity_id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          activation_note?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          opportunity_id: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          activation_note?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          opportunity_id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_origins"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "market_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities_archive"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_approval_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_activation_requests_v6_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_template_readiness"
+            referencedColumns: ["opportunity_id"]
+          },
+        ]
+      }
       opportunity_attributes: {
         Row: {
           body: string
@@ -15978,6 +16126,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_attributes_opportunity_id_fkey"
@@ -16105,6 +16260,13 @@ export type Database = {
             foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_approval_state_v6"
             referencedColumns: ["opportunity_id"]
           },
@@ -16222,6 +16384,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_events_opportunity_id_fkey"
@@ -16387,6 +16556,13 @@ export type Database = {
             foreignKeyName: "opportunity_links_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_links_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_approval_state_v6"
             referencedColumns: ["opportunity_id"]
           },
@@ -16497,6 +16673,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_proof_requirements_opportunity_id_fkey"
@@ -16630,6 +16813,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_proposals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_proposals_opportunity_id_fkey"
@@ -16786,6 +16976,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_scores_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_scores_opportunity_id_fkey"
@@ -24063,6 +24260,13 @@ export type Database = {
             foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
             referencedRelation: "opportunity_approval_state_v6"
             referencedColumns: ["opportunity_id"]
           },
@@ -27078,6 +27282,56 @@ export type Database = {
           },
         ]
       }
+      opportunity_activation_state_v6: {
+        Row: {
+          activation_state: string | null
+          client_id: string | null
+          opportunity_id: string | null
+          status: Database["public"]["Enums"]["opportunity_status"] | null
+        }
+        Insert: {
+          activation_state?: never
+          client_id?: string | null
+          opportunity_id?: string | null
+          status?: Database["public"]["Enums"]["opportunity_status"] | null
+        }
+        Update: {
+          activation_state?: never
+          client_id?: string | null
+          opportunity_id?: string | null
+          status?: Database["public"]["Enums"]["opportunity_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_opportunities_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       opportunity_approval_state_v6: {
         Row: {
           approval_current: boolean | null
@@ -27197,6 +27451,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "opportunities_archive"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_activation_state_v6"
+            referencedColumns: ["opportunity_id"]
           },
           {
             foreignKeyName: "opportunity_awareness_stages_opportunity_id_fkey"
@@ -29019,6 +29280,8 @@ export type Database = {
       approve_opportunity_v6: {
         Args: { p_opportunity_id: string; p_request_id: string }
         Returns: {
+          activated_content_hash: string | null
+          activated_request_id: string | null
           approval_request_token: string | null
           approved_content_hash: string | null
           approved_request_id: string | null
@@ -30864,6 +31127,15 @@ export type Database = {
         }
         Returns: string
       }
+      decide_opportunity_activation_inbox_v6: {
+        Args: {
+          p_activation_id: string
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+        }
+        Returns: string
+      }
       decide_production_release_candidate_v6: {
         Args: {
           p_decision: string
@@ -32341,6 +32613,32 @@ export type Database = {
         }[]
       }
       next_ref_number: { Args: { p_client_id: string }; Returns: string }
+      opportunity_activation_current_v6: {
+        Args: { p_opportunity_id: string }
+        Returns: boolean
+      }
+      opportunity_activation_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["opportunity_activation_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      opportunity_activation_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["opportunity_activation_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      opportunity_activation_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["opportunity_activation_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      opportunity_activation_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       opportunity_approval_current_v6: {
         Args: { p_id: string }
         Returns: boolean
@@ -33558,6 +33856,10 @@ export type Database = {
         }
         Returns: string
       }
+      request_opportunity_activation_v6: {
+        Args: { p_note?: string; p_opportunity_id: string }
+        Returns: string
+      }
       request_opportunity_approval_v6: {
         Args: { p_opportunity_id: string }
         Returns: string
@@ -34719,6 +35021,8 @@ export type Database = {
           p_status: Database["public"]["Enums"]["opportunity_status"]
         }
         Returns: {
+          activated_content_hash: string | null
+          activated_request_id: string | null
           approval_request_token: string | null
           approved_content_hash: string | null
           approved_request_id: string | null

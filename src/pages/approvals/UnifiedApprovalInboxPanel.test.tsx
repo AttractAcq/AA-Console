@@ -346,6 +346,28 @@ const readyGoogleProfileChange = {
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
 };
 
+const activationReviewId = "26262626-2626-4262-8262-262626262626";
+const activationToken = "27272727-2727-4272-8272-272727272727";
+const activationHash = "f".repeat(64);
+const readyOpportunityActivation = {
+  ...request, id: "activation-inbox-1", source_system: "aa_console",
+  source_kind: "opportunity_activate", source_id: activationReviewId,
+  source_version: `${activationHash}:${activationToken}`,
+  artifact_hash: activationHash, title: "Activate market opportunity: Garage gym",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: "market_opportunity:opportunity-1:active", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", opportunity_id: "opportunity-1",
+    request_token: activationToken, activation_note: "Begin planning",
+    approved_request_id: "approval-1", approved_content_hash: "a".repeat(64),
+    approved_opportunity: { opportunity_id: "opportunity-1", client_id: "client-1" },
+    campaigns: [{ campaign_id: "campaign-1", role: "campaign" }] },
+  scope: { client_id: "client-1", opportunity_id: "opportunity-1",
+    activation_id: activationReviewId, request_token: activationToken,
+    content_hash: activationHash, effect: "opportunity_status_active" },
+  owning_path: "/clients/client-1/delivery/market-opportunities?opportunity=opportunity-1",
+};
+
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
 const engineTime = "2026-11-20T09:00:00+00:00";
@@ -803,6 +825,18 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_google_profile_inbox_v6", {
       p_review_id: googleProfileReviewId, p_request_id: readyGoogleProfileChange.id,
+      p_approved: true,
+    }));
+  });
+
+  it("routes opportunity activation through a separate exact Inbox decision", async () => {
+    requests = [readyOpportunityActivation];
+    show();
+    const card = await screen.findByRole("article", { name: readyOpportunityActivation.title });
+    expect(within(card).getByText(/Begin planning/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_opportunity_activation_inbox_v6", {
+      p_activation_id: activationReviewId, p_request_id: readyOpportunityActivation.id,
       p_approved: true,
     }));
   });

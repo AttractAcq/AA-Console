@@ -15,8 +15,9 @@ import {
   createCampaignFromOpportunity,
   acceptScoreProposal, fetchOpenProposals, rejectProposal,
   requestEvaluation, requestStrategy,
-  fetchOpportunities, fetchOpportunityApprovalStates, fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
-  fetchStageTemplates, setStageTemplate, requestOpportunityApproval,
+  fetchOpportunities, fetchOpportunityApprovalStates, fetchOpportunityActivationStates,
+  fetchReadiness, fetchScoreFactors, requireProof, scoreOpportunity,
+  fetchStageTemplates, setStageTemplate, requestOpportunityApproval, requestOpportunityActivation,
   setAttributes, setAwarenessStage, setConfidence, setFields, setStatus,
   type Opportunity, type OpportunityConfidence, type OpportunityProposal,
   type Readiness, type ScoreFactor,
@@ -53,6 +54,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [readiness, setReadiness] = useState<ReadonlyMap<string, Readiness>>(new Map());
   const [approvalStates, setApprovalStates] = useState<ReadonlyMap<string, string>>(new Map());
+  const [activationStates, setActivationStates] = useState<ReadonlyMap<string, string>>(new Map());
   const [factors, setFactors] = useState<ScoreFactor[]>([]);
   const [proposals, setProposals] = useState<OpportunityProposal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,12 +71,14 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
       return;
     }
     try {
-      const [list, approvals, ready, scoring, open] = await Promise.all([
-        fetchOpportunities(clientId), fetchOpportunityApprovalStates(clientId), fetchReadiness(clientId), fetchScoreFactors(),
+      const [list, approvals, activations, ready, scoring, open] = await Promise.all([
+        fetchOpportunities(clientId), fetchOpportunityApprovalStates(clientId),
+        fetchOpportunityActivationStates(clientId), fetchReadiness(clientId), fetchScoreFactors(),
         fetchOpenProposals(clientId),
       ]);
       setOpportunities(list);
       setApprovalStates(approvals);
+      setActivationStates(activations);
       setReadiness(ready);
       setFactors(scoring);
       setProposals(open);
@@ -140,6 +144,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
           opportunities={opportunities}
           readiness={readiness}
           approvalStates={approvalStates}
+          activationStates={activationStates}
           loading={loading}
           busy={busy}
           discovering={discovering}
@@ -181,6 +186,7 @@ export function MarketOpportunitiesPanel({ view }: { view: View }) {
           opportunities={opportunities}
           readiness={readiness}
           approvalStates={approvalStates}
+          activationStates={activationStates}
           clientId={clientId}
           busy={busy}
           onSelect={select}
@@ -473,11 +479,12 @@ function ProposalsPanel({
 }
 
 function opportunityActions({
-  opportunity: o, readiness: r, approvalState, clientId, onSelect, onAct, onBuild,
+  opportunity: o, readiness: r, approvalState, activationState, clientId, onSelect, onAct, onBuild,
 }: {
   opportunity: Opportunity;
   readiness: Readiness | undefined;
   approvalState: string | undefined;
+  activationState: string | undefined;
   clientId: string | undefined;
   onSelect: (id: string) => void;
   onAct: (id: string, work: () => Promise<void>, said: string) => Promise<void>;
@@ -501,19 +508,20 @@ function opportunityActions({
       && approvalState === "current" && !r?.blocker
       ? [{ label: "Create a campaign", onSelect: () => onBuild(o) }]
       : []),
-    ...(o.status === "approved"
+    ...(o.status === "approved" && approvalState === "current" && !r?.blocker
       ? [{
-          label: "Mark active",
-          onSelect: () => void onAct(o.id, () => setStatus(o.id, "active"), "Active."),
+          label: "Request activation",
+          onSelect: () => void onAct(o.id, () => requestOpportunityActivation(o.id),
+            "Sent to Approval Inbox for a separate activation decision."),
         }]
       : []),
-    ...(o.status === "active"
+    ...(o.status === "active" && activationState === "current"
       ? [{
           label: "Mark learning",
           onSelect: () => void onAct(o.id, () => setStatus(o.id, "learning"), "Learning."),
         }]
       : []),
-    ...(o.status === "learning"
+    ...(o.status === "learning" && activationState === "current"
       ? [{
           label: "Scale it",
           onSelect: () => void onAct(o.id, () => setStatus(o.id, "scaling"), "Scaling."),
@@ -563,13 +571,14 @@ function opportunityActions({
 }
 
 function DiscoverView({
-  clientId, opportunities, readiness, approvalStates, loading, busy, discovering, onDiscover, onSelect, onAct,
+  clientId, opportunities, readiness, approvalStates, activationStates, loading, busy, discovering, onDiscover, onSelect, onAct,
   onBuild,
 }: {
   clientId: string | undefined;
   opportunities: Opportunity[];
   readiness: ReadonlyMap<string, Readiness>;
   approvalStates: ReadonlyMap<string, string>;
+  activationStates: ReadonlyMap<string, string>;
   loading: boolean;
   busy: string | null;
   discovering: boolean;
@@ -607,7 +616,9 @@ function DiscoverView({
             {o.name}
           </button>,
           <span key="s" className="capitalize">{o.status}{["legacy", "stale"].includes(approvalStates.get(o.id) ?? "")
-            ? ` · ${approvalStates.get(o.id)} approval` : ""}</span>,
+            ? ` · ${approvalStates.get(o.id)} approval` : ""}
+            {["legacy", "stale"].includes(activationStates.get(o.id) ?? "")
+              ? ` · ${activationStates.get(o.id)} activation` : ""}</span>,
           <span key="m">{o.micro_market}</span>,
           <span key="t">{o.purchase_trigger ?? "—"}</span>,
           <ConfidenceTag key="c" confidence={o.confidence} />,
@@ -621,6 +632,7 @@ function DiscoverView({
               opportunity: o,
               readiness: readiness.get(o.id),
               approvalState: approvalStates.get(o.id),
+              activationState: activationStates.get(o.id),
               clientId,
               onSelect,
               onAct,
@@ -984,11 +996,12 @@ function StrategizeView({
 }
 
 function ActivateView({
-  opportunities, readiness, approvalStates, clientId, busy, onSelect, onAct, onBuild,
+  opportunities, readiness, approvalStates, activationStates, clientId, busy, onSelect, onAct, onBuild,
 }: {
   opportunities: Opportunity[];
   readiness: ReadonlyMap<string, Readiness>;
   approvalStates: ReadonlyMap<string, string>;
+  activationStates: ReadonlyMap<string, string>;
   clientId: string | undefined;
   busy: string | null;
   onSelect: (id: string) => void;
@@ -1014,13 +1027,21 @@ function ActivateView({
             : approvalState === "stale"
               ? "The approved opportunity changed; pause and request a new exact review."
               : null;
-          const blocker = r?.blocker ?? approvalBlocker;
+          const activationState = activationStates.get(o.id);
+          const activationBlocker = activationState === "legacy"
+            ? "Pre-Inbox activation needs review before moving to learning or scaling."
+            : activationState === "stale"
+              ? "Activation evidence changed; pause and review it again before progressing."
+              : null;
+          const blocker = r?.blocker ?? approvalBlocker ?? activationBlocker;
           return [
             <button key="n" type="button" onClick={() => onSelect(o.id)} className="text-left hover:underline">
               {o.name}
             </button>,
             <span key="s">{o.status}{["legacy", "stale"].includes(approvalStates.get(o.id) ?? "")
-              ? ` · ${approvalStates.get(o.id)} approval` : ""}</span>,
+              ? ` · ${approvalStates.get(o.id)} approval` : ""}
+              {["legacy", "stale"].includes(activationState ?? "")
+                ? ` · ${activationState} activation` : ""}</span>,
             <span key="c">{r?.score ?? "—"}</span>,
             <span key="g" className={r && r.open_proof_gaps > 0 ? "text-destructive" : undefined}>
               {r?.open_proof_gaps ?? 0}
@@ -1036,6 +1057,7 @@ function ActivateView({
                 opportunity: o,
                 readiness: r,
                 approvalState: approvalStates.get(o.id),
+                activationState,
                 clientId,
                 onSelect,
                 onAct,
