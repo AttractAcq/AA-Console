@@ -53,6 +53,7 @@ begin
     where canonical_request_id=request_id;
   if review_id is null or public.request_ordinary_media_review_v6(v_asset_id)<>request_id
     or public.ordinary_media_review_source_state_v6(request_id)<>'pending'
+    or public.ordinary_media_signoff_current_v6(v_asset_id)
     or (select status from public.approval_inbox_v6 where id=request_id)<>'pending'
     then raise exception 'Exact creative request did not become pending and deduplicated'; end if;
   begin
@@ -71,16 +72,30 @@ begin
     '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
   perform public.approve_ordinary_media_inbox_v6(review_id,request_id);
   if public.ordinary_media_review_source_state_v6(request_id)<>'source_decided'
+    or not public.ordinary_media_signoff_current_v6(v_asset_id)
     or (select status from public.approval_inbox_v6 where id=request_id)<>'approved'
     or not exists(select 1 from public.client_media_assets a
       join public.ordinary_media_signoffs_v6 s on s.asset_id=a.id
       where a.id=v_asset_id and a.human_approved_at is not null
         and s.approved_request_id=request_id) then
     raise exception 'Exact Inbox decision did not sign off the creative'; end if;
+  begin
+    perform public.schedule_asset(v_asset_id,current_date+1);
+    raise exception 'Fixture asset scheduled without campaign lineage';
+  exception when SQLSTATE 'P0001' then
+    if SQLERRM not like '%no verified organic campaign brief%' then raise; end if;
+  end;
   update storage.objects set version='v2'
     where id='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
   if public.ordinary_media_review_source_state_v6(request_id)='source_decided'
+    or public.ordinary_media_signoff_current_v6(v_asset_id)
     or (select status from public.approval_inbox_v6 where id=request_id)='approved'
     then raise exception 'Storage replacement left creative approval current'; end if;
+  begin
+    perform public.schedule_asset(v_asset_id,current_date+1);
+    raise exception 'Stale creative scheduled';
+  exception when SQLSTATE 'P0001' then
+    if SQLERRM not like '%exact creative signoff is missing or stale%' then raise; end if;
+  end;
 end $checks$;
 rollback;

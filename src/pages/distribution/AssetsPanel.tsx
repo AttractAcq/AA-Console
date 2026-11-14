@@ -35,6 +35,7 @@ interface Booking {
 export function AssetsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
   const [assets, setAssets] = useState<MediaAsset[]>([]);
+  const [currentSignoffs, setCurrentSignoffs] = useState<Map<string, boolean>>(new Map());
   const [bookings, setBookings] = useState<Map<string, Booking>>(new Map());
   const urls = useSignedPreviewPaths("client-media", assets.map((asset) => asset.storage_path));
   const [bodies, setBodies] = useState<Map<string, string>>(new Map());
@@ -66,6 +67,14 @@ export function AssetsPanel() {
         reviewStatus: "approved",
         humanApproved: true,
       });
+      const { data: signoffs, error: signoffError } = await supabase
+        .from("ordinary_media_current_status_v6")
+        .select("asset_id, current_signoff")
+        .eq("client_id", clientId);
+      if (signoffError) throw new Error(signoffError.message);
+      setCurrentSignoffs(new Map((signoffs ?? [])
+        .filter((row) => !!row.asset_id)
+        .map((row) => [row.asset_id!, row.current_signoff === true] as const)));
       setAssets(rows);
 
       const { data: posts, error: postError } = await supabase
@@ -101,6 +110,9 @@ export function AssetsPanel() {
     setBusy(true);
     setError(null);
     try {
+      if (needsExactSignoff(scheduling) && currentSignoffs.get(scheduling.id) !== true) {
+        throw new Error("This asset's exact creative signoff is missing or stale. Review a new version before scheduling.");
+      }
       await assertOrganicScheduleRoute(scheduling.id, channel, clientId);
       const { error: rpcError } = await supabase.rpc("schedule_asset", {
         p_asset_id: scheduling.id,
@@ -134,6 +146,11 @@ export function AssetsPanel() {
   });
   const waiting = ordered.filter((a) => !bookings.has(a.id)).length;
 
+  function needsExactSignoff(asset: MediaAsset): boolean {
+    return (asset.media_type === "image" || asset.media_type === "text")
+      && asset.content_format === "single" && !asset.render_path;
+  }
+
   if (loadError) {
     return (
       <div role="alert">
@@ -164,6 +181,8 @@ export function AssetsPanel() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {ordered.map((asset) => {
             const booking = bookings.get(asset.id);
+            const staleSignoff = needsExactSignoff(asset)
+              && currentSignoffs.get(asset.id) !== true;
             return (
               <MediaCard
                 key={asset.id}
@@ -185,7 +204,10 @@ export function AssetsPanel() {
                     <p className="text-xs text-muted-foreground">
                       {booking.channel} · {platformLabel(booking.platform)} ·{" "}
                       {shortDate(booking.scheduled_for)}
+                      {staleSignoff && <span className="block text-destructive">Creative signoff is now stale.</span>}
                     </p>
+                  ) : staleSignoff ? (
+                    <p className="text-xs text-destructive">Exact creative signoff is missing or stale. Request a new review.</p>
                   ) : (
                     <button
                       type="button"
