@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { callRuntime } from "../../lib/callRuntime";
 import { supabase } from "../../lib/supabase";
 import { FormModal } from "../../components/forms/FormModal";
@@ -144,6 +145,11 @@ export function ProofCaptureDelivery({
             : "Request delivery requires an email or messaging provider to be configured on the server. Capture links work independently."}
         </p>
       )}
+      {setup.method === "automated_requests" && (
+        <Link className="text-sm underline" to={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>
+          Open Approval Inbox to decide prepared requests
+        </Link>
+      )}
       {data.links
         .filter((l) => l.config_id === setup.id)
         .map((l) => (
@@ -208,21 +214,16 @@ export function ProofCaptureDelivery({
                     className={button}
                     disabled={busy}
                     onClick={() => {
-                      if (
-                        window.confirm(
-                          `Send this ${d.channel} request to ${d.recipient} at the scheduled time?`,
-                        )
-                      )
-                        void act(async () => {
-                          const r = await supabase.rpc(
-                            "decide_proof_delivery",
-                            { p_delivery_id: d.id, p_approve: true },
-                          );
-                          if (r.error) throw r.error;
-                        });
+                      void act(async () => {
+                        const r = await supabase.rpc(
+                          "request_proof_delivery_review_v6",
+                          { p_delivery_id: d.id },
+                        );
+                        if (r.error) throw r.error;
+                      });
                     }}
                   >
-                    Approve send
+                    Request Inbox review
                   </button>
                 )}
                 <button

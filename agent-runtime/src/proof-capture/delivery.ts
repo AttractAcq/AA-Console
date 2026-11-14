@@ -8,6 +8,18 @@ export async function dispatchProofDelivery(
   const { data: row, error } = await sb.rpc("claim_proof_delivery");
   if (error) throw error;
   if (!row?.id) return;
+  // A revoked link or changed delivery after the claim must stop the send.
+  const { data: sendReady, error: gateError } = await sb.rpc(
+    "proof_delivery_send_ready_v6", { p_delivery_id: row.id },
+  );
+  if (gateError) throw gateError;
+  if (sendReady !== true) {
+    const { error: stopError } = await sb.from("proof_request_deliveries")
+      .update({ status: "cancelled", error: "Current exact Inbox approval or capture link is unavailable.", lease_until: null })
+      .eq("id", row.id).eq("status", "sending");
+    if (stopError) throw stopError;
+    return;
+  }
   let status = "failed",
     message: string | null = null,
     providerId: string | null = null;

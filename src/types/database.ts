@@ -18540,6 +18540,89 @@ export type Database = {
           },
         ]
       }
+      proof_delivery_reviews_v6: {
+        Row: {
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          delivery_id: string
+          id: string
+          request_token: string
+          review_epoch: number
+          source_hash: string
+        }
+        Insert: {
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          delivery_id: string
+          id?: string
+          request_token?: string
+          review_epoch?: never
+          source_hash?: string
+        }
+        Update: {
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          delivery_id?: string
+          id?: string
+          request_token?: string
+          review_epoch?: never
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_delivery_reviews_v6_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "proof_request_deliveries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proof_destinations: {
         Row: {
           destination_key: string
@@ -30570,6 +30653,15 @@ export type Database = {
         Args: { p_approve: boolean; p_delivery_id: string }
         Returns: undefined
       }
+      decide_proof_delivery_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decide_proof_placement_approval_v6: {
         Args: { p_approval_id: string; p_approved: boolean; p_reason?: string }
         Returns: {
@@ -32139,6 +32231,32 @@ export type Database = {
         Args: { p_artifact_version_id: string }
         Returns: boolean
       }
+      proof_delivery_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["proof_delivery_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      proof_delivery_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["proof_delivery_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      proof_delivery_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["proof_delivery_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      proof_delivery_send_ready_v6: {
+        Args: { p_delivery_id: string }
+        Returns: boolean
+      }
+      proof_delivery_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       proof_placement_effect_allowed_v6: {
         Args: { p_placement_id: string }
         Returns: boolean
@@ -33207,6 +33325,10 @@ export type Database = {
           p_source_asset_id: string
           p_source_proof_id: string
         }
+        Returns: string
+      }
+      request_proof_delivery_review_v6: {
+        Args: { p_delivery_id: string }
         Returns: string
       }
       request_proof_media_rights_v6: {

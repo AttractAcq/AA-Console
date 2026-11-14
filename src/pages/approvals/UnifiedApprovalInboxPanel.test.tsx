@@ -282,6 +282,28 @@ const readyOrdinaryMedia = {
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=assets",
 };
 
+const proofDeliveryReviewId = "20202020-2020-4020-8020-202020202020";
+const proofDeliveryToken = "21212121-2121-4121-8121-212121212121";
+const proofDeliveryHash = "c".repeat(64);
+const readyProofDelivery = {
+  ...request, id: "proof-delivery-inbox-1", source_system: "aa_console",
+  source_kind: "proof_delivery", source_id: proofDeliveryReviewId,
+  source_version: `${proofDeliveryHash}:${proofDeliveryToken}`,
+  artifact_hash: proofDeliveryHash, title: "Send proof request: email to customer",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: "email:customer@example.invalid", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", delivery_id: "delivery-1",
+    request_token: proofDeliveryToken, config_id: "config-1", link_id: "link-1",
+    channel: "email", recipient: "customer@example.invalid",
+    subject: "Evidence request", message: "Please send evidence",
+    capture_url: "https://example.invalid/capture/private" },
+  scope: { client_id: "client-1", delivery_id: "delivery-1",
+    review_id: proofDeliveryReviewId, request_token: proofDeliveryToken,
+    content_hash: proofDeliveryHash, effect: "proof_request_send" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
 const engineTime = "2026-11-20T09:00:00+00:00";
@@ -704,6 +726,18 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_proof_artifact_inbox_v6", {
       p_review_id: artifactReviewId, p_request_id: readyProofArtifact.id,
+    }));
+  });
+
+  it("routes an exact proof request send decision through its owning Inbox RPC", async () => {
+    requests = [readyProofDelivery];
+    show();
+    const card = await screen.findByRole("article", { name: readyProofDelivery.title });
+    expect(within(card).getByText(/Please send evidence/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_proof_delivery_inbox_v6", {
+      p_review_id: proofDeliveryReviewId, p_request_id: readyProofDelivery.id,
+      p_approved: true,
     }));
   });
 
