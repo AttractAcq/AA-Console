@@ -24,6 +24,7 @@ export function CampaignActionApprovalsPanel() {
   const [decided, setDecided] = useState<CampaignActionDue[]>([]);
   const [attemptsByExecution, setAttemptsByExecution] = useState<Record<string, ActionAttempt[]> | null>({});
   const [actionsOn, setActionsOn] = useState(false);
+  const [runtimeHold, setRuntimeHold] = useState<string | null>("Runtime state has not been verified.");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reasonById, setReasonById] = useState<Record<string, string>>({});
@@ -43,12 +44,20 @@ export function CampaignActionApprovalsPanel() {
     // a failure reading it cannot leave the outcomes of previous decisions
     // looking like an empty list, which reads as "nothing has happened".
     try {
-      const [due, on] = await Promise.all([
+      const [due, on, runtime] = await Promise.all([
         fetchCampaignActionDue(clientId),
         fetchCampaignActionsEnabled(clientId),
+        supabase.rpc("client_runtime_controls_v6" as never, { p_client_id: clientId } as never),
       ]);
       setDecided(due);
       setActionsOn(on);
+      const control = runtime.data as { state?: string; reason?: string; workerEnabled?: boolean;
+        controls?: { campaignActions?: boolean }; holds?: { campaignActions?: string } } | null;
+      setRuntimeHold(runtime.error?.message ?? (control?.state !== "observed"
+        ? control?.reason ?? "Runtime state has not been verified."
+        : control.workerEnabled !== true || control.controls?.campaignActions !== true
+          ? "Campaign action runtime switch is off or unreported."
+          : control.holds?.campaignActions ?? null));
       const executionIds = due.map((action) => action.execution_id).filter((id): id is string => Boolean(id));
       if (executionIds.length === 0) {
         setAttemptsByExecution({});
@@ -67,6 +76,7 @@ export function CampaignActionApprovalsPanel() {
       }
     } catch (cause) {
       setAttemptsByExecution(null);
+      setRuntimeHold("Runtime state has not been verified.");
       setError(cause instanceof Error ? cause.message : "Could not read what happened to approved actions.");
     }
     const { data, error: queryError } = await supabase
@@ -143,9 +153,9 @@ export function CampaignActionApprovalsPanel() {
       </div>
 
       <p role="status" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-        Generic campaign action claims are held before the worker reads or claims an approval.
-        The new owned database claim is awaiting runtime integration and validation.
-        A client switch or approval does not release this hold.
+        {runtimeHold
+          ? `Campaign action execution is held: ${runtimeHold} An approval alone does not release this hold.`
+          : "The owned campaign action worker is observed and attested. Each action still requires exact approval and last-moment checks."}
       </p>
 
       {/* Decisions remain here; the one client control lives on Dashboard. */}
@@ -156,8 +166,10 @@ export function CampaignActionApprovalsPanel() {
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {actionsOn
-              ? "This client switch is on, but the generic worker is held before claim. Each action still needs its own exact-version approval."
-              : "The generic worker is held before claim. Approvals are still recorded."}
+              ? runtimeHold
+                ? "This client switch is on, but execution is held. Each action still needs its own exact-version approval."
+                : "The owned worker may claim exact approved actions after its last-moment checks."
+              : "Approvals are recorded while the client switch is off."}
           </p>
         </div>
         <Link to={`/clients/${clientId}/delivery/dashboard`} className="text-sm text-primary underline">View controls on Dashboard</Link>
@@ -228,7 +240,7 @@ export function CampaignActionApprovalsPanel() {
           <h2 className="text-lg font-semibold">After the decision</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Approved actions, and why each has or has not been performed. The database due view
-            does not include this runtime's generic preclaim hold.
+            does not include this runtime's current hold state.
           </p>
         </div>
         {decided.length === 0 ? (
@@ -265,7 +277,7 @@ export function CampaignActionApprovalsPanel() {
                   <div>
                     <dt className="text-muted-foreground">Why not, if not</dt>
                     <dd className={action.blocker ? "text-destructive" : "text-brand-strong"}>
-                      {action.blocker ?? "Database due; the generic runtime worker is held before claim."}
+                      {action.blocker ?? runtimeHold ?? "Database due; waiting for the next owned-worker sweep."}
                     </dd>
                   </div>
                   {action.external_id && (

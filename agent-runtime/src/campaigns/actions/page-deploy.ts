@@ -28,7 +28,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { RuntimeConfig } from "../../config.js";
-import { ActionError, type ActionHandler, type ActionOutcome } from "./executor.js";
+import { ActionError, assertActionPrewrite, type ActionHandler, type ActionOutcome } from "./executor.js";
 import { publishPage } from "../../sites/provision.js";
 import { supabaseSiteStore } from "../../sites/store.js";
 import { logger } from "../../logging/logger.js";
@@ -172,6 +172,7 @@ export const deployCampaignPage: ActionHandler = async (sb, config, action) => {
   } as never);
   if (gateError) throw new ActionError(gateError.message, false);
 
+  await assertActionPrewrite(sb, config, action);
   const published = await publishPage(
     // The publisher's own general guard would refuse a v6 campaign page, and
     // correctly: 212 left that block in place for every other route. This one

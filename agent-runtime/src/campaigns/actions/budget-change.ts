@@ -25,7 +25,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { RuntimeConfig } from "../../config.js";
-import { ActionError, type ActionHandler } from "./executor.js";
+import { ActionError, assertActionPrewrite, type ActionHandler } from "./executor.js";
 import { MetaWriteError, updateAdSetDailyBudget } from "../../meta/ads.js";
 import { adAccountFor } from "../../meta/account.js";
 
@@ -68,7 +68,7 @@ async function accountFor(
   return { accessToken: token, accountId: resolved.id };
 }
 
-export const changeAdSetBudget: ActionHandler = async (sb, _config: RuntimeConfig, action) => {
+export const changeAdSetBudget: ActionHandler = async (sb, config: RuntimeConfig, action) => {
   // The money check, immediately before the write.
   const { data, error } = await sb.rpc("assert_budget_change_allowed_v6", {
     p_execution_id: action.execution_id,
@@ -84,6 +84,7 @@ export const changeAdSetBudget: ActionHandler = async (sb, _config: RuntimeConfi
   const account = await accountFor(sb, change.client_id);
   const amount = Number(change.proposed_daily_budget);
 
+  await assertActionPrewrite(sb, config, action);
   try {
     await updateAdSetDailyBudget(account, change.ad_set_external_id, amount);
   } catch (thrown) {

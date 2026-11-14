@@ -51,7 +51,7 @@ type Snapshot = {
     switches: Record<string, boolean>;
     actionHolds?: {
       profileFieldPatch?: { state: "held"; reason: string };
-      genericCampaignActionClaim?: { state: "held"; reason: string };
+      genericCampaignActionClaim?: { state: "held" | "ready" | "unknown"; reason: string };
     };
     credentialPresence: Record<string, boolean>;
     heartbeats: Observation<{
@@ -237,13 +237,14 @@ export function SystemReadinessPanel() {
           </div>
         </div>
         <div className="rounded-lg border border-border bg-card p-4 text-sm">
-          <h3 className="font-medium">Generic campaign action claims</h3>
+          <h3 className="font-medium">Owned campaign action claims</h3>
           <p className="mt-1 font-medium text-destructive">
-            {snapshot.runtime.actionHolds?.genericCampaignActionClaim?.state === "held" ? "Held" : "Unknown"}
+            {snapshot.runtime.actionHolds?.genericCampaignActionClaim?.state === "held" ? "Held"
+              : snapshot.runtime.actionHolds?.genericCampaignActionClaim?.state === "ready" ? "Ready" : "Unknown"}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {snapshot.runtime.actionHolds?.genericCampaignActionClaim?.reason
-              ?? "This runtime has not reported whether generic campaign action claims are held."}
+              ?? "This runtime has not reported whether owned campaign action claims are ready."}
           </p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4 text-sm">

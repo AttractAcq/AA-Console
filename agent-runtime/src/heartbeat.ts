@@ -10,13 +10,7 @@ import { logger } from "./logging/logger.js";
 import { deployedCommitSha } from "./readiness/version.js";
 import { GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD } from "./campaigns/actions/preclaim-hold.js";
 import { HANDLERS } from "./campaigns/actions/executor.js";
-
-const ACTION_MODULES: Record<string, string> = {
-  proof_publish: "proof_distribution",
-  page_deploy: "website_studio",
-  lead_message: "sales_os",
-  budget_change: "meta_ads_studio",
-};
+import { ACTION_HANDLER_MODULES } from "./campaigns/actions/handler-ownership.js";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
@@ -38,17 +32,37 @@ export function startHeartbeat(
   const workerId = makeHeartbeatWorkerId();
   const version = deployedCommitSha();
   const handlers = Object.fromEntries(Object.keys(HANDLERS)
-    .map((key) => [key, ACTION_MODULES[key]])
+    .map((key) => [key, ACTION_HANDLER_MODULES[key as keyof typeof ACTION_HANDLER_MODULES]])
     .filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+
+  async function campaignActionHold(): Promise<string> {
+    if (!config.campaignActionOwnedClaimEnabled) return GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD;
+    if (!version) return "Campaign action claims need a complete deployed Git commit SHA.";
+    if (!config.enabled || !config.campaignActionsEnabled) return "Campaign action runtime switch is off.";
+    const { data, error } = await sb.from("campaign_action_executors")
+      .select("action_key,executor_module,supported,handler_attested_sha")
+      .in("action_key", Object.keys(handlers));
+    if (error || !data || data.length !== Object.keys(handlers).length) {
+      return "Campaign action handler registry could not be verified.";
+    }
+    for (const row of data) {
+      if (!row.supported || row.handler_attested_sha !== version
+        || handlers[row.action_key] !== row.executor_module) {
+        return "Campaign action handler registry is not attested to this deployed build.";
+      }
+    }
+    return "";
+  }
 
   async function tick(): Promise<void> {
     try {
-      const [queued, active] = await Promise.all([
+      const [queued, active, actionHold] = await Promise.all([
         sb.from("agent_jobs").select("id", { count: "exact", head: true }).eq("status", "queued"),
         sb
           .from("agent_jobs")
           .select("id", { count: "exact", head: true })
           .in("status", ["claimed", "running"]),
+        campaignActionHold(),
       ]);
       const { error } = await sb.from("agent_runtime_heartbeats").insert({
         worker_id: workerId,
@@ -68,7 +82,7 @@ export function startHeartbeat(
             outboundMessaging: config.outboundMessagingEnabled,
             leadMagnetDelivery: config.leadMagnetDeliveryEnabled,
           },
-          holds: { campaignActions: GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD },
+          holds: actionHold ? { campaignActions: actionHold } : {},
           handlers,
         },
       });

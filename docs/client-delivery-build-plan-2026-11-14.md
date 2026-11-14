@@ -66,6 +66,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Exit gate:** 100% of the live required approval-class inventory has an owner, preview, decision path and execution outcome state. Tests prove stale bytes, wrong client, missing AAL2, absent consent/rights, disabled switch, unsupported handler and duplicate request fail closed. One supported external test action produces an observed receipt.
 
+**Implementation checkpoint, 14 November 2026:** The local Phase 2 branch now has Dashboard runtime-control evidence, a read-only operational brief, a service-offer Inbox bridge, an opt-in owned campaign-action claim, per-attempt receipts and a prewrite recheck. Clean local migration replay through 330, schema parity, focused UI/runtime tests and a rollback-only claim fixture pass. The opt-in remains off by default. The local 34-class coverage view records 1 operational, 10 blocked and 23 missing classes; these are implementation-evidence states, not verification of live provider actions. Remaining work includes source-specific Inbox coverage, owner alerts, revocation/retraction and reconciliation paths, live assurance tests, and an authorized external test action with a provider receipt. Phase 2 is open.
+
 ## Phase 3 — Intelligence, Market Opportunities, Offer Studio and proof inputs
 
 ### Intelligence OS

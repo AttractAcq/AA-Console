@@ -76,6 +76,10 @@ export interface RuntimeConfig {
    * campaign_action_executors.supported and the approval itself follow.
    */
   campaignActionsEnabled: boolean;
+  /** A second, explicit release for the atomic owned claim path. Off by default. */
+  campaignActionOwnedClaimEnabled: boolean;
+  /** Assigned by this process's heartbeat, never read from an environment variable. */
+  campaignActionWorkerId?: string;
   /**
    * Whether this runtime may send approved lead magnets. Off unless set, and
    * the first of four: the client flag, the capture endpoint and the human
@@ -318,6 +322,8 @@ export function loadConfig(): RuntimeConfig {
     proofPublishEnabled: (optionalEnv("PROOF_PUBLISH_ENABLED") ?? "false").toLowerCase() === "true",
     campaignActionsEnabled:
       (optionalEnv("CAMPAIGN_ACTIONS_ENABLED") ?? "false").toLowerCase() === "true",
+    campaignActionOwnedClaimEnabled:
+      (optionalEnv("CAMPAIGN_ACTION_OWNED_CLAIM_ENABLED") ?? "false").toLowerCase() === "true",
     leadMagnetDeliveryEnabled:
       (optionalEnv("LEAD_MAGNET_DELIVERY_ENABLED") ?? "false").toLowerCase() === "true",
     openaiApiKey: optionalEnv("OPENAI_API_KEY") ?? null,

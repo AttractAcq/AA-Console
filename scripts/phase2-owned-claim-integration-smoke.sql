@@ -60,26 +60,40 @@ select set_config('request.jwt.claim.sub','',true);
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 update public.campaign_action_executors set supported = true,
   handler_attested_sha = repeat('c',40),handler_attested_at = now()
-where action_key = 'proof_publish';
+where action_key in ('proof_publish','page_deploy','lead_message','budget_change');
 insert into public.agent_runtime_heartbeats(worker_id,status,version,metadata)
 values ('agent-runtime:1:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','healthy',
   repeat('c',40),jsonb_build_object('enabled',true,
     'controls',jsonb_build_object('campaignActions',true),
     'holds','{}'::jsonb,
-    'handlers',jsonb_build_object('proof_publish','proof_distribution')));
+    'handlers',jsonb_build_object('proof_publish','proof_distribution',
+      'page_deploy','website_studio','lead_message','sales_os',
+      'budget_change','meta_ads_studio')));
 
 do $checks$
 declare v_worker text := 'agent-runtime:1:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   v_sha text := repeat('c',40);
-  v_handlers jsonb := '{"proof_publish":"proof_distribution"}'::jsonb;
+  v_handlers jsonb := '{"proof_publish":"proof_distribution","page_deploy":"website_studio","lead_message":"sales_os","budget_change":"meta_ads_studio"}'::jsonb;
   v_claim record;
   v_page public.campaign_action_approvals%rowtype;
   v_page_execution uuid;
 begin
   if exists (select 1 from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1))
     then raise exception 'Claim passed a disabled client switch'; end if;
-  update public.client_engine_settings set campaign_actions_enabled = true
-    where client_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
+  begin
+    perform public.set_campaign_actions_enabled('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',true);
+    raise exception 'AAL1 enabled outward campaign actions';
+  exception when insufficient_privilege then null; end;
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  perform public.set_campaign_actions_enabled('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',true);
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claim.sub','',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
   begin
     perform * from public.claim_campaign_actions_owned_v6(v_worker,v_sha,
       '{"meta_ad_build":"meta_ads_studio"}'::jsonb,1);
@@ -95,6 +109,22 @@ begin
     where a.execution_id = v_claim.execution_id and a.attempt_number = 1
       and a.status = 'executing' and a.legacy_inferred = false) then
     raise exception 'The first attempt has no started receipt'; end if;
+  perform public.assert_campaign_action_prewrite_v6(
+    v_claim.execution_id,v_worker,v_sha,'proof_publish');
+  update public.client_engine_settings set campaign_actions_enabled = false
+    where client_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  begin
+    perform public.assert_campaign_action_prewrite_v6(
+      v_claim.execution_id,v_worker,v_sha,'proof_publish');
+    raise exception 'Prewrite passed after the client switch turned off';
+  exception when check_violation then null; end;
+  update public.client_engine_settings set campaign_actions_enabled = true
+    where client_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  begin
+    perform public.assert_campaign_action_prewrite_v6(
+      v_claim.execution_id,v_worker,v_sha,'page_deploy');
+    raise exception 'Prewrite accepted a different handler';
+  exception when check_violation then null; end;
   perform public.record_campaign_action_failure(v_claim.execution_id,
     'Synthetic retryable provider timeout',true);
   select * into v_claim from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1);

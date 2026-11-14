@@ -88,7 +88,6 @@ function sourcePath(clientId: string, key: string): string {
 }
 
 function dependency(state: SwitchState, key: string): string | null {
-  if (key === "campaign_actions") return "Campaign action executor held pending runtime integration and live validation.";
   if (key === "engine" && !state.engineRunning) return "System-wide content engine is off.";
   if (key === "engine" && (!state.runtime || !("budgetCap" in state.runtime))) return "Current month spend cap has not been verified.";
   if (key === "engine" && state.runtime?.budgetCap == null) return "No spend cap is set for this month.";
@@ -191,7 +190,7 @@ const SWITCHES: SwitchRow[] = [
     on: "Approved campaign actions are claimed for execution.",
     off: "Approved actions wait and nothing external happens.",
     caveat:
-      "Held in the runtime pending integration and validation of the new owned claim. Switching this on would produce a visible job failure rather than an execution.",
+      "Requires an attested deployed handler set, a fresh runtime heartbeat and AAL2 to enable. Each outward action still needs exact approval and provider preflight.",
     value: (s) => s.settings?.campaign_actions_enabled ?? null,
     write: (next) => ({ fn: "set_campaign_actions_enabled", args: { p_enabled: next } }),
   },
@@ -265,10 +264,6 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
   }, [refresh]);
 
   async function flip(row: SwitchRow, next: boolean) {
-    if (next && row.key === "campaign_actions") {
-      setError("Campaign action executor is held pending runtime integration and live validation.");
-      return;
-    }
     setBusy(row.key);
     setError(null);
     setNote(null);

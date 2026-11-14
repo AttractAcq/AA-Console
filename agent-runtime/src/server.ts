@@ -71,6 +71,8 @@ logger.info("agent_runtime_starting", {
   pid: process.pid,
 });
 
+const heartbeat = startHeartbeat(sb, config, config.enabled ? config.concurrency : 0);
+config.campaignActionWorkerId = heartbeat.workerId;
 const workers: WorkerHandle[] = [];
 if (config.enabled) {
   for (let i = 0; i < config.concurrency; i += 1) {
@@ -85,7 +87,6 @@ if (config.enabled) {
 const proofCoordinator = config.enabled
   ? startProofCoordinator(sb, config)
   : null;
-const heartbeat = startHeartbeat(sb, config, workers.length);
 const workflows =
   config.enabled && config.workflowEnabled
     ? startWorkflowReconciler(sb, config)

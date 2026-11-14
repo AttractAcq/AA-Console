@@ -98,7 +98,7 @@ describe("B001 system inventory", () => {
     });
     expect(snapshot.runtime.actionHolds.genericCampaignActionClaim).toMatchObject({
       state: "held",
-      reason: expect.stringMatching(/no atomic action-key and handler-ownership gate/),
+      reason: expect.stringMatching(/pending release of the owned claim path/),
     });
     expect(snapshot.gateway.state).toBe("unknown");
     expect(snapshot.global.value?.engineEnabled).toBe(false);
@@ -137,6 +137,23 @@ describe("B001 system inventory", () => {
       "private-github-key", "vault-secret-123", "accidentally-a-secret",
       "possibly-private-account-ref", "private-token-hash"])
       expect(exported).not.toContain(forbidden);
+  });
+
+  it("reports owned claims ready only for a fresh matching worker with no hold", async () => {
+    const { sb, config, rows } = fixture();
+    config.campaignActionsEnabled = true;
+    config.campaignActionOwnedClaimEnabled = true;
+    rows.agent_runtime_status = [{ worker_id: "agent-runtime:1:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      version: SHA, reported_at: new Date().toISOString(), is_live: true,
+      metadata: { enabled: true, controls: { campaignActions: true }, holds: {} },
+      queue_depth: 0, active_jobs: 0 }];
+    const ready = await collectSystemReadiness(sb, config, fetch, { RAILWAY_GIT_COMMIT_SHA: SHA });
+    expect(ready.runtime.actionHolds.genericCampaignActionClaim.state).toBe("ready");
+    (rows.agent_runtime_status[0]!.metadata as { holds: Record<string, string> }).holds = {
+      campaignActions: "Registry not attested",
+    };
+    const held = await collectSystemReadiness(sb, config, fetch, { RAILWAY_GIT_COMMIT_SHA: SHA });
+    expect(held.runtime.actionHolds.genericCampaignActionClaim.state).toBe("held");
   });
 
   it("names provider-specific gaps without treating metadata or a terminal status as live proof", async () => {

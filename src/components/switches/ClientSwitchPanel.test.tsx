@@ -108,16 +108,29 @@ describe("every switch in one place", () => {
     // Publishing needs a deployment variable the browser cannot set.
     expect(await screen.findByText(/PUBLISH_ENABLED must also be on/)).toBeInTheDocument();
     // And campaign actions are held in the runtime regardless of this switch.
-    expect(screen.getByText(/produce a visible job failure rather than an execution/)).toBeInTheDocument();
+    expect(screen.getByText(/attested deployed handler set/)).toBeInTheDocument();
   });
 
   it("holds campaign action activation even if a client setting is off", async () => {
-    state.runtime = { state: "observed", controls: { campaignActions: true } };
+    state.runtime = { state: "observed", workerEnabled: true,
+      controls: { campaignActions: true }, holds: { campaignActions: "Registry not attested" } };
     render(<ClientSwitchPanel clientId="c1" />);
     const button = await screen.findByLabelText("Switch on Execute approved campaign actions");
     expect(button).toBeDisabled();
-    expect(screen.getByText(/Effective state: off — Campaign action executor held/)).toBeInTheDocument();
+    expect(screen.getByText(/Effective state: off — Registry not attested/)).toBeInTheDocument();
     expect(rpc).not.toHaveBeenCalledWith("set_campaign_actions_enabled", expect.anything());
+  });
+
+  it("allows an AAL2-gated request when the owned worker is observed and attested", async () => {
+    state.runtime = { state: "observed", workerEnabled: true,
+      controls: { campaignActions: true }, holds: {} };
+    render(<ClientSwitchPanel clientId="c1" />);
+    const button = await screen.findByLabelText("Switch on Execute approved campaign actions");
+    expect(button).toBeEnabled();
+    await userEvent.click(button);
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("set_campaign_actions_enabled", {
+      p_client_id: "c1", p_enabled: true,
+    }));
   });
 
   it("reports a requested switch as held when the runtime is unverified", async () => {

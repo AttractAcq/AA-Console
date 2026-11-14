@@ -1177,6 +1177,135 @@ export type Database = {
           },
         ]
       }
+      campaign_action_attempts_v6: {
+        Row: {
+          action_key: string
+          approval_id: string
+          artifact_version_hash: string
+          attempt_number: number
+          client_id: string
+          error: string | null
+          execution_id: string
+          external_id: string | null
+          external_url: string | null
+          finished_at: string | null
+          legacy_inferred: boolean
+          result: Json | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          action_key: string
+          approval_id: string
+          artifact_version_hash: string
+          attempt_number: number
+          client_id: string
+          error?: string | null
+          execution_id: string
+          external_id?: string | null
+          external_url?: string | null
+          finished_at?: string | null
+          legacy_inferred?: boolean
+          result?: Json | null
+          started_at: string
+          status: string
+        }
+        Update: {
+          action_key?: string
+          approval_id?: string
+          artifact_version_hash?: string
+          attempt_number?: number
+          client_id?: string
+          error?: string | null
+          execution_id?: string
+          external_id?: string | null
+          external_url?: string | null
+          finished_at?: string | null
+          legacy_inferred?: boolean
+          result?: Json | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_action_attempts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["execution_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_attempts_v6_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_action_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_action_events: {
         Row: {
           actor: string
@@ -2750,6 +2879,89 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "client_page_revisions"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_route_packages_v6: {
+        Row: {
+          campaign_id: string
+          client_id: string
+          created_at: string
+          id: string
+          paid_platform: string | null
+          plan_fingerprint: string
+          route: string
+          version: number
+        }
+        Insert: {
+          campaign_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          paid_platform?: string | null
+          plan_fingerprint: string
+          route: string
+          version: number
+        }
+        Update: {
+          campaign_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          paid_platform?: string | null
+          plan_fingerprint?: string
+          route?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_route_packages_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_route_packages_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_route_packages_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_route_packages_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_route_packages_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_route_packages_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "campaign_route_packages_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
           },
         ]
       }
@@ -6401,6 +6613,7 @@ export type Database = {
           client_id: string
           content_format: Database["public"]["Enums"]["content_format"]
           created_at: string
+          delivery_bytes_sha256: string | null
           duration_sec: number | null
           edit_plan: Json | null
           edit_stage: string
@@ -6437,6 +6650,7 @@ export type Database = {
           client_id: string
           content_format?: Database["public"]["Enums"]["content_format"]
           created_at?: string
+          delivery_bytes_sha256?: string | null
           duration_sec?: number | null
           edit_plan?: Json | null
           edit_stage?: string
@@ -6473,6 +6687,7 @@ export type Database = {
           client_id?: string
           content_format?: Database["public"]["Enums"]["content_format"]
           created_at?: string
+          delivery_bytes_sha256?: string | null
           duration_sec?: number | null
           edit_plan?: Json | null
           edit_stage?: string
@@ -9527,6 +9742,858 @@ export type Database = {
             columns: ["run_id"]
             isOneToOne: true
             referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_approval_dependencies_v6: {
+        Row: {
+          approval_request_id: string
+          bound_at: string
+          client_id: string
+          entity_version_id: string
+        }
+        Insert: {
+          approval_request_id: string
+          bound_at?: string
+          client_id: string
+          entity_version_id: string
+        }
+        Update: {
+          approval_request_id?: string
+          bound_at?: string
+          client_id?: string
+          entity_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_approval_dependencie_approval_request_id_client_i_fkey"
+            columns: ["approval_request_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_dependencie_approval_request_id_client_i_fkey"
+            columns: ["approval_request_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_dependencies_entity_version_id_client_id_fkey"
+            columns: ["entity_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_entity_versions_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_dependencies_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_dependencies_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_dependencies_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_dependencies_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      delivery_approval_invalidations_v6: {
+        Row: {
+          approval_request_id: string
+          client_id: string
+          id: string
+          invalidated_at: string
+          new_entity_version_id: string
+          old_entity_version_id: string
+          reason: string
+        }
+        Insert: {
+          approval_request_id: string
+          client_id: string
+          id?: string
+          invalidated_at?: string
+          new_entity_version_id: string
+          old_entity_version_id: string
+          reason: string
+        }
+        Update: {
+          approval_request_id?: string
+          client_id?: string
+          id?: string
+          invalidated_at?: string
+          new_entity_version_id?: string
+          old_entity_version_id?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_approval_invalidations_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_invalidations_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_invalidations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_invalidations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_invalidations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_invalidations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_invalidations_v6_new_entity_version_id_fkey"
+            columns: ["new_entity_version_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_entity_versions_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_approval_invalidations_v6_old_entity_version_id_fkey"
+            columns: ["old_entity_version_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_entity_versions_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_entity_heads_v6: {
+        Row: {
+          client_id: string
+          entity_kind: string
+          entity_version_id: string
+          fingerprint: string
+          source_key: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          entity_kind: string
+          entity_version_id: string
+          fingerprint: string
+          source_key: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          entity_kind?: string
+          entity_version_id?: string
+          fingerprint?: string
+          source_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_entity_heads_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_entity_heads_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_entity_heads_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_entity_heads_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_entity_heads_v6_entity_version_id_client_id_fkey"
+            columns: ["entity_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_entity_versions_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      delivery_entity_versions_v6: {
+        Row: {
+          campaign_id: string | null
+          client_id: string
+          entity_kind: string
+          fingerprint: string
+          id: string
+          observed_at: string
+          source_key: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          client_id: string
+          entity_kind: string
+          fingerprint: string
+          id?: string
+          observed_at?: string
+          source_key: string
+        }
+        Update: {
+          campaign_id?: string | null
+          client_id?: string
+          entity_kind?: string
+          fingerprint?: string
+          id?: string
+          observed_at?: string
+          source_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_entity_versions_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_entity_versions_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_entity_versions_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_entity_versions_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      delivery_lineage_links_v6: {
+        Row: {
+          client_id: string
+          created_at: string
+          derived_version_id: string
+          id: string
+          relationship: string
+          source_version_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          derived_version_id: string
+          id?: string
+          relationship: string
+          source_version_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          derived_version_id?: string
+          id?: string
+          relationship?: string
+          source_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_lineage_links_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_lineage_links_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_lineage_links_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_lineage_links_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_lineage_links_v6_derived_version_id_client_id_fkey"
+            columns: ["derived_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_entity_versions_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_lineage_links_v6_source_version_id_client_id_fkey"
+            columns: ["source_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_entity_versions_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+        ]
+      }
+      delivery_remediation_tasks_v6: {
+        Row: {
+          approval_request_id: string
+          client_id: string
+          created_at: string
+          external_use_id: string
+          external_use_kind: string
+          id: string
+          invalidation_id: string
+          reason: string
+          resolution_note: string | null
+          resolved_at: string | null
+          state: string
+        }
+        Insert: {
+          approval_request_id: string
+          client_id: string
+          created_at?: string
+          external_use_id: string
+          external_use_kind: string
+          id?: string
+          invalidation_id: string
+          reason: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          state?: string
+        }
+        Update: {
+          approval_request_id?: string
+          client_id?: string
+          created_at?: string
+          external_use_id?: string
+          external_use_kind?: string
+          id?: string
+          invalidation_id?: string
+          reason?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_remediation_tasks_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_remediation_tasks_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_remediation_tasks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_remediation_tasks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_remediation_tasks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_remediation_tasks_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_remediation_tasks_v6_invalidation_id_fkey"
+            columns: ["invalidation_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_approval_invalidations_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_work_events_v6: {
+        Row: {
+          client_id: string
+          evidence: Json
+          from_state: string | null
+          id: string
+          occurred_at: string
+          owner_module: string
+          to_state: string
+          work_item_id: string
+        }
+        Insert: {
+          client_id: string
+          evidence?: Json
+          from_state?: string | null
+          id?: string
+          occurred_at?: string
+          owner_module: string
+          to_state: string
+          work_item_id: string
+        }
+        Update: {
+          client_id?: string
+          evidence?: Json
+          from_state?: string | null
+          id?: string
+          occurred_at?: string
+          owner_module?: string
+          to_state?: string
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_work_events_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_events_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_events_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_events_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_events_v6_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_events_v6_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_items_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_work_inputs_v6: {
+        Row: {
+          bound_at: string
+          client_id: string
+          entity_version_id: string
+          work_item_id: string
+        }
+        Insert: {
+          bound_at?: string
+          client_id: string
+          entity_version_id: string
+          work_item_id: string
+        }
+        Update: {
+          bound_at?: string
+          client_id?: string
+          entity_version_id?: string
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_work_inputs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_inputs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_inputs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_inputs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_inputs_v6_entity_version_id_client_id_fkey"
+            columns: ["entity_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_entity_versions_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_inputs_v6_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_inputs_v6_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_items_v6"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_work_items_v6: {
+        Row: {
+          approval_request_id: string | null
+          attempt_count: number
+          blocker: string | null
+          campaign_id: string
+          client_id: string
+          cost_usd: number
+          created_at: string
+          expected_output: Json
+          external_result: Json | null
+          id: string
+          input_fingerprint: string
+          input_snapshot: Json
+          item_key: string
+          job_id: string | null
+          manifest_id: string | null
+          manifest_item_key: string | null
+          output_fingerprint: string | null
+          output_refs: Json
+          owner_module: string
+          qa_state: string
+          remediation: string | null
+          required: boolean
+          retry_after: string | null
+          route_key: string
+          route_package_id: string | null
+          state: string
+          updated_at: string
+          work_version: number
+        }
+        Insert: {
+          approval_request_id?: string | null
+          attempt_count?: number
+          blocker?: string | null
+          campaign_id: string
+          client_id: string
+          cost_usd?: number
+          created_at?: string
+          expected_output?: Json
+          external_result?: Json | null
+          id?: string
+          input_fingerprint: string
+          input_snapshot?: Json
+          item_key: string
+          job_id?: string | null
+          manifest_id?: string | null
+          manifest_item_key?: string | null
+          output_fingerprint?: string | null
+          output_refs?: Json
+          owner_module: string
+          qa_state?: string
+          remediation?: string | null
+          required: boolean
+          retry_after?: string | null
+          route_key?: string
+          route_package_id?: string | null
+          state?: string
+          updated_at?: string
+          work_version?: number
+        }
+        Update: {
+          approval_request_id?: string | null
+          attempt_count?: number
+          blocker?: string | null
+          campaign_id?: string
+          client_id?: string
+          cost_usd?: number
+          created_at?: string
+          expected_output?: Json
+          external_result?: Json | null
+          id?: string
+          input_fingerprint?: string
+          input_snapshot?: Json
+          item_key?: string
+          job_id?: string | null
+          manifest_id?: string | null
+          manifest_item_key?: string | null
+          output_fingerprint?: string | null
+          output_refs?: Json
+          owner_module?: string
+          qa_state?: string
+          remediation?: string | null
+          required?: boolean
+          retry_after?: string | null
+          route_key?: string
+          route_package_id?: string | null
+          state?: string
+          updated_at?: string
+          work_version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_work_items_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_manifest_id_manifest_item_key_fkey"
+            columns: ["manifest_id", "manifest_item_key"]
+            isOneToOne: false
+            referencedRelation: "campaign_manifest_items"
+            referencedColumns: ["manifest_id", "item_key"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_route_package_id_campaign_id_client_fkey"
+            columns: ["route_package_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_packages_v6"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+        ]
+      }
+      delivery_work_outputs_v6: {
+        Row: {
+          client_id: string
+          entity_version_id: string
+          linked_at: string
+          work_item_id: string
+        }
+        Insert: {
+          client_id: string
+          entity_version_id: string
+          linked_at?: string
+          work_item_id: string
+        }
+        Update: {
+          client_id?: string
+          entity_version_id?: string
+          linked_at?: string
+          work_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_work_outputs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_outputs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_outputs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_outputs_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_outputs_v6_entity_version_id_client_id_fkey"
+            columns: ["entity_version_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_entity_versions_v6"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_outputs_v6_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_effective_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_outputs_v6_work_item_id_fkey"
+            columns: ["work_item_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_work_items_v6"
             referencedColumns: ["id"]
           },
         ]
@@ -22302,6 +23369,214 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_source_catalog_v6: {
+        Row: {
+          campaign_id: string | null
+          client_id: string | null
+          entity_kind: string | null
+          fingerprint: string | null
+          source_key: string | null
+        }
+        Relationships: []
+      }
+      delivery_work_effective_v6: {
+        Row: {
+          approval_request_id: string | null
+          attempt_count: number | null
+          blocker: string | null
+          campaign_id: string | null
+          client_id: string | null
+          cost_usd: number | null
+          created_at: string | null
+          effective_blocker: string | null
+          effective_state: string | null
+          expected_output: Json | null
+          external_result: Json | null
+          id: string | null
+          input_fingerprint: string | null
+          input_snapshot: Json | null
+          item_key: string | null
+          job_id: string | null
+          manifest_id: string | null
+          manifest_item_key: string | null
+          output_fingerprint: string | null
+          output_refs: Json | null
+          owner_module: string | null
+          qa_state: string | null
+          remediation: string | null
+          required: boolean | null
+          retry_after: string | null
+          route_key: string | null
+          route_package_id: string | null
+          state: string | null
+          updated_at: string | null
+          work_version: number | null
+        }
+        Insert: {
+          approval_request_id?: string | null
+          attempt_count?: number | null
+          blocker?: string | null
+          campaign_id?: string | null
+          client_id?: string | null
+          cost_usd?: number | null
+          created_at?: string | null
+          effective_blocker?: never
+          effective_state?: never
+          expected_output?: Json | null
+          external_result?: Json | null
+          id?: string | null
+          input_fingerprint?: string | null
+          input_snapshot?: Json | null
+          item_key?: string | null
+          job_id?: string | null
+          manifest_id?: string | null
+          manifest_item_key?: string | null
+          output_fingerprint?: string | null
+          output_refs?: Json | null
+          owner_module?: string | null
+          qa_state?: string | null
+          remediation?: string | null
+          required?: boolean | null
+          retry_after?: string | null
+          route_key?: string | null
+          route_package_id?: string | null
+          state?: string | null
+          updated_at?: string | null
+          work_version?: number | null
+        }
+        Update: {
+          approval_request_id?: string | null
+          attempt_count?: number | null
+          blocker?: string | null
+          campaign_id?: string | null
+          client_id?: string | null
+          cost_usd?: number | null
+          created_at?: string | null
+          effective_blocker?: never
+          effective_state?: never
+          expected_output?: Json | null
+          external_result?: Json | null
+          id?: string | null
+          input_fingerprint?: string | null
+          input_snapshot?: Json | null
+          item_key?: string | null
+          job_id?: string | null
+          manifest_id?: string | null
+          manifest_item_key?: string | null
+          output_fingerprint?: string | null
+          output_refs?: Json | null
+          owner_module?: string | null
+          qa_state?: string | null
+          remediation?: string | null
+          required?: boolean | null
+          retry_after?: string | null
+          route_key?: string | null
+          route_package_id?: string | null
+          state?: string | null
+          updated_at?: string | null
+          work_version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_work_items_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_launch_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_live_evidence"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns_archive"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_sheet_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_campaign_id_client_id_fkey"
+            columns: ["campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["campaign_id", "client_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "held_jobs"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "metrics_pulls"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_manifest_id_manifest_item_key_fkey"
+            columns: ["manifest_id", "manifest_item_key"]
+            isOneToOne: false
+            referencedRelation: "campaign_manifest_items"
+            referencedColumns: ["manifest_id", "item_key"]
+          },
+          {
+            foreignKeyName: "delivery_work_items_v6_route_package_id_campaign_id_client_fkey"
+            columns: ["route_package_id", "campaign_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_route_packages_v6"
+            referencedColumns: ["id", "campaign_id", "client_id"]
+          },
+        ]
+      }
       distribution_due: {
         Row: {
           asset_id: string | null
@@ -25498,6 +26773,50 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      advance_delivery_work_item_v6: {
+        Args: {
+          p_evidence?: Json
+          p_next_state: string
+          p_owner_module: string
+          p_work_item_id: string
+        }
+        Returns: {
+          approval_request_id: string | null
+          attempt_count: number
+          blocker: string | null
+          campaign_id: string
+          client_id: string
+          cost_usd: number
+          created_at: string
+          expected_output: Json
+          external_result: Json | null
+          id: string
+          input_fingerprint: string
+          input_snapshot: Json
+          item_key: string
+          job_id: string | null
+          manifest_id: string | null
+          manifest_item_key: string | null
+          output_fingerprint: string | null
+          output_refs: Json
+          owner_module: string
+          qa_state: string
+          remediation: string | null
+          required: boolean
+          retry_after: string | null
+          route_key: string
+          route_package_id: string | null
+          state: string
+          updated_at: string
+          work_version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "delivery_work_items_v6"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       advance_lead: {
         Args: {
           p_lead_id: string
@@ -25690,10 +27009,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      reject_service_offer_version_v6: {
-        Args: { p_version_id: string; p_reason: string }
-        Returns: string
-      }
       approve_slot: {
         Args: { p_note?: string; p_slot_id: string }
         Returns: {
@@ -25757,6 +27072,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      assert_campaign_action_prewrite_v6: {
+        Args: {
+          p_action_key: string
+          p_build_sha: string
+          p_execution_id: string
+          p_worker_id: string
+        }
+        Returns: undefined
       }
       assert_meta_build_allowed_v6: {
         Args: { p_campaign_id: string }
@@ -25835,6 +27159,26 @@ export type Database = {
           ends_at: string
           starts_at: string
         }[]
+      }
+      bind_campaign_action_sources_v6: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
+      bind_delivery_approval_dependency_v6: {
+        Args: { p_approval_request_id: string; p_entity_version_id: string }
+        Returns: undefined
+      }
+      bind_delivery_campaign_action_media_v6: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
+      bind_delivery_work_input_v6: {
+        Args: {
+          p_entity_version_id: string
+          p_owner_module: string
+          p_work_item_id: string
+        }
+        Returns: undefined
       }
       bind_proof_placement_to_page_v6: {
         Args: {
@@ -26173,6 +27517,26 @@ export type Database = {
           scope: Json
         }[]
       }
+      claim_campaign_actions_owned_v6: {
+        Args: {
+          p_build_sha: string
+          p_handlers: Json
+          p_limit?: number
+          p_worker_id: string
+        }
+        Returns: {
+          action_key: string
+          approval_id: string
+          artifact_version_hash: string
+          attempt: number
+          campaign_id: string
+          client_id: string
+          destination: string
+          execution_id: string
+          manifest_id: string
+          scope: Json
+        }[]
+      }
       claim_console_invitation_send_v6: {
         Args: {
           p_actor_id: string
@@ -26345,6 +27709,10 @@ export type Database = {
           spent_usd: number
         }[]
       }
+      client_control_activity_v6: {
+        Args: { p_client_id: string }
+        Returns: Json
+      }
       client_economics: {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: {
@@ -26408,6 +27776,10 @@ export type Database = {
       client_for_meta_recipient_v6: {
         Args: { p_recipient_id: string }
         Returns: string
+      }
+      client_runtime_controls_v6: {
+        Args: { p_client_id: string }
+        Returns: Json
       }
       client_timezone: { Args: { p_client_id: string }; Returns: string }
       clone_campaign_for_route: {
@@ -26710,6 +28082,56 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "content_slots"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_delivery_work_item_v6: {
+        Args: {
+          p_campaign_id: string
+          p_expected_output: Json
+          p_input_snapshot: Json
+          p_item_key: string
+          p_manifest_id: string
+          p_manifest_item_key: string
+          p_owner_module: string
+          p_required: boolean
+          p_route_package_id: string
+          p_work_version: number
+        }
+        Returns: {
+          approval_request_id: string | null
+          attempt_count: number
+          blocker: string | null
+          campaign_id: string
+          client_id: string
+          cost_usd: number
+          created_at: string
+          expected_output: Json
+          external_result: Json | null
+          id: string
+          input_fingerprint: string
+          input_snapshot: Json
+          item_key: string
+          job_id: string | null
+          manifest_id: string | null
+          manifest_item_key: string | null
+          output_fingerprint: string | null
+          output_refs: Json
+          owner_module: string
+          qa_state: string
+          remediation: string | null
+          required: boolean
+          retry_after: string | null
+          route_key: string
+          route_package_id: string | null
+          state: string
+          updated_at: string
+          work_version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "delivery_work_items_v6"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -27392,6 +28814,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      delivery_work_output_hash_v6: {
+        Args: { p_work_item_id: string }
+        Returns: string
+      }
       dispatch_brief_to_members: {
         Args: {
           p_brief_id: string
@@ -27675,6 +29101,23 @@ export type Database = {
       lead_stage_rank: {
         Args: { s: Database["public"]["Enums"]["lead_stage"] }
         Returns: number
+      }
+      link_delivery_current_source_v6: {
+        Args: {
+          p_derived: Database["public"]["Tables"]["delivery_entity_versions_v6"]["Row"]
+          p_relationship: string
+          p_source_key: string
+          p_source_kind: string
+        }
+        Returns: undefined
+      }
+      link_delivery_work_output_v6: {
+        Args: {
+          p_entity_version_id: string
+          p_owner_module: string
+          p_work_item_id: string
+        }
+        Returns: undefined
       }
       link_opportunity_v6: {
         Args: { p_opportunity_id: string; p_role: string; p_target_id: string }
@@ -29206,6 +30649,10 @@ export type Database = {
         Args: { p_packet: Json; p_request_id: string }
         Returns: string
       }
+      refresh_delivery_entity_v6: {
+        Args: { p_client_id: string; p_kind: string; p_source_key: string }
+        Returns: string
+      }
       regenerate_asset: {
         Args: {
           p_asset_id: string
@@ -29253,6 +30700,10 @@ export type Database = {
         Args: { p_request: Json }
         Returns: string
       }
+      register_delivery_asset_bytes_v6: {
+        Args: { p_asset_id: string; p_sha256: string; p_storage_path: string }
+        Returns: string
+      }
       register_organic_publication_package_v6: {
         Args: {
           p_expected_source_hash: string
@@ -29266,9 +30717,19 @@ export type Database = {
         Args: { p_brief: Database["public"]["Tables"]["client_briefs"]["Row"] }
         Returns: string
       }
+      register_service_offer_approval_v6: {
+        Args: {
+          p_version: Database["public"]["Tables"]["service_offer_versions"]["Row"]
+        }
+        Returns: string
+      }
       reject_opportunity_proposal_v6: {
         Args: { p_proposal_id: string; p_reason: string }
         Returns: undefined
+      }
+      reject_service_offer_version_v6: {
+        Args: { p_reason: string; p_version_id: string }
+        Returns: string
       }
       reject_slot: {
         Args: { p_reason: string; p_slot_id: string }
@@ -30085,6 +31546,16 @@ export type Database = {
       select_render: { Args: { p_render_id: string }; Returns: undefined }
       sequence_exit_reason_v6: {
         Args: { p_lead_id: string; p_sequence_id: string }
+        Returns: string
+      }
+      service_offer_approval_preview_v6: {
+        Args: {
+          p_version: Database["public"]["Tables"]["service_offer_versions"]["Row"]
+        }
+        Returns: Json
+      }
+      service_offer_source_state_v6: {
+        Args: { p_request_id: string }
         Returns: string
       }
       set_awareness_stage_template_v6: {

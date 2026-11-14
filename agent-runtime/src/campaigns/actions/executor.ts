@@ -3,8 +3,7 @@
  *
  * Migration 206 gave a person a way to say yes to one exact campaign
  * package, one action, one destination and one artifact version. Migration
- * 230 gave that yes a lifecycle. This worker entry point is presently held
- * before reading or claiming any approved action.
+ * 230 gave that yes a lifecycle. Migration 325 adds the atomic owned claim.
  *
  * OFF IS A STATE, NOT AN ERROR
  *
@@ -16,12 +15,9 @@
  *
  * CLAIM HOLD
  *
- * Migration 230's claim function cannot restrict a claim to handler-owned
- * action keys. The registry read and claim used to be separate requests, so
- * a support-bit change between them could consume an exact human approval.
- * The registered worker now stops before any registry read or claim. Handler
- * bodies remain available for direct unit tests and future atomic SQL
- * integration, but this entry point does not invoke them.
+ * The owned path remains opt-in. A fresh heartbeat, complete deployed build
+ * SHA and matching registered handler set are checked in the SQL claim. The
+ * runtime records each attempt's actual outcome, including failures.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -34,6 +30,8 @@ import { appendEvent } from "../../queue.js";
 import { deployCampaignPage } from "./page-deploy.js";
 import { changeAdSetBudget } from "./budget-change.js";
 import { GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD } from "./preclaim-hold.js";
+import { ACTION_HANDLER_MODULES } from "./handler-ownership.js";
+import { deployedCommitSha } from "../../readiness/version.js";
 
 export interface ClaimedAction {
   execution_id: string;
@@ -81,6 +79,25 @@ export type ActionHandler = (
   action: ClaimedAction,
 ) => Promise<ActionOutcome>;
 
+/** Refuse an outward effect if its exact approval or worker attestation changed after claim. */
+export async function assertActionPrewrite(
+  sb: SupabaseClient, config: RuntimeConfig, action: ClaimedAction,
+): Promise<void> {
+  const workerId = config.campaignActionWorkerId;
+  const buildSha = deployedCommitSha();
+  if (!config.campaignActionsEnabled || !config.campaignActionOwnedClaimEnabled
+    || !workerId || !buildSha) {
+    throw new ActionError("The campaign action worker is not attested for a prewrite check.");
+  }
+  const { error } = await sb.rpc("assert_campaign_action_prewrite_v6", {
+    p_execution_id: action.execution_id,
+    p_worker_id: workerId,
+    p_build_sha: buildSha,
+    p_action_key: action.action_key,
+  } as never);
+  if (error) throw new ActionError(`Campaign action prewrite refused: ${error.message}`);
+}
+
 /**
  * Proof publication.
  *
@@ -94,7 +111,8 @@ export type ActionHandler = (
  * person read them. Releasing nothing at all is a failure worth a person
  * seeing rather than a quiet success with a zero in it.
  */
-export const releaseProofPlacements: ActionHandler = async (sb, _config, action) => {
+export const releaseProofPlacements: ActionHandler = async (sb, config, action) => {
+  await assertActionPrewrite(sb, config, action);
   const { data, error } = await sb.rpc("release_campaign_proof_placements", {
     p_execution_id: action.execution_id,
   } as never);
@@ -136,7 +154,8 @@ export const releaseProofPlacements: ActionHandler = async (sb, _config, action)
  * approval said some leads were eligible, and if none are by the time the
  * sweep runs then something changed and a person should see why.
  */
-export const enrolCampaignLeads: ActionHandler = async (sb, _config, action) => {
+export const enrolCampaignLeads: ActionHandler = async (sb, config, action) => {
+  await assertActionPrewrite(sb, config, action);
   const { data, error } = await sb.rpc("enrol_campaign_leads_in_sequence_v6", {
     p_execution_id: action.execution_id,
   } as never);
@@ -197,7 +216,78 @@ export async function runCampaignActionJob(
     return { ok: true, retryable: false };
   }
 
-  const failureMessage = `${GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD} No action was claimed.`;
-  await appendEvent(sb, job.id, failureMessage, "warn");
-  return { ok: false, retryable: false, failureMessage };
+  if (!runtime.campaignActionOwnedClaimEnabled) {
+    const failureMessage = `${GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD} No action was claimed.`;
+    await appendEvent(sb, job.id, failureMessage, "warn");
+    return { ok: false, retryable: false, failureMessage };
+  }
+  const workerId = runtime.campaignActionWorkerId;
+  const buildSha = deployedCommitSha();
+  const keys = Object.keys(HANDLERS);
+  if (!workerId || !buildSha || keys.length !== Object.keys(ACTION_HANDLER_MODULES).length
+    || keys.some((key) => !(key in ACTION_HANDLER_MODULES))) {
+    const failureMessage = "Campaign action handler ownership or deployed build identity is unavailable. No action was claimed.";
+    await appendEvent(sb, job.id, failureMessage, "warn");
+    return { ok: false, retryable: false, failureMessage };
+  }
+  const rawLimit = job.params?.limit;
+  const limit = typeof rawLimit === "number" && Number.isInteger(rawLimit)
+    ? Math.max(1, Math.min(rawLimit, 10)) : 3;
+  const { data, error } = await sb.rpc("claim_campaign_actions_owned_v6", {
+    p_worker_id: workerId,
+    p_build_sha: buildSha,
+    p_handlers: ACTION_HANDLER_MODULES,
+    p_limit: limit,
+  } as never);
+  if (error) {
+    const failureMessage = `Atomic campaign action claim refused: ${error.message}`;
+    await appendEvent(sb, job.id, failureMessage, "warn");
+    return { ok: false, retryable: true, failureMessage };
+  }
+  const claimed = Array.isArray(data) ? data as ClaimedAction[] : [];
+  if (claimed.length === 0) {
+    await appendEvent(sb, job.id, "No approved campaign action was eligible for this worker.", "info");
+    return { ok: true, retryable: false };
+  }
+  const failures: string[] = [];
+  for (const action of claimed) {
+    const handler = HANDLERS[action.action_key];
+    let completedDetail = "outcome recorded";
+    try {
+      if (!handler) throw new ActionError(`No handler is registered for ${action.action_key}.`);
+      const outcome = await handler(sb, runtime, action);
+      const recorded = await sb.rpc("record_campaign_action_executed", {
+        p_execution_id: action.execution_id,
+        p_external_id: outcome.externalId ?? null,
+        p_external_url: outcome.externalUrl ?? null,
+        p_result: { ...(outcome.result ?? {}), detail: outcome.detail ?? null },
+      } as never);
+      if (recorded.error) {
+        throw new ActionError(
+          `The action may have completed but its outcome could not be recorded: ${recorded.error.message}`
+          + (outcome.externalId ? ` Provider ID: ${outcome.externalId}.` : "")
+          + (outcome.externalUrl ? ` Provider URL: ${outcome.externalUrl}.` : ""),
+          false,
+        );
+      }
+      completedDetail = outcome.detail ?? completedDetail;
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      const retryable = cause instanceof ActionError && cause.retryable;
+      const recorded = await sb.rpc("record_campaign_action_failure", {
+        p_execution_id: action.execution_id, p_reason: reason, p_retryable: retryable,
+      } as never);
+      failures.push(`${action.action_key}: ${reason}`);
+      if (recorded.error) failures.push(`Failure receipt could not be recorded: ${recorded.error.message}`);
+      await appendEvent(sb, job.id, `${action.action_key} failed for ${action.client_id}: ${reason}`, "error");
+      continue;
+    }
+    await appendEvent(sb, job.id,
+      `${action.action_key} completed for ${action.client_id}: ${completedDetail}`, "info");
+  }
+  if (failures.length > 0) return {
+    ok: false, retryable: false,
+    failureMessage: `${failures.length} campaign action problem${failures.length === 1 ? "" : "s"}: ${failures.join(" ")}`,
+  };
+  return { ok: true, retryable: false };
 }

@@ -44,6 +44,7 @@ function database(
     actionsOn?: boolean;
     snapshots?: unknown[];
     attempts?: unknown[];
+    runtime?: unknown;
   } = {},
 ) {
   let records = options.pending ?? [pending];
@@ -82,6 +83,7 @@ function database(
     return query;
   });
   rpc.mockImplementation(async (name: string) => {
+    if (name === "client_runtime_controls_v6") return { data: options.runtime ?? null, error: null };
     if (name === "decide_campaign_action_approval_v6") records = [];
     return { error: null };
   });
@@ -182,7 +184,7 @@ it("shows the generic hold and does not offer a switch-on action", async () => {
   expect(
     await screen.findByText("External campaign actions are off for this client"),
   ).toBeInTheDocument();
-  expect(screen.getByRole("status")).toHaveTextContent(/held before the worker reads or claims/);
+  expect(screen.getByRole("status")).toHaveTextContent(/Runtime state has not been verified/);
   expect(screen.getByRole("link", { name: "View controls on Dashboard" })).toHaveAttribute("href", "/clients/client-1/delivery/dashboard");
   expect(rpc).not.toHaveBeenCalledWith("set_campaign_actions_enabled", expect.anything());
 });
@@ -192,6 +194,14 @@ it("shows an already-on switch but keeps its control on Dashboard", async () => 
   render(<CampaignActionApprovalsPanel />);
   expect(await screen.findByText("External campaign actions are on for this client")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Turn off" })).not.toBeInTheDocument();
+});
+
+it("shows an observed attested worker separately from the client switch", async () => {
+  database({ actionsOn: true, runtime: { state: "observed", workerEnabled: true,
+    controls: { campaignActions: true }, holds: {} } });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByText("External campaign actions are on for this client")).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent(/owned campaign action worker is observed and attested/);
 });
 
 it("reports a failed attempt's error rather than leaving it blank", async () => {
