@@ -14497,6 +14497,8 @@ export type Database = {
         Row: {
           approved_at: string
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           channel_key: string
           client_id: string
           consent_basis: string
@@ -14511,6 +14513,8 @@ export type Database = {
         Insert: {
           approved_at?: string
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           channel_key: string
           client_id: string
           consent_basis: string
@@ -14525,6 +14529,8 @@ export type Database = {
         Update: {
           approved_at?: string
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           channel_key?: string
           client_id?: string
           consent_basis?: string
@@ -14542,6 +14548,20 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_approvals_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_approvals_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
           {
@@ -14588,6 +14608,92 @@ export type Database = {
           },
           {
             foreignKeyName: "message_template_approvals_template_version_id_fkey"
+            columns: ["template_version_id"]
+            isOneToOne: false
+            referencedRelation: "message_template_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_template_review_requests_v6: {
+        Row: {
+          canonical_request_id: string | null
+          client_id: string
+          consent_basis: string
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+          template_version_id: string
+        }
+        Insert: {
+          canonical_request_id?: string | null
+          client_id: string
+          consent_basis: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+          template_version_id: string
+        }
+        Update: {
+          canonical_request_id?: string | null
+          client_id?: string
+          consent_basis?: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+          template_version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_template_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "message_template_review_requests_v6_template_version_id_fkey"
             columns: ["template_version_id"]
             isOneToOne: false
             referencedRelation: "message_template_versions"
@@ -29233,6 +29339,8 @@ export type Database = {
         Returns: {
           approved_at: string
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           channel_key: string
           client_id: string
           consent_basis: string
@@ -31084,6 +31192,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      decide_message_template_inbox_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decide_meta_profile_change_v6: {
         Args: { p_approved: boolean; p_change_id: string; p_reason?: string }
         Returns: {
@@ -32575,6 +32692,32 @@ export type Database = {
         Args: { p_body: string; p_channel: string; p_subject: string }
         Returns: string
       }
+      message_template_approval_current_v6: {
+        Args: { p_approval_id: string }
+        Returns: boolean
+      }
+      message_template_review_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["message_template_review_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      message_template_review_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["message_template_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      message_template_review_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["message_template_review_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      message_template_review_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       meta_build_payload_hash_v6: {
         Args: { p_campaign_id: string }
         Returns: string
@@ -32699,6 +32842,10 @@ export type Database = {
       organic_publication_source_state_v6: {
         Args: { p_request_id: string }
         Returns: string
+      }
+      outbound_message_send_ready_v6: {
+        Args: { p_message_id: string }
+        Returns: boolean
       }
       pause_agent_job: {
         Args: { p_job_id: string; p_reason: string }
@@ -33815,6 +33962,10 @@ export type Database = {
       }
       request_lead_magnet_approval_v6: {
         Args: { p_version_id: string }
+        Returns: string
+      }
+      request_message_template_review_v6: {
+        Args: { p_consent_basis: string; p_version_id: string }
         Returns: string
       }
       request_meta_build: { Args: { p_campaign_id: string }; Returns: string }

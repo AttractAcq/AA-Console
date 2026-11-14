@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "48a40469d078b187b187e56f28a6c5001622b3156740637e990b8cbff799c572",
-  "generatedTypesSha256": "72bf30e08caa329d455dab71372d05cb05429e2969b4217bb675554fe07a4233",
-  "generatedSchemaBodySha256": "9d095cb986db4a095d83eb76c062e3cd0983d2dea1d5c085856d5be30fe77439",
+  "migrationSourceDigest": "71484b49a82b6fd38fa3e4f8e8f450fa61d004fe24ac8e3efd56552f6982e95e",
+  "generatedTypesSha256": "55421b5f7e0fded59130ca509dc5fd7f8a4cd88683ab46886e8d019afa3c363b",
+  "generatedSchemaBodySha256": "87c6664602141d38f1d23adfdabd9b1860db8b315cf2dc86e6382deb345c2391",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -2887,6 +2887,34 @@
       "filename": "20261117070000_395_opportunity_activation_coverage.sql",
       "sha256": "93922a88ca2733b3530f867e9752c092115a8418fd2b286a1e0e6335f35ccfe0",
       "trimmedMd5": "e3a395f382fc9ddb7b87340ca29f1e34"
+    },
+    {
+      "version": "20261117080000",
+      "name": "396_message_template_inbox",
+      "filename": "20261117080000_396_message_template_inbox.sql",
+      "sha256": "f3fe34cf1e3c39dc4829f6360cbb6d8f6d7475c95602827707440ca87956be89",
+      "trimmedMd5": "66c9dcc3ac0ce24df8193c9b390ca8f3"
+    },
+    {
+      "version": "20261117090000",
+      "name": "397_message_send_gate",
+      "filename": "20261117090000_397_message_send_gate.sql",
+      "sha256": "8c268f7421ae15e89e48bb2c41c57ef6b53a5926fc9726c52ae3aaa216a65adb",
+      "trimmedMd5": "a53b6269290ee6dc0341e36fc06c5b52"
+    },
+    {
+      "version": "20261117100000",
+      "name": "398_message_template_inbox_view",
+      "filename": "20261117100000_398_message_template_inbox_view.sql",
+      "sha256": "353a876c7292bb4691ee66a79cb41cf56fcc9fc6fb0e7231c482ecce0831f74f",
+      "trimmedMd5": "124333ff58933e4c12dac9ceefc80e8d"
+    },
+    {
+      "version": "20261117110000",
+      "name": "399_message_template_coverage",
+      "filename": "20261117110000_399_message_template_coverage.sql",
+      "sha256": "37ecf8b0e01983c8c9994fbba8389be94d8417dd99215bdc0b99721c1963cf66",
+      "trimmedMd5": "7f4eb919c98b28ed8f349031f438a983"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

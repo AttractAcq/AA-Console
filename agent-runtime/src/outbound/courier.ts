@@ -217,6 +217,15 @@ export async function deliverClaimedMessages(
 
   for (const message of claimed) {
     try {
+      const { data: ready, error: readyError } = await sb.rpc("outbound_message_send_ready_v6", {
+        p_message_id: message.message_id,
+      } as never);
+      if (readyError) {
+        throw new SendError(`Could not verify this send immediately before the provider call: ${readyError.message}`, true);
+      }
+      if (ready !== true) {
+        throw new SendError("The exact approval, consent, destination or client switch is no longer current.", false);
+      }
       const sender = SENDERS[message.channel_key];
       if (!sender) {
         // Only reachable if a channel is marked supported without a sender,

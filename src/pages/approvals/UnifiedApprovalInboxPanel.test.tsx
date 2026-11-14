@@ -368,6 +368,27 @@ const readyOpportunityActivation = {
   owning_path: "/clients/client-1/delivery/market-opportunities?opportunity=opportunity-1",
 };
 
+const messageReviewId = "29292929-2929-4292-8292-292929292929";
+const messageToken = "30303030-3030-4030-8030-303030303030";
+const messageHash = "e".repeat(64);
+const readyMessageTemplate = {
+  ...request, id: "message-inbox-1", source_system: "aa_console",
+  source_kind: "message_template", source_id: messageReviewId,
+  source_version: `${messageHash}:${messageToken}`, artifact_hash: messageHash,
+  title: "Approve message: Enquiry response v1", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "outbound_template:email:version-1", account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", template_version_id: "version-1",
+    request_token: messageToken, name: "Enquiry response", purpose: "transactional",
+    channel: "email", subject: "Your enquiry", body: "Hello Priya.",
+    consent_basis: "Lead explicitly requested a reply", channel_supported: true },
+  scope: { client_id: "client-1", template_version_id: "version-1",
+    review_id: messageReviewId, request_token: messageToken,
+    content_hash: messageHash, effect: "standing_template_send_permission" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
 const engineTime = "2026-11-20T09:00:00+00:00";
@@ -837,6 +858,18 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_opportunity_activation_inbox_v6", {
       p_activation_id: activationReviewId, p_request_id: readyOpportunityActivation.id,
+      p_approved: true,
+    }));
+  });
+
+  it("decides the exact message words and consent basis through the Inbox", async () => {
+    requests = [readyMessageTemplate];
+    show();
+    const card = await screen.findByRole("article", { name: readyMessageTemplate.title });
+    expect(within(card).getByText(/Lead explicitly requested a reply/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_message_template_inbox_v6", {
+      p_review_id: messageReviewId, p_request_id: readyMessageTemplate.id,
       p_approved: true,
     }));
   });
