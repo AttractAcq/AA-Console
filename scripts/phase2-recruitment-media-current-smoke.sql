@@ -34,6 +34,18 @@ begin
     'cccccccc-cccc-4ccc-8ccc-cccccccccccc') then
     raise exception 'Exact recruitment brief signoff was not current'; end if;
 end $brief$;
+do $production$
+declare v_result jsonb;
+begin
+  v_result:=public.generate_recruitment_ad(
+    'cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+  if v_result->>'job_id' is null or not exists (
+    select 1 from public.agent_jobs j
+    where j.id=(v_result->>'job_id')::uuid
+      and j.agent_key='creative_build'
+      and j.params->>'render_id'=v_result->>'render_id'
+  ) then raise exception 'Exact signoff did not queue recruitment production'; end if;
+end $production$;
 insert into public.client_media_assets
   (id,client_id,brief_id,media_type,content_format,title,storage_path,usage_rights)
 values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd',
@@ -98,4 +110,26 @@ begin
     if SQLERRM not like '%current Inbox-cleared%' then raise; end if;
   end;
 end $checks$;
+do $revoked$
+declare v_request public.approval_requests_v6%rowtype;
+begin
+  select * into v_request from public.approval_requests_v6
+    where source_kind='recruitment_brief'
+      and source_id='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  perform public.record_approval_decision_v6(
+    v_request.id,'revoked',v_request.artifact_hash,
+    'client_briefs:cccccccc-cccc-4ccc-8ccc-cccccccccccc:revoked',
+    'Fixture withdrawal before another production job');
+  if public.recruitment_brief_signoff_current_v6(
+    'cccccccc-cccc-4ccc-8ccc-cccccccccccc') then
+    raise exception 'Removed recruitment signoff remained current'; end if;
+  begin
+    perform public.build_brief_with_ai(
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      'medium','1024x1536',null);
+    raise exception 'Shared creative builder queued with a stale recruitment signoff';
+  exception when insufficient_privilege then
+    if SQLERRM not like '%Current exact Inbox signoff%' then raise; end if;
+  end;
+end $revoked$;
 rollback;

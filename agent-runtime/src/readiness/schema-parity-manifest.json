@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "f76924328e1a524ce22ba649aa626dd26dc83193d13d4d1c587aa76b31caa44c",
+  "migrationSourceDigest": "2db0bd650a0c625b98b25c0895c6f0803430c8b014ff252939139378d6804c2c",
   "generatedTypesSha256": "40ff319c794377b0968a53328b26016cf2e1477754711e5573305d43901ab516",
   "generatedSchemaBodySha256": "3cae640dbe8708ea5fa1840d6563c6618f81f8417bdb720510284808dca9e707",
   "localMigrations": [
@@ -3300,6 +3300,13 @@
       "filename": "20261119180000_454_gateway_sites_invocation.sql",
       "sha256": "eeaf57794c472c4f66bd5a9e12b502908e4f8b06562fdd4a0fda7604c493ed33",
       "trimmedMd5": "26976186d0e8ba4c710bd69319a7e6ce"
+    },
+    {
+      "version": "20261119190000",
+      "name": "455_recruitment_brief_production_gate",
+      "filename": "20261119190000_455_recruitment_brief_production_gate.sql",
+      "sha256": "cf74f3e87a7779d35e6cc9ce141413ccb63daa1c4082f4151a4af00306946d42",
+      "trimmedMd5": "9e9ae846166a11d6b8795e012aa57ea4"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
