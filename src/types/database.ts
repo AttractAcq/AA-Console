@@ -7604,6 +7604,8 @@ export type Database = {
       }
       client_proof_assets: {
         Row: {
+          approved_rights_content_hash: string | null
+          approved_rights_request_id: string | null
           avatar_relevance: string | null
           body: string | null
           capture_file_mime: string | null
@@ -7632,6 +7634,8 @@ export type Database = {
           usage_rights: string
         }
         Insert: {
+          approved_rights_content_hash?: string | null
+          approved_rights_request_id?: string | null
           avatar_relevance?: string | null
           body?: string | null
           capture_file_mime?: string | null
@@ -7660,6 +7664,8 @@ export type Database = {
           usage_rights?: string
         }
         Update: {
+          approved_rights_content_hash?: string | null
+          approved_rights_request_id?: string | null
           avatar_relevance?: string | null
           body?: string | null
           capture_file_mime?: string | null
@@ -7688,6 +7694,20 @@ export type Database = {
           usage_rights?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_proof_assets_approved_rights_request_id_fkey"
+            columns: ["approved_rights_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_proof_assets_approved_rights_request_id_fkey"
+            columns: ["approved_rights_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_proof_assets_client_id_fkey"
             columns: ["client_id"]
@@ -18773,6 +18793,190 @@ export type Database = {
           },
         ]
       }
+      proof_rights_requests_v6: {
+        Row: {
+          artifact_hash: string | null
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          proof_id: string
+          request_token: string
+          requested_basis: string
+          requested_expiry: string | null
+        }
+        Insert: {
+          artifact_hash?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          proof_id: string
+          request_token?: string
+          requested_basis: string
+          requested_expiry?: string | null
+        }
+        Update: {
+          artifact_hash?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          proof_id?: string
+          request_token?: string
+          requested_basis?: string
+          requested_expiry?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_rights_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_requests_v6_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+        ]
+      }
+      proof_rights_revocations_v6: {
+        Row: {
+          actor_id: string | null
+          canonical_request_id: string
+          client_id: string
+          proof_id: string
+          reason: string
+          revoked_at: string
+        }
+        Insert: {
+          actor_id?: string | null
+          canonical_request_id: string
+          client_id: string
+          proof_id: string
+          reason: string
+          revoked_at?: string
+        }
+        Update: {
+          actor_id?: string | null
+          canonical_request_id?: string
+          client_id?: string
+          proof_id?: string
+          reason?: string
+          revoked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proof_rights_revocations_v6_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "client_proof_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proof_rights_revocations_v6_proof_id_fkey"
+            columns: ["proof_id"]
+            isOneToOne: false
+            referencedRelation: "proof_surface_coverage"
+            referencedColumns: ["proof_asset_id"]
+          },
+        ]
+      }
       public_ingress_nonces_v1: {
         Row: {
           expires_at: string
@@ -27283,6 +27487,45 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      approve_proof_rights_v6: {
+        Args: { p_canonical_id: string; p_rights_request_id: string }
+        Returns: {
+          approved_rights_content_hash: string | null
+          approved_rights_request_id: string | null
+          avatar_relevance: string | null
+          body: string | null
+          capture_file_mime: string | null
+          capture_method: string | null
+          captured_on: string | null
+          claim: string | null
+          client_id: string
+          created_at: string
+          evidence: string | null
+          expires_on: string | null
+          id: string
+          media_type: Database["public"]["Enums"]["media_type"]
+          permission_basis: string | null
+          proof_type: string | null
+          ref_number: string | null
+          services: string | null
+          source: string | null
+          source_category: string | null
+          source_format: Database["public"]["Enums"]["content_format"]
+          source_kind: string | null
+          storage_path: string | null
+          strength: string
+          title: string | null
+          updated_at: string
+          uploaded_by: string | null
+          usage_rights: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_proof_assets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       approve_recruitment_brief: {
         Args: { p_brief_id: string }
         Returns: undefined
@@ -30455,6 +30698,32 @@ export type Database = {
         }
         Returns: string
       }
+      proof_rights_hash_v6: {
+        Args: {
+          p_request: Database["public"]["Tables"]["proof_rights_requests_v6"]["Row"]
+        }
+        Returns: string
+      }
+      proof_rights_preview_v6: {
+        Args: {
+          p_request: Database["public"]["Tables"]["proof_rights_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      proof_rights_scope_v6: {
+        Args: {
+          p_request: Database["public"]["Tables"]["proof_rights_requests_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      proof_rights_source_payload_v6: {
+        Args: { p: Database["public"]["Tables"]["client_proof_assets"]["Row"] }
+        Returns: Json
+      }
+      proof_rights_source_state_v6: {
+        Args: { p_canonical_id: string }
+        Returns: string
+      }
       proof_snapshot_hash_v6: { Args: { p: Json }; Returns: string }
       proof_source_snapshot_v6: {
         Args: { p: Database["public"]["Tables"]["client_proof_assets"]["Row"] }
@@ -31119,6 +31388,14 @@ export type Database = {
         Args: { p_proposal_id: string; p_reason: string }
         Returns: undefined
       }
+      reject_proof_rights_v6: {
+        Args: {
+          p_canonical_id: string
+          p_reason: string
+          p_rights_request_id: string
+        }
+        Returns: string
+      }
       reject_sales_agent_public_use_v6: {
         Args: { p_agent_id: string; p_reason: string; p_request_id: string }
         Returns: string
@@ -31456,6 +31733,14 @@ export type Database = {
           p_request_id: string
           p_source_asset_id: string
           p_source_proof_id: string
+        }
+        Returns: string
+      }
+      request_proof_rights_v6: {
+        Args: {
+          p_expires_on?: string
+          p_permission_basis: string
+          p_proof_id: string
         }
         Returns: string
       }
@@ -32805,6 +33090,8 @@ export type Database = {
       usable_proof: {
         Args: { p_avatar?: string; p_client_id: string; p_limit?: number }
         Returns: {
+          approved_rights_content_hash: string | null
+          approved_rights_request_id: string | null
           avatar_relevance: string | null
           body: string | null
           capture_file_mime: string | null

@@ -183,6 +183,28 @@ const readyOpportunity = {
   owning_path: `/clients/client-1/delivery/market-opportunities?opportunity=${opportunityId}`,
 };
 
+const proofRightsId = "99999999-9999-4999-8999-999999999999";
+const proofId = "aaaa1111-aaaa-4111-8111-aaaaaaaa1111";
+const proofToken = "bbbb1111-bbbb-4111-8111-bbbbbbbb1111";
+const proofHash = "3".repeat(64);
+const readyProofRights = {
+  ...request, id: "proof-rights-inbox-1", source_system: "aa_console",
+  source_kind: "proof_rights", source_id: proofRightsId,
+  source_version: `${proofHash}:${proofToken}`,
+  artifact_hash: proofHash, title: "Clear proof rights: Testimonial",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: `proof_bank:clear:${proofId}`, account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { client_id: "client-1", proof_id: proofId, request_token: proofToken,
+    requested_rights: "approved", permission_basis: "Customer signed release",
+    expires_on: null, proof: { id: proofId, media_type: "text", storage_path: null,
+      title: "Testimonial", body: "A customer result" } },
+  scope: { client_id: "client-1", proof_id: proofId,
+    rights_request_id: proofRightsId, request_token: proofToken,
+    content_hash: proofHash, requested_rights: "approved" },
+  owning_path: `/clients/client-1/delivery/proof-production-factory?proof=${proofId}`,
+};
+
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
@@ -519,6 +541,18 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_opportunity_v6", {
       p_opportunity_id: opportunityId, p_request_id: readyOpportunity.id,
+    }));
+  });
+
+  it("clears the exact text proof through its owning rights RPC", async () => {
+    requests = [readyProofRights];
+    show();
+    const card = await screen.findByRole("article", { name: readyProofRights.title });
+    expect(within(card).getByText("Proof usage rights decision")).toBeInTheDocument();
+    expect(within(card).getByText(/Customer signed release/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_proof_rights_v6", {
+      p_rights_request_id: proofRightsId, p_canonical_id: readyProofRights.id,
     }));
   });
 

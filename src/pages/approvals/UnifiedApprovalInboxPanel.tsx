@@ -9,7 +9,7 @@ import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "campaign_action", "client_sales_entitlement", "engine_slot",
-  "google_review_reply", "lead_magnet", "opportunity_approve", "recruitment_brief", "sales_agent_public_use", "service_offer",
+  "google_review_reply", "lead_magnet", "opportunity_approve", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -338,6 +338,39 @@ function isOpportunityApprovalReady(request: UnifiedApprovalRequest, clientId: s
     && request.status === "pending" && request.source_state === "pending" && !isExpired(request);
 }
 
+function isProofRightsRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "proof_rights"
+    || request.client_id !== clientId || !["pending", "source_held", "expired"].includes(request.status)
+    || !["pending", "source_held"].includes(request.source_state ?? "")
+    || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const proof = preview.proof;
+  const hash = request.artifact_hash;
+  return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
+    && typeof preview.request_token === "string" && !!preview.request_token
+    && request.source_version === `${hash}:${preview.request_token}`
+    && preview.client_id === clientId && typeof preview.proof_id === "string"
+    && !!proof && typeof proof === "object" && !Array.isArray(proof)
+    && (proof as Record<string, unknown>).id === preview.proof_id
+    && (proof as Record<string, unknown>).media_type === "text"
+    && (proof as Record<string, unknown>).storage_path == null
+    && preview.requested_rights === "approved"
+    && typeof preview.permission_basis === "string" && !!preview.permission_basis.trim()
+    && scope.rights_request_id === request.source_id && scope.client_id === clientId
+    && scope.proof_id === preview.proof_id && scope.request_token === preview.request_token
+    && scope.content_hash === hash && scope.requested_rights === "approved"
+    && request.destination === `proof_bank:clear:${preview.proof_id}`
+    && request.owner_role === "admin_or_active_client_manager";
+}
+
+function isProofRightsApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  return isProofRightsRejectionReady(request, clientId)
+    && request.status === "pending" && request.source_state === "pending" && !isExpired(request);
+}
+
 function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   return isCampaignRejectionReady(request, clientId)
     || isGoogleReplyRejectionReady(request, clientId)
@@ -345,7 +378,8 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isServiceOfferRejectionReady(request, clientId)
     || isLeadMagnetApprovalReady(request, clientId)
     || isSalesAgentRejectionReady(request, clientId)
-    || isOpportunityRejectionReady(request, clientId);
+    || isOpportunityRejectionReady(request, clientId)
+    || isProofRightsRejectionReady(request, clientId);
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
@@ -356,7 +390,8 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isServiceOfferApprovalReady(request, clientId)
     || isLeadMagnetApprovalReady(request, clientId)
     || isSalesAgentApprovalReady(request, clientId)
-    || isOpportunityApprovalReady(request, clientId);
+    || isOpportunityApprovalReady(request, clientId)
+    || isProofRightsApprovalReady(request, clientId);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
@@ -427,7 +462,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
           ? "Service offer" : request.source_kind === "lead_magnet"
             ? "Lead magnet" : request.source_kind === "sales_agent_public_use"
               ? "Sales agent public use" : request.source_kind === "opportunity_approve"
-                ? "Market opportunity" : "Campaign action";
+                ? "Market opportunity" : request.source_kind === "proof_rights"
+                  ? "Proof usage rights" : "Campaign action";
   const magnetPreview = request.source_kind === "lead_magnet" && request.preview
     && typeof request.preview === "object" && !Array.isArray(request.preview)
     ? request.preview as Record<string, unknown> : null;
@@ -767,6 +803,15 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             })
             : await supabase.rpc("reject_opportunity_approval_v6", {
               p_opportunity_id: request.source_id, p_request_id: request.id,
+              p_reason: reason!.trim(),
+            })
+        : request.source_kind === "proof_rights"
+          ? decision === "approved"
+            ? await supabase.rpc("approve_proof_rights_v6", {
+              p_rights_request_id: request.source_id, p_canonical_id: request.id,
+            })
+            : await supabase.rpc("reject_proof_rights_v6", {
+              p_rights_request_id: request.source_id, p_canonical_id: request.id,
               p_reason: reason!.trim(),
             })
         : request.source_kind === "campaign_action"
