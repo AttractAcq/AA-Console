@@ -144,9 +144,13 @@ export async function setDestinationEnabled(
 }
 
 export async function setProofPublishingEnabled(clientId: string, enabled: boolean): Promise<void> {
-  const { error } = await supabase.rpc("set_proof_publishing_enabled", {
-    p_client_id: clientId, p_enabled: enabled,
-  });
+  const { error } = enabled
+    ? await supabase.rpc("request_client_switch_activation_v6", {
+        p_client_id: clientId, p_switch_key: "proof_publishing",
+      })
+    : await supabase.rpc("set_proof_publishing_enabled", {
+        p_client_id: clientId, p_enabled: false,
+      });
   if (error) throw new Error(error.message);
 }
 

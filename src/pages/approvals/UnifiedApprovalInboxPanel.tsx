@@ -10,7 +10,7 @@ import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
-  "campaign_action", "campaign_idea", "client_sales_entitlement", "engine_slot",
+  "activation_switch", "campaign_action", "campaign_idea", "client_sales_entitlement", "engine_slot",
   "google_profile_change", "google_review_reply", "lead_magnet", "message_template", "meta_profile_change", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
@@ -716,6 +716,40 @@ function isCampaignIdeaReady(request: UnifiedApprovalRequest, clientId: string):
     && request.owner_role === "admin_or_active_client_manager";
 }
 
+const SWITCH_COLUMNS: Record<string, string> = {
+  engine: "enabled", auto_approve_ideas: "auto_approve_ideas",
+  auto_approve_briefs: "auto_approve_briefs", publishing: "publishing_enabled",
+  proof_publishing: "proof_publishing_enabled",
+  campaign_actions: "campaign_actions_enabled",
+  outbound_messaging: "outbound_messaging_enabled",
+  lead_magnet_delivery: "lead_magnet_delivery_enabled",
+};
+
+function isClientSwitchActivationReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "activation_switch"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const settings = preview.settings && typeof preview.settings === "object" && !Array.isArray(preview.settings)
+    ? preview.settings as Record<string, unknown> : null;
+  const key = preview.switch_key;
+  const column = typeof key === "string" ? SWITCH_COLUMNS[key] : undefined;
+  const hash = request.artifact_hash;
+  return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
+    && request.source_version === `${hash}:${preview.request_token}`
+    && preview.client_id === clientId && preview.action === "enable"
+    && typeof key === "string" && !!column && settings?.client_id === clientId
+    && settings[column] === false
+    && scope.client_id === clientId && scope.switch_key === key
+    && scope.review_id === request.source_id && scope.request_token === preview.request_token
+    && scope.content_hash === hash && scope.effect === "enable_client_automation_switch"
+    && request.destination === `client:automation:${clientId}:${key}`
+    && request.owner_role === "admin";
+}
+
 function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   if (request.source_system !== "aa_console" || request.source_kind !== "engine_slot"
     || request.client_id !== clientId || request.status !== "pending"
@@ -775,7 +809,8 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isNurtureSequenceReady(request, clientId)
     || isVideoSeatReady(request, clientId)
     || isMotionRenderReady(request, clientId)
-    || isCampaignIdeaReady(request, clientId);
+    || isCampaignIdeaReady(request, clientId)
+    || isClientSwitchActivationReady(request, clientId);
 }
 
 function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boolean {
@@ -800,7 +835,8 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isNurtureSequenceReady(request, clientId)
     || isVideoSeatReady(request, clientId)
     || isMotionRenderReady(request, clientId)
-    || isCampaignIdeaReady(request, clientId);
+    || isCampaignIdeaReady(request, clientId)
+    || isClientSwitchActivationReady(request, clientId);
 }
 
 function sameVersion(left: UnifiedApprovalRequest, right: UnifiedApprovalRequest): boolean {
@@ -904,7 +940,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
               ? "Sales agent public use" : request.source_kind === "opportunity_approve"
                 ? "Market opportunity" : request.source_kind === "proof_rights"
                   ? "Proof usage rights" : request.source_kind === "proof_placement"
-                    ? "Proof placement" : request.source_kind === "campaign_idea"
+                    ? "Proof placement" : request.source_kind === "activation_switch"
+                      ? "Automation activation" : request.source_kind === "campaign_idea"
                       ? "Idea selection" : request.source_kind === "motion_render"
                       ? "Motion render" : request.source_kind === "video_seat"
                       ? "Video seat" : request.source_kind === "nurture_sequence"
@@ -1356,6 +1393,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             })
         : request.source_kind === "nurture_sequence"
           ? await supabase.rpc("decide_nurture_sequence_inbox_v6", {
+              p_review_id: request.source_id, p_request_id: request.id,
+              p_approved: decision === "approved",
+              ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+            })
+        : request.source_kind === "activation_switch"
+          ? await supabase.rpc("decide_client_switch_activation_v6", {
               p_review_id: request.source_id, p_request_id: request.id,
               p_approved: decision === "approved",
               ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),

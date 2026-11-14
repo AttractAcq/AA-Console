@@ -96,8 +96,15 @@ begin
   raise exception 'Stale approved idea queued a brief';
  exception when insufficient_privilege then null; end;
  perform set_config('request.jwt.claim.role','service_role',true);
- insert into public.client_engine_settings(client_id,auto_approve_ideas)
- values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd',true);
+ insert into public.client_engine_settings(client_id)
+ values ('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+ perform set_config('request.jwt.claim.role','authenticated',true);
+ request_id:=public.request_client_switch_activation_v6(
+  'dddddddd-dddd-4ddd-8ddd-dddddddddddd','auto_approve_ideas');
+ select id into review_id from public.client_switch_activation_reviews_v6
+  where canonical_request_id=request_id;
+ perform public.decide_client_switch_activation_v6(review_id,request_id,true);
+ perform set_config('request.jwt.claim.role','service_role',true);
  insert into public.content_slots(id,client_id,platform,scheduled_at)
  values (slot_id,'dddddddd-dddd-4ddd-8ddd-dddddddddddd','instagram',now()+interval '1 day');
  perform public.advance_slot(slot_id,'ideating','engine');

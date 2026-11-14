@@ -1,5 +1,8 @@
 -- Rollback-only proof for the exact-file lead-magnet Inbox and delivery gate.
 begin;
+-- Fixture setup exercises another approval class; bypass only the new
+-- activation guard inside this rollback transaction.
+alter table public.client_engine_settings disable trigger client_switch_activation_guard_v6;
 insert into auth.users(id,instance_id,aud,role,email,encrypted_password,created_at,updated_at)
 values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','00000000-0000-0000-0000-000000000000',
   'authenticated','authenticated','magnet-admin@example.invalid','',now(),now()),

@@ -480,6 +480,25 @@ const readyCampaignIdea = {
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
 };
 
+const switchReviewId = "40404040-4040-4040-8040-404040404040";
+const switchToken = "41414141-4141-4141-8141-414141414141";
+const switchHash = "c".repeat(64);
+const readyActivationSwitch = {
+  ...request, id: "switch-inbox-1", source_system: "aa_console",
+  source_kind: "activation_switch", source_id: switchReviewId,
+  source_version: `${switchHash}:${switchToken}`, artifact_hash: switchHash,
+  title: "Enable client automation: outbound messaging", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "client:automation:client-1:outbound_messaging", account_ref: null, budget: null,
+  owner_role: "admin",
+  preview: { client_id: "client-1", switch_key: "outbound_messaging", action: "enable",
+    request_token: switchToken, settings: { client_id: "client-1", outbound_messaging_enabled: false } },
+  scope: { client_id: "client-1", switch_key: "outbound_messaging", review_id: switchReviewId,
+    request_token: switchToken, content_hash: switchHash,
+    effect: "enable_client_automation_switch" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
+
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
 const engineTime = "2026-11-20T09:00:00+00:00";
@@ -1019,6 +1038,17 @@ describe("unified approval inbox", () => {
     await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_human_idea_inbox_v6", {
       p_review_id: ideaReviewId, p_request_id: readyCampaignIdea.id,
+      p_approved: true,
+    }));
+  });
+
+  it("routes an exact client automation activation through the Inbox", async () => {
+    requests = [readyActivationSwitch];
+    show();
+    const card = await screen.findByRole("article", { name: readyActivationSwitch.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_switch_activation_v6", {
+      p_review_id: switchReviewId, p_request_id: readyActivationSwitch.id,
       p_approved: true,
     }));
   });

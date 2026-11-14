@@ -201,14 +201,14 @@ function DestinationsTab({
               void onAct(
                 "switch",
                 () => setProofPublishingEnabled(clientId!, !publishingOn),
-                publishingOn ? "Proof distribution is off for this client." : "Proof distribution is on for this client.",
+                publishingOn ? "Proof distribution is off for this client." : "Exact activation review requested in Unified Approval Inbox.",
               )
             }
             className={`rounded-md px-3 py-2 text-sm disabled:opacity-50 ${
               publishingOn ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground"
             }`}
           >
-            {publishingOn ? "Switch off" : "Switch on"}
+            {publishingOn ? "Switch off" : "Request activation"}
           </button>
         </div>
       </section>

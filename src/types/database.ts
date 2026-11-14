@@ -8581,6 +8581,88 @@ export type Database = {
           },
         ]
       }
+      client_switch_activation_reviews_v6: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+          switch_key: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+          switch_key: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+          switch_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_switch_activation_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       client_users: {
         Row: {
           client_id: string
@@ -30949,6 +31031,32 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: Json
       }
+      client_switch_activation_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["client_switch_activation_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      client_switch_activation_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["client_switch_activation_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      client_switch_activation_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["client_switch_activation_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      client_switch_activation_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      client_switch_column_v6: {
+        Args: { p_switch_key: string }
+        Returns: string
+      }
       client_timezone: { Args: { p_client_id: string }; Returns: string }
       clone_campaign_for_route: {
         Args: {
@@ -31649,6 +31757,15 @@ export type Database = {
           p_scope_hash: string
         }
         Returns: undefined
+      }
+      decide_client_switch_activation_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
       }
       decide_console_invitation_v6: {
         Args: {
@@ -34654,6 +34771,10 @@ export type Database = {
       }
       request_client_sales_entitlement: {
         Args: { p_action: string; p_client_id: string; p_member_id: string }
+        Returns: string
+      }
+      request_client_switch_activation_v6: {
+        Args: { p_client_id: string; p_switch_key: string }
         Returns: string
       }
       request_console_invitation_v6: {

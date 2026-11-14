@@ -113,10 +113,10 @@ describe("destinations", () => {
   it("leads with the switch, and says plainly that nothing goes out while it is off", async () => {
     render(<ProofDistributionPanel tab="destinations" />);
     expect(await screen.findByText("Nothing is placed anywhere for this client")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Switch on" }));
+    await userEvent.click(screen.getByRole("button", { name: "Request activation" }));
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("set_proof_publishing_enabled", {
-        p_client_id: "c1", p_enabled: true,
+      expect(rpc).toHaveBeenCalledWith("request_client_switch_activation_v6", {
+        p_client_id: "c1", p_switch_key: "proof_publishing",
       }),
     );
   });

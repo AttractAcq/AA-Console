@@ -77,6 +77,12 @@ const RUNTIME_KEYS: Record<string, string> = {
   lead_magnet_delivery: "leadMagnetDelivery",
 };
 
+const REVIEWED_SWITCHES = new Set([
+  "engine", "auto_approve_ideas", "auto_approve_briefs", "publishing",
+  "proof_publishing", "campaign_actions", "outbound_messaging",
+  "lead_magnet_delivery",
+]);
+
 function sourcePath(clientId: string, key: string): string {
   const base = `/clients/${encodeURIComponent(clientId)}/delivery/`;
   if (["engine", "auto_approve_ideas", "auto_approve_briefs", "publishing"].includes(key))
@@ -268,6 +274,16 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
     setError(null);
     setNote(null);
     if (!row.write) return;
+    if (next && REVIEWED_SWITCHES.has(row.key)) {
+      const { error: reviewError } = await supabase.rpc("request_client_switch_activation_v6", {
+        p_client_id: clientId, p_switch_key: row.key,
+      });
+      setBusy(null);
+      if (reviewError) { setError(reviewError.message); return; }
+      setNote(`${row.label}: exact activation review requested in Unified Approval Inbox.`);
+      await refresh();
+      return;
+    }
     const { fn, args } = row.write(next);
     // Every writer still reachable from here takes the client.
     const payload = { p_client_id: clientId, ...args };
@@ -298,7 +314,8 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
       )}
       {note && (
         <p role="status" className="mb-3 text-sm text-brand-strong">
-          {note}
+          {note} {note.includes("Unified Approval Inbox") &&
+            <a className="underline" href={`/clients/${clientId}/delivery/approval-inbox?tab=unified`}>Open Inbox</a>}
         </p>
       )}
       <ul className="divide-y divide-border">

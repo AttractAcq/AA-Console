@@ -97,8 +97,8 @@ describe("every switch in one place", () => {
 
     await userEvent.click(await screen.findByLabelText("Switch on Deliver lead magnets"));
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("set_lead_magnet_delivery_enabled", {
-        p_client_id: "c1", p_enabled: true,
+      expect(rpc).toHaveBeenCalledWith("request_client_switch_activation_v6", {
+        p_client_id: "c1", p_switch_key: "lead_magnet_delivery",
       }),
     );
   });
@@ -128,8 +128,8 @@ describe("every switch in one place", () => {
     const button = await screen.findByLabelText("Switch on Execute approved campaign actions");
     expect(button).toBeEnabled();
     await userEvent.click(button);
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("set_campaign_actions_enabled", {
-      p_client_id: "c1", p_enabled: true,
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_client_switch_activation_v6", {
+      p_client_id: "c1", p_switch_key: "campaign_actions",
     }));
   });
 
@@ -166,7 +166,7 @@ describe("every switch in one place", () => {
     render(<ClientSwitchPanel clientId="c1" />);
     await userEvent.click(await screen.findByLabelText("Switch on Content engine, this client"));
     await waitFor(() =>
-      expect(rpc).toHaveBeenCalledWith("set_engine_enabled", { p_client_id: "c1", p_enabled: true }),
+      expect(rpc).toHaveBeenCalledWith("request_client_switch_activation_v6", { p_client_id: "c1", p_switch_key: "engine" }),
     );
   });
 
