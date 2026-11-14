@@ -49,6 +49,14 @@ type SwitchState = {
   engineRunning: boolean;
   bookingEnabled: boolean | null;
   runtime: RuntimeControls | null;
+  activity: Record<string, ControlActivity> | null;
+};
+
+type ControlActivity = {
+  lastRun: { at: string; status: string; sourceId: string } | null;
+  lastExternalReceipt: {
+    at: string; externalRef: string | null; externalUrl: string | null; sourceId: string;
+  } | null;
 };
 
 type RuntimeControls = {
@@ -68,6 +76,16 @@ const RUNTIME_KEYS: Record<string, string> = {
   outbound_messaging: "outboundMessaging",
   lead_magnet_delivery: "leadMagnetDelivery",
 };
+
+function sourcePath(clientId: string, key: string): string {
+  const base = `/clients/${encodeURIComponent(clientId)}/delivery/`;
+  if (["engine", "auto_approve_ideas", "auto_approve_briefs", "publishing"].includes(key))
+    return `${base}organic-content-distribution`;
+  if (key === "proof_publishing") return `${base}proof-distribution`;
+  if (key === "campaign_actions") return `${base}approval-inbox?tab=campaign-actions`;
+  if (key === "lead_magnet_delivery") return `${base}lead-magnet-studio`;
+  return `${base}sales-os`;
+}
 
 function dependency(state: SwitchState, key: string): string | null {
   if (key === "campaign_actions") return "Campaign action executor held pending runtime integration and live validation.";
@@ -211,6 +229,7 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
     engineRunning: false,
     bookingEnabled: null,
     runtime: null,
+    activity: null,
   });
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -218,14 +237,15 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const [settings, controls, booking, runtime] = await Promise.all([
+    const [settings, controls, booking, runtime, activity] = await Promise.all([
       supabase.from("client_engine_settings").select("*").eq("client_id", clientId).maybeSingle(),
       supabase.from("engine_controls").select("enabled").maybeSingle(),
       supabase.from("client_booking_settings").select("enabled").eq("client_id", clientId).maybeSingle(),
       supabase.rpc("client_runtime_controls_v6" as never, { p_client_id: clientId } as never),
+      supabase.rpc("client_control_activity_v6" as never, { p_client_id: clientId } as never),
     ]);
-    const failed = settings.error ?? controls.error ?? booking.error;
-    if (failed) setError(failed.message);
+    const failed = settings.error ?? controls.error ?? booking.error ?? activity.error;
+    setError(failed?.message ?? null);
     setState({
       settings: (settings.data as EngineSettings) ?? null,
       engineRunning: Boolean((controls.data as { enabled?: boolean } | null)?.enabled),
@@ -233,12 +253,15 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
       // state from one whose booking is switched off.
       bookingEnabled: (booking.data as { enabled?: boolean } | null)?.enabled ?? null,
       runtime: runtime.error ? { state: "unknown", reason: runtime.error.message } : (runtime.data as RuntimeControls | null),
+      activity: activity.error ? null : (activity.data as Record<string, ControlActivity> | null) ?? null,
     });
     setLoading(false);
   }, [clientId]);
 
   useEffect(() => {
     void refresh();
+    const timer = window.setInterval(() => void refresh(), 30_000);
+    return () => window.clearInterval(timer);
   }, [refresh]);
 
   async function flip(row: SwitchRow, next: boolean) {
@@ -291,11 +314,14 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
           const unset = value === null;
           const blocker = dependency(state, row.key);
           const effective = value === true && !blocker;
+          const activity = state.activity?.[row.key];
+          const external = RUNTIME_KEYS[row.key] !== undefined;
+          const heldOn = !value && external && blocker !== null;
           return (
             <li key={row.key} className="flex flex-wrap items-start justify-between gap-3 py-3">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-card-foreground">{row.label}</p>
-                <p className="text-sm text-muted-foreground">{value ? row.on : row.off}</p>
+                <p className="text-sm text-muted-foreground">{effective ? row.on : value ? "Requested on; execution is held until the listed prerequisites are met." : row.off}</p>
                 {row.caveat && <p className="mt-1 text-xs text-muted-foreground">{row.caveat}</p>}
                 {!row.readOnly && <p className="mt-1 text-xs text-muted-foreground">Effective state: {effective ? "ready" : value ? "held" : "off"}{blocker ? ` — ${blocker}` : ""}</p>}
                 {RUNTIME_KEYS[row.key] && (
@@ -305,6 +331,17 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
                       : "unverified"}
                     {state.runtime?.reportedAt ? ` · checked ${new Date(state.runtime.reportedAt).toLocaleString()}` : ""}
                   </p>
+                )}
+                {!row.readOnly && (
+                  <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                    <p>Last run: {state.activity === null ? "unknown" : activity?.lastRun
+                      ? `${new Date(activity.lastRun.at).toLocaleString()} · ${activity.lastRun.status}` : "none recorded"}</p>
+                    <p>Last external receipt: {!external ? "not applicable" : state.activity === null ? "unknown"
+                      : activity?.lastExternalReceipt
+                        ? `${new Date(activity.lastExternalReceipt.at).toLocaleString()} · ${activity.lastExternalReceipt.externalRef ?? activity.lastExternalReceipt.externalUrl ?? "reference recorded"}`
+                        : "none recorded"}</p>
+                    <a className="text-primary underline" href={sourcePath(clientId, row.key)}>View source records</a>
+                  </div>
                 )}
                 {row.readOnly && (
                   <p className="mt-1 text-xs text-muted-foreground">{row.readOnly.because}</p>
@@ -323,7 +360,7 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
                 {!row.readOnly && (
                 <button
                   type="button"
-                  disabled={busy !== null || unset || (row.key === "campaign_actions" && !value)}
+                  disabled={busy !== null || unset || heldOn}
                   onClick={() => void flip(row, !value)}
                   aria-label={`${value ? "Switch off" : "Switch on"} ${row.label}`}
                   className={`rounded-md px-3 py-1.5 text-sm disabled:opacity-50 ${

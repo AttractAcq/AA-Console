@@ -17,6 +17,7 @@ const state = {
   booking: null as { enabled: boolean } | null,
   error: null as string | null,
   runtime: null as Record<string, unknown> | null,
+  activity: null as Record<string, unknown> | null,
 };
 
 const SETTINGS = {
@@ -59,8 +60,11 @@ beforeEach(() => {
   state.booking = null;
   state.error = null;
   state.runtime = null;
+  state.activity = null;
   rpc.mockImplementation((name: string) => Promise.resolve(
-    name === "client_runtime_controls_v6" ? { data: state.runtime, error: null } : { error: null },
+    name === "client_runtime_controls_v6" ? { data: state.runtime, error: null }
+      : name === "client_control_activity_v6" ? { data: state.activity, error: null }
+        : { error: null },
   ));
 });
 
@@ -86,6 +90,7 @@ describe("every switch in one place", () => {
     // copy of this switch, on the grounds that the notes put every switch
     // here. That made this panel the only control over whether a machine
     // emails a stranger a file, so it is asserted rather than assumed.
+    state.runtime = { state: "observed", workerEnabled: true, controls: { leadMagnetDelivery: true } };
     render(<ClientSwitchPanel clientId="c1" />);
     expect(await screen.findByText("Deliver lead magnets")).toBeInTheDocument();
     expect(screen.getByText(/Opt-ins are recorded and nothing is delivered/)).toBeInTheDocument();
@@ -120,6 +125,27 @@ describe("every switch in one place", () => {
     render(<ClientSwitchPanel clientId="c1" />);
     expect(await screen.findByText(/Effective state: held — Runtime state has not been verified/)).toBeInTheDocument();
     expect(screen.getAllByText(/Runtime dependency \(read only\): unverified/).length).toBeGreaterThan(0);
+  });
+
+  it("shows a recorded attempt separately from an external receipt", async () => {
+    state.settings = { ...SETTINGS, publishing_enabled: true };
+    state.runtime = { state: "observed", workerEnabled: true, controls: { publish: true } };
+    state.activity = {
+      publishing: {
+        lastRun: { at: "2026-11-14T08:00:00Z", status: "failed", sourceId: "post-2" },
+        lastExternalReceipt: { at: "2026-11-13T08:00:00Z", externalRef: "meta-1", externalUrl: null, sourceId: "post-1" },
+      },
+    };
+    render(<ClientSwitchPanel clientId="c1" />);
+    expect(await screen.findByText(/Last run: .*failed/)).toBeInTheDocument();
+    expect(screen.getByText(/Last external receipt: .*meta-1/)).toBeInTheDocument();
+  });
+
+  it("disables an outward switch when its executor cannot be verified", async () => {
+    render(<ClientSwitchPanel clientId="c1" />);
+    const button = await screen.findByLabelText("Switch on Publish approved posts");
+    expect(button).toBeDisabled();
+    expect(screen.getAllByText(/Last external receipt: unknown/).length).toBeGreaterThan(0);
   });
 
   it("writes a per-client switch with the client on it", async () => {
