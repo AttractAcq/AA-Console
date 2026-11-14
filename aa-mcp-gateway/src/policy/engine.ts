@@ -221,6 +221,14 @@ export class ActionEngine {
           const prior = JSON.parse(String(existing.result)) as Result;
           const held = prior.approval_id
             ? this.store.getApproval(prior.approval_id) : undefined;
+          if (held && (!held.canonical_request_id || !held.canonical_payload_hash)
+            && held.status !== "registration_pending") {
+            receiptKey = key;
+            executionId = createHash("sha256").update(key).digest("hex");
+            return finish({ status: "indeterminate", capability: name, request_id,
+              approval_id: held.approval_id,
+              message: "Legacy local approval has no canonical Inbox decision; start a new request with a new idempotency key." });
+          }
           if (prior.status === "approval_required" && held?.status === "pending"
             && held.requested_by_bot === identity.bot && held.tool === name
             && held.request_token_id === approvalTokenId

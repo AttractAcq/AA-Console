@@ -110,3 +110,31 @@ test("uncertain canonical registration retries the same frozen local card", asyn
       "33333333-3333-4333-8333-333333333333");
   } finally { store.close(); }
 });
+
+test("connected gateway holds a legacy SQLite approval instead of advertising it as pending", async () => {
+  const store = new Store(":memory:");
+  const disconnected = new ActionEngine(store, registry, new AAApiAdapter());
+  const bridge: CanonicalApprovalBridge = {
+    async register() { throw new Error("A new packet is required"); },
+    async attest() { return false; },
+    async claim() { return false; },
+    async finish() { throw new Error("unreachable"); },
+  };
+  try {
+    const old = await disconnected.call(identity, "workflow.create_approval", input,
+      undefined, undefined, token);
+    assert.equal(old.status, "approval_required");
+    const connected = new ActionEngine(store, registry, new AAApiAdapter(), false, bridge);
+    const held = await connected.call(identity, "workflow.create_approval", input,
+      undefined, undefined, token);
+    assert.equal(held.status, "indeterminate");
+    assert.equal(held.approval_id, old.approval_id);
+    assert.match(held.message ?? "", /Legacy local approval has no canonical Inbox decision/);
+    disconnected.decide(old.approval_id!, "old-bearer-reviewer", "approved");
+    await assert.rejects(() => connected.executeApproval(old.approval_id!, [identity], token),
+      /canonical_decision_required/);
+    const heldAgain = await connected.call(identity, "workflow.create_approval", input,
+      undefined, undefined, token);
+    assert.equal(heldAgain.status, "indeterminate");
+  } finally { store.close(); }
+});

@@ -140,6 +140,8 @@ The phases express dependencies, not dates. A page may receive early scaffolding
 
 **Gateway connected-smoke checkpoint, 14 November 2026:** `scripts/phase2-gateway-connected-smoke.mjs` exercised the gateway ActionEngine, the actual runtime HTTP route, the local Supabase service RPC and a provisioned AAL2 Inbox decision. The gateway refused execution while the canonical request was pending, then claimed and finished a single informational tool execution after approval; the Console outcome view showed `completed`. This closes the missing connected test. It creates local fixture rows and requires a local database reset afterward. Class 31 remains **blocked** pending historical SQLite-card reconciliation, provider-specific prewrite checks and an observed external provider receipt.
 
+**Gateway legacy-card checkpoint, 14 November 2026:** A connected gateway now labels an idempotent replay of a pre-bridge SQLite approval `indeterminate` and held; it cannot execute without a canonical request ID and current decision. `aa-mcp-gateway/scripts/audit-legacy-approvals.ts` inventories legacy IDs, state, tool and time from a read-only copy without exposing structured payloads. Focused tests prove an older bearer approval cannot cross the connected bridge. The deployed persistent SQLite file has not been inspected, so the historical reconciliation remains open. Class 31 is still **blocked** pending that audit, provider prewrite checks and a provider receipt.
+
 ## Phase 3 — Intelligence, Market Opportunities, Offer Studio and proof inputs
 
 ### Intelligence OS
