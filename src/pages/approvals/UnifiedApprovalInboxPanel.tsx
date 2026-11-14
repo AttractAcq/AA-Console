@@ -11,7 +11,7 @@ import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "activation_switch", "campaign_action", "campaign_idea", "client_authority_assignment", "client_sales_entitlement", "creative_requirement", "engine_slot",
-  "gateway_tool", "global_engine_activation", "global_video_owner", "google_profile_change", "google_review_reply", "integration_grant", "lead_magnet", "message_template", "meta_profile_change", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
+  "gateway_tool", "global_engine_activation", "global_video_owner", "google_profile_change", "google_review_reply", "integration_grant", "lead_magnet", "message_template", "meta_profile_change", "metrics_backfill", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -851,6 +851,33 @@ function isIntegrationGrantReady(request: UnifiedApprovalRequest, clientId: stri
     && request.account_ref === preview.account_label && request.owner_role === "admin";
 }
 
+function isMetricsBackfillReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "metrics_backfill"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const hash = request.artifact_hash;
+  return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
+    && request.source_version === `${hash}:${preview.request_token}`
+    && preview.client_id === clientId && preview.action === "pull_metrics_history"
+    && typeof preview.since === "string" && typeof preview.until === "string"
+    && ["both", "paid", "organic"].includes(String(preview.surface))
+    && Array.isArray(preview.accounts)
+    && preview.accounts.length === (preview.surface === "both" ? 2 : 1)
+    && preview.accounts.every((a) => a && typeof a === "object"
+      && typeof a.credential_version_hash === "string"
+      && /^[0-9a-f]{64}$/.test(a.credential_version_hash))
+    && scope.client_id === clientId && scope.review_id === request.source_id
+    && scope.request_token === preview.request_token && scope.content_hash === hash
+    && scope.effect === "queue_metrics_backfill" && scope.surfaces === preview.surface
+    && scope.since === preview.since && scope.until === preview.until
+    && request.destination === `client:metrics:${clientId}:${preview.surface}`
+    && request.owner_role === "admin";
+}
+
 function isCreativeRequirementReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   if (request.source_system !== "aa_console" || request.source_kind !== "creative_requirement"
     || request.client_id !== clientId || request.status !== "pending"
@@ -999,6 +1026,7 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isCampaignIdeaReady(request, clientId)
     || isClientSwitchActivationReady(request, clientId)
     || isIntegrationGrantReady(request, clientId)
+    || isMetricsBackfillReady(request, clientId)
     || isCreativeRequirementReady(request, clientId)
     || isClientAuthorityAssignmentReady(request, clientId)
     || isGatewayToolReady(request, clientId)
@@ -1031,6 +1059,7 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isCampaignIdeaReady(request, clientId)
     || isClientSwitchActivationReady(request, clientId)
     || isIntegrationGrantReady(request, clientId)
+    || isMetricsBackfillReady(request, clientId)
     || isCreativeRequirementReady(request, clientId)
     || isClientAuthorityAssignmentReady(request, clientId)
     || isGatewayToolReady(request, clientId)
@@ -1146,7 +1175,8 @@ function RequestCard({ request, history, gatewayOutcome, clientId, manager, aal,
                       ? "Global video owner" : request.source_kind === "creative_requirement"
                       ? "Creative authority" : request.source_kind === "client_authority_assignment"
                       ? "Client approval seat" : request.source_kind === "gateway_tool"
-                      ? "Gateway tool" : request.source_kind === "integration_grant"
+                      ? "Gateway tool" : request.source_kind === "metrics_backfill"
+                        ? "Metrics backfill" : request.source_kind === "integration_grant"
                       ? "Integration access" : request.source_kind === "activation_switch"
                       ? "Automation activation" : request.source_kind === "campaign_idea"
                       ? "Idea selection" : request.source_kind === "motion_render"
@@ -1657,6 +1687,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             })
         : request.source_kind === "integration_grant"
           ? await supabase.rpc("decide_integration_grant_v6", {
+              p_review_id: request.source_id, p_request_id: request.id,
+              p_approved: decision === "approved",
+              ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+            })
+        : request.source_kind === "metrics_backfill"
+          ? await supabase.rpc("decide_metrics_backfill_review_v6", {
               p_review_id: request.source_id, p_request_id: request.id,
               p_approved: decision === "approved",
               ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),

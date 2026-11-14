@@ -16103,6 +16103,97 @@ export type Database = {
           },
         ]
       }
+      metrics_backfill_reviews_v6: {
+        Row: {
+          accounts_snapshot: Json
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          id: string
+          jobs_created: number
+          request_token: string
+          since_day: string
+          source_hash: string
+          surface: string
+          until_day: string
+        }
+        Insert: {
+          accounts_snapshot: Json
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          jobs_created?: number
+          request_token?: string
+          since_day: string
+          source_hash: string
+          surface: string
+          until_day: string
+        }
+        Update: {
+          accounts_snapshot?: Json
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          jobs_created?: number
+          request_token?: string
+          since_day?: string
+          source_hash?: string
+          surface?: string
+          until_day?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_backfill_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       metrics_daily: {
         Row: {
           basis: Database["public"]["Enums"]["metric_basis"]
@@ -32987,6 +33078,15 @@ export type Database = {
         }
         Returns: string
       }
+      decide_metrics_backfill_review_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string[]
+      }
       decide_motion_render_inbox_v6: {
         Args: {
           p_approved: boolean
@@ -34661,6 +34761,32 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: string
       }
+      metrics_backfill_accounts_v6: {
+        Args: { p_client_id: string; p_surface: string }
+        Returns: Json
+      }
+      metrics_backfill_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["metrics_backfill_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      metrics_backfill_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["metrics_backfill_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      metrics_backfill_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["metrics_backfill_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      metrics_backfill_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       metrics_period_summary: {
         Args: { p_client_id: string; p_since: string; p_until: string }
         Returns: Json
@@ -36009,6 +36135,15 @@ export type Database = {
           p_until: string
         }
         Returns: string[]
+      }
+      request_metrics_backfill_review_v6: {
+        Args: {
+          p_client_id: string
+          p_since: string
+          p_surface?: string
+          p_until: string
+        }
+        Returns: string
       }
       request_motion_design: {
         Args: {

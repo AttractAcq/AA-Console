@@ -55,15 +55,15 @@ describe("pulling history", () => {
     render(<MetricsBackfill clientId="client-1" />);
     await userEvent.click(await screen.findByRole("button", { name: /last 7 days/i }));
     await userEvent.selectOptions(screen.getByLabelText(/surface/i), "paid");
-    await userEvent.click(screen.getByRole("button", { name: /^pull 7 days$/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^request 7 days pull$/i }));
 
     await waitFor(() =>
       expect(rpc).toHaveBeenCalledWith(
-        "request_metrics_backfill",
+        "request_metrics_backfill_review_v6",
         expect.objectContaining({ p_client_id: "client-1", p_surface: "paid" }),
       ),
     );
-    const args = rpc.mock.calls.find((c) => c[0] === "request_metrics_backfill")![1] as {
+    const args = rpc.mock.calls.find((c) => c[0] === "request_metrics_backfill_review_v6")![1] as {
       p_since: string;
       p_until: string;
     };
@@ -74,8 +74,8 @@ describe("pulling history", () => {
   it("sends nothing for the surface when both were asked for", async () => {
     render(<MetricsBackfill clientId="client-1" />);
     await userEvent.click(await screen.findByRole("button", { name: /last 7 days/i }));
-    await userEvent.click(screen.getByRole("button", { name: /^pull 7 days$/i }));
-    const args = rpc.mock.calls.find((c) => c[0] === "request_metrics_backfill")![1] as {
+    await userEvent.click(screen.getByRole("button", { name: /^request 7 days pull$/i }));
+    const args = rpc.mock.calls.find((c) => c[0] === "request_metrics_backfill_review_v6")![1] as {
       p_surface?: string;
     };
     // Omitted rather than null. The function defaults p_surface to null, so
@@ -84,11 +84,12 @@ describe("pulling history", () => {
     expect(args.p_surface).toBeUndefined();
   });
 
-  it("says how many pulls were queued and that they cost quota", async () => {
+  it("requests review before any quota-consuming pull is queued", async () => {
     render(<MetricsBackfill clientId="client-1" />);
     await userEvent.click(await screen.findByRole("button", { name: /last 7 days/i }));
-    await userEvent.click(screen.getByRole("button", { name: /^pull 7 days$/i }));
-    expect(await screen.findByText(/Queued 2 pulls/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^request 7 days pull$/i }));
+    expect(await screen.findByText(/Requested approval for both metrics/)).toBeInTheDocument();
+    expect(screen.getByText(/No provider pull is queued until an AAL2 admin approves/)).toBeInTheDocument();
     expect(screen.getByText(/client's own API quota/)).toBeInTheDocument();
   });
 
@@ -99,7 +100,7 @@ describe("pulling history", () => {
     });
     render(<MetricsBackfill clientId="client-1" />);
     await userEvent.click(await screen.findByRole("button", { name: /last 7 days/i }));
-    await userEvent.click(screen.getByRole("button", { name: /^pull 7 days$/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^request 7 days pull$/i }));
     expect(await screen.findByText(/already being pulled/)).toBeInTheDocument();
   });
 
@@ -111,9 +112,9 @@ describe("pulling history", () => {
     await userEvent.type(from!, "2030-01-01");
 
     expect(await screen.findByText(/starts after it ends|ends in the future/)).toBeInTheDocument();
-    const pull = screen.getByRole("button", { name: /^pull/i });
+    const pull = screen.getByRole("button", { name: /^request/i });
     expect(pull).toBeDisabled();
-    expect(rpc).not.toHaveBeenCalledWith("request_metrics_backfill", expect.anything());
+    expect(rpc).not.toHaveBeenCalledWith("request_metrics_backfill_review_v6", expect.anything());
   });
 
   it("lists what is being pulled, and says whether a person asked for it", async () => {

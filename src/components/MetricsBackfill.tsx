@@ -13,7 +13,7 @@ import {
 } from "../lib/backfill";
 
 /**
- * Ask for a window of metrics history.
+ * Ask for approval of a window of metrics history.
  *
  * `enqueue_metrics_ingest_jobs` has taken a window since it was written and
  * nothing ever passed it one, so the only history this system has pulled is
@@ -89,7 +89,7 @@ export function MetricsBackfill({ clientId }: { clientId: string }) {
     setBusy(true);
     setError(null);
     setNote(null);
-    const { data, error: failure } = await supabase.rpc("request_metrics_backfill", {
+    const { error: failure } = await supabase.rpc("request_metrics_backfill_review_v6", {
       p_client_id: clientId,
       p_since: window.since,
       p_until: window.until,
@@ -102,10 +102,10 @@ export function MetricsBackfill({ clientId }: { clientId: string }) {
       setError(failure.message);
       return;
     }
-    const queued = Array.isArray(data) ? data.length : data ? 1 : 0;
     setNote(
-      `Queued ${queued} pull${queued === 1 ? "" : "s"} for ${window.since} to ${window.until}. ` +
-        "These run against the client's own API quota, so they take as long as they take.",
+      `Requested approval for ${surface} metrics from ${window.since} to ${window.until}. ` +
+        "No provider pull is queued until an AAL2 admin approves the exact window in Approval Inbox. " +
+        "The approved pull will use the client's own API quota.",
     );
     await refresh();
   }
@@ -192,7 +192,7 @@ export function MetricsBackfill({ clientId }: { clientId: string }) {
           onClick={() => void request()}
           className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          Pull {windowDays(window)} day{windowDays(window) === 1 ? "" : "s"}
+          Request {windowDays(window)} day{windowDays(window) === 1 ? "" : "s"} pull
         </button>
       </div>
 

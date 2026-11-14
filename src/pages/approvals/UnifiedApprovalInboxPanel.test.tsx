@@ -578,6 +578,25 @@ const readyIntegrationGrant = {
     enable_daily_ingest: true, effect: "grant_client_provider_credential_use" },
   owning_path: "/clients/client-1/account/integrations",
 };
+const backfillReviewId = "51515151-5151-4515-8515-515151515151";
+const backfillToken = "52525252-5252-4525-8525-525252525252";
+const backfillHash = "2".repeat(64);
+const readyMetricsBackfill = {
+  ...request, id: "metrics-backfill-inbox-1", source_system: "aa_console",
+  source_kind: "metrics_backfill", source_id: backfillReviewId,
+  source_version: `${backfillHash}:${backfillToken}`, artifact_hash: backfillHash,
+  title: "Pull paid metrics history", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "client:metrics:client-1:paid", account_ref: null,
+  budget: null, owner_role: "admin", owning_path: "/clients/client-1/account/integrations",
+  preview: { client_id: "client-1", action: "pull_metrics_history",
+    since: "2026-10-01", until: "2026-10-07", surface: "paid", request_token: backfillToken,
+    accounts: [{ surface: "paid", provider: "meta", credential_version_hash: "a".repeat(64) }] },
+  scope: { client_id: "client-1", review_id: backfillReviewId,
+    request_token: backfillToken, content_hash: backfillHash,
+    effect: "queue_metrics_backfill", surfaces: "paid",
+    since: "2026-10-01", until: "2026-10-07" },
+};
 const creativeReviewId = "48484848-4848-4848-8848-484848484848";
 const creativeToken = "49494949-4949-4949-8949-494949494949";
 const creativeHash = "1".repeat(64);
@@ -1248,6 +1267,17 @@ describe("unified approval inbox", () => {
     show();
     const mismatched = await screen.findByRole("article", { name: readyIntegrationGrant.title });
     expect(within(mismatched).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
+  });
+
+  it("decides an exact metrics window before a manual provider pull queues", async () => {
+    requests = [readyMetricsBackfill];
+    show();
+    const card = await screen.findByRole("article", { name: readyMetricsBackfill.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_metrics_backfill_review_v6", {
+      p_review_id: backfillReviewId, p_request_id: readyMetricsBackfill.id,
+      p_approved: true,
+    }));
   });
 
   it("routes an exact creative authority change through the Inbox", async () => {
