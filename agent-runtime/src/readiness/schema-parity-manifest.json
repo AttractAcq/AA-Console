@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "9c806f15e5dc9441918ce50f537f464be5a06fa011487667cd6ba8f2893bc5f1",
-  "generatedTypesSha256": "eaf4810fbdbfdaeb480b7e2c349ef75f94d4aa3571fb54ea842bad923ade40e3",
-  "generatedSchemaBodySha256": "e8876476a95651354c2c429e004aeb61ec1dda1b726e5b25b18f580166c839da",
+  "migrationSourceDigest": "f76924328e1a524ce22ba649aa626dd26dc83193d13d4d1c587aa76b31caa44c",
+  "generatedTypesSha256": "40ff319c794377b0968a53328b26016cf2e1477754711e5573305d43901ab516",
+  "generatedSchemaBodySha256": "3cae640dbe8708ea5fa1840d6563c6618f81f8417bdb720510284808dca9e707",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3293,6 +3293,13 @@
       "filename": "20261119170000_453_gateway_sites_prewrite.sql",
       "sha256": "2b90afc7d859aa63bfabf197faa24023e8f8258d84d10315cf249eb7984bced0",
       "trimmedMd5": "c7e84d02b84ba0bf6aeeca3b57684e58"
+    },
+    {
+      "version": "20261119180000",
+      "name": "454_gateway_sites_invocation",
+      "filename": "20261119180000_454_gateway_sites_invocation.sql",
+      "sha256": "eeaf57794c472c4f66bd5a9e12b502908e4f8b06562fdd4a0fda7604c493ed33",
+      "trimmedMd5": "26976186d0e8ba4c710bd69319a7e6ce"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",

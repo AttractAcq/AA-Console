@@ -148,9 +148,10 @@ try {
     select set_config('request.jwt.claim.sub','${admin}',true);
     select set_config('request.jwt.claim.role','authenticated',true);
     select set_config('request.jwt.claims','${adminClaims}',true);
-    select execution_status from public.gateway_tool_execution_overview_v6
+    select execution_status||'|'||coalesce(sites_invocation_id,'')
+     from public.gateway_tool_execution_overview_v6
      where approval_id='${sitePending.approval_id}';`);
-  assert.equal(siteOutcome, 'completed');
+  assert.match(siteOutcome, /^completed\|[A-Za-z0-9]/);
   console.log('Connected local gateway → runtime → Supabase → Inbox → Sites prewrite smoke passed.');
 } finally {
   store.close();

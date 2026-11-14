@@ -61,6 +61,8 @@ type GatewayOutcome = {
   claimed_at: string | null;
   finished_at: string | null;
   result_hash: string | null;
+  sites_invocation_id: string | null;
+  sites_invoked_at: string | null;
 };
 
 function validatedRequest(row: ApprovalViewRow): UnifiedApprovalRequest {
@@ -1311,6 +1313,7 @@ function RequestCard({ request, history, gatewayOutcome, clientId, manager, aal,
         <p>Status: {gatewayOutcome?.execution_status ?? "Unavailable"}</p>
         {gatewayOutcome?.claimed_at && <p>Claimed: {dateLabel(gatewayOutcome.claimed_at)}</p>}
         {gatewayOutcome?.finished_at && <p>Finished: {dateLabel(gatewayOutcome.finished_at)}</p>}
+        {gatewayOutcome?.sites_invoked_at && <p>Sites adapter started: {dateLabel(gatewayOutcome.sites_invoked_at)}</p>}
         {gatewayOutcome?.result_hash && <p className="break-all">Gateway result digest: {gatewayOutcome.result_hash}</p>}
         <p className="mt-1 text-xs text-muted-foreground">This gateway outcome is not an external provider receipt.</p>
       </div>}
@@ -1435,7 +1438,7 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
       const outcomeMap: Record<string, GatewayOutcome> = {};
       if (gatewayIds.length > 0) {
         const gatewayResult = await supabase.from("gateway_tool_execution_overview_v6")
-          .select("approval_id,execution_status,claimed_at,finished_at,result_hash")
+          .select("approval_id,execution_status,claimed_at,finished_at,result_hash,sites_invocation_id,sites_invoked_at")
           .in("approval_id", gatewayIds).order("approval_id");
         if (gatewayResult.error) throw gatewayResult.error;
         for (const outcome of gatewayResult.data ?? []) {
@@ -1512,7 +1515,9 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
         : decision === "revoked" ? !isGatewayToolRevocable(currentRequest, scopeId)
           : !isRejectionReady(currentRequest, scopeId))
         || !sameVersion(request, currentRequest)) {
-        throw new Error("This exact request changed or is no longer eligible. Review the refreshed card before deciding.");
+        throw new Error(decision === "revoked"
+          ? "This exact request changed or is no longer eligible. Review the refreshed card before deciding."
+          : "This exact request changed or is no longer pending. Review the refreshed card before deciding.");
       }
       if (decision !== "approved" && !reason?.trim()) {
         throw new Error(`Enter a reason before ${decision === "revoked" ? "revoking" : "rejecting"} this request.`);

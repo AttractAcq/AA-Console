@@ -46,6 +46,15 @@ begin
  exception when insufficient_privilege then null; end;
  if not (public.claim_gateway_tool_execution_v6(aid,tid,ph,key)->>'claimed')::boolean
   then raise exception 'Exact Sites claim failed'; end if;
+ if not public.begin_gateway_sites_invocation_v6(aid,key,cid,'bot_marketing',
+  'sites.provision','harbour','example-org','route-1') then
+  raise exception 'First Sites invocation did not start'; end if;
+ if public.begin_gateway_sites_invocation_v6(aid,key,cid,'bot_marketing',
+  'sites.provision','harbour','example-org','route-2') then
+  raise exception 'Duplicate Sites invocation started'; end if;
+ if (select sites_invocation_id from public.gateway_tool_execution_receipts_v6
+  where approval_id=aid)<>'route-1' then
+  raise exception 'First Sites invocation identity changed'; end if;
  perform public.assert_gateway_sites_prewrite_v6(aid,key,cid,'bot_marketing',
   'sites.provision','harbour','example-org');
  begin

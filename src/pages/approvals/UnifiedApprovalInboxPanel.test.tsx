@@ -1303,10 +1303,12 @@ describe("unified approval inbox", () => {
     requests = [{ ...readyGatewayTool, status: "approved", source_state: "source_decided" }];
     gatewayOutcomes = [{ approval_id: gatewayApprovalId, execution_status: "completed",
       claimed_at: "2026-11-19T12:00:00Z", finished_at: "2026-11-19T12:01:00Z",
+      sites_invocation_id: "sites-route-1", sites_invoked_at: "2026-11-19T12:00:30Z",
       result_hash: "f".repeat(64) }];
     show("client", `/approvals?source=${gatewayApprovalId}`);
     const card = await screen.findByRole("article", { name: readyGatewayTool.title });
     expect(within(card).getByText("Status: completed")).toBeInTheDocument();
+    expect(within(card).getByText(/Sites adapter started:/)).toBeInTheDocument();
     expect(within(card).getByText(/not an external provider receipt/)).toBeInTheDocument();
     await userEvent.type(within(card).getByRole("textbox", { name: "Reason to revoke" }), "Operator stop");
     await userEvent.click(within(card).getByRole("button", { name: "Revoke with reason" }));

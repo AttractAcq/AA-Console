@@ -19,6 +19,7 @@ import { supabaseSiteStore } from "../sites/store.js";
 
 const SITES_BOTS = new Set(["bot_marketing", "bot_sales_ops"]);
 class GatewaySitesApprovalError extends Error {}
+class GatewaySitesInvocationConflict extends Error {}
 
 function siteConfig(config: RuntimeConfig): SiteConfig {
   return { org: config.githubSitesOrg, runtimeBase: config.publicRuntimeBase };
@@ -136,8 +137,23 @@ export async function handleMcpSites(
     }).abortSignal(AbortSignal.timeout(12_000));
     if (error) throw new GatewaySitesApprovalError("gateway_sites_approval_required");
   };
-  try { await assertPrewrite(); }
-  catch { return fail(res, "approval_required"); }
+  try {
+    const { data, error } = await sb.rpc("begin_gateway_sites_invocation_v6", {
+      p_approval_id: gatewayApprovalId,
+      p_execution_key: gatewayExecutionKey,
+      p_client_id: clientId,
+      p_bot_id: bot,
+      p_tool: tool,
+      p_target: provision ? repo : pageId,
+      p_provider_org: config.githubSitesOrg,
+      p_invocation_id: requestId,
+    }).abortSignal(AbortSignal.timeout(12_000));
+    if (error) throw new GatewaySitesApprovalError("gateway_sites_approval_required");
+    if (data !== true) throw new GatewaySitesInvocationConflict("gateway_sites_invocation_claimed");
+  } catch (cause) {
+    return fail(res, cause instanceof GatewaySitesInvocationConflict
+      ? "idempotency_conflict" : "approval_required");
+  }
 
   const missing = missingConfig({
     appId: config.githubAppId ?? undefined,

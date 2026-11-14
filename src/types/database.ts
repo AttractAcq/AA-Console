@@ -11847,6 +11847,8 @@ export type Database = {
           execution_key: string
           finished_at: string | null
           result_hash: string | null
+          sites_invocation_id: string | null
+          sites_invoked_at: string | null
           status: string
         }
         Insert: {
@@ -11856,6 +11858,8 @@ export type Database = {
           execution_key: string
           finished_at?: string | null
           result_hash?: string | null
+          sites_invocation_id?: string | null
+          sites_invoked_at?: string | null
           status: string
         }
         Update: {
@@ -11865,6 +11869,8 @@ export type Database = {
           execution_key?: string
           finished_at?: string | null
           result_hash?: string | null
+          sites_invocation_id?: string | null
+          sites_invoked_at?: string | null
           status?: string
         }
         Relationships: [
@@ -27231,6 +27237,8 @@ export type Database = {
           execution_status: string | null
           finished_at: string | null
           result_hash: string | null
+          sites_invocation_id: string | null
+          sites_invoked_at: string | null
         }
         Relationships: [
           {
@@ -31031,6 +31039,19 @@ export type Database = {
           ends_at: string
           starts_at: string
         }[]
+      }
+      begin_gateway_sites_invocation_v6: {
+        Args: {
+          p_approval_id: string
+          p_bot_id: string
+          p_client_id: string
+          p_execution_key: string
+          p_invocation_id: string
+          p_provider_org: string
+          p_target: string
+          p_tool: string
+        }
+        Returns: boolean
       }
       bind_campaign_action_sources_v6: {
         Args: { p_request_id: string }
