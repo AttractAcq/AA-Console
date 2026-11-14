@@ -77,6 +77,8 @@ declare v_worker text := 'agent-runtime:1:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   v_claim record;
   v_page public.campaign_action_approvals%rowtype;
   v_page_execution uuid;
+  v_revoke public.campaign_action_approvals%rowtype;
+  v_revoke_request public.approval_requests_v6%rowtype;
 begin
   if exists (select 1 from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1))
     then raise exception 'Claim passed a disabled client switch'; end if;
@@ -141,6 +143,48 @@ begin
     then raise exception 'Second attempt has no observed result receipt'; end if;
   if exists (select 1 from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1))
     then raise exception 'Executed action was claimed again'; end if;
+
+  v_revoke := public.request_campaign_action_approval_v6(
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddd','revoke-one','proof_publish',
+    'proof:approved_placements',repeat('f',64),
+    '{"placements":[{"placement_id":"withdrawn","payload_hash":"ffff"}]}'::jsonb);
+  select * into v_revoke_request from public.approval_requests_v6
+    where source_kind = 'campaign_action' and source_id = v_revoke.id::text;
+  perform public.attach_approval_evidence_v6(v_revoke_request.id,v_revoke_request.source_version,
+    'synthetic-fixture:' || v_revoke.id::text,jsonb_build_object(
+      'artifact_hash',v_revoke.artifact_version_hash,
+      'preview',v_revoke_request.preview || jsonb_build_object('exact_manifest','withdrawn fixture'),
+      'destination',v_revoke.destination,'account_ref',v_revoke_request.account_ref,
+      'budget',v_revoke_request.budget,'scope',v_revoke.scope));
+  perform set_config('request.jwt.claim.role','authenticated',true);
+  perform set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',true);
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  perform public.decide_campaign_action_approval_v6(v_revoke.id,'approved');
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal1"}',true);
+  begin
+    perform public.revoke_campaign_action_approval_v6(v_revoke.id,'Unassured withdrawal');
+    raise exception 'AAL1 revoked an outward action';
+  exception when insufficient_privilege then null; end;
+  perform set_config('request.jwt.claims',
+    '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+  perform public.revoke_campaign_action_approval_v6(v_revoke.id,'Synthetic withdrawal');
+  begin
+    perform public.revoke_campaign_action_approval_v6(v_revoke.id,'Duplicate withdrawal');
+    raise exception 'The same action was revoked twice';
+  exception when check_violation then null; end;
+  if not exists (select 1 from public.approval_inbox_v6 i
+    where i.id = v_revoke_request.id and i.status = 'revoked') then
+    raise exception 'Canonical Inbox did not record the withdrawal'; end if;
+  if not exists (select 1 from public.campaign_action_due d
+    where d.approval_id = v_revoke.id and d.blocker like 'Approval revoked;%') then
+    raise exception 'Owning queue did not expose the withdrawn action'; end if;
+  perform set_config('request.jwt.claim.role','service_role',true);
+  perform set_config('request.jwt.claim.sub','',true);
+  perform set_config('request.jwt.claims','{"role":"service_role"}',true);
+  if exists (select 1 from public.claim_campaign_actions_owned_v6(v_worker,v_sha,v_handlers,1))
+    then raise exception 'Revoked action was claimed'; end if;
 
   -- An external action cannot be recorded as done without a provider ref.
   -- This deliberately inserts a synthetic lifecycle row to isolate the

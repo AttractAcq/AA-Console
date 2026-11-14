@@ -12,6 +12,8 @@ Migration 328 records one row in `campaign_action_attempts_v6` for each new clai
 
 The runtime now has an opt-in owned-claim path. When the flag is true, it reports an unheld heartbeat only after checking the registry against its deployed SHA. It calls the owned RPC, dispatches only its registered handlers, and records each claimed action's success or failure. Each handler still runs its own last-moment source and provider checks. The runtime and Dashboard show the observed hold state rather than treating a requested switch as proof of execution. The rollback-only fixture proves that turning the client switch off after claim blocks the prewrite; this is a local database test, not a provider receipt.
 
+Migrations 331–332 add a reasoned AAL2 revocation as an append-only source record and canonical Inbox event. The owning queue displays the withdrawal and the owned claim refuses it. Revoking an approval after an action executed blocks future use but cannot undo an external effect; a separate provider retraction and receipt are still required.
+
 ## Release gate still open
 
 The opt-in flag must remain false in deployed environments until the full Phase 2 gate is met: review the handler and SQL contract together, verify schema parity and a full deployed SHA, attest the four registry rows to that build, exercise concurrency and fail-closed cases in the target environment, and observe one approved external test action with an actual provider receipt. An approval receipt and an attempted execution are separate facts. A provider timeout with an unknown outcome requires reconciliation before another write.

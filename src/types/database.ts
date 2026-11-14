@@ -1616,6 +1616,111 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_action_revocations_v6: {
+        Row: {
+          approval_id: string
+          client_id: string
+          inbox_decision_id: string
+          reason: string
+          revoked_at: string
+          revoked_by: string
+        }
+        Insert: {
+          approval_id: string
+          client_id: string
+          inbox_decision_id: string
+          reason: string
+          revoked_at?: string
+          revoked_by: string
+        }
+        Update: {
+          approval_id?: string
+          client_id?: string
+          inbox_decision_id?: string
+          reason?: string
+          revoked_at?: string
+          revoked_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_action_revocations_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_action_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_launch_readiness"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "campaign_page_publish_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: true
+            referencedRelation: "meta_build_due"
+            referencedColumns: ["approval_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_inbox_decision_id_fkey"
+            columns: ["inbox_decision_id"]
+            isOneToOne: true
+            referencedRelation: "approval_decision_events_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_action_revocations_v6_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_artifact_offer_inputs: {
         Row: {
           artifact_id: string
@@ -31363,6 +31468,23 @@ export type Database = {
           p_reason?: string
         }
         Returns: undefined
+      }
+      revoke_campaign_action_approval_v6: {
+        Args: { p_approval_id: string; p_reason: string }
+        Returns: {
+          approval_id: string
+          client_id: string
+          inbox_decision_id: string
+          reason: string
+          revoked_at: string
+          revoked_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campaign_action_revocations_v6"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       revoke_lead_magnet_approval_v6: {
         Args: { p_approval_id: string; p_reason: string }

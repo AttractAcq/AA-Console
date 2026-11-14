@@ -44,6 +44,7 @@ function database(
     actionsOn?: boolean;
     snapshots?: unknown[];
     attempts?: unknown[];
+    revocations?: unknown[];
     runtime?: unknown;
   } = {},
 ) {
@@ -74,6 +75,9 @@ function database(
       const query = { in: () => query,
         order: async () => ({ data: options.attempts ?? [], error: null }) };
       return { select: () => query };
+    }
+    if (table === "campaign_action_revocations_v6") {
+      return { select: () => ({ in: async () => ({ data: options.revocations ?? [], error: null }) }) };
     }
     const query = {
       select: () => query,
@@ -226,4 +230,27 @@ it("alerts the owning queue when an approved action is held before execution", a
   render(<CampaignActionApprovalsPanel />);
   expect(await screen.findByText("Campaign action owner attention")).toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent("0 failed or stopped actions; 1 approved action held before an attempt.");
+});
+
+it("requires a reason and records a revocation through the owning RPC", async () => {
+  const user = userEvent.setup();
+  render(<CampaignActionApprovalsPanel />);
+  const button = await screen.findByRole("button", { name: "Revoke future execution" });
+  await user.click(button);
+  expect(screen.getByRole("alert")).toHaveTextContent("Enter a reason before revoking");
+  expect(rpc).not.toHaveBeenCalledWith("revoke_campaign_action_approval_v6", expect.anything());
+  await user.type(screen.getByRole("textbox", { name: "Reason to revoke proof_publish" }), "Client withdrew approval");
+  await user.click(button);
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("revoke_campaign_action_approval_v6", {
+    p_approval_id: "approval-0", p_reason: "Client withdrew approval",
+  }));
+});
+
+it("shows a revoked decision without offering a second revocation", async () => {
+  database({ revocations: [{ approval_id: "approval-0", reason: "Client withdrew approval",
+    revoked_at: "2026-11-14T09:00:00Z" }] });
+  render(<CampaignActionApprovalsPanel />);
+  expect(await screen.findByText(/Revoked: Client withdrew approval/)).toBeInTheDocument();
+  expect(screen.getByText(/external effect already recorded remains live/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Revoke future execution" })).not.toBeInTheDocument();
 });

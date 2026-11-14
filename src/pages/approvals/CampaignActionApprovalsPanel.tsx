@@ -16,6 +16,7 @@ type ActionAttempt = {
   started_at: string; finished_at: string | null; external_id: string | null;
   external_url: string | null; error: string | null; legacy_inferred: boolean;
 };
+type ActionRevocation = { approval_id: string; reason: string; revoked_at: string };
 
 export function CampaignActionApprovalsPanel() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -23,16 +24,19 @@ export function CampaignActionApprovalsPanel() {
   const [pageSnapshots, setPageSnapshots] = useState<Record<string, PageSnapshot>>({});
   const [decided, setDecided] = useState<CampaignActionDue[]>([]);
   const [attemptsByExecution, setAttemptsByExecution] = useState<Record<string, ActionAttempt[]> | null>({});
+  const [revocations, setRevocations] = useState<Record<string, ActionRevocation>>({});
   const [actionsOn, setActionsOn] = useState(false);
   const [runtimeHold, setRuntimeHold] = useState<string | null>("Runtime state has not been verified.");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reasonById, setReasonById] = useState<Record<string, string>>({});
+  const [revokeReasonById, setRevokeReasonById] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const failedCount = decided.filter((action) =>
     action.execution_status === "failed" || action.execution_status === "abandoned").length;
   const heldCount = decided.filter((action) =>
-    action.execution_status === "not_attempted" && Boolean(action.blocker || runtimeHold)).length;
+    !revocations[action.approval_id] && action.execution_status === "not_attempted"
+      && Boolean(action.blocker || runtimeHold)).length;
 
   const refresh = useCallback(async () => {
     if (!clientId) {
@@ -40,6 +44,7 @@ export function CampaignActionApprovalsPanel() {
       setPageSnapshots({});
       setDecided([]);
       setAttemptsByExecution({});
+      setRevocations({});
       setLoading(false);
       return;
     }
@@ -54,6 +59,17 @@ export function CampaignActionApprovalsPanel() {
         supabase.rpc("client_runtime_controls_v6" as never, { p_client_id: clientId } as never),
       ]);
       setDecided(due);
+      if (due.length > 0) {
+        const { data: revokedRows, error: revokedError } = await supabase
+          .from("campaign_action_revocations_v6")
+          .select("approval_id,reason,revoked_at")
+          .in("approval_id", due.map((action) => action.approval_id));
+        if (revokedError) throw new Error(`Action revocations could not be read: ${revokedError.message}`);
+        setRevocations(Object.fromEntries(((revokedRows ?? []) as ActionRevocation[])
+          .map((row) => [row.approval_id, row])));
+      } else {
+        setRevocations({});
+      }
       setActionsOn(on);
       const control = runtime.data as { state?: string; reason?: string; workerEnabled?: boolean;
         controls?: { campaignActions?: boolean }; holds?: { campaignActions?: string } } | null;
@@ -142,6 +158,22 @@ export function CampaignActionApprovalsPanel() {
       setError(rpcError.message);
       return;
     }
+    await refresh();
+  }
+
+  async function revoke(approvalId: string) {
+    const reason = revokeReasonById[approvalId]?.trim();
+    if (!reason) {
+      setError("Enter a reason before revoking an approved action.");
+      return;
+    }
+    setBusyId(approvalId);
+    setError(null);
+    const { error: rpcError } = await supabase.rpc("revoke_campaign_action_approval_v6", {
+      p_approval_id: approvalId, p_reason: reason,
+    });
+    setBusyId(null);
+    if (rpcError) { setError(rpcError.message); return; }
     await refresh();
   }
 
@@ -268,6 +300,10 @@ export function CampaignActionApprovalsPanel() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       {action.destination} · Executor module: {action.executor_module.replaceAll("_", " ")}
                     </p>
+                    {revocations[action.approval_id] && <p className="mt-1 text-xs text-destructive">
+                      Revoked: {revocations[action.approval_id].reason}. No further execution is authorized.
+                      {action.execution_status === "executed" && " Any external effect already recorded remains live until separately retracted."}
+                    </p>}
                   </div>
                   <Link
                     className="text-xs text-primary underline"
@@ -314,6 +350,17 @@ export function CampaignActionApprovalsPanel() {
                     </div>
                   )}
                 </dl>
+                {!revocations[action.approval_id] && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs">
+                  <input aria-label={`Reason to revoke ${action.action_key}`} value={revokeReasonById[action.approval_id] ?? ""}
+                    onChange={(event) => setRevokeReasonById((prior) => ({ ...prior, [action.approval_id]: event.target.value }))}
+                    placeholder="Reason to revoke future execution" className="min-w-48 flex-1 rounded-lg border border-border bg-background px-3 py-2" />
+                  <button type="button" disabled={busyId === action.approval_id}
+                    onClick={() => void revoke(action.approval_id)}
+                    className="rounded-lg border border-destructive/50 px-3 py-2 font-medium text-destructive disabled:opacity-50">
+                    Revoke future execution
+                  </button>
+                  {action.execution_status === "executed" && <p className="w-full text-muted-foreground">Revocation cannot undo an external effect already recorded.</p>}
+                </div>}
                 {action.execution_id && (
                   <div className="mt-3 border-t border-border pt-3 text-xs">
                     <p className="font-medium">Execution attempts</p>
