@@ -7917,6 +7917,8 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
           archived_at: string | null
           booking_rule: string | null
           built_at: string | null
@@ -7930,6 +7932,7 @@ export type Database = {
           name: string
           objections: Json
           page_id: string | null
+          public_use_request_token: string | null
           purpose: string
           qualification: Json
           role: string | null
@@ -7940,6 +7943,8 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           booking_rule?: string | null
           built_at?: string | null
@@ -7953,6 +7958,7 @@ export type Database = {
           name: string
           objections?: Json
           page_id?: string | null
+          public_use_request_token?: string | null
           purpose: string
           qualification?: Json
           role?: string | null
@@ -7963,6 +7969,8 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          approved_content_hash?: string | null
+          approved_request_id?: string | null
           archived_at?: string | null
           booking_rule?: string | null
           built_at?: string | null
@@ -7976,6 +7984,7 @@ export type Database = {
           name?: string
           objections?: Json
           page_id?: string | null
+          public_use_request_token?: string | null
           purpose?: string
           qualification?: Json
           role?: string | null
@@ -7989,6 +7998,20 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_sales_agents_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_sales_agents_approved_request_id_fkey"
+            columns: ["approved_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests_v6"
             referencedColumns: ["id"]
           },
           {
@@ -27102,6 +27125,41 @@ export type Database = {
         }
         Returns: undefined
       }
+      approve_sales_agent_public_use_v6: {
+        Args: { p_agent_id: string; p_request_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
+          archived_at: string | null
+          booking_rule: string | null
+          built_at: string | null
+          client_id: string
+          created_at: string
+          escalation_rule: string | null
+          greeting: string | null
+          guardrails: string | null
+          id: string
+          job_id: string | null
+          name: string
+          objections: Json
+          page_id: string | null
+          public_use_request_token: string | null
+          purpose: string
+          qualification: Json
+          role: string | null
+          status: string
+          system_prompt: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_sales_agents"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       approve_service_offer_version_v6: {
         Args: { p_version_id: string }
         Returns: {
@@ -30870,6 +30928,10 @@ export type Database = {
         Args: { p_proposal_id: string; p_reason: string }
         Returns: undefined
       }
+      reject_sales_agent_public_use_v6: {
+        Args: { p_agent_id: string; p_reason: string; p_request_id: string }
+        Returns: string
+      }
       reject_service_offer_version_v6: {
         Args: { p_reason: string; p_version_id: string }
         Returns: string
@@ -31214,6 +31276,10 @@ export type Database = {
         Args: { p_brief_id: string; p_derivative_id: string }
         Returns: string
       }
+      request_sales_agent_public_use_v6: {
+        Args: { p_agent_id: string }
+        Returns: string
+      }
       request_source_video_edit: {
         Args: {
           p_animated_title: boolean
@@ -31539,6 +31605,67 @@ export type Database = {
       revoke_message_template_approval_v6: {
         Args: { p_approval_id: string; p_reason: string }
         Returns: undefined
+      }
+      revoke_sales_agent_public_use_v6: {
+        Args: { p_agent_id: string; p_reason: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          approved_content_hash: string | null
+          approved_request_id: string | null
+          archived_at: string | null
+          booking_rule: string | null
+          built_at: string | null
+          client_id: string
+          created_at: string
+          escalation_rule: string | null
+          greeting: string | null
+          guardrails: string | null
+          id: string
+          job_id: string | null
+          name: string
+          objections: Json
+          page_id: string | null
+          public_use_request_token: string | null
+          purpose: string
+          qualification: Json
+          role: string | null
+          status: string
+          system_prompt: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "client_sales_agents"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      sales_agent_public_hash_v6: {
+        Args: {
+          p_agent: Database["public"]["Tables"]["client_sales_agents"]["Row"]
+        }
+        Returns: string
+      }
+      sales_agent_public_preview_v6: {
+        Args: {
+          p_agent: Database["public"]["Tables"]["client_sales_agents"]["Row"]
+        }
+        Returns: Json
+      }
+      sales_agent_public_scope_v6: {
+        Args: {
+          p_agent: Database["public"]["Tables"]["client_sales_agents"]["Row"]
+        }
+        Returns: Json
+      }
+      sales_agent_public_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      sales_agent_public_use_current_v6: {
+        Args: { p_agent_id: string }
+        Returns: boolean
       }
       sales_entitlement_inbox_binding_valid_v6: {
         Args: {

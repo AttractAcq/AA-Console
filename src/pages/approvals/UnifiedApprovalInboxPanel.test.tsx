@@ -139,6 +139,28 @@ const readyOffer = {
   owning_path: `/clients/client-1/delivery/offer-studio?tab=versions&offer=${offerId}`,
 };
 
+const publicAgentId = "55555555-5555-4555-8555-555555555555";
+const publicAgentToken = "66666666-6666-4666-8666-666666666666";
+const publicAgentHash = "1".repeat(64);
+const readyPublicAgent = {
+  ...request, id: "public-agent-inbox-1", source_system: "aa_console",
+  source_kind: "sales_agent_public_use", source_id: publicAgentId,
+  source_version: `${publicAgentHash}:${publicAgentToken}`,
+  artifact_hash: publicAgentHash, title: "Sales agent public use: Qualifier",
+  source_state: "pending", expires_at: "2030-01-01T00:00:00Z",
+  destination: `public_sales_agent:${publicAgentId}`, account_ref: null, budget: null,
+  owner_role: "admin_or_active_client_manager",
+  preview: { agent_id: publicAgentId, client_id: "client-1",
+    request_token: publicAgentToken, name: "Qualifier", status: "live",
+    built_at: "2026-11-14T12:00:00Z", page_id: "page-1",
+    greeting: "Hello", system_prompt: "Answer accurately", guardrails: "No guarantees",
+    qualification: [], objections: [] },
+  scope: { agent_id: publicAgentId, client_id: "client-1",
+    request_token: publicAgentToken, page_id: "page-1",
+    script_hash: publicAgentHash },
+  owning_path: `/clients/client-1/delivery/sales-os?agent=${publicAgentId}`,
+};
+
 function wireDatabase() {
   from.mockImplementation((table: string) => {
     let id: string | null = null;
@@ -452,6 +474,18 @@ describe("unified approval inbox", () => {
     await user.click(within(card).getByRole("button", { name: "Approve exact version" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_service_offer_version_v6", {
       p_version_id: offerVersionId,
+    }));
+  });
+
+  it("decides the frozen public sales-agent script through its owning AAL2 RPC", async () => {
+    requests = [readyPublicAgent];
+    show();
+    const card = await screen.findByRole("article", { name: readyPublicAgent.title });
+    expect(within(card).getByText("Sales agent public use decision")).toBeInTheDocument();
+    expect(within(card).getByText(/Answer accurately/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("approve_sales_agent_public_use_v6", {
+      p_agent_id: publicAgentId, p_request_id: readyPublicAgent.id,
     }));
   });
 

@@ -1,10 +1,7 @@
-// What gets written when a person accepts or withdraws a sales agent for
-// public use, and the copy they have to read first.
+// The copy a person reads before asking for exact-script public-use review.
 //
-// Approval is a signature, not a status. Being live is an intention; being
-// approved is a person having read what the agent will say. These helpers are
-// pure so the panel cannot silently one-click the write, and so tests can pin
-// the payload without rendering.
+// Approval is a source-owned AAL2 decision in Approval Inbox. Being live is
+// an intention; this copy never writes a signature itself.
 
 export type ApprovalScript = {
   name: string;
@@ -14,29 +11,9 @@ export type ApprovalScript = {
   guardrails: string | null;
 };
 
-/** The columns an approve writes. Deliberately omits `status`. */
-export function approveFields(userId: string, now: Date = new Date()) {
-  const at = now.toISOString();
-  return {
-    approved_at: at,
-    approved_by: userId,
-    updated_at: at,
-  };
-}
-
-/** Clears the signature. Does not touch `status`. */
-export function revokeFields(now: Date = new Date()) {
-  return {
-    approved_at: null,
-    approved_by: null,
-    updated_at: now.toISOString(),
-  };
-}
-
 /**
- * The confirm body. Name, greeting, and a short reading of qualification,
- * objections and guardrails — the minimum a person should have in front of
- * them before they accept this agent speaking to the public.
+ * The request body. A short reading helps the requester identify the agent;
+ * the Inbox shows the full immutable script before the reviewer decides.
  */
 export function approvalConfirmBody(agent: ApprovalScript): string {
   const greeting = agent.greeting?.trim() || "(none written)";
@@ -61,7 +38,7 @@ export function approvalConfirmBody(agent: ApprovalScript): string {
         }`;
 
   return [
-    `Approve “${agent.name}” for public use? Read what it will say before you confirm.`,
+    `Request public-use review for “${agent.name}”? The Approval Inbox will show its complete script for an AAL2 decision.`,
     `Opens with: ${greeting}`,
     endSentence(qualification),
     endSentence(objection),
