@@ -33621,6 +33621,10 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: string
       }
+      google_reply_credential_eligible_v6: {
+        Args: { p_client_id: string }
+        Returns: boolean
+      }
       google_reply_inbox_payload_v6: {
         Args: {
           p_reply: Database["public"]["Tables"]["google_review_replies"]["Row"]

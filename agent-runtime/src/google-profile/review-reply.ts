@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 const API_ROOT = "https://mybusiness.googleapis.com/v4";
+const ACCOUNT_API_ROOT = "https://mybusinessaccountmanagement.googleapis.com/v1";
 const LOCATION_REF = /^accounts\/[A-Za-z0-9_-]+\/locations\/[A-Za-z0-9_-]+$/;
 const REVIEW_ID = /^[A-Za-z0-9_-]+$/;
 const MAX_REPLY_BYTES = 4096;
@@ -49,7 +50,7 @@ function resourceName(locationRef: string, reviewRef: string): string {
 
 async function requestJson(
   fetchImpl: typeof fetch, url: string, accessToken: string,
-  method: "GET" | "PUT", body?: string,
+  method: "GET" | "PUT", body?: string, resource = "review",
 ): Promise<ProviderReview> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -65,7 +66,7 @@ async function requestJson(
     });
   } catch {
     throw new GoogleReplyTransportError(
-      `Google review ${method === "PUT" ? "write" : "read"} did not return an outcome. Reconcile the provider state before another attempt.`,
+      `Google ${resource} ${method === "PUT" ? "write" : "read"} did not return an outcome. Reconcile the provider state before another attempt.`,
       method === "PUT",
     );
   } finally {
@@ -73,7 +74,7 @@ async function requestJson(
   }
   if (!response.ok) {
     throw new GoogleReplyTransportError(
-      `Google review ${method === "PUT" ? "write" : "read"} returned HTTP ${response.status}.`,
+      `Google ${resource} ${method === "PUT" ? "write" : "read"} returned HTTP ${response.status}.`,
       method === "PUT" && response.status >= 500,
     );
   }
@@ -93,6 +94,12 @@ export async function putApprovedReviewReply(request: ReviewReplyRequest): Promi
   }
   const fetchImpl = request.fetchImpl ?? fetch;
   const url = `${API_ROOT}/${name}`;
+  const accountRef = request.locationRef.split("/locations/")[0];
+  const account = await requestJson(fetchImpl, `${ACCOUNT_API_ROOT}/${accountRef}`,
+    request.accessToken, "GET", undefined, "account");
+  if (account.name !== accountRef) {
+    throw new GoogleReplyTransportError("Google did not confirm access to the approved Business Profile account.");
+  }
   const before = await requestJson(fetchImpl, url, request.accessToken, "GET");
   if (before.name !== name) {
     throw new GoogleReplyTransportError("Google returned a different review than the approved destination.");

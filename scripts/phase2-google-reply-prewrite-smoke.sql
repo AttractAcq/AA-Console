@@ -94,4 +94,43 @@ begin
  if public.google_reply_prewrite_current_v6('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') then
   raise exception 'Suspended location passed prewrite'; end if;
 end $checks$;
+do $credential$
+declare integration_id uuid; request_id uuid; review_id uuid;
+  cid uuid:='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+begin
+ if public.google_reply_credential_eligible_v6(cid) then
+  raise exception 'Missing Google credential passed reply sender gate'; end if;
+ perform set_config('request.jwt.claim.role','authenticated',true);
+ perform set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated","aal":"aal2"}',true);
+ integration_id:=public.admin_store_integration_credential(
+  cid,'google_business','Fixture Google account','fixture-secret','read');
+ request_id:=public.request_integration_grant_v6(integration_id,false);
+ select id into review_id from public.integration_grant_reviews_v6
+  where canonical_request_id=request_id;
+ perform public.decide_integration_grant_v6(review_id,request_id,true);
+ perform set_config('request.jwt.claim.role','service_role',true);
+ if public.google_reply_credential_eligible_v6(cid) then
+  raise exception 'Read-only Google grant passed reply sender gate'; end if;
+ perform set_config('request.jwt.claim.role','authenticated',true);
+ integration_id:=public.admin_store_integration_credential(
+  cid,'google_business','Fixture Google account','fixture-write-secret','write');
+ update public.client_integrations set token_expires_at=now()+interval '1 day'
+  where id=integration_id;
+ perform set_config('request.jwt.claim.role','service_role',true);
+ if public.google_reply_credential_eligible_v6(cid) then
+  raise exception 'Unapproved write credential passed reply sender gate'; end if;
+ perform set_config('request.jwt.claim.role','authenticated',true);
+ request_id:=public.request_integration_grant_v6(integration_id,false);
+ select id into review_id from public.integration_grant_reviews_v6
+  where canonical_request_id=request_id;
+ perform public.decide_integration_grant_v6(review_id,request_id,true);
+ perform set_config('request.jwt.claim.role','service_role',true);
+ if not public.google_reply_credential_eligible_v6(cid) then
+  raise exception 'Current exact write grant did not release reply sender'; end if;
+ update public.client_integrations set credential_label='Changed Google account'
+  where id=integration_id;
+ if public.google_reply_credential_eligible_v6(cid) then
+  raise exception 'Changed account label kept reply sender credential eligible'; end if;
+end $credential$;
 rollback;

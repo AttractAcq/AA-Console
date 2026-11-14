@@ -18,6 +18,11 @@ export type ReplySendResult =
   | { status: "refused" | "uncertain"; attemptId: string; reason: string };
 
 async function currentToken(sb: SupabaseClient, clientId: string): Promise<string | null> {
+  const { data: eligible, error: gateError } = await sb.rpc("google_reply_credential_eligible_v6", {
+    p_client_id: clientId,
+  });
+  if (gateError) throw new Error(`Could not check the Google reply access grant: ${gateError.message}`);
+  if (eligible !== true) return null;
   const { data, error } = await sb.rpc("integration_secret", {
     p_client_id: clientId, p_provider: "google_business",
   });
@@ -42,7 +47,7 @@ export async function sendApprovedGoogleReply(
   if (replyError) throw new Error(`Could not load the Google reply: ${replyError.message}`);
   if (!reply) return { status: "held", reason: "The Google reply no longer exists." };
   const token = await currentToken(sb, String(reply.client_id));
-  if (!token) return { status: "held", reason: "No usable Google Business credential is available." };
+  if (!token) return { status: "held", reason: "A current, AAL2-reviewed Google Business write credential is required." };
 
   const { data, error } = await sb.rpc("claim_google_reply_execution_v6", { p_reply_id: replyId });
   if (error) throw new Error(`Could not reserve the Google reply: ${error.message}`);

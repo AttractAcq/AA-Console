@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "3a2fc8e47094dcfda7f3d3ee0db35b6d14f383b1ca73ab821794ab41d54c2e09",
-  "generatedTypesSha256": "5f5c8f4e27d65c679359244e23b153a748c17f45ed7832fd18b0649ec8a3119a",
-  "generatedSchemaBodySha256": "a74cdb2dff57e25c464c360f31b06a010da3163feb6d96fee5ecfec4fce1cd89",
+  "migrationSourceDigest": "c78c173ebd52de01aea96562d4492a62728a7b2f2d5b99f271ec81fd02cf0ab8",
+  "generatedTypesSha256": "2eeab0d017fb765eed211616b19b3924959b4e5b8f8c8bbdd95dcf2ba95144ab",
+  "generatedSchemaBodySha256": "94bb5fb112f7d764ea35d4a7f97dcfc9e6a0f6f95eab52455bdaa5dbbb5fc2a8",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3328,6 +3328,13 @@
       "filename": "20261119220000_458_google_reply_job.sql",
       "sha256": "104b477f491ddeec6ee88a4aee62e3d424d296a2b553714d06a2e5939642c46a",
       "trimmedMd5": "ac699095203b833712bdfa4077b29727"
+    },
+    {
+      "version": "20261119230000",
+      "name": "459_google_reply_credential_gate",
+      "filename": "20261119230000_459_google_reply_credential_gate.sql",
+      "sha256": "afc38a84baedc329308b1de3bb63f374e2ed23052af7f247908fa99f4c38b28c",
+      "trimmedMd5": "8605db3c9706bfa9839b32c084411fec"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
