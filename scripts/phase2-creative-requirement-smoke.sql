@@ -1,5 +1,8 @@
 -- Rollback-only exact creative-director requirement changes in both directions.
 begin;
+-- Exercise creative-requirement invalidation against legacy seat changes;
+-- direct-write protection is covered by the authority-assignment fixture.
+alter table public.client_assignments disable trigger client_authority_assignment_guard_v6;
 insert into auth.users(id,instance_id,aud,role,email,encrypted_password,created_at,updated_at)
 values
  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','00000000-0000-0000-0000-000000000000','authenticated','authenticated','creative-admin@example.invalid','',now(),now()),

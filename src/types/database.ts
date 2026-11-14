@@ -3918,6 +3918,114 @@ export type Database = {
           },
         ]
       }
+      client_authority_assignment_reviews_v6: {
+        Row: {
+          action: string
+          applied_assignment_id: string | null
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          client_id: string
+          compensation: number | null
+          created_at: string
+          due_date: string | null
+          id: string
+          member_id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          action: string
+          applied_assignment_id?: string | null
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          compensation?: number | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          member_id: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          action?: string
+          applied_assignment_id?: string | null
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          compensation?: number | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          member_id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_authority_assignment_reviews__applied_assignment_id_fkey"
+            columns: ["applied_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "client_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "client_authority_assignment_reviews_v6_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_billing: {
         Row: {
           client_id: string
@@ -31240,6 +31348,28 @@ export type Database = {
         Args: { p_issued_at: string; p_nonce_hash: string }
         Returns: boolean
       }
+      client_authority_assignment_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["client_authority_assignment_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      client_authority_assignment_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["client_authority_assignment_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      client_authority_assignment_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["client_authority_assignment_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      client_authority_assignment_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
       client_budget_state: {
         Args: { p_client_id: string; p_month?: string }
         Returns: {
@@ -32060,6 +32190,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      decide_client_authority_assignment_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
       }
       decide_client_sales_entitlement: {
         Args: {
@@ -35185,6 +35324,16 @@ export type Database = {
       }
       request_client_activation_target_v6: {
         Args: { p_client_id: string; p_switch_key: string; p_target_id: string }
+        Returns: string
+      }
+      request_client_authority_assignment_v6: {
+        Args: {
+          p_action: string
+          p_client_id: string
+          p_compensation?: number
+          p_due_date?: string
+          p_member_id: string
+        }
         Returns: string
       }
       request_client_sales_entitlement: {

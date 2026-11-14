@@ -597,6 +597,26 @@ const readyCreativeRequirement = {
     proposed_required: true, effect: "change_creative_approval_authority" },
   owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
 };
+const authorityReviewId = "52525252-5252-4252-8252-525252525252";
+const authorityToken = "53535353-5353-4353-8353-535353535353";
+const authorityHash = "3".repeat(64);
+const readyClientAuthorityAssignment = {
+  ...request, id: "client-authority-inbox-1", source_system: "aa_console",
+  source_kind: "client_authority_assignment", source_id: authorityReviewId,
+  source_version: `${authorityHash}:${authorityToken}`, artifact_hash: authorityHash,
+  title: "Assign SMM seat", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: "client:approval_seat:client-1:member-1", account_ref: null,
+  budget: null, owner_role: "admin",
+  preview: { client_id: "client-1", member_id: "member-1", request_token: authorityToken,
+    action: "assign", member: { id: "member-1", category: "smm", user_id: "employee-1" },
+    current_assignment: null, active_same_category: [], proposed_due_date: null,
+    proposed_compensation: null },
+  scope: { client_id: "client-1", member_id: "member-1", review_id: authorityReviewId,
+    request_token: authorityToken, content_hash: authorityHash, action: "assign",
+    effect: "change_client_approval_seat" },
+  owning_path: "/clients/client-1/delivery/approval-inbox?tab=unified",
+};
 
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
@@ -1214,6 +1234,25 @@ describe("unified approval inbox", () => {
       p_review_id: creativeReviewId, p_request_id: readyCreativeRequirement.id,
       p_approved: true,
     }));
+  });
+
+  it("decides an exact client approval-seat assignment", async () => {
+    requests = [readyClientAuthorityAssignment];
+    show();
+    const card = await screen.findByRole("article", { name: readyClientAuthorityAssignment.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_client_authority_assignment_v6", {
+      p_review_id: authorityReviewId, p_request_id: readyClientAuthorityAssignment.id,
+      p_approved: true,
+    }));
+  });
+
+  it("holds a client approval-seat card with a different member destination", async () => {
+    requests = [{ ...readyClientAuthorityAssignment,
+      destination: "client:approval_seat:client-1:member-2" }];
+    show();
+    const card = await screen.findByRole("article", { name: readyClientAuthorityAssignment.title });
+    expect(within(card).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
   });
 
   it("unlocks ordinary creative approval only after downloading the exact stored file", async () => {
