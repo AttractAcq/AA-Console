@@ -539,6 +539,28 @@ const readyGlobalEngineActivation = {
     client_scope: "all individually enabled clients until manually disabled" },
 };
 
+const integrationReviewId = "45454545-4545-4545-8545-454545454545";
+const integrationId = "46464646-4646-4646-8646-464646464646";
+const integrationToken = "47474747-4747-4747-8747-474747474747";
+const integrationHash = "f".repeat(64);
+const readyIntegrationGrant = {
+  ...request, id: "integration-inbox-1", source_system: "aa_console",
+  source_kind: "integration_grant", source_id: integrationReviewId,
+  source_version: `${integrationHash}:${integrationToken}`, artifact_hash: integrationHash,
+  title: "Grant meta credential access for act_123", status: "pending", source_state: "pending",
+  expires_at: "2030-01-01T00:00:00Z", preview_blocker: null,
+  destination: `client:integration:client-1:${integrationId}`, account_ref: "act_123",
+  budget: null, owner_role: "admin",
+  preview: { client_id: "client-1", integration_id: integrationId,
+    request_token: integrationToken, action: "grant_provider_access", provider: "meta",
+    account_label: "act_123", access_level: "read", recorded_status: "pending_grant",
+    credential_version_hash: "a".repeat(64), enable_daily_ingest: true },
+  scope: { client_id: "client-1", integration_id: integrationId, review_id: integrationReviewId,
+    request_token: integrationToken, content_hash: integrationHash,
+    enable_daily_ingest: true, effect: "grant_client_provider_credential_use" },
+  owning_path: "/clients/client-1/account/integrations",
+};
+
 const engineSlotId = "18181818-1818-4818-8818-181818181818";
 const engineEntryId = "19191919-1919-4919-8919-191919191919";
 const engineTime = "2026-11-20T09:00:00+00:00";
@@ -1114,6 +1136,24 @@ describe("unified approval inbox", () => {
       p_approved: true,
     }));
     expect(clientEqValues).toEqual([]);
+  });
+
+  it("decides an exact integration grant", async () => {
+    requests = [readyIntegrationGrant];
+    show();
+    const card = await screen.findByRole("article", { name: readyIntegrationGrant.title });
+    await userEvent.click(within(card).getByRole("button", { name: "Approve exact version" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("decide_integration_grant_v6", {
+      p_review_id: integrationReviewId, p_request_id: readyIntegrationGrant.id,
+      p_approved: true,
+    }));
+  });
+
+  it("holds an integration grant with a mismatched account", async () => {
+    requests = [{ ...readyIntegrationGrant, account_ref: "another-account" }];
+    show();
+    const mismatched = await screen.findByRole("article", { name: readyIntegrationGrant.title });
+    expect(within(mismatched).queryByRole("button", { name: "Approve exact version" })).not.toBeInTheDocument();
   });
 
   it("unlocks ordinary creative approval only after downloading the exact stored file", async () => {

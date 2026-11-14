@@ -11,7 +11,7 @@ import { ApprovalCoveragePanel } from "./ApprovalCoveragePanel";
 const PAGE_SIZE = 50;
 const RELEASED_SOURCE_KINDS = [
   "activation_switch", "campaign_action", "campaign_idea", "client_sales_entitlement", "engine_slot",
-  "global_engine_activation", "google_profile_change", "google_review_reply", "lead_magnet", "message_template", "meta_profile_change", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
+  "global_engine_activation", "google_profile_change", "google_review_reply", "integration_grant", "lead_magnet", "message_template", "meta_profile_change", "motion_render", "nurture_sequence", "opportunity_activate", "opportunity_approve", "ordinary_media", "proof_artifact", "proof_delivery", "proof_placement", "proof_rights", "recruitment_brief", "sales_agent_public_use", "service_offer", "video_seat",
 ] as const;
 type ApprovalViewRow = Database["public"]["Views"]["approval_inbox_v6"]["Row"];
 
@@ -789,6 +789,36 @@ function isGlobalEngineActivationReady(request: UnifiedApprovalRequest): boolean
     && request.destination === "system:content_engine" && request.owner_role === "admin";
 }
 
+function isIntegrationGrantReady(request: UnifiedApprovalRequest, clientId: string): boolean {
+  if (request.source_system !== "aa_console" || request.source_kind !== "integration_grant"
+    || request.client_id !== clientId || request.status !== "pending"
+    || request.source_state !== "pending" || isExpired(request) || previewMissing(request)
+    || !request.preview || typeof request.preview !== "object" || Array.isArray(request.preview)
+    || !request.scope || typeof request.scope !== "object" || Array.isArray(request.scope)) return false;
+  const preview = request.preview as Record<string, unknown>;
+  const scope = request.scope as Record<string, unknown>;
+  const hash = request.artifact_hash;
+  return typeof hash === "string" && /^[0-9a-f]{64}$/.test(hash)
+    && request.source_version === `${hash}:${preview.request_token}`
+    && preview.client_id === clientId && preview.action === "grant_provider_access"
+    && typeof preview.integration_id === "string" && !!preview.integration_id
+    && typeof preview.provider === "string" && !!preview.provider
+    && typeof preview.account_label === "string" && !!preview.account_label
+    && ["read", "write", "admin"].includes(String(preview.access_level))
+    && typeof preview.credential_version_hash === "string"
+    && /^[0-9a-f]{64}$/.test(preview.credential_version_hash)
+    && typeof preview.enable_daily_ingest === "boolean"
+    && (preview.recorded_status === "pending_grant"
+      || (preview.enable_daily_ingest === true
+        && ["connected", "active", "expiring"].includes(String(preview.recorded_status))))
+    && scope.client_id === clientId && scope.integration_id === preview.integration_id
+    && scope.review_id === request.source_id && scope.request_token === preview.request_token
+    && scope.enable_daily_ingest === preview.enable_daily_ingest
+    && scope.content_hash === hash && scope.effect === "grant_client_provider_credential_use"
+    && request.destination === `client:integration:${clientId}:${preview.integration_id}`
+    && request.account_ref === preview.account_label && request.owner_role === "admin";
+}
+
 function isEngineSlotReady(request: UnifiedApprovalRequest, clientId: string): boolean {
   if (request.source_system !== "aa_console" || request.source_kind !== "engine_slot"
     || request.client_id !== clientId || request.status !== "pending"
@@ -850,6 +880,7 @@ function isRejectionReady(request: UnifiedApprovalRequest, clientId: string): bo
     || isMotionRenderReady(request, clientId)
     || isCampaignIdeaReady(request, clientId)
     || isClientSwitchActivationReady(request, clientId)
+    || isIntegrationGrantReady(request, clientId)
     || isGlobalEngineActivationReady(request);
 }
 
@@ -877,6 +908,7 @@ function isApprovalReady(request: UnifiedApprovalRequest, clientId: string): boo
     || isMotionRenderReady(request, clientId)
     || isCampaignIdeaReady(request, clientId)
     || isClientSwitchActivationReady(request, clientId)
+    || isIntegrationGrantReady(request, clientId)
     || isGlobalEngineActivationReady(request);
 }
 
@@ -982,7 +1014,8 @@ function RequestCard({ request, history, clientId, manager, aal, busy, onDecide 
                 ? "Market opportunity" : request.source_kind === "proof_rights"
                   ? "Proof usage rights" : request.source_kind === "proof_placement"
                     ? "Proof placement" : request.source_kind === "global_engine_activation"
-                      ? "System Engine activation" : request.source_kind === "activation_switch"
+                    ? "System Engine activation" : request.source_kind === "integration_grant"
+                      ? "Integration access" : request.source_kind === "activation_switch"
                       ? "Automation activation" : request.source_kind === "campaign_idea"
                       ? "Idea selection" : request.source_kind === "motion_render"
                       ? "Motion render" : request.source_kind === "video_seat"
@@ -1448,6 +1481,12 @@ export function UnifiedApprovalInboxPanel({ scope = "client" }: { scope?: "clien
             })
         : request.source_kind === "global_engine_activation"
           ? await supabase.rpc("decide_global_engine_activation_v6", {
+              p_review_id: request.source_id, p_request_id: request.id,
+              p_approved: decision === "approved",
+              ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),
+            })
+        : request.source_kind === "integration_grant"
+          ? await supabase.rpc("decide_integration_grant_v6", {
               p_review_id: request.source_id, p_request_id: request.id,
               p_approved: decision === "approved",
               ...(decision === "rejected" ? { p_reason: reason!.trim() } : {}),

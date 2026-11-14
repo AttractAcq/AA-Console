@@ -12849,6 +12849,105 @@ export type Database = {
           },
         ]
       }
+      integration_grant_reviews_v6: {
+        Row: {
+          applied_at: string | null
+          applied_by: string | null
+          canonical_request_id: string | null
+          client_id: string
+          created_at: string
+          enable_ingest: boolean
+          id: string
+          integration_id: string
+          request_epoch: number
+          request_token: string
+          source_hash: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id: string
+          created_at?: string
+          enable_ingest?: boolean
+          id?: string
+          integration_id: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          canonical_request_id?: string | null
+          client_id?: string
+          created_at?: string
+          enable_ingest?: boolean
+          id?: string
+          integration_id?: string
+          request_epoch?: never
+          request_token?: string
+          source_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_grant_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_inbox_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_canonical_request_id_fkey"
+            columns: ["canonical_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests_v6"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "booking_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_creative_authority"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "engine_readiness"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "client_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_grant_reviews_v6_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integration_health"
+            referencedColumns: ["integration_id"]
+          },
+        ]
+      }
       job_assignments: {
         Row: {
           accepted_at: string | null
@@ -31954,6 +32053,15 @@ export type Database = {
         }
         Returns: string
       }
+      decide_integration_grant_v6: {
+        Args: {
+          p_approved: boolean
+          p_reason?: string
+          p_request_id: string
+          p_review_id: string
+        }
+        Returns: string
+      }
       decide_lead_magnet_approval_v6: {
         Args: { p_approval_id: string; p_approved: boolean; p_reason?: string }
         Returns: {
@@ -32645,6 +32753,28 @@ export type Database = {
           p_title: string
         }
         Returns: Json
+      }
+      integration_grant_hash_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["integration_grant_reviews_v6"]["Row"]
+        }
+        Returns: string
+      }
+      integration_grant_preview_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["integration_grant_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      integration_grant_scope_v6: {
+        Args: {
+          q: Database["public"]["Tables"]["integration_grant_reviews_v6"]["Row"]
+        }
+        Returns: Json
+      }
+      integration_grant_source_state_v6: {
+        Args: { p_request_id: string }
+        Returns: string
       }
       integration_secret: {
         Args: { p_client_id: string; p_provider: string }
@@ -34893,6 +35023,10 @@ export type Database = {
       }
       request_human_video_edit: {
         Args: { p_asset_id: string; p_due_date?: string; p_member_id: string }
+        Returns: string
+      }
+      request_integration_grant_v6: {
+        Args: { p_enable_ingest?: boolean; p_integration_id: string }
         Returns: string
       }
       request_lead_capture_activation_v6: {

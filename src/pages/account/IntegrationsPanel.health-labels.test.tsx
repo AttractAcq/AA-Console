@@ -217,63 +217,36 @@ it("closes client A's Meta dialog on route change, rejects its stale submit, and
   expect(writes).toHaveLength(1);
 });
 
-it("keeps client B's pending sync control disabled when client A's older update finishes", async () => {
-  let selectedClient = "client-1";
-  const finish = new Map<string, (value: { data: Array<{ id: string; client_id: string; ingest_enabled: boolean }>; error: null }) => void>();
-  const writes: Array<Array<[string, string]>> = [];
-  useParams.mockImplementation(() => ({ clientId: selectedClient }));
+it("keeps daily sync off while an exact access review is requested", async () => {
+  let finish: ((value: { data: string; error: null }) => void) | undefined;
+  const writes = vi.fn();
   from.mockImplementation(() => {
-    let readClient = "";
     const query = {
-      select: () => query,
-      eq: (field: string, value: string) => { if (field === "client_id") readClient = value; return query; },
-      order: async () => ({
-        data: [{ ...base, id: `meta-${readClient}`, client_id: readClient, provider: "meta" }],
-        error: null,
-      }),
-      update: () => {
-        const filters: Array<[string, string]> = [];
-        writes.push(filters);
-        const updateQuery = {
-          eq: (field: string, value: string) => {
-            filters.push([field, value]);
-            return updateQuery;
-          },
-          select: () => new Promise<{ data: Array<{ id: string; client_id: string; ingest_enabled: boolean }>; error: null }>((resolve) => {
-            finish.set(filters.find(([field]) => field === "client_id")![1], resolve);
-          }),
-        };
-        return updateQuery;
-      },
+      select: () => query, eq: () => query,
+      order: async () => ({ data: [{ ...base, id: "meta-1", provider: "meta" }], error: null }),
+      update: writes,
     };
     return query;
   });
-
-  const rendered = render(<IntegrationsPanel />);
-  fireEvent.click(await screen.findByRole("switch", { name: "Daily sync for meta" }));
-  expect(screen.getByRole("switch", { name: "Daily sync for meta" })).toBeDisabled();
-
-  selectedClient = "client-2";
-  rendered.rerender(<IntegrationsPanel />);
-  const bSwitch = await screen.findByRole("switch", { name: "Daily sync for meta" });
-  await waitFor(() => expect(bSwitch).not.toBeDisabled());
-  fireEvent.click(bSwitch);
-  expect(bSwitch).toBeDisabled();
-  expect(writes).toEqual([
-    [["id", "meta-client-1"], ["client_id", "client-1"]],
-    [["id", "meta-client-2"], ["client_id", "client-2"]],
-  ]);
-
-  await act(async () => { finish.get("client-1")?.({ data: [{ id: "meta-client-1", client_id: "client-1", ingest_enabled: true }], error: null }); });
-  expect(bSwitch).toBeDisabled();
-  await act(async () => { finish.get("client-2")?.({ data: [{ id: "meta-client-2", client_id: "client-2", ingest_enabled: true }], error: null }); });
-  await waitFor(() => expect(bSwitch).not.toBeDisabled());
+  rpc.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  render(<IntegrationsPanel />);
+  const toggle = await screen.findByRole("switch", { name: "Daily sync for meta" });
+  fireEvent.click(toggle);
+  expect(toggle).toBeDisabled();
+  expect(toggle).toHaveAttribute("aria-checked", "false");
+  expect(rpc).toHaveBeenCalledWith("request_integration_grant_v6", {
+    p_integration_id: "meta-1", p_enable_ingest: true,
+  });
+  expect(writes).not.toHaveBeenCalled();
+  await act(async () => { finish?.({ data: "review-1", error: null }); });
+  await waitFor(() => expect(toggle).not.toBeDisabled());
+  expect(toggle).toHaveAttribute("aria-checked", "false");
+  expect(screen.getByRole("status")).toHaveTextContent("review requested");
 });
 
-it("keeps a returned client's sync pending and ignores an old visit's failed rollback", async () => {
+it("keeps a new client's review pending when an old client's request finishes", async () => {
   let selectedClient = "client-1";
-  let aServerEnabled = false;
-  const finish = new Map<string, (value: { data: Array<{ id: string; client_id: string; ingest_enabled: boolean }> | null; error: { message: string } | null }) => void>();
+  const finish = new Map<string, (value: { data: string; error: null }) => void>();
   useParams.mockImplementation(() => ({ clientId: selectedClient }));
   from.mockImplementation(() => {
     let readClient = "";
@@ -281,97 +254,55 @@ it("keeps a returned client's sync pending and ignores an old visit's failed rol
       select: () => query,
       eq: (field: string, value: string) => { if (field === "client_id") readClient = value; return query; },
       order: async () => ({ data: [{ ...base, id: `meta-${readClient}`, client_id: readClient,
-        provider: "meta", ingest_enabled: readClient === "client-1" ? aServerEnabled : false }], error: null }),
-      update: () => {
-        let updateClient = "";
-        const updateQuery = {
-          eq: (field: string, value: string) => {
-            if (field === "client_id") updateClient = value;
-            return updateQuery;
-          },
-          select: () => new Promise<{ data: Array<{ id: string; client_id: string; ingest_enabled: boolean }> | null; error: { message: string } | null }>((resolve) => { finish.set(updateClient, resolve); }),
-        };
-        return updateQuery;
-      },
+        provider: "meta" }], error: null }),
     };
     return query;
   });
-
+  rpc.mockImplementation((_name: string, args: { p_integration_id: string }) =>
+    new Promise((resolve) => { finish.set(args.p_integration_id, resolve); }));
   const rendered = render(<IntegrationsPanel />);
   fireEvent.click(await screen.findByRole("switch", { name: "Daily sync for meta" }));
-  expect(screen.getByRole("switch", { name: "Daily sync for meta" })).toBeDisabled();
-
   selectedClient = "client-2";
   rendered.rerender(<IntegrationsPanel />);
   const bSwitch = await screen.findByRole("switch", { name: "Daily sync for meta" });
   await waitFor(() => expect(bSwitch).not.toBeDisabled());
   fireEvent.click(bSwitch);
   expect(bSwitch).toBeDisabled();
-
-  // A fresh A read sees a newer server value while A's earlier write is still pending.
-  aServerEnabled = true;
-  selectedClient = "client-1";
-  rendered.rerender(<IntegrationsPanel />);
-  const aSwitch = await screen.findByRole("switch", { name: "Daily sync for meta" });
-  expect(aSwitch).toHaveAttribute("aria-checked", "true");
-  expect(aSwitch).toBeDisabled();
-
-  await act(async () => { finish.get("client-1")?.({ data: null, error: { message: "Old visit denied" } }); });
-  await waitFor(() => expect(aSwitch).not.toBeDisabled());
-  expect(aSwitch).toHaveAttribute("aria-checked", "true");
-  expect(screen.queryByText("Old visit denied")).not.toBeInTheDocument();
-
-  selectedClient = "client-2";
-  rendered.rerender(<IntegrationsPanel />);
-  expect(await screen.findByRole("switch", { name: "Daily sync for meta" })).toBeDisabled();
-  await act(async () => { finish.get("client-2")?.({ data: [{ id: "meta-client-2", client_id: "client-2", ingest_enabled: true }], error: null }); });
-  await waitFor(() => expect(screen.getByRole("switch", { name: "Daily sync for meta" })).not.toBeDisabled());
+  await act(async () => { finish.get("meta-client-1")?.({ data: "review-a", error: null }); });
+  expect(bSwitch).toBeDisabled();
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  await act(async () => { finish.get("meta-client-2")?.({ data: "review-b", error: null }); });
+  await waitFor(() => expect(bSwitch).not.toBeDisabled());
+  expect(screen.getByRole("status")).toHaveTextContent("review requested");
 });
 
-it.each([
-  { label: "zero rows", returned: [] },
-  { label: "another client's row", returned: [{ id: "meta-1", client_id: "client-2", ingest_enabled: true }] },
-])("reconciles an unconfirmed same-visit sync update: $label", async ({ returned }) => {
-  const updateSelect = vi.fn(async () => ({ data: returned, error: null }));
-  let reads = 0;
-  from.mockImplementation(() => {
-    const query = {
-      select: () => query,
-      eq: () => query,
-      order: async () => {
-        reads += 1;
-        return { data: [{ ...base, id: "meta-1", provider: "meta" }], error: null };
-      },
-      update: () => {
-        const updateQuery = { eq: () => updateQuery, select: updateSelect };
-        return updateQuery;
-      },
-    };
-    return query;
-  });
-
+it("shows a failed review request without enabling ingest", async () => {
+  rpc.mockResolvedValue({ data: null, error: { message: "Review unavailable" } });
+  responseFor([{ ...base, id: "meta-1", provider: "meta" }]);
   render(<IntegrationsPanel />);
   const toggle = await screen.findByRole("switch", { name: "Daily sync for meta" });
   fireEvent.click(toggle);
-  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("not confirmed for this client"));
-  await waitFor(() => expect(toggle).not.toBeDisabled());
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Review unavailable"));
   expect(toggle).toHaveAttribute("aria-checked", "false");
-  expect(reads).toBe(2); // Initial evidence plus authoritative post-denial readback.
-  expect(updateSelect).toHaveBeenCalledWith("id, client_id, ingest_enabled");
 });
 
-it("keeps a same-visit sync change only after one exact-client returned row", async () => {
-  let serverEnabled = false;
-  const updateSelect = vi.fn(async () => {
-    serverEnabled = true;
-    return { data: [{ id: "meta-1", client_id: "client-1", ingest_enabled: true }], error: null };
-  });
+it("requests a credential-use grant without starting daily ingest", async () => {
+  rpc.mockResolvedValue({ data: "review-1", error: null });
+  responseFor([{ ...base, id: "meta-1", provider: "meta", status: "pending_grant" }]);
+  render(<IntegrationsPanel />);
+  fireEvent.click(await screen.findByRole("button", { name: "Request access review" }));
+  await waitFor(() => expect(rpc).toHaveBeenCalledWith("request_integration_grant_v6", {
+    p_integration_id: "meta-1", p_enable_ingest: false,
+  }));
+  expect(screen.getByRole("status")).toHaveTextContent("credential remains unavailable");
+});
+
+it("stops an enabled daily sync immediately with an exact client update", async () => {
+  const updateSelect = vi.fn(async () => ({ data: [{ id: "meta-1", client_id: "client-1", ingest_enabled: false }], error: null }));
   from.mockImplementation(() => {
     const query = {
-      select: () => query,
-      eq: () => query,
-      order: async () => ({ data: [{ ...base, id: "meta-1", provider: "meta",
-        ingest_enabled: serverEnabled }], error: null }),
+      select: () => query, eq: () => query,
+      order: async () => ({ data: [{ ...base, id: "meta-1", provider: "meta", ingest_enabled: true }], error: null }),
       update: () => {
         const updateQuery = { eq: () => updateQuery, select: updateSelect };
         return updateQuery;
@@ -379,63 +310,10 @@ it("keeps a same-visit sync change only after one exact-client returned row", as
     };
     return query;
   });
-
   render(<IntegrationsPanel />);
-  const toggle = await screen.findByRole("switch", { name: "Daily sync for meta" });
-  fireEvent.click(toggle);
-  await waitFor(() => expect(toggle).not.toBeDisabled());
-  expect(toggle).toHaveAttribute("aria-checked", "true");
-  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  expect(updateSelect).toHaveBeenCalledWith("id, client_id, ingest_enabled");
-});
-
-it("does not let a pre-toggle refresh overwrite a confirmed sync change", async () => {
-  let reads = 0;
-  let serverEnabled = false;
-  let finishStaleRead: ((value: { data: Array<typeof base & { id: string; provider: string }>; error: null }) => void) | undefined;
-  let finishUpdate: ((value: { data: Array<{ id: string; client_id: string; ingest_enabled: boolean }>; error: null }) => void) | undefined;
-  from.mockImplementation(() => {
-    const query = {
-      select: () => query,
-      eq: () => query,
-      order: () => {
-        reads += 1;
-        const result: { data: Array<typeof base & { id: string; provider: string }>; error: null } = {
-          data: [{ ...base, id: "meta-1", provider: "meta", ingest_enabled: serverEnabled }], error: null,
-        };
-        return reads === 2
-          ? new Promise<typeof result>((resolve) => { finishStaleRead = resolve; })
-          : Promise.resolve(result);
-      },
-      update: () => {
-        const updateQuery = {
-          eq: () => updateQuery,
-          select: () => new Promise<{ data: Array<{ id: string; client_id: string; ingest_enabled: boolean }>; error: null }>((resolve) => { finishUpdate = resolve; }),
-        };
-        return updateQuery;
-      },
-    };
-    return query;
-  });
-
-  render(<IntegrationsPanel />);
-  fireEvent.click(await screen.findByRole("button", { name: "Add page for ads" }));
-  latestAdModal().onSaved(); // Starts a refresh before the operator toggles sync.
-  await waitFor(() => expect(reads).toBe(2));
-
-  const toggle = screen.getByRole("switch", { name: "Daily sync for meta" });
-  fireEvent.click(toggle);
-  expect(toggle).toHaveAttribute("aria-checked", "true");
-  expect(toggle).toBeDisabled();
-  await act(async () => { finishStaleRead?.({ data: [{ ...base, id: "meta-1", provider: "meta" }], error: null }); });
-  expect(toggle).toHaveAttribute("aria-checked", "true");
-  await act(async () => {
-    serverEnabled = true;
-    finishUpdate?.({ data: [{ id: "meta-1", client_id: "client-1", ingest_enabled: true }], error: null });
-  });
-  expect(toggle).toHaveAttribute("aria-checked", "true");
-  expect(toggle).not.toBeDisabled();
-  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  fireEvent.click(await screen.findByRole("switch", { name: "Daily sync for meta" }));
+  await waitFor(() => expect(updateSelect).toHaveBeenCalledWith("id, client_id, ingest_enabled"));
+  expect(rpc).not.toHaveBeenCalled();
 });
 
 it("closes the Add Integration form on route change and rejects an old client's stale submit", async () => {

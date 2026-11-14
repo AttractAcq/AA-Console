@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "migrationSourceDigest": "c175ea1e0475a55de6590302c90e6a6efba8e32610d23385b7cac5a01b0d6c6c",
-  "generatedTypesSha256": "91fc7ede8816e9d00cdbc654da47cbf7958366294f07f0f89cb26f7d70b2b04d",
-  "generatedSchemaBodySha256": "7e39003657f5d09788d813f9e771ddecf78a7e3a77715f7d5cd47ee090f81a49",
+  "migrationSourceDigest": "65f574f5c58cbde1c0b79a995711e4b33b0273499892c1b6135fd2d5ad1922d1",
+  "generatedTypesSha256": "1f55e86aede8dfbd0db032253d0b113e521e328bc8788bb07e9874ec2c946687",
+  "generatedSchemaBodySha256": "02810860fc797e5ff5d511fb4db67c0e8c7a64849913226e7baec47662f32d39",
   "localMigrations": [
     {
       "version": "20260903104450",
@@ -3139,6 +3139,34 @@
       "filename": "20261118190000_431_global_activation_coverage.sql",
       "sha256": "8fc8856e617253eb99283c5cd95fddfe9b61dad01da54bd56910f1d523e1d582",
       "trimmedMd5": "38da9c98464ec9932fc23d932596ae3e"
+    },
+    {
+      "version": "20261118200000",
+      "name": "432_credential_rotation_stops_ingest",
+      "filename": "20261118200000_432_credential_rotation_stops_ingest.sql",
+      "sha256": "c9f880617f6f9ae6eb703b5ec76b29ac430af70ca685e12694c5f88fa1a218ee",
+      "trimmedMd5": "74f318536c6309f7f4faab68c91b4f71"
+    },
+    {
+      "version": "20261118210000",
+      "name": "433_integration_access_grant",
+      "filename": "20261118210000_433_integration_access_grant.sql",
+      "sha256": "d3f114254bd18c70e55ca29dee4cbcba42e1644bceb99699c359c3b00e37cec2",
+      "trimmedMd5": "d102e5bfc4d1f2e69af79e47d2d71e33"
+    },
+    {
+      "version": "20261118220000",
+      "name": "434_integration_grant_inbox_view",
+      "filename": "20261118220000_434_integration_grant_inbox_view.sql",
+      "sha256": "8e4bf38e5f235c4d380a753c9a87303a7a6f69090d43dfcdccfe948605238b14",
+      "trimmedMd5": "d69753c52ed0afc8b1c8434ac2a58ce4"
+    },
+    {
+      "version": "20261118230000",
+      "name": "435_integration_grant_coverage",
+      "filename": "20261118230000_435_integration_grant_coverage.sql",
+      "sha256": "0493d0012ed02da4681da500742ac6bed7a40196d40b7e493afba9e8d1906b0a",
+      "trimmedMd5": "e01f39f46adb2cfd91d6fba6498789f4"
     }
   ],
   "historySql": "select version,name,\n  coalesce(cardinality(statements),0)::integer as statement_count,\n  md5(array_to_string(statements,chr(10))) as stored_sql_md5,\n  case when cardinality(statements)=1 then md5(rtrim(statements[1],' ' || chr(10) || chr(13) || chr(9))) else null end as single_statement_trimmed_md5\n  from supabase_migrations.schema_migrations order by version",
