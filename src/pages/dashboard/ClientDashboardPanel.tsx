@@ -11,6 +11,7 @@ import { ClientSwitchPanel } from "../../components/switches/ClientSwitchPanel";
 import { AgentActivityBar } from "../../components/agents/AgentActivityBar";
 import { useAgentJobs } from "../../lib/useAgentJobs";
 import { totalSpend, unresolvedFailures } from "../../lib/jobHistory";
+import { ClientOperationalBrief } from "./ClientOperationalBrief";
 
 type JobRow = {
   id: string;
@@ -98,6 +99,7 @@ export function ClientDashboardPanel() {
         </p>
       )}
 
+      {clientId && <ClientOperationalBrief clientId={clientId} spend={spend} failedRuns={failed.length} activeRuns={active.length} />}
       {clientId && <ClientSwitchPanel clientId={clientId} />}
 
       <Panel title="Agent spend"><p className="text-2xl font-semibold text-card-foreground">${spend.toFixed(2)}</p></Panel>

@@ -16,6 +16,7 @@ const state = {
   controls: { enabled: false } as { enabled: boolean } | null,
   booking: null as { enabled: boolean } | null,
   error: null as string | null,
+  runtime: null as Record<string, unknown> | null,
 };
 
 const SETTINGS = {
@@ -57,7 +58,10 @@ beforeEach(() => {
   state.controls = { enabled: false };
   state.booking = null;
   state.error = null;
-  rpc.mockResolvedValue({ error: null });
+  state.runtime = null;
+  rpc.mockImplementation((name: string) => Promise.resolve(
+    name === "client_runtime_controls_v6" ? { data: state.runtime, error: null } : { error: null },
+  ));
 });
 
 describe("every switch in one place", () => {
@@ -100,6 +104,22 @@ describe("every switch in one place", () => {
     expect(await screen.findByText(/PUBLISH_ENABLED must also be on/)).toBeInTheDocument();
     // And campaign actions are held in the runtime regardless of this switch.
     expect(screen.getByText(/produces a visible job failure rather than an execution/)).toBeInTheDocument();
+  });
+
+  it("holds campaign action activation even if a client setting is off", async () => {
+    state.runtime = { state: "observed", controls: { campaignActions: true } };
+    render(<ClientSwitchPanel clientId="c1" />);
+    const button = await screen.findByLabelText("Switch on Execute approved campaign actions");
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/Effective state: off — Campaign action executor held/)).toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalledWith("set_campaign_actions_enabled", expect.anything());
+  });
+
+  it("reports a requested switch as held when the runtime is unverified", async () => {
+    state.settings = { ...SETTINGS, publishing_enabled: true };
+    render(<ClientSwitchPanel clientId="c1" />);
+    expect(await screen.findByText(/Effective state: held — Runtime state has not been verified/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Runtime dependency \(read only\): unverified/).length).toBeGreaterThan(0);
   });
 
   it("writes a per-client switch with the client on it", async () => {

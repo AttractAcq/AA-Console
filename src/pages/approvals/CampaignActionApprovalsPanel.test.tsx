@@ -159,19 +159,15 @@ it("shows the generic hold and does not offer a switch-on action", async () => {
     await screen.findByText("External campaign actions are off for this client"),
   ).toBeInTheDocument();
   expect(screen.getByRole("status")).toHaveTextContent(/held before the worker reads or claims/);
-  expect(screen.getByRole("button", { name: "Turn on (held)" })).toBeDisabled();
+  expect(screen.getByRole("link", { name: "View controls on Dashboard" })).toHaveAttribute("href", "/clients/client-1/delivery/dashboard");
   expect(rpc).not.toHaveBeenCalledWith("set_campaign_actions_enabled", expect.anything());
 });
 
-it("keeps the ability to turn an already-on client switch off", async () => {
-  const user = userEvent.setup();
+it("shows an already-on switch but keeps its control on Dashboard", async () => {
   database({ actionsOn: true });
   render(<CampaignActionApprovalsPanel />);
   expect(await screen.findByText("External campaign actions are on for this client")).toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Turn off" }));
-  await waitFor(() => expect(rpc).toHaveBeenCalledWith("set_campaign_actions_enabled", {
-    p_client_id: "client-1", p_enabled: false,
-  }));
+  expect(screen.queryByRole("button", { name: "Turn off" })).not.toBeInTheDocument();
 });
 
 it("reports a failed attempt's error rather than leaving it blank", async () => {

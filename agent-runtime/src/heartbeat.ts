@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import type { RuntimeConfig } from "./config.js";
 import { logger } from "./logging/logger.js";
 import { deployedCommitSha } from "./readiness/version.js";
+import { GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD } from "./campaigns/actions/preclaim-hold.js";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
@@ -48,6 +49,14 @@ export function startHeartbeat(
           concurrency: workerCount,
           model: config.model,
           pid: process.pid,
+          controls: {
+            publish: config.publishEnabled,
+            proofPublish: config.proofPublishEnabled,
+            campaignActions: config.campaignActionsEnabled,
+            outboundMessaging: config.outboundMessagingEnabled,
+            leadMagnetDelivery: config.leadMagnetDeliveryEnabled,
+          },
+          holds: { campaignActions: GENERIC_CAMPAIGN_ACTION_CLAIM_HOLD },
         },
       });
       if (error) logger.error("heartbeat_write_failed", { error: error.message });

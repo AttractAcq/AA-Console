@@ -48,7 +48,48 @@ type SwitchState = {
   settings: EngineSettings | null;
   engineRunning: boolean;
   bookingEnabled: boolean | null;
+  runtime: RuntimeControls | null;
 };
+
+type RuntimeControls = {
+  state: "observed" | "unknown";
+  reportedAt?: string | null;
+  reason?: string;
+  controls?: Record<string, boolean>;
+  holds?: Record<string, string>;
+  workerEnabled?: boolean;
+  budgetCap?: number | null;
+};
+
+const RUNTIME_KEYS: Record<string, string> = {
+  publishing: "publish",
+  proof_publishing: "proofPublish",
+  campaign_actions: "campaignActions",
+  outbound_messaging: "outboundMessaging",
+  lead_magnet_delivery: "leadMagnetDelivery",
+};
+
+function dependency(state: SwitchState, key: string): string | null {
+  if (key === "campaign_actions") return "Campaign action executor held: atomic handler-ownership claim is not installed.";
+  if (key === "engine" && !state.engineRunning) return "System-wide content engine is off.";
+  if (key === "engine" && (!state.runtime || !("budgetCap" in state.runtime))) return "Current month spend cap has not been verified.";
+  if (key === "engine" && state.runtime?.budgetCap == null) return "No spend cap is set for this month.";
+  if (key === "engine" && state.runtime.budgetCap <= 0) return "This month's spend cap is zero.";
+  if (key === "engine" && state.runtime.state !== "observed") return state.runtime.reason ?? "Runtime state has not been verified.";
+  if (key === "engine" && state.runtime.workerEnabled !== true) return "Agent runtime worker is off or unreported.";
+  if (key === "auto_approve_ideas" || key === "auto_approve_briefs") {
+    if (!state.settings?.enabled) return "This client's content engine is off.";
+    const engineBlocker = dependency(state, "engine");
+    if (engineBlocker) return `Content engine: ${engineBlocker}`;
+  }
+  const runtimeKey = RUNTIME_KEYS[key];
+  if (!runtimeKey) return null;
+  if (state.runtime?.state !== "observed") return state.runtime?.reason ?? "Runtime state has not been verified.";
+  if (state.runtime.workerEnabled !== true) return "Agent runtime worker is off or unreported.";
+  if (state.runtime.holds?.[runtimeKey]) return state.runtime.holds[runtimeKey];
+  if (state.runtime.controls?.[runtimeKey] !== true) return "Runtime deployment switch is off or unreported.";
+  return null;
+}
 
 /** What a row needs to render itself and to write itself back. */
 type SwitchRow = {
@@ -169,6 +210,7 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
     settings: null,
     engineRunning: false,
     bookingEnabled: null,
+    runtime: null,
   });
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -176,10 +218,11 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const [settings, controls, booking] = await Promise.all([
+    const [settings, controls, booking, runtime] = await Promise.all([
       supabase.from("client_engine_settings").select("*").eq("client_id", clientId).maybeSingle(),
       supabase.from("engine_controls").select("enabled").maybeSingle(),
       supabase.from("client_booking_settings").select("enabled").eq("client_id", clientId).maybeSingle(),
+      supabase.rpc("client_runtime_controls_v6" as never, { p_client_id: clientId } as never),
     ]);
     const failed = settings.error ?? controls.error ?? booking.error;
     if (failed) setError(failed.message);
@@ -189,6 +232,7 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
       // null, not false: a client with no booking rules yet is a different
       // state from one whose booking is switched off.
       bookingEnabled: (booking.data as { enabled?: boolean } | null)?.enabled ?? null,
+      runtime: runtime.error ? { state: "unknown", reason: runtime.error.message } : (runtime.data as RuntimeControls | null),
     });
     setLoading(false);
   }, [clientId]);
@@ -198,6 +242,10 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
   }, [refresh]);
 
   async function flip(row: SwitchRow, next: boolean) {
+    if (next && row.key === "campaign_actions") {
+      setError("Campaign action executor is held until atomic handler-ownership claim is installed.");
+      return;
+    }
     setBusy(row.key);
     setError(null);
     setNote(null);
@@ -241,12 +289,23 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
           // A switch whose row does not exist yet cannot be flipped from
           // here: the thing it belongs to has to be configured first.
           const unset = value === null;
+          const blocker = dependency(state, row.key);
+          const effective = value === true && !blocker;
           return (
             <li key={row.key} className="flex flex-wrap items-start justify-between gap-3 py-3">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-card-foreground">{row.label}</p>
                 <p className="text-sm text-muted-foreground">{value ? row.on : row.off}</p>
                 {row.caveat && <p className="mt-1 text-xs text-muted-foreground">{row.caveat}</p>}
+                {!row.readOnly && <p className="mt-1 text-xs text-muted-foreground">Effective state: {effective ? "ready" : value ? "held" : "off"}{blocker ? ` — ${blocker}` : ""}</p>}
+                {RUNTIME_KEYS[row.key] && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Runtime dependency (read only): {state.runtime?.state === "observed"
+                      ? state.runtime.controls?.[RUNTIME_KEYS[row.key]] === true ? "on" : "off or unreported"
+                      : "unverified"}
+                    {state.runtime?.reportedAt ? ` · checked ${new Date(state.runtime.reportedAt).toLocaleString()}` : ""}
+                  </p>
+                )}
                 {row.readOnly && (
                   <p className="mt-1 text-xs text-muted-foreground">{row.readOnly.because}</p>
                 )}
@@ -264,7 +323,7 @@ export function ClientSwitchPanel({ clientId }: { clientId: string }) {
                 {!row.readOnly && (
                 <button
                   type="button"
-                  disabled={busy !== null || unset}
+                  disabled={busy !== null || unset || (row.key === "campaign_actions" && !value)}
                   onClick={() => void flip(row, !value)}
                   aria-label={`${value ? "Switch off" : "Switch on"} ${row.label}`}
                   className={`rounded-md px-3 py-1.5 text-sm disabled:opacity-50 ${

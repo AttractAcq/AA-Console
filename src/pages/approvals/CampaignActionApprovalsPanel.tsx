@@ -6,7 +6,6 @@ import {
   EXECUTION_HINT,
   fetchCampaignActionDue,
   fetchCampaignActionsEnabled,
-  setCampaignActionsEnabled,
   type CampaignActionDue,
 } from "../../lib/campaignActions";
 
@@ -125,9 +124,7 @@ export function CampaignActionApprovalsPanel() {
         A client switch or approval does not release this hold.
       </p>
 
-      {/* The client switch. Approving an action and switching the client on
-          are two separate acts on purpose: a decision about one campaign is
-          not consent for a machine to act on this client's behalf at all. */}
+      {/* Decisions remain here; the one client control lives on Dashboard. */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
         <div>
           <p className="text-sm font-medium">
@@ -139,24 +136,7 @@ export function CampaignActionApprovalsPanel() {
               : "The generic worker is held before claim. Approvals are still recorded."}
           </p>
         </div>
-        <button
-          type="button"
-          disabled={!clientId || busyId === "switch" || !actionsOn}
-          onClick={() => {
-            if (!clientId) return;
-            setBusyId("switch");
-            setError(null);
-            void setCampaignActionsEnabled(clientId, !actionsOn)
-              .then(() => refresh())
-              .catch((cause: unknown) =>
-                setError(cause instanceof Error ? cause.message : "Could not change that."),
-              )
-              .finally(() => setBusyId(null));
-          }}
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
-        >
-          {actionsOn ? "Turn off" : "Turn on (held)"}
-        </button>
+        <Link to={`/clients/${clientId}/delivery/dashboard`} className="text-sm text-primary underline">View controls on Dashboard</Link>
       </div>
       {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
       {loading ? <p className="text-sm text-muted-foreground">Loading requests…</p>
